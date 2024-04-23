@@ -7,13 +7,14 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
+from app_users.models import AppUser
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.asr import (
     translation_model_selector,
@@ -1289,6 +1290,76 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
 
         if bi.platform == Platform.WEB:
+            config = {
+                "type": "copilot-direct",
+                # "bot_id": bi.api_integration_id(),
+                "bot_id": "qxo",
+                "bot_profile": {},
+                "target_div_id": "gooey-embed",
+                "link_color": "#FFD700",
+                "widget_text": "Help",
+                "show_gooey_branding": True,
+                "show_sources": True,
+            }
+            with st.div(style={"width": "100%", "textAlign": "left"}):
+                col1, col2 = st.columns(2)
+            with col1:
+                bot_profile = config["bot_profile"]
+                if st.session_state.get("--add-display-picture"):
+                    bot_profile["display_picture"] = st.file_uploader(
+                        label="###### Display Picture",
+                        accept=["image/*"],
+                    )
+                else:
+                    if st.button(f"{icons.camera} Add Display Picture"):
+                        st.session_state["--add-display-picture"] = True
+                        st.experimental_rerun()
+                bot_profile["title"] = st.text_input("###### Name", value="Farmer.CHAT")
+                bot_profile["description"] = st.text_area(
+                    "###### Description",
+                    value="An AI Assistant designed to help farmer extension agents in India.",
+                )
+                user: AppUser = self.request.user
+                scol1, scol2 = st.columns(2)
+                with scol1:
+                    bot_profile["created_by"] = st.text_input(
+                        "###### By Line", value=user.display_name
+                    )
+                with scol2:
+                    bot_profile["creator_link"] = st.text_input(
+                        "###### Website Link", value=user.website_url
+                    )
+
+                st.write("###### Conversation Starters")
+                config["questions"] = list(
+                    filter(
+                        None,
+                        [st.text_input("", key=f"--question-{i}") for i in range(4)],
+                    )
+                )
+
+            with col2:
+                st.html(
+                    """
+                    <div style="all: unset" id="gooey-embed-outer"></div>
+                    <link href="https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@1.0.12/dist/style.css" rel="stylesheet"/>
+                    <script src="https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@1.0.12/dist/lib.js"></script>
+                    """
+                )
+                st.js(
+                    """
+                    window.waitUntilHydrated.then(() => {
+                        const config = %s;
+                        if (GooeyEmbed.el) {
+                            GooeyEmbed.unmount();
+                        }
+                        document.getElementById("gooey-embed-outer").innerHTML += '<div id="gooey-embed" style="height: 80vh"></div>';
+                        GooeyEmbed.mount(config);
+                    });
+                    """
+                    % json.dumps(config)
+                )
+
             bot_api_example_generator(bi.api_integration_id())
             st.write("---")
 
