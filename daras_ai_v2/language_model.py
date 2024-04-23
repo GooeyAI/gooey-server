@@ -649,6 +649,7 @@ def _run_anthropic_chat(
         stop_sequences=stop,
         temperature=temperature,
     )
+
     record_cost_auto(
         model=model,
         sku=ModelSku.llm_prompt,

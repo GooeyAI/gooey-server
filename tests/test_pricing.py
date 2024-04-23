@@ -68,6 +68,7 @@ def test_multiple_llm_sums_usage_cost(transactional_db):
     state = {
         "tts_provider": "google",
         "num_outputs": 3,
+        "selected_models": ["test_model1", "test_model2"],
     }
 
     model_pricing1 = ModelPricing.objects.create(
@@ -131,6 +132,7 @@ def test_workflowmetadata_2x_multiplier(transactional_db):
     state = {
         "tts_provider": "google",
         "num_outputs": 1,
+        "selected_models": ["test_model"],
     }
 
     model_pricing = ModelPricing.objects.create(
