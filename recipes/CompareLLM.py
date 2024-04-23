@@ -1,5 +1,6 @@
 import random
 import typing
+import math
 
 from pydantic import BaseModel, Field
 
@@ -145,7 +146,20 @@ class CompareLLMPage(BasePage):
             _render_outputs(state, 300)
 
     def get_raw_price(self, state: dict) -> float:
-        return self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+        num_models = len(state["selected_models"])
+        return (
+            max(self.get_total_linked_usage_cost_in_credits(), num_models)
+            + self.PROFIT_CREDITS
+        )
+
+    def additional_notes(self) -> str:
+        selected_models = st.session_state["selected_models"]
+        if not selected_models:
+            return ""
+        notes = f" \\\n*Breakdown: {max(math.ceil(self.get_total_linked_usage_cost_in_credits()), len(selected_models))} ({selected_models[0] or ''}"
+        for model in selected_models[1:]:
+            notes += f", {model}"
+        return notes + f") + {self.PROFIT_CREDITS}/run*"
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
