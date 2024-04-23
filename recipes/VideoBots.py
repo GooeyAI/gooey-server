@@ -1341,25 +1341,50 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             with col2:
                 st.html(
                     """
-                    <div style="all: unset" id="gooey-embed-outer"></div>
-                    <link href="https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@1.0.12/dist/style.css" rel="stylesheet"/>
+                    <gooey-embed id="gooey-embed-shadow-dom"></gooey-embed>
                     <script src="https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@1.0.12/dist/lib.js"></script>
                     """
                 )
                 st.js(
                     """
+                    if (customElements.get('gooey-embed') === undefined) {
+                        const template = document.createElement('template');
+                        template.innerHTML = `
+                            <div id="gooey-embed" style="height: 100%%; border: 1px solid #eee"></div>
+                            <link href="https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@1.0.12/dist/style.css" rel="stylesheet"/>
+                        `;
+                        customElements.define('gooey-embed', class extends HTMLElement {
+                            constructor() {
+                                super();
+                                this.attachShadow({mode: 'open'});
+                                this.shadowRoot.appendChild(template.content.cloneNode(true));
+                            }
+                        });
+                    }
+                    const shadowRoot = document.getElementById('gooey-embed-shadow-dom').shadowRoot;
+                    const embed = shadowRoot.getElementById('gooey-embed');
+                    if (document._getElementById === undefined) {
+                        document._getElementById = document.getElementById;
+                        document.getElementById = (id) => {
+                            if (id === 'gooey-embed') {
+                                return embed;
+                            }
+                            return document._getElementById(id);
+                        };
+                    }
                     window.waitUntilHydrated.then(() => {
                         const config = %s;
                         if (GooeyEmbed.el) {
                             GooeyEmbed.unmount();
+                            shadowRoot.appendChild(embed);
                         }
-                        document.getElementById("gooey-embed-outer").innerHTML += '<div id="gooey-embed" style="height: 80vh"></div>';
                         GooeyEmbed.mount(config);
                     });
                     """
                     % json.dumps(config)
                 )
 
+            st.newline()
             bot_api_example_generator(bi.api_integration_id())
             st.write("---")
 
