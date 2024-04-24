@@ -1,3 +1,4 @@
+import mimetypes
 import re
 import typing
 from string import Template
@@ -81,6 +82,11 @@ class SlackBot(BotInterface):
             if self._file.get("file_access") == "check_file_info":
                 self._file = fetch_file_info(self._file["id"], self._access_token)
             self.input_type = self._file.get("mimetype", "").split("/")[0] or "unknown"
+            if (
+                self.input_type == "unknown"
+                and self._file.get("subtype") == "slack_audio"
+            ):
+                self.input_type = "audio"
         else:
             self._file = None
             self.input_type = "text"
@@ -100,7 +106,7 @@ class SlackBot(BotInterface):
         if not self._file:
             return None
         url = self._file.get("url_private_download")
-        mime_type = self._file.get("mimetype")
+        mime_type = self._file.get("mimetype") or mimetypes.guess_type(url)[0]
         if not (url and mime_type):
             return None
         assert (
