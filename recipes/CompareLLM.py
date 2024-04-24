@@ -20,6 +20,8 @@ DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 
 class CompareLLMPage(BasePage):
+    PROFIT_CREDITS = 1
+
     title = "Large Language Models: GPT-3"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae42015e-88d7-11ee-aac9-02420a00016b/Compare%20LLMs.png.png"
     workflow = Workflow.COMPARE_LLM
@@ -125,15 +127,8 @@ class CompareLLMPage(BasePage):
         with col2:
             _render_outputs(state, 300)
 
-    def get_raw_price(self, state: dict) -> int:
-        selected_models = state.get("selected_models", [])
-        total = 0
-        for name in selected_models:
-            try:
-                total += LargeLanguageModels[name].price
-            except KeyError:
-                total += 5
-        return total * state.get("num_outputs", 1)
+    def get_raw_price(self, state: dict) -> float:
+        return self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

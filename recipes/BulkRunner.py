@@ -2,13 +2,11 @@ import datetime
 import typing
 import uuid
 
-from django.db.models import Q
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from app_users.models import AppUser
-from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
+from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
@@ -18,11 +16,18 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     doc_url_to_file_metadata,
     tabular_bytes_to_any_df,
+)
+from daras_ai_v2.workflow_url_input import (
+    url_to_runs,
+    init_workflow_selector,
+    edit_button,
+    del_button,
+    workflow_url_input,
+    get_published_run_options,
 )
 from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -242,7 +247,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         list_view_editor(
             add_btn_label="➕ Add an Eval",
             key="eval_urls",
-            render_inputs=render_eval_url_inputs,
+            render_inputs=self.render_eval_url_inputs,
             flatten_dict_key="url",
         )
 
@@ -413,14 +418,14 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        _prefill_workflow(d, key)
+        init_workflow_selector(d, key)
 
         col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
             with col1:
                 url = st.text_input(
                     "",
-                    key=key + ":url",
+                    key=key,
                     value=d.get("url"),
                     placeholder="https://gooey.ai/.../?run_id=...",
                 )
@@ -448,13 +453,13 @@ To get started:
                     st.session_state[last_workflow_key] = workflow
             with scol2:
                 page_cls = Workflow(workflow).page_cls
-                options = _get_published_run_options(
-                    page_cls, workflow, current_user=self.request.user
+                options = get_published_run_options(
+                    page_cls, current_user=self.request.user
                 )
                 with st.div(className="pt-1"):
                     url = st.selectbox(
                         "",
-                        key=key + ":url",
+                        key=key,
                         options=options,
                         default_value=d.get("url"),
                         format_func=lambda x: options[x],
@@ -472,144 +477,16 @@ To get started:
             st.error(repr(e))
         d["url"] = url
 
+    def render_eval_url_inputs(self, key: str, del_key: str | None, d: dict):
+        from recipes.BulkEval import BulkEvalPage
 
-@st.cache_in_session_state
-def _get_published_run_options(
-    page_cls: typing.Type[BasePage],
-    workflow: Workflow,
-    current_user: AppUser | None = None,
-) -> dict[str, str]:
-    # approved examples
-    pr_query = Q(is_approved_example=True, visibility=PublishedRunVisibility.PUBLIC)
-
-    if current_user:
-        # user's saved runs
-        pr_query |= Q(created_by=current_user)
-
-    saved_runs_and_examples = PublishedRun.objects.filter(
-        pr_query,
-        workflow=workflow,
-    ).exclude(published_run_id="")
-    saved_runs_and_examples = sorted(
-        saved_runs_and_examples,
-        reverse=True,
-        key=lambda pr: (
-            int(
-                current_user and pr.created_by == current_user or False
-            ),  # user's saved first
-            pr.example_priority,  # higher priority first
-            pr.updated_at,  # newer first
-        ),
-    )
-
-    options = {
-        # root recipe
-        page_cls.get_root_published_run().get_app_url(): "Default",
-    } | {
-        pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
-        for pr in saved_runs_and_examples
-    }
-
-    return options
-
-
-def render_eval_url_inputs(key: str, del_key: str, d: dict):
-    _prefill_workflow(d, key)
-
-    col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
-    if not d.get("workflow") and d.get("url"):
-        with col1:
-            url = st.text_input(
-                "",
-                key=key + ":url",
-                value=d.get("url"),
-                placeholder="https://gooey.ai/.../?run_id=...",
-            )
-    else:
-        d["workflow"] = Workflow.BULK_EVAL
-        with col1:
-            scol1, scol2 = st.columns([11, 1], responsive=False)
-        with scol1:
-            from recipes.BulkEval import BulkEvalPage
-
-            options = {
-                BulkEvalPage.get_root_published_run().get_app_url(): "Default",
-            } | {
-                pr.get_app_url(): pr.title
-                for pr in PublishedRun.objects.filter(
-                    workflow=Workflow.BULK_EVAL,
-                    is_approved_example=True,
-                    visibility=PublishedRunVisibility.PUBLIC,
-                ).exclude(published_run_id="")
-            }
-            with st.div(className="pt-1"):
-                url = st.selectbox(
-                    "",
-                    key=key + ":url",
-                    options=options,
-                    default_value=d.get("url"),
-                    format_func=lambda x: options[x],
-                )
-        with scol2:
-            edit_button(key + ":editmode")
-    with col2:
-        url_button(url)
-    with col3:
-        del_button(del_key)
-
-    try:
-        url_to_runs(url)
-    except Exception as e:
-        st.error(repr(e))
-    d["url"] = url
-
-
-def edit_button(key: str):
-    st.button(
-        '<i class="fa-regular fa-pencil text-warning"></i>',
-        key=key,
-        type="tertiary",
-    )
-
-
-def del_button(key: str):
-    st.button(
-        '<i class="fa-regular fa-trash text-danger"></i>',
-        key=key,
-        type="tertiary",
-    )
-
-
-def _prefill_workflow(d: dict, key: str):
-    if st.session_state.get(key + ":editmode"):
-        d.pop("workflow", None)
-    elif not d.get("workflow") and d.get("url"):
-        try:
-            _, sr, pr = url_to_runs(str(d["url"]))
-        except Exception:
-            return
-        else:
-            if (
-                pr
-                and pr.saved_run == sr
-                and pr.visibility == PublishedRunVisibility.PUBLIC
-                and (pr.is_approved_example or pr.is_root())
-            ):
-                d["workflow"] = pr.workflow
-                d["url"] = pr.get_app_url()
-
-
-def url_to_runs(
-    url: str,
-) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
-    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
-
-    f = furl(url)
-    slug = f.path.segments[0]
-    page_cls = page_slug_map[normalize_slug(slug)]
-    example_id, run_id, uid = extract_query_params(f.query.params)
-    sr, pr = page_cls.get_runs_from_query_params(example_id, run_id, uid)
-    return page_cls, sr, pr
+        workflow_url_input(
+            page_cls=BulkEvalPage,
+            key=key,
+            internal_state=d,
+            del_key=del_key,
+            current_user=self.request.user,
+        )
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):

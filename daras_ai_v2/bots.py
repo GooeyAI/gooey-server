@@ -2,11 +2,10 @@ import mimetypes
 import traceback
 import typing
 from datetime import datetime
-from urllib.parse import parse_qs
 
 from django.db import transaction
 from django.utils import timezone
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 from sentry_sdk import capture_exception
@@ -22,7 +21,7 @@ from bots.models import (
     Workflow,
     MessageAttachment,
 )
-from daras_ai_v2.asr import AsrModels, run_google_translate
+from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -46,11 +45,6 @@ INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
 )
 
-AUDIO_ASR_CONFIRMATION = """
-🎧 I heard: “{}”
-Working on your answer…
-""".strip()
-
 ERROR_MSG = """
 `{}`
 
@@ -66,14 +60,6 @@ FEEDBACK_CONFIRMED_MSG = (
 TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 SLACK_MAX_SIZE = 3000
-
-
-async def request_json(request: Request):
-    return await request.json()
-
-
-async def request_urlencoded_body(request: Request):
-    return parse_qs((await request.body()).decode("utf-8"))
 
 
 class ButtonPressed(BaseModel):
@@ -163,6 +149,7 @@ class BotInterface:
             saved_run = bi.published_run.saved_run
             self.input_glossary = saved_run.state.get("input_glossary_document")
             self.output_glossary = saved_run.state.get("output_glossary_document")
+            self.language = saved_run.state.get("user_language")
         elif bi.saved_run:
             self.page_cls = Workflow(bi.saved_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
@@ -172,12 +159,14 @@ class BotInterface:
             )
             self.input_glossary = bi.saved_run.state.get("input_glossary_document")
             self.output_glossary = bi.saved_run.state.get("output_glossary_document")
+            self.language = bi.saved_run.state.get("user_language")
         else:
             self.page_cls = None
             self.query_params = {}
 
         self.billing_account_uid = bi.billing_account_uid
-        self.language = bi.user_language
+        if bi.user_language and bi.user_language != "en":
+            self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
         self.streaming_enabled = bi.streaming_enabled
 
@@ -210,9 +199,6 @@ def _mock_api_output(input_text):
 
 @db_middleware
 def msg_handler(bot: BotInterface):
-    speech_run = None
-    input_images = None
-    input_documents = None
     recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
@@ -226,36 +212,21 @@ def msg_handler(bot: BotInterface):
     )[0]
     # get the user's input
     # print("input type:", bot.input_type)
+    input_text = (bot.get_input_text() or "").strip()
+    input_audio = None
+    input_images = None
+    input_documents = None
     match bot.input_type:
         # handle button press
         case "interactive":
             _handle_interactive_msg(bot)
             return
-        case "audio" | "video":
-            try:
-                result = _handle_audio_msg(billing_account_user, bot)
-                speech_run = result.get("url")
-            except HTTPException as e:
-                traceback.print_exc()
-                capture_exception(e)
-                # send error message
-                bot.send_msg(text=ERROR_MSG.format(e))
-                return
-            else:
-                # set the asr output as the input text
-                input_text = result["output"]["output_text"][0].strip()
-                if not input_text:
-                    bot.send_msg(text=DEFAULT_RESPONSE)
-                    return
-                # send confirmation of asr
-                bot.send_msg(text=AUDIO_ASR_CONFIRMATION.format(input_text))
         case "image":
             input_images = bot.get_input_images()
             if not input_images:
                 raise HTTPException(
                     status_code=400, detail="No image found in request."
                 )
-            input_text = (bot.get_input_text() or "").strip()
         case "document":
             input_documents = bot.get_input_documents()
             if not input_documents:
@@ -265,10 +236,13 @@ def msg_handler(bot: BotInterface):
             filenames = ", ".join(
                 furl(url.strip("/")).path.segments[-1] for url in input_documents
             )
-            input_text = (bot.get_input_text() or "").strip()
             input_text = f"Files: {filenames}\n\n{input_text}"
+        case "audio" | "video":
+            input_audio = bot.get_input_audio()
+            if not input_audio:
+                bot.send_msg(text=DEFAULT_RESPONSE)
+                return
         case "text":
-            input_text = (bot.get_input_text() or "").strip()
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
@@ -297,7 +271,7 @@ def msg_handler(bot: BotInterface):
             input_images=input_images,
             input_documents=input_documents,
             input_text=input_text,
-            speech_run=speech_run,
+            input_audio=input_audio,
             recieved_time=recieved_time,
         )
 
@@ -335,26 +309,29 @@ def _process_and_send_msg(
     billing_account_user: AppUser,
     bot: BotInterface,
     input_images: list[str] | None,
+    input_audio: str | None,
     input_documents: list[str] | None,
     input_text: str,
     recieved_time: datetime,
-    speech_run: str | None,
 ):
     # get latest messages for context
     saved_msgs = bot.convo.messages.all().as_llm_context(reset_at=bot.convo.reset_at)
 
     # # mock testing
     # result = _mock_api_output(input_text)
+    body = {
+        "input_prompt": input_text,
+        "input_audio": input_audio,
+        "input_images": input_images,
+        "input_documents": input_documents,
+        "messages": saved_msgs,
+    }
+    if bot.language and bot.language != "en":
+        body["user_language"] = bot.language
     page, result, run_id, uid = submit_api_call(
         page_cls=bot.page_cls,
         user=billing_account_user,
-        request_body={
-            "input_prompt": input_text,
-            "input_images": input_images,
-            "input_documents": input_documents,
-            "messages": saved_msgs,
-            "user_language": bot.language,
-        },
+        request_body=body,
         query_params=bot.query_params,
     )
     bot.on_run_created(page, result, run_id, uid)
@@ -380,13 +357,13 @@ def _process_and_send_msg(
                     bot.send_msg(text=ERROR_MSG.format(err_msg))
                     return  # abort
                 if bot.recipe_run_state != RecipeRunState.running:
-                    break  # we're done running, abort
+                    break  # we're done running, stop streaming
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(update_msg_id=update_msg_id)
                     continue  # no text, wait for the next update
-                streaming_done = not bot.run_status.lower().startswith("streaming")
+                streaming_done = state.get("finish_reason")
                 # send the response to the user
                 if bot.can_update_message:
                     update_msg_id = bot.send_msg(
@@ -410,12 +387,13 @@ def _process_and_send_msg(
                     # don't show buttons again
                     buttons = None
                 if streaming_done:
-                    break  # we're done streaming, abort
+                    break  # we're done streaming, stop the loop
 
     # wait for the celery task to finish
     get_celery_result_db_safe(result)
     # get the final state from db
-    state = page.run_doc_sr(run_id, uid).to_dict()
+    sr = page.run_doc_sr(run_id, uid)
+    state = sr.to_dict()
     bot.recipe_run_state = page.get_run_state(state)
     bot.run_status = state.get(StateKeys.run_status) or ""
     # check for errors
@@ -452,10 +430,9 @@ def _process_and_send_msg(
         input_images=input_images,
         input_documents=input_documents,
         input_text=input_text,
-        speech_run=speech_run,
         platform_msg_id=sent_msg_id or update_msg_id,
         response=VideoBotsPage.ResponseModel.parse_obj(state),
-        url=page.app_url(run_id=run_id, uid=uid),
+        saved_run=sr,
         received_time=recieved_time,
     )
 
@@ -465,10 +442,9 @@ def _save_msgs(
     input_images: list[str] | None,
     input_documents: list[str] | None,
     input_text: str,
-    speech_run: str | None,
     platform_msg_id: str | None,
     response: VideoBotsPage.ResponseModel,
-    url: str,
+    saved_run: SavedRun,
     received_time: datetime,
 ):
     # create messages for future context
@@ -478,13 +454,6 @@ def _save_msgs(
         role=CHATML_ROLE_USER,
         content=response.raw_input_text,
         display_content=input_text,
-        saved_run=(
-            SavedRun.objects.get_or_create(
-                workflow=Workflow.ASR, **furl(speech_run).query.params
-            )[0]
-            if speech_run
-            else None
-        ),
         response_time=timezone.now() - received_time,
     )
     attachments = []
@@ -499,9 +468,7 @@ def _save_msgs(
         role=CHATML_ROLE_ASSISTANT,
         content=response.raw_output_text and response.raw_output_text[0],
         display_content=response.output_text and response.output_text[0],
-        saved_run=SavedRun.objects.get_or_create(
-            workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
-        )[0],
+        saved_run=saved_run,
         response_time=timezone.now() - received_time,
     )
     # save the messages & attachments
@@ -573,49 +540,6 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
-
-
-def _handle_audio_msg(billing_account_user, bot: BotInterface):
-    from recipes.asr import AsrPage
-    from routers.api import call_api
-
-    input_audio = bot.get_input_audio()
-    if not input_audio:
-        raise HTTPException(status_code=400, detail="No audio found in request.")
-
-    # run asr
-    language = None
-    match bot.language.lower():
-        case "am":
-            selected_model = AsrModels.usm.name
-            language = "am-et"
-        case "hi":
-            selected_model = AsrModels.nemo_hindi.name
-        case "te":
-            selected_model = AsrModels.whisper_telugu_large_v2.name
-        case "bho":
-            selected_model = AsrModels.vakyansh_bhojpuri.name
-        case "sw":
-            selected_model = AsrModels.seamless_m4t.name
-            language = "swh"
-        # case "en":
-        #     selected_model = AsrModels.usm.name
-        #     language = "am-et"
-        case _:
-            selected_model = AsrModels.whisper_large_v2.name
-
-    result = call_api(
-        page_cls=AsrPage,
-        user=billing_account_user,
-        request_body={
-            "documents": [input_audio],
-            "selected_model": selected_model,
-            "google_translate_target": None,
-            "language": language,
-        },
-        query_params={},
-    )
-    return result
 
 
 class ButtonIds:

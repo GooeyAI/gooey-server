@@ -4,8 +4,8 @@ from starlette.testclient import TestClient
 
 from bots.models import PublishedRun, Workflow
 from daras_ai_v2.all_pages import all_api_pages, all_hidden_pages
-from daras_ai_v2.tabs_widget import MenuTabs
 from routers import facebook_api
+from routers.root import RecipeTabs
 from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
 from server import app
 
@@ -39,29 +39,34 @@ def test_all_get(threadpool_subtest):
 
 def _test_get_path(path):
     r = client.get(path, allow_redirects=False)
-    assert r.ok
+    assert r.ok, r.content
 
 
 @pytest.mark.django_db
-def test_all_slugs(threadpool_subtest):
+def test_all_tabs(threadpool_subtest):
     for page_cls in all_api_pages + all_hidden_pages:
         for slug in page_cls.slug_versions:
-            for tab in MenuTabs.paths.values():
-                url = f"/{slug}/{tab}"
-                threadpool_subtest(_test_post_path, url)
+            for tab in RecipeTabs:
+                threadpool_subtest(_test_post_path, tab.url_path(slug))
 
 
 @pytest.mark.django_db
 def test_all_examples(threadpool_subtest):
-    qs = PublishedRun.objects.exclude(
-        is_approved_example=False, published_run_id=""
-    ).order_by("workflow")
+    qs = (
+        PublishedRun.objects.exclude(is_approved_example=False)
+        .exclude(published_run_id="")
+        .order_by("workflow")
+    )
     for pr in qs:
         slug = Workflow(pr.workflow).page_cls.slug_versions[-1]
-        url = f"/{slug}?example_id={pr.published_run_id}"
-        threadpool_subtest(_test_post_path, url)
+        threadpool_subtest(
+            _test_post_path,
+            RecipeTabs.run.url_path(slug, "test-run-slug", pr.published_run_id),
+        )
 
 
 def _test_post_path(url):
+    with open("urls.2.txt", "a") as f:
+        f.write(url + "\n")
     r = client.post(url, json={}, allow_redirects=True)
-    assert r.status_code == 200
+    assert r.ok, r.content

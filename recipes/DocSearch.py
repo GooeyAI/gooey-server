@@ -1,3 +1,4 @@
+import math
 import typing
 
 from furl import furl
@@ -40,6 +41,8 @@ DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 
 class DocSearchPage(BasePage):
+    PROFIT_CREDITS = 3
+
     title = "Search your Docs with GPT"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cbbb4dc6-88d7-11ee-bf6c-02420a000166/Search%20your%20docs%20with%20gpt.png.png"
     workflow = Workflow.DOC_SEARCH
@@ -132,7 +135,7 @@ class DocSearchPage(BasePage):
         st.write("---")
         st.write("##### 🔎 Document Search Settings")
         citation_style_selector()
-        doc_extract_selector()
+        doc_extract_selector(self.request and self.request.user)
         st.write("---")
         query_instructions_widget()
         doc_search_advanced_settings()
@@ -214,12 +217,14 @@ class DocSearchPage(BasePage):
         )
 
     def get_raw_price(self, state: dict) -> float:
-        name = state.get("selected_model")
+        return self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+
+    def additional_notes(self):
         try:
-            unit_price = LargeLanguageModels[name].price * 2
+            model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
-            unit_price = 10
-        return unit_price * state.get("num_outputs", 1)
+            model = "LLM"
+        return f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

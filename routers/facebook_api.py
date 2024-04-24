@@ -1,5 +1,5 @@
 import requests
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 from furl import furl
 from starlette.background import BackgroundTasks
@@ -8,15 +8,16 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings, db
-from daras_ai_v2.bots import msg_handler, request_json
+from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
+from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
 
-router = APIRouter()
+app = APIRouter()
 
 
-@router.get("/__/fb/connect_whatsapp/")
+@app.get("/__/fb/connect_whatsapp/")
 def fb_connect_whatsapp_redirect(request: Request):
     if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
@@ -102,8 +103,7 @@ def fb_connect_whatsapp_redirect(request: Request):
             f"https://graph.facebook.com/v19.0/{waba_id}/subscribed_apps?access_token={user_access_token}",
             json={
                 "override_callback_uri": str(
-                    furl(settings.APP_BASE_URL)
-                    / router.url_path_for(fb_webhook.__name__)
+                    furl(settings.APP_BASE_URL) / app.url_path_for(fb_webhook.__name__)
                 ),
                 "verify_token": settings.FB_WEBHOOK_TOKEN,
             },
@@ -117,7 +117,7 @@ def fb_connect_whatsapp_redirect(request: Request):
     )
 
 
-@router.get("/__/fb/connect/")
+@app.get("/__/fb/connect/")
 def fb_connect_redirect(request: Request):
     if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
@@ -170,7 +170,7 @@ def get_currently_connected_fb_pages(user_access_token):
     return fb_pages
 
 
-@router.get("/__/fb/webhook/")
+@app.get("/__/fb/webhook/")
 async def fb_webhook_verify(request: Request):
     mode = request.query_params.get("hub.mode")
     verify_token = request.query_params.get("hub.verify_token")
@@ -184,10 +184,10 @@ async def fb_webhook_verify(request: Request):
         return Response(status_code=403)
 
 
-@router.post("/__/fb/webhook/")
+@app.post("/__/fb/webhook/")
 def fb_webhook(
     background_tasks: BackgroundTasks,
-    data: dict = Depends(request_json),
+    data: dict = fastapi_request_json,
 ):
     import glom
 
@@ -238,7 +238,7 @@ wa_connect_redirect_url = (
     furl(
         settings.APP_BASE_URL,
     )
-    / router.url_path_for(fb_connect_whatsapp_redirect.__name__)
+    / app.url_path_for(fb_connect_whatsapp_redirect.__name__)
 ).tostr()
 
 
@@ -260,7 +260,7 @@ fb_connect_redirect_url = (
     furl(
         settings.APP_BASE_URL,
     )
-    / router.url_path_for(fb_connect_redirect.__name__)
+    / app.url_path_for(fb_connect_redirect.__name__)
 ).tostr()
 
 

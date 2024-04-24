@@ -171,7 +171,7 @@ def text_to_speech_provider_selector(page):
     with col1:
         tts_provider = enum_selector(
             TextToSpeechProviders,
-            "###### Speech Provider",
+            "###### Text-to-Speech Provider",
             key="tts_provider",
             use_selectbox=True,
         )

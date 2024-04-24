@@ -1,7 +1,9 @@
 import datetime
-import os.path
+import os
 import tempfile
 import typing
+from contextlib import contextmanager
+from enum import Enum
 from time import time
 
 from fastapi import Depends
@@ -23,25 +25,25 @@ import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
-from daras_ai_v2 import settings
-from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import BasePage, RedirectException
-from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 from daras_ai_v2.exceptions import ffmpeg, UserError
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_json,
+    fastapi_request_form,
+)
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
-from daras_ai_v2.tabs_widget import MenuTabs
+from gooey_ui import RedirectException
 from gooey_ui.components.url_button import url_button
 from handles.models import Handle
-from routers.api import request_form_files
 
 app = APIRouter()
 
@@ -51,6 +53,8 @@ DEFAULT_LOGOUT_REDIRECT = "/"
 
 @app.get("/sitemap.xml/")
 async def get_sitemap():
+    from daras_ai_v2.all_pages import all_api_pages
+
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
 
@@ -81,22 +85,16 @@ async def favicon():
 
 
 @app.post("/handleError/")
-async def handle_error(request: Request):
+@st.route
+def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-
-    def not_found():
-        st.html(templates.get_template("errors/404.html").render(**context))
-
-    def unknown_error():
-        st.html(templates.get_template("errors/unknown.html").render(**context))
-
-    body = await request.json()
-
-    match body["status"]:
+    match json_data["status"]:
         case 404:
-            return st.runner(lambda: page_wrapper(request, not_found))
+            template = "errors/404.html"
         case _:
-            return st.runner(lambda: page_wrapper(request, unknown_error))
+            template = "errors/unknown.html"
+    with page_wrapper(request):
+        st.html(templates.get_template(template).render(**context))
 
 
 @app.get("/login/")
@@ -168,12 +166,12 @@ async def logout(request: Request):
 
 
 @app.post("/__/file-upload/url/meta")
-async def file_upload(body_json: dict = Depends(request_json)):
+async def file_upload(body_json: dict = fastapi_request_json):
     return dict(name=body_json["url"], type="url/undefined")
 
 
 @app.post("/__/file-upload/")
-def file_upload(request: Request, form_data: FormData = Depends(request_form_files)):
+def file_upload(form_data: FormData = fastapi_request_form):
     from wand.image import Image
 
     file = form_data["file"]
@@ -210,50 +208,43 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
-async def request_json(request: Request):
-    return await request.json()
-
-
 @app.post("/explore/")
-def explore_page(request: Request, json_data: dict = Depends(request_json)):
+@st.route
+def explore_page(request: Request):
     import explore
 
-    ret = st.runner(
-        lambda: page_wrapper(request=request, render_fn=explore.render),
-        **json_data,
-    )
-    ret |= {
+    with page_wrapper(request):
+        explore.render()
+
+    return {
         "meta": raw_build_meta_tags(
             url=get_og_url_path(request),
             title=explore.META_TITLE,
             description=explore.META_DESCRIPTION,
         ),
     }
-    return ret
 
 
 @app.post("/api/")
-def api_docs_page(request: Request, json_data: dict = Depends(request_json)):
-    ret = st.runner(
-        lambda: page_wrapper(
-            request=request, render_fn=lambda: _api_docs_page(request)
-        ),
-        **json_data,
-    )
-    ret |= {
-        "meta": raw_build_meta_tags(
+@st.route
+def api_docs_page(request: Request):
+    with page_wrapper(request):
+        _api_docs_page(request)
+    return dict(
+        meta=raw_build_meta_tags(
             url=get_og_url_path(request),
             title="Gooey.AI API Platform",
             description="Explore resources, tutorials, API docs, and dynamic examples to get the most out of GooeyAI's developer platform.",
             image=meta_preview_url(
                 "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/API%20Docs.png.png"
             ),
-        ),
-    }
-    return ret
+        )
+    )
 
 
 def _api_docs_page(request):
+    from daras_ai_v2.all_pages import all_api_pages
+
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
 
     st.markdown(
@@ -300,7 +291,7 @@ Authorization: Bearer GOOEY_API_KEY
                 )
             )
     with col2:
-        url_button(workflow.get_app_url("", "", ""))
+        url_button(workflow.page_cls.app_url())
 
     st.write("###### 📤 Example Request")
 
@@ -339,116 +330,178 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@app.post("/{page_slug_or_handle}/")
-@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/")
-@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/{tab}/")
-def st_page(
-    request: Request,
-    page_slug_or_handle: str = "",
-    run_slug_or_tab="",
-    tab="",
-    json_data: dict = Depends(request_json),
+@app.post("/{page_slug}/examples/")
+@app.post("/{page_slug}/{run_slug}/examples/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/examples/")
+@st.route
+def examples_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    try:
-        page_cls = page_slug_map[normalize_slug(page_slug_or_handle)]
-    except KeyError:
-        pass
-    else:
-        return recipe_page(
-            request=request,
-            page_cls=page_cls,
-            page_slug=page_slug_or_handle,
-            run_slug_or_tab=run_slug_or_tab,
-            tab=tab,
-            json_data=json_data,
-        )
-
-    try:
-        handle = Handle.objects.get_by_name(page_slug_or_handle)
-    except Handle.DoesNotExist:
-        pass
-    else:
-        return handle_page(request=request, handle=handle, json_data=json_data)
-
-    raise HTTPException(status_code=404)
+    return render_page(request, page_slug, run_slug, RecipeTabs.examples, example_id)
 
 
-def recipe_page(
+@app.post("/{page_slug}/api/")
+@app.post("/{page_slug}/{run_slug}/api/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/api/")
+@st.route
+def api_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    return render_page(request, page_slug, run_slug, RecipeTabs.run_as_api, example_id)
+
+
+@app.post("/{page_slug}/history/")
+@app.post("/{page_slug}/{run_slug}/history/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/history/")
+@st.route
+def history_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    return render_page(request, page_slug, run_slug, RecipeTabs.history, example_id)
+
+
+@app.post("/{page_slug}/saved/")
+@app.post("/{page_slug}/{run_slug}/saved/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/saved/")
+@st.route
+def save_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    return render_page(request, page_slug, run_slug, RecipeTabs.saved, example_id)
+
+
+@app.post("/{page_slug}/integrations/add/")
+@app.post("/{page_slug}/{run_slug}/integrations/add/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/add/")
+@st.route
+def add_integrations_route(
     request: Request,
-    page_cls: type[BasePage],
     page_slug: str,
-    run_slug_or_tab: str,
-    tab: str,
-    json_data: dict,
+    run_slug: str = None,
+    example_id: str = None,
 ):
-    run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
+    st.session_state["--add-integration"] = True
+    return render_page(
+        request, page_slug, run_slug, RecipeTabs.integrations, example_id
+    )
+
+
+@app.post("/{page_slug}/integrations/{integration_id}/stats/")
+@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/stats/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/")
+@st.route
+def integrations_stats_route(
+    request: Request,
+    page_slug: str,
+    integration_id: str,
+    run_slug: str = None,
+    example_id: str = None,
+):
+    from routers.bots_api import api_hashids
+
     try:
-        selected_tab = MenuTabs.paths_reverse[tab]
+        st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
+    except IndexError:
+        raise HTTPException(status_code=404)
+    return render_page(request, "stats", run_slug, RecipeTabs.integrations, example_id)
+
+
+@app.post("/{page_slug}/integrations/")
+@app.post("/{page_slug}/{run_slug}/integrations/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/")
+###
+@app.post("/{page_slug}/integrations/{integration_id}/")
+@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/")
+@st.route
+def integrations_route(
+    request: Request,
+    page_slug: str,
+    run_slug: str = None,
+    example_id: str = None,
+    integration_id: str = None,
+):
+    from routers.bots_api import api_hashids
+
+    if integration_id:
+        try:
+            st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
+        except IndexError:
+            raise HTTPException(status_code=404)
+    return render_page(
+        request, page_slug, run_slug, RecipeTabs.integrations, example_id
+    )
+
+
+@app.post("/{page_slug}/")
+@app.post("/{page_slug}/{run_slug}-{example_id}/")
+@st.route
+def recipe_page_or_handle(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    try:
+        handle = Handle.objects.get_by_name(page_slug)
+    except Handle.DoesNotExist:
+        return render_page(request, page_slug, run_slug, RecipeTabs.run, example_id)
+    else:
+        return render_page_for_handle(request, handle)
+
+
+def render_page_for_handle(request: Request, handle: Handle):
+    if handle.has_user:
+        with page_wrapper(request):
+            user_profile_page(request, handle.user)
+        return dict(meta=get_meta_tags_for_profile(handle.user))
+    elif handle.has_redirect:
+        raise RedirectException(handle.redirect_url, status_code=301)
+    else:
+        logger.error(f"Handle {handle.name} has no user or redirect")
+        raise HTTPException(status_code=404)
+
+
+def render_page(
+    request: Request,
+    page_slug: str,
+    run_slug: str | None,
+    tab: "RecipeTabs",
+    example_id: str | None,
+):
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+
+    # lookup the page class
+    try:
+        page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
 
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
-        return RedirectResponse(
-            request.url.replace(path=os.path.join("/", latest_slug, run_slug, tab, ""))
-        )
+        return RedirectResponse(tab.url_path(latest_slug, run_slug))
 
-    example_id, run_id, uid = extract_query_params(request.query_params)
-
-    page = page_cls(
-        tab=selected_tab, request=request, run_user=get_run_user(request, uid)
-    )
-
-    state = json_data.get("state", {})
-    if not state:
+    # parse the query params and load the state
+    query_params = st.get_query_params()
+    if not query_params.get("example_id"):
+        query_params["example_id"] = example_id
+    example_id, run_id, uid = extract_query_params(query_params)
+    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
+    if not st.session_state:
         sr = page.get_sr_from_query_params(example_id, run_id, uid)
-        try:
-            state.update(page.load_state_from_sr(sr))
-        except HTTPException:
-            pass
-    if state is None:
-        raise HTTPException(status_code=404)
+        st.session_state.update(page.load_state_from_sr(sr))
 
-    try:
-        ret = st.runner(
-            lambda: page_wrapper(request, page.render),
-            query_params=dict(request.query_params),
-            state=state,
-        )
-    except RedirectException as e:
-        return RedirectResponse(e.url, status_code=e.status_code)
+    with page_wrapper(request):
+        page.render()
 
-    ret |= {
-        "meta": build_meta_tags(
+    return dict(
+        meta=build_meta_tags(
             url=get_og_url_path(request),
             page=page,
-            state=state,
+            state=st.session_state,
             run_id=run_id,
             uid=uid,
             example_id=example_id,
-        )
-    }
-    return ret
-
-
-def handle_page(request: Request, handle: Handle, json_data: dict):
-    if handle.has_user:
-        response = st.runner(
-            lambda: page_wrapper(
-                request=request,
-                render_fn=lambda: user_profile_page(request=request, user=handle.user),
-            ),
-            **json_data,
-        )
-        return response | {
-            "meta": get_meta_tags_for_profile(handle.user),
-        }
-    elif handle.has_redirect:
-        raise RedirectException(handle.redirect_url, status_code=301)
-    else:
-        logger.error(f"Handle {handle.name} has no user or redirect")
-        raise HTTPException(status_code=404)
+        ),
+    )
 
 
 def get_og_url_path(request) -> str:
@@ -468,7 +521,8 @@ def get_run_user(request, uid) -> AppUser | None:
         pass
 
 
-def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
+@contextmanager
+def page_wrapper(request: Request):
     context = {
         "request": request,
         "settings": settings,
@@ -484,16 +538,59 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
     st.html(copy_to_clipboard_scripts)
 
     with st.div(id="main-content", className="container"):
-        render_fn(**kwargs)
+        yield
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
 
 
-def _extract_run_slug_and_tab(run_slug_or_tab, tab) -> tuple[str, str]:
-    if run_slug_or_tab and tab:
-        return run_slug_or_tab, tab
-    elif run_slug_or_tab in MenuTabs.paths_reverse:
-        return "", run_slug_or_tab
-    else:
-        return run_slug_or_tab, ""
+INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
+
+
+class TabData(typing.NamedTuple):
+    title: str
+    label: str
+    route: typing.Callable
+
+
+class RecipeTabs(TabData, Enum):
+    run = TabData(
+        title=f"{icons.run} Run",
+        label="",
+        route=recipe_page_or_handle,
+    )
+    examples = TabData(
+        title=f"{icons.example} Examples",
+        label="Examples",
+        route=examples_route,
+    )
+    run_as_api = TabData(
+        title=f"{icons.api} API",
+        label="API",
+        route=api_route,
+    )
+    history = TabData(
+        title=f"{icons.history} History",
+        label="History",
+        route=history_route,
+    )
+    integrations = TabData(
+        title=f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{INTEGRATION_IMG}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
+        label="Integrations",
+        route=integrations_route,
+    )
+    saved = TabData(
+        title=f"{icons.save} Saved",
+        label="Saved Runs",
+        route=save_route,
+    )
+
+    def url_path(
+        self, page_slug: str, run_slug: str = None, example_id: str = None, **kwargs
+    ) -> str:
+        kwargs["page_slug"] = page_slug
+        if example_id:
+            kwargs["example_id"] = example_id
+            if run_slug:
+                kwargs["run_slug"] = run_slug
+        return os.path.join(app.url_path_for(self.route.__name__, **kwargs), "")

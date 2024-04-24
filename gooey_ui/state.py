@@ -1,9 +1,14 @@
 import hashlib
+import inspect
 import threading
 import typing
-from functools import wraps
+import urllib.parse
+from functools import wraps, partial
 
+from fastapi import Depends
 from pydantic import BaseModel
+from starlette.requests import Request
+from starlette.responses import Response, RedirectResponse
 
 from gooey_ui.pubsub import (
     get_subscriptions,
@@ -110,34 +115,85 @@ class NestingCtx:
         return self
 
 
+class RedirectException(Exception):
+    def __init__(self, url, status_code=302):
+        self.url = url
+        self.status_code = status_code
+
+
+class QueryParamsRedirectException(RedirectException):
+    def __init__(self, query_params: dict, status_code=303):
+        query_params = {k: v for k, v in query_params.items() if v is not None}
+        url = "?" + urllib.parse.urlencode(query_params)
+        super().__init__(url, status_code)
+
+
 def runner(
     fn: typing.Callable,
     state: dict[str, typing.Any] = None,
     query_params: dict[str, str] = None,
-    # channels: list[str] = None,
-    # session_id: str = None,
-) -> dict:
+) -> dict | Response:
     set_session_state(state or {})
     set_query_params(query_params or {})
     realtime_clear_subs()
-    # subscibe(channels or {})
-    # pubsub.threadlocal.session_id = session_id
     while True:
         try:
             root = RenderTreeNode(name="root")
             try:
                 with NestingCtx(root):
-                    fn()
+                    ret = fn()
             except StopException:
                 pass
+            except RedirectException as e:
+                return RedirectResponse(e.url, status_code=e.status_code)
+            if isinstance(ret, Response):
+                return ret
             return dict(
                 children=root.children,
                 state=get_session_state(),
-                # query_params=get_query_params(),
                 channels=get_subscriptions(),
+                **(ret or {}),
             )
         except RerunException:
             continue
+
+
+def route(fn):
+    @wraps(fn)
+    def wrapper(request: Request, json_data: dict | None, **kwargs):
+        if "request" in fn_sig.parameters:
+            kwargs["request"] = request
+        if "json_data" in fn_sig.parameters:
+            kwargs["json_data"] = json_data
+        return runner(
+            partial(fn, **kwargs),
+            query_params=dict(request.query_params),
+            state=json_data and json_data.get("state"),
+        )
+
+    fn_sig = inspect.signature(fn)
+    mod_params = dict(fn_sig.parameters) | dict(
+        request=inspect.Parameter(
+            "request",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=Request,
+        ),
+        json_data=inspect.Parameter(
+            "json_data",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            default=Depends(_request_json),
+            annotation=typing.Optional[dict],
+        ),
+    )
+    mod_sig = fn_sig.replace(parameters=list(mod_params.values()))
+    wrapper.__signature__ = mod_sig
+
+    return wrapper
+
+
+async def _request_json(request: Request) -> dict | None:
+    if request.headers.get("content-type") == "application/json":
+        return await request.json()
 
 
 def experimental_rerun():

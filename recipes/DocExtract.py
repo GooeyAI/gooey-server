@@ -142,7 +142,7 @@ class DocExtractPage(BasePage):
         # )
 
     def related_workflows(self) -> list:
-        from recipes.asr import AsrPage
+        from recipes.asr_page import AsrPage
         from recipes.CompareLLM import CompareLLMPage
         from recipes.DocSearch import DocSearchPage
         from recipes.VideoBots import VideoBotsPage

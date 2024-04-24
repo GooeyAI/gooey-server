@@ -1,4 +1,5 @@
 import json
+import math
 import mimetypes
 import typing
 
@@ -20,12 +21,15 @@ from daras_ai_v2.asr import (
     translation_language_selector,
     run_translate,
     TranslationModels,
+    AsrModels,
+    asr_language_selector,
+    run_asr,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
     azure_form_recognizer_models,
 )
-from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
@@ -82,6 +86,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from gooey_ui import RedirectException
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -167,6 +172,7 @@ class VideoBotsPage(BasePage):
         bot_script: str | None
 
         input_prompt: str
+        input_audio: str | None
         input_images: list[str] | None
         input_documents: list[str] | None
         doc_extract_url: str | None = Field(
@@ -236,6 +242,15 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
+        asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            title="Speech-to-Text Provider",
+            description="Choose a model to transcribe incoming audio messages to text.",
+        )
+        asr_language: str | None = Field(
+            title="Spoken Language",
+            description="Choose a language to transcribe incoming audio messages to text.",
+        )
+
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
@@ -265,15 +280,11 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
 
     class ResponseModel(BaseModel):
-        final_prompt: str | list[ConversationEntry]
+        final_prompt: str | list[ConversationEntry] = []
 
-        output_text: list[str]
-
-        # tts
-        output_audio: list[str]
-
-        # lipsync
-        output_video: list[str]
+        output_text: list[str] = []
+        output_audio: list[str] = []
+        output_video: list[str] = []
 
         # intermediate text
         raw_input_text: str | None
@@ -288,6 +299,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # function calls
         output_documents: list[str] | None
         reply_buttons: list[ReplyButton] | None
+
+        finish_reason: list[str] | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
@@ -366,6 +379,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         ):
             text_to_speech_provider_selector(self)
             st.write("---")
+
             enable_video = st.checkbox(
                 "##### 🫦 Add Lipsync Video",
                 value=bool(st.session_state.get("input_face")),
@@ -386,8 +400,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.session_state["input_face"] = None
 
         if st.checkbox(
-            "##### 🔠 Translation",
-            value=bool(st.session_state.get("user_language")),
+            "##### 🔠 Translation & Speech Recognition",
+            value=bool(
+                st.session_state.get("user_language")
+                or st.session_state.get("asr_model")
+            ),
         ):
             st.caption(field_desc(self.RequestModel, "user_language"))
             col1, col2 = st.columns(2)
@@ -395,13 +412,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 translation_model = translation_model_selector(allow_none=False)
             with col2:
                 translation_language_selector(
-                    translation_model,
+                    model=translation_model,
                     label=f"###### {field_title(self.RequestModel, 'user_language')}",
                     key="user_language",
                 )
             st.write("---")
+
+            col1, col2 = st.columns(2, responsive=False)
+            with col1:
+                selected_model = enum_selector(
+                    AsrModels,
+                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
+                    key="asr_model",
+                    use_selectbox=True,
+                    allow_none=True,
+                    format_func=lambda x: AsrModels[x].value if x else "Auto Select",
+                )
+            if selected_model:
+                with col2:
+                    asr_language_selector(
+                        AsrModels[selected_model],
+                        label=f"###### {field_title(self.RequestModel, 'asr_language')}",
+                        key="asr_language",
+                    )
+            else:
+                st.caption(
+                    f"We'll automatically select an [ASR](https://gooey.ai/asr) model for you based on the {field_title(self.RequestModel, 'user_language')}."
+                )
+            st.write("---")
         else:
             st.session_state["translation_model"] = None
+            st.session_state["asr_model"] = None
             st.session_state["user_language"] = None
 
         if st.checkbox(
@@ -495,7 +536,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
 
-            doc_extract_selector()
+            doc_extract_selector(self.request and self.request.user)
 
             st.write("---")
 
@@ -551,22 +592,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # chat window
         with st.div(className="pb-3"):
             chat_list_view()
-            (
-                pressed_send,
-                new_input,
-                new_input_images,
-                new_input_documents,
-            ) = chat_input_view()
+            pressed_send, new_inputs = chat_input_view()
 
         if pressed_send:
-            self.on_send(new_input, new_input_images, new_input_documents)
+            self.on_send(*new_inputs)
 
         # clear chat inputs
         if st.button("🗑️ Clear"):
             st.session_state["messages"] = []
             st.session_state["input_prompt"] = ""
             st.session_state["input_images"] = None
-            st.session_state["new_input_documents"] = None
+            st.session_state["input_audio"] = None
+            st.session_state["input_documents"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
             st.session_state["final_keyword_query"] = ""
@@ -588,16 +625,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def on_send(
         self,
-        new_input: str,
+        new_input_text: str,
         new_input_images: list[str],
+        new_input_audio: str,
         new_input_documents: list[str],
     ):
         prev_input = st.session_state.get("raw_input_text") or ""
         prev_output = (st.session_state.get("raw_output_text") or [""])[0]
         prev_input_images = st.session_state.get("input_images")
+        prev_input_audio = st.session_state.get("input_audio")
         prev_input_documents = st.session_state.get("input_documents")
 
-        if (prev_input or prev_input_images or prev_input_documents) and prev_output:
+        if (
+            prev_input or prev_input_images or prev_input_audio or prev_input_documents
+        ) and prev_output:
             # append previous input to the history
             st.session_state["messages"] = st.session_state.get("messages", []) + [
                 format_chat_entry(
@@ -616,8 +657,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             filenames = ", ".join(
                 furl(url.strip("/")).path.segments[-1] for url in new_input_documents
             )
-            new_input = f"Files: {filenames}\n\n{new_input}"
-        st.session_state["input_prompt"] = new_input
+            new_input_text = f"Files: {filenames}\n\n{new_input_text}"
+        st.session_state["input_prompt"] = new_input_text
+        st.session_state["input_audio"] = new_input_audio or None
         st.session_state["input_images"] = new_input_images or None
         st.session_state["input_documents"] = new_input_documents or None
 
@@ -691,14 +733,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if state.get("input_face"):
             total += 1
 
-        return total * state.get("num_outputs", 1)
+        return total
 
     def additional_notes(self):
         try:
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + {self.PROFIT_CREDITS}/run*"
+        notes = f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
         if (
             st.session_state.get("tts_provider")
@@ -711,10 +753,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         return notes
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
-
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+    def run_v2(
+        self,
+        request: "VideoBotsPage.RequestModel",
+        response: "VideoBotsPage.ResponseModel",
+    ) -> typing.Iterator[str | None]:
+        if request.tts_provider == TextToSpeechProviders.ELEVEN_LABS.name and not (
             self.is_current_user_paying() or self.is_current_user_admin()
         ):
             raise UserError(
@@ -723,16 +767,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 """
             )
 
-        state.update(
-            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
-        )
-
-        user_input = request.input_prompt.strip()
-        if not (user_input or request.input_images or request.input_documents):
-            return
         model = LargeLanguageModels[request.selected_model]
-        saved_msgs = request.messages.copy()
-        bot_script = request.bot_script
+        user_input = request.input_prompt.strip()
+        if not (
+            user_input
+            or request.input_audio
+            or request.input_images
+            or request.input_documents
+        ):
+            return
 
         ocr_texts = []
         if request.document_model and (request.input_images or request.input_documents):
@@ -746,6 +789,24 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if not ocr_text:
                     continue
                 ocr_texts.append(ocr_text)
+
+        if request.input_audio:
+            if not request.asr_model:
+                request.asr_model, request.asr_language = infer_asr_model_and_language(
+                    request.user_language or ""
+                )
+            selected_model = AsrModels[request.asr_model]
+            yield f"Transcribing using {selected_model.value}..."
+            asr_output = run_asr(
+                audio_url=request.input_audio,
+                selected_model=request.asr_model,
+                language=request.asr_language,
+            )
+            asr_msg = f"🎧 I heard: “{asr_output}”"
+            response.output_text = [asr_msg] * request.num_outputs
+            user_input = f"{asr_output}\n\n{user_input}".strip()
+        else:
+            asr_msg = None
 
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
@@ -769,37 +830,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             for text in ocr_texts:
                 user_input = f"Exracted Text: {text!r}\n\n{user_input}"
 
-        # parse the bot script
-        # system_message, scripted_msgs = parse_script(bot_script)
-        system_message = bot_script.strip()
-        scripted_msgs = []
-
         # consturct the system prompt
-        if system_message:
-            system_message = render_prompt_vars(system_message, state)
+        bot_script = (request.bot_script or "").strip()
+        if bot_script:
+            bot_script = render_prompt_vars(bot_script, st.session_state)
             # insert to top
-            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
         else:
             system_prompt = None
 
-        # # get user/bot display names
-        # try:
-        #     bot_display_name = scripted_msgs[-1]["display_name"]
-        # except IndexError:
-        #     bot_display_name = CHATML_ROLE_ASSISTANT
-        # try:
-        #     user_display_name = scripted_msgs[-2]["display_name"]
-        # except IndexError:
-        #     user_display_name = CHATML_ROLE_USER
-
         # save raw input for reference
-        state["raw_input_text"] = user_input
+        response.raw_input_text = user_input
 
         # if documents are provided, run doc search on the saved msgs and get back the references
         references = None
         if request.documents:
             # formulate the search query as a history of all the messages
-            query_msgs = saved_msgs + [
+            query_msgs = request.messages + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
             clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
@@ -813,14 +860,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
                 yield "Creating search query..."
-                state["final_search_query"] = generate_final_search_query(
+                response.final_search_query = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
-                    context={**state, "messages": chat_history},
+                    context={**st.session_state, "messages": chat_history},
                 )
             else:
                 query_msgs.reverse()
-                state["final_search_query"] = "\n---\n".join(
+                response.final_search_query = "\n---\n".join(
                     get_entry_text(entry) for entry in query_msgs
                 )
 
@@ -833,21 +880,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 keyword_query = generate_final_search_query(
                     request=k_request,
                     instructions=keyword_instructions,
-                    context={**state, "messages": chat_history},
+                    context={**st.session_state, "messages": chat_history},
                     response_format_type="json_object",
                 )
                 if keyword_query and isinstance(keyword_query, dict):
                     keyword_query = list(keyword_query.values())[0]
-                state["final_keyword_query"] = keyword_query
+                response.final_keyword_query = keyword_query
             # return
 
             # perform doc search
             references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
                     {
-                        **state,
-                        "search_query": state["final_search_query"],
-                        "keyword_query": state.get("final_keyword_query"),
+                        **st.session_state,
+                        "search_query": response.final_search_query,
+                        "keyword_query": response.final_keyword_query,
                     },
                 ),
             )
@@ -858,11 +905,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         user=self.request.user,
                         workflow=Workflow.VIDEO_BOTS,
                     )[0].shortened_url()
-            state["references"] = references
+            response.references = references
         # if doc search is successful, add the search results to the user prompt
         if references:
             # add task instructions
-            task_instructions = render_prompt_vars(request.task_instructions, state)
+            task_instructions = render_prompt_vars(
+                request.task_instructions, st.session_state
+            )
             user_input = (
                 references_as_prompt(references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
@@ -875,7 +924,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         # truncate the history to fit the model's max tokens
-        history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model.context_window
             - calc_gpt_tokens([system_prompt, user_input])
@@ -883,15 +931,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
-            history_window,
+            request.messages,
             max_history_tokens,
         )
-        history_window = history_window[clip_idx:]
-        prompt_messages = [system_prompt, *history_window, user_prompt]
-        state["final_prompt"] = prompt_messages
+        history_prompt = request.messages[clip_idx:]
+        response.final_prompt = [system_prompt, *history_prompt, user_prompt]
 
         # ensure input script is not too big
-        max_allowed_tokens = model.context_window - calc_gpt_tokens(prompt_messages)
+        max_allowed_tokens = model.context_window - calc_gpt_tokens(
+            response.final_prompt
+        )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise UserError("Input Script is too long! Please reduce the script size.")
@@ -900,7 +949,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         chunks = run_language_model(
             model=request.selected_model,
             messages=[
-                {"role": s["role"], "content": s["content"]} for s in prompt_messages
+                {"role": entry["role"], "content": entry["content"]}
+                for entry in response.final_prompt
             ],
             max_tokens=max_allowed_tokens,
             num_outputs=request.num_outputs,
@@ -918,13 +968,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             output_text = [entry["content"] for entry in entries]
             if request.tools:
                 # output_text, tool_call_choices = output_text
-                state["output_documents"] = output_documents = []
+                response.output_documents = output_documents = []
                 for call in entries[0].get("tool_calls") or []:
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
             # save model response
-            state["raw_output_text"] = [
+            response.raw_output_text = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
@@ -939,7 +989,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     glossary_url=request.output_glossary_document,
                     model=translation_model,
                 )
-                state["raw_tts_text"] = [
+                response.raw_tts_text = [
                     "".join(snippet for snippet, _ in parse_refs(text, references))
                     for text in output_text
                 ]
@@ -951,46 +1001,52 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 all_refs_list = None
 
-            state["output_text"] = output_text
-            if all(entry.get("finish_reason") for entry in entries):
+            if asr_msg:
+                output_text = [asr_msg + "\n\n" + text for text in output_text]
+            response.output_text = output_text
+            finish_reasons = [entry.get("finish_reason") for entry in entries]
+            if all(finish_reasons):
                 if all_refs_list:
                     apply_response_formattings_suffix(
-                        all_refs_list, state["output_text"], citation_style
+                        all_refs_list, response.output_text, citation_style
                     )
-                finish_reason = entries[0]["finish_reason"]
-                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+                response.finish_reason = finish_reasons
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
         if not request.tts_provider:
             return
-        tts_state = dict(state)
-        for text in state.get("raw_tts_text", state["raw_output_text"]):
-            tts_state["text_prompt"] = text
+        response.output_audio = []
+        for text in response.raw_tts_text or response.raw_output_text:
+            tts_state = TextToSpeechPage.RequestModel.parse_obj(
+                {**st.session_state, "text_prompt": text}
+            ).dict()
             yield from TextToSpeechPage(
                 request=self.request, run_user=self.run_user
             ).run(tts_state)
-            state["output_audio"].append(tts_state["audio_url"])
+            response.output_audio.append(tts_state["audio_url"])
 
         if not request.input_face:
             return
-        lip_state = dict(state)
-        for audio_url in state["output_audio"]:
-            lip_state["input_audio"] = audio_url
+        response.output_video = []
+        for audio_url in response.output_audio:
+            lip_state = LipsyncPage.RequestModel.parse_obj(
+                {**st.session_state, "input_audio": audio_url}
+            ).dict()
             yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
                 lip_state
             )
-            state["output_video"].append(lip_state["output_video"])
+            response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):
         tabs = super().get_tabs()
-        tabs.extend([MenuTabs.integrations])
+        tabs.extend([RecipeTabs.integrations])
         return tabs
 
-    def render_selected_tab(self, selected_tab):
-        super().render_selected_tab(selected_tab)
+    def render_selected_tab(self):
+        super().render_selected_tab()
 
-        if selected_tab == MenuTabs.integrations:
+        if self.tab == RecipeTabs.integrations:
             st.newline()
 
             # not signed in case
@@ -1000,7 +1056,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with st.center():
                     st.anchor(
                         "Get Started",
-                        href=self.get_auth_url(self.app_url(query_params={})),
+                        href=self.get_auth_url(self.app_url()),
                         type="primary",
                     )
                 return
@@ -1018,7 +1074,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with st.center():
                     st.anchor(
                         "Run & Save this Copilot",
-                        href=self.get_auth_url(self.app_url(query_params={})),
+                        href=self.get_auth_url(self.app_url()),
                         type="primary",
                     )
                 return
@@ -1034,16 +1090,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     self._render_published_run_buttons(
                         current_run=current_run,
                         published_run=published_run,
-                        redirect_to=self.get_tab_url(MenuTabs.integrations),
+                        redirect_to=self.current_app_url(RecipeTabs.integrations),
                     )
                 return
 
             # if we come from an integration redirect, we connect the integrations
             if "connect_ids" in self.request.query_params:
-                self.integrations_on_connect(
-                    current_run,
-                    published_run,
-                )
+                self.integrations_on_connect(current_run, published_run)
 
             # see which integrations are available to the user for the current published run
             assert published_run, "At this point, published_run should be available"
@@ -1070,9 +1123,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def integrations_on_connect(self, current_run, published_run):
         from app_users.models import AppUser
-        from daras_ai_v2.base import RedirectException
         from daras_ai_v2.slack_bot import send_confirmation_msg
 
+        bi = None
         for bid in self.request.query_params.getlist("connect_ids"):
             try:
                 bi = BotIntegration.objects.get(id=bid)
@@ -1086,7 +1139,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 return
 
             bi.streaming_enabled = True
-            bi.user_language = st.session_state.get("user_language") or bi.user_language
             bi.saved_run = current_run
             if published_run and published_run.saved_run_id == current_run.id:
                 bi.published_run = published_run
@@ -1097,7 +1149,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 send_confirmation_msg(bi)
             bi.save()
 
-        raise RedirectException(self.get_tab_url(MenuTabs.integrations))
+        if bi:
+            path_params = dict(integration_id=bi.api_integration_id())
+        else:
+            path_params = dict()
+        raise RedirectException(
+            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
+        )
 
     def integration_welcome_screen(self, title="Connect your Copilot"):
         with st.center():
@@ -1138,9 +1196,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ):
         from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
-        from daras_ai_v2.base import RedirectException
 
-        on_connect = self.get_tab_url(MenuTabs.integrations)
+        on_connect = self.current_app_url(RecipeTabs.integrations)
 
         with st.center():
             st.markdown(
@@ -1221,6 +1278,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             furl(on_connect).add(
                                 query_params=dict(connect_ids=str(bi.id))
                             )
+                            / bi.api_integration_id()
                         )
                     with st.div(style=descriptionstyle):
                         st.markdown("Connect to your own App or Website.")
@@ -1230,39 +1288,33 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         send_integration_attempt_email.delay(
                             user_id=self.request.user.id,
                             platform=selected_platform,
-                            run_url=self._get_current_app_url() or "",
+                            run_url=self.current_app_url() or "",
                         )
                     raise RedirectException(redirect_url)
 
             st.newline()
             st.write(
-                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to build custom integrations with your server."
+                f"Or use [our API]({self.current_app_url(RecipeTabs.run_as_api)}) to build custom integrations with your server."
             )
 
     def integration_test_config_screen(
         self, integrations: QuerySet[BotIntegration], current_run, published_run
     ):
-        from daras_ai_v2.base import RedirectException, get_title_breadcrumbs
-        from recipes.VideoBotsStats import VideoBotsStatsPage
-
-        # from recipes.BulkRunner import BulkRunnerPage
+        from daras_ai_v2.base import get_title_breadcrumbs
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
         run_title = get_title_breadcrumbs(
             VideoBotsPage, current_run, published_run
         ).h1_title
 
-        add_integration = self.get_tab_url(
-            MenuTabs.integrations, query_params={"add-integration": "true"}
-        )
-        if self.request.query_params.get("add-integration") == "true":
-            cancel = self.get_tab_url(MenuTabs.integrations)
+        if st.session_state.pop("--add-integration", None):
+            cancel_url = self.current_app_url(RecipeTabs.integrations)
             self.integration_connect_screen(
                 "Configure your Copilot: Add a New Integration",
-                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel}">Test & Configure</a> ✅',
+                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel_url}">Test & Configure</a> ✅',
             )
             if st.button("Return to Test & Configure"):
-                raise RedirectException(cancel)
+                raise RedirectException(cancel_url)
             return
 
         st.markdown("#### Configure your Copilot")
@@ -1277,6 +1329,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     key="bi_id",
                 )
                 bi = integrations_map[bi_id]
+                old_bi_id = st.session_state.get("old_bi_id", bi_id)
+                if bi_id != old_bi_id:
+                    raise RedirectException(
+                        self.current_app_url(
+                            RecipeTabs.integrations,
+                            path_params=dict(integration_id=bi.api_integration_id()),
+                        )
+                    )
+                st.session_state["old_bi_id"] = bi_id
         else:
             bi = integrations[0]
         icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
@@ -1321,12 +1382,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Understand your Users")
                 st.caption(f"See real-time analytics.")
             with col2:
-                stats_url = furl(
-                    VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
-                ).tostr()
                 st.anchor(
                     "📊 View Analytics",
-                    stats_url,
+                    str(
+                        furl(
+                            self.current_app_url(
+                                RecipeTabs.integrations,
+                                path_params=dict(
+                                    integration_id=bi.api_integration_id()
+                                ),
+                            )
+                        )
+                        / "stats/"
+                    ),
                 )
 
             # ==== future changes ====
@@ -1369,11 +1437,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Add Integration")
                 st.caption(f"Add another connection for {run_title}.")
             with col2:
-                if st.button(
+                st.anchor(
                     f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
-                    key="btn_connect",
-                ):
-                    raise RedirectException(add_integration)
+                    str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
+                    unsafe_allow_html=True,
+                )
 
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
@@ -1401,6 +1469,28 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.published_run = None
                         bi.save()
                         st.experimental_rerun()
+
+
+def infer_asr_model_and_language(
+    user_language: str, default=AsrModels.whisper_large_v2
+) -> tuple[str, str]:
+    asr_lang = None
+    user_lang = user_language.lower()
+    if "am" in user_lang:
+        asr_model = AsrModels.usm
+        asr_lang = "am-et"
+    elif "hi" in user_lang:
+        asr_model = AsrModels.nemo_hindi
+    elif "te" in user_lang:
+        asr_model = AsrModels.whisper_telugu_large_v2
+    elif "bho" in user_lang:
+        asr_model = AsrModels.vakyansh_bhojpuri
+    elif "sw" in user_lang:
+        asr_model = AsrModels.seamless_m4t
+        asr_lang = "swh"
+    else:
+        asr_model = default
+    return asr_model.name, asr_lang
 
 
 def chat_list_view():
@@ -1447,7 +1537,8 @@ def chat_list_view():
         else:
             input_prompt = st.session_state.get("input_prompt")
         input_images = st.session_state.get("input_images")
-        if input_prompt or input_images:
+        input_audio = st.session_state.get("input_audio")
+        if input_prompt or input_images or input_audio:
             messages += [
                 format_chat_entry(
                     role=CHATML_ROLE_USER, content=input_prompt, images=input_images
@@ -1458,14 +1549,17 @@ def chat_list_view():
             with msg_container_widget(entry["role"]):
                 images = get_entry_images(entry)
                 text = get_entry_text(entry)
-                if text or images:
+                if text or images or input_audio:
                     st.write(f"**{entry['role'].capitalize()}**  \n{text}")
                 if images:
                     for im in images:
                         st.image(im, style={"maxHeight": "200px"})
+                if input_audio:
+                    st.audio(input_audio)
+                    input_audio = None
 
 
-def chat_input_view() -> tuple[bool, str, list[str], list[str]]:
+def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
     with st.div(
         className="px-3 pt-3 d-flex gap-1",
         style=dict(background="rgba(239, 239, 239, 0.6)"),
@@ -1480,25 +1574,37 @@ def chat_input_view() -> tuple[bool, str, list[str], list[str]]:
             st.session_state[show_uploader_key] = show_uploader
 
         with st.div(className="flex-grow-1"):
-            new_input = st.text_area("", placeholder="Send a message", height=50)
+            new_input_text = st.text_area("", placeholder="Send a message", height=50)
 
         pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
 
     if show_uploader:
         uploaded_files = st.file_uploader("", accept_multiple_files=True)
         new_input_images = []
+        new_input_audio = None
         new_input_documents = []
         for f in uploaded_files:
             mime_type = mimetypes.guess_type(f)[0] or ""
             if mime_type.startswith("image/"):
                 new_input_images.append(f)
+            if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+                new_input_audio = f
             else:
                 new_input_documents.append(f)
     else:
         new_input_images = None
+        new_input_audio = None
         new_input_documents = None
 
-    return pressed_send, new_input, new_input_images, new_input_documents
+    return (
+        pressed_send,
+        (
+            new_input_text,
+            new_input_images,
+            new_input_audio,
+            new_input_documents,
+        ),
+    )
 
 
 def msg_container_widget(role: str):

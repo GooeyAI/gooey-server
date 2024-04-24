@@ -9,8 +9,8 @@ from furl import furl
 
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import request_json
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
@@ -57,7 +57,7 @@ def generate_auth_header() -> str:
 # Create an order to start the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
 @router.post("/__/paypal/orders/create/")
-def create_order(request: Request, payload=Depends(request_json)):
+def create_order(request: Request, payload: dict = fastapi_request_json):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
 

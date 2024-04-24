@@ -6,7 +6,6 @@ import typing
 from datetime import datetime, timezone
 
 import numpy as np
-
 from furl import furl
 
 from daras_ai.image_input import resize_img_scale
@@ -167,10 +166,6 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
 def caption(body: str, className: str = None, **props):
     className = className or "text-muted"
     markdown(body, className=className, **props)
-
-
-def option_menu(*args, options, **kwargs):
-    return tabs(options)
 
 
 def tabs(labels: list[str]) -> list[state.NestingCtx]:
@@ -335,7 +330,15 @@ def text_area(
     #     assert not value, "only one of value or key can be provided"
     # else:
     if not key:
-        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+        key = md5_values(
+            "textarea",
+            label,
+            height,
+            help,
+            placeholder,
+            label_visibility,
+            not disabled or value,
+        )
     value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
@@ -428,6 +431,7 @@ def selectbox(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value: T = None,
+    allow_none: bool = False,
     **props,
 ) -> T | None:
     if not options:
@@ -435,6 +439,8 @@ def selectbox(
     if label_visibility != "visible":
         label = None
     options = list(options)
+    if allow_none:
+        options.insert(0, None)
     if not key:
         key = md5_values("select", label, options, help, label_visibility)
     value = state.session_state.get(key)
@@ -973,29 +979,3 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
-
-
-def change_url(url: str, request):
-    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
-    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
-    old_url = furl(request.url).remove(origin=True).tostr()
-    url = furl(url).remove(origin=True).tostr()
-    if old_url == url:
-        return
-    # the request is likely processing which means it will overwrite the url we set once it is done
-    # so we set up a timer to keep setting the url until the request is done at which point we stop
-    js(
-        f"""
-        setTimeout(() => window.history.replaceState(null, '', '{url}'));
-        function change_url() {{
-            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
-                clearInterval(window._change_url_timer);
-            }}
-            window.history.replaceState(null, '', '{url}');
-        }}
-        clearInterval(window._change_url_timer);
-        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
-            window._change_url_timer = setInterval(change_url, 100);
-        }}
-        """,
-    )

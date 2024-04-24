@@ -2,23 +2,14 @@ from django.core.exceptions import ValidationError
 from furl import furl
 
 import gooey_ui as st
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration
 from bots.models import Workflow
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import (
-    google_translate_language_selector,
-)
-from daras_ai_v2.field_render import field_title_desc
 from recipes.BulkRunner import url_to_runs
 
 
 def general_integration_settings(bi: BotIntegration):
-    from recipes.VideoBots import VideoBotsPage
-
     if st.session_state.get(f"_bi_reset_{bi.id}"):
-        st.session_state[f"_bi_user_language_{bi.id}"] = BotIntegration._meta.get_field(
-            "user_language"
-        ).default
         st.session_state[f"_bi_streaming_enabled_{bi.id}"] = (
             BotIntegration._meta.get_field("streaming_enabled").default
         )
@@ -42,18 +33,6 @@ def general_integration_settings(bi: BotIntegration):
         "Users can rate and provide feedback on every copilot response if enabled."
     )
 
-    bi.user_language = (
-        google_translate_language_selector(
-            f"""
-##### {field_title_desc(VideoBotsPage.RequestModel, 'user_language')} \\
-This will also help better understand incoming audio messages by automatically choosing the best [Speech](https://gooey.ai/speech/) model.
-            """,
-            default_value=bi.user_language,
-            allow_none=False,
-            key=f"_bi_user_language_{bi.id}",
-        )
-        or "en"
-    )
     st.caption(
         "Please note that this language is distinct from the one provided in the workflow settings. Hence, this allows you to integrate the same bot in many languages."
     )

@@ -32,7 +32,7 @@ from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
-from recipes.asr import AsrPage
+from recipes.asr_page import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
 from recipes.VideoBotsStats import VideoBotsStatsPage
 

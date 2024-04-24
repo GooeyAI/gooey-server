@@ -12,6 +12,7 @@ import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
+from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -281,9 +282,10 @@ class TranslationModels(Enum):
 
 
 def translation_language_selector(
+    *,
     model: TranslationModels | None,
-    label="###### Target Language",
-    key="translation_target",
+    label: str,
+    key: str,
     **kwargs,
 ) -> str | None:
     if not model:
@@ -301,7 +303,7 @@ def translation_language_selector(
     return st.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: languages[k],
+        format_func=lambda k: languages[k] if k else BLANK_OPTION,
         options=options,
         **kwargs,
     )
@@ -341,13 +343,12 @@ def google_translate_language_selector(
     """
     languages = google_translate_target_languages()
     options = list(languages.keys())
-    if allow_none:
-        options.insert(0, None)
     return st.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
+        allow_none=allow_none,
         **kwargs,
     )
 
@@ -488,6 +489,7 @@ def run_ghana_nlp_translate(
     assert (
         target_language in GHANA_NLP_SUPPORTED
     ), "Ghana NLP does not support this target language"
+    assert source_language, "Source language is required for Ghana NLP"
 
     if source_language not in GHANA_NLP_SUPPORTED:
         src = langcodes.Language.get(source_language).language

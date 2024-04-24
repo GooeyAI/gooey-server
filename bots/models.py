@@ -1,7 +1,6 @@
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
-from textwrap import dedent
 
 import pytz
 from django.conf import settings
@@ -9,8 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils.text import Truncator, slugify
-from furl import furl
+from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
@@ -25,7 +23,6 @@ if typing.TYPE_CHECKING:
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
-
 
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
@@ -111,20 +108,6 @@ class Workflow(models.IntegerChoices):
         metadata = self.get_or_create_metadata()
         return metadata.short_title
 
-    def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
-        """return the url to the gooey app"""
-        query_params = {}
-        if run_id and uid:
-            query_params |= dict(run_id=run_id, uid=uid)
-        if example_id:
-            query_params |= dict(example_id=example_id)
-        return str(
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / self.page_cls.slug_versions[-1]
-            / run_slug
-            / "/"
-        )
-
     @property
     def page_cls(self) -> typing.Type["BasePage"]:
         from daras_ai_v2.all_pages import workflow_map
@@ -171,6 +154,7 @@ class WorkflowMetadata(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    price_multiplier = models.FloatField(default=1)
 
     def __str__(self):
         return self.meta_title
@@ -285,8 +269,9 @@ class SavedRun(models.Model):
         return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
-        workflow = Workflow(self.workflow)
-        return workflow.get_app_url(self.example_id, self.run_id, self.uid)
+        return Workflow(self.workflow).page_cls.app_url(
+            example_id=self.example_id, run_id=self.run_id, uid=self.uid
+        )
 
     def to_dict(self) -> dict:
         from daras_ai_v2.base import StateKeys
@@ -452,8 +437,9 @@ class BotIntegration(models.Model):
         db_index=True,
     )
     user_language = models.TextField(
-        default="en",
+        default="",
         help_text="The response language (same as user language in video bots)",
+        blank=True,
     )
     show_feedback_buttons = models.BooleanField(
         default=False,
@@ -738,8 +724,10 @@ class ConversationQuerySet(models.QuerySet):
                 row |= {
                     "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
-                    "A7": not convo.d7(),
-                    "A30": not convo.d30(),
+                    "A7": last_time
+                    > datetime.datetime.now() - datetime.timedelta(days=7),
+                    "A30": last_time
+                    > datetime.datetime.now() - datetime.timedelta(days=30),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
                     "R7": last_time - first_time < datetime.timedelta(days=7),
                     "R30": last_time - first_time < datetime.timedelta(days=30),
@@ -1463,11 +1451,8 @@ class PublishedRun(models.Model):
         )
 
     def get_app_url(self):
-        return Workflow(self.workflow).get_app_url(
-            example_id=self.published_run_id,
-            run_id="",
-            uid="",
-            run_slug=self.title and slugify(self.title),
+        return Workflow(self.workflow).page_cls.app_url(
+            example_id=self.published_run_id
         )
 
     def add_version(

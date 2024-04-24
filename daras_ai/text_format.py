@@ -23,3 +23,20 @@ def daras_ai_format_str(format_str, variables):
             variable_value = variable_value.strip()
         format_str = format_str.replace("{{" + spec + "}}", str(variable_value))
     return format_str
+
+
+def format_number_with_suffix(num: int) -> str:
+    """
+    Formats large number with a suffix.
+
+    Ref: https://stackoverflow.com/a/45846841
+    """
+    num_float = float("{:.3g}".format(num))
+    magnitude = 0
+    while abs(num_float) >= 1000:
+        magnitude += 1
+        num_float /= 1000.0
+    return "{}{}".format(
+        "{:f}".format(num_float).rstrip("0").rstrip("."),
+        ["", "K", "M", "B", "T"][magnitude],
+    )
