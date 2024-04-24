@@ -1014,6 +1014,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if not request.tts_provider:
             return
+        response.output_audio = []
         for text in response.raw_tts_text or response.raw_output_text:
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
                 {**st.session_state, "text_prompt": text}
@@ -1025,6 +1026,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if not request.input_face:
             return
+        response.output_video = []
         for audio_url in response.output_audio:
             lip_state = LipsyncPage.RequestModel.parse_obj(
                 {**st.session_state, "input_audio": audio_url}
