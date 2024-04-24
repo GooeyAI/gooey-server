@@ -1,6 +1,7 @@
 import typing
 from enum import Enum
 from pathlib import Path
+from textwrap import dedent
 from urllib.parse import quote_plus
 
 import stripe
@@ -14,6 +15,7 @@ import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, settings, urls
+from daras_ai_v2.auto_recharge import get_default_payment_method
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -308,37 +310,93 @@ def auto_recharge_section(request: Request):
     assert request.user
 
     st.write("## Auto Recharge & Limits")
-    auto_recharge_enabled = st.checkbox(
-        """
-        #### Enable auto recharge
+    col1, col2 = st.columns(2)
 
-        Enable auto recharge to automatically keep your credit balance topped up.\
-        """,
-        value=request.user.auto_recharge_enabled,
-    )
+    with col1:
+        with st.div(className="d-flex align-items-end"):
+            auto_recharge_enabled = st.checkbox(
+                "",
+                value=request.user.auto_recharge_enabled,
+            )
+            st.write("#### Enable Auto Recharge")
+        if not auto_recharge_enabled:
+            st.caption(
+                "Enable auto recharge to automatically keep your credit balance topped up."
+            )
 
     if auto_recharge_enabled != request.user.auto_recharge_enabled:
         request.user.auto_recharge_enabled = auto_recharge_enabled
         request.user.save(update_fields=["auto_recharge_enabled"])
+        st.experimental_rerun()
 
-    if request.user.auto_recharge_enabled:
-        st.write("Auto recharge is enabled!")
+    if not request.user.auto_recharge_enabled:
+        return
 
-        pms = stripe.PaymentMethod.list(
-            customer=request.user.get_or_create_stripe_customer()
+    pm = get_default_payment_method(request.user)
+    if not pm:
+        setup_default_payment_method_url = urls.remove_hostname(
+            request.url_for("stripe_setup_default_payment_method")
         )
-        if not pms:
-            setup_auto_recharge_url = urls.remove_hostname(
-                request.url_for("create_auto_recharge_checkout_session")
-            )
-            st.write(
-                f"Link a payment method with Stripe [here]({setup_auto_recharge_url})."
-            )
-        else:
-            pm = pms.data[0]
-            st.write(
-                f"Will automatically charge from {pm.card.brand} ending in {pm.card.last4}. ({pm.id=})",
-            )
+        st.write(
+            f"Link a payment method with Stripe [here]({setup_default_payment_method_url})."
+        )
+        return
+
+    with col1:
+        request.user.auto_recharge_amount = st.selectbox(
+            "Automatically purchase",
+            options=settings.ADDON_AMOUNT_CHOICES,
+            format_func=lambda amt: f"{settings.ADDON_CREDITS_PER_DOLLAR * amt:,} credits for ${amt}",
+            default_value=request.user.auto_recharge_amount or 10,
+        )
+        request.user.auto_recharge_topup_threshold = st.selectbox(
+            "When balance falls below (in credits)",
+            options=[300, 1000, 3000, 10000],
+            format_func=lambda credits: f"{credits:,} credits",
+            default_value=request.user.auto_recharge_topup_threshold or 300,
+        )
+
+    with col2:
+        request.user.auto_recharge_monthly_budget = st.number_input(
+            dedent(
+                """\
+                #### Monthly Budget (in USD)
+
+                If your account exceeds this budget in a given calendar month
+                (UTC), subsequent runs & API requests will be rejected.
+                """,
+            ),
+            min_value=10,
+            value=request.user.auto_recharge_monthly_budget or 50,
+        )
+        request.user.auto_recharge_email_threshold = st.number_input(
+            dedent(
+                """\
+                #### Email Notification Threshold (in USD)
+
+                If your account purchases exceed this threshold in a given
+                calendar month (UTC), you will receive an email notification.
+                This include both manual and auto-recharge purchases.
+                """,
+            ),
+            min_value=10,
+            max_value=10000,
+            value=request.user.auto_recharge_email_threshold or 10,
+        )
+
+    st.write(
+        f"Will automatically charge from {pm.card.brand} ending in {pm.card.last4}. ({pm.id=})",
+    )
+    if st.button("Save", type="primary"):
+        request.user.save(
+            update_fields=[
+                "auto_recharge_amount",
+                "auto_recharge_topup_threshold",
+                "auto_recharge_monthly_budget",
+                "auto_recharge_email_threshold",
+            ]
+        )
+        st.success("Settings saved!")
 
 
 async def request_form(request: Request):
@@ -390,7 +448,8 @@ def create_checkout_session(
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-def create_auto_recharge_checkout_session(request: Request):
+@router.get("/__/stripe/setup-default-payment-method")
+def stripe_setup_default_payment_method(request: Request):
     if not request.user or request.user.is_anonymous:
         return RedirectResponse(
             request.url_for("login", query_params={"next": request.url.path})
@@ -444,8 +503,8 @@ def webhook_received(request: Request, payload: bytes = Depends(request_body)):
 
     data = event.data.object
 
-    customer = stripe.Customer.retrieve(data.customer)
     try:
+        customer = stripe.Customer.retrieve(data.customer)
         uid = customer.metadata.uid
     except AttributeError:
         uid = None
@@ -453,7 +512,7 @@ def webhook_received(request: Request, payload: bytes = Depends(request_body)):
         return JSONResponse(
             {
                 "status": "failed",
-                "error": f"customer.metadata.uid not found",
+                "error": "customer.metadata.uid not found",
             },
             status_code=400,
         )
@@ -462,6 +521,8 @@ def webhook_received(request: Request, payload: bytes = Depends(request_body)):
     match event["type"]:
         case "invoice.paid":
             _handle_invoice_paid(uid, data)
+        case "checkout.session.completed":
+            _handle_checkout_session_completed(uid, data)
 
     return JSONResponse({"status": "success"})
 
@@ -482,6 +543,19 @@ def _handle_invoice_paid(uid: str, invoice_data):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
+
+
+def _handle_checkout_session_completed(uid: str, session_data):
+    setup_intent_id = session_data.get("setup_intent")
+    if not setup_intent_id:
+        # not a setup mode checkout
+        return
+
+    setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
+    stripe.Customer.modify(
+        session_data.customer,
+        invoice_settings={"default_payment_method": setup_intent.payment_method},
+    )
 
 
 @router.post("/__/stripe/cancel-subscription")
