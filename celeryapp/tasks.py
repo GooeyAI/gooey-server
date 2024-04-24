@@ -18,8 +18,10 @@ from bots.models import SavedRun, Platform
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
+from daras_ai_v2.auto_recharge import auto_recharge_user
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.send_email import send_low_balance_email
 from daras_ai_v2.settings import templates
@@ -252,3 +254,11 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
         subject=f"{user.display_name} Attempted to Connect to {platform.label}",
         html_body=html_body,
     )
+
+
+@app.task
+def auto_recharge_before_run(*, user_id: int):
+    redis_lock_key = f"auto_recharge_before_run/{user_id}"
+    with redis_lock(redis_lock_key):
+        user = AppUser.objects.get(id=user_id)
+        auto_recharge_user(user)
