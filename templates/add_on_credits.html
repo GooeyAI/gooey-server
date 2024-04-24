@@ -1,4 +1,4 @@
-{% for amt in [10, 30, 50, 100, 300, 500] %}
+{% for amt in settings.ADDON_AMOUNT_CHOICES %}
     <form class="d-inline" action="/__/stripe/create-checkout-session" method="POST">
         <!-- Add a hidden field with the lookup_key of your Price -->
         <input type="hidden" name="quantity" value="{{ amt * settings.ADDON_CREDITS_PER_DOLLAR }}"/>
