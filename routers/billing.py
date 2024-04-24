@@ -322,6 +322,16 @@ def auto_recharge_section(request: Request):
             format_func=lambda credits: f"{credits:,} credits",
             default_value=request.user.auto_recharge_topup_threshold or 300,
         )
+        card_icon = f'<i class="fa-brands fa-cc-{pm.card.brand}"></i>'
+        setup_default_payment_method_url = urls.remove_hostname(
+            request.url_for("stripe_setup_default_payment_method")
+        )
+        st.write(
+            '<span class="text-muted">Using my card ending in </span>'
+            f"**{pm.card.last4}** {card_icon}. "
+            f'<span class="text-muted">[Change]({setup_default_payment_method_url})</span>',
+            unsafe_allow_html=True,
+        )
 
     with col2:
         request.user.auto_recharge_monthly_budget = st.number_input(
@@ -351,9 +361,6 @@ def auto_recharge_section(request: Request):
             value=request.user.auto_recharge_email_threshold or 10,
         )
 
-    st.write(
-        f"Will automatically charge from {pm.card.brand} ending in {pm.card.last4}. ({pm.id=})",
-    )
     if st.button("Save", type="primary"):
         request.user.save(
             update_fields=[
@@ -368,6 +375,7 @@ def auto_recharge_section(request: Request):
 
 async def request_form(request: Request):
     return await request.form()
+
 
 @contextmanager
 def account_page_wrapper(request: Request, current_tab: TabData):
