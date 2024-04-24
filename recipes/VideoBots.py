@@ -300,6 +300,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         output_documents: list[str] | None
         reply_buttons: list[ReplyButton] | None
 
+        finish_reason: list[str] | None
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
 
@@ -1002,13 +1004,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             if asr_msg:
                 output_text = [asr_msg + "\n\n" + text for text in output_text]
             response.output_text = output_text
-            if all(entry.get("finish_reason") for entry in entries):
+            finish_reasons = [entry.get("finish_reason") for entry in entries]
+            if all(finish_reasons):
                 if all_refs_list:
                     apply_response_formattings_suffix(
                         all_refs_list, response.output_text, citation_style
                     )
-                finish_reason = entries[0]["finish_reason"]
-                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+                response.finish_reason = finish_reasons
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 

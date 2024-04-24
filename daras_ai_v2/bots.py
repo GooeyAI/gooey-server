@@ -363,7 +363,7 @@ def _process_and_send_msg(
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(update_msg_id=update_msg_id)
                     continue  # no text, wait for the next update
-                streaming_done = bot.run_status.lower().startswith("completed")
+                streaming_done = state.get("finish_reason")
                 # send the response to the user
                 if bot.can_update_message:
                     update_msg_id = bot.send_msg(

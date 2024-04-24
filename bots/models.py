@@ -437,8 +437,9 @@ class BotIntegration(models.Model):
         db_index=True,
     )
     user_language = models.TextField(
-        default="en",
+        default="",
         help_text="The response language (same as user language in video bots)",
+        blank=True,
     )
     show_feedback_buttons = models.BooleanField(
         default=False,

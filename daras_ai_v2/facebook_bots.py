@@ -220,15 +220,16 @@ class WhatsappBot(BotInterface):
 
         if audio and not video:  # video already has audio
             # simple audio msg
-            messages.append(
+            messages.insert(
+                0,
                 {
                     "type": "audio",
                     "audio": {"link": audio},
-                }
+                },
             )
 
         if documents:
-            messages += [
+            messages = [
                 # simple document msg
                 {
                     "type": "document",
@@ -238,7 +239,7 @@ class WhatsappBot(BotInterface):
                     },
                 }
                 for link in documents
-            ]
+            ] + messages
 
         return send_wa_msgs_raw(
             bot_number=bot_number,
