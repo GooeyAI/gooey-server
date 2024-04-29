@@ -22,8 +22,7 @@ from daras_ai_v2.auto_recharge import auto_recharge_user
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.redis_cache import redis_lock
-from daras_ai_v2.send_email import send_email_via_postmark
-from daras_ai_v2.send_email import send_low_balance_email
+from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params

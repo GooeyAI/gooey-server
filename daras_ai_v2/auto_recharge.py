@@ -3,10 +3,13 @@ from datetime import datetime, timedelta, timezone
 import stripe
 from django.db.models import Sum
 from django.utils import timezone
+from furl import furl
 from loguru import logger
 
 from app_users.models import AppUser, AppUserTransaction
 from daras_ai_v2 import settings
+from daras_ai_v2.settings import templates
+from daras_ai_v2.send_email import send_email_via_postmark
 
 
 def get_default_payment_method(user: AppUser) -> stripe.PaymentMethod | None:
@@ -27,6 +30,41 @@ def _get_default_payment_method_for_customer(
     return stripe.PaymentMethod.retrieve(pm_id)
 
 
+def send_email_auto_recharge_failed(user: AppUser, reason: str):
+    if not user.email:
+        return
+
+    email_body = templates.get_template("auto_recharge_failed_email.html").render(
+        user=user,
+        account_url=get_account_url(),
+        reason=reason,
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email,
+        subject="[Gooey.AI] Auto-Recharge failed",
+        html_body=email_body,
+    )
+
+
+def send_email_monthly_spend_threshold_reached(user: AppUser):
+    if not user.email:
+        return
+
+    email_body = templates.get_template(
+        "monthly_spend_threshold_reached_email.html"
+    ).render(
+        user=user,
+        account_url=get_account_url(),
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email,
+        subject="[Gooey.AI] Monthly Spend Threshold Reached",
+        html_body=email_body,
+    )
+
+
 def auto_recharge_user(user: AppUser):
     if (
         not user.auto_recharge_enabled
@@ -36,12 +74,12 @@ def auto_recharge_user(user: AppUser):
         return
 
     if not user.auto_recharge_amount:
-        # user hasn't set the amount... should notify
+        send_email_auto_recharge_failed(user, reason="recharge amount wasn't set")
         logger.error(f"User hasn't set auto recharge amount ({user=})")
         return
 
     if user.auto_recharge_amount > settings.AUTO_RECHARGE_MAX_AMOUNT:
-        # user has set a very high amount... should notify
+        send_email_auto_recharge_failed(user, reason="recharge amount is too high")
         logger.error(
             f"User has set very high auto recharge amount ({user=}, {user.auto_recharge_amount=})",
         )
@@ -49,17 +87,21 @@ def auto_recharge_user(user: AppUser):
 
     customer = user.search_stripe_customer()
     if not customer:
-        # user should be on stripe
+        # server side error
         logger.error(f"User is not on stripe: {user=}")
         return
 
-    if (
-        dollars_spent := get_dollars_spent_this_month_by_user(user)
-    ) >= user.auto_recharge_monthly_budget:
-        # user has reached the monthly budget
+    dollars_spent = get_dollars_spent_this_month_by_user(user)
+
+    if dollars_spent >= user.auto_recharge_monthly_budget:
+        send_email_auto_recharge_failed(
+            user, reason="you have reached your monthly budget"
+        )
         logger.info(f"User has reached the monthly budget: {user=}, {dollars_spent=}")
-        # send an email to the user
         return
+
+    if dollars_spent >= user.auto_recharge_email_threshold:
+        send_email_monthly_spend_threshold_reached(user)
 
     invoice = get_or_create_auto_invoice(
         customer, amount_in_dollars=user.auto_recharge_amount
@@ -146,3 +188,7 @@ def user_should_auto_recharge(user: AppUser):
     return (
         user.auto_recharge_enabled and user.balance < user.auto_recharge_topup_threshold
     )
+
+
+def get_account_url():
+    return str(furl(settings.APP_BASE_URL) / "account" / "")
