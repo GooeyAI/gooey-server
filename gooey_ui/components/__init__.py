@@ -985,7 +985,7 @@ def tooltip(text: str):
     """Usage: st.markdown(f'Some text that needs a tooltip. {st.tooltip("The tooltip text")}')"""
     return f"""<span style="position: relative; font-size: 16px">
         <i role="button" onclick="this.nextElementSibling.show(); event.preventDefault()" class="fa-solid fa-circle-info"></i>
-        <dialog onblur="setTimeout(() => this.close(), 200)" style="width: max-content; max-width: 50vw; z-index: 10000">
+        <dialog onblur="setTimeout(() => this.close(), 200)" style="width: max-content; max-width: 50vw; z-index: 10000; border-radius: 16px; border: 2px solid whitesmoke; font-weight: lighter; line-height: normal; font-family: basiercircle, sans-serif;">
             <input style="width: 0; height: 0; min-width: 0; border: 0; outline: 0; padding: 0; margin: 0"></input>{text}
         </dialog>
     </span>""".replace(
