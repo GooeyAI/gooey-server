@@ -1057,15 +1057,38 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Message (Local)": message.display_content,
+                "Analysis JSON": message.analysis_result,
                 "Feedback": (
                     message.feedbacks.first().get_display_text()
                     if message.feedbacks.first()
                     else None
                 ),  # only show first feedback as per Sean's request
-                "Analysis JSON": message.analysis_result,
                 "Run Time": (
                     message.saved_run.run_time if message.saved_run else 0
                 ),  # user messages have no run/run_time
+                "Run URL": (
+                    message.saved_run.get_app_url()
+                    if message.saved_run and message.role == CHATML_ROLE_ASSISSTANT
+                    else ""
+                ),
+                "Photo Input": ", ".join(
+                    message.attachments.filter(
+                        metadata__mime_type__startswith="image/"
+                    ).values_list("url", flat=True)
+                ),
+                "Audio Input": ", ".join(
+                    message.attachments.filter(
+                        metadata__mime_type__startswith="audio/"
+                    ).values_list("url", flat=True)
+                ),
+                "Speech Run URL": (
+                    message.get_previous_by_created_at().saved_run.get_app_url()
+                    if message.role == CHATML_ROLE_ASSISSTANT
+                    and message.get_previous_by_created_at()
+                    and message.get_previous_by_created_at().saved_run
+                    else ""
+                ),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1075,9 +1098,14 @@ class MessageQuerySet(models.QuerySet):
                 "Role",
                 "Message (EN)",
                 "Sent",
-                "Feedback",
+                "Message (Local)",
                 "Analysis JSON",
+                "Feedback",
                 "Run Time",
+                "Run URL",
+                "Photo Input",
+                "Audio Input",
+                "Speech Run URL",
             ],
         )
         return df
@@ -1098,12 +1126,24 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Question (Local)": message.get_previous_by_created_at().display_content,
+                "Answer (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
+                "Run URL": message.saved_run.get_app_url(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
             rows,
-            columns=["Name", "Question (EN)", "Answer (EN)", "Sent", "Analysis JSON"],
+            columns=[
+                "Name",
+                "Question (EN)",
+                "Answer (EN)",
+                "Sent",
+                "Question (Local)",
+                "Answer (Local)",
+                "Analysis JSON",
+                "Run URL",
+            ],
         )
         return df
 
@@ -1288,20 +1328,17 @@ class FeedbackQuerySet(models.QuerySet):
             row = {
                 "Name": feedback.message.conversation.get_display_name(),
                 "Question (EN)": feedback.message.get_previous_by_created_at().content,
-                "Question Sent": feedback.message.get_previous_by_created_at()
+                "Answer (EN)": feedback.message.content,
+                "Sent": feedback.message.get_previous_by_created_at()
                 .created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Answer (EN)": feedback.message.content,
-                "Answer Sent": feedback.message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Question (Local)": feedback.message.get_previous_by_created_at().display_content,
+                "Answer (Local)": feedback.message.display_content,
                 "Rating": Feedback.Rating(feedback.rating).label,
                 "Feedback (EN)": feedback.text_english,
-                "Feedback Sent": feedback.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Question Answered": feedback.message.question_answered,
+                "Feedback (Local)": feedback.text,
+                "Run URL": feedback.message.saved_run.get_app_url(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1309,13 +1346,14 @@ class FeedbackQuerySet(models.QuerySet):
             columns=[
                 "Name",
                 "Question (EN)",
-                "Question Sent",
                 "Answer (EN)",
-                "Answer Sent",
+                "Sent",
+                "Question (Local)",
+                "Answer (Local)",
                 "Rating",
                 "Feedback (EN)",
-                "Feedback Sent",
-                "Question Answered",
+                "Feedback (Local)",
+                "Run URL",
             ],
         )
         return df
