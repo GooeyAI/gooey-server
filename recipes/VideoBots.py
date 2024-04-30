@@ -347,8 +347,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def render_form_v2(self):
         st.text_area(
-            """
-            #### 📝 Instructions
+            f"""
+            #### 📝 Instructions {st.tooltip("[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!")}
             """,
             key="bot_script",
             height=300,
@@ -365,9 +365,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         document_uploader(
-            """
-            #### 📄 Knowledge
-            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
+            f"""
+            #### 📄 Knowledge {st.tooltip("Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)")} 
             """,
             accept=["audio/*", "application/*", "video/*", "text/*"],
         )
@@ -492,7 +491,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         ):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
-                "📖 Add Glossary",
+                f'📖 Add Glossary {st.tooltip("[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!")}',
                 value=bool(
                     st.session_state.get("input_glossary_document")
                     or st.session_state.get("output_glossary_document")
@@ -522,8 +521,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if documents:
             st.write("#### 📄 Knowledge Base")
             st.text_area(
-                """
-            ###### 👩‍🏫 Search Instructions
+                f"""
+            ###### 👩‍🏫 Search Instructions {st.tooltip("[Learn how](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings) to get the most out of your copilot with advanced settings.")}
             How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",

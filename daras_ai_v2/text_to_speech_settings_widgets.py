@@ -373,7 +373,7 @@ def elevenlabs_selector(page):
         )
 
     elevenlabs_use_custom_key = st.checkbox(
-        "Use custom API key + Voice ID",
+        f"Use custom API key + Voice ID {st.tooltip('[Learn how](https://gooey.ai/docs/guides/lipsync-videos-with-custom-voices) to add custom voices!')}",
         value=bool(st.session_state.get("elevenlabs_api_key")),
     )
     if elevenlabs_use_custom_key:

@@ -979,3 +979,8 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
+
+
+def tooltip(text: str):
+    # must be one line to work with input labels
+    return f'<span style="position: relative; font-size: 16px"><i role="button" onclick="this.nextElementSibling.show(); event.preventDefault()" class="fa-solid fa-circle-info"></i><dialog onblur="setTimeout(() => this.close(), 200)" style="width: max-content; max-width: 50vw; z-index: 10000"><input style="width: 0; height: 0; min-width: 0; border: 0; outline: 0; padding: 0; margin: 0"></input>{text}</dialog></span>'

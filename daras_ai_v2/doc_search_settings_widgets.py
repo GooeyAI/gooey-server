@@ -39,7 +39,7 @@ def document_uploader(
     accept: typing.Iterable[str] = None,
     accept_multiple_files=True,
 ) -> list[str] | str:
-    st.write(label, className="gui-input")
+    st.write(label, className="gui-input", unsafe_allow_html=True)
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
