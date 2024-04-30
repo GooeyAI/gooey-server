@@ -270,7 +270,6 @@ class VideoBotsStatsPage(BasePage):
 
         df = self.get_tabular_data(
             bi,
-            run_url,
             conversations,
             messages,
             details,
@@ -301,7 +300,6 @@ class VideoBotsStatsPage(BasePage):
             if st.checkbox("Export"):
                 df = self.get_tabular_data(
                     bi,
-                    run_url,
                     conversations,
                     messages,
                     details,
@@ -828,7 +826,6 @@ class VideoBotsStatsPage(BasePage):
     def get_tabular_data(
         self,
         bi,
-        run_url,
         conversations,
         messages,
         details,
@@ -870,7 +867,7 @@ class VideoBotsStatsPage(BasePage):
             df = df.sort_values(
                 by=["Last Sent", "Name", "Sent"], ascending=False
             ).reset_index()
-            df.drop(columns=["index"], inplace=True)
+            df.drop(columns=["index", "Last Sent"], inplace=True)
         elif details == "Feedback Positive":
             pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
@@ -881,8 +878,6 @@ class VideoBotsStatsPage(BasePage):
                     created_at__date__gte=start_date, created_at__date__lte=end_date
                 )
             df = pos_feedbacks.to_df_format(row_limit=rows)
-            df["Run URL"] = run_url
-            df["Bot"] = bi.name
         elif details == "Feedback Negative":
             neg_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
@@ -893,8 +888,6 @@ class VideoBotsStatsPage(BasePage):
                     created_at__date__gte=start_date, created_at__date__lte=end_date
                 )
             df = neg_feedbacks.to_df_format(row_limit=rows)
-            df["Run URL"] = run_url
-            df["Bot"] = bi.name
         elif details == "Answered Successfully":
             successful_messages: MessageQuerySet = Message.objects.filter(
                 Q(analysis_result__contains={"Answered": True})
@@ -906,8 +899,6 @@ class VideoBotsStatsPage(BasePage):
                     created_at__date__gte=start_date, created_at__date__lte=end_date
                 )
             df = successful_messages.to_df_analysis_format(row_limit=rows)
-            df["Run URL"] = run_url
-            df["Bot"] = bi.name
         elif details == "Answered Unsuccessfully":
             unsuccessful_messages: MessageQuerySet = Message.objects.filter(
                 Q(analysis_result__contains={"Answered": False})
@@ -919,8 +910,6 @@ class VideoBotsStatsPage(BasePage):
                     created_at__date__gte=start_date, created_at__date__lte=end_date
                 )
             df = unsuccessful_messages.to_df_analysis_format(row_limit=rows)
-            df["Run URL"] = run_url
-            df["Bot"] = bi.name
 
         if sort_by and sort_by in df.columns:
             df.sort_values(by=[sort_by], ascending=False, inplace=True)
