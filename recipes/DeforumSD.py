@@ -85,7 +85,15 @@ def animation_prompts_editor(
         View the ‘Details’ drop down menu to get started.
         """
     )
+    st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
+    col1, col2, col3 = st.columns([2, 8, 3], responsive=False)
+    with col1:
+        st.write("Second")
+    with col2:
+        st.write("Prompt")
+    with col3:
+        st.write("Zoom/Pan")
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
@@ -95,23 +103,42 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns([8, 3], responsive=False)
+        col1, col2, col3 = st.columns([2, 8, 3], responsive=False)
         with col1:
-            st.text_area(
-                label="*Prompt*",
-                key=prompt_key,
-                height=100,
-            )
-        with col2:
             st.number_input(
-                label="*Frame*",
+                label="",
                 key=frame_key,
                 min_value=0,
                 step=1,
             )
-            if st.button("🗑️", help=f"Remove Frame {idx + 1}"):
+        with col2:
+            st.text_area(
+                label="",
+                key=prompt_key,
+                height=100,
+            )
+        with col3:
+            if idx != 0 and st.button("🗑️", help=f"Remove Frame {idx + 1}"):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
+            if st.button(
+                '<i class="fa-regular fa-plus"></i>',
+                help=f"Insert Frame after Frame {idx + 1}",
+            ):
+                max_frames = st.session_state.get("max_frames", 100)
+                next_frame = st.session_state.get(frame_key) + 1
+                if next_frame > max_frames:
+                    st.error("Please increase Frame Count")
+                else:
+                    prompt_st_list.insert(
+                        idx + 1,
+                        {
+                            "frame": next_frame,
+                            "prompt": "",
+                            "key": str(uuid.uuid1()),
+                        },
+                    )
+                    st.experimental_rerun()
 
         updated_st_list.append(
             {
@@ -124,32 +151,8 @@ def animation_prompts_editor(
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
 
-    if st.button("➕ Add a Prompt"):
-        max_frames = st.session_state.get("max_frames", 100)
-        if prompt_st_list:
-            next_frame = get_last_frame(prompt_st_list)
-            next_frame += max(min(max_frames - next_frame, 10), 1)
-        else:
-            next_frame = 0
-        if next_frame > max_frames:
-            st.error("Please increase Frame Count")
-        else:
-            prompt_st_list.append(
-                {
-                    "frame": next_frame,
-                    "prompt": "",
-                    "key": str(uuid.uuid1()),
-                }
-            )
-            st.experimental_rerun()
-
     st.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
-    )
-    st.caption(
-        """
-        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation.
-        """
     )
 
 
@@ -218,24 +221,6 @@ class DeforumSDPage(BasePage):
 
     def render_form_v2(self):
         animation_prompts_editor()
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.slider(
-                """
-                #### Frame Count
-                Choose the number of frames in your animation.
-                """,
-                min_value=10,
-                max_value=500,
-                step=10,
-                key="max_frames",
-            )
-            st.caption(
-                """
-Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames.
-            """
-            )
 
     def get_cost_note(self) -> str | None:
         return f"{CREDITS_PER_FRAME} / frame"
