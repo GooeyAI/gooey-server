@@ -36,6 +36,7 @@ from recipes.VideoBots import VideoBotsPage
 from recipes.asr_page import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
 from recipes.VideoBotsStats import VideoBotsStatsPage
+from recipes.Translation import TranslationPage
 
 # note: the ordering here matters!
 all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
@@ -66,6 +67,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         TextToSpeechPage,
         AsrPage,
         Text2AudioPage,
+        TranslationPage,
     ],
     "Images": [
         Img2ImgPage,
