@@ -87,7 +87,7 @@ def animation_prompts_editor(
     )
     st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
-    col1, col2, col3 = st.columns([2, 8, 3], responsive=False)
+    col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
     with col1:
         st.write("Second")
     with col2:
@@ -103,7 +103,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3 = st.columns([2, 8, 3], responsive=False)
+        col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
         with col1:
             st.number_input(
                 label="",
@@ -135,7 +135,7 @@ def animation_prompts_editor(
                         {
                             "frame": next_frame,
                             "prompt": "",
-                            "key": str(uuid.uuid1()),
+                            "key": fp_key,
                         },
                     )
                     st.experimental_rerun()
@@ -147,6 +147,18 @@ def animation_prompts_editor(
                 "key": fp_key,
             }
         )
+    # Add final end of video prompt
+    col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
+    with col1:
+        st.number_input(
+            label="",
+            key=fp_key,
+            min_value=0,
+            step=1,
+            value=st.session_state.get(frame_key) + 10,
+        )
+    with col2:
+        st.write("*End of Video*")
 
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
