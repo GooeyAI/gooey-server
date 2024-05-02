@@ -304,7 +304,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
                 headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                 timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
             )
-            raise_for_status(r)
+            raise_for_status(r, is_user_url=True)
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
             name = None
@@ -548,7 +548,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         )
-        raise_for_status(r)
+        raise_for_status(r, is_user_url=True)
     except requests.RequestException as e:
         print(f"ignore error while downloading {f_url}: {e}")
         return b"", ""

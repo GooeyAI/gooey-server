@@ -306,7 +306,7 @@ def extract_info(url: str) -> list[dict | None]:
                 headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                 timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
             )
-            raise_for_status(r)
+            raise_for_status(r, is_user_url=True)
             f_bytes = r.content
             content_url = url
         num_pages = get_pdf_num_pages(f_bytes)

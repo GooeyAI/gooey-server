@@ -730,7 +730,7 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
     img = bytes_to_cv2_img(r.content, greyscale=True)
     return extract_qr_code_data(img)
 
