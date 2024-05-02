@@ -2,7 +2,7 @@ import json
 import time
 import typing
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from furl import furl
 from pydantic import BaseModel
@@ -90,7 +90,7 @@ class TextToSpeechPage(BasePage):
         openai_tts_model: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
-        audio_url: pydantic.HttpUrl
+        audio_url: FieldHttpUrl
 
     def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG

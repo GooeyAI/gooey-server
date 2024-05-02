@@ -1,7 +1,7 @@
 import typing
 from enum import Enum
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -58,7 +58,7 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        documents: list[pydantic.HttpUrl]
+        documents: list[FieldHttpUrl]
 
         task_instructions: str | None
         merge_instructions: str | None

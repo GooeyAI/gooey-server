@@ -1,6 +1,6 @@
 import typing
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
@@ -46,7 +46,7 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.HttpUrl
+        input_image: FieldHttpUrl
         text_prompt: str
 
         obj_scale: float | None
@@ -72,10 +72,10 @@ class ObjectInpaintingPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        resized_image: pydantic.HttpUrl
-        obj_mask: pydantic.HttpUrl
-        # diffusion_images: list[pydantic.HttpUrl]
-        output_images: list[pydantic.HttpUrl]
+        resized_image: FieldHttpUrl
+        obj_mask: FieldHttpUrl
+        # diffusion_images: list[FieldHttpUrl]
+        output_images: list[FieldHttpUrl]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_OBJECT_INPAINTING_META_IMG

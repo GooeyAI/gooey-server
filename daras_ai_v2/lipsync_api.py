@@ -2,10 +2,11 @@ import typing
 from enum import Enum
 
 from loguru import logger
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
 class LipsyncModel(Enum):
@@ -22,8 +23,8 @@ class SadTalkerSettings(BaseModel):
     )
     pose_style: int = Field(0, title="Pose Style")
     expression_scale: float = Field(1.0, title="Expression Scale")
-    ref_eyeblink: HttpUrl = Field(None, title="Reference Eyeblink")
-    ref_pose: HttpUrl = Field(None, title="Reference Pose")
+    ref_eyeblink: FieldHttpUrl = Field(None, title="Reference Eyeblink")
+    ref_pose: FieldHttpUrl = Field(None, title="Reference Pose")
     input_yaw: list[int] = Field(None, title="Input Yaw (comma separated)")
     input_pitch: list[int] = Field(None, title="Input Pitch (comma separated)")
     input_roll: list[int] = Field(None, title="Input Roll (comma separated)")
@@ -32,7 +33,7 @@ class SadTalkerSettings(BaseModel):
 
 
 class LipsyncSettings(BaseModel):
-    input_face: HttpUrl = None
+    input_face: FieldHttpUrl = None
 
     # wav2lip
     face_padding_top: int = None

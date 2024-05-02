@@ -1,6 +1,6 @@
 import typing
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
@@ -43,7 +43,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.HttpUrl
+        input_image: FieldHttpUrl
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
@@ -71,7 +71,7 @@ class Img2ImgPage(BasePage):
         image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
-        output_images: list[pydantic.HttpUrl]
+        output_images: list[FieldHttpUrl]
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:

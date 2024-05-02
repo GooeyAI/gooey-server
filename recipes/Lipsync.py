@@ -1,7 +1,7 @@
 import typing
 
 import requests
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -10,6 +10,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 CREDITS_PER_MB = 2
 
@@ -26,10 +27,10 @@ class LipsyncPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )
-        input_audio: HttpUrl = None
+        input_audio: FieldHttpUrl = None
 
     class ResponseModel(BaseModel):
-        output_video: HttpUrl
+        output_video: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG

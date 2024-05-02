@@ -1,7 +1,7 @@
 import re
 import typing
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
@@ -81,11 +81,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             }
 
     class ResponseModel(BaseModel):
-        input_image: pydantic.HttpUrl
-        resized_image: pydantic.HttpUrl
-        face_mask: pydantic.HttpUrl
-        diffusion_images: list[pydantic.HttpUrl]
-        output_images: list[pydantic.HttpUrl]
+        input_image: FieldHttpUrl
+        resized_image: FieldHttpUrl
+        face_mask: FieldHttpUrl
+        diffusion_images: list[FieldHttpUrl]
+        output_images: list[FieldHttpUrl]
         email_sent: bool = False
 
     @classmethod

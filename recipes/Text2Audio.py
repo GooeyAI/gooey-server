@@ -1,7 +1,7 @@
 import typing
 from enum import Enum
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -57,7 +57,7 @@ class Text2AudioPage(BasePage):
     class ResponseModel(BaseModel):
         output_audios: dict[
             typing.Literal[tuple(e.name for e in Text2AudioModels)],
-            list[pydantic.HttpUrl],
+            list[FieldHttpUrl],
         ]
 
     def preview_image(self, state: dict) -> str | None:

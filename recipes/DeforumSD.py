@@ -1,7 +1,7 @@
 import typing
 import uuid
 
-import pydantic
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from django.db.models import TextChoices
 from pydantic import BaseModel
 from typing_extensions import TypedDict
@@ -199,7 +199,7 @@ class DeforumSDPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        output_video: pydantic.HttpUrl
+        output_video: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DEFORUMSD_META_IMG
