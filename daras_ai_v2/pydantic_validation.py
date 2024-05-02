@@ -1,13 +1,24 @@
 import typing
+from typing import Any
 
 from pydantic import HttpUrl
 
 if typing.TYPE_CHECKING:
+    from pydantic import BaseConfig, AnyUrl
+    from pydantic.fields import ModelField
     from pydantic.error_wrappers import ErrorDict
 
 
 class FieldHttpUrl(HttpUrl):
     min_length = 0  # allow empty string
+
+    @classmethod
+    def validate(
+        cls, value: Any, field: "ModelField", config: "BaseConfig"
+    ) -> "AnyUrl":
+        if value == "":
+            return None
+        return super().validate(value, field, config)
 
 
 CUSTOM_MESSAGES = {
