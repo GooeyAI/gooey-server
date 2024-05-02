@@ -40,7 +40,7 @@ def serp_search_location_selectbox(key="serp_search_location"):
         options=SerpSearchLocation,
         format_func=lambda x: f"{x.label} ({x.value})",
         key=key,
-        default_value=SerpSearchLocation.UNITED_STATES,
+        value=SerpSearchLocation.UNITED_STATES,
     )
 
 

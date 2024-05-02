@@ -253,7 +253,7 @@ Here's what you uploaded:
                         label_visibility="collapsed",
                         key=key + ":func",
                         options=AggFunctionsList,
-                        default_value=d.get("function"),
+                        value=d.get("function"),
                     )
             with col3:
                 del_button(del_key)

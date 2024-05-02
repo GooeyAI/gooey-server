@@ -4,7 +4,7 @@ import inspect
 import math
 import typing
 import uuid
-from copy import deepcopy
+from copy import deepcopy, copy
 from enum import Enum
 from itertools import pairwise
 from random import Random
@@ -1264,7 +1264,9 @@ class BasePage:
             return "/account/"
 
     def get_submit_container_props(self):
-        return dict(className="position-sticky bottom-0 bg-white")
+        return dict(
+            className="position-sticky bottom-0 bg-white", style=dict(zIndex=100)
+        )
 
     def render_submit_button(self, key="--submit-1"):
         with st.div(**self.get_submit_container_props()):
@@ -1638,6 +1640,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         state = sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
+        for k, v in self.RequestModel.schema()["properties"].items():
+            try:
+                state.setdefault(k, copy(v["default"]))
+            except KeyError:
+                pass
         for k, v in self.sane_defaults.items():
             state.setdefault(k, v)
         return state

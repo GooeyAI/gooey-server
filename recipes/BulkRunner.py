@@ -197,7 +197,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                         label="`" + title + "`",
                         options=column_options,
                         key="--input-mapping:" + field,
-                        default_value=input_columns_old.get(field),
+                        value=input_columns_old.get(field),
                     )
                 if col:
                     input_columns_new[field] = col
@@ -442,7 +442,7 @@ To get started:
                     workflow = st.selectbox(
                         "",
                         key=key + ":workflow",
-                        default_value=(
+                        value=(
                             d.get("workflow") or st.session_state.get(last_workflow_key)
                         ),
                         options=options,
@@ -461,7 +461,7 @@ To get started:
                         "",
                         key=key,
                         options=options,
-                        default_value=d.get("url"),
+                        value=d.get("url"),
                         format_func=lambda x: options[x],
                     )
             with scol3:

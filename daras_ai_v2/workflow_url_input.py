@@ -45,7 +45,7 @@ def workflow_url_input(
                     "",
                     key=key,
                     options=options,
-                    default_value=internal_state.get("url"),
+                    value=internal_state.get("url"),
                     format_func=lambda x: options[x] if x else BLANK_OPTION,
                     allow_none=allow_none,
                 )
