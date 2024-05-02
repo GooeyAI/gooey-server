@@ -54,6 +54,9 @@ def export(obj, exclude=()):
     for field in obj._meta.get_fields():
         if field.name in exclude:
             continue
-        if field.is_relation and field.many_to_one:
-            setattr(obj, field.name, None)
+        if field.is_relation:
+            try:
+                setattr(obj, field.name, None)
+            except TypeError:
+                pass
     return obj
