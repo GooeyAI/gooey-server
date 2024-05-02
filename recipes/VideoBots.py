@@ -403,7 +403,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.write("---")
         else:
             st.session_state["input_face"] = None
-            st.session_state["lipsync_model"] = None
+            st.session_state.pop("lipsync_model", None)
 
         if st.checkbox(
             "##### 🔠 Translation & Speech Recognition",

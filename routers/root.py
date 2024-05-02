@@ -434,6 +434,7 @@ def integrations_route(
 
 
 @app.post("/{page_slug}/")
+@app.post("/{page_slug}/{run_slug}/")
 @app.post("/{page_slug}/{run_slug}-{example_id}/")
 @st.route
 def recipe_page_or_handle(
