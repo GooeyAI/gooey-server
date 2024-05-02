@@ -41,7 +41,7 @@ class AsrPage(BasePage):
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
     class RequestModel(BaseModel):
-        documents: list[pydantic.AnyHttpUrl]
+        documents: list[pydantic.HttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
 
@@ -59,7 +59,7 @@ class AsrPage(BasePage):
             description="DEPRECATED: use translation_model & translation_target instead."
         )
 
-        glossary_document: pydantic.AnyHttpUrl | None
+        glossary_document: pydantic.HttpUrl | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):

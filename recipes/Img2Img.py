@@ -43,7 +43,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
+        input_image: pydantic.HttpUrl
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
@@ -71,7 +71,7 @@ class Img2ImgPage(BasePage):
         image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
-        output_images: list[pydantic.AnyHttpUrl]
+        output_images: list[pydantic.HttpUrl]
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:

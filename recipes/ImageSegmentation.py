@@ -48,7 +48,7 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
+        input_image: pydantic.HttpUrl
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
@@ -63,10 +63,10 @@ class ImageSegmentationPage(BasePage):
         obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
-        output_image: pydantic.AnyHttpUrl
-        cutout_image: pydantic.AnyHttpUrl
-        resized_image: pydantic.AnyHttpUrl
-        resized_mask: pydantic.AnyHttpUrl
+        output_image: pydantic.HttpUrl
+        cutout_image: pydantic.HttpUrl
+        resized_image: pydantic.HttpUrl
+        resized_mask: pydantic.HttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_IMG_SEGMENTATION_META_IMG

@@ -57,7 +57,7 @@ class Text2AudioPage(BasePage):
     class ResponseModel(BaseModel):
         output_audios: dict[
             typing.Literal[tuple(e.name for e in Text2AudioModels)],
-            list[pydantic.AnyHttpUrl],
+            list[pydantic.HttpUrl],
         ]
 
     def preview_image(self, state: dict) -> str | None:

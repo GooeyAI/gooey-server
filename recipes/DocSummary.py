@@ -58,7 +58,7 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        documents: list[pydantic.AnyHttpUrl]
+        documents: list[pydantic.HttpUrl]
 
         task_instructions: str | None
         merge_instructions: str | None

@@ -21,7 +21,7 @@ class CompareUpscalerPage(BasePage):
     slug_versions = ["compare-ai-upscalers"]
 
     class RequestModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
+        input_image: pydantic.HttpUrl
 
         scale: int
 
@@ -31,7 +31,7 @@ class CompareUpscalerPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], pydantic.AnyHttpUrl
+            typing.Literal[tuple(e.name for e in UpscalerModels)], pydantic.HttpUrl
         ]
 
     def render_form_v2(self):

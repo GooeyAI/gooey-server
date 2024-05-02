@@ -39,7 +39,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     class ResponseModel(BaseModel):
         audio_url: str | None
 
-        output_video: pydantic.AnyHttpUrl
+        output_video: pydantic.HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
