@@ -13,6 +13,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
+from pydantic import BaseModel
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -50,6 +51,12 @@ class VideoBotsStatsPage(BasePage):
     workflow = (
         Workflow.VIDEO_BOTS
     )  # this is a hidden page, so this isn't used but type checking requires a workflow
+
+    class RequestModel(BaseModel):
+        pass
+
+    class ResponseModel(BaseModel):
+        pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

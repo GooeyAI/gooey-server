@@ -1,42 +1,62 @@
+import typing
+from enum import Enum
+
 from loguru import logger
+from pydantic import HttpUrl, BaseModel, Field
 
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 
-from pydantic import BaseModel, HttpUrl
-import typing
+
+class LipsyncModel(Enum):
+    Wav2Lip = "Rudrabha/Wav2Lip"
+    SadTalker = "OpenTalker/SadTalker"
 
 
-class SadtalkerInput(BaseModel):
-    source_image: HttpUrl
-    driven_audio: HttpUrl
-    pose_style: int
-    ref_eyeblink: HttpUrl | None = None
-    ref_pose: HttpUrl | None = None
-    batch_size: int = 2
-    size: int = 256
-    expression_scale: float = 1.0
-    input_yaw: list[int] | None = None
-    input_pitch: list[int] | None = None
-    input_roll: list[int] | None = None
-    enhancer: typing.Literal["gfpgan", "RestoreFormer"] | None = None
-    background_enhancer: typing.Literal["realesrgan"] | None = None
-    face3dvis: bool = False
-    still: bool = False
-    preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = "crop"
+class SadTalkerSettings(BaseModel):
+    still: bool = Field(
+        False, title="Still (fewer head motion, works with preprocess 'full')"
+    )
+    preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = Field(
+        "crop", title="Preprocess"
+    )
+    pose_style: int = Field(0, title="Pose Style")
+    expression_scale: float = Field(1.0, title="Expression Scale")
+    ref_eyeblink: HttpUrl = Field(None, title="Reference Eyeblink")
+    ref_pose: HttpUrl = Field(None, title="Reference Pose")
+    input_yaw: list[int] = Field(None, title="Input Yaw (comma separated)")
+    input_pitch: list[int] = Field(None, title="Input Pitch (comma separated)")
+    input_roll: list[int] = Field(None, title="Input Roll (comma separated)")
+    # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None
+    # background_enhancer: typing.Literal["realesrgan"] =None
 
 
-def sadtalker(input: SadtalkerInput):
+class LipsyncSettings(BaseModel):
+    input_face: HttpUrl = None
+
+    # wav2lip
+    face_padding_top: int = None
+    face_padding_bottom: int = None
+    face_padding_left: int = None
+    face_padding_right: int = None
+
+    sadtalker_settings: SadTalkerSettings = None
+
+
+def run_sadtalker(settings: SadTalkerSettings, face: str, audio: str):
     return call_celery_task_outfile(
         "lipsync.sadtalker",
-        pipeline=dict(model_id="sadtalker"),
-        inputs=input.dict(),
+        pipeline=dict(
+            model_id="SadTalker_V0.0.2_512.safetensors",
+            preprocess=settings.preprocess,
+        ),
+        inputs=settings.dict() | dict(source_image=face, driven_audio=audio),
         content_type="video/mp4",
         filename=f"gooey.ai lipsync.mp4",
     )[0]
 
 
-def wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> bytes:
+def run_wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> bytes:
     try:
         return call_celery_task_outfile(
             "wav2lip",

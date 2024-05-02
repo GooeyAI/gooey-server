@@ -65,6 +65,7 @@ from daras_ai_v2.language_model import (
     SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
@@ -149,6 +150,11 @@ class VideoBotsPage(BasePage):
         "quality": 1.0,
         "max_tokens": 1500,
         "sampling_temperature": 0.5,
+        # wav2lip
+        "face_padding_top": 0,
+        "face_padding_bottom": 10,
+        "face_padding_left": 0,
+        "face_padding_right": 0,
         # doc search
         "citation_style": CitationStyles.number.name,
         "documents": [],
@@ -161,15 +167,9 @@ class VideoBotsPage(BasePage):
         "use_url_shortener": False,
         "dense_weight": 1.0,
         "translation_model": TranslationModels.google.name,
-        # lipsync
-        "lipsync_model": "Wav2Lip",
-        "face_padding_top": 0,
-        "face_padding_bottom": 10,
-        "face_padding_left": 0,
-        "face_padding_right": 0,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(LipsyncSettings, BaseModel):
         bot_script: str | None
 
         input_prompt: str
@@ -219,32 +219,6 @@ class VideoBotsPage(BasePage):
         max_tokens: int | None
         sampling_temperature: float | None
 
-        # lipsync
-        lipsync_model: str = "Wav2Lip"
-        input_face: str | None
-        # wav2lip settings
-        face_padding_top: int | None
-        face_padding_bottom: int | None
-        face_padding_left: int | None
-        face_padding_right: int | None
-        # sadtalker settings
-        pose_style: int = 0
-        ref_eyeblink: str | None = None
-        ref_pose: str | None = None
-        batch_size: int = 2
-        size: int = 256
-        expression_scale: float = 1.0
-        input_yaw: list[int] | None = None
-        input_pitch: list[int] | None = None
-        input_roll: list[int] | None = None
-        enhancer: typing.Literal["gfpgan", "RestoreFormer"] | None = None
-        background_enhancer: typing.Literal["realesrgan"] | None = None
-        face3dvis: bool = False
-        still: bool = False
-        preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = (
-            "crop"
-        )
-
         # doc search
         task_instructions: str | None
         query_instructions: str | None
@@ -290,6 +264,10 @@ Translation Glossary for User Langauge -> LLM Language (English)
             description="""
 Translation Glossary for LLM Language (English) -> User Langauge
             """,
+        )
+
+        lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
+            LipsyncModel.Wav2Lip.name
         )
 
         variables: dict[str, typing.Any] | None
@@ -415,9 +393,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 """,
                 key="input_face",
             )
+            enum_selector(
+                LipsyncModel,
+                label="###### Lipsync Model",
+                key="lipsync_model",
+                use_selectbox=True,
+            )
             st.write("---")
         else:
             st.session_state["input_face"] = None
+            st.session_state["lipsync_model"] = None
 
         if st.checkbox(
             "##### 🔠 Translation & Speech Recognition",
@@ -498,9 +483,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             text_to_speech_settings(self, tts_provider)
             st.write("---")
 
-        input_face = st.session_state.get("input_face")
-        if input_face:
-            lipsync_settings()
+        lipsync_model = st.session_state.get("lipsync_model")
+        if lipsync_model:
+            lipsync_settings(lipsync_model)
             st.write("---")
 
         translation_model = st.session_state.get(
@@ -1051,7 +1036,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.output_video = []
         for audio_url in response.output_audio:
             lip_state = LipsyncPage.RequestModel.parse_obj(
-                {**st.session_state, "input_audio": audio_url}
+                {
+                    **st.session_state,
+                    "input_audio": audio_url,
+                    "selected_model": request.lipsync_model,
+                }
             ).dict()
             yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
                 lip_state
