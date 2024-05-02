@@ -148,11 +148,12 @@ class LargeLanguageModels(Enum):
         price=1,
     )
     llama2_70b_chat = LLMSpec(
-        label="Llama 2 70b Chat (Meta AI)",
+        label="Llama 2 70b Chat [Deprecated] (Meta AI)",
         model_id="llama2-70b-4096",
         llm_api=LLMApis.groq,
         context_window=4096,
         price=1,
+        is_deprecated=True,
     )
     mixtral_8x7b_instruct_0_1 = LLMSpec(
         label="Mixtral 8x7b Instruct v0.1 (Mistral)",
