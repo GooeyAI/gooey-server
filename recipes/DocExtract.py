@@ -74,14 +74,14 @@ class DocExtractPage(BasePage):
     price = 500
 
     class RequestModel(BaseModel):
-        documents: list[pydantic.AnyHttpUrl]
+        documents: list[pydantic.HttpUrl]
 
-        sheet_url: pydantic.AnyHttpUrl | None
+        sheet_url: pydantic.HttpUrl | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
-        glossary_document: pydantic.AnyHttpUrl | None
+        glossary_document: pydantic.HttpUrl | None
 
         task_instructions: str | None
 

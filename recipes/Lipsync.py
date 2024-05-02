@@ -1,7 +1,6 @@
 import typing
 
 import requests
-import pydantic
 from pydantic import BaseModel, HttpUrl
 
 import gooey_ui as st
@@ -30,7 +29,7 @@ class LipsyncPage(BasePage):
         input_audio: HttpUrl = None
 
     class ResponseModel(BaseModel):
-        output_video: pydantic.AnyHttpUrl
+        output_video: HttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG

@@ -45,7 +45,7 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
+        input_image: pydantic.HttpUrl
         text_prompt: str
 
         face_scale: float | None
@@ -76,10 +76,10 @@ class FaceInpaintingPage(BasePage):
             }
 
     class ResponseModel(BaseModel):
-        resized_image: pydantic.AnyHttpUrl
-        face_mask: pydantic.AnyHttpUrl
-        diffusion_images: list[pydantic.AnyHttpUrl]
-        output_images: list[pydantic.AnyHttpUrl]
+        resized_image: pydantic.HttpUrl
+        face_mask: pydantic.HttpUrl
+        diffusion_images: list[pydantic.HttpUrl]
+        output_images: list[pydantic.HttpUrl]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_FACE_INPAINTING_META_IMG

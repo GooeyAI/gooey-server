@@ -46,7 +46,7 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
+        input_image: pydantic.HttpUrl
         text_prompt: str
 
         obj_scale: float | None
@@ -72,10 +72,10 @@ class ObjectInpaintingPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        resized_image: pydantic.AnyHttpUrl
-        obj_mask: pydantic.AnyHttpUrl
-        # diffusion_images: list[pydantic.AnyHttpUrl]
-        output_images: list[pydantic.AnyHttpUrl]
+        resized_image: pydantic.HttpUrl
+        obj_mask: pydantic.HttpUrl
+        # diffusion_images: list[pydantic.HttpUrl]
+        output_images: list[pydantic.HttpUrl]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_OBJECT_INPAINTING_META_IMG

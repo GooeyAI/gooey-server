@@ -175,8 +175,8 @@ class VideoBotsPage(BasePage):
 
         input_prompt: str
         input_audio: str | None
-        input_images: list[pydantic.AnyHttpUrl] | None
-        input_documents: list[pydantic.AnyHttpUrl] | None
+        input_images: list[pydantic.HttpUrl] | None
+        input_documents: list[pydantic.HttpUrl] | None
         doc_extract_url: str | None = Field(
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
@@ -224,7 +224,7 @@ class VideoBotsPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
         keyword_instructions: str | None
-        documents: list[pydantic.AnyHttpUrl] | None
+        documents: list[pydantic.HttpUrl] | None
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
@@ -254,13 +254,13 @@ class VideoBotsPage(BasePage):
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        input_glossary_document: pydantic.AnyHttpUrl | None = Field(
+        input_glossary_document: pydantic.HttpUrl | None = Field(
             title="Input Glossary",
             description="""
 Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
-        output_glossary_document: pydantic.AnyHttpUrl | None = Field(
+        output_glossary_document: pydantic.HttpUrl | None = Field(
             title="Output Glossary",
             description="""
 Translation Glossary for LLM Language (English) -> User Langauge
@@ -282,8 +282,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_prompt: str | list[ConversationEntry] = []
 
         output_text: list[str] = []
-        output_audio: list[pydantic.AnyHttpUrl] = []
-        output_video: list[pydantic.AnyHttpUrl] = []
+        output_audio: list[pydantic.HttpUrl] = []
+        output_video: list[pydantic.HttpUrl] = []
 
         # intermediate text
         raw_input_text: str | None
@@ -296,7 +296,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_keyword_query: str | list[str] | None
 
         # function calls
-        output_documents: list[pydantic.AnyHttpUrl] | None
+        output_documents: list[pydantic.HttpUrl] | None
         reply_buttons: list[ReplyButton] | None
 
         finish_reason: list[str] | None

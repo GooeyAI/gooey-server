@@ -1,3 +1,9 @@
+import typing
+
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from starlette.requests import Request
+
 from gooeysite import wsgi
 
 assert wsgi
@@ -36,6 +42,9 @@ from routers import (
     bots_api,
 )
 import url_shortener.routers as url_shortener
+
+if typing.TYPE_CHECKING:
+    from pydantic.error_wrappers import ErrorDict
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
@@ -92,3 +101,29 @@ def request_time_middleware(app):
         )
 
     return middleware
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    ## https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions
+    convert_errors(exc.errors())
+    return await request_validation_exception_handler(request, exc)
+
+
+CUSTOM_MESSAGES = {
+    "value_error.url": (
+        "{original_msg}. "
+        "Please make sure the URL is correct and accessible. "
+        "If you are trying to use a local file, please use the [Upload Files via Form Data] option on https://gooey.ai/api/ to upload the file directly."
+    ),
+}
+
+
+def convert_errors(errors: list["ErrorDict"]):
+    for error in errors:
+        for type_prefix, custom_message in CUSTOM_MESSAGES.items():
+            if not error["type"].startswith(type_prefix):
+                continue
+            ctx = error.get("ctx", {})
+            custom_message = custom_message.format(**ctx, original_msg=error["msg"])
+            error["msg"] = custom_message

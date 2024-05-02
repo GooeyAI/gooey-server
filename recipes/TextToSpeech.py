@@ -90,7 +90,7 @@ class TextToSpeechPage(BasePage):
         openai_tts_model: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
-        audio_url: pydantic.AnyHttpUrl
+        audio_url: pydantic.HttpUrl
 
     def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG

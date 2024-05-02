@@ -199,7 +199,7 @@ class DeforumSDPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        output_video: pydantic.AnyHttpUrl
+        output_video: pydantic.HttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DEFORUMSD_META_IMG

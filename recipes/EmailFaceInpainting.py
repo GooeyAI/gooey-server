@@ -81,11 +81,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             }
 
     class ResponseModel(BaseModel):
-        input_image: pydantic.AnyHttpUrl
-        resized_image: pydantic.AnyHttpUrl
-        face_mask: pydantic.AnyHttpUrl
-        diffusion_images: list[pydantic.AnyHttpUrl]
-        output_images: list[pydantic.AnyHttpUrl]
+        input_image: pydantic.HttpUrl
+        resized_image: pydantic.HttpUrl
+        face_mask: pydantic.HttpUrl
+        diffusion_images: list[pydantic.HttpUrl]
+        output_images: list[pydantic.HttpUrl]
         email_sent: bool = False
 
     @classmethod

@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 from loguru import logger
-from pydantic import HttpUrl, BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile

@@ -45,7 +45,7 @@ class BulkRunnerPage(BasePage):
     price = 1
 
     class RequestModel(BaseModel):
-        documents: list[pydantic.AnyHttpUrl] = Field(
+        documents: list[pydantic.HttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
 Upload or link to a CSV or google sheet that contains your sample input data.
@@ -53,7 +53,7 @@ For example, for Copilot, this would sample questions or for Art QR Code, would 
 Remember to includes header names in your CSV too.
             """,
         )
-        run_urls: list[pydantic.AnyHttpUrl] = Field(
+        run_urls: list[pydantic.HttpUrl] = Field(
             title="Gooey Workflows",
             description="""
 Provide one or more Gooey.AI workflow runs.
@@ -74,7 +74,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
             """,
         )
 
-        eval_urls: list[pydantic.AnyHttpUrl] | None = Field(
+        eval_urls: list[pydantic.HttpUrl] | None = Field(
             title="Evaluation Workflows",
             description="""
 _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the results of your runs.
@@ -82,9 +82,9 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
         )
 
     class ResponseModel(BaseModel):
-        output_documents: list[pydantic.AnyHttpUrl]
+        output_documents: list[pydantic.HttpUrl]
 
-        eval_runs: list[pydantic.AnyHttpUrl] | None = Field(
+        eval_runs: list[pydantic.HttpUrl] | None = Field(
             title="Evaluation Run URLs",
             description="""
 List of URLs to the evaluation runs that you requested.

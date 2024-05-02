@@ -76,7 +76,7 @@ class CompareText2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[pydantic.AnyHttpUrl],
+            list[pydantic.HttpUrl],
         ]
 
     @classmethod
