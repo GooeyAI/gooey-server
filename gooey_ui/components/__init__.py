@@ -863,7 +863,7 @@ def number_input(
         max=max_value,
         step=_step_value(min_value, max_value, step),
     )
-    return value or 0
+    return float(format(value, ".2f")) or 0
 
 
 def _step_value(

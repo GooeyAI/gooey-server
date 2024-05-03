@@ -7,6 +7,7 @@ from typing_extensions import TypedDict
 
 import gooey_ui as st
 from bots.models import Workflow
+from gooey_ui.components.modal import Modal
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
@@ -87,7 +88,7 @@ def animation_prompts_editor(
     )
     st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
-    col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
+    col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
     with col1:
         st.write("Second")
     with col2:
@@ -103,13 +104,13 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
+        col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         with col1:
             st.number_input(
                 label="",
                 key=frame_key,
                 min_value=0,
-                step=1,
+                step=0.01,
             )
         with col2:
             st.text_area(
@@ -118,15 +119,29 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
+            zoom_pan_modal = Modal("Zoom/Pan", key=fp_key)
+            # st.caption("<a href='gooey.ai'>none</a>", unsafe_allow_html=True)
+            if st.button("Zoom/Pan", key=fp_key):
+                zoom_pan_modal.open()
+            if zoom_pan_modal.is_open():
+                with zoom_pan_modal.container():
+                    st.write(
+                        "#### Keyframe second 0:00 until 0.50",
+                    )
+                    st.caption(
+                        "Starting at second 0 and until second 0.50, how do you want the camera to move?"
+                    )
+        with col4:
             if idx != 0 and st.button("🗑️", help=f"Remove Frame {idx + 1}"):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
             if st.button(
                 '<i class="fa-regular fa-plus"></i>',
                 help=f"Insert Frame after Frame {idx + 1}",
+                type="tertiary",
             ):
                 max_frames = st.session_state.get("max_frames", 100)
-                next_frame = st.session_state.get(frame_key) + 1
+                next_frame = fp["frame"] + 3
                 if next_frame > max_frames:
                     st.error("Please increase Frame Count")
                 else:
@@ -135,7 +150,7 @@ def animation_prompts_editor(
                         {
                             "frame": next_frame,
                             "prompt": "",
-                            "key": fp_key,
+                            "key": str(uuid.uuid1()),
                         },
                     )
                     st.experimental_rerun()
@@ -148,14 +163,14 @@ def animation_prompts_editor(
             }
         )
     # Add final end of video prompt
-    col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
+    col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
     with col1:
         st.number_input(
             label="",
             key=fp_key,
             min_value=0,
-            step=1,
-            value=st.session_state.get(frame_key) + 10,
+            step=0.01,
+            value=st.session_state.get(frame_key) + 3,
         )
     with col2:
         st.write("*End of Video*")
