@@ -14,7 +14,7 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import icons, settings, urls
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -71,7 +71,25 @@ available_subscriptions = {
                     "interval": "month",
                 },
             },
-            "quantity": 1500,  # number of credits
+            "quantity": 1_500,  # number of credits
+        },
+        "paypal": {
+            "plan_id": settings.PAYPAL_PLAN_IDS["basic"],
+            "plan": {
+                "billing_cycles": [
+                    {
+                        "pricing_scheme": {
+                            "fixed_price": {
+                                "value": 10,  # in dollars
+                                "currency_code": "USD",
+                            },
+                        },
+                        "sequence": 1,
+                        "total_cycles": 0,
+                    }
+                ],
+            },
+            "quantity": 1_500,  # number of credits
         },
     },
     "premium": {
@@ -91,7 +109,25 @@ available_subscriptions = {
                     "interval": "month",
                 },
             },
-            "quantity": 10000,  # number of credits
+            "quantity": 10_000,  # number of credits
+        },
+        "paypal": {
+            "plan_id": settings.PAYPAL_PLAN_IDS["premium"],
+            "plan": {
+                "billing_cycles": [
+                    {
+                        "pricing_scheme": {
+                            "fixed_price": {
+                                "value": 50,
+                                "currency_code": "USD",
+                            },
+                        },
+                        "sequence": 1,
+                        "total_cycles": 0,
+                    }
+                ],
+            },
+            "quantity": 10_000,  # number of credits
         },
     },
     #
