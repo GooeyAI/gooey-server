@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
 	ffmpeg \
     libzbar0 \
-	&& rm -rf /var/lib/apt/lists/* \
+	&& rm -rf /var/lib/apt/lists/*
 
 # because https://github.com/Azure-Samples/cognitive-services-speech-sdk/issues/2204
 RUN wget -qO libssl.deb http://security.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.22_amd64.deb \
