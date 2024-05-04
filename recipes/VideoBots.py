@@ -1243,7 +1243,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         redirect_url = wa_connect_url(on_connect)
                     with st.div(style=descriptionstyle):
                         st.markdown(
-                            "Bring your own [WhatsApp number](https://business.facebook.com/wa/manage/phone-numbers) to connect. "
+                            "Bring your own WhatsApp number to connect. "
                             "Need a new one? Email [sales@gooey.ai](mailto:sales@gooey.ai) for help."
                         )
 
