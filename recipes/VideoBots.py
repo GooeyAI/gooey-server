@@ -1376,17 +1376,38 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                 else:
                     st.write("Message quicklink not available.")
+                if bi.platform == Platform.FACEBOOK:
+                    st.anchor(
+                        '<i class="fa-regular fa-inbox"></i> Open Inbox',
+                        f"https://www.facebook.com/latest/inbox",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
 
             col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Test")
-                st.caption(f"Send a test {Platform(bi.platform).label} message.")
+                st.caption(f"Send a test message via {Platform(bi.platform).label}.")
             with col2:
-                if test_link:
+                if bi.platform == Platform.FACEBOOK and test_link:
+                    st.anchor(
+                        f"{icon} Open Profile",
+                        test_link,
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                    st.anchor(
+                        '<img src="https://upload.wikimedia.org/wikipedia/commons/b/be/Facebook_Messenger_logo_2020.svg" width="20" height="20" /> Open Messenger',
+                        f"https://www.messenger.com/t/{bi.fb_page_id}",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                elif test_link:
                     st.anchor(
                         f"{icon} Message {bi.get_display_name()}",
                         test_link,
                         unsafe_allow_html=True,
+                        new_tab=True,
                     )
                 else:
                     st.write("Message quicklink not available.")
@@ -1409,6 +1430,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         )
                         / "stats/"
                     ),
+                    new_tab=True,
                 )
 
             # ==== future changes ====
