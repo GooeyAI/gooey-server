@@ -342,6 +342,9 @@ def get_entry_text(entry: ConversationEntry) -> str:
     )
 
 
+ResponseFormatType = typing.Literal["text", "json_object"]
+
+
 def run_language_model(
     *,
     model: str,
@@ -355,7 +358,7 @@ def run_language_model(
     avoid_repetition: bool = False,
     tools: list[LLMTools] = None,
     stream: bool = False,
-    response_format_type: typing.Literal["text", "json_object"] = None,
+    response_format_type: ResponseFormatType = None,
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
@@ -394,9 +397,9 @@ def run_language_model(
             stream=stream and not (tools or response_format_type),
         )
         if stream:
-            return _stream_llm_outputs(entries, response_format_type)
+            return _stream_llm_outputs(entries)
         else:
-            return _parse_entries(entries, response_format_type, tools)
+            return _parse_entries(entries, tools)
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -440,28 +443,17 @@ def run_language_model(
 
 def _stream_llm_outputs(
     result: list | typing.Generator[list[ConversationEntry], None, None],
-    response_format_type: typing.Literal["text", "json_object"] | None,
 ):
     if isinstance(result, list):  # compatibility with non-streaming apis
         result = [result]
     for entries in result:
-        if response_format_type == "json_object":
-            for i, entry in enumerate(entries):
-                entries[i] = json.loads(entry["content"])
         for i, entry in enumerate(entries):
             entries[i]["content"] = entry.get("content") or ""
         yield entries
 
 
-def _parse_entries(
-    entries: list[dict],
-    response_format_type: typing.Literal["text", "json_object"] | None,
-    tools: list[dict] | None,
-):
-    if response_format_type == "json_object":
-        ret = [json.loads(entry["content"]) for entry in entries]
-    else:
-        ret = [get_entry_text(entry).strip() for entry in entries]
+def _parse_entries(entries: list[dict], tools: list[dict] | None):
+    ret = [get_entry_text(entry).strip() for entry in entries]
     if tools:
         return ret, [(entry.get("tool_calls") or []) for entry in entries]
     else:
@@ -527,7 +519,7 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"] | None,
+    response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
@@ -680,7 +672,7 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"] | None,
+    response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN

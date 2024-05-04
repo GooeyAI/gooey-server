@@ -883,11 +883,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
-                keyword_query = generate_final_search_query(
-                    request=k_request,
-                    instructions=keyword_instructions,
-                    context={**st.session_state, "messages": chat_history},
-                    response_format_type="json_object",
+                keyword_query = json.loads(
+                    generate_final_search_query(
+                        request=k_request,
+                        instructions=keyword_instructions,
+                        context={**st.session_state, "messages": chat_history},
+                        response_format_type="json_object",
+                    ),
                 )
                 if keyword_query and isinstance(keyword_query, dict):
                     keyword_query = list(keyword_query.values())[0]

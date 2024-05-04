@@ -1,4 +1,5 @@
 import itertools
+import json
 import os
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
@@ -368,11 +369,13 @@ def submit(
 
 
 def _run_language_model(prompt: str, result: TaskResult):
-    ret = run_language_model(
-        model=LargeLanguageModels.gpt_4_turbo.name,
-        prompt=prompt,
-        response_format_type="json_object",
-    )[0]
+    ret = json.loads(
+        run_language_model(
+            model=LargeLanguageModels.gpt_4_turbo.name,
+            prompt=prompt,
+            response_format_type="json_object",
+        )[0]
+    )
     assert isinstance(ret, dict)
     result.llm_output.update(ret)
     return result
