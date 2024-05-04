@@ -932,7 +932,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
             model.context_window
-            - calc_gpt_tokens([system_prompt, user_input])
+            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
             - request.max_tokens
             - SAFETY_BUFFER
         )
@@ -941,7 +941,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             max_history_tokens,
         )
         history_prompt = request.messages[clip_idx:]
-        response.final_prompt = [system_prompt, *history_prompt, user_prompt]
+        response.final_prompt = list(
+            filter(None, [system_prompt, *history_prompt, user_prompt])
+        )
 
         # ensure input script is not too big
         max_allowed_tokens = model.context_window - calc_gpt_tokens(
