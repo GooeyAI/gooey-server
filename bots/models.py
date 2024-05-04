@@ -917,6 +917,9 @@ class Conversation(models.Model):
     d30.short_description = "D30"
     d30.boolean = True
 
+    def msgs_as_llm_context(self):
+        return self.messages.all().as_llm_context(reset_at=self.reset_at)
+
 
 class MessageQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
@@ -1011,7 +1014,7 @@ class MessageQuerySet(models.QuerySet):
         return df
 
     def as_llm_context(
-        self, limit: int = 50, reset_at: datetime.datetime = None
+        self, reset_at: datetime.datetime, limit: int = 50
     ) -> list["ConversationEntry"]:
         if reset_at:
             self = self.filter(created_at__gt=reset_at)

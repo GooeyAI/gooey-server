@@ -14,6 +14,7 @@ from bots.models import (
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
+from daras_ai_v2.language_model import get_entry_text
 from daras_ai_v2.slack_bot import (
     fetch_channel_members,
     create_personal_channel,
@@ -42,11 +43,17 @@ def msg_analysis(msg_id: int):
     analysis_sr = bi.analysis_run
     assert analysis_sr, "bot integration must have an analysis run"
 
+    chat_history = "\n".join(
+        f'{entry["role"]}: """{get_entry_text(entry)}"""'
+        for entry in msg.conversation.msgs_as_llm_context()
+    )
+
     # make the api call
     billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
     variables = dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
+        messages=chat_history,
         bot_script=msg.saved_run.state.get("bot_script", ""),
         references=references_as_prompt(msg.saved_run.state.get("references", [])),
     )
