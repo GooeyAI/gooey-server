@@ -175,8 +175,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-            else:
-                run_slug = "example"
 
         query_params = cls.clean_query_params(
             example_id=None, run_id=run_id, uid=uid

@@ -592,6 +592,5 @@ class RecipeTabs(TabData, Enum):
         kwargs["page_slug"] = page_slug
         if example_id:
             kwargs["example_id"] = example_id
-            if run_slug:
-                kwargs["run_slug"] = run_slug
+            kwargs["run_slug"] = run_slug or "untitled"
         return os.path.join(app.url_path_for(self.route.__name__, **kwargs), "")
