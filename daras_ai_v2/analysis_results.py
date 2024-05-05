@@ -35,7 +35,7 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
             """
             setTimeout(() => {
                 gooeyRefresh();
-            }, 1000);
+            }, 10000);
             """
         )
 
