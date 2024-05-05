@@ -165,7 +165,6 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
-        has_analysis_run = bi.analysis_run is not None
         run_url = VideoBotsPage.current_app_url()
         if bi.published_run_id:
             run_title = bi.published_run.title
@@ -222,7 +221,7 @@ class VideoBotsStatsPage(BasePage):
                         "Answered Successfully",
                         "Answered Unsuccessfully",
                     ]
-                    if has_analysis_run
+                    if bi.analysis_runs.exists()
                     else []
                 )
             ),

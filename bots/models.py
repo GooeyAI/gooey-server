@@ -265,7 +265,7 @@ class SavedRun(models.Model):
         ).h1_title
         return title or self.get_app_url()
 
-    def parent_published_run(self) -> "PublishedRun":
+    def parent_published_run(self) -> typing.Optional["PublishedRun"]:
         return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
@@ -578,15 +578,15 @@ class BotIntegration(models.Model):
         help_text="List of allowed domains for the bot's web integration",
     )
 
-    analysis_run = models.ForeignKey(
-        "bots.SavedRun",
-        on_delete=models.SET_NULL,
-        related_name="analysis_botintegrations",
-        null=True,
-        blank=True,
-        default=None,
-        help_text="If provided, the message content will be analyzed for this bot using this saved run",
-    )
+    # analysis_run = models.ForeignKey(
+    #     "bots.SavedRun",
+    #     on_delete=models.SET_NULL,
+    #     related_name="analysis_botintegrations",
+    #     null=True,
+    #     blank=True,
+    #     default=None,
+    #     help_text="If provided, the message content will be analyzed for this bot using this saved run",
+    # )
 
     streaming_enabled = models.BooleanField(
         default=False,
@@ -642,6 +642,49 @@ class BotIntegration(models.Model):
         from routers.bots_api import api_hashids
 
         return api_hashids.encode(self.id)
+
+
+class BotIntegrationAnalysisRun(models.Model):
+    bot_integration = models.ForeignKey(
+        "BotIntegration",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+    )
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+        null=True,
+        default=None,
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+        null=True,
+        default=None,
+    )
+
+    class Meta:
+        unique_together = [
+            ("bot_integration", "saved_run", "published_run"),
+        ]
+        constraints = [
+            # ensure only one of saved_run or published_run is set
+            models.CheckConstraint(
+                check=models.Q(saved_run__isnull=False)
+                ^ models.Q(published_run__isnull=False),
+                name="saved_run_xor_published_run",
+            ),
+        ]
+
+    def get_active_saved_run(self) -> SavedRun:
+        if self.published_run:
+            return self.published_run.saved_run
+        elif self.saved_run:
+            return self.saved_run
+        else:
+            raise ValueError("No saved run found")
 
 
 class ConvoState(models.IntegerChoices):

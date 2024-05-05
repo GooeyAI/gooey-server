@@ -11,6 +11,7 @@ from bots.models import (
     BotIntegration,
     Conversation,
     Platform,
+    SavedRun,
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
@@ -33,15 +34,16 @@ def create_personal_channels_for_all_members(bi_id: int):
 
 
 @shared_task
-def msg_analysis(msg_id: int):
+def msg_analysis(msg_id: int, sr_id: int):
     msg = Message.objects.get(id=msg_id)
     assert (
         msg.role == CHATML_ROLE_ASSISSTANT
     ), f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
 
-    bi = msg.conversation.bot_integration
-    analysis_sr = bi.analysis_run
-    assert analysis_sr, "bot integration must have an analysis run"
+    billing_account = AppUser.objects.get(
+        uid=msg.conversation.bot_integration.billing_account_uid
+    )
+    analysis_sr = SavedRun.objects.get(id=sr_id)
 
     chat_history = "\n".join(
         f'{entry["role"]}: """{get_entry_text(entry)}"""'
@@ -49,7 +51,6 @@ def msg_analysis(msg_id: int):
     )
 
     # make the api call
-    billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
     variables = dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,

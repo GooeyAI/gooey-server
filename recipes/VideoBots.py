@@ -1460,7 +1460,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
                     slack_specific_settings(bi, run_title)
-                general_integration_settings(bi)
+                general_integration_settings(bi, self.request.user)
 
                 if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
                     st.newline()

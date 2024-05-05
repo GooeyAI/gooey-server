@@ -22,7 +22,7 @@ def workflow_url_input(
     del_key: str = None,
     current_user: AppUser | None = None,
     allow_none: bool = False,
-):
+) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 
     col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
@@ -60,10 +60,12 @@ def workflow_url_input(
             del_button(del_key)
 
     try:
-        url_to_runs(url)
+        ret = url_to_runs(url)
     except Exception as e:
+        ret = None
         st.error(repr(e))
     internal_state["url"] = url
+    return ret
 
 
 def edit_button(key: str):
@@ -90,15 +92,9 @@ def init_workflow_selector(internal_state: dict, key: str):
             _, sr, pr = url_to_runs(str(internal_state["url"]))
         except Exception:
             return
-        else:
-            if (
-                pr
-                and pr.saved_run == sr
-                and pr.visibility == PublishedRunVisibility.PUBLIC
-                and (pr.is_approved_example or pr.is_root())
-            ):
-                internal_state["workflow"] = pr.workflow
-                internal_state["url"] = pr.get_app_url()
+        if pr and pr.saved_run_id == sr.id:
+            internal_state["workflow"] = pr.workflow
+            internal_state["url"] = pr.get_app_url()
 
 
 def url_to_runs(

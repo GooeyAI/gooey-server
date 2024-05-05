@@ -26,6 +26,7 @@ from bots.models import (
     BotIntegration,
     MessageAttachment,
     WorkflowMetadata,
+    BotIntegrationAnalysisRun,
 )
 from bots.tasks import create_personal_channels_for_all_members
 from gooeysite.custom_actions import export_to_excel, export_to_csv
@@ -100,6 +101,12 @@ def create_personal_channels(modeladmin, request, queryset):
     )
 
 
+class BotIntegrationQuerySetInline(admin.TabularInline):
+    model = BotIntegrationAnalysisRun
+    autocomplete_fields = ["saved_run", "published_run"]
+    extra = 0
+
+
 @admin.register(BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
@@ -130,17 +137,18 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "billing_account_uid",
         "saved_run",
         "published_run",
-        "analysis_run",
     ]
     list_filter = ["platform"]
 
     form = BotIntegrationAdminForm
 
-    autocomplete_fields = ["saved_run", "published_run", "analysis_run"]
+    autocomplete_fields = ["saved_run", "published_run"]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
+
+    inlines = [BotIntegrationQuerySetInline]
 
     readonly_fields = [
         "fb_page_access_token",
@@ -198,7 +206,6 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "streaming_enabled",
                     "show_feedback_buttons",
-                    "analysis_run",
                     "view_analysis_results",
                 ]
             },
