@@ -68,7 +68,7 @@ def related_json_field_summary(
     results = {
         key.split(field + "__")[-1]: [
             (
-                json.dumps(val).strip('"'),
+                str(val),
                 count,
                 furl(
                     reverse(

@@ -2,6 +2,7 @@ import json
 from json import JSONDecodeError
 
 from celery import shared_task
+from django.db import transaction
 from django.db.models import QuerySet
 
 from app_users.models import AppUser
@@ -91,9 +92,13 @@ def msg_analysis(msg_id: int, sr_id: int):
         analysis_result = {
             "error": "Failed to parse the analysis result. Please check your script.",
         }
-    Message.objects.filter(id=msg_id).update(
-        analysis_result=analysis_result,
-    )
+    with transaction.atomic():
+        msg = Message.objects.get(id=msg_id)
+        # merge the analysis result with the existing one
+        msg.analysis_result = (msg.analysis_result or {}) | analysis_result
+        # save the result
+        msg._analysis_started = True  # prevent infinite recursion
+        msg.save(update_fields=["analysis_result"])
 
 
 def send_broadcast_msgs_chunked(
