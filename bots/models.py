@@ -578,16 +578,6 @@ class BotIntegration(models.Model):
         help_text="List of allowed domains for the bot's web integration",
     )
 
-    # analysis_run = models.ForeignKey(
-    #     "bots.SavedRun",
-    #     on_delete=models.SET_NULL,
-    #     related_name="analysis_botintegrations",
-    #     null=True,
-    #     blank=True,
-    #     default=None,
-    #     help_text="If provided, the message content will be analyzed for this bot using this saved run",
-    # )
-
     streaming_enabled = models.BooleanField(
         default=False,
         help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",

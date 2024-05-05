@@ -45,22 +45,32 @@ def msg_analysis(msg_id: int, sr_id: int):
     )
     analysis_sr = SavedRun.objects.get(id=sr_id)
 
-    chat_history = "\n".join(
-        f'{entry["role"]}: """{get_entry_text(entry)}"""'
-        for entry in msg.conversation.msgs_as_llm_context()
-    )
-
-    # make the api call
-    variables = dict(
+    # add variables to the script
+    variables = analysis_sr.state.get("variables", {}) | dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
-        messages=chat_history,
         bot_script=msg.saved_run.state.get("bot_script", ""),
         references=references_as_prompt(msg.saved_run.state.get("references", [])),
     )
+
+    # these are resource intensive, so only include them if the script asks for them
+    if "messages" in variables:
+        variables["messages"] = "\n".join(
+            f'{entry["role"]}: """{get_entry_text(entry)}"""'
+            for entry in msg.conversation.msgs_as_llm_context()
+        )
+    if "conversations" in variables:
+        variables["conversations"] = "\n####\n".join(
+            "\n".join(
+                f'{entry["role"]}: """{get_entry_text(entry)}"""'
+                for entry in convo.msgs_as_llm_context()
+            )
+            for convo in msg.conversation.bot_integration.conversations.all()
+        )
+
+    # make the api call
     result, sr = analysis_sr.submit_api_call(
-        current_user=billing_account,
-        request_body=dict(variables=variables),
+        current_user=billing_account, request_body=dict(variables=variables)
     )
 
     # save the run before the result is ready

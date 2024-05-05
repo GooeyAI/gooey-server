@@ -17,8 +17,6 @@ def run_after_message_save(instance: Message, **kwargs):
         and instance.role == CHATML_ROLE_ASSISSTANT
     ):
         # msg_analysis.delay(msg_id=instance.id)
-        for analysis_run in analysis_runs:
-            msg_analysis.delay(
-                msg_id=instance.id, sr_id=analysis_run.get_active_saved_run().id
-            )
+        for anal in analysis_runs:
+            msg_analysis.delay(msg_id=instance.id, sr_id=anal.get_active_saved_run().id)
         instance._analysis_started = True
