@@ -10,7 +10,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
-    InpaintingModels,
     Img2ImgModels,
     img2img,
     SD_IMG_MAX_SIZE,
@@ -102,15 +101,14 @@ class Img2ImgPage(BasePage):
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
         )
 
-        if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
-            st.text_area(
-                """
-                #### Prompt
-                Describe your edits 
-                """,
-                key="text_prompt",
-                placeholder="Iron man",
-            )
+        st.text_area(
+            """
+            #### Prompt
+            Describe your edits 
+            """,
+            key="text_prompt",
+            placeholder="Iron man",
+        )
 
     def validate_form_v2(self):
         input_image = st.session_state.get("input_image")
