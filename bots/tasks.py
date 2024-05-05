@@ -50,8 +50,11 @@ def msg_analysis(msg_id: int, sr_id: int):
     variables = analysis_sr.state.get("variables", {}) | dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
-        bot_script=msg.saved_run.state.get("bot_script", ""),
-        references=references_as_prompt(msg.saved_run.state.get("references", [])),
+        bot_script=msg.saved_run and msg.saved_run.state.get("bot_script", ""),
+        references=(
+            msg.saved_run
+            and references_as_prompt(msg.saved_run.state.get("references", []))
+        ),
     )
 
     # these are resource intensive, so only include them if the script asks for them

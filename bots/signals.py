@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -16,7 +17,12 @@ def run_after_message_save(instance: Message, **kwargs):
         # this is the assistant's response
         and instance.role == CHATML_ROLE_ASSISSTANT
     ):
-        # msg_analysis.delay(msg_id=instance.id)
-        for anal in analysis_runs:
-            msg_analysis.delay(msg_id=instance.id, sr_id=anal.get_active_saved_run().id)
+
+        @transaction.on_commit
+        def _():
+            for anal in analysis_runs:
+                msg_analysis.delay(
+                    msg_id=instance.id, sr_id=anal.get_active_saved_run().id
+                )
+
         instance._analysis_started = True

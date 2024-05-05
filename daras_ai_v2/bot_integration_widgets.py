@@ -9,6 +9,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
+from routers.root import RecipeTabs
 
 
 def general_integration_settings(bi: BotIntegration, current_user: AppUser):
@@ -53,6 +54,22 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
             (anal.published_run or anal.saved_run).get_app_url()
             for anal in bi.analysis_runs.all()
         ]
+
+    if st.session_state.get("analysis_urls"):
+        from recipes.VideoBots import VideoBotsPage
+
+        st.anchor(
+            "📊 View Results",
+            str(
+                furl(
+                    VideoBotsPage.current_app_url(
+                        RecipeTabs.integrations,
+                        path_params=dict(integration_id=bi.api_integration_id()),
+                    )
+                )
+                / "analysis/"
+            ),
+        )
 
     input_analysis_runs = []
 

@@ -23,7 +23,7 @@ from starlette.responses import (
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import Workflow
+from bots.models import Workflow, BotIntegration
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -404,6 +404,39 @@ def integrations_stats_route(
     except IndexError:
         raise HTTPException(status_code=404)
     return render_page(request, "stats", run_slug, RecipeTabs.integrations, example_id)
+
+
+@app.post("/{page_slug}/integrations/{integration_id}/analysis/")
+@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/")
+@app.post(
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/"
+)
+@st.route
+def integrations_analysis_route(
+    request: Request,
+    page_slug: str,
+    integration_id: str,
+    run_slug: str = None,
+    example_id: str = None,
+    graphs: str = None,
+):
+    from routers.bots_api import api_hashids
+    from daras_ai_v2.analysis_results import render_analysis_results_page
+
+    try:
+        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+    except (IndexError, BotIntegration.DoesNotExist):
+        raise HTTPException(status_code=404)
+
+    with page_wrapper(request):
+        render_analysis_results_page(bi, graphs)
+
+    return dict(
+        meta=raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=f"Analysis for {bi.name}",
+        ),
+    )
 
 
 @app.post("/{page_slug}/integrations/")
