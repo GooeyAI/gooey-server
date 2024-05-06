@@ -4,6 +4,8 @@ from json import JSONDecodeError
 from celery import shared_task
 from django.db import transaction
 from django.db.models import QuerySet
+from django.utils import timezone
+from loguru import logger
 
 from app_users.models import AppUser
 from bots.models import (
@@ -13,6 +15,7 @@ from bots.models import (
     Conversation,
     Platform,
     SavedRun,
+    BotIntegrationAnalysisRun,
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
@@ -26,6 +29,8 @@ from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton
 
+MAX_PROMPT_LEN = 100_000
+
 
 @shared_task
 def create_personal_channels_for_all_members(bi_id: int):
@@ -34,8 +39,24 @@ def create_personal_channels_for_all_members(bi_id: int):
     map_parallel(lambda user: create_personal_channel(bi, user), users, max_workers=10)
 
 
-@shared_task
-def msg_analysis(msg_id: int, sr_id: int):
+@shared_task(bind=True)
+def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
+    anal = BotIntegrationAnalysisRun.objects.get(id=anal_id)
+
+    if (
+        countdown
+        and anal.scheduled_task_id
+        and anal.scheduled_task_id != self.request.id
+    ):
+        logger.warning(
+            f"Skipping analysis {anal} because another task is already scheduled"
+        )
+        return
+
+    anal.last_run_at = timezone.now()
+    anal.scheduled_task_id = None
+    anal.save(update_fields=["last_run_at"])
+
     msg = Message.objects.get(id=msg_id)
     assert (
         msg.role == CHATML_ROLE_ASSISSTANT
@@ -44,7 +65,7 @@ def msg_analysis(msg_id: int, sr_id: int):
     billing_account = AppUser.objects.get(
         uid=msg.conversation.bot_integration.billing_account_uid
     )
-    analysis_sr = SavedRun.objects.get(id=sr_id)
+    analysis_sr = anal.get_active_saved_run()
 
     # add variables to the script
     variables = analysis_sr.state.get("variables", {}) | dict(
@@ -63,14 +84,21 @@ def msg_analysis(msg_id: int, sr_id: int):
             f'{entry["role"]}: """{get_entry_text(entry)}"""'
             for entry in msg.conversation.msgs_as_llm_context()
         )
+
     if "conversations" in variables:
-        variables["conversations"] = "\n####\n".join(
-            "\n".join(
-                f'{entry["role"]}: """{get_entry_text(entry)}"""'
-                for entry in convo.msgs_as_llm_context()
+        conversations = []
+        for convo in msg.conversation.bot_integration.conversations.order_by(
+            "-created_at"
+        ):
+            if sum(map(len, conversations)) > MAX_PROMPT_LEN:
+                break
+            conversations.append(
+                "\n".join(
+                    f'{entry["role"]}: """{get_entry_text(entry)}"""'
+                    for entry in convo.msgs_as_llm_context()
+                )
             )
-            for convo in msg.conversation.bot_integration.conversations.all()
-        )
+        variables["conversations"] = "\n####\n".join(conversations)
 
     # make the api call
     result, sr = analysis_sr.submit_api_call(

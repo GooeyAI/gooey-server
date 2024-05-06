@@ -104,6 +104,7 @@ def create_personal_channels(modeladmin, request, queryset):
 class BotIntegrationQuerySetInline(admin.TabularInline):
     model = BotIntegrationAnalysisRun
     autocomplete_fields = ["saved_run", "published_run"]
+    readonly_fields = ["last_run_at"]
     extra = 0
 
 

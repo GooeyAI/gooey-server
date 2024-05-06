@@ -8,6 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -645,6 +646,7 @@ class BotIntegrationAnalysisRun(models.Model):
         on_delete=models.CASCADE,
         related_name="analysis_runs",
         null=True,
+        blank=True,
         default=None,
     )
     published_run = models.ForeignKey(
@@ -652,8 +654,23 @@ class BotIntegrationAnalysisRun(models.Model):
         on_delete=models.CASCADE,
         related_name="analysis_runs",
         null=True,
+        blank=True,
         default=None,
     )
+
+    cooldown_period = models.DurationField(
+        help_text="The time period to wait before running the analysis again",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
+    last_run_at = models.DateTimeField(
+        null=True, blank=True, default=None, editable=False
+    )
+    scheduled_task_id = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
         unique_together = [
@@ -908,6 +925,7 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
+            models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
     def __str__(self):

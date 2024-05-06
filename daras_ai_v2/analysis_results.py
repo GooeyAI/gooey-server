@@ -308,6 +308,7 @@ def render_data_in_plotly(*data):
             font=dict(size=16, family="basiercircle, sans-serif"),
             polar=dict(
                 radialaxis=dict(angle=90, tickangle=90),
+                angularaxis=dict(rotation=25),
             ),
             margin=dict(l=40, r=40, t=40, b=40),
             dragmode="pan",
