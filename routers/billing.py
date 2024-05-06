@@ -74,7 +74,25 @@ available_subscriptions = {
                     "interval": "month",
                 },
             },
-            "quantity": 1500,  # number of credits
+            "quantity": 1_500,  # number of credits
+        },
+        "paypal": {
+            "plan_id": settings.PAYPAL_PLAN_IDS["basic"],
+            "plan": {
+                "billing_cycles": [
+                    {
+                        "pricing_scheme": {
+                            "fixed_price": {
+                                "value": 10,  # in dollars
+                                "currency_code": "USD",
+                            },
+                        },
+                        "sequence": 1,
+                        "total_cycles": 0,
+                    }
+                ],
+            },
+            "quantity": 1_500,  # number of credits
         },
     },
     "premium": {
@@ -94,7 +112,25 @@ available_subscriptions = {
                     "interval": "month",
                 },
             },
-            "quantity": 10000,  # number of credits
+            "quantity": 10_000,  # number of credits
+        },
+        "paypal": {
+            "plan_id": settings.PAYPAL_PLAN_IDS["premium"],
+            "plan": {
+                "billing_cycles": [
+                    {
+                        "pricing_scheme": {
+                            "fixed_price": {
+                                "value": 50,
+                                "currency_code": "USD",
+                            },
+                        },
+                        "sequence": 1,
+                        "total_cycles": 0,
+                    }
+                ],
+            },
+            "quantity": 10_000,  # number of credits
         },
     },
     #

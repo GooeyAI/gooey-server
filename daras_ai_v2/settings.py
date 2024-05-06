@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import json
 from pathlib import Path
 
 import sentry_sdk
@@ -297,6 +298,18 @@ LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 
+PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
+PAYPAL_SECRET = config("PAYPAL_SECRET", "")
+PAYPAL_BASE = config("PAYPAL_BASE", "")
+PAYPAL_PLAN_IDS = config(
+    "PAYPAL_PLAN_IDS",
+    cast=json.loads,
+    # sandbox plan IDs
+    default='{"basic": "P-7EE20432AK666360GMYZFNBQ", "premium": "P-35W68839HF2588719MYZFN5Y"}',
+)
+PAYPAL_WEBHOOK_ID = config("PAYPAL_WEBHOOK_ID", "")
+PAYPAL_CREDITS_PER_UNIT = 100
+
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
@@ -352,11 +365,6 @@ DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 
 GHANA_NLP_SUBKEY = config("GHANA_NLP_SUBKEY", "")
-
-# Paypal
-PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
-PAYPAL_SECRET = config("PAYPAL_SECRET", "")
-PAYPAL_BASE = config("PAYPAL_BASE", "")
 
 VESPA_URL = config("VESPA_URL", "http://localhost:8085")
 VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")

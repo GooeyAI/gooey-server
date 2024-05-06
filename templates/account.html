@@ -1,28 +1,44 @@
 <script src="https://js.stripe.com/v3/" async defer></script>
 <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
-        async defer onload=renderPaypalButtons></script>
-
+        data-integration-source="button-factory"
+        data-namespace="paypal_one_time"
+        async
+        defer
+        onLoad="renderPaypalAddonButtons()"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&intent=subscription&vault=true&enable-funding=venmo&disable-funding=paylater"
+        data-integration-source="button-factory"
+        data-namespace="paypal_subscription"
+        async
+        defer
+        onLoad="renderPaypalSubscriptionButtons()"></script>
 <div class="container">
     {% if is_admin %}
         <div class="admin-div">
             <h2>Admin Links</h2>
             <ul>
-                <li><a href="https://gooey-dash-prod.us-1.gooey.ai/" target="_blank">Usage Dashboard</a></li>
-                <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
-                       target="_blank">Traffic Dashboard</a></li>
-                <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
-                       target="_blank">Sentry</a></li>
+                <li>
+                    <a href="https://gooey-dash-prod.us-1.gooey.ai/" target="_blank">Usage Dashboard</a>
+                </li>
+                <li>
+                    <a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
+                       target="_blank">Traffic Dashboard</a>
+                </li>
+                <li>
+                    <a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
+                       target="_blank">Sentry</a>
+                </li>
                 <li>
                     <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
-                       target="_blank">Analytics Summary</a></li>
+                       target="_blank">Analytics Summary</a>
+                </li>
                 <li>
                     <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
-                       target="_blank">Most Popular Pages</a></li>
+                       target="_blank">Most Popular Pages</a>
+                </li>
             </ul>
         </div>
         <hr>
     {% endif %}
-
     <div class="credits-container">
         <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
         <p>
@@ -30,30 +46,31 @@
             we deduct credits from your account.
         </p>
     </div>
-
     {% if not subscription %}
         <hr>
         <div class="buy-credits-container">
             <h2>Buy Credits</h2>
             <div class="pb-2">
                 Pay via
-
                 <input class="form-check-input mx-1"
                        type="radio"
                        id="payment-method-stripe"
                        name="payment-method"
-                       onchange="stripeLayout()"
+                       onChange="stripeLayout()"
                        data-submit-disabled
                        checked>
-                <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
-
+                <label class="form-check-label" for="payment-method-stripe">
+                    <b>Stripe</b>
+                </label>
                 <input class="form-check-input mx-1"
                        type="radio"
                        id="payment-method-paypal"
                        name="payment-method"
-                       onchange="paypalLayout()"
+                       onChange="paypalLayout()"
                        data-submit-disabled>
-                <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
+                <label class="form-check-label" for="payment-method-paypal">
+                    <b>Paypal</b>
+                </label>
             </div>
             <div id="stripe-container">
                 {% for lookup_key, subscription in available_subscriptions.items() %}
@@ -62,11 +79,11 @@
                             <div class="h4">{{ subscription["display"]["title"] }}</div>
                             <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
                             {% if lookup_key == "addon" %}
-                                {% include 'add_on_credits.html' %}
+                                {% include "add_on_credits.html" %}
                             {% else %}
-                                <form action="/__/stripe/create-checkout-session" method="POST">
+                                <form action="/__/stripe/create-checkout-session" method="post">
                                     <!-- Add a hidden field with the lookup_key of your Price -->
-                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
+                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}" />
                                     <button class="streamlit-like-btn" type="submit">Buy</button>
                                 </form>
                             {% endif %}
@@ -75,49 +92,61 @@
                 {% endfor %}
             </div>
             <div id="paypal-container" style="display: none;">
+                <p id="paypal-result-message"></p>
                 {% for lookup_key, subscription in available_subscriptions.items() %}
                     <ul>
-                        {% if lookup_key == "addon" %}
-                            <li>
-                                <div class="h4">{{ subscription["display"]["title"] }}</div>
-                                <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
+                        <li>
+                            <div class="h4">{{ subscription["display"]["title"] }}</div>
+                            <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
+                            {% if lookup_key == "addon" %}
                                 {% for option in [10, 30, 50, 100, 300, 500] %}
                                     <button class="streamlit-like-btn paypal-checkout-option"
-                                            onclick="setQuantity(this, {{ option * settings.ADDON_CREDITS_PER_DOLLAR }});"
+                                            onClick="setQuantity(this, {{ option * settings.ADDON_CREDITS_PER_DOLLAR }});"
                                             type="button"
-                                            data-submit-disabled>
-                                        Buy ${{ option }}
-                                    </button>
+                                            data-submit-disabled>Buy ${{ option }}</button>
                                 {% endfor %}
-                                <div class="pt-3" style="width: fit-content; display: none;"
-                                     id="paypal-button-container"></div>
-                                <p id="result-message"></p>
-                            </li>
-                        {% endif %}
+                                <div id="paypal-addon-buttons"
+                                     class="pt-3 paypal-buttons-container"
+                                     style="width: fit-content;
+                                            display: none"></div>
+                            {% else %}
+                                <button class="streamlit-like-btn paypal-checkout-option"
+                                        onClick="setSubscription(this, '{{ lookup_key }}');"
+                                        type="button"
+                                        data-submit-disabled>Buy</button>
+                                <div id="paypal-subscription-buttons-{{ lookup_key }}"
+                                     class="pt-3 paypal-buttons-container paypal-subscription-buttons"
+                                     data-plan-id="{{ subscription["paypal"]["plan_id"] }}"
+                                     style="width: fit-content;
+                                            display: none"></div>
+                            {% endif %}
+                        </li>
                     </ul>
                 {% endfor %}
             </div>
         </div>
     {% else %}
-        <hr/>
+        <hr />
         <div class="h4" id="subscription-text">
             You are subscribed to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}
         </div>
-        <form class="d-inline" action="/__/stripe/cancel-subscription" method="POST">
-            <button class="bg-danger streamlit-like-btn" id="cancel-button" type="submit">Cancel Subscription
-            </button>
+        <form class="d-inline"
+              action="/__/stripe/cancel-subscription"
+              method="post">
+            <button class="bg-danger streamlit-like-btn" id="cancel-button" type="submit">Cancel Subscription</button>
         </form>
-        <form class="d-inline" action="/__/stripe/create-portal-session" method="POST">
-            <button class="streamlit-like-btn" id="portal-button" type="submit">Manage your billing
+        <form class="d-inline"
+              action="/__/stripe/create-portal-session"
+              method="post">
+            <button class="streamlit-like-btn" id="portal-button" type="submit">
+                Manage your billing
                 information
             </button>
         </form>
-
         <div class="p-1"></div>
-        {% include 'add_on_credits.html' %}
+        {% include "add_on_credits.html" %}
     {% endif %}
 </div>
-
 <script>
     function stripeLayout() {
         document.getElementById("paypal-container").style.display = "none";
@@ -132,19 +161,82 @@
 
     let selectedQty = 0;
 
-    // Handle Paypal
-    function setQuantity(el, qty) {
+    function paypalSetButtonAsActive(el) {
         for (let btn of document.getElementsByClassName("paypal-checkout-option")) {
             btn.className = el.className.replace(" bg-secondary", "");
         }
         el.className += " bg-secondary";
-        document.getElementById("paypal-button-container").style.display = "block";
+    }
+
+    function paypalSetContainerAsActive(el) {
+        for (let container of document.getElementsByClassName("paypal-buttons-container")) {
+            container.style.display = "none";
+        }
+        el.style.display = "block";
+    }
+
+    function setQuantity(el, qty) {
+        paypalSetButtonAsActive(el);
+        paypalSetContainerAsActive(document.getElementById("paypal-addon-buttons"));
         selectedQty = qty;
     }
 
+    function setSubscription(el, lookupKey) {
+        paypalSetButtonAsActive(el);
+        paypalSetContainerAsActive(document.getElementById(`paypal-subscription-buttons-${lookupKey}`));
+    }
+
     function renderPaypalButtons() {
-        if (document.querySelector("#paypal-button-container").innerHTML) return;
-        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+        renderPaypalAddonButtons();
+        renderPaypalSubscriptionButtons();
+    }
+
+    function renderPaypalAddonButtons() {
+        if (document.querySelector("#paypal-addon-buttons").innerHTML) return;
+        window.paypal_one_time.Buttons({createOrder, onApprove}).render("#paypal-addon-buttons");
+    }
+
+    function renderPaypalSubscriptionButtons() {
+        for (const el of document.getElementsByClassName("paypal-subscription-buttons")) {
+            if (el.innerHTML) continue;
+            const planId = el.dataset.planId;
+            window.paypal_subscription.Buttons({
+                createSubscription: async function () {
+                    return await createSubscriptionWithPlan(planId);
+                },
+                onApprove: function (data, actions) {
+                    return actions.redirect(window.location.origin + "/payment-success/");
+                },
+            }).render(el);
+        }
+    }
+
+    async function createSubscriptionWithPlan(planId) {
+        try {
+            const response = await fetch("/__/paypal/subscriptions/create/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    plan_id: planId,
+                }),
+            });
+            const subscriptionData = await response.json();
+            if (subscriptionData.id) {
+                return subscriptionData.id;
+            } else {
+                const errorDetail = subscriptionData?.details?.[0];
+                const errorMessage = errorDetail
+                    ? `${errorDetail.issue} ${errorDetail.description} (${subscriptionData.debug_id})`
+                    : JSON.stringify(subscriptionData);
+
+                throw new Error(errorMessage);
+            }
+        } catch (error) {
+            console.error(error);
+            resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+        }
     }
 
     async function createOrder() {
@@ -216,9 +308,8 @@
         }
     }
 
-    // Example function to show a result to the user. Your site's UI library can be used instead.
     function resultMessage(message) {
-        const container = document.querySelector("#result-message");
+        const container = document.querySelector("#paypal-result-message");
         container.innerHTML = message;
     }
 </script>
