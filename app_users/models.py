@@ -91,6 +91,11 @@ class AppUser(models.Model):
     is_paying = models.BooleanField("paid", default=False)
 
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+    auto_recharge_enabled = models.BooleanField(default=False)
+    auto_recharge_amount = models.IntegerField(null=True, blank=True)
+    auto_recharge_topup_threshold = models.IntegerField(null=True, blank=True)
+    auto_recharge_monthly_budget = models.IntegerField(null=True, blank=True)
+    auto_recharge_email_threshold = models.IntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
@@ -294,6 +299,7 @@ class AppUserTransaction(models.Model):
         indexes = [
             models.Index(fields=["user", "amount", "-created_at"]),
             models.Index(fields=["-created_at"]),
+            models.Index(fields=["user", "created_at", "amount"]),
         ]
 
     def __str__(self):
