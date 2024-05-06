@@ -5,6 +5,7 @@ from django.db.models import IntegerChoices, Count
 
 import gooey_ui as st
 from bots.models import BotIntegration, Message
+from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
 from gooey_ui import QueryParamsRedirectException
 from gooeysite.custom_filters import related_json_field_summary
@@ -104,8 +105,7 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
         raise QueryParamsRedirectException(dict(graphs=new_graphs))
 
     with placeholder:
-        for graph_data in graphs:
-            render_graph_data(bi, results, graph_data)
+        grid_layout(2, graphs, lambda d: render_graph_data(bi, results, d))
 
 
 @st.cache_in_session_state
