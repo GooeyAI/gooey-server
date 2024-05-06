@@ -29,6 +29,7 @@ from daras_ai_v2.workflow_url_input import (
     del_button,
     workflow_url_input,
     get_published_run_options,
+    edit_done_button,
 )
 from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -419,9 +420,9 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        init_workflow_selector(d, key)
+        added_options = init_workflow_selector(d, key)
 
-        col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+        col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
             with col1:
                 url = st.text_input(
@@ -430,9 +431,11 @@ To get started:
                     value=d.get("url"),
                     placeholder="https://gooey.ai/.../?run_id=...",
                 )
+            with col2:
+                edit_done_button(key)
         else:
             with col1:
-                scol1, scol2, scol3 = st.columns([5, 6, 1], responsive=False)
+                scol1, scol2 = st.columns([1, 1], responsive=False)
             with scol1:
                 with st.div(className="pt-1"):
                     options = {
@@ -457,6 +460,7 @@ To get started:
                 options = get_published_run_options(
                     page_cls, current_user=self.request.user
                 )
+                options.update(added_options)
                 with st.div(className="pt-1"):
                     url = st.selectbox(
                         "",
@@ -465,11 +469,11 @@ To get started:
                         value=d.get("url"),
                         format_func=lambda x: options[x],
                     )
-            with scol3:
-                edit_button(key + ":editmode")
-        with col2:
-            url_button(url)
+            with col2:
+                edit_button(key)
         with col3:
+            url_button(url)
+        with col4:
             del_button(del_key)
 
         try:

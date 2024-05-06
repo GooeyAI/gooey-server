@@ -239,7 +239,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             qs=msgs,
             query_param="conversation__bot_integration__id__exact",
             instance_id=bi.id,
-            limit=50,
+            max_keys=50,
         )
         html = loader.render_to_string(
             "anaylsis_result.html", context=dict(results=results)

@@ -5,7 +5,7 @@ from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunVisibility, SavedRun
+from bots.models import PublishedRun, PublishedRunVisibility, SavedRun, Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.enum_selector_widget import BLANK_OPTION
@@ -23,9 +23,9 @@ def workflow_url_input(
     current_user: AppUser | None = None,
     allow_none: bool = False,
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
-    init_workflow_selector(internal_state, key)
+    added_options = init_workflow_selector(internal_state, key)
 
-    col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+    col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
     if not internal_state.get("workflow") and internal_state.get("url"):
         with col1:
             url = st.text_input(
@@ -34,12 +34,13 @@ def workflow_url_input(
                 value=internal_state.get("url"),
                 placeholder="https://gooey.ai/.../?run_id=...",
             )
+        with col2:
+            edit_done_button(key)
     else:
         internal_state["workflow"] = page_cls.workflow
         with col1:
-            scol1, scol2 = st.columns([11, 1], responsive=False)
-        with scol1:
             options = get_published_run_options(page_cls, current_user=current_user)
+            options.update(added_options)
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -51,11 +52,11 @@ def workflow_url_input(
                 )
                 if not url:
                     return
-        with scol2:
-            edit_button(key + ":editmode")
-    with col2:
-        url_button(url)
+        with col2:
+            edit_button(key)
     with col3:
+        url_button(url)
+    with col4:
         if del_key:
             del_button(del_key)
 
@@ -68,10 +69,18 @@ def workflow_url_input(
     return ret
 
 
+def edit_done_button(key: str):
+    st.button(
+        '<i class="fa-regular fa-square-check text-success"></i>',
+        key=key + ":edit-done",
+        type="tertiary",
+    )
+
+
 def edit_button(key: str):
     st.button(
         '<i class="fa-regular fa-pencil text-warning"></i>',
-        key=key,
+        key=key + ":edit-mode",
         type="tertiary",
     )
 
@@ -84,17 +93,38 @@ def del_button(key: str):
     )
 
 
-def init_workflow_selector(internal_state: dict, key: str):
-    if st.session_state.get(key + ":editmode"):
+def init_workflow_selector(
+    internal_state: dict,
+    key: str,
+) -> dict:
+    if st.session_state.get(key + ":edit-done"):
+        st.session_state.pop(key + ":edit-mode", None)
+        st.session_state.pop(key + ":edit-done", None)
+        st.session_state.pop(key, None)
+
+    if st.session_state.get(key + ":edit-mode"):
         internal_state.pop("workflow", None)
+
     elif not internal_state.get("workflow") and internal_state.get("url"):
         try:
             _, sr, pr = url_to_runs(str(internal_state["url"]))
         except Exception:
-            return
+            return {}
+
+        workflow = sr.workflow
+        page_cls = Workflow(workflow).page_cls
         if pr and pr.saved_run_id == sr.id:
-            internal_state["workflow"] = pr.workflow
-            internal_state["url"] = pr.get_app_url()
+            url = pr.get_app_url()
+        else:
+            url = sr.get_app_url()
+        title = get_title_breadcrumbs(page_cls, sr, pr).h1_title
+
+        internal_state["workflow"] = workflow
+        internal_state["url"] = url
+
+        return {url: title}
+
+    return {}
 
 
 def url_to_runs(

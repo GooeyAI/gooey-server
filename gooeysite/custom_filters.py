@@ -42,7 +42,7 @@ def related_json_field_summary(
     query_param: str = None,
     instance_id: int = None,
     exclude_keys: typing.Iterable[str] = (),
-    limit: int = None,
+    max_keys: int = None,
 ):
     if query_param is None:
         try:
@@ -84,7 +84,7 @@ def related_json_field_summary(
                 qs.values(key)
                 .annotate(count=Count("id"))
                 .order_by("-count")
-                .values_list(key, "count")[:limit]
+                .values_list(key, "count")[:max_keys]
             )
             if val is not None
         ]

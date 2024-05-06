@@ -11,8 +11,6 @@ from gooey_ui import QueryParamsRedirectException
 from gooeysite.custom_filters import related_json_field_summary
 from recipes.BulkRunner import list_view_editor
 
-MAX_LIMIT = 100
-
 
 class GraphType(IntegerChoices):
     display_values = 1, "Display as Text"
@@ -29,8 +27,7 @@ class DataSelection(IntegerChoices):
 
 
 def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
-    st.div(className="p-2")
-    if st.checkbox("🔄 Refresh every 10s"):
+    if st.session_state.get("autorefresh"):
         st.session_state.pop("__cache__", None)
         st.js(
             # language=JavaScript
@@ -80,6 +77,8 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
 
     placeholder = st.div(className="py-5")
 
+    st.checkbox("🔄 Refresh every 10s", key="autorefresh")
+
     with st.expander("✏️ Edit"):
         graphs = list_view_editor(
             add_btn_label="➕ Add a Graph",
@@ -121,7 +120,7 @@ def fetch_analysis_results(bi: BotIntegration) -> dict:
         qs=msgs,
         query_param="--",
         instance_id=bi.id,
-        limit=MAX_LIMIT,
+        max_keys=20,
     )
     return results
 
