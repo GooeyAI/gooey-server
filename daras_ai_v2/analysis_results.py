@@ -1,6 +1,7 @@
 import json
+from collections import Counter
 
-from django.db.models import IntegerChoices
+from django.db.models import IntegerChoices, Count
 
 import gooey_ui as st
 from bots.models import BotIntegration, Message
@@ -128,25 +129,29 @@ def fetch_analysis_results(bi: BotIntegration) -> dict:
 def render_graph_data(bi, results, graph_data):
     key = graph_data["key"]
     st.write(f"##### {key}")
+    obj_key = f"analysis_result__{key}"
 
     if graph_data["data_selection"] == DataSelection.last.value:
         latest_msg = (
             Message.objects.filter(conversation__bot_integration=bi)
-            .exclude(**{f"analysis_result__{key}": None})
+            .exclude(**{obj_key: None})
             .latest()
         )
         if not latest_msg:
             st.write("No analysis results found")
             return
-        values = [[latest_msg.analysis_result.get(key), 0, ""]]
+        values = [[latest_msg.analysis_result.get(key), 1]]
     elif graph_data["data_selection"] == DataSelection.convo_last.value:
-        latest_msgs = (
+        values_list = (
             Message.objects.filter(conversation__bot_integration=bi)
+            .exclude(**{obj_key: None})
             .exclude(**{f"analysis_result__{key}": None})
             .order_by("conversation_id", "-created_at")
             .distinct("conversation_id")
+            .values_list(obj_key, flat=True)
         )
-        values = [[msg.analysis_result.get(key), 0, ""] for msg in latest_msgs]
+        counts = Counter(values_list)
+        values = [[value, counts[value]] for value in counts]
     else:
         values = results[key]
 
