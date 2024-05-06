@@ -203,12 +203,13 @@ def render_pie_chart(values):
 def render_radar_plot(values):
     import plotly.graph_objects as go
 
+    r = [result[1] for result in values]
+    theta = [result[0] for result in values]
+    if r and theta:
+        r.append(r[0])
+        theta.append(theta[0])
     render_data_in_plotly(
-        go.Scatterpolar(
-            r=[result[1] for result in values],
-            theta=[result[0] for result in values],
-            fill="toself",
-        ),
+        go.Scatterpolar(r=r, theta=theta, fill="toself"),
     )
 
 
