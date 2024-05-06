@@ -41,7 +41,6 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
-from gooey_ui import RedirectException
 from gooey_ui.components.url_button import url_button
 from handles.models import Handle
 
@@ -490,7 +489,9 @@ def render_page_for_handle(request: Request, handle: Handle):
             user_profile_page(request, handle.user)
         return dict(meta=get_meta_tags_for_profile(handle.user))
     elif handle.has_redirect:
-        raise RedirectException(handle.redirect_url, status_code=301)
+        return RedirectResponse(
+            handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}
+        )
     else:
         logger.error(f"Handle {handle.name} has no user or redirect")
         raise HTTPException(status_code=404)
