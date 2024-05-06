@@ -428,13 +428,15 @@ def integrations_analysis_route(
         bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
+    url = get_og_url_path(request)
 
     with page_wrapper(request):
-        render_analysis_results_page(bi, str(request.url), request.user, title, graphs)
+        render_analysis_results_page(bi, url, request.user, title, graphs)
 
     return dict(
         meta=raw_build_meta_tags(
-            url=get_og_url_path(request),
+            url=url,
+            canonical_url=url,
             title=f"Analysis for {bi.name}",
         ),
     )
