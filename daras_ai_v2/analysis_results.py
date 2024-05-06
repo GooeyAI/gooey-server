@@ -294,7 +294,7 @@ def render_radar_plot(values):
         r.append(r[0])
         theta.append(theta[0])
     render_data_in_plotly(
-        go.Scatterpolar(r=r, theta=theta, fill="toself"),
+        go.Scatterpolar(r=r, theta=theta, fill="toself", marker=dict(color="#02b3a1")),
     )
 
 
@@ -305,7 +305,12 @@ def render_data_in_plotly(*data):
         data=data,
         layout=go.Layout(
             template="plotly_white",
-            font=dict(size=16),
+            font=dict(size=16, family="basiercircle, sans-serif"),
+            polar=dict(
+                radialaxis=dict(angle=90, tickangle=90),
+            ),
+            margin=dict(l=40, r=40, t=40, b=40),
+            dragmode="pan",
         ),
     )
     st.plotly_chart(fig)
