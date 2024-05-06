@@ -1,15 +1,20 @@
 import json
 from collections import Counter
+from functools import partial
 
 from django.db.models import IntegerChoices
 
 import gooey_ui as st
+from app_users.models import AppUser
 from bots.models import BotIntegration, Message
+from daras_ai_v2.base import RecipeTabs
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
 from gooey_ui import QueryParamsRedirectException
 from gooeysite.custom_filters import related_json_field_summary
 from recipes.BulkRunner import list_view_editor
+from recipes.VideoBots import VideoBotsPage
 
 
 class GraphType(IntegerChoices):
@@ -27,73 +32,33 @@ class DataSelection(IntegerChoices):
 
 
 def render_analysis_results_page(
-    bi: BotIntegration, title: str = None, graphs_json: str = None
+    bi: BotIntegration,
+    current_url: str,
+    current_user: AppUser | None,
+    title: str | None,
+    graphs_json: str | None,
 ):
-    with st.div(className="py-3"):
-        if title:
-            st.write(title)
+    render_title_breadcrumb_share(bi, current_url, current_user)
+
+    if title:
+        st.write(title)
 
     if graphs_json:
         graphs = json.loads(graphs_json)
     else:
         graphs = []
 
-    if st.session_state.get("autorefresh"):
-        st.session_state.pop("__cache__", None)
-        st.js(
-            # language=JavaScript
-            """
-            setTimeout(() => {
-                gooeyRefresh();
-            }, 10000);
-            """
-        )
+    _autorefresh_script()
 
     results = fetch_analysis_results(bi)
     if not results:
         st.write("No analysis results found")
         return
 
-    with st.div(className="pb-5"):
-        grid_layout(
-            2, graphs, lambda d: render_graph_data(bi, results, d), separator=False
-        )
+    with st.div(className="pb-5 pt-3"):
+        grid_layout(2, graphs, partial(render_graph_data, bi, results), separator=False)
 
     st.checkbox("🔄 Refresh every 10s", key="autorefresh")
-
-    def render_inputs(key: str, del_key: str, d: dict):
-        ocol1, ocol2 = st.columns([11, 1], responsive=False)
-        with ocol1:
-            col1, col2, col3 = st.columns(3)
-        with ocol2:
-            ocol2.node.props["style"] = dict(paddingTop="2rem")
-            del_button(del_key)
-
-        with col1:
-            d["key"] = st.selectbox(
-                label="##### Key",
-                options=results.keys(),
-                key=f"{key}_key",
-                value=d.get("key"),
-            )
-        with col2:
-            col2.node.props["style"] = dict(paddingTop="0.45rem")
-            d["graph_type"] = st.selectbox(
-                label="###### Graph Type",
-                options=[g.value for g in GraphType],
-                format_func=lambda x: GraphType(x).label,
-                key=f"{key}_type",
-                value=d.get("graph_type"),
-            )
-        with col3:
-            col3.node.props["style"] = dict(paddingTop="0.45rem")
-            d["data_selection"] = st.selectbox(
-                label="###### Data Selection",
-                options=[d.value for d in DataSelection],
-                format_func=lambda x: DataSelection(x).label,
-                key=f"{key}_data_selection",
-                value=d.get("data_selection"),
-            )
 
     with st.expander("✏️ Edit"):
         title = st.text_area("##### Title", value=title)
@@ -102,12 +67,113 @@ def render_analysis_results_page(
         selected_graphs = list_view_editor(
             add_btn_label="➕ Add a Graph",
             key="selected_graphs",
-            render_inputs=render_inputs,
+            render_inputs=partial(render_inputs, results),
         )
 
         with st.center():
             if st.button("✅ Update"):
                 _on_press_update(title, selected_graphs)
+
+
+def render_inputs(results: dict, key: str, del_key: str, d: dict):
+    ocol1, ocol2 = st.columns([11, 1], responsive=False)
+    with ocol1:
+        col1, col2, col3 = st.columns(3)
+    with ocol2:
+        ocol2.node.props["style"] = dict(paddingTop="2rem")
+        del_button(del_key)
+
+    with col1:
+        d["key"] = st.selectbox(
+            label="##### Key",
+            options=results.keys(),
+            key=f"{key}_key",
+            value=d.get("key"),
+        )
+    with col2:
+        col2.node.props["style"] = dict(paddingTop="0.45rem")
+        d["graph_type"] = st.selectbox(
+            label="###### Graph Type",
+            options=[g.value for g in GraphType],
+            format_func=lambda x: GraphType(x).label,
+            key=f"{key}_type",
+            value=d.get("graph_type"),
+        )
+    with col3:
+        col3.node.props["style"] = dict(paddingTop="0.45rem")
+        d["data_selection"] = st.selectbox(
+            label="###### Data Selection",
+            options=[d.value for d in DataSelection],
+            format_func=lambda x: DataSelection(x).label,
+            key=f"{key}_data_selection",
+            value=d.get("data_selection"),
+        )
+
+
+def _autorefresh_script():
+    if not st.session_state.get("autorefresh"):
+        return
+    st.session_state.pop("__cache__", None)
+    st.js(
+        # language=JavaScript
+        """
+            setTimeout(() => {
+                gooeyRefresh();
+            }, 10000);
+            """
+    )
+
+
+def render_title_breadcrumb_share(
+    bi: BotIntegration,
+    current_url: str,
+    current_user: AppUser | None,
+):
+    if bi.published_run_id:
+        run_title = bi.published_run.title
+        query_params = dict(example_id=bi.published_run.published_run_id)
+    else:
+        run_title = bi.saved_run.page_title  # this is mostly for backwards compat
+        query_params = dict(run_id=bi.saved_run.run_id, uid=bi.saved_run.uid)
+    with st.div(className="d-flex justify-content-between mt-4"):
+        with st.div(className="d-lg-flex d-block align-items-center"):
+            with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                with st.breadcrumbs():
+                    metadata = VideoBotsPage.workflow.get_or_create_metadata()
+                    st.breadcrumb_item(
+                        metadata.short_title,
+                        link_to=VideoBotsPage.app_url(),
+                        className="text-muted",
+                    )
+                    if not (bi.published_run_id and bi.published_run.is_root()):
+                        st.breadcrumb_item(
+                            run_title,
+                            link_to=VideoBotsPage.app_url(**query_params),
+                            className="text-muted",
+                        )
+                    st.breadcrumb_item(
+                        "Integrations",
+                        link_to=VideoBotsPage.app_url(
+                            **query_params,
+                            tab=RecipeTabs.integrations,
+                            path_params=dict(integration_id=bi.api_integration_id()),
+                        ),
+                    )
+
+            author = AppUser.objects.filter(uid=bi.billing_account_uid).first()
+            VideoBotsPage().render_author(
+                author,
+                show_as_link=VideoBotsPage.is_user_admin(current_user),
+            )
+
+        with st.div(className="d-flex align-items-center"):
+            with st.div(className="d-flex align-items-start right-action-icons"):
+                copy_to_clipboard_button(
+                    f'<i class="fa-regular fa-link"></i> <span class="d-none d-lg-inline"> Copy Link</span>',
+                    value=current_url,
+                    type="secondary",
+                    className="mb-0 ms-lg-2",
+                )
 
 
 def _on_press_update(title: str, selected_graphs: list[dict]):
@@ -145,7 +211,7 @@ def fetch_analysis_results(bi: BotIntegration) -> dict:
     return results
 
 
-def render_graph_data(bi, results, graph_data):
+def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
     key = graph_data["key"]
     st.write(f"##### {key}")
     obj_key = f"analysis_result__{key}"

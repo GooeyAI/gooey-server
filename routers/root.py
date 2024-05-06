@@ -430,7 +430,7 @@ def integrations_analysis_route(
         raise HTTPException(status_code=404)
 
     with page_wrapper(request):
-        render_analysis_results_page(bi, title, graphs)
+        render_analysis_results_page(bi, str(request.url), request.user, title, graphs)
 
     return dict(
         meta=raw_build_meta_tags(
