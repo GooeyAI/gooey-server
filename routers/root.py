@@ -418,6 +418,7 @@ def integrations_analysis_route(
     integration_id: str,
     run_slug: str = None,
     example_id: str = None,
+    title: str = None,
     graphs: str = None,
 ):
     from routers.bots_api import api_hashids
@@ -429,7 +430,7 @@ def integrations_analysis_route(
         raise HTTPException(status_code=404)
 
     with page_wrapper(request):
-        render_analysis_results_page(bi, graphs)
+        render_analysis_results_page(bi, title, graphs)
 
     return dict(
         meta=raw_build_meta_tags(

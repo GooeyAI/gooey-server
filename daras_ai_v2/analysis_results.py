@@ -1,7 +1,7 @@
 import json
 from collections import Counter
 
-from django.db.models import IntegerChoices, Count
+from django.db.models import IntegerChoices
 
 import gooey_ui as st
 from bots.models import BotIntegration, Message
@@ -26,7 +26,18 @@ class DataSelection(IntegerChoices):
     convo_last = 3, "Last Analysis per Conversation"
 
 
-def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
+def render_analysis_results_page(
+    bi: BotIntegration, title: str = None, graphs_json: str = None
+):
+    with st.div(className="py-3"):
+        if title:
+            st.write(title)
+
+    if graphs_json:
+        graphs = json.loads(graphs_json)
+    else:
+        graphs = []
+
     if st.session_state.get("autorefresh"):
         st.session_state.pop("__cache__", None)
         st.js(
@@ -43,16 +54,30 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
         st.write("No analysis results found")
         return
 
+    with st.div(className="pb-5"):
+        grid_layout(
+            2, graphs, lambda d: render_graph_data(bi, results, d), separator=False
+        )
+
+    st.checkbox("🔄 Refresh every 10s", key="autorefresh")
+
     def render_inputs(key: str, del_key: str, d: dict):
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        ocol1, ocol2 = st.columns([11, 1], responsive=False)
+        with ocol1:
+            col1, col2, col3 = st.columns(3)
+        with ocol2:
+            ocol2.node.props["style"] = dict(paddingTop="2rem")
+            del_button(del_key)
+
         with col1:
             d["key"] = st.selectbox(
-                label="###### Key",
+                label="##### Key",
                 options=results.keys(),
                 key=f"{key}_key",
                 value=d.get("key"),
             )
         with col2:
+            col2.node.props["style"] = dict(paddingTop="0.45rem")
             d["graph_type"] = st.selectbox(
                 label="###### Graph Type",
                 options=[g.value for g in GraphType],
@@ -61,6 +86,7 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
                 value=d.get("graph_type"),
             )
         with col3:
+            col3.node.props["style"] = dict(paddingTop="0.45rem")
             d["data_selection"] = st.selectbox(
                 label="###### Data Selection",
                 options=[d.value for d in DataSelection],
@@ -68,43 +94,37 @@ def render_analysis_results_page(bi: BotIntegration, old_graphs: str = None):
                 key=f"{key}_data_selection",
                 value=d.get("data_selection"),
             )
-        with col4:
-            col4.node.props["style"] = dict(paddingTop="1.5rem")
-            del_button(del_key)
-
-    if old_graphs and "selected_graphs" not in st.session_state:
-        st.session_state["selected_graphs"] = json.loads(old_graphs)
-
-    placeholder = st.div(className="py-5")
-
-    st.checkbox("🔄 Refresh every 10s", key="autorefresh")
 
     with st.expander("✏️ Edit"):
-        graphs = list_view_editor(
+        title = st.text_area("##### Title", value=title)
+
+        st.session_state.setdefault("selected_graphs", graphs)
+        selected_graphs = list_view_editor(
             add_btn_label="➕ Add a Graph",
             key="selected_graphs",
             render_inputs=render_inputs,
         )
 
-    new_graphs = (
-        json.dumps(
+        with st.center():
+            if st.button("✅ Update"):
+                _on_press_update(title, selected_graphs)
+
+
+def _on_press_update(title: str, selected_graphs: list[dict]):
+    if selected_graphs:
+        graphs_json = json.dumps(
             [
                 dict(
                     key=d["key"],
                     graph_type=d["graph_type"],
                     data_selection=d["data_selection"],
                 )
-                for d in graphs
+                for d in selected_graphs
             ]
         )
-        if graphs
-        else None
-    )
-    if new_graphs != old_graphs:
-        raise QueryParamsRedirectException(dict(graphs=new_graphs))
-
-    with placeholder:
-        grid_layout(2, graphs, lambda d: render_graph_data(bi, results, d))
+    else:
+        graphs_json = None
+    raise QueryParamsRedirectException(dict(title=title, graphs=graphs_json))
 
 
 @st.cache_in_session_state
