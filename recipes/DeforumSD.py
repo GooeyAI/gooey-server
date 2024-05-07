@@ -88,7 +88,7 @@ def animation_prompts_editor(
     )
     st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
-    col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
+    col1, col2, col3 = st.columns([3, 7, 3], responsive=False)
     with col1:
         st.write("Second")
     with col2:
@@ -104,9 +104,9 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
+        col1, col2, col3, col4, col5 = st.columns([3, 7, 1, 1, 1], responsive=False)
         with col1:
-            st.number_input(
+            start = st.number_input(
                 label="",
                 key=frame_key,
                 min_value=0,
@@ -119,22 +119,37 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
-            zoom_pan_modal = Modal("Zoom/Pan", key=fp_key)
-            # st.caption("<a href='gooey.ai'>none</a>", unsafe_allow_html=True)
-            if st.button("Zoom/Pan", key=fp_key):
+            zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
+            if st.button(
+                st.session_state.get("zoom", f"{start}:") or "none",
+                key="button-" + fp_key,
+                type="link",
+            ):
                 zoom_pan_modal.open()
             if zoom_pan_modal.is_open():
                 with zoom_pan_modal.container():
                     st.write(
-                        "#### Keyframe second 0:00 until 0.50",
+                        f"#### Keyframe second {start} until 0.50",
                     )
                     st.caption(
-                        "Starting at second 0 and until second 0.50, how do you want the camera to move?"
+                        f"Starting at second {start} and until second _, how do you want the camera to move?"
                     )
+                    st.slider(
+                        label="""
+                        #### Zoom
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.05,
+                    )
+                    st.button("Save")
         with col4:
-            if idx != 0 and st.button("🗑️", help=f"Remove Frame {idx + 1}"):
+            if idx != 0 and st.button(
+                "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
+            ):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
+        with col5:
             if st.button(
                 '<i class="fa-regular fa-plus"></i>',
                 help=f"Insert Frame after Frame {idx + 1}",
@@ -163,7 +178,7 @@ def animation_prompts_editor(
             }
         )
     # Add final end of video prompt
-    col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
+    col1, col2 = st.columns([3, 10], responsive=False)
     with col1:
         st.number_input(
             label="",
