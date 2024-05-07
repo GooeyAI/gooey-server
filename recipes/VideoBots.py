@@ -3,6 +3,7 @@ import math
 import mimetypes
 import typing
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
@@ -65,6 +66,7 @@ from daras_ai_v2.language_model import (
     SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
@@ -168,13 +170,13 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(LipsyncSettings, BaseModel):
         bot_script: str | None
 
         input_prompt: str
         input_audio: str | None
-        input_images: list[str] | None
-        input_documents: list[str] | None
+        input_images: list[FieldHttpUrl] | None
+        input_documents: list[FieldHttpUrl] | None
         doc_extract_url: str | None = Field(
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
@@ -218,18 +220,11 @@ class VideoBotsPage(BasePage):
         max_tokens: int | None
         sampling_temperature: float | None
 
-        # lipsync
-        input_face: str | None
-        face_padding_top: int | None
-        face_padding_bottom: int | None
-        face_padding_left: int | None
-        face_padding_right: int | None
-
         # doc search
         task_instructions: str | None
         query_instructions: str | None
         keyword_instructions: str | None
-        documents: list[str] | None
+        documents: list[FieldHttpUrl] | None
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
@@ -259,17 +254,21 @@ class VideoBotsPage(BasePage):
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        input_glossary_document: str | None = Field(
+        input_glossary_document: FieldHttpUrl | None = Field(
             title="Input Glossary",
             description="""
 Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
-        output_glossary_document: str | None = Field(
+        output_glossary_document: FieldHttpUrl | None = Field(
             title="Output Glossary",
             description="""
 Translation Glossary for LLM Language (English) -> User Langauge
             """,
+        )
+
+        lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
+            LipsyncModel.Wav2Lip.name
         )
 
         variables: dict[str, typing.Any] | None
@@ -283,8 +282,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_prompt: str | list[ConversationEntry] = []
 
         output_text: list[str] = []
-        output_audio: list[str] = []
-        output_video: list[str] = []
+        output_audio: list[FieldHttpUrl] = []
+        output_video: list[FieldHttpUrl] = []
 
         # intermediate text
         raw_input_text: str | None
@@ -297,7 +296,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_keyword_query: str | list[str] | None
 
         # function calls
-        output_documents: list[str] | None
+        output_documents: list[FieldHttpUrl] | None
         reply_buttons: list[ReplyButton] | None
 
         finish_reason: list[str] | None
@@ -395,9 +394,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 """,
                 key="input_face",
             )
+            enum_selector(
+                LipsyncModel,
+                label="###### Lipsync Model",
+                key="lipsync_model",
+                use_selectbox=True,
+            )
             st.write("---")
         else:
             st.session_state["input_face"] = None
+            st.session_state.pop("lipsync_model", None)
 
         if st.checkbox(
             "##### 🔠 Translation & Speech Recognition",
@@ -478,9 +484,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             text_to_speech_settings(self, tts_provider)
             st.write("---")
 
-        input_face = st.session_state.get("input_face")
-        if input_face:
-            lipsync_settings()
+        lipsync_model = st.session_state.get("lipsync_model")
+        if lipsync_model:
+            lipsync_settings(lipsync_model)
             st.write("---")
 
         translation_model = st.session_state.get(
@@ -877,11 +883,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
-                keyword_query = generate_final_search_query(
-                    request=k_request,
-                    instructions=keyword_instructions,
-                    context={**st.session_state, "messages": chat_history},
-                    response_format_type="json_object",
+                keyword_query = json.loads(
+                    generate_final_search_query(
+                        request=k_request,
+                        instructions=keyword_instructions,
+                        context={**st.session_state, "messages": chat_history},
+                        response_format_type="json_object",
+                    ),
                 )
                 if keyword_query and isinstance(keyword_query, dict):
                     keyword_query = list(keyword_query.values())[0]
@@ -926,7 +934,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
             model.context_window
-            - calc_gpt_tokens([system_prompt, user_input])
+            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
             - request.max_tokens
             - SAFETY_BUFFER
         )
@@ -935,7 +943,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             max_history_tokens,
         )
         history_prompt = request.messages[clip_idx:]
-        response.final_prompt = [system_prompt, *history_prompt, user_prompt]
+        response.final_prompt = list(
+            filter(None, [system_prompt, *history_prompt, user_prompt])
+        )
 
         # ensure input script is not too big
         max_allowed_tokens = model.context_window - calc_gpt_tokens(
@@ -1031,7 +1041,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.output_video = []
         for audio_url in response.output_audio:
             lip_state = LipsyncPage.RequestModel.parse_obj(
-                {**st.session_state, "input_audio": audio_url}
+                {
+                    **st.session_state,
+                    "input_audio": audio_url,
+                    "selected_model": request.lipsync_model,
+                }
             ).dict()
             yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
                 lip_state
@@ -1446,7 +1460,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
                     slack_specific_settings(bi, run_title)
-                general_integration_settings(bi)
+                general_integration_settings(bi, self.request.user)
 
                 if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
                     st.newline()

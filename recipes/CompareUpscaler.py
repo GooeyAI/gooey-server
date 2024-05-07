@@ -1,5 +1,6 @@
 import typing
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -20,7 +21,7 @@ class CompareUpscalerPage(BasePage):
     slug_versions = ["compare-ai-upscalers"]
 
     class RequestModel(BaseModel):
-        input_image: str
+        input_image: FieldHttpUrl
 
         scale: int
 
@@ -29,7 +30,9 @@ class CompareUpscalerPage(BasePage):
         )
 
     class ResponseModel(BaseModel):
-        output_images: dict[typing.Literal[tuple(e.name for e in UpscalerModels)], str]
+        output_images: dict[
+            typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
+        ]
 
     def render_form_v2(self):
         st.file_uploader(

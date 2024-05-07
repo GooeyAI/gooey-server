@@ -1,14 +1,18 @@
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from furl import furl
 
 import gooey_ui as st
-from bots.models import BotIntegration
-from bots.models import Workflow
+from app_users.models import AppUser
+from bots.models import BotIntegration, BotIntegrationAnalysisRun
 from daras_ai_v2 import settings
-from recipes.BulkRunner import url_to_runs
+from daras_ai_v2.workflow_url_input import workflow_url_input
+from recipes.BulkRunner import list_view_editor
+from recipes.CompareLLM import CompareLLMPage
+from routers.root import RecipeTabs
 
 
-def general_integration_settings(bi: BotIntegration):
+def general_integration_settings(bi: BotIntegration, current_user: AppUser):
     if st.session_state.get(f"_bi_reset_{bi.id}"):
         st.session_state[f"_bi_streaming_enabled_{bi.id}"] = (
             BotIntegration._meta.get_field("streaming_enabled").default
@@ -16,7 +20,8 @@ def general_integration_settings(bi: BotIntegration):
         st.session_state[f"_bi_show_feedback_buttons_{bi.id}"] = (
             BotIntegration._meta.get_field("show_feedback_buttons").default
         )
-        st.session_state[f"_bi_analysis_url_{bi.id}"] = None
+        st.session_state["analysis_urls"] = []
+        st.session_state.pop("--list-view:analysis_urls", None)
 
     bi.streaming_enabled = st.checkbox(
         "**📡 Streaming Enabled**",
@@ -37,38 +42,84 @@ def general_integration_settings(bi: BotIntegration):
         "Please note that this language is distinct from the one provided in the workflow settings. Hence, this allows you to integrate the same bot in many languages."
     )
 
-    analysis_url = st.text_input(
+    st.write(
         """
-        ##### 🧠 Analysis Run URL
-        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow url. Leave blank to disable. 
+        ##### 🧠 Analysis Scripts
+        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. Must return a JSON object.
         [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
-        """,
-        value=bi.analysis_run and bi.analysis_run.get_app_url(),
-        key=f"_bi_analysis_url_{bi.id}",
+        """
     )
-    if analysis_url:
-        try:
-            page_cls, bi.analysis_run, _ = url_to_runs(analysis_url)
-            assert page_cls.workflow in [
-                Workflow.COMPARE_LLM,
-                Workflow.VIDEO_BOTS,
-                Workflow.GOOGLE_GPT,
-                Workflow.DOC_SEARCH,
-            ], "We only support Compare LLM, Copilot, Google GPT and Doc Search workflows for analysis."
-        except Exception as e:
-            bi.analysis_run = None
-            st.error(repr(e))
-    else:
-        bi.analysis_run = None
+    if "analysis_urls" not in st.session_state:
+        st.session_state["analysis_urls"] = [
+            (anal.published_run or anal.saved_run).get_app_url()
+            for anal in bi.analysis_runs.all()
+        ]
 
-    pressed_update = st.button("Update")
-    pressed_reset = st.button("Reset", key=f"_bi_reset_{bi.id}", type="tertiary")
+    if st.session_state.get("analysis_urls"):
+        from recipes.VideoBots import VideoBotsPage
+
+        st.anchor(
+            "📊 View Results",
+            str(
+                furl(
+                    VideoBotsPage.current_app_url(
+                        RecipeTabs.integrations,
+                        path_params=dict(integration_id=bi.api_integration_id()),
+                    )
+                )
+                / "analysis/"
+            ),
+        )
+
+    input_analysis_runs = []
+
+    def render_workflow_url_input(key: str, del_key: str | None, d: dict):
+        with st.columns([3, 2])[0]:
+            ret = workflow_url_input(
+                page_cls=CompareLLMPage,
+                key=key,
+                internal_state=d,
+                del_key=del_key,
+                current_user=current_user,
+            )
+            if not ret:
+                return
+            page_cls, sr, pr = ret
+            if pr and pr.saved_run_id == sr.id:
+                input_analysis_runs.append(dict(saved_run=None, published_run=pr))
+            else:
+                input_analysis_runs.append(dict(saved_run=sr, published_run=None))
+
+    list_view_editor(
+        add_btn_label="➕ Add",
+        key="analysis_urls",
+        render_inputs=render_workflow_url_input,
+        flatten_dict_key="url",
+    )
+
+    with st.center():
+        with st.div():
+            pressed_update = st.button("✅ Save")
+            pressed_reset = st.button(
+                "Reset", key=f"_bi_reset_{bi.id}", type="tertiary"
+            )
     if pressed_update or pressed_reset:
-        try:
-            bi.full_clean()
-            bi.save()
-        except ValidationError as e:
-            st.error(str(e))
+        with transaction.atomic():
+            try:
+                bi.full_clean()
+                bi.save()
+                # save analysis runs
+                input_analysis_runs = [
+                    BotIntegrationAnalysisRun.objects.get_or_create(
+                        bot_integration=bi, **data
+                    )[0].id
+                    for data in input_analysis_runs
+                ]
+                # delete any analysis runs that were removed
+                bi.analysis_runs.all().exclude(id__in=input_analysis_runs).delete()
+            except ValidationError as e:
+                st.error(str(e))
+    st.write("---")
 
 
 def slack_specific_settings(bi: BotIntegration, default_name: str):

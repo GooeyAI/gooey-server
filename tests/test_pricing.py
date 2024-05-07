@@ -13,7 +13,7 @@ client = TestClient(app)
 
 
 @pytest.mark.django_db
-def test_copilot_get_raw_price_round_up(transactional_db):
+def test_copilot_get_raw_price_round_up():
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )

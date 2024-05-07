@@ -548,7 +548,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         )
-        raise_for_status(r)
+        raise_for_status(r, is_user_url=True)
     except requests.RequestException as e:
         print(f"ignore error while downloading {f_url}: {e}")
         return b"", ""

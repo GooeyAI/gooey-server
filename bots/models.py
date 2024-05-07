@@ -8,6 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -265,7 +266,7 @@ class SavedRun(models.Model):
         ).h1_title
         return title or self.get_app_url()
 
-    def parent_published_run(self) -> "PublishedRun":
+    def parent_published_run(self) -> typing.Optional["PublishedRun"]:
         return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
@@ -578,16 +579,6 @@ class BotIntegration(models.Model):
         help_text="List of allowed domains for the bot's web integration",
     )
 
-    analysis_run = models.ForeignKey(
-        "bots.SavedRun",
-        on_delete=models.SET_NULL,
-        related_name="analysis_botintegrations",
-        null=True,
-        blank=True,
-        default=None,
-        help_text="If provided, the message content will be analyzed for this bot using this saved run",
-    )
-
     streaming_enabled = models.BooleanField(
         default=False,
         help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
@@ -642,6 +633,65 @@ class BotIntegration(models.Model):
         from routers.bots_api import api_hashids
 
         return api_hashids.encode(self.id)
+
+
+class BotIntegrationAnalysisRun(models.Model):
+    bot_integration = models.ForeignKey(
+        "BotIntegration",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+    )
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
+        on_delete=models.CASCADE,
+        related_name="analysis_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
+    cooldown_period = models.DurationField(
+        help_text="The time period to wait before running the analysis again",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
+    last_run_at = models.DateTimeField(
+        null=True, blank=True, default=None, editable=False
+    )
+    scheduled_task_id = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+
+    class Meta:
+        unique_together = [
+            ("bot_integration", "saved_run", "published_run"),
+        ]
+        constraints = [
+            # ensure only one of saved_run or published_run is set
+            models.CheckConstraint(
+                check=models.Q(saved_run__isnull=False)
+                ^ models.Q(published_run__isnull=False),
+                name="saved_run_xor_published_run",
+            ),
+        ]
+
+    def get_active_saved_run(self) -> SavedRun:
+        if self.published_run:
+            return self.published_run.saved_run
+        elif self.saved_run:
+            return self.saved_run
+        else:
+            raise ValueError("No saved run found")
 
 
 class ConvoState(models.IntegerChoices):
@@ -875,6 +925,7 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
+            models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
     def __str__(self):
@@ -916,6 +967,9 @@ class Conversation(models.Model):
 
     d30.short_description = "D30"
     d30.boolean = True
+
+    def msgs_as_llm_context(self):
+        return self.messages.all().as_llm_context(reset_at=self.reset_at)
 
 
 class MessageQuerySet(models.QuerySet):
@@ -1011,7 +1065,7 @@ class MessageQuerySet(models.QuerySet):
         return df
 
     def as_llm_context(
-        self, limit: int = 50, reset_at: datetime.datetime = None
+        self, reset_at: datetime.datetime, limit: int = 50
     ) -> list["ConversationEntry"]:
         if reset_at:
             self = self.filter(created_at__gt=reset_at)

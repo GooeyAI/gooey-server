@@ -1,16 +1,18 @@
 import random
 import typing
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_multiselect, BLANK_OPTION
+from daras_ai_v2.field_render import field_title
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     SUPERSCRIPT,
+    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -48,6 +50,11 @@ class CompareLLMPage(BasePage):
         sampling_temperature: float | None
 
         variables: dict[str, typing.Any] | None
+
+        response_format_type: ResponseFormatType = Field(
+            None,
+            title="Response Format",
+        )
 
     class ResponseModel(BaseModel):
         output_text: dict[
@@ -90,6 +97,15 @@ class CompareLLMPage(BasePage):
 
     def render_settings(self):
         language_model_settings(show_selector=False)
+        st.selectbox(
+            f"###### {field_title(self.RequestModel, 'response_format_type')}",
+            options=[None, "json_object"],
+            key="response_format_type",
+            format_func={
+                None: BLANK_OPTION,
+                "json_object": "JSON Object",
+            }.__getitem__,
+        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -108,6 +124,7 @@ class CompareLLMPage(BasePage):
                 prompt=prompt,
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
+                response_format_type=request.response_format_type,
                 stream=True,
             )
             for i, entries in enumerate(ret):

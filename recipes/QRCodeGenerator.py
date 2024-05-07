@@ -2,6 +2,7 @@ import typing
 from enum import Enum
 
 import numpy as np
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import qrcode
 import requests
 from django.core.exceptions import ValidationError
@@ -79,9 +80,9 @@ class QRCodeGeneratorPage(BasePage):
 
     class RequestModel(BaseModel):
         qr_code_data: str | None
-        qr_code_input_image: str | None
+        qr_code_input_image: FieldHttpUrl | None
         qr_code_vcard: VCARD | None
-        qr_code_file: str | None
+        qr_code_file: FieldHttpUrl | None
 
         use_url_shortener: bool | None
 
@@ -118,10 +119,10 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
-        output_images: list[str]
-        raw_images: list[str]
-        shortened_url: str | None
-        cleaned_qr_code: str
+        output_images: list[FieldHttpUrl]
+        raw_images: list[FieldHttpUrl]
+        shortened_url: FieldHttpUrl | None
+        cleaned_qr_code: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         if len(state.get("output_images") or []) > 0:
@@ -729,7 +730,7 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
     img = bytes_to_cv2_img(r.content, greyscale=True)
     return extract_qr_code_data(img)
 

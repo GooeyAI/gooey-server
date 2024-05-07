@@ -13,6 +13,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
+from pydantic import BaseModel
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -50,6 +51,12 @@ class VideoBotsStatsPage(BasePage):
     workflow = (
         Workflow.VIDEO_BOTS
     )  # this is a hidden page, so this isn't used but type checking requires a workflow
+
+    class RequestModel(BaseModel):
+        pass
+
+    class ResponseModel(BaseModel):
+        pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -158,7 +165,6 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
-        has_analysis_run = bi.analysis_run is not None
         run_url = VideoBotsPage.current_app_url()
         if bi.published_run_id:
             run_title = bi.published_run.title
@@ -215,7 +221,7 @@ class VideoBotsStatsPage(BasePage):
                         "Answered Successfully",
                         "Answered Unsuccessfully",
                     ]
-                    if has_analysis_run
+                    if bi.analysis_runs.exists()
                     else []
                 )
             ),

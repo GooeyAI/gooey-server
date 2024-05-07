@@ -3,6 +3,7 @@ from pathlib import Path
 
 import PIL
 import numpy as np
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 import gooey_ui as st
 from pydantic import BaseModel
@@ -47,7 +48,7 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: str
+        input_image: FieldHttpUrl
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
@@ -62,10 +63,10 @@ class ImageSegmentationPage(BasePage):
         obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
-        output_image: str
-        cutout_image: str
-        resized_image: str
-        resized_mask: str
+        output_image: FieldHttpUrl
+        cutout_image: FieldHttpUrl
+        resized_image: FieldHttpUrl
+        resized_mask: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_IMG_SEGMENTATION_META_IMG

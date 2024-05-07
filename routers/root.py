@@ -23,7 +23,7 @@ from starlette.responses import (
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import Workflow
+from bots.models import Workflow, BotIntegration
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -41,7 +41,6 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
-from gooey_ui import RedirectException
 from gooey_ui.components.url_button import url_button
 from handles.models import Handle
 
@@ -406,6 +405,42 @@ def integrations_stats_route(
     return render_page(request, "stats", run_slug, RecipeTabs.integrations, example_id)
 
 
+@app.post("/{page_slug}/integrations/{integration_id}/analysis/")
+@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/")
+@app.post(
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/"
+)
+@st.route
+def integrations_analysis_route(
+    request: Request,
+    page_slug: str,
+    integration_id: str,
+    run_slug: str = None,
+    example_id: str = None,
+    title: str = None,
+    graphs: str = None,
+):
+    from routers.bots_api import api_hashids
+    from daras_ai_v2.analysis_results import render_analysis_results_page
+
+    try:
+        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+    except (IndexError, BotIntegration.DoesNotExist):
+        raise HTTPException(status_code=404)
+    url = get_og_url_path(request)
+
+    with page_wrapper(request):
+        render_analysis_results_page(bi, url, request.user, title, graphs)
+
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title=f"Analysis for {bi.name}",
+        ),
+    )
+
+
 @app.post("/{page_slug}/integrations/")
 @app.post("/{page_slug}/{run_slug}/integrations/")
 @app.post("/{page_slug}/{run_slug}-{example_id}/integrations/")
@@ -434,6 +469,7 @@ def integrations_route(
 
 
 @app.post("/{page_slug}/")
+@app.post("/{page_slug}/{run_slug}/")
 @app.post("/{page_slug}/{run_slug}-{example_id}/")
 @st.route
 def recipe_page_or_handle(
@@ -453,7 +489,9 @@ def render_page_for_handle(request: Request, handle: Handle):
             user_profile_page(request, handle.user)
         return dict(meta=get_meta_tags_for_profile(handle.user))
     elif handle.has_redirect:
-        raise RedirectException(handle.redirect_url, status_code=301)
+        return RedirectResponse(
+            handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}
+        )
     else:
         logger.error(f"Handle {handle.name} has no user or redirect")
         raise HTTPException(status_code=404)
@@ -591,6 +629,5 @@ class RecipeTabs(TabData, Enum):
         kwargs["page_slug"] = page_slug
         if example_id:
             kwargs["example_id"] = example_id
-            if run_slug:
-                kwargs["run_slug"] = run_slug
+            kwargs["run_slug"] = run_slug or "untitled"
         return os.path.join(app.url_path_for(self.route.__name__, **kwargs), "")

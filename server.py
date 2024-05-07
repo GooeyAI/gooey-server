@@ -1,3 +1,8 @@
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from starlette.requests import Request
+
+from daras_ai_v2.pydantic_validation import convert_errors
 from gooeysite import wsgi
 
 assert wsgi
@@ -92,3 +97,10 @@ def request_time_middleware(app):
         )
 
     return middleware
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    ## https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions
+    convert_errors(exc.errors())
+    return await request_validation_exception_handler(request, exc)

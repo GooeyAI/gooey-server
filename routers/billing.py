@@ -23,7 +23,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
-from routers.root import page_wrapper
+from routers.root import page_wrapper, get_og_url_path
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -125,12 +125,13 @@ available_subscriptions = {
 def account_route(request: Request):
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Billing • Gooey.AI",
             description="Your billing details.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -141,12 +142,13 @@ def account_route(request: Request):
 def profile_route(request: Request):
     with account_page_wrapper(request, AccountTabs.profile):
         profile_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Profile • Gooey.AI",
             description="Your profile details.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -157,12 +159,13 @@ def profile_route(request: Request):
 def saved_route(request: Request):
     with account_page_wrapper(request, AccountTabs.saved):
         all_saved_runs_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Saved • Gooey.AI",
             description="Your saved runs.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -173,12 +176,13 @@ def saved_route(request: Request):
 def api_keys_route(request: Request):
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="API Keys • Gooey.AI",
             description="Your API keys.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
