@@ -849,6 +849,7 @@ def number_input(
     help: str = None,
     *,
     disabled: bool = False,
+    className: str = "",
 ) -> float:
     value = _input_widget(
         input_type="number",
@@ -861,6 +862,7 @@ def number_input(
         min=min_value,
         max=max_value,
         step=_step_value(min_value, max_value, step),
+        className=className,
     )
     return float(format(value, ".2f")) or 0
 
@@ -908,6 +910,7 @@ def _input_widget(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value_attr: str = "defaultValue",
+    className: str = "",
     **kwargs,
 ) -> typing.Any:
     # if key:
@@ -927,6 +930,7 @@ def _input_widget(
             default_value_attr: value,
             "help": help,
             "disabled": disabled,
+            "className": className,
             **kwargs,
         },
     ).mount()
