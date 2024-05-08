@@ -105,7 +105,9 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3, col4, col5 = st.columns([2, 6, 2, 1, 1], responsive=False)
+        col1, col2, col3, col4, col5, col6 = st.columns(
+            [2, 4, 2, 2, 1, 1], responsive=False
+        )
         with col1:
             start = st.number_input(
                 label="",
@@ -121,6 +123,8 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
+            st.video(st.session_state.get("output_video", None))
+        with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
             if st.button(
                 st.session_state.get("zoom", f"{start}:") or "none",
@@ -145,13 +149,13 @@ def animation_prompts_editor(
                         step=0.05,
                     )
                     st.button("Save")
-        with col4:
+        with col5:
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
             ):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
-        with col5:
+        with col6:
             if st.button(
                 '<i class="fa-regular fa-plus"></i>',
                 help=f"Insert Frame after Frame {idx + 1}",
