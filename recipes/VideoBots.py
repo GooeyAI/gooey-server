@@ -1387,7 +1387,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Test")
-                st.caption(f"Send a test message via {Platform(bi.platform).get_long_name()}.")
+                st.caption(f"Send a test message via {Platform(bi.platform).label}.")
             with col2:
                 if bi.platform == Platform.FACEBOOK and test_link:
                     st.anchor(

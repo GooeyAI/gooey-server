@@ -52,7 +52,7 @@ class PublishedRunVisibility(models.IntegerChoices):
 
 
 class Platform(models.IntegerChoices):
-    FACEBOOK = (1, "Facebook")
+    FACEBOOK = (1, "Facebook Messenger")
     INSTAGRAM = (2, "Instagram")
     WHATSAPP = (3, "WhatsApp")
     SLACK = (4, "Slack")
@@ -65,12 +65,6 @@ class Platform(models.IntegerChoices):
             return f"https://gooey.ai/favicon.ico"
         else:
             return f"https://www.{self.name.lower()}.com/favicon.ico"
-
-    def get_long_name(self):
-        if self == Platform.FACEBOOK:
-            return "Facebook or Messenger"
-        else:
-            return self.label
 
 
 class Workflow(models.IntegerChoices):
