@@ -239,6 +239,6 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
     elif bi.ig_username:
         return (furl("http://instagram.com/") / bi.ig_username).tostr()
     elif bi.fb_page_name:
-        return (furl("https://www.facebook.com/") / bi.fb_page_name).tostr()
+        return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
     else:
         return None
