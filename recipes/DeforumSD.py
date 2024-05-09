@@ -89,13 +89,13 @@ def animation_prompts_editor(
     )
     st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
-    col1, col2, col3 = st.columns([2, 6, 4], responsive=False)
+    col1, col2, col3 = st.columns([2, 9, 2], responsive=False)
     with col1:
         st.write("Second")
     with col2:
         st.write("Prompt")
     with col3:
-        st.write("Zoom/Pan")
+        st.write("Camera")
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
@@ -105,9 +105,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3, col4, col5, col6 = st.columns(
-            [2, 4, 2, 2, 1, 1], responsive=False
-        )
+        col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         with col1:
             start = st.number_input(
                 label="",
@@ -116,46 +114,16 @@ def animation_prompts_editor(
                 step=0.01,
                 className="gui-input-smaller",
             )
-        with col2:
-            st.text_area(
-                label="",
-                key=prompt_key,
-                height=100,
+            end = (
+                prompt_st_list[idx + 1]["frame"]
+                if idx + 1 < len(prompt_st_list)
+                else get_last_frame(prompt_st_list) + 3
             )
-        with col3:
-            st.video(st.session_state.get("output_video", None))
-        with col4:
-            zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
-            if st.button(
-                st.session_state.get("zoom", f"{start}:") or "none",
-                key="button-" + fp_key,
-                type="link",
-            ):
-                zoom_pan_modal.open()
-            if zoom_pan_modal.is_open():
-                with zoom_pan_modal.container():
-                    st.write(
-                        f"#### Keyframe second {start} until 0.50",
-                    )
-                    st.caption(
-                        f"Starting at second {start} and until second _, how do you want the camera to move?"
-                    )
-                    st.slider(
-                        label="""
-                        #### Zoom
-                        """,
-                        min_value=-1.5,
-                        max_value=1.5,
-                        step=0.05,
-                    )
-                    st.button("Save")
-        with col5:
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
             ):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
-        with col6:
             if st.button(
                 '<i class="fa-regular fa-plus"></i>',
                 help=f"Insert Frame after Frame {idx + 1}",
@@ -175,6 +143,39 @@ def animation_prompts_editor(
                         },
                     )
                     st.experimental_rerun()
+        with col2:
+            st.text_area(
+                label="",
+                key=prompt_key,
+                height=100,
+            )
+        with col3:
+            st.video(st.session_state.get("output_video", None))
+        with col4:
+            zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
+            if st.button(
+                '<i class="fa-solid fa-camera-movie"></i>',
+                key="button-" + fp_key,
+                type="link",
+            ):
+                zoom_pan_modal.open()
+            if zoom_pan_modal.is_open():
+                with zoom_pan_modal.container():
+                    st.write(
+                        f"#### Keyframe second {start} until {end}",
+                    )
+                    st.caption(
+                        f"Starting at second {start} and until second {end}, how do you want the camera to move?"
+                    )
+                    st.slider(
+                        label="""
+                        #### Zoom
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.05,
+                    )
+                    st.button("Save")
 
         updated_st_list.append(
             {
@@ -183,19 +184,20 @@ def animation_prompts_editor(
                 "key": fp_key,
             }
         )
-    # Add final end of video prompt
-    col1, col2 = st.columns([2, 10], responsive=False)
-    with col1:
-        st.number_input(
-            label="",
-            key=fp_key,
-            min_value=0,
-            step=0.01,
-            value=st.session_state.get(frame_key) + 3,
-            className="gui-input-smaller",
-        )
-    with col2:
-        st.write("*End of Video*")
+        if idx + 1 == len(prompt_st_list):
+            col1, col2 = st.columns([2, 11], responsive=False)
+            with col1:
+                st.number_input(
+                    label="",
+                    key=frame_key + "/end_frame",
+                    min_value=0,
+                    step=0.01,
+                    value=get_last_frame(prompt_st_list) + 3,
+                    className="gui-input-smaller",
+                )
+            with col2:
+                st.write("*End of Video*")
+            continue
 
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
