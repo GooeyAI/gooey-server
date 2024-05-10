@@ -12,7 +12,7 @@ from time import sleep
 from types import SimpleNamespace
 
 import sentry_sdk
-from django.db.models import Sum
+from django.db.models import Sum, QuerySet
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -1990,7 +1990,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
 
-    def get_pricing_from_model_name(self, model_name: str):
+    def get_pricing_from_model_name(self, model_name: str) -> QuerySet:
         from usage_costs.models import ModelPricing
 
         return ModelPricing.objects.filter(model_name=model_name)
