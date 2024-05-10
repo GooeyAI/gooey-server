@@ -1990,8 +1990,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
 
-    def get_total_linked_usage_cost_in_credits(self, default=1) -> float:
-        """Return the sun of the linked usage costs in gooey credits."""
+    def get_pricing_from_model_name(self, model_name: str):
+        from usage_costs.models import ModelPricing
+
+        return ModelPricing.objects.filter(model_name=model_name)
+
+    def get_total_linked_usage_cost_in_credits(
+        self, default=1, model_name=None
+    ) -> float:
+        """Return the sum of the linked usage costs in gooey credits."""
         from usage_costs.models import UsageCost
 
         current_run, published_run = self.get_runs_from_query_params(
@@ -1999,9 +2006,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
         if not current_run:
             return default
-        dollar_amt = UsageCost.objects.filter(
-            saved_run__run_id=current_run.run_id
-        ).aggregate(total=Sum("dollar_amount"))["total"]
+        if model_name:
+            pricings = self.get_pricing_from_model_name(model_name)
+            dollar_amt = UsageCost.objects.filter(
+                saved_run__run_id=current_run.run_id,
+                pricing__in=pricings,
+            ).aggregate(total=Sum("dollar_amount"))["total"]
+        else:
+            dollar_amt = UsageCost.objects.filter(
+                saved_run__run_id=current_run.run_id
+            ).aggregate(total=Sum("dollar_amount"))["total"]
         if not dollar_amt:
             return default
         return dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR
