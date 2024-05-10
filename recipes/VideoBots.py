@@ -2,9 +2,10 @@ import json
 import math
 import mimetypes
 import typing
+from textwrap import dedent
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from django.db.models import QuerySet, Q
+from django.utils.text import slugify
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -15,8 +16,7 @@ from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2.api_examples_widget import bot_api_example_generator
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -36,6 +36,7 @@ from daras_ai_v2.bot_integration_widgets import (
     slack_specific_settings,
     broadcast_input,
     get_bot_test_link,
+    web_widget_config,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
@@ -49,6 +50,7 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
@@ -70,6 +72,7 @@ from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
@@ -96,6 +99,7 @@ from recipes.DocSearch import (
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from routers.root import chat_lib_route
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
@@ -1339,7 +1343,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 bi_id = st.selectbox(
                     label="",
                     options=integrations_map.keys(),
-                    format_func=lambda bi_id: f'<img width="20" height="20" style="margin-right: 10px" src="{Platform(integrations_map[bi_id].platform).get_favicon()}" /> {integrations_map[bi_id].name}',
+                    format_func=lambda bi_id: f"{Platform(integrations_map[bi_id].platform).get_icon()} &nbsp; {integrations_map[bi_id].name}",
                     key="bi_id",
                 )
                 bi = integrations_map[bi_id]
@@ -1354,11 +1358,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.session_state["old_bi_id"] = bi_id
         else:
             bi = integrations[0]
-        icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
+        icon = Platform(bi.platform).get_icon()
 
         if bi.platform == Platform.WEB:
-            bot_api_example_generator(bi.api_integration_id())
-            st.write("---")
+            web_widget_config(bi, self.request.user)
+            st.newline()
 
         st.newline()
         with st.div(style={"width": "100%", "textAlign": "left"}):
@@ -1368,7 +1372,25 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                if test_link:
+                if bi.platform == Platform.WEB and test_link:
+                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
+                        chat_lib_route,
+                        dict(
+                            integration_id=bi.api_integration_id(),
+                            integration_name=slugify(bi.name) or "untitled",
+                        ),
+                    )
+                    copy_to_clipboard_button(
+                        f"{icons.code} Copy Embed Code",
+                        value=dedent(
+                            f"""
+                            <div id="gooey-embed"></div>
+                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
+                            """
+                        ).strip(),
+                        type="secondary",
+                    )
+                elif test_link:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                         value=test_link,
