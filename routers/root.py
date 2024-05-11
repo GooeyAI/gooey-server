@@ -1,6 +1,5 @@
 import datetime
 import json
-import os
 import tempfile
 import typing
 from contextlib import contextmanager
@@ -468,6 +467,23 @@ def integrations_route(
             raise HTTPException(status_code=404)
     return render_page(
         request, page_slug, run_slug, RecipeTabs.integrations, example_id
+    )
+
+
+@app.post("/chat/")
+@st.route
+def chat_explore_route(request: Request):
+    from daras_ai_v2 import chat_explore
+
+    with page_wrapper(request):
+        chat_explore.render()
+
+    return dict(
+        meta=raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title="Explore our Bots",
+            description="Explore & Chat with our Bots on Gooey.AI",
+        ),
     )
 
 

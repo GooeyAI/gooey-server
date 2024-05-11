@@ -205,7 +205,7 @@ class AccountTabs(TabData, Enum):
 
     @property
     def url_path(self) -> str:
-        return get_route_url(self.route.__name__)
+        return get_route_url(self.route)
 
 
 def billing_tab(request: Request):

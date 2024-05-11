@@ -1199,8 +1199,8 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
+    @staticmethod
     def render_author(
-        self,
         user: AppUser,
         *,
         image_size: str = "30px",
@@ -1687,7 +1687,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             .order_by("-example_priority", "-updated_at")[:50]
         )
 
-        grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
+        grid_layout(3, example_runs, _render)
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -1851,7 +1851,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if published_run.notes:
-            st.caption(published_run.notes)
+            st.caption(published_run.notes, line_clamp=2)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
