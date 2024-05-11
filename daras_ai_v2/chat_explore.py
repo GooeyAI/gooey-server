@@ -21,7 +21,8 @@ def render():
         published_run__isnull=False,
         published_run__visibility=PublishedRunVisibility.PUBLIC,
         published_run__is_approved_example=True,
-    )
+    ).exclude(published_run__published_run_id="")
+
     grid_layout(3, integrations, _render_bi)
 
 
