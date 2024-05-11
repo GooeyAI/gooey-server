@@ -15,7 +15,9 @@
 <div id="gooey-embed"></div>
 <script src="lib.js"></script>
 <script>
-    GooeyEmbed.mount({ mode: "fullscreen"});
+    window.onload = () => {
+        GooeyEmbed.mount({ mode: "fullscreen"});
+    }
 </script>
 </body>
 </html>

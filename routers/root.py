@@ -523,12 +523,20 @@ def chat_lib_route(request: Request, integration_id: str, integration_name: str 
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
 
-    r = requests.get(settings.WEB_WIDGET_LIB)
-    raise_for_status(r)
-    js_code = r.text
+    # r = requests.get(settings.WEB_WIDGET_LIB)
+    # raise_for_status(r)
+    # js_code = r.text
 
     return Response(
-        f"{js_code};GooeyEmbed.defaultConfig={json.dumps(bi.get_web_widget_config())}",
+        # f"{js_code};GooeyEmbed.defaultConfig={json.dumps(bi.get_web_widget_config())}",
+        f"""
+        let script = document.createElement("script");
+        script.src = {settings.WEB_WIDGET_LIB!r};
+        script.onload = () => {{
+            GooeyEmbed.defaultConfig={json.dumps(bi.get_web_widget_config())}
+        }};
+        document.currentScript.insertAdjacentElement("afterend", script);
+        """,
         headers={
             "Content-Type": "application/javascript",
         },
