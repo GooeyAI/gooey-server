@@ -117,7 +117,7 @@ def animation_prompts_editor(
             end = (
                 prompt_st_list[idx + 1]["frame"]
                 if idx + 1 < len(prompt_st_list)
-                else get_last_frame(prompt_st_list) + 3
+                else st.session_state["max_frames"]
             )
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
@@ -184,20 +184,18 @@ def animation_prompts_editor(
                 "key": fp_key,
             }
         )
-        if idx + 1 == len(prompt_st_list):
-            col1, col2 = st.columns([2, 11], responsive=False)
-            with col1:
-                st.number_input(
-                    label="",
-                    key=frame_key + "/end_frame",
-                    min_value=0,
-                    step=0.01,
-                    value=get_last_frame(prompt_st_list) + 3,
-                    className="gui-input-smaller",
-                )
-            with col2:
-                st.write("*End of Video*")
-            continue
+    col1, col2 = st.columns([2, 11], responsive=False)
+    with col1:
+        st.number_input(
+            label="",
+            key="max_frames",
+            min_value=0,
+            step=0.01,
+            value=st.session_state.get("max_frames", 100),
+            className="gui-input-smaller",
+        )
+    with col2:
+        st.write("*End of Video*")
 
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
