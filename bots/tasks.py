@@ -70,7 +70,9 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
     # add variables to the script
     variables = analysis_sr.state.get("variables", {}) | dict(
         user_msg=msg.get_previous_by_created_at().content,
+        user_msg_local=msg.get_previous_by_created_at().display_content,
         assistant_msg=msg.content,
+        assistant_msg_local=msg.display_content,
         bot_script=msg.saved_run and msg.saved_run.state.get("bot_script", ""),
         references=(
             msg.saved_run
