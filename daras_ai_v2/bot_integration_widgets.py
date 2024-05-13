@@ -1,15 +1,21 @@
+import json
+from itertools import zip_longest
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils.text import slugify
 from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import BotIntegration, BotIntegrationAnalysisRun
-from daras_ai_v2 import settings
+from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
+from daras_ai_v2 import settings, icons
+from daras_ai_v2.api_examples_widget import bot_api_example_generator
+from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs
+from routers.root import RecipeTabs, chat_route
 
 
 def general_integration_settings(bi: BotIntegration, current_user: AppUser):
@@ -240,5 +246,90 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
         return (furl("http://instagram.com/") / bi.ig_username).tostr()
     elif bi.fb_page_name:
         return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
+    elif bi.platform == Platform.WEB:
+        return get_route_url(
+            chat_route,
+            dict(
+                integration_id=bi.api_integration_id(),
+                integration_name=slugify(bi.name) or "untitled",
+            ),
+        )
     else:
         return None
+
+
+def web_widget_config(bi: BotIntegration, user: AppUser | None):
+    with st.div(style={"width": "100%", "textAlign": "left"}):
+        col1, col2 = st.columns(2)
+    with col1:
+        if st.session_state.get("--update-display-picture"):
+            display_pic = st.file_uploader(
+                label="###### Display Picture",
+                accept=["image/*"],
+            )
+            if display_pic:
+                bi.photo_url = display_pic
+        else:
+            if st.button(f"{icons.camera} Update Display Picture"):
+                st.session_state["--update-display-picture"] = True
+                st.experimental_rerun()
+        bi.name = st.text_input("###### Name", value=bi.name)
+        bi.descripton = st.text_area(
+            "###### Description",
+            value=bi.descripton,
+        )
+        scol1, scol2 = st.columns(2)
+        with scol1:
+            bi.by_line = st.text_input(
+                "###### By Line",
+                value=bi.by_line or (user and f"By {user.display_name}"),
+            )
+        with scol2:
+            bi.website_url = st.text_input(
+                "###### Website Link",
+                value=bi.website_url or (user and user.website_url),
+            )
+
+        st.write("###### Conversation Starters")
+        bi.conversation_starters = list(
+            filter(
+                None,
+                [
+                    st.text_input("", key=f"--question-{i}", value=value)
+                    for i, value in zip_longest(range(4), bi.conversation_starters)
+                ],
+            )
+        )
+        with st.div(className="d-flex justify-content-end"):
+            if st.button(
+                f"{icons.save} Update Integration",
+                type="primary",
+                className="align-right",
+            ):
+                bi.save()
+                st.experimental_rerun()
+    with col2:
+        config = json.dumps(bi.get_web_widget_config())
+        with st.center(), st.div():
+            web_preview_tab = f"{icons.chat} Web Preview"
+            api_tab = f"{icons.api} API"
+            selected = st.horizontal_radio("", [web_preview_tab, api_tab])
+        if selected == web_preview_tab:
+            st.html(
+                # language=html
+                f"""
+                    <div id="gooey-embed" style="border: 1px solid #eee; height: 90%"></div>
+                    <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
+                    <script>
+                        function loadGooeyEmbed() {{
+                            if (typeof GooeyEmbed === 'undefined') return;
+                            GooeyEmbed.unmount();
+                            GooeyEmbed.mount({config});
+                        }}
+                        document.getElementById("gooey-embed-script").onload = loadGooeyEmbed;
+                    </script>
+                    """
+            )
+            st.js("window.waitUntilHydrated.then(loadGooeyEmbed)")
+        else:
+            bot_api_example_generator(bi.api_integration_id())

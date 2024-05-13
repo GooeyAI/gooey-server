@@ -1,11 +1,12 @@
 import datetime
-import os
+import json
 import tempfile
 import typing
 from contextlib import contextmanager
 from enum import Enum
 from time import time
 
+import requests
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
@@ -30,10 +31,11 @@ from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
-from daras_ai_v2.exceptions import ffmpeg, UserError
+from daras_ai_v2.exceptions import ffmpeg, UserError, raise_for_status
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
+    get_route_url,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
@@ -468,6 +470,95 @@ def integrations_route(
     )
 
 
+@app.post("/chat/")
+@st.route
+def chat_explore_route(request: Request):
+    from daras_ai_v2 import chat_explore
+
+    with page_wrapper(request):
+        chat_explore.render()
+
+    return dict(
+        meta=raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title="Explore our Bots",
+            description="Explore & Chat with our Bots on Gooey.AI",
+        ),
+    )
+
+
+@app.get("/chat/{integration_name}-{integration_id}/")
+def chat_route(
+    request: Request, integration_id: str = None, integration_name: str = None
+):
+    from routers.bots_api import api_hashids
+
+    try:
+        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+    except (IndexError, BotIntegration.DoesNotExist):
+        raise HTTPException(status_code=404)
+
+    return templates.TemplateResponse(
+        "chat_fullscreen.html",
+        {
+            "request": request,
+            "bi": bi,
+            "meta": raw_build_meta_tags(
+                url=get_og_url_path(request),
+                title=f"Chat with {bi.name}",
+                description=f"Chat with {bi.name} on Gooey.AI - {bi.descripton}",
+                image=bi.photo_url,
+            ),
+        },
+    )
+
+
+@app.get("/chat/{integration_name}-{integration_id}/lib.js")
+@app.get("/chat/{integration_name}-{integration_id}/lib.js/")
+def chat_lib_route(request: Request, integration_id: str, integration_name: str = None):
+    from routers.bots_api import api_hashids
+
+    try:
+        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+    except (IndexError, BotIntegration.DoesNotExist):
+        raise HTTPException(status_code=404)
+
+    # r = requests.get(settings.WEB_WIDGET_LIB)
+    # raise_for_status(r)
+    # js_code = r.text
+
+    return Response(
+        # f"{js_code};GooeyEmbed.defaultConfig={json.dumps(bi.get_web_widget_config())}",
+        """
+(() => {
+let script = document.createElement("script");
+    script.src = %(lib_url)r;
+    script.onload = function() {
+        window.GooeyEmbed.defaultConfig = %(config)s;
+    };
+    document.body.appendChild(script);
+    
+    window.GooeyEmbed = new Proxy({}, {
+        get: function(target, prop) {
+            return (...args) => {
+                window.addEventListener("load", () => {
+                    window.GooeyEmbed[prop](...args);
+                });
+            }
+        },
+    });
+})();
+        """
+        % dict(
+            lib_url=settings.WEB_WIDGET_LIB,
+            config=json.dumps(bi.get_web_widget_config()),
+        ),
+        headers={
+            "Content-Type": "application/javascript",
+        },
+    )
+
+
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{run_slug}/")
 @app.post("/{page_slug}/{run_slug}-{example_id}/")
@@ -630,4 +721,4 @@ class RecipeTabs(TabData, Enum):
         if example_id:
             kwargs["example_id"] = example_id
             kwargs["run_slug"] = run_slug or "untitled"
-        return os.path.join(app.url_path_for(self.route.__name__, **kwargs), "")
+        return get_route_url(self.route, kwargs)

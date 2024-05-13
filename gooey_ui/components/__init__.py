@@ -661,7 +661,7 @@ def horizontal_radio(
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
-    button_props: dict = {},
+    **button_props,
 ) -> T | None:
     if not options:
         return None

@@ -355,3 +355,8 @@ VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")
 
 ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", "")
 os.environ["ANTHROPIC_API_KEY"] = ANTHROPIC_API_KEY
+
+WEB_WIDGET_LIB = config(
+    "WEB_WIDGET_LIB",
+    "https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@2/dist/lib.js",
+)

@@ -16,7 +16,11 @@ from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.base import RedirectException
-from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_body,
+    fastapi_request_form,
+    get_route_url,
+)
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -201,7 +205,7 @@ class AccountTabs(TabData, Enum):
 
     @property
     def url_path(self) -> str:
-        return os.path.join(app.url_path_for(self.route.__name__), "")
+        return get_route_url(self.route)
 
 
 def billing_tab(request: Request):

@@ -1,4 +1,7 @@
+import json
 import typing
+from html import escape
+
 import gooey_ui as gui
 
 # language="html"
@@ -32,7 +35,7 @@ def copy_to_clipboard_button(
     class="btn btn-theme btn-{type} {className}"
     onclick="copyToClipboard(this);"
     style="{style}"
-    data-clipboard-text={value!r}>
+    data-clipboard-text="{escape(value)}">
     {label}
 </button>
         """,

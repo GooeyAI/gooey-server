@@ -15,6 +15,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from daras_ai_v2 import icons
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
 
@@ -58,13 +59,12 @@ class Platform(models.IntegerChoices):
     SLACK = (4, "Slack")
     WEB = (5, "Web")
 
-    def get_favicon(self):
-        if self == Platform.WHATSAPP:
-            return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
-        elif self == Platform.WEB:
-            return f"https://gooey.ai/favicon.ico"
-        else:
-            return f"https://www.{self.name.lower()}.com/favicon.ico"
+    def get_icon(self):
+        match self:
+            case Platform.WEB:
+                return f'<i class="fa-regular fa-globe"></i>'
+            case _:
+                return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
 
 
 class Workflow(models.IntegerChoices):
@@ -415,6 +415,13 @@ class BotIntegration(models.Model):
         max_length=1024,
         help_text="The name of the bot (for display purposes)",
     )
+
+    by_line = models.TextField(blank=True, default="")
+    descripton = models.TextField(blank=True, default="")
+    conversation_starters = models.JSONField(default=list, blank=True)
+    photo_url = CustomURLField(default="", blank=True)
+    website_url = CustomURLField(blank=True, default="")
+
     saved_run = models.ForeignKey(
         "bots.SavedRun",
         on_delete=models.SET_NULL,
@@ -624,6 +631,10 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
+            or (
+                self.platform == Platform.WEB
+                and f"Integration ID {self.api_integration_id()}"
+            )
         )
 
     get_display_name.short_description = "Bot"
@@ -633,6 +644,21 @@ class BotIntegration(models.Model):
         from routers.bots_api import api_hashids
 
         return api_hashids.encode(self.id)
+
+    def get_web_widget_config(self, mode="inline", target="#gooey-embed") -> dict:
+        return dict(
+            target=target,
+            integration_id=self.api_integration_id(),
+            mode=mode,
+            branding=dict(
+                name=self.name,
+                byLine=self.by_line,
+                description=self.descripton,
+                conversationStarters=self.conversation_starters,
+                photoUrl=self.photo_url,
+                websiteUrl=self.website_url,
+            ),
+        )
 
 
 class BotIntegrationAnalysisRun(models.Model):
@@ -967,6 +993,9 @@ class Conversation(models.Model):
 
     d30.short_description = "D30"
     d30.boolean = True
+
+    def msgs_as_llm_context(self):
+        return self.messages.all().as_llm_context(reset_at=self.reset_at)
 
 
 class MessageQuerySet(models.QuerySet):
