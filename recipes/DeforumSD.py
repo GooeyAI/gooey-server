@@ -107,18 +107,20 @@ def animation_prompts_editor(
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         with col1:
-            start = st.number_input(
+            start_value = st.number_input(
                 label="",
                 key=frame_key,
                 min_value=0,
                 step=0.01,
                 className="gui-input-smaller",
             )
-            end = (
+            start = "{0:02.0f}:{1:02.0f}".format(*divmod(start_value * 60, 60))
+            end_value = float(
                 prompt_st_list[idx + 1]["frame"]
                 if idx + 1 < len(prompt_st_list)
                 else st.session_state["max_frames"]
             )
+            end = "{0:02.0f}:{1:02.0f}".format(*divmod(end_value * 60, 60))
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
             ):
