@@ -91,11 +91,8 @@ class AppUser(models.Model):
     is_paying = models.BooleanField("paid", default=False)
 
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
-    auto_recharge_enabled = models.BooleanField(default=False)
-    auto_recharge_amount = models.IntegerField(null=True, blank=True)
-    auto_recharge_topup_threshold = models.IntegerField(null=True, blank=True)
-    auto_recharge_monthly_budget = models.IntegerField(null=True, blank=True)
-    auto_recharge_email_threshold = models.IntegerField(null=True, blank=True)
+    monthly_spending_budget = models.IntegerField(null=True, blank=True)
+    monthly_spending_notification_threshold = models.IntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import stripe
 from django.db.models import Sum
@@ -28,6 +28,23 @@ def _get_default_payment_method_for_customer(
         return
 
     return stripe.PaymentMethod.retrieve(pm_id)
+
+
+def send_email_auto_recharge_successful(user: AppUser, amount: int):
+    if not user.email:
+        return
+
+    email_body = templates.get_template("auto_recharge_successful_email.html").render(
+        user=user,
+        account_url=get_account_url(),
+        amount=amount,
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email,
+        subject="[Gooey.AI] Auto-Recharge Successful",
+        html_body=email_body,
+    )
 
 
 def send_email_auto_recharge_failed(user: AppUser, reason: str):
@@ -93,14 +110,14 @@ def auto_recharge_user(user: AppUser):
 
     dollars_spent = get_dollars_spent_this_month_by_user(user)
 
-    if dollars_spent >= user.auto_recharge_monthly_budget:
+    if dollars_spent >= user.monthly_spending_budget:
         send_email_auto_recharge_failed(
             user, reason="you have reached your monthly budget"
         )
         logger.info(f"User has reached the monthly budget: {user=}, {dollars_spent=}")
         return
 
-    if dollars_spent >= user.auto_recharge_email_threshold:
+    if dollars_spent >= user.monthly_spending_notification_threshold:
         send_email_monthly_spend_threshold_reached(user)
 
     invoice = get_or_create_auto_invoice(
@@ -128,8 +145,6 @@ def get_or_create_auto_invoice(
         collection_method="charge_automatically",
     )
     invoices = [inv for inv in invoices.data if "auto_recharge" in inv.metadata]
-
-    logger.info(f"{invoices=}")
 
     open_invoice = next((inv for inv in invoices if inv.status == "open"), None)
     if open_invoice:

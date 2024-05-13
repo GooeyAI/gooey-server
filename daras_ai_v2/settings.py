@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "usage_costs",
     "embeddings",
     "handles",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -305,7 +306,11 @@ PAYPAL_PLAN_IDS = config(
     "PAYPAL_PLAN_IDS",
     cast=json.loads,
     # sandbox plan IDs
-    default='{"basic": "P-7EE20432AK666360GMYZFNBQ", "premium": "P-35W68839HF2588719MYZFN5Y"}',
+    default="""{
+        "basic": "P-7EE20432AK666360GMYZFNBQ",
+        "premium": "P-35W68839HF2588719MYZFN5Y",
+        "addon": "addon"
+    }""",
 )
 PAYPAL_WEBHOOK_ID = config("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_CREDITS_PER_UNIT = 100

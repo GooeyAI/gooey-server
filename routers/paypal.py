@@ -136,7 +136,7 @@ def generate_auth_header() -> str:
         expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
         redis_cache.set(cache_key, access_token.encode(), ex=expiry)
 
-    return f"Bearer " + access_token
+    return f"Bearer {access_token}"
 
 
 # Create an order to start the transaction.

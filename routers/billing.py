@@ -56,6 +56,9 @@ available_subscriptions = {
                 "minimum": 1_000,
             },
         },
+        "paypal": {
+            "plan_id": settings.PAYPAL_PLAN_IDS["addon"],
+        },
     },
     "basic": {
         "display": {
@@ -370,7 +373,7 @@ def auto_recharge_section(request: Request):
         )
 
     with col2:
-        request.user.auto_recharge_monthly_budget = st.number_input(
+        request.user.monthly_spending_budget = st.number_input(
             dedent(
                 """\
                 #### Monthly Budget (in USD)
@@ -380,9 +383,9 @@ def auto_recharge_section(request: Request):
                 """,
             ),
             min_value=10,
-            value=request.user.auto_recharge_monthly_budget or 50,
+            value=request.user.monthly_spending_budget or 50,
         )
-        request.user.auto_recharge_email_threshold = st.number_input(
+        request.user.monthly_spending_notification_threshold = st.number_input(
             dedent(
                 """\
                 #### Email Notification Threshold (in USD)
@@ -394,7 +397,7 @@ def auto_recharge_section(request: Request):
             ),
             min_value=10,
             max_value=10000,
-            value=request.user.auto_recharge_email_threshold or 10,
+            value=request.user.monthly_spending_notification_threshold or 10,
         )
 
     if st.button("Save", type="primary"):
@@ -402,8 +405,8 @@ def auto_recharge_section(request: Request):
             update_fields=[
                 "auto_recharge_amount",
                 "auto_recharge_topup_threshold",
-                "auto_recharge_monthly_budget",
-                "auto_recharge_email_threshold",
+                "monthly_spending_budget",
+                "monthly_spending_notification_threshold",
             ]
         )
         st.success("Settings saved!")
