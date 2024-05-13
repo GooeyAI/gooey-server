@@ -65,5 +65,5 @@ class AutoRechargeSubscription(models.Model):
         max_length=255,
         help_text="Subscription ID for PayPal and payment_method_id for Stripe",
     )
-    topup_amount = models.IntegerField(null=True, blank=True)
-    topup_threshold = models.IntegerField(null=True, blank=True)
+    topup_amount = models.IntegerField()
+    topup_threshold = models.IntegerField()
