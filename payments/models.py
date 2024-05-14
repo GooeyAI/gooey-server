@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
@@ -60,10 +61,18 @@ class PricingPlan(PricingData, Enum):
 
 
 class AutoRechargeSubscription(models.Model):
-    payment_provider = models.IntegerField(choices=PaymentProvider.choices)
+    payment_provider = models.IntegerField(
+        choices=PaymentProvider.choices, null=True, blank=True
+    )
     external_id = models.CharField(
         max_length=255,
         help_text="Subscription ID for PayPal and payment_method_id for Stripe",
+        null=True,
+        blank=True,
     )
-    topup_amount = models.IntegerField()
+    topup_amount = models.IntegerField(validators=[MinValueValidator(1)])
     topup_threshold = models.IntegerField()
+
+    @property
+    def has_payment_method(self) -> bool:
+        return bool(self.external_id)

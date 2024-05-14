@@ -1,3 +1,10 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import AutoRechargeSubscription
+
+
+class AutoRechargeAdmin(admin.ModelAdmin):
+    pass
+
+
+admin.site.register(AutoRechargeSubscription, AutoRechargeAdmin)

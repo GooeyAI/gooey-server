@@ -6,28 +6,18 @@ from django.utils import timezone
 from furl import furl
 from loguru import logger
 
-from app_users.models import AppUser, AppUserTransaction
+from app_users.models import AppUser, AppUserTransaction, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 from daras_ai_v2.send_email import send_email_via_postmark
 
 
-def get_default_payment_method(user: AppUser) -> stripe.PaymentMethod | None:
-    customer = user.search_stripe_customer()
-    if not customer:
-        return
-
-    return _get_default_payment_method_for_customer(customer)
-
-
-def _get_default_payment_method_for_customer(
-    customer: stripe.Customer,
-) -> stripe.PaymentMethod | None:
-    pm_id = customer.invoice_settings.default_payment_method
-    if not pm_id:
-        return
-
-    return stripe.PaymentMethod.retrieve(pm_id)
+def get_auto_recharge_payment_method(user: AppUser) -> stripe.PaymentMethod | None:
+    if (
+        user.auto_recharge
+        and user.auto_recharge.payment_provider == PaymentProvider.STRIPE
+    ):
+        return stripe.PaymentMethod.retrieve(user.auto_recharge.external_id)
 
 
 def send_email_auto_recharge_successful(user: AppUser, amount: int):
@@ -83,55 +73,68 @@ def send_email_monthly_spend_threshold_reached(user: AppUser):
 
 
 def auto_recharge_user(user: AppUser):
-    if (
-        not user.auto_recharge_enabled
-        or user.balance >= user.auto_recharge_topup_threshold
-    ):
-        # user has disabled auto recharge or has enough balance
+    if not user_should_auto_recharge(user):
         return
 
-    if not user.auto_recharge_amount:
+    if not user.auto_recharge.topup_amount:
         send_email_auto_recharge_failed(user, reason="recharge amount wasn't set")
         logger.error(f"User hasn't set auto recharge amount ({user=})")
         return
 
-    if user.auto_recharge_amount > settings.AUTO_RECHARGE_MAX_AMOUNT:
+    if user.auto_recharge.topup_amount > settings.AUTO_RECHARGE_MAX_AMOUNT:
         send_email_auto_recharge_failed(user, reason="recharge amount is too high")
         logger.error(
-            f"User has set very high auto recharge amount ({user=}, {user.auto_recharge_amount=})",
+            f"User has set very high auto recharge amount ({user=}, {user.auto_recharge.topup_amount=})",
         )
         return
 
-    customer = user.search_stripe_customer()
-    if not customer:
-        # server side error
-        logger.error(f"User is not on stripe: {user=}")
-        return
-
     dollars_spent = get_dollars_spent_this_month_by_user(user)
-
-    if dollars_spent >= user.monthly_spending_budget:
+    if dollars_spent + user.auto_recharge.topup_amount > user.monthly_spending_budget:
         send_email_auto_recharge_failed(
             user, reason="you have reached your monthly budget"
         )
         logger.info(f"User has reached the monthly budget: {user=}, {dollars_spent=}")
         return
 
-    if dollars_spent >= user.monthly_spending_notification_threshold:
-        send_email_monthly_spend_threshold_reached(user)
+    match user.auto_recharge.payment_provider:
+        case PaymentProvider.STRIPE:
+            customer = user.search_stripe_customer()
+            if not customer:
+                logger.error(f"User doesn't have a stripe customer: {user=}")
+                return
 
-    invoice = get_or_create_auto_invoice(
-        customer, amount_in_dollars=user.auto_recharge_amount
-    )
-    if invoice.status == "open":
-        invoice.pay(payment_method=customer.invoice_settings.default_payment_method)
-    elif invoice.status == "paid":
-        logger.info(f"Auto recharge invoice already paid recently: {user=}, {invoice=}")
+            pm = stripe.PaymentMethod.retrieve(user.auto_recharge.external_id)
+            if not pm:
+                logger.error(
+                    f"Payment method not found: {user=}, {user.auto_recharge.external_id=}"
+                )
+                return
+
+            invoice, created = get_or_create_auto_invoice(
+                customer=customer, amount_in_dollars=user.auto_recharge.topup_amount
+            )
+
+            if created:
+                logger.info(f"Auto recharge invoice created: {user=}, {invoice=}")
+
+            if invoice.status == "open":
+                invoice.pay(payment_method=pm)
+                logger.info(
+                    f"Payment attempted for auto recharge invoice: {user=}, {invoice=}"
+                )
+            elif invoice.status == "paid":
+                logger.info(
+                    f"Auto recharge invoice already paid recently: {user=}, {invoice=}"
+                )
+
+        case PaymentProvider.PAYPAL:
+            logger.error(f"Auto recharge via PayPal is not supported yet: {user=}")
+            return
 
 
 def get_or_create_auto_invoice(
     customer: stripe.Customer, amount_in_dollars: int
-) -> stripe.Invoice:
+) -> tuple[stripe.Invoice, bool]:
     """
     Fetches the relevant auto recharge invoice, or creates one if it doesn't exist.
 
@@ -148,7 +151,7 @@ def get_or_create_auto_invoice(
 
     open_invoice = next((inv for inv in invoices if inv.status == "open"), None)
     if open_invoice:
-        return open_invoice
+        return open_invoice, False
 
     recently_paid_invoice = next(
         (
@@ -161,7 +164,7 @@ def get_or_create_auto_invoice(
         None,
     )
     if recently_paid_invoice:
-        return recently_paid_invoice
+        return recently_paid_invoice, False
 
     invoice = stripe.Invoice.create(
         customer=customer,
@@ -185,7 +188,7 @@ def get_or_create_auto_invoice(
         metadata={"auto_recharge": True},
     )
     invoice.finalize_invoice(auto_advance=True)
-    return invoice
+    return invoice, True
 
 
 def get_dollars_spent_this_month_by_user(user: AppUser):
@@ -200,8 +203,11 @@ def get_dollars_spent_this_month_by_user(user: AppUser):
 
 
 def user_should_auto_recharge(user: AppUser):
+    # auto recharge is enabled, configured with a payment metohd, and user has low balance
     return (
-        user.auto_recharge_enabled and user.balance < user.auto_recharge_topup_threshold
+        user.auto_recharge
+        and user.auto_recharge.has_payment_method
+        and user.balance < user.auto_recharge.topup_threshold
     )
 
 

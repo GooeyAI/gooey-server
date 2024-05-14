@@ -3,21 +3,22 @@ import typing
 from contextlib import contextmanager
 from enum import Enum
 from textwrap import dedent
-
 from urllib.parse import quote_plus
 
 import stripe
+from django.db import transaction
 from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
+from loguru import logger
 from starlette.datastructures import FormData
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, settings, urls
-from daras_ai_v2.auto_recharge import get_default_payment_method
+from daras_ai_v2.auto_recharge import get_auto_recharge_payment_method
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -26,6 +27,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
+from payments.models import AutoRechargeSubscription
 from routers.root import page_wrapper
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -318,57 +320,57 @@ def auto_recharge_section(request: Request):
     st.write("## Auto Recharge & Limits")
     col1, col2 = st.columns(2)
 
-    with col1:
-        with st.div(className="d-flex align-items-end"):
-            auto_recharge_enabled = st.checkbox(
-                "",
-                value=request.user.auto_recharge_enabled,
-            )
-            st.write("#### Enable Auto Recharge")
-        if not auto_recharge_enabled:
+    with col1, st.div(className="d-flex align-items-end"):
+        auto_recharge_enabled = st.checkbox("", value=bool(request.user.auto_recharge))
+        st.write("#### Enable Auto Recharge")
+
+    if not auto_recharge_enabled:
+        if request.user.auto_recharge:
+            request.user.auto_recharge.delete()
+            st.experimental_rerun()
+
+        with col1:
             st.caption(
                 "Enable auto recharge to automatically keep your credit balance topped up."
             )
 
-    if auto_recharge_enabled != request.user.auto_recharge_enabled:
-        request.user.auto_recharge_enabled = auto_recharge_enabled
-        request.user.save(update_fields=["auto_recharge_enabled"])
-        st.experimental_rerun()
-
-    if not request.user.auto_recharge_enabled:
         return
 
-    pm = get_default_payment_method(request.user)
-    if not pm:
-        setup_default_payment_method_url = urls.remove_hostname(
-            request.url_for("stripe_setup_default_payment_method")
+    if not request.user.auto_recharge:
+        request.user.auto_recharge = AutoRechargeSubscription(
+            topup_amount=settings.ADDON_AMOUNT_CHOICES[0],
+            topup_threshold=settings.AUTO_RECHARGE_TOPUP_THRESHOLD_CHOICES[0],
         )
+        request.user.auto_recharge.save()
+
+    setup_auto_recharge_url = urls.remove_hostname(
+        request.url_for("stripe_setup_auto_recharge")
+    )
+    pm = get_auto_recharge_payment_method(request.user)
+    if not pm:
         st.write(
-            f"Link a payment method with Stripe [here]({setup_default_payment_method_url})."
+            f"Link a payment method with Stripe [here]({setup_auto_recharge_url})."
         )
         return
 
     with col1:
-        request.user.auto_recharge_amount = st.selectbox(
+        request.user.auto_recharge.topup_amount = st.selectbox(
             "Automatically purchase",
             options=settings.ADDON_AMOUNT_CHOICES,
             format_func=lambda amt: f"{settings.ADDON_CREDITS_PER_DOLLAR * amt:,} credits for ${amt}",
-            default_value=request.user.auto_recharge_amount or 10,
+            default_value=request.user.auto_recharge.topup_amount,
         )
-        request.user.auto_recharge_topup_threshold = st.selectbox(
+        request.user.auto_recharge.topup_threshold = st.selectbox(
             "When balance falls below (in credits)",
-            options=[300, 1000, 3000, 10000],
+            options=settings.AUTO_RECHARGE_TOPUP_THRESHOLD_CHOICES,
             format_func=lambda credits: f"{credits:,} credits",
-            default_value=request.user.auto_recharge_topup_threshold or 300,
+            default_value=request.user.auto_recharge.topup_threshold,
         )
         card_icon = f'<i class="fa-brands fa-cc-{pm.card.brand}"></i>'
-        setup_default_payment_method_url = urls.remove_hostname(
-            request.url_for("stripe_setup_default_payment_method")
-        )
         st.write(
             '<span class="text-muted">Using my card ending in </span>'
             f"**{pm.card.last4}** {card_icon}. "
-            f'<span class="text-muted">[Change]({setup_default_payment_method_url})</span>',
+            f'<span class="text-muted">[Change]({setup_auto_recharge_url})</span>',
             unsafe_allow_html=True,
         )
 
@@ -401,14 +403,17 @@ def auto_recharge_section(request: Request):
         )
 
     if st.button("Save", type="primary"):
-        request.user.save(
-            update_fields=[
-                "auto_recharge_amount",
-                "auto_recharge_topup_threshold",
-                "monthly_spending_budget",
-                "monthly_spending_notification_threshold",
-            ]
-        )
+        with transaction.atomic():
+            request.user.auto_recharge.external_id = pm.id
+            request.user.auto_recharge.payment_provider = PaymentProvider.STRIPE
+            request.user.auto_recharge.save()
+            request.user.save(
+                update_fields=[
+                    "auto_recharge",
+                    "monthly_spending_budget",
+                    "monthly_spending_notification_threshold",
+                ]
+            )
         st.success("Settings saved!")
 
 
@@ -479,8 +484,8 @@ def create_checkout_session(
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@app.get("/__/stripe/setup-default-payment-method")
-def stripe_setup_default_payment_method(request: Request):
+@app.get("/__/stripe/setup-auto-recharge")
+def stripe_setup_auto_recharge(request: Request):
     if not request.user or request.user.is_anonymous:
         return RedirectResponse(
             request.url_for("login", query_params={"next": request.url.path})
@@ -580,11 +585,15 @@ def _handle_checkout_session_completed(uid: str, session_data):
         # not a setup mode checkout
         return
 
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    if not user.auto_recharge:
+        logger.error("AutoRechargeSubscription not found for user %s", user)
+        return
+
     setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
-    stripe.Customer.modify(
-        session_data.customer,
-        invoice_settings={"default_payment_method": setup_intent.payment_method},
-    )
+    user.auto_recharge.payment_provider = PaymentProvider.STRIPE
+    user.auto_recharge.external_id = setup_intent.payment_method
+    user.auto_recharge.save(update_fields=["payment_provider", "external_id"])
 
 
 @app.post("/__/stripe/cancel-subscription")
