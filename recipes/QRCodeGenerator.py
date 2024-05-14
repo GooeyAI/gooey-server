@@ -697,16 +697,14 @@ def generate_and_upload_qr_code(
             qr_code_data = qr_code_data.strip()
         if not qr_code_data:
             raise UserError("Please provide QR Code URL, text content, or an image")
-        if (
-            request.use_url_shortener
-            and not is_url(qr_code_data)
-            and is_url("http://" + qr_code_data)
-        ):
+        using_shortened_url = request.use_url_shortener
+        if using_shortened_url:
+            # only shorten valid urls
+            using_shortened_url = is_url(qr_code_data)
             # prepend http:// to the URL if it has no scheme but is valid with http (similar to how browsers do it)
-            qr_code_data = "http://" + qr_code_data
-            using_shortened_url = True
-        else:
-            using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
+            if not using_shortened_url and is_url("http://" + qr_code_data):
+                qr_code_data = "http://" + qr_code_data
+                using_shortened_url = True
         if using_shortened_url:
             qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
                 url=qr_code_data,
