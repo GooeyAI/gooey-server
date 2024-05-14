@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='appuser',
-            name='auto_recharge_subscription',
+            name='auto_recharge',
             field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='user', to='payments.autorechargesubscription'),
         ),
     ]

@@ -93,7 +93,7 @@ class AppUser(models.Model):
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
     monthly_spending_budget = models.IntegerField(null=True, blank=True)
     monthly_spending_notification_threshold = models.IntegerField(null=True, blank=True)
-    auto_recharge_subscription = models.OneToOneField(
+    auto_recharge = models.OneToOneField(
         "payments.AutoRechargeSubscription",
         on_delete=models.SET_NULL,
         related_name="user",
