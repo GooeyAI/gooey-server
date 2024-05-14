@@ -158,9 +158,12 @@ class CompareLLMPage(BasePage):
         selected_models = st.session_state["selected_models"]
         if not selected_models:
             return ""
-        notes = f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits(model_name=selected_models[0]))}Cr for {selected_models[0] or ''}"
-        for model in selected_models[1:]:
-            notes += f", {math.ceil(self.get_total_linked_usage_cost_in_credits(model_name=model))}Cr for {model}"
+        notes = f" \\\n*Breakdown: "
+        model_notes = [
+            f"{math.ceil(self.get_total_linked_usage_cost_in_credits(model_name=selected_models[i]))}Cr for {selected_models[i] or ''}"
+            for i in range(len(selected_models))
+        ]
+        notes += ", ".join(model_notes)
         return notes + f" + {self.PROFIT_CREDITS}Cr/run*"
 
     def related_workflows(self) -> list:
