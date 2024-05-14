@@ -57,7 +57,7 @@ class PricingPlan(PricingData, Enum):
 
     @classmethod
     def choices(cls):
-        return {plan.value: plan.name for plan in cls}
+        return [(plan.value, plan.name) for plan in cls]
 
 
 class AutoRechargeSubscription(models.Model):
@@ -73,6 +73,26 @@ class AutoRechargeSubscription(models.Model):
     topup_amount = models.IntegerField(validators=[MinValueValidator(1)])
     topup_threshold = models.IntegerField()
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     @property
     def has_payment_method(self) -> bool:
         return bool(self.external_id)
+
+
+class Subscription(models.Model):
+    plan = models.IntegerField(choices=PricingPlan.choices())
+    payment_provider = models.IntegerField(choices=PaymentProvider.choices)
+    external_id = models.CharField(
+        max_length=255, help_text="Resource ID from the payment provider"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("payment_provider", "external_id")
+        indexes = [
+            models.Index(fields=["plan"]),
+        ]
