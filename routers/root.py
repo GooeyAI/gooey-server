@@ -213,21 +213,20 @@ async def request_json(request: Request):
 
 
 @app.post("/components/")
-def component_page(request: Request, json_data: dict = Depends(request_json)):
-    import components_page
+@st.route
+def component_page(request: Request):
+    import components_doc
 
-    ret = st.runner(
-        lambda: page_wrapper(request=request, render_fn=components_page.render),
-        **json_data,
-    )
-    ret |= {
+    with page_wrapper(request):
+        components_doc.render()
+
+    return {
         "meta": raw_build_meta_tags(
             url=get_og_url_path(request),
-            title=components_page.META_TITLE,
-            description=components_page.META_DESCRIPTION,
+            title=components_doc.META_TITLE,
+            description=components_doc.META_DESCRIPTION,
         ),
     }
-    return ret
 
 
 @app.post("/explore/")
