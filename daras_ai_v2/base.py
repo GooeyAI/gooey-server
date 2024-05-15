@@ -12,7 +12,7 @@ from time import sleep
 from types import SimpleNamespace
 
 import sentry_sdk
-from django.db.models import Sum, QuerySet
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -1990,9 +1990,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
 
-    def get_total_linked_usage_cost_in_credits(
-        self, default=1, model_name=None
-    ) -> float:
+    def get_total_linked_usage_cost_in_credits(self, default=1, group_by_model=False):
         """Return the sum of the linked usage costs in gooey credits."""
         from usage_costs.models import UsageCost
 
@@ -2002,12 +2000,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not current_run:
             return default
         qs = UsageCost.objects.filter(saved_run__run_id=current_run.run_id)
-        if model_name:
-            qs = qs.filter(pricing__model_name=model_name)
-        dollar_amt = qs.aggregate(total=Sum("dollar_amount"))["total"]
-        if not dollar_amt:
-            return default
-        return dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR
+        if group_by_model:
+            qs = qs.values("pricing__model_name")
+            return (
+                qs.annotate(
+                    total=Sum("dollar_amount") * settings.ADDON_CREDITS_PER_DOLLAR
+                )
+                or default
+            )
+        return (
+            qs.aggregate(total=Sum("dollar_amount"))["total"]
+            * settings.ADDON_CREDITS_PER_DOLLAR
+        ) or default
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
