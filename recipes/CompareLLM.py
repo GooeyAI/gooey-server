@@ -165,7 +165,7 @@ class CompareLLMPage(BasePage):
                 for model in model_prices
             ]
             notes += ", ".join(model_notes) + " + "
-        return notes + f" + {self.PROFIT_CREDITS}Cr/run*"
+        return notes + f"{self.PROFIT_CREDITS}Cr/run*"
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

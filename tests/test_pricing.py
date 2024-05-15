@@ -107,12 +107,6 @@ def test_multiple_llm_sums_usage_cost(transactional_db):
         dollar_amount=model_pricing2.unit_cost * 1 / model_pricing2.unit_quantity,
     )
 
-    WorkflowMetadata.objects.create(
-        workflow=Workflow.COMPARE_LLM,
-        short_title="compare llm",
-        help_url="",
-        price_multiplier=1,
-    )
     llm_page = CompareLLMPage(run_user=user)
     set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
     assert llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS)
