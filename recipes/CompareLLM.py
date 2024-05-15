@@ -146,24 +146,25 @@ class CompareLLMPage(BasePage):
             _render_outputs(state, 300)
 
     def get_raw_price(self, state: dict) -> float:
-        selected_models = state["selected_models"]
+        default = 1
         total = self.PROFIT_CREDITS
-        for model in selected_models:
-            total += math.ceil(
-                self.get_total_linked_usage_cost_in_credits(model_name=model)
-            )
+        model_prices = self.get_total_linked_usage_cost_in_credits(default, True)
+        if model_prices == default:
+            return total
+        for model in model_prices:
+            total += math.ceil(model.get("total"))
         return total
 
     def additional_notes(self) -> str:
-        selected_models = st.session_state["selected_models"]
-        if not selected_models:
-            return ""
+        default = 1
+        model_prices = self.get_total_linked_usage_cost_in_credits(default, True)
         notes = f" \\\n*Breakdown: "
-        model_notes = [
-            f"{math.ceil(self.get_total_linked_usage_cost_in_credits(model_name=selected_models[i]))}Cr for {selected_models[i] or ''}"
-            for i in range(len(selected_models))
-        ]
-        notes += ", ".join(model_notes)
+        if model_prices != default:
+            model_notes = [
+                f"{math.ceil(model.get('total'))}Cr for {model.get('pricing__model_name')}"
+                for model in model_prices
+            ]
+            notes += ", ".join(model_notes) + " + "
         return notes + f" + {self.PROFIT_CREDITS}Cr/run*"
 
     def related_workflows(self) -> list:
