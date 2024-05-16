@@ -749,6 +749,7 @@ def run_asr(
                 "diarize": "true",
                 "language": language,
                 "detect_language": "true" if language else "false",
+                "punctuate": "true",
             },
             json={
                 "url": audio_url,
@@ -817,6 +818,9 @@ def run_asr(
             encoding=AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
             audio_channel_count=1,
+        )
+        config.features = cloud_speech.RecognitionFeatures(
+            enable_automatic_punctuation=True,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
         audio.uri = gs_url_to_uri(audio_url)

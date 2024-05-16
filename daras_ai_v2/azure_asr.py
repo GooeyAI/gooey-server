@@ -28,9 +28,9 @@ def azure_asr(audio_url: str, language: str):
             "model": azure_get_latest_model(language),
             "properties": {
                 "wordLevelTimestampsEnabled": False,
+                "punctuationMode": "DictatedAndAutomatic",
                 # "displayFormWordLevelTimestampsEnabled": True,
                 # "diarizationEnabled": False,
-                # "punctuationMode": "DictatedAndAutomatic",
                 # "profanityFilterMode": "Masked",
             },
             "locale": language,

@@ -65,6 +65,14 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_o = LLMSpec(
+        label="GPT-4o (openai)",
+        model_id="gpt-4o",
+        llm_api=LLMApis.openai,
+        context_window=8192,
+        price=10,
+        is_vision_model=True,
+    )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
         label="GPT-4 Turbo with Vision (openai)",
