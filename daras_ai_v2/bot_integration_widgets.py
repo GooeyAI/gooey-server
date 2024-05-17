@@ -357,8 +357,8 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                     GooeyEmbed.unmount();
                     GooeyEmbed.mount(config);
                 }
-                document.getElementById("gooey-embed-script").onload = loadGooeyEmbed;
-                loadGooeyEmbed(config);
+                (document.getElementById("gooey-embed-script") || undefined).onload = loadGooeyEmbed;
+                loadGooeyEmbed();
                 """,
                 config=bi.get_web_widget_config(),
             )
