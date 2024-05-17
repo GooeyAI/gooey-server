@@ -300,6 +300,33 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 ],
             )
         )
+
+        with st.expander("Additional Settings"):
+            config = (
+                dict(
+                    showSources=True,
+                    enableAudioMessage=True,
+                    branding=(
+                        dict(showPoweredByGooey=True)
+                        | bi.web_config_extras.get("branding", {})
+                    ),
+                )
+                | bi.web_config_extras
+            )
+
+            config["showSources"] = st.checkbox(
+                "Show Sources", value=config["showSources"]
+            )
+            config["enableAudioMessage"] = st.checkbox(
+                "Enable Audio Message", value=config["enableAudioMessage"]
+            )
+            config["branding"]["showPoweredByGooey"] = st.checkbox(
+                "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
+            )
+
+            # remove defaults
+            bi.web_config_extras = config
+
         with st.div(className="d-flex justify-content-end"):
             if st.button(
                 f"{icons.save} Update Integration",
@@ -309,7 +336,6 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 bi.save()
                 st.experimental_rerun()
     with col2:
-        config = json.dumps(bi.get_web_widget_config())
         with st.center(), st.div():
             web_preview_tab = f"{icons.chat} Web Preview"
             api_tab = f"{icons.api} API"
@@ -318,18 +344,23 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             st.html(
                 # language=html
                 f"""
-                    <div id="gooey-embed" style="border: 1px solid #eee; height: 90%"></div>
-                    <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
-                    <script>
-                        function loadGooeyEmbed() {{
-                            if (typeof GooeyEmbed === 'undefined') return;
-                            GooeyEmbed.unmount();
-                            GooeyEmbed.mount({config});
-                        }}
-                        document.getElementById("gooey-embed-script").onload = loadGooeyEmbed;
-                    </script>
-                    """
+                <div id="gooey-embed" style="border: 1px solid #eee; height: 90%"></div>
+                <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
+                """
             )
-            st.js("window.waitUntilHydrated.then(loadGooeyEmbed)")
+            st.js(
+                # language=javascript
+                """
+                async function loadGooeyEmbed() {
+                    await window.waitUntilHydrated;
+                    if (typeof GooeyEmbed === 'undefined') return;
+                    GooeyEmbed.unmount();
+                    GooeyEmbed.mount(config);
+                }
+                document.getElementById("gooey-embed-script").onload = loadGooeyEmbed;
+                loadGooeyEmbed(config);
+                """,
+                config=bi.get_web_widget_config(),
+            )
         else:
             bot_api_example_generator(bi.api_integration_id())

@@ -585,6 +585,11 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="List of allowed domains for the bot's web integration",
     )
+    web_config_extras = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Extra configuration for the bot's web integration",
+    )
 
     streaming_enabled = models.BooleanField(
         default=False,
@@ -646,19 +651,23 @@ class BotIntegration(models.Model):
         return api_hashids.encode(self.id)
 
     def get_web_widget_config(self, mode="inline", target="#gooey-embed") -> dict:
-        return dict(
+        config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
             mode=mode,
-            branding=dict(
-                name=self.name,
-                byLine=self.by_line,
-                description=self.descripton,
-                conversationStarters=self.conversation_starters,
-                photoUrl=self.photo_url,
-                websiteUrl=self.website_url,
+            branding=(
+                self.web_config_extras.get("branding", {})
+                | dict(
+                    name=self.name,
+                    byLine=self.by_line,
+                    description=self.descripton,
+                    conversationStarters=self.conversation_starters,
+                    photoUrl=self.photo_url,
+                    websiteUrl=self.website_url,
+                )
             ),
         )
+        return config
 
 
 class BotIntegrationAnalysisRun(models.Model):
