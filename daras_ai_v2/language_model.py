@@ -69,7 +69,7 @@ class LargeLanguageModels(Enum):
         label="GPT-4o (openai)",
         model_id="gpt-4o",
         llm_api=LLMApis.openai,
-        context_window=8192,
+        context_window=128_000,
         price=10,
         is_vision_model=True,
     )

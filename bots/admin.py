@@ -64,7 +64,7 @@ slack_fields = [
     "slack_read_receipt_msg",
     "slack_create_personal_channels",
 ]
-web_fields = ["web_allowed_origins"]
+web_fields = ["web_allowed_origins", "web_config_extras"]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
