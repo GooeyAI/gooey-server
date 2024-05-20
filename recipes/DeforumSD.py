@@ -101,26 +101,28 @@ def animation_prompts_editor(
         frame_key = f"{st_list_key}/frame/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
         if frame_key not in st.session_state:
-            st.session_state[frame_key] = fp["frame"]
+            st.session_state[frame_key] = frames_to_seconds(
+                fp["frame"], st.session_state.get("fps", 12)
+            )
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         with col1:
-            start_value = st.number_input(
+            start = st.number_input(
                 label="",
                 key=frame_key,
                 min_value=0,
-                step=0.01,
+                step=0.1,
                 className="gui-input-smaller",
             )
-            start = "{0:02.0f}:{1:02.0f}".format(*divmod(start_value * 60, 60))
-            end_value = float(
+            end = float(
                 prompt_st_list[idx + 1]["frame"]
                 if idx + 1 < len(prompt_st_list)
-                else st.session_state["max_frames"]
+                else frames_to_seconds(
+                    st.session_state["max_frames"], st.session_state["fps"]
+                )
             )
-            end = "{0:02.0f}:{1:02.0f}".format(*divmod(end_value * 60, 60))
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
             ):
@@ -132,7 +134,10 @@ def animation_prompts_editor(
                 type="tertiary",
             ):
                 max_frames = st.session_state.get("max_frames", 100)
-                next_frame = fp["frame"] + 3
+                frame_step = frames_to_seconds(10, st.session_state.get("fps", 12))
+                next_frame = seconds_to_frames(
+                    fp["frame"] + frame_step, st.session_state.get("fps", 12)
+                )
                 if next_frame > max_frames:
                     st.error("Please increase Frame Count")
                 else:
@@ -188,12 +193,15 @@ def animation_prompts_editor(
         )
     col1, col2 = st.columns([2, 11], responsive=False)
     with col1:
+        max_frames = st.session_state.get("max_frames", 100)
+        fps = st.session_state.get("fps", 12)
+        ending_seconds = frames_to_seconds(max_frames, fps)
         st.number_input(
             label="",
-            key="max_frames",
+            key="max_frames/",
             min_value=0,
-            step=0.01,
-            value=st.session_state.get("max_frames", 100),
+            step=0.1,
+            value=ending_seconds,
             className="gui-input-smaller",
         )
     with col2:
@@ -209,6 +217,14 @@ def animation_prompts_editor(
 
 def get_last_frame(prompt_list: list) -> int:
     return max(fp["frame"] for fp in prompt_list)
+
+
+def frames_to_seconds(frames: int, fps: int) -> float:
+    return round(frames / fps, 2)
+
+
+def seconds_to_frames(seconds: float, fps: int) -> int:
+    return int(seconds * fps)
 
 
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
