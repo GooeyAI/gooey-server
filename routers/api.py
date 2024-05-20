@@ -362,7 +362,7 @@ def submit_api_call(
         )
     # create a new run
     example_id, run_id, uid = self.create_new_run(
-        is_api_call=True, retention_policy=retention_policy
+        is_api_call=True, retention_policy=retention_policy or RetentionPolicy.keep
     )
     # submit the task
     result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
