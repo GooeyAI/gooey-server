@@ -25,6 +25,7 @@ from daras_ai_v2.asr import (
     AsrModels,
     asr_language_selector,
     run_asr,
+    should_translate_lang,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -820,7 +821,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
-        if request.user_language and request.user_language != "en":
+        if should_translate_lang(request.user_language):
             yield f"Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],
@@ -994,7 +995,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ]
 
             # translate response text
-            if request.user_language and request.user_language != "en":
+            if should_translate_lang(request.user_language):
                 yield f"Translating response to {request.user_language}..."
                 output_text = run_translate(
                     texts=output_text,
