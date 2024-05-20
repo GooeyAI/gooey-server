@@ -828,7 +828,7 @@ class BasePage:
                 with input_col:
                     submitted = self._render_input_col()
                 with output_col:
-                    self._render_output_col(submitted)
+                    self._render_output_col(submitted=submitted)
 
                 self._render_step_row()
 
@@ -1438,7 +1438,7 @@ class BasePage:
             st.newline()
             self.render_run_cost()
 
-    def _render_output_col(self, is_deleted: False, submitted: bool = False):
+    def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
         if st.session_state.get(StateKeys.pressed_randomize):
