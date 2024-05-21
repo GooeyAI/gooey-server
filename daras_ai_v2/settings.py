@@ -260,6 +260,7 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
+SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
 
 DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
@@ -298,14 +299,15 @@ STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = config("PAYPAL_SECRET", "")
-PAYPAL_BASE = config("PAYPAL_BASE", "")
-PAYPAL_PLAN_IDS = config(
+PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
+PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
     "PAYPAL_PLAN_IDS",
     cast=json.loads,
     # sandbox plan IDs
     default="""{
         "basic": "P-7EE20432AK666360GMYZFNBQ",
         "premium": "P-35W68839HF2588719MYZFN5Y",
+        "creator": "creator",
         "addon": "addon"
     }""",
 )
