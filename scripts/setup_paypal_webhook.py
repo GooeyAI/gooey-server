@@ -17,6 +17,15 @@ def run(base_url: str = None):
                 {
                     "name": "PAYMENT.SALE.COMPLETED",
                 },
+                {
+                    "name": "BILLING.SUBSCRIPTION.ACTIVATED",
+                },
+                {
+                    "name": "BILLING.SUBSCRIPTION.CANCELLED",
+                },
+                {
+                    "name": "BILLING.SUBSCRIPTION.EXPIRED",
+                },
             ],
         },
     )
