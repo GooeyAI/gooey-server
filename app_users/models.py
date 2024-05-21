@@ -1,3 +1,4 @@
+from furl import furl
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
@@ -312,3 +313,20 @@ class AppUserTransaction(models.Model):
 
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"
+
+    def is_addon_transaction(self) -> bool:
+        if self.charged_amount <= 0:
+            return False
+
+        charged_dollars = self.charged_amount / 100
+        return (self.amount / charged_dollars) == settings.ADDON_CREDITS_PER_DOLLAR
+
+    def note(self) -> str:
+        if self.amount <= 0:
+            return ""
+        elif self.payment_provider is None:
+            return f"+{self.amount:,} credits (via Stripe)"
+        elif self.is_addon_transaction():
+            return f"Addon credits via {PaymentProvider(self.payment_provider).label} (+{self.amount:,} credits)"
+        else:
+            return f"Subscription payment via {PaymentProvider(self.payment_provider).label} (+{self.amount:,} credits)"
