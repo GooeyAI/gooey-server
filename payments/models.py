@@ -1,63 +1,24 @@
-from dataclasses import dataclass
-from enum import Enum
+from __future__ import annotations
 
+from datetime import datetime
+
+from furl import furl
+import requests
+import stripe
+from dateutil.parser import isoparse
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
+from daras_ai_v2.exceptions import raise_for_status
+
+from .plans import PricingPlan
+from .utils import (
+    generate_paypal_auth_header,
+    cancel_stripe_subscription,
+    cancel_paypal_subscription,
+)
 from app_users.models import PaymentProvider
 from daras_ai_v2 import settings
-
-
-@dataclass
-class PricingData:
-    key: str
-    display_name: str
-    title: str
-    description: str
-    stripe: dict | None = None
-    paypal: dict | None = None
-
-
-class PricingPlan(PricingData, Enum):
-    BASIC = (
-        1,
-        {
-            "key": "basic",
-            "display_name": "Basic Plan",
-            "title": "$10/month",
-            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
-            "stripe": make_stripe_recurring_plan(
-                product_name="Gooey.AI Basic Plan", credits=1_500, amount=10
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["basic"], credits=1_500, amount=10
-            ),
-        },
-    )
-    PREMIUM = (
-        2,
-        {
-            "key": "premium",
-            "display_name": "Premium Plan",
-            "title": "$50/month + Bots",
-            "description": "10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable [videobots](/video-bots/)",
-            "stripe": make_stripe_recurring_plan(
-                product_name="Gooey.AI Premium Plan", credits=10_000, amount=50
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["premium"], credits=10_000, amount=50
-            ),
-        },
-    )
-
-    def __init__(self, value: int, data: dict):
-        PricingData.__init__(self, **data)
-        self._value_ = value
-
-    @classmethod
-    def choices(cls):
-        return [(plan.value, plan.name) for plan in cls]
 
 
 class AutoRechargeSubscription(models.Model):
@@ -85,11 +46,49 @@ class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.choices())
     payment_provider = models.IntegerField(choices=PaymentProvider.choices)
     external_id = models.CharField(
-        max_length=255, help_text="Resource ID from the payment provider"
+        max_length=255,
+        help_text="Resource ID from the payment provider",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_user(self) -> bool:
+        try:
+            self.user
+        except Subscription.user.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
+
+    def cancel(self):
+        if self.payment_provider == PaymentProvider.STRIPE:
+            cancel_stripe_subscription(self.external_id)
+        elif self.payment_provider == PaymentProvider.PAYPAL:
+            cancel_paypal_subscription(self.external_id)
+
+    def get_next_invoice_date(self) -> datetime:
+        if self.payment_provider == PaymentProvider.STRIPE:
+            subscription = stripe.Subscription.retrieve(self.external_id)
+            period_end = subscription.current_period_end
+            return datetime.fromtimestamp(period_end)
+        elif self.payment_provider == PaymentProvider.PAYPAL:
+            r = requests.get(
+                str(
+                    furl(settings.PAYPAL_BASE)
+                    .add(path=f"/v1/billing/subscriptions/{self.external_id}")
+                    .url
+                ),
+                headers={"Authorization": generate_paypal_auth_header()},
+            )
+            raise_for_status(r)
+            subscription = r.json()
+            print(f"{subscription=}")
+            period_end = subscription["billing_info"]["next_billing_time"]
+            return isoparse(period_end)
+        else:
+            raise ValueError("Invalid Payment Provider")
 
     class Meta:
         unique_together = ("payment_provider", "external_id")

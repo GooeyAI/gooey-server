@@ -99,6 +99,11 @@ class AppUser(models.Model):
         related_name="user",
         null=True,
     )
+    subscription = models.OneToOneField(
+        "payments.Subscription",
+        on_delete=models.SET_NULL,
+        null=True,
+    )
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
