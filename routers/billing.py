@@ -404,39 +404,11 @@ def render_all_plans(user: AppUser):
                     else ("Downgrade", "secondary")
                 )
                 key = f"__change-plan-{plan.key}"
-                st.button(action_text, key=key, className=btn_classes, type=btn_type)
-                # if user.subscription:
-                #     match PaymentProvider(user.subscription.payment_provider):
-                #         case PaymentProvider.STRIPE:
-                #             render_stripe_subscription_button(
-                #                 action_text,
-                #                 plan=plan,
-                #                 className=btn_classes,
-                #                 type=btn_type,
-                #             )
-                #         case PaymentProvider.PAYPAL:
-                #             render_paypal_subscription_button(
-                #                 action_text,
-                #                 plan=plan,
-                #                 className=btn_classes,
-                #                 type=btn_type,
-                #             )
-                # elif st.button(
-                #     action_text, key=key, className=btn_classes, type=btn_type
-                # ):
-                #     col1, col2 = st.columns(2)
-                #     with col1:
-                #         render_stripe_subscription_button(
-                #             "Stripe",
-                #             plan=plan,
-                #             className=btn_classes,
-                #         )
-                #     with col2:
-                #         render_paypal_subscription_button(
-                #             "PayPal",
-                #             plan=plan,
-                #             className=btn_classes,
-                #         )
+                if st.button(
+                    action_text, key=key, className=btn_classes, type=btn_type
+                ):
+                    # TODO: change user plan
+                    ...
 
     st.write("## All Plans")
     grid_layout(4, all_plans, _render_plan, separator=False)
