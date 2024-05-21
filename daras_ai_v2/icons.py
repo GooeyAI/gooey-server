@@ -14,6 +14,7 @@ link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
 copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
+download = '<i class="fa-solid fa-download"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

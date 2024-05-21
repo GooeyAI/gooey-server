@@ -3,9 +3,11 @@ import json
 import typing
 from datetime import datetime
 from time import time
+from typing import Literal
 
 import pydantic
 import requests
+from django.db import transaction
 from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
@@ -17,10 +19,8 @@ from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
-from daras_ai_v2.redis_cache import (
-    get_redis_cache,
-)
-from routers.billing import available_subscriptions
+from payments.models import PricingPlan, Subscription
+from payments.utils import generate_paypal_auth_header
 
 router = APIRouter()
 
@@ -29,17 +29,21 @@ class PaypalSubscriptionPayload(BaseModel):
     plan_id: str
 
 
+class PaypalResource(BaseModel):
+    id: str
+    create_time: datetime
+    update_time: datetime | None
+    links: list
+
+
 class Amount(BaseModel):
     total: str
     currency: str
 
 
-class Sale(BaseModel):
-    id: str
+class Sale(PaypalResource):
     amount: Amount
     state: str | None
-    create_time: datetime | None
-    update_time: datetime | None
     payment_mode: str | None
     parent_payment: str | None
     custom: str | None
@@ -47,52 +51,44 @@ class Sale(BaseModel):
     # ... ignore rest of the fields
 
 
-class Payment(BaseModel):
-    id: str
-    intent: str
-    state: str
-    cart: str
-    payer: dict
-    create_time: datetime
-    links: list
-    application_context: dict = pydantic.Field(default=dict)
-    # ... ignore rest of the fields
-
-
-class Plan(BaseModel):
-    id: str
-    # ... ignore rest of the fields
-
-
-class Subscription(BaseModel):
-    id: str
+class PaypalSubscription(PaypalResource):
+    custom_id: str | None
     plan_id: str
     quantity: str
-    custom_id: str | None
     start_date: str | None
     plan_overridden: bool = False
-    create_time: str | None
-    update_time: str | None
+    status: Literal[
+        "APPROVAL_PENDING", "APPROVED", "ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"
+    ]
     # ... ignore rest of the fields
 
 
-class WebhookEvent(BaseModel):
+class BaseWebhookEvent(BaseModel):
     id: str
-    create_time: str
+    summary: str
+    create_time: datetime
+
+
+class WebhookEvent(BaseWebhookEvent):
     resource_type: str
     event_type: str
-    summary: str
     resource: dict
 
 
-class SaleCompletedEvent(BaseModel):
-    resource_type: typing.Literal["sale"]
-    event_type: typing.Literal["PAYMENT.SALE.COMPLETED"]
-
-    id: str
-    summary: str
-    create_time: datetime
+class SaleCompletedEvent(BaseWebhookEvent):
+    resource_type: Literal["sale"]
+    event_type: Literal["PAYMENT.SALE.COMPLETED"]
     resource: Sale
+
+
+class SubscriptionEvent(BaseWebhookEvent):
+    resource_type: Literal["subscription"]
+    event_type: Literal[
+        "BILLING.SUBSCRIPTION.ACTIVATED",
+        "BILLING.SUBSCRIPTION.CANCELLED",
+        "BILLING.SUBSCRIPTION.EXPIRED",
+    ]
+    resource: PaypalSubscription
 
 
 class ValidPaypalWebhookHeaders(BaseModel):
@@ -101,42 +97,6 @@ class ValidPaypalWebhookHeaders(BaseModel):
     PAYPAL_TRANSMISSION_ID: str = pydantic.Field(alias="paypal-transmission-id")
     PAYPAL_TRANSMISSION_SIG: str = pydantic.Field(alias="paypal-transmission-sig")
     PAYPAL_TRANSMISSION_TIME: str = pydantic.Field(alias="paypal-transmission-time")
-
-
-def generate_auth_header() -> str:
-    """
-    Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
-    @see https://developer.paypal.com/api/rest/authentication/
-    """
-    assert (
-        settings.PAYPAL_CLIENT_ID and settings.PAYPAL_SECRET
-    ), "Missing API Credentials"
-    auth = base64.b64encode(
-        (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode()
-    ).decode()
-    redis_cache = get_redis_cache()
-
-    # to reset token: $ redis-cli --scan --pattern 'gooey/paypal-access-token/*' | xargs redis-cli unlink
-    cache_key = f"gooey/paypal-access-token/v1/{auth}"
-    cache_val = redis_cache.get(cache_key)
-    if cache_val:
-        access_token = cache_val.decode()
-    else:
-        s = time()
-        response = requests.post(
-            str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
-            data="grant_type=client_credentials",
-            headers={"Authorization": f"Basic {auth}"},
-        )
-        raise_for_status(response)
-        data = response.json()
-        access_token = data.get("access_token")
-        assert access_token, "Missing access token in response"
-        # expiry with a buffer of the time taken to fetch the token + 5 minutes
-        expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
-        redis_cache.set(cache_key, access_token.encode(), ex=expiry)
-
-    return f"Bearer {access_token}"
 
 
 # Create an order to start the transaction.
@@ -154,7 +114,7 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
         str(furl(settings.PAYPAL_BASE) / "v2/checkout/orders"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": generate_auth_header(),
+            "Authorization": generate_paypal_auth_header(),
             # Uncomment one of these to force an error for negative testing (in sandbox mode only). Documentation:
             # https://developer.paypal.com/tools/sandbox/negative-testing/request-headers/
             # "PayPal-Mock-Response": '{"mock_application_codes": "MISSING_REQUIRED_PARAMETER"}'
@@ -200,13 +160,13 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         return JSONResponse({}, status_code=401)
 
     paypal_payload = PaypalSubscriptionPayload.parse_obj(payload)
-    pricing_info = get_pricing_info_from_plan_id(paypal_payload.plan_id)
-    if pricing_info is None:
+    plan = get_pricing_plan(paypal_payload.plan_id)
+    if plan is None:
         return JSONResponse({"error": "Invalid plan ID"}, status_code=400)
 
     response = requests.post(
         str(furl(settings.PAYPAL_BASE) / "v1/billing/subscriptions"),
-        headers={"Authorization": generate_auth_header()},
+        headers={"Authorization": generate_paypal_auth_header()},
         json={
             "plan_id": paypal_payload.plan_id,
             "custom_id": request.user.uid,
@@ -218,7 +178,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
                 ),
                 "cancel_url": str(furl(settings.APP_BASE_URL) / "account" / "/"),
             },
-            "plan": pricing_info["plan"],
+            "plan": plan.paypal.get("plan", {}),
         },
     )
 
@@ -228,19 +188,28 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
 
 @router.post("/__/paypal/webhook/")
 def webhook(request: Request, payload: dict = fastapi_request_json):
+    if not verify_webhook_event(payload, headers=request.headers):
+        logger.error("Invalid PayPal webhook signature")
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
+
     try:
         event = WebhookEvent.parse_obj(payload)
     except pydantic.ValidationError as e:
         logger.error(f"Invalid PayPal webhook payload: {json.dumps(e)}")
         return JSONResponse({"error": "Invalid event type"}, status_code=400)
 
-    if not verify_webhook_event(payload, headers=request.headers):
-        return JSONResponse({"error": "Invalid signature"}, status_code=400)
+    logger.info(f"Received event: {event.event_type}")
 
     match event.event_type:
         case "PAYMENT.SALE.COMPLETED":
-            sale_event = SaleCompletedEvent.parse_obj(event)
-            _handle_sale_completed(sale_event)
+            event = SaleCompletedEvent.parse_obj(event)
+            _handle_sale_completed(event)
+        case "BILLING.SUBSCRIPTION.ACTIVATED":
+            event = SubscriptionEvent.parse_obj(event)
+            _handle_subscription_updated(event.resource)
+        case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
+            event = SubscriptionEvent.parse_obj(event)
+            _handle_subscription_cancelled(event.resource)
         case _:
             logger.error(f"Unhandled PayPal webhook event: {event.event_type}")
 
@@ -255,7 +224,7 @@ def capture_order(order_id: str):
         str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}/capture"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": generate_auth_header(),
+            "Authorization": generate_paypal_auth_header(),
             # Uncomment one of these to force an error for negative testing (in sandbox mode only). Documentation:
             # https://developer.paypal.com/tools/sandbox/negative-testing/request-headers/
             # "PayPal-Mock-Response": '{"mock_application_codes": "INSTRUMENT_DECLINED"}'
@@ -270,7 +239,7 @@ def capture_order(order_id: str):
 def _handle_invoice_paid(order_id: str):
     response = requests.get(
         str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}"),
-        headers={"Authorization": generate_auth_header()},
+        headers={"Authorization": generate_paypal_auth_header()},
     )
     raise_for_status(response)
     order = response.json()
@@ -288,23 +257,23 @@ def _handle_invoice_paid(order_id: str):
         user.save(update_fields=["is_paying"])
 
 
-def _handle_sale_completed(sale_completed_event: SaleCompletedEvent):
-    sale = sale_completed_event.resource
+def _handle_sale_completed(event: SaleCompletedEvent):
+    sale = event.resource
     if not sale.billing_agreement_id or not sale.custom:
         logger.warning(f"Sale {sale.id} is missing billing agreement or custom ID")
         return
 
-    user = AppUser.objects.get_or_create_from_uid(sale.custom)[0]
+    user = AppUser.objects.get(uid=sale.custom)
     subscription = get_subscription_from_id(sale.billing_agreement_id)
-    pricing_info = get_pricing_info_from_plan_id(subscription.plan_id)
-    if not pricing_info:
+    plan = get_pricing_plan(subscription.plan_id)
+    if not plan:
         logger.error(f"Invalid plan ID: {subscription.plan_id}")
         return
 
     user.add_balance(
         payment_provider=PaymentProvider.PAYPAL,
         invoice_id=sale.id,
-        amount=int(pricing_info["quantity"]),
+        amount=int(plan.credits),
         charged_amount=int(float(sale.amount.total) * 100),  # in cents
     )
 
@@ -313,11 +282,55 @@ def _handle_sale_completed(sale_completed_event: SaleCompletedEvent):
         user.save(update_fields=["is_paying"])
 
 
+@transaction.atomic
+def _handle_subscription_updated(subscription: PaypalSubscription):
+    plan = get_pricing_plan(subscription.plan_id)
+    if not plan:
+        logger.error(f"Invalid plan ID: {subscription.plan_id}")
+        return
+
+    if not subscription.status == "ACTIVE":
+        logger.warning(f"Subscription {subscription.id} is not active")
+        return
+
+    user = AppUser.objects.get(uid=subscription.custom_id)
+    if (
+        user.subscription
+        and user.subscription.payment_provider == PaymentProvider.PAYPAL
+        and user.subscription.external_id == subscription.id
+    ):
+        logger.warning(f"Subscription {subscription.id} already exists")
+        return
+    elif user.subscription:
+        user.subscription.cancel()
+        user.subscription = None
+
+    user.subscription = Subscription(
+        plan=plan.value,
+        payment_provider=PaymentProvider.PAYPAL,
+        external_id=subscription.id,
+    )
+    user.subscription.full_clean()
+    user.subscription.save()
+    user.save()
+
+
+def _handle_subscription_cancelled(subscription: PaypalSubscription):
+    user = AppUser.objects.get(uid=subscription.custom_id)
+    if (
+        user.subscription
+        and user.subscription.payment_provider == PaymentProvider.PAYPAL
+        and user.subscription.external_id == subscription.id
+    ):
+        user.subscription = None
+        user.save()
+
+
 def get_payment_from_id(payment_id: str):
     response = requests.get(
         str(furl(settings.PAYPAL_BASE) / f"v2/payments/{payment_id}"),
         headers={
-            "Authorization": generate_auth_header(),
+            "Authorization": generate_paypal_auth_header(),
             "Prefer": "return=representation",
         },
     )
@@ -329,7 +342,7 @@ def get_sale_from_id(sale_id: str):
     response = requests.get(
         str(furl(settings.PAYPAL_BASE) / f"v1/payments/sale/{sale_id}"),
         headers={
-            "Authorization": generate_auth_header(),
+            "Authorization": generate_paypal_auth_header(),
             "Prefer": "return=representation",
         },
     )
@@ -337,16 +350,16 @@ def get_sale_from_id(sale_id: str):
     return Sale.parse_obj(response.json())
 
 
-def get_subscription_from_id(billing_agreement_id: str) -> Subscription:
+def get_subscription_from_id(billing_agreement_id: str) -> PaypalSubscription:
     response = requests.get(
         str(
             furl(settings.PAYPAL_BASE)
             / f"v1/billing/subscriptions/{billing_agreement_id}"
         ),
-        headers={"Authorization": generate_auth_header()},
+        headers={"Authorization": generate_paypal_auth_header()},
     )
     raise_for_status(response)
-    return Subscription.parse_obj(response.json())
+    return PaypalSubscription.parse_obj(response.json())
 
 
 def verify_webhook_event(event: dict, *, headers: typing.Mapping) -> bool:
@@ -363,7 +376,7 @@ def verify_webhook_event(event: dict, *, headers: typing.Mapping) -> bool:
     response = requests.post(
         str(furl(settings.PAYPAL_BASE) / "v1/notifications/verify-webhook-signature"),
         headers={
-            "Authorization": generate_auth_header(),
+            "Authorization": generate_paypal_auth_header(),
         },
         json={
             "auth_algo": validated_headers.PAYPAL_AUTH_ALGO,
@@ -380,9 +393,8 @@ def verify_webhook_event(event: dict, *, headers: typing.Mapping) -> bool:
     return response.json()["verification_status"] == "SUCCESS"
 
 
-def get_pricing_info_from_plan_id(plan_id: str) -> dict | None:
-    for subscription in available_subscriptions.values():
-        if "paypal" not in subscription:
-            continue
-        if subscription["paypal"]["plan_id"] == plan_id:
-            return subscription["paypal"]
+def get_pricing_plan(plan_id: str) -> PricingPlan | None:
+    for plan in PricingPlan:
+        if plan.paypal and plan.paypal.get("plan_id") == plan_id:
+            return plan
+    return None
