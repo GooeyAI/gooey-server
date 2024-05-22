@@ -1308,7 +1308,7 @@ class BasePage:
 
         additional_notes = self.additional_notes()
         if additional_notes:
-            ret += f" \n{additional_notes.strip()}"
+            ret += f" \n{additional_notes}"
 
         st.caption(ret, line_clamp=1, unsafe_allow_html=True)
 
@@ -1990,28 +1990,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
 
-    def get_total_linked_usage_cost_in_credits(self, default=1, group_by_model=False):
+    def get_total_linked_usage_cost_in_credits(self, default=1):
         """Return the sum of the linked usage costs in gooey credits."""
-        from usage_costs.models import UsageCost
-
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
-        if not current_run:
+        sr = self.get_current_sr()
+        total = sr.usage_costs.aggregate(total=Sum("dollar_amount"))["total"]
+        if not total:
             return default
-        qs = UsageCost.objects.filter(saved_run__run_id=current_run.run_id)
-        if group_by_model:
-            qs = qs.values("pricing__model_name")
-            return (
-                qs.annotate(
-                    total=Sum("dollar_amount") * settings.ADDON_CREDITS_PER_DOLLAR
-                )
-                or default
-            )
-        return (
-            qs.aggregate(total=Sum("dollar_amount"))["total"]
-            * settings.ADDON_CREDITS_PER_DOLLAR
-        ) or default
+        return total * settings.ADDON_CREDITS_PER_DOLLAR
+
+    def get_grouped_linked_usage_cost_in_credits(self):
+        """Return the linked usage costs grouped by model name in gooey credits."""
+        qs = (
+            self.get_current_sr()
+            .usage_costs.values("pricing__model_name")
+            .annotate(total=Sum("dollar_amount") * settings.ADDON_CREDITS_PER_DOLLAR)
+        )
+        return {item["pricing__model_name"]: item["total"] for item in qs}
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
