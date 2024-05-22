@@ -13,12 +13,11 @@ from daras_ai_v2.exceptions import raise_for_status
 
 from .plans import PricingPlan
 from .utils import (
-    generate_paypal_auth_header,
     cancel_stripe_subscription,
     cancel_paypal_subscription,
 )
 from app_users.models import PaymentProvider
-from daras_ai_v2 import settings
+from daras_ai_v2 import paypal, settings
 
 
 class AutoRechargeSubscription(models.Model):
@@ -27,7 +26,7 @@ class AutoRechargeSubscription(models.Model):
     )
     external_id = models.CharField(
         max_length=255,
-        help_text="Subscription ID for PayPal and payment_method_id for Stripe",
+        help_text="Subscription ID for PayPal",
         null=True,
         blank=True,
     )
@@ -47,7 +46,7 @@ class Subscription(models.Model):
     payment_provider = models.IntegerField(choices=PaymentProvider.choices)
     external_id = models.CharField(
         max_length=255,
-        help_text="Resource ID from the payment provider",
+        help_text="Subscription ID from the payment provider",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -63,10 +62,15 @@ class Subscription(models.Model):
             return True
 
     def cancel(self):
-        if self.payment_provider == PaymentProvider.STRIPE:
-            cancel_stripe_subscription(self.external_id)
-        elif self.payment_provider == PaymentProvider.PAYPAL:
-            cancel_paypal_subscription(self.external_id)
+        match self.payment_provider:
+            case PaymentProvider.STRIPE:
+                cancel_stripe_subscription(self.external_id)
+            case PaymentProvider.PAYPAL:
+                cancel_paypal_subscription(self.external_id)
+            case _:
+                raise NotImplementedError(
+                    f"Can't cancel subscription for {self.payment_provider}"
+                )
 
     def get_next_invoice_date(self) -> datetime:
         if self.payment_provider == PaymentProvider.STRIPE:
@@ -80,7 +84,7 @@ class Subscription(models.Model):
                     .add(path=f"/v1/billing/subscriptions/{self.external_id}")
                     .url
                 ),
-                headers={"Authorization": generate_paypal_auth_header()},
+                headers={"Authorization": paypal.generate_auth_header()},
             )
             raise_for_status(r)
             subscription = r.json()
@@ -89,6 +93,28 @@ class Subscription(models.Model):
             return isoparse(period_end)
         else:
             raise ValueError("Invalid Payment Provider")
+
+    def get_default_payment_method_preview(self) -> str | None:
+        match self.payment_provider:
+            case PaymentProvider.STRIPE:
+                subscription = stripe.Subscription.retrieve(
+                    self.external_id, expand=["default_payment_method"]
+                )
+                source = subscription.default_payment_method
+                if not source:
+                    return None
+                match source.type:
+                    case "card":
+                        return f"{source.card.brand} ending in {source.card.last4}"
+                    case other_method:
+                        return other_method
+            case PaymentProvider.PAYPAL:
+                subscription = paypal.Subscription.retrieve(self.external_id)
+                ...
+            case _:
+                raise NotImplementedError(
+                    f"Can't get payment method preview for {self.payment_provider}"
+                )
 
     class Meta:
         unique_together = ("payment_provider", "external_id")
