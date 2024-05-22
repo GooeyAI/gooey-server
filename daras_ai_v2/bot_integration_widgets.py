@@ -247,12 +247,15 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
     elif bi.fb_page_name:
         return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
     elif bi.platform == Platform.WEB:
-        return get_route_url(
-            chat_route,
-            dict(
-                integration_id=bi.api_integration_id(),
-                integration_name=slugify(bi.name) or "untitled",
-            ),
+        return str(
+            furl(settings.APP_BASE_URL)
+            / get_route_url(
+                chat_route,
+                dict(
+                    integration_id=bi.api_integration_id(),
+                    integration_name=slugify(bi.name) or "untitled",
+                ),
+            )
         )
     else:
         return None
