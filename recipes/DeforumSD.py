@@ -31,6 +31,8 @@ class _AnimationPrompt(TypedDict):
 
 AnimationPrompts = list[_AnimationPrompt]
 ZoomSettings: dict[int, float] = {0: 1.004}
+HPanSettings: dict[int, float] = {0: 0}
+VPanSettings: dict[int, float] = {0: 0}
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -182,10 +184,33 @@ def animation_prompts_editor(
                         max_value=1.5,
                         step=0.01,
                     )
+                    hpan_slider = st.slider(
+                        label="""
+                        #### Horizontal Pan
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.01,
+                    )
+                    vpan_slider = st.slider(
+                        label="""
+                        #### Vertical Pan
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.01,
+                    )
                     if st.button("Save"):
                         ZoomSettings.update({fp["frame"]: 1 + zoom_pan_slider})
-                        st.session_state["zoom"] = zoom_dict_to_str(ZoomSettings)
-
+                        HPanSettings.update({fp["frame"]: hpan_slider})
+                        VPanSettings.update({fp["frame"]: vpan_slider})
+                        st.session_state["zoom"] = zoom_pan_to_string(ZoomSettings)
+                        st.session_state["translation_x"] = zoom_pan_to_string(
+                            HPanSettings
+                        )
+                        st.session_state["translation_y"] = zoom_pan_to_string(
+                            VPanSettings
+                        )
         updated_st_list.append(
             {
                 "frame": st.session_state.get(frame_key),
@@ -229,7 +254,7 @@ def seconds_to_frames(seconds: float, fps: int) -> int:
     return int(seconds * fps)
 
 
-def zoom_dict_to_str(zoom_dict: dict[int, float]) -> str:
+def zoom_pan_to_string(zoom_dict: dict[int, float]) -> str:
     return ", ".join([f"{frame}:({zoom})" for frame, zoom in zoom_dict.items()])
 
 
