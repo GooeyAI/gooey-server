@@ -1373,25 +1373,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                if bi.platform == Platform.WEB and test_link:
-                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
-                        chat_lib_route,
-                        dict(
-                            integration_id=bi.api_integration_id(),
-                            integration_name=slugify(bi.name) or "untitled",
-                        ),
-                    )
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=dedent(
-                            f"""
-                            <div id="gooey-embed"></div>
-                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
-                            """
-                        ).strip(),
-                        type="secondary",
-                    )
-                elif test_link:
+                if test_link:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                         value=test_link,
@@ -1431,6 +1413,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
+                    )
+                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
+                        chat_lib_route,
+                        dict(
+                            integration_id=bi.api_integration_id(),
+                            integration_name=slugify(bi.name) or "untitled",
+                        ),
+                    )
+                    copy_to_clipboard_button(
+                        f"{icons.code} Copy Embed Code",
+                        value=dedent(
+                            f"""
+                            <div id="gooey-embed"></div>
+                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
+                            """
+                        ).strip(),
+                        type="secondary",
                     )
                 else:
                     st.write("Message quicklink not available.")

@@ -270,7 +270,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             if display_pic:
                 bi.photo_url = display_pic
         else:
-            if st.button(f"{icons.camera} Update Display Picture"):
+            if st.button(f"{icons.camera} Change Photo"):
                 st.session_state["--update-display-picture"] = True
                 st.experimental_rerun()
         bi.name = st.text_input("###### Name", value=bi.name)
@@ -301,35 +301,58 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             )
         )
 
-        with st.expander("Additional Settings"):
-            config = (
-                dict(
-                    showSources=True,
-                    enableAudioMessage=True,
-                    branding=(
-                        dict(showPoweredByGooey=True)
-                        | bi.web_config_extras.get("branding", {})
-                    ),
-                )
-                | bi.web_config_extras
+        config = (
+            dict(
+                mode="inline",
+                showSources=True,
+                enableAudioMessage=True,
+                branding=(
+                    dict(showPoweredByGooey=True)
+                    | bi.web_config_extras.get("branding", {})
+                ),
             )
+            | bi.web_config_extras
+        )
 
+        scol1, scol2 = st.columns(2)
+        with scol1:
             config["showSources"] = st.checkbox(
                 "Show Sources", value=config["showSources"]
             )
+        with scol2:
             config["enableAudioMessage"] = st.checkbox(
                 "Enable Audio Message", value=config["enableAudioMessage"]
             )
-            config["branding"]["showPoweredByGooey"] = st.checkbox(
-                "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
-            )
+            # config["branding"]["showPoweredByGooey"] = st.checkbox(
+            #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
+            # )
 
-            # remove defaults
-            bi.web_config_extras = config
+        with st.expander("Embed Settings"):
+            st.caption(
+                "These settings will take effect when you embed the widget on your website."
+            )
+            scol1, scol2 = st.columns(2)
+            with scol1:
+                config["mode"] = st.selectbox(
+                    "###### Mode",
+                    ["popup", "inline", "fullscreen"],
+                    value=config["mode"],
+                    format_func=lambda x: x.capitalize(),
+                )
+                if config["mode"] == "popup":
+                    config["branding"]["fabLabel"] = st.text_input(
+                        "###### Label",
+                        value=config["branding"].get("fabLabel", "Help"),
+                    )
+                else:
+                    config["branding"].pop("fabLabel", None)
+
+        # remove defaults
+        bi.web_config_extras = config
 
         with st.div(className="d-flex justify-content-end"):
             if st.button(
-                f"{icons.save} Update Integration",
+                f"{icons.save} Update Web Preview",
                 type="primary",
                 className="align-right",
             ):
@@ -344,7 +367,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             st.html(
                 # language=html
                 f"""
-                <div id="gooey-embed" style="border: 1px solid #eee; height: 90%"></div>
+                <div id="gooey-embed" style="border: 1px solid #eee; height: 80vh"></div>
                 <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
                 """
             )
@@ -357,10 +380,11 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                     GooeyEmbed.unmount();
                     GooeyEmbed.mount(config);
                 }
-                (document.getElementById("gooey-embed-script") || undefined).onload = loadGooeyEmbed;
+                const script = document.getElementById("gooey-embed-script");
+                if (script) script.onload = loadGooeyEmbed;
                 loadGooeyEmbed();
                 """,
-                config=bi.get_web_widget_config(),
+                config=bi.get_web_widget_config() | dict(mode="inline"),
             )
         else:
             bot_api_example_generator(bi.api_integration_id())
