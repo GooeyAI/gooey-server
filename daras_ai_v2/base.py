@@ -32,6 +32,7 @@ from bots.models import (
     PublishedRunVersion,
     PublishedRunVisibility,
     Workflow,
+    RetentionPolicy,
 )
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
@@ -366,10 +367,9 @@ class BasePage:
 
     def can_user_edit_run(
         self,
-        current_run: SavedRun | None = None,
-        published_run: PublishedRun | None = None,
+        current_run: SavedRun,
+        published_run: PublishedRun | None,
     ) -> bool:
-        current_run = current_run or self.get_current_sr()
         return (
             self.is_current_user_admin()
             or bool(
@@ -820,11 +820,15 @@ class BasePage:
     def render_selected_tab(self):
         match self.tab:
             case RecipeTabs.run:
+                if self.get_current_sr().retention_policy == RetentionPolicy.delete:
+                    self.render_deleted_output()
+                    return
+
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
                     submitted = self._render_input_col()
                 with output_col:
-                    self._render_output_col(submitted)
+                    self._render_output_col(submitted=submitted)
 
                 self._render_step_row()
 
@@ -1275,17 +1279,7 @@ class BasePage:
             ] += " d-flex justify-content-end align-items-center"
             col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
-                cost_note = self.get_cost_note() or ""
-                if cost_note:
-                    cost_note = f"({cost_note.strip()})"
-                st.caption(
-                    f"""
-Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
-{self.additional_notes() or ""}
-                    """,
-                    line_clamp=1,
-                    unsafe_allow_html=True,
-                )
+                self.render_run_cost()
             with col2:
                 submitted = st.button(
                     "🏃 Submit",
@@ -1302,6 +1296,21 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 return False
             else:
                 return True
+
+    def render_run_cost(self):
+        url = self.get_credits_click_url()
+        run_cost = self.get_price_roundoff(st.session_state)
+        ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+
+        cost_note = self.get_cost_note()
+        if cost_note:
+            ret += f" ({cost_note.strip()})"
+
+        additional_notes = self.additional_notes()
+        if additional_notes:
+            ret += f" \n{additional_notes.strip()}"
+
+        st.caption(ret, line_clamp=1, unsafe_allow_html=True)
 
     def _render_step_row(self):
         with st.expander("**ℹ️ Details**"):
@@ -1386,15 +1395,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         st.session_state["show_report_workflow"] = reported
         st.experimental_rerun()
 
-    def _render_before_output(self):
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if not (run_id or example_id):
-            return
-
-        url = self.current_app_url()
-        if not url:
-            return
-
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_sr(uid=uid, run_id=run_id)
         ref.is_flagged = is_flagged
@@ -1425,7 +1425,20 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             # when user is at a recipe root, and not running anything
             return RecipeRunState.starting
 
-    def _render_output_col(self, submitted: bool):
+    def render_deleted_output(self):
+        col1, *_ = st.columns(2)
+        with col1:
+            st.error(
+                "This data has been deleted as per the retention policy.",
+                icon="🗑️",
+                color="rgba(255, 200, 100, 0.5)",
+            )
+            st.newline()
+            self._render_output_col(is_deleted=True)
+            st.newline()
+            self.render_run_cost()
+
+    def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
         if st.session_state.get(StateKeys.pressed_randomize):
@@ -1435,8 +1448,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         if submitted or self.should_submit_after_login():
             self.on_submit()
-
-        self._render_before_output()
 
         run_state = self.get_run_state(st.session_state)
         match run_state:
@@ -1450,10 +1461,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 pass
 
         # render outputs
-        self.render_output()
+        if not is_deleted:
+            self.render_output()
 
         if run_state != RecipeRunState.running:
-            self._render_after_output()
+            if not is_deleted:
+                self._render_after_output()
+            render_output_caption()
 
     def _render_completed_output(self):
         pass
@@ -1513,7 +1527,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, is_api_call: bool = False):
+    def create_new_run(self, **defaults):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1548,9 +1562,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id,
             uid,
             create=True,
-            defaults=dict(
-                parent=parent, parent_version=parent_version, is_api_call=is_api_call
-            ),
+            defaults=dict(parent=parent, parent_version=parent_version) | defaults,
         )
         self.dump_state_to_sr(st.session_state, sr)
 
@@ -1631,8 +1643,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if randomize:
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
-
-        render_output_caption()
 
     def load_state_from_sr(self, sr: SavedRun) -> dict:
         state = sr.to_dict()

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import Q, IntegerChoices
 from django.utils import timezone
 from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -15,7 +15,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2 import icons
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
 
@@ -179,6 +178,11 @@ class SavedRunQuerySet(models.QuerySet):
         return df
 
 
+class RetentionPolicy(IntegerChoices):
+    keep = 0, "Keep"
+    delete = 1, "Delete"
+
+
 class SavedRun(models.Model):
     parent = models.ForeignKey(
         "self",
@@ -228,6 +232,10 @@ class SavedRun(models.Model):
     )
     page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
     page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
+
+    retention_policy = models.IntegerField(
+        choices=RetentionPolicy.choices, default=RetentionPolicy.keep
+    )
 
     is_api_call = models.BooleanField(default=False)
 

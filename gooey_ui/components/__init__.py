@@ -126,12 +126,18 @@ def text(body: str, **props):
     ).mount()
 
 
-def error(body: str, icon: str = "🔥", *, unsafe_allow_html=False):
+def error(
+    body: str,
+    icon: str = "🔥",
+    *,
+    unsafe_allow_html=False,
+    color="rgba(255, 108, 108, 0.2)",
+):
     if not isinstance(body, str):
         body = repr(body)
     with div(
         style=dict(
-            backgroundColor="rgba(255, 108, 108, 0.2)",
+            backgroundColor=color,
             padding="1rem",
             paddingBottom="0",
             marginBottom="0.5rem",
