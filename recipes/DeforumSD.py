@@ -30,6 +30,7 @@ class _AnimationPrompt(TypedDict):
 
 
 AnimationPrompts = list[_AnimationPrompt]
+ZoomSettings: dict[int, float] = {0: 1.004}
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -134,9 +135,8 @@ def animation_prompts_editor(
                 type="tertiary",
             ):
                 max_frames = st.session_state.get("max_frames", 100)
-                frame_step = frames_to_seconds(10, st.session_state.get("fps", 12))
                 next_frame = seconds_to_frames(
-                    fp["frame"] + frame_step, st.session_state.get("fps", 12)
+                    (start + end) / 2, st.session_state["fps"]
                 )
                 if next_frame > max_frames:
                     st.error("Please increase Frame Count")
@@ -174,15 +174,17 @@ def animation_prompts_editor(
                     st.caption(
                         f"Starting at second {start} and until second {end}, how do you want the camera to move?"
                     )
-                    st.slider(
+                    zoom_pan_slider = st.slider(
                         label="""
                         #### Zoom
                         """,
                         min_value=-1.5,
                         max_value=1.5,
-                        step=0.05,
+                        step=0.01,
                     )
-                    st.button("Save")
+                    if st.button("Save"):
+                        ZoomSettings.update({fp["frame"]: 1 + zoom_pan_slider})
+                        st.session_state["zoom"] = zoom_dict_to_str(ZoomSettings)
 
         updated_st_list.append(
             {
@@ -227,6 +229,10 @@ def seconds_to_frames(seconds: float, fps: int) -> int:
     return int(seconds * fps)
 
 
+def zoom_dict_to_str(zoom_dict: dict[int, float]) -> str:
+    return ", ".join([f"{frame}:({zoom})" for frame, zoom in zoom_dict.items()])
+
+
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
 
 
@@ -248,6 +254,8 @@ class DeforumSDPage(BasePage):
         seed=42,
         selected_model=AnimationModels.protogen_2_2.name,
     )
+
+    ZoomSettings = {0: 1.004}
 
     class RequestModel(BaseModel):
         # input_prompt: str
