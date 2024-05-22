@@ -55,7 +55,7 @@ def test_copilot_get_raw_price_round_up():
 
 
 @pytest.mark.django_db
-def test_multiple_llm_sums_usage_cost(transactional_db):
+def test_multiple_llm_sums_usage_cost():
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -113,7 +113,7 @@ def test_multiple_llm_sums_usage_cost(transactional_db):
 
 
 @pytest.mark.django_db
-def test_workflowmetadata_2x_multiplier(transactional_db):
+def test_workflowmetadata_2x_multiplier():
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -148,12 +148,10 @@ def test_workflowmetadata_2x_multiplier(transactional_db):
         dollar_amount=model_pricing.unit_cost * 1 / model_pricing.unit_quantity,
     )
 
-    WorkflowMetadata.objects.create(
-        workflow=Workflow.COMPARE_LLM,
-        short_title="compare llm",
-        help_url="",
-        price_multiplier=2,
-    )
+    metadata = Workflow.COMPARE_LLM.get_or_create_metadata()
+    metadata.price_multiplier = 2
+    metadata.save()
+
     llm_page = CompareLLMPage(run_user=user)
     set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
     assert (
