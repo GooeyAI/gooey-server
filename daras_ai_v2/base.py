@@ -1558,14 +1558,14 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
-        from celeryapp.tasks import gui_runner, auto_recharge_before_run
+        from celeryapp.tasks import gui_runner, auto_recharge
 
         if (
             self.request.user
             and not self.request.user.is_anonymous
             and user_should_auto_recharge(self.request.user)
         ):
-            auto_recharge_before_run.delay(user_id=self.request.user.id)
+            auto_recharge.delay(user_id=self.request.user.id)
 
         return gui_runner.delay(
             page_cls=self.__class__,

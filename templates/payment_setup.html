@@ -37,14 +37,14 @@
 <script>
 
 function renderPaypalAddonButtons() {
-    let element = document.getElementById("paypal-addon-buttons");
+    let element = document.querySelector("#paypal-addon-buttons");
     if (!element || element.innerHTML) return;
 
     window.paypal_one_time.Buttons({createOrder, onApprove}).render("#paypal-addon-buttons");
 }
 
 function renderPaypalSubscriptionButtons() {
-    for (const el of document.getElementsByClassName("paypal-subscription-buttons")) {
+    for (const el of document.querySelectorAll(".paypal-subscription-buttons")) {
         if (el.innerHTML) continue;
         const planId = el.dataset.planId;
         window.paypal_subscription.Buttons({
@@ -57,6 +57,31 @@ function renderPaypalSubscriptionButtons() {
         }).render(el);
     }
 }
+
+function setupToggleShowElement() {
+    for (const el of document.querySelectorAll("[data-toggle-show]")) {
+        el.addEventListener("click", function () {
+            for (const target of document.querySelectorAll(el.dataset.toggleShow)) {
+                if (target) {
+                    target.style.display = target.style.display === "none" ? "block" : "none";
+                } else {
+                  console.error(`Could not find target element: ${el.dataset.toggleShow}`)
+                }
+            }
+        });
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const observer = new MutationObserver((mutationsList, observer) => {
+        console.log("mutation observed");
+        renderPaypalSubscriptionButtons();
+        setupToggleShowElement();
+    });
+
+    // Start observing the target node for configured mutations
+    observer.observe(document.body, { childList: true, subtree: true });
+});
 
 // -- Setup: PayPal One-time --
 

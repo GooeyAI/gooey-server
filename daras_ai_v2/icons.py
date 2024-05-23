@@ -18,3 +18,15 @@ download = '<i class="fa-solid fa-download"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
+stripe = '<i class="fa-brands fa-stripe"></i>'
+paypal = '<i class="fa-brands fa-paypal"></i>'
+
+# cards
+card_icons = {
+    "visa": '<i class="fa-brands fa-cc-visa"></i>',
+    "mastercard": '<i class="fa-brands fa-cc-mastercard"></i>',
+    "amex": '<i class="fa-brands fa-cc-amex"></i>',
+    "discover": '<i class="fa-brands fa-cc-discover"></i>',
+    "jcb": '<i class="fa-brands fa-cc-jcb"></i>',
+    "diners": '<i class="fa-brands fa-cc-diners-club"></i>',
+}

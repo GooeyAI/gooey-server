@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 
 import stripe
 from django.db.models import Sum
@@ -7,34 +8,9 @@ from furl import furl
 from loguru import logger
 
 from app_users.models import AppUser, AppUserTransaction, PaymentProvider
-from daras_ai_v2 import settings
+from daras_ai_v2 import paypal, settings
 from daras_ai_v2.settings import templates
 from daras_ai_v2.send_email import send_email_via_postmark
-
-
-def get_auto_recharge_payment_method(user: AppUser) -> stripe.PaymentMethod | None:
-    if (
-        user.auto_recharge
-        and user.auto_recharge.payment_provider == PaymentProvider.STRIPE
-    ):
-        return stripe.PaymentMethod.retrieve(user.auto_recharge.external_id)
-
-
-def send_email_auto_recharge_successful(user: AppUser, amount: int):
-    if not user.email:
-        return
-
-    email_body = templates.get_template("auto_recharge_successful_email.html").render(
-        user=user,
-        account_url=get_account_url(),
-        amount=amount,
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=user.email,
-        subject="[Gooey.AI] Auto-Recharge Successful",
-        html_body=email_body,
-    )
 
 
 def send_email_auto_recharge_failed(user: AppUser, reason: str):
@@ -74,67 +50,89 @@ def send_email_monthly_spend_threshold_reached(user: AppUser):
 
 def auto_recharge_user(user: AppUser):
     if not user_should_auto_recharge(user):
+        logger.info(f"User doesn't need to auto-recharge: {user=}")
         return
 
-    if not user.auto_recharge.topup_amount:
+    if not user.subscription.auto_recharge_topup_amount:
         send_email_auto_recharge_failed(user, reason="recharge amount wasn't set")
         logger.error(f"User hasn't set auto recharge amount ({user=})")
         return
 
-    if user.auto_recharge.topup_amount > settings.AUTO_RECHARGE_MAX_AMOUNT:
-        send_email_auto_recharge_failed(user, reason="recharge amount is too high")
-        logger.error(
-            f"User has set very high auto recharge amount ({user=}, {user.auto_recharge.topup_amount=})",
-        )
-        return
-
     dollars_spent = get_dollars_spent_this_month_by_user(user)
-    if dollars_spent + user.auto_recharge.topup_amount > user.monthly_spending_budget:
+    if (
+        dollars_spent + user.subscription.auto_recharge_topup_amount
+        > user.monthly_spending_budget
+    ):
         send_email_auto_recharge_failed(
             user, reason="you have reached your monthly budget"
         )
         logger.info(f"User has reached the monthly budget: {user=}, {dollars_spent=}")
         return
 
-    match user.auto_recharge.payment_provider:
+    match user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             customer = user.search_stripe_customer()
             if not customer:
                 logger.error(f"User doesn't have a stripe customer: {user=}")
                 return
 
-            pm = stripe.PaymentMethod.retrieve(user.auto_recharge.external_id)
-            if not pm:
-                logger.error(
-                    f"Payment method not found: {user=}, {user.auto_recharge.external_id=}"
+            sub = stripe.Subscription.retrieve(user.subscription.external_id)
+            pm = sub.default_payment_method
+            with email_user_if_fails(user, reason="the payment failed"):
+                invoice = stripe_get_or_create_auto_invoice(
+                    customer=customer,
+                    amount_in_dollars=user.subscription.auto_recharge_topup_amount,
+                )
+
+                if invoice.status == "open":
+                    invoice.pay(payment_method=pm)
+                    logger.info(
+                        f"Payment attempted for auto recharge invoice: {user=}, {invoice=}"
+                    )
+                elif invoice.status == "paid":
+                    logger.info(
+                        f"Auto recharge invoice already paid recently: {user=}, {invoice=}"
+                    )
+
+        case PaymentProvider.PAYPAL:
+            subscription = paypal.Subscription.retrieve(user.subscription.external_id)
+            if not subscription.billing_info:
+                logger.error(f"Subscription doesn't have billing info: {user=}")
+                return
+
+            if last_payment := subscription.billing_info.last_payment:
+                if last_payment.time - datetime.now(tz=timezone.utc) < timedelta(
+                    seconds=settings.AUTO_RECHARGE_COOLDOWN_SECONDS
+                ):
+                    logger.info(
+                        f"Last payment was within cooldown interval, skipping...: {user=}, {subscription.billing_info.last_payment=}"
+                    )
+                    return
+
+            if float(subscription.billing_info.outstanding_balance.total) != 0.0:
+                logger.warning(
+                    f"Subscription has outstanding balance already, attempting to charge: {user=}",
+                )
+                subscription.capture(
+                    note="Attempting payment of outstanding balance due to low credits",
+                    amount=subscription.billing_info.outstanding_balance,
                 )
                 return
 
-            invoice, created = get_or_create_auto_invoice(
-                customer=customer, amount_in_dollars=user.auto_recharge.topup_amount
-            )
+            amount = paypal.Amount.USD(subscription.auto_recharge_topup_amount)
 
-            if created:
-                logger.info(f"Auto recharge invoice created: {user=}, {invoice=}")
-
-            if invoice.status == "open":
-                invoice.pay(payment_method=pm)
-                logger.info(
-                    f"Payment attempted for auto recharge invoice: {user=}, {invoice=}"
-                )
-            elif invoice.status == "paid":
-                logger.info(
-                    f"Auto recharge invoice already paid recently: {user=}, {invoice=}"
+            logger.info(f"Auto-recharging user: {user=}, {amount=}")
+            with email_user_if_fails(user, reason="the payment failed"):
+                subscription.set_outstanding_balance(amount=amount)
+                subscription.capture(
+                    note="Auto-recharge due to low credits", amount=amount
                 )
 
-        case PaymentProvider.PAYPAL:
-            logger.error(f"Auto recharge via PayPal is not supported yet: {user=}")
-            return
 
-
-def get_or_create_auto_invoice(
-    customer: stripe.Customer, amount_in_dollars: int
-) -> tuple[stripe.Invoice, bool]:
+def stripe_get_or_create_auto_invoice(
+    customer: stripe.Customer,
+    amount_in_dollars: int,
+) -> stripe.Invoice:
     """
     Fetches the relevant auto recharge invoice, or creates one if it doesn't exist.
 
@@ -151,7 +149,7 @@ def get_or_create_auto_invoice(
 
     open_invoice = next((inv for inv in invoices if inv.status == "open"), None)
     if open_invoice:
-        return open_invoice, False
+        return open_invoice
 
     recently_paid_invoice = next(
         (
@@ -164,7 +162,7 @@ def get_or_create_auto_invoice(
         None,
     )
     if recently_paid_invoice:
-        return recently_paid_invoice, False
+        return recently_paid_invoice
 
     invoice = stripe.Invoice.create(
         customer=customer,
@@ -188,7 +186,7 @@ def get_or_create_auto_invoice(
         metadata={"auto_recharge": True},
     )
     invoice.finalize_invoice(auto_advance=True)
-    return invoice, True
+    return invoice
 
 
 def get_dollars_spent_this_month_by_user(user: AppUser):
@@ -203,13 +201,21 @@ def get_dollars_spent_this_month_by_user(user: AppUser):
 
 
 def user_should_auto_recharge(user: AppUser):
-    # auto recharge is enabled, configured with a payment metohd, and user has low balance
     return (
-        user.auto_recharge
-        and user.auto_recharge.has_payment_method
-        and user.balance < user.auto_recharge.topup_threshold
+        user.subscription
+        and user.subscription.auto_recharge_enabled
+        and user.balance < user.subscription.auto_recharge_balance_threshold
     )
 
 
 def get_account_url():
     return str(furl(settings.APP_BASE_URL) / "account" / "")
+
+
+@contextmanager
+def email_user_if_fails(user: AppUser, reason: str):
+    try:
+        yield
+    except Exception:
+        send_email_auto_recharge_failed(user, reason=reason)
+        raise

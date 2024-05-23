@@ -6,6 +6,7 @@ from enum import Enum
 from textwrap import dedent
 from urllib.parse import quote_plus
 
+from django.core.validators import ValidationError
 import stripe
 from django.db import transaction
 from fastapi import APIRouter
@@ -19,7 +20,6 @@ import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, settings, urls
-from daras_ai_v2.auto_recharge import get_auto_recharge_payment_method
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -28,7 +28,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
-from payments.models import AutoRechargeSubscription, PricingPlan, Subscription
+from payments.models import PricingPlan, Subscription
 from routers.root import page_wrapper
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -288,31 +288,14 @@ Every time you submit a workflow or make an API call, we deduct credits from you
 """
         )
 
-    render_all_plans(user=request.user)
-    render_auto_recharge_section(request)
-    render_addon_section()
+    render_all_plans(request.user)
+    if request.user.subscription:
+        render_auto_recharge_section(request.user)
+        render_addon_section(request.user)
+        render_payment_information(request.user)
     render_billing_history(request.user)
 
     return
-    is_admin = request.user.email in settings.ADMIN_EMAILS
-
-    context = {
-        "request": request,
-        "settings": settings,
-        "available_subscriptions": available_subscriptions,
-        "user_credits": request.user.balance,
-        "is_admin": is_admin,
-        "subscription": request.user.subscription,
-        "subscription_plan": (
-            PricingPlan(request.user.subscription.plan)
-            if request.user.subscription
-            else None
-        ),
-        "PaymentProvider": PaymentProvider,
-    }
-
-    st.html(templates.get_template("account.html").render(**context))
-    render_auto_recharge_section(request)
 
 
 def render_payments_setup():
@@ -329,7 +312,7 @@ def render_current_plan(subscription: Subscription):
                     f"""
                 #### Gooey.AI {plan.title}
 
-                [{icons.edit} Manage Subscription](/__/stripe/create-portal-session)
+                [{icons.edit} Manage Subscription](#payment-information)
                 """
                 ),
                 unsafe_allow_html=True,
@@ -347,7 +330,11 @@ def render_current_plan(subscription: Subscription):
             with st.tag("h1", className="my-0"):
                 st.html(plan.pricing_title())
             if plan.monthly_charge:
-                st.caption("per month")
+                provider = PaymentProvider(subscription.payment_provider)
+                with st.div(className="d-flex align-items-center"):
+                    st.caption(
+                        f"per month **via {provider.label}**", unsafe_allow_html=True
+                    )
         with right(className="text-end"):
             with st.tag("h1", className="my-0"):
                 st.html(f"{plan.credits:,} credits")
@@ -363,15 +350,13 @@ def render_all_plans(user: AppUser):
         if user.subscription
         else PricingPlan.STARTER
     )
-
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
+    preferred_payment_provider = None
 
     def _render_plan(plan: PricingPlan):
         current_plan_class = "bg-light" if plan == current_plan else ""
-        with border_box(
-            className=f"p-3 {current_plan_class} h-100 d-flex justify-content-between flex-column"
-        ):
-            with st.div():
+        with border_box(className=f"p-3 {current_plan_class} h-100 d-flex flex-column"):
+            with st.div(className="flex-grow-1"):
                 with st.div(className="mb-4"):
                     with st.tag("h4", className="mb-0"):
                         st.html(plan.title)
@@ -403,37 +388,77 @@ def render_all_plans(user: AppUser):
                     if plan.credits > current_plan.credits
                     else ("Downgrade", "secondary")
                 )
-                key = f"__change-plan-{plan.key}"
-                if st.button(
-                    action_text, key=key, className=btn_classes, type=btn_type
-                ):
-                    # TODO: change user plan
-                    ...
+                update_subscription_button(
+                    action_text,
+                    plan=plan,
+                    className=btn_classes,
+                    type=btn_type,
+                    payment_provider=preferred_payment_provider,
+                )
 
     st.write("## All Plans")
-    grid_layout(4, all_plans, _render_plan, separator=False)
+    plans_div = st.div(className="mb-1")
+    if not user.subscription:
+        preferred_payment_provider = PaymentProvider[
+            payment_provider_radio() or PaymentProvider.STRIPE.name
+        ]
+    with plans_div:
+        grid_layout(4, all_plans, _render_plan, separator=False)
+    with st.div(className="my-2 d-flex justify-content-center"):
+        st.caption(
+            f"#### [See all features & benefits]({furl(settings.APP_BASE_URL)/'pricing'/''})"
+        )
 
 
-def payment_provider_radio():
+def update_subscription_button(
+    label: str,
+    *,
+    plan: PricingPlan,
+    className: str = "",
+    type: str | None = "secondary",
+    payment_provider: PaymentProvider | None = None,
+):
+    if type is not None:
+        className += f" btn btn-theme btn-{type}"
+
+    match payment_provider:
+        case PaymentProvider.STRIPE:
+            render_stripe_subscription_button(
+                label, plan=plan, className=className, type=type
+            )
+        case PaymentProvider.PAYPAL:
+            render_paypal_subscription_button(label, plan=plan)
+        case _:
+            st.html(
+                f"""
+            <form action="/__/billing/change-subscription" method="post" class="d-inline">
+                <input type="hidden" name="lookup_key" value="{plan.key}">
+                <button type="submit" class="{className}" data-submit-disabled>{label}</button>
+            </form>
+            """
+            )
+
+
+def payment_provider_radio() -> str | None:
     with st.div(className="d-flex"):
         st.write("###### Pay Via", className="d-block me-3")
         return st.radio(
             "",
-            options=PaymentProvider.labels,
-            format_func=lambda l: f'<span class="me-3">{l}</span>',
+            options=PaymentProvider.names,
+            format_func=lambda name: f'<span class="me-3">{PaymentProvider[name].label}</span>',
         )
 
 
-def render_addon_section():
+def render_addon_section(user: AppUser):
     st.write("# Purchase More Credits")
     st.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    provider = payment_provider_radio()
+    provider = PaymentProvider(user.subscription.payment_provider)
     match provider:
-        case PaymentProvider.STRIPE.label:
+        case PaymentProvider.STRIPE:
             for amount in settings.ADDON_AMOUNT_CHOICES:
                 render_stripe_addon_button(amount)
-        case PaymentProvider.PAYPAL.label:
+        case PaymentProvider.PAYPAL:
             for amount in settings.ADDON_AMOUNT_CHOICES:
                 render_paypal_addon_button(amount)
             st.div(
@@ -494,47 +519,85 @@ def render_paypal_subscription_button(
     label: str,
     *,
     plan: PricingPlan,
-    className: str = "streamlit-like-btn",
-    type: str = "primary",
 ):
     if not plan.paypal or "plan_id" not in plan.paypal:
         st.write("Paypal subscription not available")
         return
 
-    className += f" btn btn-theme btn-{type}"
+    plan_id = plan.paypal["plan_id"]
+    st.write(f"**{label}**")
     st.html(
         f"""
-    <button class="paypal-subscription-buttons {className}"
-            type="button"
-            data-plan-id="{plan.paypal['plan_id']}"
-            data-submit-disabled
-    >{label}</button>
+    <div id="paypal-subscription-{plan_id}"
+         class="paypal-subscription-{plan_id} paypal-subscription-buttons"
+         data-plan-id="{plan_id}"></div>
     """
     )
+
+
+def render_payment_information(user: AppUser):
+    if not user.subscription:
+        return
+
+    st.write("## Payment Information", id="payment-information", className="d-block")
+    col1, col2, _ = st.columns(3, responsive=False)
+    with col1:
+        st.write("**Pay via**")
+    with col2:
+        provider = PaymentProvider(user.subscription.payment_provider)
+        st.write(provider.label)
+
+    pm_summary = user.subscription.get_payment_method_summary()
+    if pm_summary and pm_summary.card_brand:
+        col1, col2, col3 = st.columns(3, responsive=False)
+        with col1:
+            st.write("**Payment Method**")
+        with col2:
+            st.write(
+                f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
+                unsafe_allow_html=True,
+            )
+        with col3:
+            with st.link(to="/__/billing/change-payment-method"):
+                st.button(f"{icons.edit} Edit", type="link")
+
+    if pm_summary and pm_summary.billing_email:
+        col1, col2, _ = st.columns(3, responsive=False)
+        with col1:
+            st.write("**Billing Email**")
+        with col2:
+            st.write(pm_summary.billing_email)
+
+
+def format_card_brand(brand: str) -> str:
+    brand = brand.lower()
+    if brand in icons.card_icons:
+        return icons.card_icons[brand]
+    else:
+        return brand.capitalize()
 
 
 def render_billing_history(user: AppUser):
     import pandas as pd
 
     txns = user.transactions.filter(amount__gt=0).order_by("-created_at")
+    if not txns:
+        return
 
     st.write("## Billing History")
-    if not txns:
-        st.caption("No purchases yet")
-    else:
-        st.table(
-            pd.DataFrame.from_records(
-                columns=[""] * 3,
-                data=[
-                    [
-                        txn.created_at.strftime("%m/%d/%Y"),
-                        txn.note(),
-                        f"${txn.charged_amount / 100:,.2f}",
-                    ]
-                    for txn in txns
-                ],
-            )
+    st.table(
+        pd.DataFrame.from_records(
+            columns=[""] * 3,
+            data=[
+                [
+                    txn.created_at.strftime("%m/%d/%Y"),
+                    txn.note(),
+                    f"${txn.charged_amount / 100:,.2f}",
+                ]
+                for txn in txns
+            ],
         )
+    )
 
 
 def profile_tab(request: Request):
@@ -586,74 +649,42 @@ def api_keys_tab(request: Request):
     manage_api_keys(request.user)
 
 
-def render_auto_recharge_section(request: Request):
-    assert request.user
+def render_auto_recharge_section(user: AppUser):
+    assert user and user.subscription
+    subscription = user.subscription
 
     st.write("## Auto Recharge & Limits")
     col1, col2 = st.columns(2)
 
     with col1, st.div(className="d-flex align-items-end"):
-        auto_recharge_enabled = st.checkbox("", value=bool(request.user.auto_recharge))
+        subscription.auto_recharge_enabled = st.checkbox(
+            "", value=subscription.auto_recharge_enabled
+        )
         st.write("#### Enable Auto Recharge")
 
-    if not auto_recharge_enabled:
-        if request.user.auto_recharge:
-            with transaction.atomic():
-                request.user.auto_recharge.delete()
-                request.user.auto_recharge = None
-                request.user.save(update_fields=["auto_recharge"])
-            st.experimental_rerun()
-
+    if not subscription.auto_recharge_enabled:
         with col1:
             st.caption(
                 "Enable auto recharge to automatically keep your credit balance topped up."
             )
-
-        return
-
-    if not request.user.auto_recharge:
-        request.user.auto_recharge = AutoRechargeSubscription(
-            topup_amount=settings.ADDON_AMOUNT_CHOICES[0],
-            topup_threshold=settings.AUTO_RECHARGE_TOPUP_THRESHOLD_CHOICES[0],
-        )
-        with transaction.atomic():
-            request.user.auto_recharge.save()
-            request.user.save(update_fields=["auto_recharge"])
-        st.experimental_rerun()
-
-    setup_auto_recharge_url = urls.remove_hostname(
-        request.url_for("stripe_setup_auto_recharge")
-    )
-    pm = get_auto_recharge_payment_method(request.user)
-    if not pm:
-        st.write(
-            f"Link a payment method with Stripe [here]({setup_auto_recharge_url})."
-        )
         return
 
     with col1:
-        request.user.auto_recharge.topup_amount = st.selectbox(
+        subscription.auto_recharge_topup_amount = st.selectbox(
             "Automatically purchase",
             options=settings.ADDON_AMOUNT_CHOICES,
             format_func=lambda amt: f"{settings.ADDON_CREDITS_PER_DOLLAR * amt:,} credits for ${amt}",
-            default_value=request.user.auto_recharge.topup_amount,
+            default_value=subscription.auto_recharge_topup_amount,
         )
-        request.user.auto_recharge.topup_threshold = st.selectbox(
+        subscription.auto_recharge_balance_threshold = st.selectbox(
             "When balance falls below (in credits)",
-            options=settings.AUTO_RECHARGE_TOPUP_THRESHOLD_CHOICES,
+            options=settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES,
             format_func=lambda credits: f"{credits:,} credits",
-            default_value=request.user.auto_recharge.topup_threshold,
-        )
-        card_icon = f'<i class="fa-brands fa-cc-{pm.card.brand}"></i>'
-        st.write(
-            '<span class="text-muted">Using my card ending in </span>'
-            f"**{pm.card.last4}** {card_icon}. "
-            f'<span class="text-muted">[Change]({setup_auto_recharge_url})</span>',
-            unsafe_allow_html=True,
+            default_value=subscription.auto_recharge_balance_threshold,
         )
 
     with col2:
-        request.user.monthly_spending_budget = st.number_input(
+        user.monthly_spending_budget = st.number_input(
             dedent(
                 """\
                 #### Monthly Budget (in USD)
@@ -663,9 +694,9 @@ def render_auto_recharge_section(request: Request):
                 """,
             ),
             min_value=10,
-            value=request.user.monthly_spending_budget or 50,
+            value=user.monthly_spending_budget or 50,
         )
-        request.user.monthly_spending_notification_threshold = st.number_input(
+        user.monthly_spending_notification_threshold = st.number_input(
             dedent(
                 """\
                 #### Email Notification Threshold (in USD)
@@ -677,17 +708,27 @@ def render_auto_recharge_section(request: Request):
             ),
             min_value=10,
             max_value=10000,
-            value=request.user.monthly_spending_notification_threshold or 10,
+            value=user.monthly_spending_notification_threshold or 10,
         )
 
     if st.button("Save", type="primary"):
+        try:
+            subscription.full_clean()
+            user.full_clean()
+        except ValidationError as e:
+            st.error(str(e))
+            return
+
         with transaction.atomic():
-            request.user.auto_recharge.external_id = pm.id
-            request.user.auto_recharge.payment_provider = PaymentProvider.STRIPE
-            request.user.auto_recharge.save()
-            request.user.save(
+            subscription.save(
                 update_fields=[
-                    "auto_recharge",
+                    "auto_recharge_enabled",
+                    "auto_recharge_topup_amount",
+                    "auto_recharge_balance_threshold",
+                ]
+            )
+            user.save(
+                update_fields=[
                     "monthly_spending_budget",
                     "monthly_spending_notification_threshold",
                 ]
@@ -771,30 +812,42 @@ def create_checkout_session(
         subscription_data=subscription_data,
         invoice_creation=invoice_creation,
         allow_promotion_codes=True,
-        # saved_payment_method_options={
-        #     "payment_method_save": "enabled",
-        # },
+        saved_payment_method_options={
+            "payment_method_save": "enabled",
+        },
     )
 
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@app.get("/__/stripe/setup-auto-recharge")
-def stripe_setup_auto_recharge(request: Request):
-    if not request.user or request.user.is_anonymous:
-        return RedirectResponse(
-            request.url_for("login", query_params={"next": request.url.path})
-        )
+@app.get("/__/billing/change-payment-method")
+def change_payment_method(request: Request):
+    if not request.user or not request.user.subscription:
+        return RedirectResponse(account_url)
 
-    checkout_session = stripe.checkout.Session.create(
-        mode="setup",
-        currency="usd",
-        customer=request.user.get_or_create_stripe_customer(),
-        success_url=payment_success_url,
-        cancel_url=account_url,
-    )
-
-    return RedirectResponse(checkout_session.url, status_code=303)
+    match request.user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            session = stripe.checkout.Session.create(
+                mode="setup",
+                currency="usd",
+                customer=request.user.get_or_create_stripe_customer(),
+                setup_intent_data={
+                    "metadata": {
+                        "subscription_id": request.user.subscription.external_id,
+                        "op": "change_payment_method",
+                    },
+                },
+                success_url=payment_success_url,
+                cancel_url=account_url,
+            )
+            return RedirectResponse(session.url, status_code=303)
+        case _:
+            return JSONResponse(
+                {
+                    "message": "Not implemented for this payment provider",
+                },
+                status_code=400,
+            )
 
 
 @app.post("/__/stripe/create-portal-session")
@@ -885,25 +938,38 @@ def _handle_checkout_session_completed(uid: str, session_data):
         return
 
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    if not user.auto_recharge:
-        logger.error("AutoRechargeSubscription not found for user %s", user)
+    setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
+
+    match setup_intent.metadata.get("op"):
+        case "change_payment_method":
+            _handle_change_payment_method(user, setup_intent)
+        case _:
+            raise Exception(f"Unknown operation {setup_intent.metadata.get('op')}")
+
+
+def _handle_change_payment_method(user: AppUser, setup_intent: stripe.SetupIntent):
+    subscription_id = setup_intent.metadata.get("subscription_id")
+    if not (
+        user.subscription.payment_provider == PaymentProvider.STRIPE
+        and user.subscription.external_id == subscription_id
+    ):
+        logger.error(f"Subscription {subscription_id} not found for user {user}")
         return
 
-    setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
-    user.auto_recharge.payment_provider = PaymentProvider.STRIPE
-    user.auto_recharge.external_id = setup_intent.payment_method
-    user.auto_recharge.save(update_fields=["payment_provider", "external_id"])
+    stripe.Subscription.modify(
+        subscription_id, default_payment_method=setup_intent.payment_method
+    )
 
 
 @transaction.atomic
 def _handle_subscription_updated(uid: str, subscription_data):
-    logger.info(f"Subscription updated: {subscription_data}")
+    logger.info("Subscription updated")
 
     if subscription_data.get("status") != "active":
         return
 
     product = stripe.Product.retrieve(subscription_data.plan.product)
-    plan = PricingPlan.get_by_stripe_product_name(product.name)
+    plan = PricingPlan.get_by_stripe_product(product)
     if not plan:
         raise Exception(
             f"PricingPlan not found for product {subscription_data.plan.product}"
@@ -913,21 +979,19 @@ def _handle_subscription_updated(uid: str, subscription_data):
     if (
         user.subscription
         and user.subscription.payment_provider == PaymentProvider.STRIPE
-        and user.subscription.external_id == subscription_data.id
+        and user.subscription.external_id != subscription_data.id
     ):
-        # this subscription already exists
-        return
-    elif user.subscription:
         logger.warning(
             f"User {user} has existing subscription {user.subscription}. Cancelling that..."
         )
         user.subscription.cancel()
+        user.subscription.delete()
+    elif not user.subscription:
+        user.subscription = Subscription()
 
-    user.subscription = Subscription(
-        plan=plan.value,
-        payment_provider=PaymentProvider.STRIPE,
-        external_id=subscription_data.id,
-    )
+    user.subscription.plan = plan.value
+    user.subscription.payment_provider = PaymentProvider.STRIPE
+    user.subscription.external_id = subscription_data.id
     user.subscription.save()
     user.save(update_fields=["subscription"])
 
@@ -952,14 +1016,70 @@ def cancel_stripe_subscription(request: Request):
     return RedirectResponse("/account/", status_code=303)
 
 
-@app.post("/__/cancel-subscription")
-def cancel_subscription(request: Request):
-    user = request.user
-    if not user.subscription:
+@app.post("/__/billing/change-subscription")
+def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
+    if not request.user:
         return RedirectResponse("/account/", status_code=303)
 
-    user.subscription.cancel()
-    user.subscription.delete()
+    lookup_key = form_data["lookup_key"]
+    new_plan = PricingPlan.get_by_key(lookup_key)
+    if not new_plan:
+        return JSONResponse(
+            {
+                "message": "Invalid plan lookup key",
+            },
+            status_code=400,
+        )
+
+    current_plan = PricingPlan(request.user.subscription.plan)
+
+    if new_plan == current_plan:
+        return RedirectResponse("/account/", status_code=303)
+
+    if new_plan == PricingPlan.STARTER:
+        request.user.subscription.cancel()
+        return RedirectResponse(app.url_path_for("payment_success"), status_code=303)
+
+    match request.user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            if not new_plan.stripe:
+                return JSONResponse(
+                    {
+                        "message": f"Stripe subscription not available for {new_plan}",
+                    },
+                    status_code=400,
+                )
+            subscription = stripe.Subscription.retrieve(
+                request.user.subscription.external_id
+            )
+            stripe.Subscription.modify(
+                subscription.id,
+                items=[
+                    {"id": subscription["items"].data[0], "deleted": True},
+                    new_plan.stripe.copy(),
+                ],
+                metadata={USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key},
+            )
+        case PaymentProvider.PAYPAL:
+            ...
+        case _:
+            return JSONResponse(
+                {
+                    "message": "Not implemented for this payment provider",
+                },
+                status_code=400,
+            )
+
+    return RedirectResponse("/account/", status_code=303)
+
+
+@app.post("/__/billing/cancel-subscription")
+def cancel_subscription(request: Request):
+    if not request.user or not request.user.subscription:
+        return RedirectResponse("/account/", status_code=303)
+
+    request.user.subscription.cancel()
+    request.user.subscription.delete()
     return RedirectResponse("/account/", status_code=303)
 
 

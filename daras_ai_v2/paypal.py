@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import datetime
 from time import time
-from typing import Any, Literal, Mapping
+from typing import Literal, Mapping, TypedDict
 
 import requests
 from furl import furl
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.redis_cache import get_redis_cache
+from daras_ai_v2.redis_cache import get_redis_cache, redis_lock
 
 
 class PaypalResource(BaseModel):
@@ -30,20 +30,48 @@ class PaypalResource(BaseModel):
 
         r = requests.get(
             str(furl(settings.PAYPAL_BASE) / cls._api_endpoint / resource_id),
-            headers={"Authorization": generate_auth_header()},
+            headers=get_default_headers(),
         )
         raise_for_status(r)
         return cls.parse_obj(r.json())
+
+    def get_resource_url(self) -> furl:
+        if not self._api_endpoint:
+            raise NotImplementedError(
+                f"API endpoint not defined for {self.__class__.__name__}"
+            )
+
+        return furl(settings.PAYPAL_BASE) / self._api_endpoint / self.id
 
 
 class Amount(BaseModel):
     total: str
     currency: str
 
+    @classmethod
+    def USD(cls, amount: int | float) -> Amount:
+        return cls(total=str(amount), currency="USD")
 
-class Subscriber(PaypalResource):
+
+class Subscriber(BaseModel):
     email_address: str | None
     payment_source: dict | None
+
+
+class InlinePaymentInfo(BaseModel):
+    status: (
+        Literal["COMPLETED", "DECLINED", "PARTIALLY_REFUNDED", "PENDING", "REFUNDED"]
+        | None
+    )
+    amount: Amount
+    time: datetime
+
+
+class BillingInfo(BaseModel):
+    outstanding_balance: Amount
+    failed_payments_count: int
+    next_billing_time: datetime | None
+    last_payment: InlinePaymentInfo | None
 
 
 class Subscription(PaypalResource):
@@ -58,12 +86,47 @@ class Subscription(PaypalResource):
     quantity: str
     plan_overridden: bool = False
     subscriber: Subscriber | None
+    billing_info: BillingInfo | None
 
-    def cancel(self, *, reason: str) -> None:
+    def cancel(self, *, reason: str = "cancellation_requested") -> None:
         r = requests.post(
-            str(furl(settings.PAYPAL_BASE) / self._api_endpoint / self.id),
-            headers={"Authorization": generate_auth_header()},
+            str(self.get_resource_url() / "cancel"),
+            headers=get_default_headers(),
             json={"reason": reason},
+        )
+        raise_for_status(r)
+
+    def set_outstanding_balance(self, *, amount: Amount) -> None:
+        """
+        Set the outstanding balance on a subscription. This can then be charged for with /capture.
+        """
+        r = requests.patch(
+            str(self.get_resource_url()),
+            headers=get_default_headers(),
+            json=[
+                {
+                    "op": "replace",
+                    "path": "/billing_info/outstanding_balance",
+                    "value": amount.dict(),
+                }
+            ],
+        )
+        raise_for_status(r)
+
+    def capture(
+        self, *, note: str, amount: Amount, capture_type: str = "OUTSTANDING_BALANCE"
+    ) -> None:
+        """
+        Fully/partially capture outstanding payment on subscription.
+        """
+        r = requests.post(
+            str(self.get_resource_url() / "capture"),
+            headers=get_default_headers(),
+            json={
+                "note": note,
+                "amount": amount.dict(),
+                "capture_type": capture_type,
+            },
         )
         raise_for_status(r)
 
@@ -100,9 +163,7 @@ def verify_webhook_event(event: dict, *, headers: Mapping) -> bool:
 
     response = requests.post(
         str(furl(settings.PAYPAL_BASE) / "v1/notifications/verify-webhook-signature"),
-        headers={
-            "Authorization": generate_auth_header(),
-        },
+        headers=get_default_headers(),
         json={
             "auth_algo": validated_headers.PAYPAL_AUTH_ALGO,
             "cert_url": validated_headers.PAYPAL_CERT_URL,
@@ -154,13 +215,9 @@ def generate_auth_header() -> str:
     return f"Bearer {access_token}"
 
 
-def get_nested(d: dict, *keys: str, default: Any = None):
-    match keys:
-        case [key]:
-            return d.get(key, default)
-        case [key, *rest]:
-            if key not in d:
-                return default
-            return get_nested(d[key], *rest, default=default)
-        case _:
-            raise ValueError("Invalid keys")
+def get_default_headers() -> dict[str, str]:
+    return {
+        "Authorization": generate_auth_header(),
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }

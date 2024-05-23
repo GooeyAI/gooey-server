@@ -8,7 +8,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
-from daras_ai_v2 import settings, db
+from daras_ai_v2 import icons, settings, db
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import Handle
 
@@ -77,6 +77,21 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
             raise
 
 
+class PaymentProvider(models.IntegerChoices):
+    STRIPE = 1, "Stripe"
+    PAYPAL = 2, "PayPal"
+
+    @property
+    def icon(self) -> str:
+        match self:
+            case PaymentProvider.STRIPE:
+                return icons.stripe
+            case PaymentProvider.PAYPAL:
+                return icons.paypal
+            case _:
+                raise NotImplementedError(f"Icon not implemented for {self}")
+
+
 class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
@@ -94,15 +109,10 @@ class AppUser(models.Model):
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
     monthly_spending_budget = models.IntegerField(null=True, blank=True)
     monthly_spending_notification_threshold = models.IntegerField(null=True, blank=True)
-    auto_recharge = models.OneToOneField(
-        "payments.AutoRechargeSubscription",
-        on_delete=models.SET_NULL,
-        related_name="user",
-        null=True,
-    )
     subscription = models.OneToOneField(
         "payments.Subscription",
         on_delete=models.SET_NULL,
+        related_name="user",
         null=True,
     )
 
@@ -260,11 +270,6 @@ class AppUser(models.Model):
             self.stripe_customer_id = customer.id
             self.save()
             return customer
-
-
-class PaymentProvider(models.IntegerChoices):
-    STRIPE = 1, "Stripe"
-    PAYPAL = 2, "Paypal"
 
 
 class AppUserTransaction(models.Model):

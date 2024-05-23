@@ -256,8 +256,8 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
 
 
 @app.task
-def auto_recharge_before_run(*, user_id: int):
-    redis_lock_key = f"auto_recharge_before_run/{user_id}"
+def auto_recharge(*, user_id: int):
+    redis_lock_key = f"gooey/auto_recharge/{user_id}"
     with redis_lock(redis_lock_key):
         user = AppUser.objects.get(id=user_id)
         auto_recharge_user(user)

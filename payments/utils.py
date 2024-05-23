@@ -1,30 +1,32 @@
 import typing
 
-import stripe
-
-from daras_ai_v2 import paypal
-
 
 def make_stripe_recurring_plan(
-    product_name: str,
     credits: int,
     amount: int | float,
+    *,
+    product_name: str | None = None,
+    product_id: str | None = None,
 ) -> dict[str, typing.Any]:
     """
     amount is in USD
     """
+    if not product_id and not product_name:
+        raise ValueError("Either product_id or product_name is required")
+
     cents_per_month = amount * 100
+    price_data = {
+        "currency": "usd",
+        "unit_amount_decimal": round(cents_per_month / credits, 4),
+        "recurring": {"interval": "month"},
+    }
+    if product_id:
+        price_data["product"] = product_id
+    elif product_name:
+        price_data["product_data"] = {"name": product_name}
+
     return {
-        "price_data": {
-            "currency": "usd",
-            "product_data": {
-                "name": product_name,
-            },
-            "unit_amount_decimal": round(cents_per_month / credits, 4),
-            "recurring": {
-                "interval": "month",
-            },
-        },
+        "price_data": price_data,
         "quantity": credits,
     }
 
@@ -53,13 +55,3 @@ def make_paypal_recurring_plan(
         },
         "quantity": credits,  # number of credits
     }
-
-
-def cancel_stripe_subscription(subscription_id: str) -> None:
-    stripe.Subscription.delete(subscription_id)
-
-
-def cancel_paypal_subscription(
-    subscription_id: str, reason: str = "Cancellation Requested"
-) -> None:
-    paypal.Subscription.retrieve(subscription_id).cancel(reason=reason)

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 
+import stripe
+
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
 from daras_ai_v2 import settings
 
@@ -192,6 +194,16 @@ class PricingPlan(PricingData, Enum):
                 </ul>
             """
             ),
+            "stripe": make_stripe_recurring_plan(
+                product_id="prod_Q9YfjAsk4kq5o3",
+                credits=20_000,
+                amount=199,
+            ),
+            "paypal": make_paypal_recurring_plan(
+                plan_id=settings.PAYPAL_PLAN_IDS["business"],
+                credits=20_000,
+                amount=199,
+            ),
         },
     )
 
@@ -200,7 +212,7 @@ class PricingPlan(PricingData, Enum):
         {
             "key": "enterprise",
             "title": "Enterprise / Agency",
-            "description": "Unlimited access, Enterprise SLAs & Support",
+            "description": "Unlimited access, enterprise SLAs & support",
             "monthly_charge": 0,  # custom
             "credits": 999_999,  # unlimited
             "long_description": dedent(
@@ -259,11 +271,12 @@ class PricingPlan(PricingData, Enum):
         return [(plan.value, plan.name) for plan in cls]
 
     @classmethod
-    def get_by_stripe_product_name(cls, product_name: str) -> PricingPlan | None:
+    def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
         for plan in cls:
-            if (
-                plan.stripe
-                and plan.stripe["price_data"]["product_data"]["name"] == product_name
+            if plan.stripe and (
+                plan.stripe["price_data"].get("product") == product.id
+                or plan.stripe["price_data"].get("product_data", {}).get("name")
+                == product.name
             ):
                 return plan
 
