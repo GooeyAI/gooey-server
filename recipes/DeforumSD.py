@@ -102,29 +102,32 @@ def animation_prompts_editor(
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
+        seconds_key = f"{st_list_key}/seconds/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
-        if frame_key not in st.session_state:
-            st.session_state[frame_key] = frames_to_seconds(
+        if seconds_key not in st.session_state:
+            st.session_state[seconds_key] = frames_to_seconds(
                 fp["frame"], st.session_state.get("fps", 12)
             )
+        st.session_state[frame_key] = seconds_to_frames(
+            st.session_state[seconds_key], st.session_state.get("fps", 12)
+        )
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
+        fps = st.session_state.get("fps", 12)
         with col1:
-            start = st.number_input(
+            st.number_input(
                 label="",
-                key=frame_key,
+                key=seconds_key,
                 min_value=0,
                 step=0.1,
                 className="gui-input-smaller",
             )
-            end = float(
+            float(
                 prompt_st_list[idx + 1]["frame"]
                 if idx + 1 < len(prompt_st_list)
-                else frames_to_seconds(
-                    st.session_state["max_frames"], st.session_state["fps"]
-                )
+                else frames_to_seconds(st.session_state["max_frames"], fps)
             )
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
@@ -137,17 +140,23 @@ def animation_prompts_editor(
                 type="tertiary",
             ):
                 max_frames = st.session_state.get("max_frames", 100)
-                next_frame = seconds_to_frames(
-                    (start + end) / 2, st.session_state["fps"]
+                start = prompt_st_list[idx]["frame"]
+                end = (
+                    prompt_st_list[idx + 1]["frame"]
+                    if idx + 1 < len(prompt_st_list)
+                    else max_frames
                 )
+                next_frame = (start + end) / 2
+                st.write(next_frame)
                 if next_frame > max_frames:
                     st.error("Please increase Frame Count")
                 else:
+                    # set prompt to previous prompt
                     prompt_st_list.insert(
                         idx + 1,
                         {
                             "frame": next_frame,
-                            "prompt": "",
+                            "prompt": prompt_st_list[idx]["prompt"],
                             "key": str(uuid.uuid1()),
                         },
                     )
@@ -162,8 +171,14 @@ def animation_prompts_editor(
             st.video(st.session_state.get("output_video", None))
         with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
+            zoom_value = ZoomSettings.get(fp["frame"])
+            zoom_description = "none"
+            if zoom_value and zoom_value > 1:
+                zoom_description = f"Out: {round(zoom_value, 3)}"
+            elif zoom_value and zoom_value < 1:
+                zoom_description = f"In: {round(zoom_value, 3)}"
             if st.button(
-                '<i class="fa-solid fa-camera-movie"></i>',
+                zoom_description,
                 key="button-" + fp_key,
                 type="link",
             ):
@@ -182,7 +197,7 @@ def animation_prompts_editor(
                         """,
                         min_value=-1.5,
                         max_value=1.5,
-                        step=0.01,
+                        step=0.001,
                     )
                     hpan_slider = st.slider(
                         label="""
@@ -190,7 +205,7 @@ def animation_prompts_editor(
                         """,
                         min_value=-1.5,
                         max_value=1.5,
-                        step=0.01,
+                        step=0.001,
                     )
                     vpan_slider = st.slider(
                         label="""
@@ -198,7 +213,7 @@ def animation_prompts_editor(
                         """,
                         min_value=-1.5,
                         max_value=1.5,
-                        step=0.01,
+                        step=0.001,
                     )
                     if st.button("Save"):
                         ZoomSettings.update({fp["frame"]: 1 + zoom_pan_slider})
@@ -220,17 +235,20 @@ def animation_prompts_editor(
         )
     col1, col2 = st.columns([2, 11], responsive=False)
     with col1:
-        max_frames = st.session_state.get("max_frames", 100)
         fps = st.session_state.get("fps", 12)
-        ending_seconds = frames_to_seconds(max_frames, fps)
-        st.number_input(
+        if "max_seconds" not in st.session_state:
+            st.session_state["max_seconds"] = frames_to_seconds(
+                st.session_state.get("max_frames", 100), fps
+            )
+
+        ending_seconds = st.number_input(
             label="",
-            key="max_frames/",
+            key="max_seconds",
             min_value=0,
             step=0.1,
-            value=ending_seconds,
             className="gui-input-smaller",
         )
+        st.session_state["max_frames"] = seconds_to_frames(ending_seconds, fps)
     with col2:
         st.write("*End of Video*")
 
