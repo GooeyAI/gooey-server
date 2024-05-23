@@ -10,7 +10,11 @@ from sentry_sdk import capture_exception
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
+from daras_ai_v2.asr import (
+    run_google_translate,
+    audio_bytes_to_wav,
+    should_translate_lang,
+)
 from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
@@ -145,7 +149,7 @@ class SlackBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str | None = None,
     ) -> str | None:
-        if text and should_translate and self.language and self.language != "en":
+        if text and should_translate and should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
@@ -224,7 +228,7 @@ class SlackBot(BotInterface):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()
         if not text:
             return
-        if self.language and self.language != "en":
+        if should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]

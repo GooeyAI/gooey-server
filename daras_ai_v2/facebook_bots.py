@@ -4,7 +4,11 @@ from furl import furl
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
+from daras_ai_v2.asr import (
+    run_google_translate,
+    audio_bytes_to_wav,
+    should_translate_lang,
+)
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
@@ -104,7 +108,7 @@ class WhatsappBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        if text and should_translate and self.language and self.language != "en":
+        if text and should_translate and should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
@@ -376,7 +380,7 @@ class FacebookBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        if text and should_translate and self.language and self.language != "en":
+        if text and should_translate and should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]

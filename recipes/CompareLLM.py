@@ -1,3 +1,4 @@
+import math
 import random
 import typing
 
@@ -145,7 +146,18 @@ class CompareLLMPage(BasePage):
             _render_outputs(state, 300)
 
     def get_raw_price(self, state: dict) -> float:
-        return self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+        grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
+        return sum(map(math.ceil, grouped_costs.values())) + self.PROFIT_CREDITS
+
+    def additional_notes(self) -> str | None:
+        grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
+        if not grouped_costs:
+            return
+        parts = [
+            f"{math.ceil(total)}Cr for {LargeLanguageModels[model_name].value}"
+            for model_name, total in grouped_costs.items()
+        ]
+        return f"\n*Breakdown: {' + '.join(parts)} + {self.PROFIT_CREDITS}Cr/run*"
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

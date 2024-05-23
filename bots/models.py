@@ -644,6 +644,7 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
+            or self.name
             or (
                 self.platform == Platform.WEB
                 and f"Integration ID {self.api_integration_id()}"
@@ -658,11 +659,10 @@ class BotIntegration(models.Model):
 
         return api_hashids.encode(self.id)
 
-    def get_web_widget_config(self, mode="inline", target="#gooey-embed") -> dict:
+    def get_web_widget_config(self, target="#gooey-embed") -> dict:
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
-            mode=mode,
             branding=(
                 self.web_config_extras.get("branding", {})
                 | dict(
