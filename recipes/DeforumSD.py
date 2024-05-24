@@ -116,6 +116,13 @@ def animation_prompts_editor(
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         fps = st.session_state.get("fps", 12)
+        max_frames = st.session_state.get("max_frames", 100)
+        start = int(prompt_st_list[idx]["frame"])
+        end = int(
+            prompt_st_list[idx + 1]["frame"]
+            if idx + 1 < len(prompt_st_list)
+            else max_frames
+        )
         with col1:
             st.number_input(
                 label="",
@@ -139,13 +146,6 @@ def animation_prompts_editor(
                 help=f"Insert Frame after Frame {idx + 1}",
                 type="tertiary",
             ):
-                max_frames = st.session_state.get("max_frames", 100)
-                start = prompt_st_list[idx]["frame"]
-                end = (
-                    prompt_st_list[idx + 1]["frame"]
-                    if idx + 1 < len(prompt_st_list)
-                    else max_frames
-                )
                 next_frame = (start + end) / 2
                 st.write(next_frame)
                 if next_frame > max_frames:
@@ -172,7 +172,7 @@ def animation_prompts_editor(
         with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
             zoom_value = ZoomSettings.get(fp["frame"])
-            zoom_description = "none"
+            zoom_description = '<i class="fa-solid fa-camera-movie"></i>'
             if zoom_value and zoom_value > 1:
                 zoom_description = f"Out: {round(zoom_value, 3)}"
             elif zoom_value and zoom_value < 1:
@@ -185,6 +185,8 @@ def animation_prompts_editor(
                 zoom_pan_modal.open()
             if zoom_pan_modal.is_open():
                 with zoom_pan_modal.container():
+                    start = frames_to_seconds(start, fps)
+                    end = frames_to_seconds(end, fps)
                     st.write(
                         f"#### Keyframe second {start} until {end}",
                     )
