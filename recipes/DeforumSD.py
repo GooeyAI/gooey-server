@@ -27,6 +27,7 @@ class AnimationModels(TextChoices):
 class _AnimationPrompt(TypedDict):
     frame: str
     prompt: str
+    second: float
 
 
 AnimationPrompts = list[_AnimationPrompt]
@@ -42,26 +43,46 @@ def input_prompt_to_animation_prompts(input_prompt: str):
     animation_prompts = []
     for fp in input_prompt.split("|"):
         split = fp.split(":")
-        if len(split) == 2:
+        if len(split) == 3:
             frame = int(split[0])
             prompt = split[1].strip()
+            second = float(split[2])
         else:
             frame = 0
             prompt = fp
-        animation_prompts.append({"frame": frame, "prompt": prompt})
+            second = 0
+        animation_prompts.append({"frame": frame, "prompt": prompt, "second": second})
     return animation_prompts
 
 
 def animation_prompts_to_st_list(animation_prompts: AnimationPrompts):
-    return [
-        {"frame": fp["frame"], "prompt": fp["prompt"], "key": str(uuid.uuid1())}
-        for fp in animation_prompts
-    ]
+    if "second" in animation_prompts[0]:
+        return [
+            {
+                "frame": fp["frame"],
+                "prompt": fp["prompt"],
+                "second": fp["second"],
+                "key": str(uuid.uuid1()),
+            }
+            for fp in animation_prompts
+        ]
+    else:
+        return [
+            {
+                "frame": fp["frame"],
+                "prompt": fp["prompt"],
+                "second": frames_to_seconds(
+                    int(fp["frame"]), st.session_state.get("fps", 12)
+                ),
+                "key": str(uuid.uuid1()),
+            }
+            for fp in animation_prompts
+        ]
 
 
 def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
     return [
-        {"frame": fp["frame"], "prompt": prompt}
+        {"frame": fp["frame"], "prompt": prompt, "second": fp["second"]}
         for fp in prompt_st_list
         if (prompt := fp["prompt"].strip())
     ]
@@ -105,9 +126,7 @@ def animation_prompts_editor(
         seconds_key = f"{st_list_key}/seconds/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
         if seconds_key not in st.session_state:
-            st.session_state[seconds_key] = frames_to_seconds(
-                fp["frame"], st.session_state.get("fps", 12)
-            )
+            st.session_state[seconds_key] = fp["second"]
         st.session_state[frame_key] = seconds_to_frames(
             st.session_state[seconds_key], st.session_state.get("fps", 12)
         )
@@ -116,12 +135,12 @@ def animation_prompts_editor(
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         fps = st.session_state.get("fps", 12)
-        max_frames = st.session_state.get("max_frames", 100)
-        start = int(prompt_st_list[idx]["frame"])
-        end = int(
-            prompt_st_list[idx + 1]["frame"]
+        max_seconds = st.session_state.get("max_seconds", 10)
+        start = fp["second"]
+        end = (
+            prompt_st_list[idx + 1]["second"]
             if idx + 1 < len(prompt_st_list)
-            else max_frames
+            else max_seconds
         )
         with col1:
             st.number_input(
@@ -130,11 +149,6 @@ def animation_prompts_editor(
                 min_value=0,
                 step=0.1,
                 className="gui-input-smaller",
-            )
-            float(
-                prompt_st_list[idx + 1]["frame"]
-                if idx + 1 < len(prompt_st_list)
-                else frames_to_seconds(st.session_state["max_frames"], fps)
             )
             if idx != 0 and st.button(
                 "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
@@ -146,17 +160,17 @@ def animation_prompts_editor(
                 help=f"Insert Frame after Frame {idx + 1}",
                 type="tertiary",
             ):
-                next_frame = (start + end) / 2
-                st.write(next_frame)
-                if next_frame > max_frames:
+                next_second = round((start + end) / 2, 2)
+                if next_second > max_seconds:
                     st.error("Please increase Frame Count")
                 else:
                     # set prompt to previous prompt
                     prompt_st_list.insert(
                         idx + 1,
                         {
-                            "frame": next_frame,
+                            "frame": seconds_to_frames(next_second, fps),
                             "prompt": prompt_st_list[idx]["prompt"],
+                            "second": next_second,
                             "key": str(uuid.uuid1()),
                         },
                     )
@@ -185,8 +199,6 @@ def animation_prompts_editor(
                 zoom_pan_modal.open()
             if zoom_pan_modal.is_open():
                 with zoom_pan_modal.container():
-                    start = frames_to_seconds(start, fps)
-                    end = frames_to_seconds(end, fps)
                     st.write(
                         f"#### Keyframe second {start} until {end}",
                     )
@@ -232,6 +244,7 @@ def animation_prompts_editor(
             {
                 "frame": st.session_state.get(frame_key),
                 "prompt": st.session_state.get(prompt_key),
+                "second": st.session_state.get(seconds_key),
                 "key": fp_key,
             }
         )
