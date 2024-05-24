@@ -36,132 +36,6 @@ USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 app = APIRouter()
 
-available_subscriptions = {
-    "addon": {
-        "display": {
-            "name": "Add-on",
-            "title": "Top up Credits",
-            "description": f"Buy a one-time top up @ {settings.ADDON_CREDITS_PER_DOLLAR} Credits per dollar.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Add-on Credits",
-                },
-                "unit_amount_decimal": (
-                    settings.ADDON_CREDITS_PER_DOLLAR / 100
-                ),  # in cents
-            },
-            # "quantity": 1000,  # number of credits (set by html)
-            "adjustable_quantity": {
-                "enabled": True,
-                "maximum": 50_000,
-                "minimum": 1_000,
-            },
-        },
-    },
-    "basic": {
-        "display": {
-            "name": "Basic Plan",
-            "title": "$10/Month",
-            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Basic Plan",
-                },
-                "unit_amount_decimal": 0.6666,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 1_500,  # number of credits
-        },
-        "paypal": {
-            "plan_id": settings.PAYPAL_PLAN_IDS["basic"],
-            "plan": {
-                "billing_cycles": [
-                    {
-                        "pricing_scheme": {
-                            "fixed_price": {
-                                "value": 10,  # in dollars
-                                "currency_code": "USD",
-                            },
-                        },
-                        "sequence": 1,
-                        "total_cycles": 0,
-                    }
-                ],
-            },
-            "quantity": 1_500,  # number of credits
-        },
-    },
-    "premium": {
-        "display": {
-            "name": "Premium Plan",
-            "title": "$50/month + Bots",
-            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Premium Plan",
-                },
-                "unit_amount_decimal": 0.5,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 10_000,  # number of credits
-        },
-        "paypal": {
-            "plan_id": settings.PAYPAL_PLAN_IDS["premium"],
-            "plan": {
-                "billing_cycles": [
-                    {
-                        "pricing_scheme": {
-                            "fixed_price": {
-                                "value": 50,
-                                "currency_code": "USD",
-                            },
-                        },
-                        "sequence": 1,
-                        "total_cycles": 0,
-                    }
-                ],
-            },
-            "quantity": 10_000,  # number of credits
-        },
-    },
-    #
-    # just for testing
-    #
-    # "daily": {
-    #     "display": {
-    #         "name": "Daily Plan",
-    #         "title": "DAILY @ $1",
-    #         "description": "100 credits everyday.",
-    #     },
-    #     "stripe": {
-    #         "price_data": {
-    #             "currency": "usd",
-    #             "product_data": {
-    #                 "name": "Gooey.AI Daily Plan",
-    #             },
-    #             "unit_amount": 1,  # in cents
-    #             "recurring": {
-    #                 "interval": "day",
-    #             },
-    #         },
-    #         "quantity": 100,  # number of credits
-    #     },
-    # },
-}
-
 
 @app.post("/account/")
 @st.route
@@ -857,10 +731,7 @@ def create_checkout_session(
         )
 
     lookup_key: str = body_form["lookup_key"]
-    if lookup_key == "addon":
-        plan = available_subscriptions["addon"]
-        line_item = available_subscriptions["addon"]["stripe"].copy()
-    elif plan := PricingPlan.get_by_key(lookup_key):
+    if (plan := PricingPlan.get_by_key(lookup_key)) and plan.stripe:
         line_item = plan.stripe.copy()
     else:
         return JSONResponse(
@@ -869,37 +740,20 @@ def create_checkout_session(
             }
         )
 
-    quantity = body_form.get("quantity")
-    if quantity:
-        line_item["quantity"] = int(quantity)
-
     if request.user.subscription and request.user.subscription.plan == plan.value:
-        # already subscribed
+        # already subscribed to the same plan
         return RedirectResponse("/", status_code=303)
 
     metadata = {USER_SUBSCRIPTION_METADATA_FIELD: lookup_key}
 
-    try:
-        # check if recurring payment
-        line_item["price_data"]["recurring"]
-    except KeyError:
-        mode = "payment"
-        invoice_creation = {"enabled": True}
-        subscription_data = None  # can't pass subscription_data in payment mode
-    else:
-        mode = "subscription"
-        invoice_creation = None  # invoice automatically genearated in subscription mode
-        subscription_data = {"metadata": metadata}
-
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
-        mode=mode,
+        mode="subscription",
         success_url=payment_success_url,
         cancel_url=account_url,
         customer=request.user.get_or_create_stripe_customer(),
         metadata=metadata,
-        subscription_data=subscription_data,
-        invoice_creation=invoice_creation,
+        subscription_data={"metadata": metadata},
         allow_promotion_codes=True,
         saved_payment_method_options={
             "payment_method_save": "enabled",
@@ -1184,16 +1038,3 @@ def cancel_subscription(request: Request):
     request.user.subscription.cancel()
     request.user.subscription.delete()
     return RedirectResponse("/account/", status_code=303)
-
-
-def get_user_subscription(user: AppUser):
-    customer = user.search_stripe_customer()
-    if not customer:
-        return
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        try:
-            lookup_key = sub.metadata[USER_SUBSCRIPTION_METADATA_FIELD]
-            return available_subscriptions[lookup_key]
-        except KeyError:
-            pass
