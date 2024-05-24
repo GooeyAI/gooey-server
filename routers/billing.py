@@ -19,7 +19,7 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import icons, paypal, settings, urls
+from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -125,19 +125,10 @@ def border_box(*, className: str = "", **kwargs):
     )
 
 
-def _accept_props_as_callable(component):
-    @wraps(component)
-    def wrapper(**kwargs):
-        component.node.props.update(kwargs)
-        return component
-
-    return wrapper
-
-
 def left_and_right(**kwargs):
     className = kwargs.pop("className", "") + " d-flex flex-row justify-content-between"
     with st.div(className=className, **kwargs):
-        return _accept_props_as_callable(st.div()), _accept_props_as_callable(st.div())
+        return st.div(), st.div()
 
 
 def billing_tab(request: Request):
@@ -179,7 +170,7 @@ def render_current_plan(subscription: Subscription):
     plan = PricingPlan(subscription.plan)
     with border_box(className="w-100 pt-4 p-3 bg-light text-dark"):
         left, right = left_and_right(className="align-items-center")
-        with left():
+        with left:
             st.write(
                 dedent(
                     f"""
@@ -192,12 +183,12 @@ def render_current_plan(subscription: Subscription):
             )
         if plan.monthly_charge:
             if next_invoice_date := subscription.get_next_invoice_date():
-                with right(className="text-muted"), st.tag("p"):
+                with right, st.tag("p", className="text-muted"):
                     st.html("Next invoice on ")
                     pill(next_invoice_date.strftime("%b %d, %Y"), type="dark")
 
         left, right = left_and_right(className="mt-5")
-        with left():
+        with left:
             with st.tag("h1", className="my-0"):
                 st.html(plan.pricing_title())
             if plan.monthly_charge:
@@ -206,7 +197,7 @@ def render_current_plan(subscription: Subscription):
                     st.caption(
                         f"per month **via {provider.label}**", unsafe_allow_html=True
                     )
-        with right(className="text-end"):
+        with right, st.tag("div", className="text-end"):
             with st.tag("h1", className="my-0"):
                 st.html(f"{plan.credits:,} credits")
             if plan.monthly_charge:
@@ -949,15 +940,6 @@ def _handle_subscription_cancelled(uid: str, subscription_data):
     subscription.delete()
 
 
-@app.post("/__/stripe/cancel-subscription")
-def cancel_stripe_subscription(request: Request):
-    customer = request.user.get_or_create_stripe_customer()
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        stripe.Subscription.delete(sub.id)
-    return RedirectResponse("/account/", status_code=303)
-
-
 @app.post("/__/billing/change-subscription")
 def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
     if not request.user:
@@ -1027,14 +1009,4 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                 status_code=400,
             )
 
-    return RedirectResponse("/account/", status_code=303)
-
-
-@app.post("/__/billing/cancel-subscription")
-def cancel_subscription(request: Request):
-    if not request.user or not request.user.subscription:
-        return RedirectResponse("/account/", status_code=303)
-
-    request.user.subscription.cancel()
-    request.user.subscription.delete()
     return RedirectResponse("/account/", status_code=303)
