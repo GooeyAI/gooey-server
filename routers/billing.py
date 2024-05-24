@@ -974,8 +974,8 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
 
     data = event.data.object
 
+    customer = stripe.Customer.retrieve(data.customer)
     try:
-        customer = stripe.Customer.retrieve(data.customer)
         uid = customer.metadata.uid
     except AttributeError:
         uid = None
