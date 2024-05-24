@@ -1,14 +1,13 @@
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-import stripe
 from django.db.models import Sum
 from django.utils import timezone
 from furl import furl
 from loguru import logger
 
 from app_users.models import AppUser, AppUserTransaction, PaymentProvider
-from daras_ai_v2 import paypal, settings
+from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 from daras_ai_v2.send_email import send_email_via_postmark
 
@@ -26,24 +25,6 @@ def send_email_auto_recharge_failed(user: AppUser, reason: str):
         from_address=settings.SUPPORT_EMAIL,
         to_address=user.email,
         subject="[Gooey.AI] Auto-Recharge failed",
-        html_body=email_body,
-    )
-
-
-def send_email_monthly_spend_threshold_reached(user: AppUser):
-    if not user.email:
-        return
-
-    email_body = templates.get_template(
-        "monthly_spend_threshold_reached_email.html"
-    ).render(
-        user=user,
-        account_url=get_account_url(),
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=user.email,
-        subject="[Gooey.AI] Monthly Spend Threshold Reached",
         html_body=email_body,
     )
 
