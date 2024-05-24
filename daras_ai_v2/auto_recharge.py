@@ -76,15 +76,14 @@ def auto_recharge_user(user: AppUser):
                 logger.error(f"User doesn't have a stripe customer: {user=}")
                 return
 
-            sub = stripe.Subscription.retrieve(user.subscription.external_id)
-            pm = sub.default_payment_method
             with email_user_if_fails(user, reason="the payment failed"):
-                invoice = stripe_get_or_create_auto_invoice(
-                    customer=customer,
+                invoice = user.subscription.stripe_get_or_create_auto_invoice(
                     amount_in_dollars=user.subscription.auto_recharge_topup_amount,
+                    metadata_key="auto_recharge",
                 )
 
                 if invoice.status == "open":
+                    pm = user.subscription.stripe_get_default_payment_method()
                     invoice.pay(payment_method=pm)
                     logger.info(
                         f"Payment attempted for auto recharge invoice: {user=}, {invoice=}"
@@ -95,98 +94,8 @@ def auto_recharge_user(user: AppUser):
                     )
 
         case PaymentProvider.PAYPAL:
-            subscription = paypal.Subscription.retrieve(user.subscription.external_id)
-            if not subscription.billing_info:
-                logger.error(f"Subscription doesn't have billing info: {user=}")
-                return
-
-            if last_payment := subscription.billing_info.last_payment:
-                if last_payment.time - datetime.now(tz=timezone.utc) < timedelta(
-                    seconds=settings.AUTO_RECHARGE_COOLDOWN_SECONDS
-                ):
-                    logger.info(
-                        f"Last payment was within cooldown interval, skipping...: {user=}, {subscription.billing_info.last_payment=}"
-                    )
-                    return
-
-            if float(subscription.billing_info.outstanding_balance.total) != 0.0:
-                logger.warning(
-                    f"Subscription has outstanding balance already, attempting to charge: {user=}",
-                )
-                subscription.capture(
-                    note="Attempting payment of outstanding balance due to low credits",
-                    amount=subscription.billing_info.outstanding_balance,
-                )
-                return
-
-            amount = paypal.Amount.USD(subscription.auto_recharge_topup_amount)
-
-            logger.info(f"Auto-recharging user: {user=}, {amount=}")
-            with email_user_if_fails(user, reason="the payment failed"):
-                subscription.set_outstanding_balance(amount=amount)
-                subscription.capture(
-                    note="Auto-recharge due to low credits", amount=amount
-                )
-
-
-def stripe_get_or_create_auto_invoice(
-    customer: stripe.Customer,
-    amount_in_dollars: int,
-) -> stripe.Invoice:
-    """
-    Fetches the relevant auto recharge invoice, or creates one if it doesn't exist.
-
-    This is the fallback order:
-    - Fetch an open auto_recharge invoice
-    - Fetch an auto_recharge invoice that was recently paid
-    - Create an invoice with amount=amount_in_dollars
-    """
-    invoices = stripe.Invoice.list(
-        customer=customer,
-        collection_method="charge_automatically",
-    )
-    invoices = [inv for inv in invoices.data if "auto_recharge" in inv.metadata]
-
-    open_invoice = next((inv for inv in invoices if inv.status == "open"), None)
-    if open_invoice:
-        return open_invoice
-
-    recently_paid_invoice = next(
-        (
-            inv
-            for inv in invoices
-            if inv.status == "paid"
-            and datetime.now(tz=timezone.utc).timestamp() - inv.created
-            < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
-        ),
-        None,
-    )
-    if recently_paid_invoice:
-        return recently_paid_invoice
-
-    invoice = stripe.Invoice.create(
-        customer=customer,
-        collection_method="charge_automatically",
-        metadata={"auto_recharge": True},
-        auto_advance=False,
-        pending_invoice_items_behavior="exclude",
-    )
-    stripe.InvoiceItem.create(
-        customer=customer,
-        invoice=invoice,
-        price_data={
-            "currency": "usd",
-            "product": settings.STRIPE_ADDON_CREDITS_PRODUCT_ID,
-            "unit_amount_decimal": (
-                settings.ADDON_CREDITS_PER_DOLLAR / 100
-            ),  # in cents
-        },
-        quantity=amount_in_dollars * settings.ADDON_CREDITS_PER_DOLLAR,
-        currency="usd",
-        metadata={"auto_recharge": True},
-    )
-    invoice.finalize_invoice(auto_advance=True)
-    return invoice
+            logger.error(f"Auto-recharge not supported for PayPal: {user=}")
+            return
 
 
 def get_dollars_spent_this_month_by_user(user: AppUser):

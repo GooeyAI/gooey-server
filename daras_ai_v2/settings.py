@@ -244,7 +244,7 @@ GROQ_API_KEY = config("GROQ_API_KEY", default="")
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
-APP_BASE_URL = config("APP_BASE_URL", "/")
+APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
@@ -280,14 +280,12 @@ SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
-LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
+LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 
-ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500]
+ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]
-
 AUTO_RECHARGE_COOLDOWN_SECONDS = config("AUTO_RECHARGE_COOLDOWN_SECONDS", 60, cast=int)
-STRIPE_ADDON_CREDITS_PRODUCT_ID = config("STRIPE_ADDON_CREDITS_PRODUCT_ID", "")
 
 LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
@@ -295,10 +293,22 @@ LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
+    "STRIPE_PRODUCT_IDS",
+    cast=json.loads,
+    # test mode product IDs
+    default="""{
+        "creator": "prod_Q9x4USwPZXAjDr",
+        "business": "prod_Q9YfjAsk4kq5o3",
+        "addon": "prod_Pz8hAslLzckWRw"
+    }""",
+)
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
+PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
+PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
 PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
     "PAYPAL_PLAN_IDS",
     cast=json.loads,
@@ -306,13 +316,10 @@ PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
     default="""{
         "basic": "P-7EE20432AK666360GMYZFNBQ",
         "premium": "P-35W68839HF2588719MYZFN5Y",
-        "creator": "creator",
-        "business": "business",
-        "addon": "addon"
+        "creator": "P-3T117524WS380863NMZIH36Y",
+        "business": "P-5D3735626S133783GMZIH4MI"
     }""",
 )
-PAYPAL_WEBHOOK_ID = config("PAYPAL_WEBHOOK_ID", "")
-PAYPAL_CREDITS_PER_UNIT = 100
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 

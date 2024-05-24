@@ -1,4 +1,3 @@
-from furl import furl
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
@@ -8,9 +7,10 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
-from daras_ai_v2 import icons, settings, db
+from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import Handle
+from payments.plans import PricingPlan
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -80,16 +80,6 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
 class PaymentProvider(models.IntegerChoices):
     STRIPE = 1, "Stripe"
     PAYPAL = 2, "PayPal"
-
-    @property
-    def icon(self) -> str:
-        match self:
-            case PaymentProvider.STRIPE:
-                return icons.stripe
-            case PaymentProvider.PAYPAL:
-                return icons.paypal
-            case _:
-                raise NotImplementedError(f"Icon not implemented for {self}")
 
 
 class AppUser(models.Model):
@@ -319,19 +309,24 @@ class AppUserTransaction(models.Model):
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"
 
-    def is_addon_transaction(self) -> bool:
-        if self.charged_amount <= 0:
-            return False
+    def get_subscription_plan(self) -> PricingPlan | None:
+        if self.amount <= 0:
+            # credits deducted
+            return None
 
-        charged_dollars = self.charged_amount / 100
-        return (self.amount / charged_dollars) == settings.ADDON_CREDITS_PER_DOLLAR
+        for plan in PricingPlan:
+            if (
+                self.amount == plan.credits
+                and self.charged_amount == plan.monthly_charge * 100
+            ):
+                return plan
+
+        return None
 
     def note(self) -> str:
         if self.amount <= 0:
             return ""
-        elif self.payment_provider is None:
-            return f"+{self.amount:,} credits (via Stripe)"
-        elif self.is_addon_transaction():
-            return f"Addon credits via {PaymentProvider(self.payment_provider).label} (+{self.amount:,} credits)"
+        elif plan := self.get_subscription_plan():
+            return f"Subscription payment: {plan.title} (+{self.amount:,} credits)"
         else:
-            return f"Subscription payment via {PaymentProvider(self.payment_provider).label} (+{self.amount:,} credits)"
+            return f"Addon Purchase (+{self.amount:,} credits)"

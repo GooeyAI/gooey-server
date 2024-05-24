@@ -46,10 +46,10 @@ function renderPaypalAddonButtons() {
 function renderPaypalSubscriptionButtons() {
     for (const el of document.querySelectorAll(".paypal-subscription-buttons")) {
         if (el.innerHTML) continue;
-        const planId = el.dataset.planId;
+        let planKey = el.dataset.planKey;
         window.paypal_subscription.Buttons({
             createSubscription: async function () {
-                return await createSubscriptionWithPlan(planId);
+                return await subscribeWithPlan(planKey);
             },
             onApprove: function (data, actions) {
                 return actions.redirect(window.location.origin + "/payment-success/");
@@ -170,7 +170,7 @@ function resultMessage(message) {
 
 // -- Setup: PayPal Subscriptions --
 
-async function createSubscriptionWithPlan(planId) {
+async function subscribeWithPlan(planKey) {
     try {
         const response = await fetch("/__/paypal/subscriptions/create/", {
             method: "POST",
@@ -178,7 +178,7 @@ async function createSubscriptionWithPlan(planId) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                plan_id: planId,
+                lookup_key: planKey,
             }),
         });
         const subscriptionData = await response.json();

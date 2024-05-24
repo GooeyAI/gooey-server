@@ -13,8 +13,6 @@ from daras_ai_v2 import settings
 STRIPE_PRODUCT_NAMES = {
     "basic": "Gooey.AI Basic Plan",
     "premium": "Gooey.AI Premium Plan",
-    "creator": "Gooey.AI Creator Plan",
-    "business": "Gooey.AI Business Plan",
 }
 
 
@@ -153,7 +151,7 @@ class PricingPlan(PricingData, Enum):
             """
             ),
             "stripe": make_stripe_recurring_plan(
-                product_name=STRIPE_PRODUCT_NAMES["creator"],
+                product_id=settings.STRIPE_PRODUCT_IDS["creator"],
                 credits=2_000,
                 amount=20,
             ),
@@ -195,7 +193,7 @@ class PricingPlan(PricingData, Enum):
             """
             ),
             "stripe": make_stripe_recurring_plan(
-                product_id="prod_Q9YfjAsk4kq5o3",
+                product_id=settings.STRIPE_PRODUCT_IDS["business"],
                 credits=20_000,
                 amount=199,
             ),

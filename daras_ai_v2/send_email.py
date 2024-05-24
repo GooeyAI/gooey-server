@@ -197,3 +197,13 @@ def send_smtp_message(
         # Uncomment the next line to send SMTP server responses to stdout.
         # smtp_server.set_debuglevel(1)
         smtp_server.sendmail(sender, to, msg.as_string())
+
+
+if settings.DEBUG:
+    from loguru import logger
+
+    def mock_email_sender(**kwargs):
+        debug_log = "\n".join(f"{k}: {v}" for k, v in kwargs.items())
+        logger.info("Email sent with the following details:\n" + debug_log)
+
+    send_email_via_postmark = mock_email_sender

@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import datetime
 from time import time
-from typing import Literal, Mapping, TypedDict
+from typing import Any, Literal, Mapping
 
 import requests
 from furl import furl
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.redis_cache import get_redis_cache, redis_lock
+from daras_ai_v2.redis_cache import get_redis_cache
 
 
 class PaypalResource(BaseModel):
@@ -35,6 +35,19 @@ class PaypalResource(BaseModel):
         raise_for_status(r)
         return cls.parse_obj(r.json())
 
+    @classmethod
+    def create(cls, **data) -> PaypalResource:
+        if not cls._api_endpoint:
+            raise NotImplementedError(f"API endpoint not defined for {cls.__name__}")
+
+        r = requests.post(
+            str(furl(settings.PAYPAL_BASE) / cls._api_endpoint),
+            headers=get_default_headers(),
+            json=data,
+        )
+        raise_for_status(r)
+        return cls.parse_obj(r.json())
+
     def get_resource_url(self) -> furl:
         if not self._api_endpoint:
             raise NotImplementedError(
@@ -44,13 +57,18 @@ class PaypalResource(BaseModel):
         return furl(settings.PAYPAL_BASE) / self._api_endpoint / self.id
 
 
-class Amount(BaseModel):
-    total: str
+class AmountV1(BaseModel):
+    total: float
     currency: str
+
+
+class Amount(BaseModel):
+    value: str
+    currency_code: str
 
     @classmethod
     def USD(cls, amount: int | float) -> Amount:
-        return cls(total=str(amount), currency="USD")
+        return cls(value=str(amount), currency_code="USD")
 
 
 class Subscriber(BaseModel):
@@ -77,13 +95,13 @@ class BillingInfo(BaseModel):
 class Subscription(PaypalResource):
     _api_endpoint = "v1/billing/subscriptions"
 
-    plan_id: str
+    plan_id: str | None
     status: Literal[
         "APPROVAL_PENDING", "APPROVED", "ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"
     ]
     custom_id: str | None
     start_date: str | None
-    quantity: str
+    quantity: str | None
     plan_overridden: bool = False
     subscriber: Subscriber | None
     billing_info: BillingInfo | None
@@ -113,6 +131,33 @@ class Subscription(PaypalResource):
         )
         raise_for_status(r)
 
+    def update_plan(
+        self,
+        *,
+        plan_id: str,
+        plan: dict[str, Any] | None = None,
+        application_context: dict[str, Any] | None = None,
+    ) -> str:
+        """
+        Revise the plan on a subscription. Returns approval link.
+        """
+        r = requests.post(
+            str(self.get_resource_url() / "revise"),
+            headers=get_default_headers(),
+            json={
+                "plan_id": plan_id,
+                "plan": plan or {},
+                "application_context": application_context or {},
+            },
+        )
+        raise_for_status(r)
+        links = r.json().get("links", [])
+        for link in links:
+            if link["rel"] == "approve":
+                return link["href"]
+
+        raise ValueError("Approval link not found")
+
     def capture(
         self, *, note: str, amount: Amount, capture_type: str = "OUTSTANDING_BALANCE"
     ) -> None:
@@ -134,12 +179,12 @@ class Subscription(PaypalResource):
 class Sale(PaypalResource):
     _api_endpoint = "v1/payments/sale"
 
-    amount: Amount
+    amount: AmountV1
     state: str | None
     payment_mode: str | None
     parent_payment: str | None
     custom: str | None
-    billing_agreement_id: str | None = Field(alias="subscription_id")
+    billing_agreement_id: str | None
 
 
 class PaypalWebhookHeaders(BaseModel):
