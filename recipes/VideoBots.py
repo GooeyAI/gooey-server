@@ -25,6 +25,7 @@ from daras_ai_v2.asr import (
     AsrModels,
     asr_language_selector,
     run_asr,
+    should_translate_lang,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -750,7 +751,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
+        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
         if (
             st.session_state.get("tts_provider")
@@ -820,7 +821,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
-        if request.user_language and request.user_language != "en":
+        if should_translate_lang(request.user_language):
             yield f"Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],
@@ -994,7 +995,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ]
 
             # translate response text
-            if request.user_language and request.user_language != "en":
+            if should_translate_lang(request.user_language):
                 yield f"Translating response to {request.user_language}..."
                 output_text = run_translate(
                     texts=output_text,
@@ -1372,25 +1373,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                if bi.platform == Platform.WEB and test_link:
-                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
-                        chat_lib_route,
-                        dict(
-                            integration_id=bi.api_integration_id(),
-                            integration_name=slugify(bi.name) or "untitled",
-                        ),
-                    )
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=dedent(
-                            f"""
-                            <div id="gooey-embed"></div>
-                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
-                            """
-                        ).strip(),
-                        type="secondary",
-                    )
-                elif test_link:
+                if test_link:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                         value=test_link,
@@ -1430,6 +1413,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
+                    )
+                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
+                        chat_lib_route,
+                        dict(
+                            integration_id=bi.api_integration_id(),
+                            integration_name=slugify(bi.name) or "untitled",
+                        ),
+                    )
+                    copy_to_clipboard_button(
+                        f"{icons.code} Copy Embed Code",
+                        value=dedent(
+                            f"""
+                            <div id="gooey-embed"></div>
+                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
+                            """
+                        ).strip(),
+                        type="secondary",
                     )
                 else:
                     st.write("Message quicklink not available.")

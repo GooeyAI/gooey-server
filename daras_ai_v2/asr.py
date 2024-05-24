@@ -1071,3 +1071,7 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
     return (
         f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
     )
+
+
+def should_translate_lang(code: str) -> bool:
+    return code and not code.split("-")[0] != "en"

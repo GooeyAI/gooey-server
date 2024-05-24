@@ -888,6 +888,9 @@ def _run_groq_chat(
     avoid_repetition: bool,
     stop: list[str] | None,
 ):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     data = {
         "model": model,
         "messages": messages,
@@ -908,6 +911,15 @@ def _run_groq_chat(
     )
     raise_for_status(r)
     out = r.json()
+
+    record_cost_auto(
+        model=model, sku=ModelSku.llm_prompt, quantity=out["usage"]["prompt_tokens"]
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
     return [choice["message"] for choice in out["choices"]]
 
 
