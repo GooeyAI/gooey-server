@@ -114,6 +114,7 @@ def animation_prompts_editor(
     st.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
     col1, col2, col3 = st.columns([2, 9, 2], responsive=False)
+    max_seconds = st.session_state.get("max_seconds", 10)
     with col1:
         st.write("Second")
     with col2:
@@ -123,19 +124,20 @@ def animation_prompts_editor(
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
-        seconds_key = f"{st_list_key}/seconds/{fp_key}"
+        second_key = f"{st_list_key}/seconds/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
-        if seconds_key not in st.session_state:
-            st.session_state[seconds_key] = fp["second"]
+        if second_key not in st.session_state:
+            st.session_state[second_key] = fp["second"]
         st.session_state[frame_key] = seconds_to_frames(
-            st.session_state[seconds_key], st.session_state.get("fps", 12)
+            st.session_state[second_key], st.session_state.get("fps", 12)
         )
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         fps = st.session_state.get("fps", 12)
-        max_seconds = st.session_state.get("max_seconds", 10)
+        # max_seconds = st.session_state.get("max_seconds", 10)
+        print("sdflksjeflksejf", max_seconds)
         start = fp["second"]
         end = (
             prompt_st_list[idx + 1]["second"]
@@ -145,7 +147,7 @@ def animation_prompts_editor(
         with col1:
             st.number_input(
                 label="",
-                key=seconds_key,
+                key=second_key,
                 min_value=0,
                 step=0.1,
                 className="gui-input-smaller",
@@ -244,26 +246,19 @@ def animation_prompts_editor(
             {
                 "frame": st.session_state.get(frame_key),
                 "prompt": st.session_state.get(prompt_key),
-                "second": st.session_state.get(seconds_key),
+                "second": st.session_state.get(second_key),
                 "key": fp_key,
             }
         )
     col1, col2 = st.columns([2, 11], responsive=False)
     with col1:
-        fps = st.session_state.get("fps", 12)
-        if "max_seconds" not in st.session_state:
-            st.session_state["max_seconds"] = frames_to_seconds(
-                st.session_state.get("max_frames", 100), fps
-            )
-
-        ending_seconds = st.number_input(
+        st.number_input(
             label="",
             key="max_seconds",
             min_value=0,
             step=0.1,
             className="gui-input-smaller",
         )
-        st.session_state["max_frames"] = seconds_to_frames(ending_seconds, fps)
     with col2:
         st.write("*End of Video*")
 
@@ -355,6 +350,16 @@ class DeforumSDPage(BasePage):
     def render_form_v2(self):
         animation_prompts_editor()
 
+        col1, col2 = st.columns(2)
+        with col1:
+            st.slider(
+                "",
+                min_value=0.5,
+                max_value=frames_to_seconds(500, st.session_state.get("fps", 12)),
+                step=0.1,
+                key="max_seconds",
+            )
+
     def get_cost_note(self) -> str | None:
         return f"{CREDITS_PER_FRAME} / frame"
 
@@ -362,7 +367,7 @@ class DeforumSDPage(BasePage):
         return "Render Time ≈ 3s / frame"
 
     def get_raw_price(self, state: dict) -> float:
-        max_frames = state.get("max_frames", 100) or 0
+        max_frames = state.get("max_frames", 100)
         return max_frames * CREDITS_PER_FRAME
 
     def validate_form_v2(self):
