@@ -34,6 +34,7 @@ AnimationPrompts = list[_AnimationPrompt]
 ZoomSettings: dict[int, float] = {0: 1.004}
 HPanSettings: dict[int, float] = {0: 0}
 VPanSettings: dict[int, float] = {0: 0}
+MaxSeconds: int = 10
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -136,8 +137,7 @@ def animation_prompts_editor(
 
         col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
         fps = st.session_state.get("fps", 12)
-        # max_seconds = st.session_state.get("max_seconds", 10)
-        print("sdflksjeflksejf", max_seconds)
+        max_seconds = st.session_state.get("max_seconds", 10)
         start = fp["second"]
         end = (
             prompt_st_list[idx + 1]["second"]
@@ -250,17 +250,6 @@ def animation_prompts_editor(
                 "key": fp_key,
             }
         )
-    col1, col2 = st.columns([2, 11], responsive=False)
-    with col1:
-        st.number_input(
-            label="",
-            key="max_seconds",
-            min_value=0,
-            step=0.1,
-            className="gui-input-smaller",
-        )
-    with col2:
-        st.write("*End of Video*")
 
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
@@ -350,15 +339,25 @@ class DeforumSDPage(BasePage):
     def render_form_v2(self):
         animation_prompts_editor()
 
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([2, 11], responsive=False)
         with col1:
-            st.slider(
-                "",
-                min_value=0.5,
-                max_value=frames_to_seconds(500, st.session_state.get("fps", 12)),
-                step=0.1,
+            if "max_seconds" not in st.session_state:
+                st.session_state["max_seconds"] = st.session_state.get(
+                    "max_frames", 100
+                )
+            MaxSeconds = st.number_input(
+                label="",
                 key="max_seconds",
+                min_value=0,
+                step=0.1,
+                className="gui-input-smaller",
             )
+            st.session_state["max_frames"] = seconds_to_frames(
+                MaxSeconds, st.session_state.get("fps", 12)
+            )
+
+        with col2:
+            st.write("*End of Video*")
 
     def get_cost_note(self) -> str | None:
         return f"{CREDITS_PER_FRAME} / frame"
