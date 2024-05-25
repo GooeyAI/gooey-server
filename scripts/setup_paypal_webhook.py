@@ -19,6 +19,9 @@ def run(base_url: str = settings.APP_BASE_URL):
                     "name": "BILLING.SUBSCRIPTION.ACTIVATED",
                 },
                 {
+                    "name": "BILLING.SUBSCRIPTION.UPDATED",
+                },
+                {
                     "name": "BILLING.SUBSCRIPTION.CANCELLED",
                 },
                 {
