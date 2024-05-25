@@ -2,6 +2,7 @@ import typing
 from enum import Enum
 
 import numpy as np
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import qrcode
 import requests
 from django.core.exceptions import ValidationError
@@ -79,9 +80,9 @@ class QRCodeGeneratorPage(BasePage):
 
     class RequestModel(BaseModel):
         qr_code_data: str | None
-        qr_code_input_image: str | None
+        qr_code_input_image: FieldHttpUrl | None
         qr_code_vcard: VCARD | None
-        qr_code_file: str | None
+        qr_code_file: FieldHttpUrl | None
 
         use_url_shortener: bool | None
 
@@ -118,10 +119,10 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
-        output_images: list[str]
-        raw_images: list[str]
-        shortened_url: str | None
-        cleaned_qr_code: str
+        output_images: list[FieldHttpUrl]
+        raw_images: list[FieldHttpUrl]
+        shortened_url: FieldHttpUrl | None
+        cleaned_qr_code: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         if len(state.get("output_images") or []) > 0:
@@ -697,7 +698,14 @@ def generate_and_upload_qr_code(
             qr_code_data = qr_code_data.strip()
         if not qr_code_data:
             raise UserError("Please provide QR Code URL, text content, or an image")
-        using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
+        using_shortened_url = request.use_url_shortener
+        if using_shortened_url:
+            # only shorten valid urls
+            using_shortened_url = is_url(qr_code_data)
+            # prepend http:// to the URL if it has no scheme but is valid with http (similar to how browsers do it)
+            if not using_shortened_url and is_url("http://" + qr_code_data):
+                qr_code_data = "http://" + qr_code_data
+                using_shortened_url = True
         if using_shortened_url:
             qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
                 url=qr_code_data,
@@ -729,7 +737,7 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
     img = bytes_to_cv2_img(r.content, greyscale=True)
     return extract_qr_code_data(img)
 

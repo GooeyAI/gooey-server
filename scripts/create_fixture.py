@@ -8,7 +8,7 @@ from bots.models import BotIntegration, PublishedRun, PublishedRunVisibility
 
 def run():
     with open("fixture.json", "w") as f:
-        objs = list(get_objects())
+        objs = list(filter(None, get_objects()))
         print(f"Exporting {len(objs)} objects")
         serializers.serialize(
             "json",
@@ -38,7 +38,9 @@ def get_objects():
             yield export(version, ["published_run", "saved_run"])
 
     for obj in BotIntegration.objects.all():
-        yield AppUser.objects.get(uid=obj.billing_account_uid)
+        user = AppUser.objects.get(uid=obj.billing_account_uid)
+        yield user.handle
+        yield user
 
         if obj.saved_run_id:
             yield export(obj.saved_run)
@@ -54,6 +56,9 @@ def export(obj, exclude=()):
     for field in obj._meta.get_fields():
         if field.name in exclude:
             continue
-        if field.is_relation and field.many_to_one:
-            setattr(obj, field.name, None)
+        if field.is_relation:
+            try:
+                setattr(obj, field.name, None)
+            except TypeError:
+                pass
     return obj

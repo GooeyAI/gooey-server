@@ -10,7 +10,11 @@ from sentry_sdk import capture_exception
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
+from daras_ai_v2.asr import (
+    run_google_translate,
+    audio_bytes_to_wav,
+    should_translate_lang,
+)
 from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
@@ -23,8 +27,6 @@ Hi there! 👋
 $name is now connected to your Slack workspace in this channel!
 
 I'll respond to any text and audio messages in this channel while keeping track of a separate conversation history with each user. Add 👍 or 👎 to my responses to help me learn.
-
-I have been configured for $user_language and will respond to you in that language.
 """.strip()
 
 
@@ -147,7 +149,7 @@ class SlackBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str | None = None,
     ) -> str | None:
-        if text and should_translate and self.language and self.language != "en":
+        if text and should_translate and should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
@@ -226,7 +228,7 @@ class SlackBot(BotInterface):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()
         if not text:
             return
-        if self.language and self.language != "en":
+        if should_translate_lang(self.language):
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
@@ -654,21 +656,10 @@ def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
 
 
 def send_confirmation_msg(bot: BotIntegration):
-    import langcodes
-
-    substitutions = vars(bot).copy()  # convert to dict for string substitution
-    substitutions["user_language"] = langcodes.Language.get(
-        bot.user_language,
-    ).display_name()
-    text = run_google_translate(
-        [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
-        target_language=bot.user_language,
-        source_language="en",
-        glossary_url=bot.saved_run.state.get("output_glossary_document"),
-    )[0]
+    confirmation_msg = Template(SLACK_CONFIRMATION_MSG).safe_substitute(**vars(bot))
     res = requests.post(
         str(bot.slack_channel_hook_url),
-        json={"text": text},
+        json={"text": confirmation_msg},
     )
     raise_for_status(res)
 

@@ -749,6 +749,7 @@ def run_asr(
                 "diarize": "true",
                 "language": language,
                 "detect_language": "true" if language else "false",
+                "punctuate": "true",
             },
             json={
                 "url": audio_url,
@@ -817,6 +818,9 @@ def run_asr(
             encoding=AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
             audio_channel_count=1,
+        )
+        config.features = cloud_speech.RecognitionFeatures(
+            enable_automatic_punctuation=True,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
         audio.uri = gs_url_to_uri(audio_url)
@@ -981,7 +985,7 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:
@@ -1067,3 +1071,7 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
     return (
         f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
     )
+
+
+def should_translate_lang(code: str) -> bool:
+    return code and not code.split("-")[0] != "en"

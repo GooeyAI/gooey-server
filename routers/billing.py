@@ -21,7 +21,11 @@ from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.base import RedirectException
-from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_body,
+    fastapi_request_form,
+    get_route_url,
+)
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -30,7 +34,8 @@ from daras_ai_v2.settings import templates
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.models import PricingPlan, Subscription
-from routers.root import page_wrapper
+from routers.root import page_wrapper, get_og_url_path
+
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -42,12 +47,13 @@ app = APIRouter()
 def account_route(request: Request):
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Billing • Gooey.AI",
             description="Your billing details.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -58,12 +64,13 @@ def account_route(request: Request):
 def profile_route(request: Request):
     with account_page_wrapper(request, AccountTabs.profile):
         profile_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Profile • Gooey.AI",
             description="Your profile details.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -74,12 +81,13 @@ def profile_route(request: Request):
 def saved_route(request: Request):
     with account_page_wrapper(request, AccountTabs.saved):
         all_saved_runs_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="Saved • Gooey.AI",
             description="Your saved runs.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -90,12 +98,13 @@ def saved_route(request: Request):
 def api_keys_route(request: Request):
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)
+    url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
-            url=str(request.url),
+            url=url,
+            canonical_url=url,
             title="API Keys • Gooey.AI",
             description="Your API keys.",
-            canonical_url=str(request.url),
             robots="noindex,nofollow",
         )
     )
@@ -114,7 +123,7 @@ class AccountTabs(TabData, Enum):
 
     @property
     def url_path(self) -> str:
-        return os.path.join(app.url_path_for(self.route.__name__), "")
+        return get_route_url(self.route)
 
 
 def border_box(*, className: str = "", **kwargs):

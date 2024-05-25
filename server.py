@@ -1,3 +1,13 @@
+from fastapi.exception_handlers import (
+    request_validation_exception_handler,
+    http_exception_handler,
+)
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+
+from daras_ai_v2.pydantic_validation import convert_errors
+from daras_ai_v2.settings import templates
 from gooeysite import wsgi
 
 assert wsgi
@@ -92,3 +102,33 @@ def request_time_middleware(app):
         )
 
     return middleware
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    ## https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions
+    convert_errors(exc.errors())
+    return await request_validation_exception_handler(request, exc)
+
+
+@app.exception_handler(404)
+@app.exception_handler(405)
+async def not_found_exception_handler(request: Request, exc: HTTPException):
+    if not request.headers.get("accept", "").startswith("text/html"):
+        return await http_exception_handler(request, exc)
+    return templates.TemplateResponse(
+        "errors/404.html",
+        {"request": request, "settings": settings},
+        status_code=exc.status_code,
+    )
+
+
+@app.exception_handler(HTTPException)
+async def server_error_exception_handler(request: Request, exc: HTTPException):
+    if not request.headers.get("accept", "").startswith("text/html"):
+        return await http_exception_handler(request, exc)
+    return templates.TemplateResponse(
+        "errors/unknown.html",
+        {"request": request, "settings": settings},
+        status_code=exc.status_code,
+    )

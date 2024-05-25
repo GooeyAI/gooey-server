@@ -65,6 +65,14 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_o = LLMSpec(
+        label="GPT-4o (openai)",
+        model_id="gpt-4o",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=10,
+        is_vision_model=True,
+    )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
         label="GPT-4 Turbo with Vision (openai)",
@@ -148,11 +156,12 @@ class LargeLanguageModels(Enum):
         price=1,
     )
     llama2_70b_chat = LLMSpec(
-        label="Llama 2 70b Chat (Meta AI)",
+        label="Llama 2 70b Chat [Deprecated] (Meta AI)",
         model_id="llama2-70b-4096",
         llm_api=LLMApis.groq,
         context_window=4096,
         price=1,
+        is_deprecated=True,
     )
     mixtral_8x7b_instruct_0_1 = LLMSpec(
         label="Mixtral 8x7b Instruct v0.1 (Mistral)",
@@ -341,6 +350,9 @@ def get_entry_text(entry: ConversationEntry) -> str:
     )
 
 
+ResponseFormatType = typing.Literal["text", "json_object"]
+
+
 def run_language_model(
     *,
     model: str,
@@ -354,7 +366,7 @@ def run_language_model(
     avoid_repetition: bool = False,
     tools: list[LLMTools] = None,
     stream: bool = False,
-    response_format_type: typing.Literal["text", "json_object"] = None,
+    response_format_type: ResponseFormatType = None,
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
@@ -393,9 +405,9 @@ def run_language_model(
             stream=stream and not (tools or response_format_type),
         )
         if stream:
-            return _stream_llm_outputs(entries, response_format_type)
+            return _stream_llm_outputs(entries)
         else:
-            return _parse_entries(entries, response_format_type, tools)
+            return _parse_entries(entries, tools)
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -439,28 +451,17 @@ def run_language_model(
 
 def _stream_llm_outputs(
     result: list | typing.Generator[list[ConversationEntry], None, None],
-    response_format_type: typing.Literal["text", "json_object"] | None,
 ):
     if isinstance(result, list):  # compatibility with non-streaming apis
         result = [result]
     for entries in result:
-        if response_format_type == "json_object":
-            for i, entry in enumerate(entries):
-                entries[i] = json.loads(entry["content"])
         for i, entry in enumerate(entries):
             entries[i]["content"] = entry.get("content") or ""
         yield entries
 
 
-def _parse_entries(
-    entries: list[dict],
-    response_format_type: typing.Literal["text", "json_object"] | None,
-    tools: list[dict] | None,
-):
-    if response_format_type == "json_object":
-        ret = [json.loads(entry["content"]) for entry in entries]
-    else:
-        ret = [get_entry_text(entry).strip() for entry in entries]
+def _parse_entries(entries: list[dict], tools: list[dict] | None):
+    ret = [get_entry_text(entry).strip() for entry in entries]
     if tools:
         return ret, [(entry.get("tool_calls") or []) for entry in entries]
     else:
@@ -526,7 +527,7 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"] | None,
+    response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
@@ -679,7 +680,7 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"] | None,
+    response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
@@ -887,6 +888,9 @@ def _run_groq_chat(
     avoid_repetition: bool,
     stop: list[str] | None,
 ):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     data = {
         "model": model,
         "messages": messages,
@@ -907,6 +911,15 @@ def _run_groq_chat(
     )
     raise_for_status(r)
     out = r.json()
+
+    record_cost_auto(
+        model=model, sku=ModelSku.llm_prompt, quantity=out["usage"]["prompt_tokens"]
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
     return [choice["message"] for choice in out["choices"]]
 
 

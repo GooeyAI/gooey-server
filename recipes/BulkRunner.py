@@ -2,6 +2,7 @@ import datetime
 import typing
 import uuid
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,7 @@ from daras_ai_v2.workflow_url_input import (
     del_button,
     workflow_url_input,
     get_published_run_options,
+    edit_done_button,
 )
 from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -44,7 +46,7 @@ class BulkRunnerPage(BasePage):
     price = 1
 
     class RequestModel(BaseModel):
-        documents: list[str] = Field(
+        documents: list[FieldHttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
 Upload or link to a CSV or google sheet that contains your sample input data.
@@ -52,7 +54,7 @@ For example, for Copilot, this would sample questions or for Art QR Code, would 
 Remember to includes header names in your CSV too.
             """,
         )
-        run_urls: list[str] = Field(
+        run_urls: list[FieldHttpUrl] = Field(
             title="Gooey Workflows",
             description="""
 Provide one or more Gooey.AI workflow runs.
@@ -73,7 +75,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
             """,
         )
 
-        eval_urls: list[str] | None = Field(
+        eval_urls: list[FieldHttpUrl] | None = Field(
             title="Evaluation Workflows",
             description="""
 _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the results of your runs.
@@ -81,9 +83,9 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
         )
 
     class ResponseModel(BaseModel):
-        output_documents: list[str]
+        output_documents: list[FieldHttpUrl]
 
-        eval_runs: list[str] | None = Field(
+        eval_runs: list[FieldHttpUrl] | None = Field(
             title="Evaluation Run URLs",
             description="""
 List of URLs to the evaluation runs that you requested.
@@ -197,7 +199,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                         label="`" + title + "`",
                         options=column_options,
                         key="--input-mapping:" + field,
-                        default_value=input_columns_old.get(field),
+                        value=input_columns_old.get(field),
                     )
                 if col:
                     input_columns_new[field] = col
@@ -418,9 +420,9 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        init_workflow_selector(d, key)
+        added_options = init_workflow_selector(d, key)
 
-        col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+        col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
             with col1:
                 url = st.text_input(
@@ -429,9 +431,11 @@ To get started:
                     value=d.get("url"),
                     placeholder="https://gooey.ai/.../?run_id=...",
                 )
+            with col2:
+                edit_done_button(key)
         else:
             with col1:
-                scol1, scol2, scol3 = st.columns([5, 6, 1], responsive=False)
+                scol1, scol2 = st.columns([1, 1], responsive=False)
             with scol1:
                 with st.div(className="pt-1"):
                     options = {
@@ -442,7 +446,7 @@ To get started:
                     workflow = st.selectbox(
                         "",
                         key=key + ":workflow",
-                        default_value=(
+                        value=(
                             d.get("workflow") or st.session_state.get(last_workflow_key)
                         ),
                         options=options,
@@ -456,19 +460,20 @@ To get started:
                 options = get_published_run_options(
                     page_cls, current_user=self.request.user
                 )
+                options.update(added_options)
                 with st.div(className="pt-1"):
                     url = st.selectbox(
                         "",
                         key=key,
                         options=options,
-                        default_value=d.get("url"),
+                        value=d.get("url"),
                         format_func=lambda x: options[x],
                     )
-            with scol3:
-                edit_button(key + ":editmode")
-        with col2:
-            url_button(url)
+            with col2:
+                edit_button(key)
         with col3:
+            url_button(url)
+        with col4:
             del_button(del_key)
 
         try:

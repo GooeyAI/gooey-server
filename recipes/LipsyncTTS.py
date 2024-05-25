@@ -1,18 +1,19 @@
 import typing
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
-from daras_ai_v2.safety_checker import safety_checker
-from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13b4d352-9456-11ee-8edd-02420a0001c7/Lipsync%20TTS.jpg.png"
 
@@ -30,44 +31,15 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         "elevenlabs_similarity_boost": 0.75,
     }
 
-    class RequestModel(BaseModel):
-        input_face: str
-        input_audio: str | None
-
-        face_padding_top: int | None
-        face_padding_bottom: int | None
-        face_padding_left: int | None
-        face_padding_right: int | None
-
-        text_prompt: str
-
-        tts_provider: str | None
-
-        uberduck_voice_name: str | None
-        uberduck_speaking_rate: float | None
-
-        google_voice_name: str | None
-        google_speaking_rate: float | None
-        google_pitch: float | None
-
-        bark_history_prompt: str | None
-
-        elevenlabs_voice_name: str | None
-        elevenlabs_api_key: str | None
-        elevenlabs_voice_id: str | None
-        elevenlabs_model: str | None
-        elevenlabs_stability: float | None
-        elevenlabs_similarity_boost: float | None
-        elevenlabs_style: float | None
-        elevenlabs_speaker_boost: bool | None
-
-        azure_voice_name: str | None
-
-        openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model: OPENAI_TTS_MODELS_T | None
+    class RequestModel(LipsyncSettings, TextToSpeechPage.RequestModel):
+        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
+            LipsyncModel.Wav2Lip.name
+        )
 
     class ResponseModel(BaseModel):
-        output_video: str
+        audio_url: str | None
+
+        output_video: FieldHttpUrl
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
@@ -96,6 +68,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+
+        enum_selector(
+            LipsyncModel,
+            label="###### Lipsync Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
+
         text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
@@ -124,6 +104,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """
         )
 
+    def render_steps(self):
+        audio_url = st.session_state.get("audio_url")
+        st.audio(audio_url, caption="Output Audio", show_download_button=True)
+
     def render_settings(self):
         LipsyncPage.render_settings(self)
         TextToSpeechPage.render_settings(self)
@@ -132,10 +116,12 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         if not self.request.user.disable_safety_checker:
             safety_checker(text=state["text_prompt"])
 
-        yield from TextToSpeechPage.run(self, state)
+        yield from TextToSpeechPage(request=self.request, run_user=self.run_user).run(
+            state
+        )
         # IMP: Copy output of TextToSpeechPage "audio_url" to Lipsync as "input_audio"
         state["input_audio"] = state["audio_url"]
-        yield from LipsyncPage.run(self, state)
+        yield from LipsyncPage(request=self.request, run_user=self.run_user).run(state)
 
     def render_example(self, state: dict):
         output_video = state.get("output_video")

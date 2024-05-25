@@ -21,7 +21,7 @@ from bots.models import (
     Workflow,
     MessageAttachment,
 )
-from daras_ai_v2.asr import run_google_translate
+from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -165,7 +165,7 @@ class BotInterface:
             self.query_params = {}
 
         self.billing_account_uid = bi.billing_account_uid
-        if bi.user_language and bi.user_language != "en":
+        if should_translate_lang(bi.user_language):
             self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
         self.streaming_enabled = bi.streaming_enabled
@@ -315,7 +315,7 @@ def _process_and_send_msg(
     recieved_time: datetime,
 ):
     # get latest messages for context
-    saved_msgs = bot.convo.messages.all().as_llm_context(reset_at=bot.convo.reset_at)
+    saved_msgs = bot.convo.msgs_as_llm_context()
 
     # # mock testing
     # result = _mock_api_output(input_text)
@@ -326,7 +326,7 @@ def _process_and_send_msg(
         "input_documents": input_documents,
         "messages": saved_msgs,
     }
-    if bot.language and bot.language != "en":
+    if should_translate_lang(bot.language):
         body["user_language"] = bot.language
     page, result, run_id, uid = submit_api_call(
         page_cls=bot.page_cls,

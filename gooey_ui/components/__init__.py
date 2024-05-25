@@ -126,12 +126,18 @@ def text(body: str, **props):
     ).mount()
 
 
-def error(body: str, icon: str = "🔥", *, unsafe_allow_html=False):
+def error(
+    body: str,
+    icon: str = "🔥",
+    *,
+    unsafe_allow_html=False,
+    color="rgba(255, 108, 108, 0.2)",
+):
     if not isinstance(body, str):
         body = repr(body)
     with div(
         style=dict(
-            backgroundColor="rgba(255, 108, 108, 0.2)",
+            backgroundColor=color,
             padding="1rem",
             paddingBottom="0",
             marginBottom="0.5rem",
@@ -430,7 +436,7 @@ def selectbox(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-    default_value: T = None,
+    value: T = None,
     allow_none: bool = False,
     **props,
 ) -> T | None:
@@ -443,10 +449,9 @@ def selectbox(
         options.insert(0, None)
     if not key:
         key = md5_values("select", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
-        value = default_value or options[0]
-    state.session_state.setdefault(key, value)
+    value = state.session_state.setdefault(key, value)
+    if value not in options:
+        value = state.session_state[key] = options[0]
     state.RenderTreeNode(
         name="select",
         props=dict(
@@ -565,6 +570,7 @@ def file_uploader(
     accept: list[str] = None,
     accept_multiple_files=False,
     key: str = None,
+    value: str | list[str] = None,
     upload_key: str = None,
     help: str = None,
     *,
@@ -572,7 +578,7 @@ def file_uploader(
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
     optional: bool = False,
-):
+) -> str | list[str]:
     if label_visibility != "visible":
         label = None
     key = upload_key or key
@@ -587,12 +593,12 @@ def file_uploader(
         )
     if optional:
         if not checkbox(
-            label, value=bool(state.session_state.get(key)), disabled=disabled
+            label, value=bool(state.session_state.get(key, value)), disabled=disabled
         ):
             state.session_state.pop(key, None)
-            return None
+            return ""
         label = None
-    value = state.session_state.get(key)
+    value = state.session_state.setdefault(key, value)
     if not value:
         if accept_multiple_files:
             value = []
@@ -661,7 +667,7 @@ def horizontal_radio(
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
-    button_props: dict = {},
+    **button_props,
 ) -> T | None:
     if not options:
         return None
@@ -708,8 +714,7 @@ def radio(
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.setdefault(key, value)
     if value not in options and checked_by_default:
-        value = options[0]
-        state.session_state[key] = value
+        value = state.session_state[key] = options[0]
     if label_visibility != "visible":
         label = None
     markdown(label)

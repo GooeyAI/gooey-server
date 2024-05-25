@@ -15,6 +15,9 @@ company = '<i class="fa-regular fa-buildings"></i>'
 copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
 
+code = '<i class="fa-regular fa-code"></i>'
+chat = '<i class="fa-regular fa-messages"></i>'
+
 # brands
 github = '<i class="fa-brands fa-github"></i>'
 

@@ -2,7 +2,10 @@ import json
 from json import JSONDecodeError
 
 from celery import shared_task
+from django.db import transaction
 from django.db.models import QuerySet
+from django.utils import timezone
+from loguru import logger
 
 from app_users.models import AppUser
 from bots.models import (
@@ -11,9 +14,12 @@ from bots.models import (
     BotIntegration,
     Conversation,
     Platform,
+    SavedRun,
+    BotIntegrationAnalysisRun,
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
+from daras_ai_v2.language_model import get_entry_text
 from daras_ai_v2.slack_bot import (
     fetch_channel_members,
     create_personal_channel,
@@ -23,6 +29,8 @@ from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton
 
+MAX_PROMPT_LEN = 100_000
+
 
 @shared_task
 def create_personal_channels_for_all_members(bi_id: int):
@@ -31,28 +39,70 @@ def create_personal_channels_for_all_members(bi_id: int):
     map_parallel(lambda user: create_personal_channel(bi, user), users, max_workers=10)
 
 
-@shared_task
-def msg_analysis(msg_id: int):
+@shared_task(bind=True)
+def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
+    anal = BotIntegrationAnalysisRun.objects.get(id=anal_id)
+
+    if (
+        countdown
+        and anal.scheduled_task_id
+        and anal.scheduled_task_id != self.request.id
+    ):
+        logger.warning(
+            f"Skipping analysis {anal} because another task is already scheduled"
+        )
+        return
+
+    anal.last_run_at = timezone.now()
+    anal.scheduled_task_id = None
+    anal.save(update_fields=["last_run_at"])
+
     msg = Message.objects.get(id=msg_id)
     assert (
         msg.role == CHATML_ROLE_ASSISSTANT
     ), f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
 
-    bi = msg.conversation.bot_integration
-    analysis_sr = bi.analysis_run
-    assert analysis_sr, "bot integration must have an analysis run"
+    billing_account = AppUser.objects.get(
+        uid=msg.conversation.bot_integration.billing_account_uid
+    )
+    analysis_sr = anal.get_active_saved_run()
 
-    # make the api call
-    billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
-    variables = dict(
+    # add variables to the script
+    variables = analysis_sr.state.get("variables", {}) | dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
-        bot_script=msg.saved_run.state.get("bot_script", ""),
-        references=references_as_prompt(msg.saved_run.state.get("references", [])),
+        bot_script=msg.saved_run and msg.saved_run.state.get("bot_script", ""),
+        references=(
+            msg.saved_run
+            and references_as_prompt(msg.saved_run.state.get("references", []))
+        ),
     )
+
+    # these are resource intensive, so only include them if the script asks for them
+    if "messages" in variables:
+        variables["messages"] = "\n".join(
+            f'{entry["role"]}: """{get_entry_text(entry)}"""'
+            for entry in msg.conversation.msgs_as_llm_context()
+        )
+
+    if "conversations" in variables:
+        conversations = []
+        for convo in msg.conversation.bot_integration.conversations.order_by(
+            "-created_at"
+        ):
+            if sum(map(len, conversations)) > MAX_PROMPT_LEN:
+                break
+            conversations.append(
+                "\n".join(
+                    f'{entry["role"]}: """{get_entry_text(entry)}"""'
+                    for entry in convo.msgs_as_llm_context()
+                )
+            )
+        variables["conversations"] = "\n####\n".join(conversations)
+
+    # make the api call
     result, sr = analysis_sr.submit_api_call(
-        current_user=billing_account,
-        request_body=dict(variables=variables),
+        current_user=billing_account, request_body=dict(variables=variables)
     )
 
     # save the run before the result is ready
@@ -73,9 +123,13 @@ def msg_analysis(msg_id: int):
         analysis_result = {
             "error": "Failed to parse the analysis result. Please check your script.",
         }
-    Message.objects.filter(id=msg_id).update(
-        analysis_result=analysis_result,
-    )
+    with transaction.atomic():
+        msg = Message.objects.get(id=msg_id)
+        # merge the analysis result with the existing one
+        msg.analysis_result = (msg.analysis_result or {}) | analysis_result
+        # save the result
+        msg._analysis_started = True  # prevent infinite recursion
+        msg.save(update_fields=["analysis_result"])
 
 
 def send_broadcast_msgs_chunked(

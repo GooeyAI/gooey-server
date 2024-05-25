@@ -448,6 +448,6 @@ def _call_summarize_url(url: str) -> (str, str):
         headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
     )
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()

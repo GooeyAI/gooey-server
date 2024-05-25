@@ -3,18 +3,17 @@ import time
 import typing
 
 import requests
-from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
-from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
     ELEVEN_LABS_VOICES,
@@ -89,7 +88,7 @@ class TextToSpeechPage(BasePage):
         openai_tts_model: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
-        audio_url: str
+        audio_url: FieldHttpUrl
 
     def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG
@@ -251,7 +250,7 @@ class TextToSpeechPage(BasePage):
                 )
 
                 synthesis_input = texttospeech.SynthesisInput(
-                    text=emoji.replace_emoji(text, replace="")
+                    text=emoji.replace_emoji(text)
                 )
 
                 voice = texttospeech.VoiceSelectionParams()
@@ -324,33 +323,43 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.AZURE_TTS:
                 import emoji
+                import azure.cognitiveservices.speech as speechsdk
 
-                output_format = "audio-16khz-32kbitrate-mono-mp3"
                 voice_name = state.get("azure_voice_name", "en-US")
                 try:
-                    voice = azure_tts_voices()[voice_name]
+                    voice = azure_tts_voices()[voice_name]["ShortName"]
                 except KeyError as e:
                     raise UserError(f"Invalid Azure voice name: {voice_name}") from e
-                res = requests.post(
-                    str(furl(settings.AZURE_TTS_ENDPOINT) / "/cognitiveservices/v1"),
-                    headers={
-                        "Content-Type": "application/ssml+xml",
-                        "X-Microsoft-OutputFormat": output_format,
-                        **azure_auth_header(),
-                    },
-                    data=f"""
-                    <speak version='1.0' xml:lang='en-US'>
-                        <voice xml:lang='{voice.get('Locale', 'en-US')}' xml:gender='{voice.get('Gender', 'Male')}' name='{voice.get('ShortName', 'en-US-ChristopherNeural')}'>
-                            {emoji.replace_emoji(text, replace='')}
-                        </voice>
-                    </speak>
-                    """.strip(),  # Microsoft's implementation of Speech Synthesis Markup Language (SSML) does not support emojis etc. so we replace them with descriptive text. https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-synthesis-markup
+
+                config = speechsdk.SpeechConfig(
+                    subscription=settings.AZURE_SPEECH_KEY,
+                    region=settings.AZURE_SPEECH_REGION,
                 )
-                raise_for_status(res)
+                config.set_speech_synthesis_output_format(
+                    speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3
+                )
+                config.speech_synthesis_voice_name = voice
+                speech_synthesizer = speechsdk.SpeechSynthesizer(config)
+                result = speech_synthesizer.speak_text(emoji.replace_emoji(text))
+                if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
+                    raise ValueError(
+                        f"Azure TTS failed: (code: {result.reason}) {result.cancellation_details.error_details}"
+                    )
+                stream = speechsdk.AudioDataStream(result)
+                ret = bytes()
+                while True:
+                    buf = bytes(16_000)
+                    n = stream.read_data(buf)
+                    if n <= 0:
+                        break
+                    ret += buf[:n]
+                if not ret:
+                    raise ValueError(
+                        f"No audio data received from azure TTS (code: {result.reason})"
+                    )
+
                 state["audio_url"] = upload_file_from_bytes(
-                    "azure_tts.mp3",
-                    res.content,
-                    "audio/mpeg",
+                    "azure_tts.mp3", ret, "audio/mpeg"
                 )
 
             case TextToSpeechProviders.OPEN_AI:
