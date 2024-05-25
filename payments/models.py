@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from django.core.exceptions import ValidationError
-from furl import furl
 import stripe
+from django.core.exceptions import ValidationError
 from django.db import models
+from furl import furl
 
 from .plans import PricingPlan
 from app_users.models import PaymentProvider
@@ -50,16 +50,25 @@ class Subscription(models.Model):
         max_length=255,
         help_text="Subscription ID from the payment provider",
     )
-    auto_recharge_enabled = models.BooleanField(default=False)
+    auto_recharge_enabled = models.BooleanField(default=True)
     auto_recharge_balance_threshold = models.IntegerField(
         validators=[
             validate_auto_recharge_balance_threshold,
         ],
-        default=settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES[0],
     )
     auto_recharge_topup_amount = models.IntegerField(
         validators=[validate_addon_amount],
         default=settings.ADDON_AMOUNT_CHOICES[0],
+    )
+    monthly_spending_budget = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="In USD, pause auto-recharge just before the spending exceeds this amount in a calendar month",
+    )
+    monthly_spending_notification_threshold = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="In USD, send an email when spending crosses this threshold in a calendar month",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -75,6 +84,40 @@ class Subscription(models.Model):
 
     def __str__(self):
         return PricingPlan(self.plan).title
+
+    def full_clean(self, *args, **kwargs):
+        if self.plan and self.auto_recharge_enabled:
+            if not self.auto_recharge_balance_threshold:
+                self.auto_recharge_balance_threshold = (
+                    self._get_default_auto_recharge_balance_threshold()
+                )
+
+            if not self.monthly_spending_budget:
+                self.monthly_spending_budget = (
+                    self._get_default_monthly_spending_budget()
+                )
+
+            if not self.monthly_spending_notification_threshold:
+                self.monthly_spending_notification_threshold = (
+                    self._get_default_monthly_spending_notification_threshold()
+                )
+
+        return super().full_clean(*args, **kwargs)
+
+    def _get_default_auto_recharge_balance_threshold(self):
+        # 25% of the monthly credit subscription
+        threshold = int(PricingPlan(self.plan).credits * 0.25)
+        return nearest_choice(
+            settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES, threshold
+        )
+
+    def _get_default_monthly_spending_budget(self):
+        # 3x the monthly subscription charge
+        return 3 * PricingPlan(self.plan).monthly_charge
+
+    def _get_default_monthly_spending_notification_threshold(self):
+        # 80% of the monthly budget
+        return int(0.8 * self._get_default_monthly_spending_budget())
 
     @property
     def has_user(self) -> bool:
@@ -267,3 +310,14 @@ class Subscription(models.Model):
                 raise NotImplementedError(
                     f"Can't get management URL for subscription with provider {self.payment_provider}"
                 )
+
+    def has_sent_monthly_spending_notification_this_month(self) -> bool:
+        return self.monthly_spending_notification_sent_at and (
+            self.monthly_spending_notification_sent_at.strftime("%B %Y")
+            == datetime.now(tz=timezone.utc).strftime("%B %Y")
+        )
+
+
+def nearest_choice(choices: list[int], value: int) -> int:
+    # nearest value in choices that is less than or equal to value
+    return min(filter(lambda x: x <= value, choices), key=lambda x: abs(x - value))

@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from django.db.models import Sum
 from django.utils import timezone
 from furl import furl
 from loguru import logger
@@ -39,7 +38,7 @@ def auto_recharge_user(user: AppUser):
         logger.error(f"User hasn't set auto recharge amount ({user=})")
         return
 
-    dollars_spent = get_dollars_spent_this_month_by_user(user)
+    dollars_spent = user.get_dollars_spent_this_month()
     if (
         dollars_spent + user.subscription.auto_recharge_topup_amount
         > user.monthly_spending_budget
@@ -77,17 +76,6 @@ def auto_recharge_user(user: AppUser):
         case PaymentProvider.PAYPAL:
             logger.error(f"Auto-recharge not supported for PayPal: {user=}")
             return
-
-
-def get_dollars_spent_this_month_by_user(user: AppUser):
-    today = datetime.now(tz=timezone.utc)
-    cents_spent = AppUserTransaction.objects.filter(
-        user=user,
-        created_at__month=today.month,
-        created_at__year=today.year,
-        amount__gt=0,
-    ).aggregate(total=Sum("charged_amount"))["total"]
-    return (cents_spent or 0) / 100
 
 
 def user_should_auto_recharge(user: AppUser):

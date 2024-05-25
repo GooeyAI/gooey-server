@@ -1,6 +1,9 @@
+from datetime import datetime
+
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
+from django.db.models import Sum
 from django.utils import timezone
 from firebase_admin import auth
 from phonenumber_field.modelfields import PhoneNumberField
@@ -97,8 +100,6 @@ class AppUser(models.Model):
     is_paying = models.BooleanField("paid", default=False)
 
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
-    monthly_spending_budget = models.IntegerField(null=True, blank=True)
-    monthly_spending_notification_threshold = models.IntegerField(null=True, blank=True)
     subscription = models.OneToOneField(
         "payments.Subscription",
         on_delete=models.SET_NULL,
@@ -260,6 +261,24 @@ class AppUser(models.Model):
             self.stripe_customer_id = customer.id
             self.save()
             return customer
+
+    def get_dollars_spent_this_month_by_user(self) -> float:
+        today = datetime.now(tz=timezone.utc)
+        cents_spent = self.transactions.filter(
+            created_at__month=today.month,
+            created_at__year=today.year,
+            amount__gt=0,
+        ).aggregate(total=Sum("charged_amount"))["total"]
+        return (cents_spent or 0) / 100
+
+    def should_send_monthly_spending_notification(self) -> bool:
+        return (
+            self.subscription
+            and self.subscription.monthly_spending_notification_threshold
+            and not self.subscription.has_sent_monthly_spending_notification_this_month()
+            and self.get_dollars_spent_this_month_by_user()
+            >= self.subscription.monthly_spending_notification_threshold
+        )
 
 
 class AppUserTransaction(models.Model):

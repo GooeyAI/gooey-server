@@ -1,0 +1,23 @@
+<p>
+    Hi, {{ user.first_name() }}!
+</p>
+
+<p>
+    You have exceeded your notification threshold of ${{ user.subscription.monthly_spending_notification_threshold }}
+    in spending this month.
+</p>
+<p>
+    Your monthly budget is ${{ user.subscription.monthly_spending_budget }}, after which auto-recharge will be
+    paused and all runs / API calls will be rejected.
+</p>
+
+<p>
+    Please visit your <a href="{{ account_url }}">billing settings</a> to review limits / manually top-up your account.
+</p>
+
+<p>
+    Best Wishes,
+    <br>
+    Gooey.AI Team
+</p>
+{{  "{{{ pm:unsubscribe }}}" }}

@@ -18,6 +18,8 @@ from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from payments.models import PricingPlan, Subscription
+from routers.billing import send_monthly_spending_notification_email
+
 
 router = APIRouter()
 
@@ -247,6 +249,8 @@ def _handle_sale_completed(event: SaleCompletedEvent):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
+    if user.should_send_monthly_spending_notification_email():
+        send_monthly_spending_notification_email(user)
 
 
 @transaction.atomic

@@ -1,7 +1,6 @@
-from functools import wraps
-import os
 import typing
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from enum import Enum
 from textwrap import dedent
 from urllib.parse import quote_plus
@@ -16,6 +15,7 @@ from furl import furl
 from loguru import logger
 from starlette.datastructures import FormData
 
+from daras_ai_v2.send_email import send_email_via_postmark
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
@@ -610,6 +610,7 @@ def render_auto_recharge_section(user: AppUser):
 
     if auto_recharge_enabled != subscription.auto_recharge_enabled:
         subscription.auto_recharge_enabled = auto_recharge_enabled
+        subscription.full_clean()
         subscription.save(update_fields=["auto_recharge_enabled"])
 
     if not auto_recharge_enabled:
@@ -642,11 +643,11 @@ def render_auto_recharge_section(user: AppUser):
             """,
         )
         with st.div(className="d-flex align-items-center"):
-            user.monthly_spending_budget = st.number_input(
+            user.subscription.monthly_spending_budget = st.number_input(
                 "",
                 min_value=10,
-                value=user.monthly_spending_budget or 500,
-                label_visibility="collapsed",
+                value=user.subscription.monthly_spending_budget,
+                key="monthly-spending-budget",
             )
             st.write("USD", className="d-block ms-2")
 
@@ -654,15 +655,15 @@ def render_auto_recharge_section(user: AppUser):
         st.caption(
             """
                 If your account purchases exceed this threshold in a given
-                calendar month (UTC), you will receive an email notification.
+                calendar month, you will receive an email notification.
                 """
         )
         with st.div(className="d-flex align-items-center"):
-            user.monthly_spending_notification_threshold = st.number_input(
+            user.subscription.monthly_spending_notification_threshold = st.number_input(
                 "",
                 min_value=10,
-                max_value=10_000,
-                value=user.monthly_spending_notification_threshold or 500,
+                value=user.subscription.monthly_spending_notification_threshold,
+                key="monthly-spending-notification-threshold",
             )
             st.write("USD", className="d-block ms-2")
 
@@ -676,25 +677,12 @@ def render_auto_recharge_section(user: AppUser):
     if st.session_state.get(save_button_key):
         try:
             subscription.full_clean()
-            user.full_clean()
         except ValidationError as e:
             st.error(str(e))
             return
 
         with transaction.atomic():
-            subscription.save(
-                update_fields=[
-                    "auto_recharge_enabled",
-                    "auto_recharge_topup_amount",
-                    "auto_recharge_balance_threshold",
-                ]
-            )
-            user.save(
-                update_fields=[
-                    "monthly_spending_budget",
-                    "monthly_spending_notification_threshold",
-                ]
-            )
+            subscription.save()
         st.success("Settings saved!")
 
 
@@ -880,6 +868,8 @@ def _handle_invoice_paid(uid: str, invoice_data):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
+    if user.should_send_monthly_spending_notification_email():
+        send_monthly_spending_notification_email(user)
 
 
 def _handle_checkout_session_completed(uid: str, session_data):
@@ -960,7 +950,7 @@ def _handle_subscription_cancelled(uid: str, subscription_data):
 @app.post("/__/billing/change-subscription")
 def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
     if not request.user:
-        return RedirectResponse("/account/", status_code=303)
+        return RedirectResponse(account_url, status_code=303)
 
     lookup_key = form_data["lookup_key"]
     new_plan = PricingPlan.get_by_key(lookup_key)
@@ -975,12 +965,12 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
     current_plan = PricingPlan(request.user.subscription.plan)
 
     if new_plan == current_plan:
-        return RedirectResponse("/account/", status_code=303)
+        return RedirectResponse(account_url, status_code=303)
 
     if new_plan == PricingPlan.STARTER:
         request.user.subscription.cancel()
         request.user.subscription.delete()
-        return RedirectResponse(app.url_path_for("payment_processing"), status_code=303)
+        return RedirectResponse(payment_processing_url, status_code=303)
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
@@ -1002,6 +992,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                 ],
                 metadata={USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key},
             )
+            return RedirectResponse(payment_processing_url, status_code=303)
         case PaymentProvider.PAYPAL:
             if not new_plan.paypal:
                 return JSONResponse(
@@ -1026,4 +1017,29 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                 status_code=400,
             )
 
-    return RedirectResponse("/account/", status_code=303)
+
+@transaction.atomic
+def send_monthly_spending_notification_email(user: AppUser):
+    if not user.email:
+        logger.error(f"User doesn't have an email: {user=}")
+        return
+
+    assert (
+        user.subscription and user.subscription.monthly_spending_notification_threshold
+    )
+
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email,
+        subject=f"[Gooey.AI] Monthly spending has exceeded ${user.subscription.monthly_spending_notification_threshold}",
+        html_body=templates.get_template(
+            "monthly_spending_notification_threshold_email.html"
+        ).render(
+            user=user,
+        ),
+    )
+
+    user.subscription.monthly_spending_notification_sent_at = datetime.now(
+        tz=timezone.utc
+    )
+    user.subscription.save(update_fields=["monthly_spending_notification_sent_at"])
