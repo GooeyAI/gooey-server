@@ -22,14 +22,6 @@ from payments.models import PricingPlan, Subscription
 router = APIRouter()
 
 
-PAYPAL_DEFUALT_APPLICATION_CONTEXT = {
-    "brand_name": "Gooey.AI",
-    "shipping_preference": "NO_SHIPPING",
-    "return_url": str(furl(settings.APP_BASE_URL) / "payment-success" / "/"),
-    "cancel_url": str(furl(settings.APP_BASE_URL) / "account" / "/"),
-}
-
-
 class SubscriptionPayload(BaseModel):
     lookup_key: str
 
@@ -142,7 +134,12 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         plan_id=plan.paypal["plan_id"],
         custom_id=request.user.uid,
         plan=plan.paypal and plan.paypal.get("plan", {}),
-        application_context=PAYPAL_DEFUALT_APPLICATION_CONTEXT,
+        application_context={
+            "brand_name": "Gooey.AI",
+            "shipping_preference": "NO_SHIPPING",
+            "return_url": str(furl(settings.APP_BASE_URL) / "payment-processing" / "/"),
+            "cancel_url": str(furl(settings.APP_BASE_URL) / "account" / "/"),
+        },
     )
     return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
 

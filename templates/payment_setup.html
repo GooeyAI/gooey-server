@@ -52,7 +52,7 @@ function renderPaypalSubscriptionButtons() {
                 return await subscribeWithPlan(planKey);
             },
             onApprove: function (data, actions) {
-                return actions.redirect(window.location.origin + "/payment-success/");
+                return actions.redirect(window.location.origin + "/payment-processing/");
             },
         }).render(el);
     }
@@ -153,7 +153,7 @@ async function onApprove(data, actions) {
         } else {
             // (3) Successful transaction -> Show confirmation or thank you message
             // Or go to another URL:  actions.redirect('thank_you.html');
-            actions.redirect(window.location.origin + "/payment-success/");
+            actions.redirect(window.location.origin + "/payment-processing/");
         }
     } catch (error) {
         console.error(error);

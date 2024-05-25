@@ -149,8 +149,9 @@ def billing_tab(request: Request):
         render_all_plans(request.user)
 
     if request.user.subscription:
-        with st.div(className="my-5"):
-            render_auto_recharge_section(request.user)
+        if request.user.subscription.payment_provider == PaymentProvider.STRIPE:
+            with st.div(className="my-5"):
+                render_auto_recharge_section(request.user)
         with st.div(className="my-5"):
             render_addon_section(request.user)
         with st.div(className="my-5"):
@@ -586,14 +587,13 @@ def api_keys_tab(request: Request):
 
 
 def render_auto_recharge_section(user: AppUser):
-    assert user.subscription
+    assert (
+        user.subscription
+        and user.subscription.payment_provider == PaymentProvider.STRIPE
+    )
     subscription = user.subscription
 
     st.write("## Auto Recharge & Limits")
-    if subscription.payment_provider == PaymentProvider.PAYPAL:
-        st.caption("Auto-recharge is only available for Stripe subscriptions :(")
-        return
-
     with st.div(className="d-flex align-items-center"):
         auto_recharge_enabled = st.checkbox(
             "", value=subscription.auto_recharge_enabled
@@ -740,7 +740,7 @@ def create_checkout_session(
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode="subscription",
-        success_url=payment_success_url,
+        success_url=payment_processing_url,
         cancel_url=account_url,
         customer=request.user.get_or_create_stripe_customer(),
         metadata=metadata,
@@ -771,7 +771,7 @@ def change_payment_method(request: Request):
                         "op": "change_payment_method",
                     },
                 },
-                success_url=payment_success_url,
+                success_url=payment_processing_url,
                 cancel_url=account_url,
             )
             return RedirectResponse(session.url, status_code=303)
@@ -794,14 +794,23 @@ def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
-@app.get("/payment-success/")
-def payment_success(request: Request):
-    context = {"request": request, "settings": settings}
-    return templates.TemplateResponse("payment_success.html", context)
+@app.post("/payment-processing/")
+@st.route
+def payment_processing(request: Request):
+    with page_wrapper(request):
+        context = {
+            "request": request,
+            "settings": settings,
+            "redirect_url": account_url,
+        }
+        st.html(templates.get_template("payment_processing.html").render(**context))
+    return dict(
+        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
+    )
 
 
-payment_success_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(payment_success.__name__)
+payment_processing_url = str(
+    furl(settings.APP_BASE_URL) / app.url_path_for(payment_processing.__name__)
 )
 account_url = str(
     furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
@@ -963,7 +972,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
     if new_plan == PricingPlan.STARTER:
         request.user.subscription.cancel()
         request.user.subscription.delete()
-        return RedirectResponse(app.url_path_for("payment_success"), status_code=303)
+        return RedirectResponse(app.url_path_for("payment_processing"), status_code=303)
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
