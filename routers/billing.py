@@ -487,11 +487,11 @@ def render_payment_information(user: AppUser):
     with col2:
         provider = PaymentProvider(user.subscription.payment_provider)
         st.write(provider.label)
-    with col3:
-        with st.link(
-            to=user.subscription.get_external_management_url(), target="_blank"
-        ):
-            st.write(f"{icons.edit} Manage", unsafe_allow_html=True)
+    with (
+        col3,
+        st.link(to=user.subscription.get_external_management_url(), target="_blank"),
+    ):
+        st.write(f"{icons.edit} Edit", unsafe_allow_html=True)
 
     pm_summary = user.subscription.get_payment_method_summary()
     if pm_summary and pm_summary.card_brand:
@@ -503,9 +503,8 @@ def render_payment_information(user: AppUser):
                 f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
                 unsafe_allow_html=True,
             )
-        with col3:
-            with st.link(to="/__/billing/change-payment-method"):
-                st.button(f"{icons.edit} Edit", type="link")
+        with col3, st.link(to="/__/billing/change-payment-method"):
+            st.button(f"{icons.edit} Edit", type="link")
 
     if pm_summary and pm_summary.billing_email:
         col1, col2, _ = st.columns(3, responsive=False)
