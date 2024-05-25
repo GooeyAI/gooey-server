@@ -244,7 +244,7 @@ class Subscription(models.Model):
             return True
         return False
 
-    def get_external_management_url(self):
+    def get_external_management_url(self) -> str:
         """
         Get URL to Stripe/PayPal for user to manage the subscription.
         """
