@@ -1,4 +1,3 @@
-import os
 import typing
 from contextlib import contextmanager
 from enum import Enum
@@ -14,7 +13,7 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import icons, settings, urls
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_body,
@@ -27,7 +26,17 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
+from payments.plans import PricingPlan
 from routers.root import page_wrapper, get_og_url_path
+from routers.billing_v2 import (
+    BILLING_VERSION_KEY,
+    BILLING_VERSION_V2,
+    billing_v2_tab,
+    handle_checkout_session_completed,
+    handle_subscription_updated,
+    handle_subscription_cancelled,
+    send_monthly_spending_notification_email,
+)
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -141,6 +150,23 @@ def account_route(request: Request):
     )
 
 
+@app.post("/account/v2/")
+@st.route
+def account_v2_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.billing_v2):
+        billing_v2_tab(request)
+    url = get_og_url_path(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title="Billing • Gooey.AI",
+            description="Your billing details.",
+            robots="noindex,nofollow",
+        )
+    )
+
+
 @app.post("/account/profile/")
 @st.route
 def profile_route(request: Request):
@@ -195,10 +221,14 @@ def api_keys_route(request: Request):
 class TabData(typing.NamedTuple):
     title: str
     route: typing.Callable
+    hidden: bool = False
 
 
 class AccountTabs(TabData, Enum):
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+    billing_v2 = TabData(
+        title=f"{icons.billing} Billing V2", route=account_v2_route, hidden=True
+    )
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
@@ -288,6 +318,8 @@ def account_page_wrapper(request: Request, current_tab: TabData):
         st.div(className="mt-5")
         with st.nav_tabs():
             for tab in AccountTabs:
+                if tab.hidden:
+                    continue
                 with st.nav_item(tab.url_path, active=tab == current_tab):
                     st.html(tab.title)
 
@@ -340,6 +372,51 @@ def create_checkout_session(
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
+@app.post("/__/stripe/create-checkout-session-v2")
+def create_checkout_session_v2(
+    request: Request, body_form: FormData = fastapi_request_form
+):
+    if not request.user:
+        return RedirectResponse(
+            request.url_for("login", query_params={"next": request.url.path})
+        )
+
+    lookup_key: str = body_form["lookup_key"]
+    if (plan := PricingPlan.get_by_key(lookup_key)) and plan.stripe:
+        line_item = plan.stripe.copy()
+    else:
+        return JSONResponse(
+            {
+                "message": "Invalid plan lookup key",
+            }
+        )
+
+    if request.user.subscription and request.user.subscription.plan == plan.value:
+        # already subscribed to the same plan
+        return RedirectResponse("/", status_code=303)
+
+    metadata = {
+        USER_SUBSCRIPTION_METADATA_FIELD: lookup_key,
+        BILLING_VERSION_KEY: BILLING_VERSION_V2,
+    }
+
+    checkout_session = stripe.checkout.Session.create(
+        line_items=[line_item],
+        mode="subscription",
+        success_url=payment_processing_url,
+        cancel_url=account_url,
+        customer=request.user.get_or_create_stripe_customer(),
+        metadata=metadata,
+        subscription_data={"metadata": metadata},
+        allow_promotion_codes=True,
+        saved_payment_method_options={
+            "payment_method_save": "enabled",
+        },
+    )
+
+    return RedirectResponse(checkout_session.url, status_code=303)
+
+
 @app.post("/__/stripe/create-portal-session")
 def customer_portal(request: Request):
     customer = request.user.get_or_create_stripe_customer()
@@ -350,17 +427,142 @@ def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
+@app.get("/__/billing/change-payment-method")
+def change_payment_method(request: Request):
+    if not request.user or not request.user.subscription:
+        return RedirectResponse(account_url)
+
+    match request.user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            session = stripe.checkout.Session.create(
+                mode="setup",
+                currency="usd",
+                customer=request.user.get_or_create_stripe_customer(),
+                setup_intent_data={
+                    "metadata": {
+                        "subscription_id": request.user.subscription.external_id,
+                    },
+                },
+                success_url=payment_processing_url,
+                cancel_url=account_url,
+            )
+            return RedirectResponse(session.url, status_code=303)
+        case _:
+            return JSONResponse(
+                {
+                    "message": "Not implemented for this payment provider",
+                },
+                status_code=400,
+            )
+
+
+@app.post("/__/billing/change-subscription")
+def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
+    if not request.user:
+        return RedirectResponse(account_url, status_code=303)
+
+    lookup_key = form_data["lookup_key"]
+    new_plan = PricingPlan.get_by_key(lookup_key)
+    if not new_plan:
+        return JSONResponse(
+            {
+                "message": "Invalid plan lookup key",
+            },
+            status_code=400,
+        )
+
+    current_plan = PricingPlan(request.user.subscription.plan)
+
+    if new_plan == current_plan:
+        return RedirectResponse(account_url, status_code=303)
+
+    if new_plan == PricingPlan.STARTER:
+        request.user.subscription.cancel()
+        request.user.subscription.delete()
+        return RedirectResponse(payment_processing_url, status_code=303)
+
+    match request.user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            if not new_plan.stripe:
+                return JSONResponse(
+                    {
+                        "message": f"Stripe subscription not available for {new_plan}",
+                    },
+                    status_code=400,
+                )
+            subscription = stripe.Subscription.retrieve(
+                request.user.subscription.external_id
+            )
+            stripe.Subscription.modify(
+                subscription.id,
+                items=[
+                    {"id": subscription["items"].data[0], "deleted": True},
+                    new_plan.stripe.copy(),
+                ],
+                metadata={
+                    USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
+                    BILLING_VERSION_KEY: BILLING_VERSION_V2,
+                },
+            )
+            return RedirectResponse(payment_processing_url, status_code=303)
+
+        case PaymentProvider.PAYPAL:
+            if not new_plan.paypal:
+                return JSONResponse(
+                    {
+                        "message": f"Paypal subscription not available for {new_plan}",
+                    },
+                    status_code=400,
+                )
+
+            subscription = paypal.Subscription.retrieve(
+                request.user.subscription.external_id
+            )
+            approval_url = subscription.update_plan(
+                plan_id=new_plan.paypal["plan_id"], plan=new_plan.paypal.get("plan", {})
+            )
+            return RedirectResponse(approval_url, status_code=303)
+        case _:
+            return JSONResponse(
+                {
+                    "message": "Not implemented for this payment provider",
+                },
+                status_code=400,
+            )
+
+
 @app.get("/payment-success/")
 def payment_success(request: Request):
     context = {"request": request, "settings": settings}
     return templates.TemplateResponse("payment_success.html", context)
 
 
+@app.post(settings.PAYMENT_PROCESSING_PAGE_PATH)
+@st.route
+def payment_processing(request: Request):
+    with page_wrapper(request):
+        context = {
+            "request": request,
+            "settings": settings,
+            "redirect_url": account_v2_url,
+        }
+        st.html(templates.get_template("payment_processing.html").render(**context))
+    return dict(
+        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
+    )
+
+
 payment_success_url = str(
     furl(settings.APP_BASE_URL) / app.url_path_for(payment_success.__name__)
 )
+payment_processing_url = str(
+    furl(settings.APP_BASE_URL) / app.url_path_for(payment_processing.__name__)
+)
 account_url = str(
     furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
+)
+account_v2_url = str(
+    furl(settings.APP_BASE_URL) / app.url_path_for(account_v2_route.__name__)
 )
 
 
@@ -384,7 +586,7 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
         return JSONResponse(
             {
                 "status": "failed",
-                "error": f"customer.metadata.uid not found",
+                "error": "customer.metadata.uid not found",
             },
             status_code=400,
         )
@@ -393,6 +595,13 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     match event["type"]:
         case "invoice.paid":
             _handle_invoice_paid(uid, data)
+        # v2 ...
+        case "checkout.session.completed":
+            handle_checkout_session_completed(uid, data)
+        case "customer.subscription.created" | "customer.subscription.updated":
+            handle_subscription_updated(uid, data)
+        case "customer.subscription.deleted":
+            handle_subscription_cancelled(uid, data)
 
     return JSONResponse({"status": "success"})
 
@@ -413,6 +622,11 @@ def _handle_invoice_paid(uid: str, invoice_data):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
+    if (
+        user.subscription
+        and user.subscription.should_send_monthly_spending_notification()
+    ):
+        send_monthly_spending_notification_email(user)
 
 
 @app.post("/__/stripe/cancel-subscription")

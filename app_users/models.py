@@ -1,6 +1,9 @@
+from datetime import datetime
+
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
+from django.db.models import Sum
 from django.utils import timezone
 from firebase_admin import auth
 from phonenumber_field.modelfields import PhoneNumberField
@@ -10,6 +13,7 @@ from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import Handle
+from payments.plans import PricingPlan
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -76,6 +80,11 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
             raise
 
 
+class PaymentProvider(models.IntegerChoices):
+    STRIPE = 1, "Stripe"
+    PAYPAL = 2, "PayPal"
+
+
 class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
@@ -91,6 +100,12 @@ class AppUser(models.Model):
     is_paying = models.BooleanField("paid", default=False)
 
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+    subscription = models.OneToOneField(
+        "payments.Subscription",
+        on_delete=models.SET_NULL,
+        related_name="user",
+        null=True,
+    )
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
@@ -247,10 +262,14 @@ class AppUser(models.Model):
             self.save()
             return customer
 
-
-class PaymentProvider(models.IntegerChoices):
-    STRIPE = 1, "Stripe"
-    PAYPAL = 2, "Paypal"
+    def get_dollars_spent_this_month(self) -> float:
+        today = datetime.now(tz=timezone.utc)
+        cents_spent = self.transactions.filter(
+            created_at__month=today.month,
+            created_at__year=today.year,
+            amount__gt=0,
+        ).aggregate(total=Sum("charged_amount"))["total"]
+        return (cents_spent or 0) / 100
 
 
 class AppUserTransaction(models.Model):
@@ -294,7 +313,38 @@ class AppUserTransaction(models.Model):
         indexes = [
             models.Index(fields=["user", "amount", "-created_at"]),
             models.Index(fields=["-created_at"]),
+            models.Index(fields=["user", "created_at", "amount"]),
         ]
 
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"
+
+    def get_subscription_plan(self) -> PricingPlan | None:
+        """
+        It just so happened that all monthly subscriptions we offered had
+        different amounts from the one-time purchases.
+        This uses that heuristic to determine whether a transaction
+        was a subscription payment or a one-time purchase.
+
+        TODO: Implement this more robustly
+        """
+        if self.amount <= 0:
+            # credits deducted
+            return None
+
+        for plan in PricingPlan:
+            if (
+                self.amount == plan.credits
+                and self.charged_amount == plan.monthly_charge * 100
+            ):
+                return plan
+
+        return None
+
+    def note(self) -> str:
+        if self.amount <= 0:
+            return ""
+        elif plan := self.get_subscription_plan():
+            return f"Subscription payment: {plan.title} (+{self.amount:,} credits)"
+        else:
+            return f"Addon purchase (+{self.amount:,} credits)"

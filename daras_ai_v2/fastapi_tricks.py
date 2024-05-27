@@ -54,7 +54,7 @@ def resolve_url(url: str) -> ResolverMatch | None:
     return None
 
 
-def get_route_url(route_fn: typing.Callable, params: dict = None):
+def get_route_url(route_fn: typing.Callable, params: dict = None) -> str:
     from server import app
 
     return os.path.join(app.url_path_for(route_fn.__name__, **(params or {})), "")
