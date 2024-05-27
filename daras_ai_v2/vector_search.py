@@ -465,7 +465,7 @@ def pages_to_split_refs(
                     file_meta.name + (f", page {doc.end + 1}" if len(pages) > 1 else "")
                 ),
                 "url": add_page_number_to_pdf(
-                    f_url, (doc.end + 1 if len(pages) > 1 else f_url)
+                    f_url, (doc.end + 1 if len(pages) > 1 else None)
                 ).url,
                 "snippet": doc.text,
                 **doc.kwargs,
