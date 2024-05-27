@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <section class="text-center">
+        <div class="description Box-root">
+            <h3>Payment successful!</h3>
+        </div>
+        <form action="/" method="GET">
+            <button id="home" class="streamlit-like-btn" type="submit">Home</button>
+        </form>
+        <form action="/account" method="GET">
+            <button id="home" class="streamlit-like-btn" type="submit">Account</button>
+        </form>
+    </section>
+
+{% endblock content %}

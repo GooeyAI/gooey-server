@@ -18,6 +18,9 @@ from payments.plans import PricingPlan
 payment_processing_url = str(
     furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
 )
+stripe_create_checkout_session_url = "/__/stripe/create-checkout-session-v2"
+change_subscription_url = "/__/billing/change-subscription"
+change_payment_method_url = "/__/billing/change-payment-method"
 
 
 def billing_page(user: AppUser):
@@ -202,9 +205,12 @@ def update_subscription_button(
             render_paypal_subscription_button(plan=plan)
         case _ if label == "Downgrade":
             downgrade_modal = Modal(
-                "Confirm downgrade", key=f"downgrade-plan-modal-{plan.key}"
+                "Confirm downgrade",
+                key=f"downgrade-plan-modal-{plan.key}",
             )
-            if st.button(label, className=className):
+            if st.button(
+                label, className=className, key=f"downgrade-button-{plan.key}"
+            ):
                 downgrade_modal.open()
 
             if downgrade_modal.is_open():
@@ -238,7 +244,7 @@ def update_subscription_button(
 def render_change_subscription_button(label: str, *, plan: PricingPlan, className: str):
     st.html(
         f"""
-    <form action="/__/billing/change-subscription" method="post" class="d-inline">
+    <form action="{change_subscription_url}" method="post" class="d-inline">
         <input type="hidden" name="lookup_key" value="{plan.key}">
         <button type="submit" class="{className}" data-submit-disabled>{label}</button>
     </form>
@@ -329,7 +335,7 @@ def render_stripe_subscription_button(
     btn_classes = f"btn btn-theme btn-{type} {className}"
     st.html(
         f"""
-    <form action="/__/stripe/create-checkout-session" method="post" class="d-inline">
+    <form action="{stripe_create_checkout_session_url}" method="post" class="d-inline">
         <input type="hidden" name="lookup_key" value="{plan.key}">
         <button type="submit" class="{btn_classes}" data-submit-disabled>{label}</button>
     </form>
@@ -382,7 +388,7 @@ def render_payment_information(user: AppUser):
                 f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
                 unsafe_allow_html=True,
             )
-        with col3, st.link(to="/__/billing/change-payment-method"):
+        with col3, st.link(to=change_payment_method_url):
             st.button(f"{icons.edit} Edit", type="link")
 
     if pm_summary and pm_summary.billing_email:

@@ -320,6 +320,14 @@ class AppUserTransaction(models.Model):
         return f"{self.invoice_id} ({self.amount})"
 
     def get_subscription_plan(self) -> PricingPlan | None:
+        """
+        It just so happened that all monthly subscriptions we offered had
+        different amounts from the one-time purchases.
+        This uses that heuristic to determine whether a transaction
+        was a subscription payment or a one-time purchase.
+
+        TODO: Implement this more robustly
+        """
         if self.amount <= 0:
             # credits deducted
             return None
@@ -339,4 +347,4 @@ class AppUserTransaction(models.Model):
         elif plan := self.get_subscription_plan():
             return f"Subscription payment: {plan.title} (+{self.amount:,} credits)"
         else:
-            return f"Addon Purchase (+{self.amount:,} credits)"
+            return f"Addon purchase (+{self.amount:,} credits)"
