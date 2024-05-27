@@ -41,7 +41,7 @@ def auto_recharge_user(user: AppUser):
     dollars_spent = user.get_dollars_spent_this_month()
     if (
         dollars_spent + user.subscription.auto_recharge_topup_amount
-        > user.monthly_spending_budget
+        > user.subscription.monthly_spending_budget
     ):
         send_email_auto_recharge_failed(
             user, reason="you have reached your monthly budget"

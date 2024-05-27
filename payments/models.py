@@ -71,6 +71,8 @@ class Subscription(models.Model):
         help_text="In USD, send an email when spending crosses this threshold in a calendar month",
     )
 
+    monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -315,6 +317,16 @@ class Subscription(models.Model):
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
             == datetime.now(tz=timezone.utc).strftime("%B %Y")
+        )
+
+    def should_send_monthly_spending_notification(self) -> bool:
+        assert self.has_user
+
+        return bool(
+            self.monthly_spending_notification_threshold
+            and not self.has_sent_monthly_spending_notification_this_month()
+            and self.user.get_dollars_spent_this_month()
+            >= self.monthly_spending_notification_threshold
         )
 
 

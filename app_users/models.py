@@ -262,7 +262,7 @@ class AppUser(models.Model):
             self.save()
             return customer
 
-    def get_dollars_spent_this_month_by_user(self) -> float:
+    def get_dollars_spent_this_month(self) -> float:
         today = datetime.now(tz=timezone.utc)
         cents_spent = self.transactions.filter(
             created_at__month=today.month,
@@ -270,15 +270,6 @@ class AppUser(models.Model):
             amount__gt=0,
         ).aggregate(total=Sum("charged_amount"))["total"]
         return (cents_spent or 0) / 100
-
-    def should_send_monthly_spending_notification(self) -> bool:
-        return (
-            self.subscription
-            and self.subscription.monthly_spending_notification_threshold
-            and not self.subscription.has_sent_monthly_spending_notification_this_month()
-            and self.get_dollars_spent_this_month_by_user()
-            >= self.subscription.monthly_spending_notification_threshold
-        )
 
 
 class AppUserTransaction(models.Model):
