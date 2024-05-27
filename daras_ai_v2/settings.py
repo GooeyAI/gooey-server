@@ -298,12 +298,6 @@ STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
     "STRIPE_PRODUCT_IDS",
     cast=json.loads,
-    # test mode product IDs
-    default="""{
-        "creator": "prod_Q9x4USwPZXAjDr",
-        "business": "prod_Q9YfjAsk4kq5o3",
-        "addon": "prod_Pz8hAslLzckWRw"
-    }""",
 )
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
@@ -314,13 +308,6 @@ PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
 PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
     "PAYPAL_PLAN_IDS",
     cast=json.loads,
-    # sandbox plan IDs
-    default="""{
-        "basic": "P-7EE20432AK666360GMYZFNBQ",
-        "premium": "P-35W68839HF2588719MYZFN5Y",
-        "creator": "P-3T117524WS380863NMZIH36Y",
-        "business": "P-5D3735626S133783GMZIH4MI"
-    }""",
 )
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
