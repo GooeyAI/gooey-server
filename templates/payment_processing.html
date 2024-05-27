@@ -102,13 +102,11 @@
 </section>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const redirectUrl = "{{ redirect_url }}";
-    const waitingTime = {{ waitingTime | default(3) }};
+const redirectUrl = "{{ redirect_url }}";
+const waitingTime = {{ waitingTime | default(3) }};
 
-    setTimeout(() => {
-        window.location.href = redirectUrl;
-    }, waitingTime * 1000);
-});
+setTimeout(() => {
+    window.location.href = redirectUrl;
+}, waitingTime * 1000);
 </script>
 {% endblock %}
