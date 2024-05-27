@@ -249,7 +249,10 @@ def _handle_sale_completed(event: SaleCompletedEvent):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
-    if user.should_send_monthly_spending_notification():
+    if (
+        user.subscription
+        and user.subscription.should_send_monthly_spending_notification()
+    ):
         send_monthly_spending_notification_email(user)
 
 
