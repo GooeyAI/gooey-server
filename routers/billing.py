@@ -414,7 +414,7 @@ def render_paypal_addon_button(amount: int):
 
 def render_stripe_addon_button(amount: int, user: AppUser):
     confirm_purchase_modal = Modal("Confirm Purchase", key=f"confirm-purchase-{amount}")
-    if st.button(f"${amount:,}", className="streamlit-like-btn", type="primary"):
+    if st.button(f"${amount:,}", type="primary"):
         confirm_purchase_modal.open()
 
     if confirm_purchase_modal.is_open():
@@ -429,7 +429,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             with st.div(className="d-flex w-100"):
                 if st.button("Buy", type="primary"):
                     if user.subscription.stripe_attempt_addon_purchase(amount):
-                        confirm_purchase_modal.close()
+                        raise RedirectException(payment_processing_url)
                     else:
                         st.error("Payment failed... Please try again.")
                 if st.button("Cancel", className="border border-danger text-danger"):
@@ -624,14 +624,14 @@ def render_auto_recharge_section(user: AppUser):
         subscription.auto_recharge_topup_amount = st.selectbox(
             "###### Automatically purchase",
             options=settings.ADDON_AMOUNT_CHOICES,
-            format_func=lambda amt: f"{settings.ADDON_CREDITS_PER_DOLLAR * amt:,} credits for ${amt}",
-            default_value=subscription.auto_recharge_topup_amount,
+            format_func=lambda amt: f"{settings.ADDON_CREDITS_PER_DOLLAR * int(amt):,} credits for ${amt}",
+            value=subscription.auto_recharge_topup_amount,
         )
         subscription.auto_recharge_balance_threshold = st.selectbox(
             "###### when balance falls below",
             options=settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES,
-            format_func=lambda credits: f"{credits:,} credits",
-            default_value=subscription.auto_recharge_balance_threshold,
+            format_func=lambda c: f"{c:,} credits",
+            value=subscription.auto_recharge_balance_threshold,
         )
 
     with col2:
@@ -868,7 +868,10 @@ def _handle_invoice_paid(uid: str, invoice_data):
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])
-    if user.should_send_monthly_spending_notification():
+    if (
+        user.subscription
+        and user.subscription.should_send_monthly_spending_notification()
+    ):
         send_monthly_spending_notification_email(user)
 
 
@@ -1036,6 +1039,7 @@ def send_monthly_spending_notification_email(user: AppUser):
             "monthly_spending_notification_threshold_email.html"
         ).render(
             user=user,
+            account_url=account_url,
         ),
     )
 
