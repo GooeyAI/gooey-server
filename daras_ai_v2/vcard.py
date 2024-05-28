@@ -115,7 +115,7 @@ class VCARD(BaseModel):
 def vard_img(prop: str, img: str, compress_and_base64: bool, fmt: str = "PNG") -> str:
     if compress_and_base64:
         r = requests.get(img)
-        raise_for_status(r)
+        raise_for_status(r, is_user_url=True)
         downscaled = resize_img_scale(r.content, (400, 400))
         img = base64.b64encode(downscaled).decode()
     return prop + ";" + vard_line(f"ENCODING=BASE64;TYPE={fmt}", img)

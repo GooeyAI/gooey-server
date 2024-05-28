@@ -1,6 +1,7 @@
 import typing
 import uuid
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from django.db.models import TextChoices
 from pydantic import BaseModel
 from typing_extensions import TypedDict
@@ -198,7 +199,7 @@ class DeforumSDPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        output_video: str
+        output_video: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DEFORUMSD_META_IMG
@@ -467,12 +468,12 @@ Choose fps for the video.
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
                     },
                     max_frames=request.max_frames,
-                    zoom=request.zoom,
-                    translation_x=request.translation_x,
-                    translation_y=request.translation_y,
-                    rotation_3d_x=request.rotation_3d_x,
-                    rotation_3d_y=request.rotation_3d_y,
-                    rotation_3d_z=request.rotation_3d_z,
+                    zoom=request.zoom or "0: (1.004)",
+                    translation_x=request.translation_x or "0:(10*sin(2*3.14*t/10))",
+                    translation_y=request.translation_y or "0:(0)",
+                    rotation_3d_x=request.rotation_3d_x or "0:(0)",
+                    rotation_3d_y=request.rotation_3d_y or "0:(0)",
+                    rotation_3d_z=request.rotation_3d_z or "0:(0)",
                     translation_z="0:(0)",
                     fps=request.fps,
                 ),

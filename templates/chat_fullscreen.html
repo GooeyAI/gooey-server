@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    {% for meta_props in meta %}
+        {% if meta_props.title %}
+            <title>{{ meta_props.title }}</title>
+        {% else %}
+            <meta {% for key, value in meta_props.items() %}{{ key }}="{{ value }}" {% endfor %}/>
+        {% endif %}
+    {% endfor %}
+</head>
+<body>
+<div id="gooey-embed"></div>
+<script src="lib.js"></script>
+<script>
+    GooeyEmbed.mount({ mode: "fullscreen"});
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import inspect
 import math
 import typing
 import uuid
-from copy import deepcopy
+from copy import deepcopy, copy
 from enum import Enum
 from itertools import pairwise
 from random import Random
@@ -175,8 +175,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-            else:
-                run_slug = "example"
 
         query_params = cls.clean_query_params(
             example_id=None, run_id=run_id, uid=uid
@@ -1201,8 +1199,8 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
+    @staticmethod
     def render_author(
-        self,
         user: AppUser,
         *,
         image_size: str = "30px",
@@ -1264,7 +1262,9 @@ class BasePage:
             return "/account/"
 
     def get_submit_container_props(self):
-        return dict(className="position-sticky bottom-0 bg-white")
+        return dict(
+            className="position-sticky bottom-0 bg-white", style=dict(zIndex=100)
+        )
 
     def render_submit_button(self, key="--submit-1"):
         with st.div(**self.get_submit_container_props()):
@@ -1638,6 +1638,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         state = sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
+        for k, v in self.RequestModel.schema()["properties"].items():
+            try:
+                state.setdefault(k, copy(v["default"]))
+            except KeyError:
+                pass
         for k, v in self.sane_defaults.items():
             state.setdefault(k, v)
         return state
@@ -1682,7 +1687,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             .order_by("-example_priority", "-updated_at")[:50]
         )
 
-        grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
+        grid_layout(3, example_runs, _render)
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -1846,7 +1851,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if published_run.notes:
-            st.caption(published_run.notes)
+            st.caption(published_run.notes, line_clamp=2)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)

@@ -246,7 +246,7 @@ class LetterWriterPage(BasePage):
             body = None
 
         r = requests.request(method=method, url=url, headers=headers, json=body)
-        raise_for_status(r)
+        raise_for_status(r, is_user_url=True)
         response_json = r.json()
 
         state["response_json"] = response_json

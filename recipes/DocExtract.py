@@ -2,6 +2,7 @@ import random
 import threading
 import typing
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
@@ -73,14 +74,14 @@ class DocExtractPage(BasePage):
     price = 500
 
     class RequestModel(BaseModel):
-        documents: list[str]
+        documents: list[FieldHttpUrl]
 
-        sheet_url: str | None
+        sheet_url: FieldHttpUrl | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
-        glossary_document: str | None
+        glossary_document: FieldHttpUrl | None
 
         task_instructions: str | None
 
@@ -305,7 +306,7 @@ def extract_info(url: str) -> list[dict | None]:
                 headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                 timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
             )
-            raise_for_status(r)
+            raise_for_status(r, is_user_url=True)
             f_bytes = r.content
             content_url = url
         num_pages = get_pdf_num_pages(f_bytes)
