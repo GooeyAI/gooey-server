@@ -378,3 +378,11 @@ WEB_WIDGET_LIB = config(
     "WEB_WIDGET_LIB",
     "https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@2/dist/lib.js",
 )
+
+MAX_CONCURRENCY_ANON = config("MAX_CONCURRENCY_ANON", 1, cast=int)
+MAX_CONCURRENCY_FREE = config("MAX_CONCURRENCY_FREE", 2, cast=int)
+MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
+
+MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
+MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
+MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)

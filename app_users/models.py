@@ -129,6 +129,8 @@ class AppUser(models.Model):
     github_username = models.CharField(max_length=255, blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
 
+    disable_rate_limits = models.BooleanField(default=False)
+
     objects = AppUserQuerySet.as_manager()
 
     def __str__(self):
