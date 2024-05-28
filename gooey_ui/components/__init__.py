@@ -759,10 +759,6 @@ def text_input(
     return value or ""
 
 
-def tooltip(text: str, **props):
-    return _node("tooltip", text=text, **props)
-
-
 def date_input(
     label: str,
     value: str | None = None,

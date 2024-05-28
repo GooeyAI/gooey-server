@@ -40,10 +40,7 @@ def document_uploader(
     accept_multiple_files=True,
     tooltip: str | None = None,
 ) -> list[str] | str:
-    with st.div(style={"display": "flex"}):
-        st.write(label, className="gui-input", unsafe_allow_html=True)
-        if tooltip:
-            st.tooltip(tooltip)
+    st.write(label, tooltip=tooltip, unsafe_allow_html=True)
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
