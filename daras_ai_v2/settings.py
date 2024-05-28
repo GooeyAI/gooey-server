@@ -296,9 +296,8 @@ LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
-STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
-    "STRIPE_PRODUCT_IDS",
-    cast=json.loads,
+STRIPE_ADDON_PRODUCT_NAME = config(
+    "STRIPE_ADDON_PRODUCT_NAME", "Gooey.AI Add-on Credits"
 )
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
@@ -306,10 +305,7 @@ PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
 PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
 PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
-PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
-    "PAYPAL_PLAN_IDS",
-    cast=json.loads,
-)
+PAYPAL_DEFAULT_PRODUCT_NAME: str = config("PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits")  # type: ignore
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 

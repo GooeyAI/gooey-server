@@ -281,7 +281,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
-            if not new_plan.stripe:
+            if not new_plan.monthly_charge:
                 return JSONResponse(
                     {
                         "message": f"Stripe subscription not available for {new_plan}",
@@ -296,7 +296,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                 subscription.id,
                 items=[
                     {"id": subscription["items"].data[0], "deleted": True},
-                    new_plan.stripe.copy(),
+                    new_plan.get_stripe_line_item(),
                 ],
                 metadata={
                     settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
@@ -305,7 +305,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
             return RedirectResponse(payment_processing_url, status_code=303)
 
         case PaymentProvider.PAYPAL:
-            if not new_plan.paypal:
+            if not new_plan.monthly_charge:
                 return JSONResponse(
                     {
                         "message": f"Paypal subscription not available for {new_plan}",
@@ -316,8 +316,10 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
             subscription = paypal.Subscription.retrieve(
                 request.user.subscription.external_id
             )
+            paypal_plan_info = new_plan.get_paypal_plan()
             approval_url = subscription.update_plan(
-                plan_id=new_plan.paypal["plan_id"], plan=new_plan.paypal.get("plan", {})
+                plan_id=paypal_plan_info["plan_id"],
+                plan=paypal_plan_info["plan"],
             )
             return RedirectResponse(approval_url, status_code=303)
         case _:

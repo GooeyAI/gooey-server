@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from furl import furl
 
-from .plans import PricingPlan
+from .plans import PricingPlan, stripe_get_addon_product
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 
@@ -259,7 +259,7 @@ class Subscription(models.Model):
             invoice=invoice,
             price_data={
                 "currency": "usd",
-                "product": settings.STRIPE_PRODUCT_IDS["addon"],
+                "product": stripe_get_addon_product().id,
                 "unit_amount_decimal": (
                     settings.ADDON_CREDITS_PER_DOLLAR / 100
                 ),  # in cents

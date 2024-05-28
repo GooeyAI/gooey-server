@@ -11,7 +11,7 @@ client = TestClient(app)
 def test_create_checkout_session(
     plan: PricingPlan, transactional_db, force_authentication
 ):
-    if not plan.stripe:
+    if not plan.monthly_charge:
         return
 
     form_data = {"lookup_key": plan.key}

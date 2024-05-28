@@ -31,8 +31,8 @@ def create_checkout_session(
         )
 
     lookup_key: str = body_form["lookup_key"]
-    if (plan := PricingPlan.get_by_key(lookup_key)) and plan.stripe:
-        line_item = plan.stripe.copy()
+    if plan := PricingPlan.get_by_key(lookup_key):
+        line_item = plan.get_stripe_line_item()
     else:
         return JSONResponse(
             {

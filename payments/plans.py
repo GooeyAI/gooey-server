@@ -3,17 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
+from typing import Any
 
 import stripe
 
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
-from daras_ai_v2 import settings
+from daras_ai_v2 import paypal, settings
 
 
 STRIPE_PRODUCT_NAMES = {
     "basic": "Gooey.AI Basic Plan",
     "premium": "Gooey.AI Premium Plan",
 }
+REVERSE_STRIPE_PRODUCT_NAMES = {v: k for k, v in STRIPE_PRODUCT_NAMES.items()}
 
 
 @dataclass(frozen=True)
@@ -25,8 +27,6 @@ class PricingData:
     credits: int
     long_description: str = ""
     deprecated: bool = False
-    stripe: dict | None = None
-    paypal: dict | None = None
     contact_us_link: str | None = None  # For Special/Enterprise plans
     _pricing_title: str | None = None
     _pricing_caption: str | None = None
@@ -54,14 +54,6 @@ class PricingPlan(PricingData, Enum):
             "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
             "credits": 1_500,
             "monthly_charge": 10,  # USD
-            "stripe": make_stripe_recurring_plan(
-                product_name=STRIPE_PRODUCT_NAMES["basic"],
-                credits=1_500,
-                amount=10,
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["basic"], credits=1_500, amount=10
-            ),
             "deprecated": True,
         },
     )
@@ -73,16 +65,6 @@ class PricingPlan(PricingData, Enum):
             "description": "10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable [videobots](/video-bots/)",
             "credits": 10_000,
             "monthly_charge": 50,  # USD
-            "stripe": make_stripe_recurring_plan(
-                product_name=STRIPE_PRODUCT_NAMES["premium"],
-                credits=10_000,
-                amount=50,
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["premium"],
-                credits=10_000,
-                amount=50,
-            ),
             "deprecated": True,
             "_pricing_caption": "10,000 Credits / month + Bots",
         },
@@ -153,16 +135,6 @@ class PricingPlan(PricingData, Enum):
                 </ul>
             """
             ),
-            "stripe": make_stripe_recurring_plan(
-                product_id=settings.STRIPE_PRODUCT_IDS["creator"],
-                credits=2_000,
-                amount=20,
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["creator"],
-                credits=2_000,
-                amount=20,
-            ),
         },
     )
 
@@ -194,16 +166,6 @@ class PricingPlan(PricingData, Enum):
                   <li>Premium Support via Slack</li>
                 </ul>
             """
-            ),
-            "stripe": make_stripe_recurring_plan(
-                product_id=settings.STRIPE_PRODUCT_IDS["business"],
-                credits=20_000,
-                amount=199,
-            ),
-            "paypal": make_paypal_recurring_plan(
-                plan_id=settings.PAYPAL_PLAN_IDS["business"],
-                credits=20_000,
-                amount=199,
             ),
         },
     )
@@ -273,18 +235,17 @@ class PricingPlan(PricingData, Enum):
 
     @classmethod
     def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
+        if product.name in REVERSE_STRIPE_PRODUCT_NAMES:
+            return cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
+
         for plan in cls:
-            if plan.stripe and (
-                plan.stripe["price_data"].get("product") == product.id
-                or plan.stripe["price_data"].get("product_data", {}).get("name")
-                == product.name
-            ):
+            if plan.monthly_charge and plan.get_stripe_product_id() == product.id:
                 return plan
 
     @classmethod
     def get_by_paypal_plan_id(cls, plan_id: str) -> PricingPlan | None:
         for plan in cls:
-            if plan.paypal and plan.paypal["plan_id"] == plan_id:
+            if plan.monthly_charge and plan.get_paypal_plan_id() == plan_id:
                 return plan
 
     @classmethod
@@ -292,3 +253,113 @@ class PricingPlan(PricingData, Enum):
         for plan in cls:
             if plan.key == key:
                 return plan
+
+    def get_stripe_line_item(self) -> dict[str, Any]:
+        if not self.monthly_charge:
+            raise ValueError(f"Can't bill {self.title} via Stripe")
+
+        if self.key in STRIPE_PRODUCT_NAMES:
+            # via product_name
+            return make_stripe_recurring_plan(
+                product_name=STRIPE_PRODUCT_NAMES[self.key],
+                credits=self.credits,
+                amount=self.monthly_charge,
+            )
+        else:
+            # via product_id
+            return make_stripe_recurring_plan(
+                product_id=self.get_stripe_product_id(),
+                credits=self.credits,
+                amount=self.monthly_charge,
+            )
+
+    def get_paypal_plan(self) -> dict[str, Any]:
+        if not self.monthly_charge:
+            raise ValueError(f"Can't bill {self.title} via PayPal")
+
+        return make_paypal_recurring_plan(
+            plan_id=self.get_paypal_plan_id(),
+            credits=self.credits,
+            amount=self.monthly_charge,
+        )
+
+    def get_stripe_product_id(self) -> str:
+        for product in stripe.Product.list(expand=["data.default_price"]).data:
+            if product.default_price.unit_amount == self.monthly_charge * 100:  # cents
+                return product.id
+
+        product = stripe.Product.create(
+            name=self.title,
+            description=self.description,
+            default_price_data={
+                "currency": "usd",
+                "unit_amount": self.monthly_charge * 100,
+                "recurring": {"interval": "month"},
+            },
+        )
+        return product.id
+
+    def get_paypal_plan_id(self) -> str:
+        product_id = paypal_get_or_create_default_product().id
+
+        for plan in paypal.Plan.list(list_all=True):
+            if plan.status != "ACTIVE":
+                continue
+
+            plan = paypal.Plan.retrieve(plan.id)
+            if value := plan.billing_cycles and plan.billing_cycles[0].get(
+                "pricing_scheme", {}
+            ).get("fixed_price", {}).get("value", ""):
+                assert isinstance(value, str)
+                if float(value) == float(self.monthly_charge):
+                    return plan.id
+
+        plan = paypal.Plan.create(
+            product_id=product_id,
+            name=self.title,
+            description=self.description,
+            billing_cycles=[
+                {
+                    "tenure_type": "REGULAR",
+                    "pricing_scheme": {
+                        "fixed_price": {
+                            "value": str(self.monthly_charge),
+                            "currency_code": "USD",
+                        },
+                    },
+                    "sequence": 1,
+                    "total_cycles": 0,
+                    "frequency": {
+                        "interval_unit": "MONTH",
+                        "interval_count": 1,
+                    },
+                }
+            ],
+            payment_preferences={},
+        )
+        return plan.id
+
+
+def paypal_get_or_create_default_product() -> paypal.Product:
+    for product in paypal.Product.list():
+        if product.name == settings.PAYPAL_DEFAULT_PRODUCT_NAME:
+            return product
+
+    product = paypal.Product.create(
+        name=settings.PAYPAL_DEFAULT_PRODUCT_NAME,
+        type="DIGITAL",
+        description="Credits for using Gooey.AI",
+    )
+    return product
+
+
+def stripe_get_addon_product() -> stripe.Product:
+    for product in stripe.Product.list():
+        if product.name == settings.STRIPE_ADDON_PRODUCT_NAME:
+            return product
+
+    product = stripe.Product.create(
+        name=settings.STRIPE_ADDON_PRODUCT_NAME,
+        description="Credits for using Gooey.AI",
+    )
+    return product

@@ -328,7 +328,7 @@ def render_stripe_subscription_button(
     className: str = "streamlit-like-btn",
     type: str = "primary",
 ):
-    if not plan.stripe:
+    if not plan.monthly_charge:
         st.write("Stripe subscription not available")
         return
 
@@ -347,7 +347,7 @@ def render_paypal_subscription_button(
     *,
     plan: PricingPlan,
 ):
-    if not plan.paypal:
+    if not plan.monthly_charge:
         st.write("Paypal subscription not available")
         return
 

@@ -123,7 +123,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
 
     lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
-    if plan is None or not plan.paypal:
+    if plan is None or not plan.monthly_charge:
         return JSONResponse(
             {"error": "Invalid plan key or not supported by PayPal"}, status_code=400
         )
@@ -136,10 +136,11 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
             {"error": "User already has an active subscription"}, status_code=400
         )
 
+    paypal_plan_info = plan.get_paypal_plan()
     pp_subscription = paypal.Subscription.create(
-        plan_id=plan.paypal["plan_id"],
+        plan_id=paypal_plan_info["plan_id"],
         custom_id=request.user.uid,
-        plan=plan.paypal and plan.paypal.get("plan", {}),
+        plan=paypal_plan_info.get("plan", {}),
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
