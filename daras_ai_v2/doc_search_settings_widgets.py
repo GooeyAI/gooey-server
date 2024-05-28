@@ -38,8 +38,12 @@ def document_uploader(
     key: str = "documents",
     accept: typing.Iterable[str] = None,
     accept_multiple_files=True,
+    tooltip: str | None = None,
 ) -> list[str] | str:
-    st.write(label, className="gui-input", unsafe_allow_html=True)
+    with st.div(style={"display": "flex"}):
+        st.write(label, className="gui-input", unsafe_allow_html=True)
+        if tooltip:
+            st.tooltip(tooltip)
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]

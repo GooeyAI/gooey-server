@@ -323,6 +323,8 @@ def text_area(
     placeholder: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    tooltip: str | None = None,
+    reverse_tooltip: bool = False,
     **props,
 ) -> str:
     style = props.setdefault("style", {})
@@ -359,6 +361,8 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
+            tooltip=tooltip,
+            tooltip_direction="left" if reverse_tooltip else "right",
             **props,
         ),
     ).mount()
@@ -755,6 +759,10 @@ def text_input(
     return value or ""
 
 
+def tooltip(text: str, **props):
+    return _node("tooltip", text=text, **props)
+
+
 def date_input(
     label: str,
     value: str | None = None,
@@ -882,6 +890,7 @@ def checkbox(
     key: str = None,
     help: str = None,
     *,
+    tooltip: str | None = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
 ) -> bool:
@@ -894,6 +903,7 @@ def checkbox(
         disabled=disabled,
         label_visibility=label_visibility,
         default_value_attr="defaultChecked",
+        tooltip=tooltip,
     )
     return bool(value)
 
@@ -908,6 +918,7 @@ def _input_widget(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value_attr: str = "defaultValue",
+    tooltip: str | None = None,
     **kwargs,
 ) -> typing.Any:
     # if key:
@@ -927,6 +938,7 @@ def _input_widget(
             default_value_attr: value,
             "help": help,
             "disabled": disabled,
+            "tooltip": tooltip,
             **kwargs,
         },
     ).mount()
@@ -978,15 +990,3 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
-
-
-def tooltip(text: str):
-    """Usage: st.markdown(f'Some text that needs a tooltip. {st.tooltip("The tooltip text")}')"""
-    return f"""<span style="position: relative; font-size: 16px">
-        <i role="button" onclick="this.nextElementSibling.show(); event.preventDefault()" class="fa-regular fa-circle-info"></i>
-        <dialog onblur="setTimeout(() => this.close(), 200)" style="width: max-content; max-width: 50vw; z-index: 10000; border-radius: 16px; border: 2px solid whitesmoke; font-weight: lighter; line-height: normal; font-family: basiercircle, sans-serif; box-shadow: rgba(149, 157, 165, 0.2) 0px 8px 24px;">
-            <input style="width: 0; height: 0; min-width: 0; border: 0; outline: 0; padding: 0; margin: 0"></input>{text}
-        </dialog>
-    </span>""".replace(
-        "\n", ""
-    )  # must not have newlines to work in markdown
