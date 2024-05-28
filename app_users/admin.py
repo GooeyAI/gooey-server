@@ -47,6 +47,7 @@ class AppUserAdmin(admin.ModelAdmin):
     list_display = [
         "uid",
         "user_handle",
+        "user_subscription",
         "display_name",
         "email",
         "phone_number",
@@ -80,6 +81,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_firebase",
         "open_in_stripe",
         "low_balance_email_sent_at",
+        "user_subscription",
     ]
 
     @admin.display(description="User Runs")
@@ -97,6 +99,15 @@ class AppUserAdmin(admin.ModelAdmin):
             return change_obj_url(
                 user.handle,
                 label=str(user.handle),
+            )
+        return None
+
+    @admin.display(description="User Subscription")
+    def user_subscription(self, user: models.AppUser):
+        if user.subscription:
+            return change_obj_url(
+                user.subscription,
+                label=str(user.subscription),
             )
         return None
 
