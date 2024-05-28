@@ -336,6 +336,7 @@ class SavedRun(models.Model):
         *,
         current_user: AppUser,
         request_body: dict,
+        enable_rate_limits: bool = False,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -350,6 +351,7 @@ class SavedRun(models.Model):
                     ),
                     user=current_user,
                     request_body=request_body,
+                    enable_rate_limits=enable_rate_limits,
                 ),
             )
         return result, page.run_doc_sr(run_id, uid)

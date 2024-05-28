@@ -35,6 +35,7 @@ class AppUserAdmin(admin.ModelAdmin):
                     "stripe_customer_id",
                     "is_paying",
                     "disable_safety_checker",
+                    "disable_rate_limits",
                     "created_at",
                     "upgraded_from_anonymous_at",
                     "open_in_firebase",

@@ -58,6 +58,7 @@ from daras_ai_v2.query_params import (
 from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
+from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.user_date_widgets import (
     render_local_dt_attrs,
@@ -1507,6 +1508,12 @@ class BasePage:
         pass
 
     def on_submit(self):
+        try:
+            ensure_rate_limits(self.workflow, self.request.user)
+        except RateLimitExceeded as e:
+            st.session_state[StateKeys.run_status] = None
+            st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
+            return
         example_id, run_id, uid = self.create_new_run()
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
