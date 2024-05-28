@@ -10,8 +10,8 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
 class LipsyncModel(Enum):
-    Wav2Lip = "SD (Rudrabha/Wav2Lip)"
-    SadTalker = "HD (OpenTalker/SadTalker)"
+    Wav2Lip = "SD"
+    SadTalker = "HD: SadTalker"
 
 
 class SadTalkerSettings(BaseModel):
