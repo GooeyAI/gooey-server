@@ -50,12 +50,14 @@ class PricingPlan(PricingData, Enum):
         1,
         {
             "key": "basic",
-            "title": "$10/month",
+            "title": "Basic Plan",
             "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
             "credits": 1_500,
             "monthly_charge": 10,  # USD
             "stripe": make_stripe_recurring_plan(
-                product_name=STRIPE_PRODUCT_NAMES["basic"], credits=1_500, amount=10
+                product_name=STRIPE_PRODUCT_NAMES["basic"],
+                credits=1_500,
+                amount=10,
             ),
             "paypal": make_paypal_recurring_plan(
                 plan_id=settings.PAYPAL_PLAN_IDS["basic"], credits=1_500, amount=10
@@ -67,7 +69,7 @@ class PricingPlan(PricingData, Enum):
         2,
         {
             "key": "premium",
-            "title": "$50/month + Bots",
+            "title": "Premium Plan",
             "description": "10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable [videobots](/video-bots/)",
             "credits": 10_000,
             "monthly_charge": 50,  # USD
@@ -82,6 +84,7 @@ class PricingPlan(PricingData, Enum):
                 amount=50,
             ),
             "deprecated": True,
+            "_pricing_caption": "10,000 Credits / month + Bots",
         },
     )
 
