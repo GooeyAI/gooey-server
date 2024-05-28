@@ -3,6 +3,8 @@
 
     ## Context required:
     - redirect_url: str
+    - text: str = "Processing Payment..." default
+    - subtext: str = "" default
     - waiting_time: int (seconds) = 3 default
 #}
 
@@ -98,12 +100,17 @@
 <section class="my-5 d-flex justify-content-center align-items-center" style="min-height: 50vh">
     <!-- spinner from loading.io: https://loading.io/css/ -->
     <div class="lds-spinner me-4"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
-    <h1>Processing Payment...</h1>
+    <div>
+      <h1>{{ text | default("Processing Payment...") }}</h1>
+        {% if subtext %}
+        <p class="text-muted text-center">{{ subtext }}</p>
+        {% endif %}
+    </div>
 </section>
 
 <script>
 const redirectUrl = "{{ redirect_url }}";
-const waitingTime = {{ waitingTime | default(3) }};
+const waitingTime = {{ waiting_time | default(3) }};
 
 setTimeout(() => {
     window.location.href = redirectUrl;

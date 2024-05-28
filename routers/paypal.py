@@ -21,6 +21,11 @@ from payments.models import PricingPlan, Subscription
 from routers.billing import send_monthly_spending_notification_email
 
 
+payment_processing_url = str(
+    furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
+)
+account_url = str(furl(settings.APP_BASE_URL) / "account" / "v2" / "/")
+
 router = APIRouter()
 
 
@@ -139,8 +144,8 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
-            "return_url": str(furl(settings.APP_BASE_URL) / "payment-processing" / "/"),
-            "cancel_url": str(furl(settings.APP_BASE_URL) / "account" / "/"),
+            "return_url": payment_processing_url,
+            "cancel_url": account_url,
         },
     )
     return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
@@ -166,7 +171,7 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
             _handle_sale_completed(event)
         case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
             event = SubscriptionEvent.parse_obj(event)
-            _handle_subscription_updated(event.resource)
+            handle_subscription_updated(event.resource)
         case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
             event = SubscriptionEvent.parse_obj(event)
             _handle_subscription_cancelled(event.resource)
@@ -257,7 +262,7 @@ def _handle_sale_completed(event: SaleCompletedEvent):
 
 
 @transaction.atomic
-def _handle_subscription_updated(subscription: paypal.Subscription):
+def handle_subscription_updated(subscription: paypal.Subscription):
     logger.info("Subscription updated")
 
     plan = PricingPlan.get_by_paypal_plan_id(subscription.plan_id)
