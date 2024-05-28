@@ -1,13 +1,15 @@
 import typing
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from enum import Enum
-from urllib.parse import quote_plus
 
 import stripe
+from django.db import transaction
 from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
+from loguru import logger
 from starlette.datastructures import FormData
 
 import gooey_ui as st
@@ -15,8 +17,8 @@ from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import (
-    fastapi_request_body,
     fastapi_request_form,
     get_route_url,
 )
@@ -24,116 +26,40 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
+from payments.models import Subscription
 from payments.plans import PricingPlan
-from routers.billing_v2 import (
-    BILLING_VERSION_KEY,
-    BILLING_VERSION_V2,
-    billing_v2_tab,
-    handle_checkout_session_completed,
-    handle_subscription_updated,
-    handle_subscription_cancelled,
-    send_monthly_spending_notification_email,
-)
-from routers.paypal import (
-    handle_subscription_updated as paypal_handle_subscription_updated,
-)
 from routers.root import page_wrapper, get_og_url_path
-
-USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 app = APIRouter()
 
-available_subscriptions = {
-    "addon": {
-        "display": {
-            "name": "Add-on",
-            "title": "Top up Credits",
-            "description": f"Buy a one-time top up @ {settings.ADDON_CREDITS_PER_DOLLAR} Credits per dollar.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Add-on Credits",
-                },
-                "unit_amount_decimal": (
-                    settings.ADDON_CREDITS_PER_DOLLAR / 100
-                ),  # in cents
-            },
-            # "quantity": 1000,  # number of credits (set by html)
-            "adjustable_quantity": {
-                "enabled": True,
-                "maximum": 50_000,
-                "minimum": 1_000,
-            },
-        },
-    },
-    "basic": {
-        "display": {
-            "name": "Basic Plan",
-            "title": "$10/Month",
-            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Basic Plan",
-                },
-                "unit_amount_decimal": 0.6666,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 1500,  # number of credits
-        },
-    },
-    "premium": {
-        "display": {
-            "name": "Premium Plan",
-            "title": "$50/month + Bots",
-            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Premium Plan",
-                },
-                "unit_amount_decimal": 0.5,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 10000,  # number of credits
-        },
-    },
-    #
-    # just for testing
-    #
-    # "daily": {
-    #     "display": {
-    #         "name": "Daily Plan",
-    #         "title": "DAILY @ $1",
-    #         "description": "100 credits everyday.",
-    #     },
-    #     "stripe": {
-    #         "price_data": {
-    #             "currency": "usd",
-    #             "product_data": {
-    #                 "name": "Gooey.AI Daily Plan",
-    #             },
-    #             "unit_amount": 1,  # in cents
-    #             "recurring": {
-    #                 "interval": "day",
-    #             },
-    #         },
-    #         "quantity": 100,  # number of credits
-    #     },
-    # },
-}
+
+@app.post(settings.PAYMENT_PROCESSING_PAGE_PATH)
+@st.route
+def payment_processing_route(request: Request):
+    context = {
+        "request": request,
+        "settings": settings,
+        "redirect_url": account_url,
+    }
+
+    if request.query_params.get("provider") == "paypal":
+        if sub_id := request.query_params.get("subscription_id"):
+            sub = paypal.Subscription.retrieve(sub_id)
+            paypal_handle_subscription_updated(sub)
+        else:
+            context["subtext"] = (
+                "PayPal transactions take up to a minute to reflect in your account..."
+            )
+            context["waiting_time"] = 30  # seconds
+
+    with page_wrapper(request):
+        st.html(templates.get_template("payment_processing.html").render(**context))
+    return dict(
+        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
+    )
 
 
 @app.post("/account/")
@@ -153,21 +79,12 @@ def account_route(request: Request):
     )
 
 
-@app.post("/account/v2/")
-@st.route
-def account_v2_route(request: Request):
-    with account_page_wrapper(request, AccountTabs.billing_v2):
-        billing_v2_tab(request)
-    url = get_og_url_path(request)
-    return dict(
-        meta=raw_build_meta_tags(
-            url=url,
-            canonical_url=url,
-            title="Billing • Gooey.AI",
-            description="Your billing details.",
-            robots="noindex,nofollow",
-        )
-    )
+payment_processing_url = str(
+    furl(settings.APP_BASE_URL) / app.url_path_for(payment_processing_route.__name__)
+)
+account_url = str(
+    furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
+)
 
 
 @app.post("/account/profile/")
@@ -224,14 +141,10 @@ def api_keys_route(request: Request):
 class TabData(typing.NamedTuple):
     title: str
     route: typing.Callable
-    hidden: bool = False
 
 
 class AccountTabs(TabData, Enum):
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
-    billing_v2 = TabData(
-        title=f"{icons.billing} Billing V2", route=account_v2_route, hidden=True
-    )
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
@@ -242,23 +155,7 @@ class AccountTabs(TabData, Enum):
 
 
 def billing_tab(request: Request):
-    if not request.user or request.user.is_anonymous:
-        next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        return RedirectResponse(str(redirect_url))
-
-    is_admin = request.user.email in settings.ADMIN_EMAILS
-
-    context = {
-        "request": request,
-        "settings": settings,
-        "available_subscriptions": available_subscriptions,
-        "user_credits": request.user.balance,
-        "subscription": get_user_subscription(request.user),
-        "is_admin": is_admin,
-    }
-
-    st.html(templates.get_template("account.html").render(**context))
+    return billing_page(request.user)
 
 
 def profile_tab(request: Request):
@@ -321,113 +218,11 @@ def account_page_wrapper(request: Request, current_tab: TabData):
         st.div(className="mt-5")
         with st.nav_tabs():
             for tab in AccountTabs:
-                if tab.hidden:
-                    continue
                 with st.nav_item(tab.url_path, active=tab == current_tab):
                     st.html(tab.title)
 
         with st.nav_tab_content():
             yield
-
-
-@app.post("/__/stripe/create-checkout-session")
-def create_checkout_session(
-    request: Request, body_form: FormData = fastapi_request_form
-):
-    lookup_key = body_form["lookup_key"]
-    subscription = available_subscriptions[lookup_key]
-    line_item = subscription["stripe"].copy()
-
-    quantity = body_form.get("quantity")
-    if quantity:
-        line_item["quantity"] = int(quantity)
-
-    if get_user_subscription(request.user) == subscription:
-        # already subscribed
-        return RedirectResponse("/", status_code=303)
-
-    metadata = {USER_SUBSCRIPTION_METADATA_FIELD: lookup_key}
-
-    try:
-        # check if recurring payment
-        line_item["price_data"]["recurring"]
-    except KeyError:
-        mode = "payment"
-        invoice_creation = {"enabled": True}
-        subscription_data = None  # can't pass subscription_data in payment mode
-    else:
-        mode = "subscription"
-        invoice_creation = None  # invoice automatically genearated in subscription mode
-        subscription_data = {"metadata": metadata}
-
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[line_item],
-        mode=mode,
-        success_url=payment_success_url,
-        cancel_url=account_url,
-        customer=request.user.get_or_create_stripe_customer(),
-        metadata=metadata,
-        subscription_data=subscription_data,
-        invoice_creation=invoice_creation,
-        allow_promotion_codes=True,
-    )
-
-    return RedirectResponse(checkout_session.url, status_code=303)
-
-
-@app.post("/__/stripe/create-checkout-session-v2")
-def create_checkout_session_v2(
-    request: Request, body_form: FormData = fastapi_request_form
-):
-    if not request.user:
-        return RedirectResponse(
-            request.url_for("login", query_params={"next": request.url.path})
-        )
-
-    lookup_key: str = body_form["lookup_key"]
-    if (plan := PricingPlan.get_by_key(lookup_key)) and plan.stripe:
-        line_item = plan.stripe.copy()
-    else:
-        return JSONResponse(
-            {
-                "message": "Invalid plan lookup key",
-            }
-        )
-
-    if request.user.subscription and request.user.subscription.plan == plan.value:
-        # already subscribed to the same plan
-        return RedirectResponse("/", status_code=303)
-
-    metadata = {
-        USER_SUBSCRIPTION_METADATA_FIELD: lookup_key,
-        BILLING_VERSION_KEY: BILLING_VERSION_V2,
-    }
-
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[line_item],
-        mode="subscription",
-        success_url=payment_processing_url,
-        cancel_url=account_url,
-        customer=request.user.get_or_create_stripe_customer(),
-        metadata=metadata,
-        subscription_data={"metadata": metadata},
-        allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
-    )
-
-    return RedirectResponse(checkout_session.url, status_code=303)
-
-
-@app.post("/__/stripe/create-portal-session")
-def customer_portal(request: Request):
-    customer = request.user.get_or_create_stripe_customer()
-    portal_session = stripe.billing_portal.Session.create(
-        customer=customer,
-        return_url=account_url,
-    )
-    return RedirectResponse(portal_session.url, status_code=303)
 
 
 @app.get("/__/billing/change-payment-method")
@@ -504,8 +299,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                     new_plan.stripe.copy(),
                 ],
                 metadata={
-                    USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
-                    BILLING_VERSION_KEY: BILLING_VERSION_V2,
+                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
                 },
             )
             return RedirectResponse(payment_processing_url, status_code=303)
@@ -535,132 +329,64 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
             )
 
 
-@app.get("/payment-success/")
-def payment_success(request: Request):
-    context = {"request": request, "settings": settings}
-    return templates.TemplateResponse("payment_success.html", context)
-
-
-@app.post(settings.PAYMENT_PROCESSING_PAGE_PATH)
-@st.route
-def payment_processing(request: Request):
-    context = {
-        "request": request,
-        "settings": settings,
-        "redirect_url": account_v2_url,
-    }
-
-    if request.query_params.get("provider") == "paypal":
-        if sub_id := request.query_params.get("subscription_id"):
-            sub = paypal.Subscription.retrieve(sub_id)
-            paypal_handle_subscription_updated(sub)
-        else:
-            context["subtext"] = (
-                "PayPal transactions take up to a minute to reflect in your account..."
-            )
-            context["waiting_time"] = 30  # seconds
-
-    with page_wrapper(request):
-        st.html(templates.get_template("payment_processing.html").render(**context))
-    return dict(
-        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
+@transaction.atomic
+def send_monthly_spending_notification_email(user: AppUser):
+    assert (
+        user.subscription and user.subscription.monthly_spending_notification_threshold
     )
 
-
-payment_success_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(payment_success.__name__)
-)
-payment_processing_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(payment_processing.__name__)
-)
-account_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
-)
-account_v2_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(account_v2_route.__name__)
-)
-
-
-@app.post("/__/stripe/webhook")
-def webhook_received(request: Request, payload: bytes = fastapi_request_body):
-    # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
-    event = stripe.Webhook.construct_event(
-        payload=payload,
-        sig_header=request.headers["stripe-signature"],
-        secret=settings.STRIPE_ENDPOINT_SECRET,
-    )
-
-    data = event.data.object
-
-    customer = stripe.Customer.retrieve(data.customer)
-    try:
-        uid = customer.metadata.uid
-    except AttributeError:
-        uid = None
-    if not uid:
-        return JSONResponse(
-            {
-                "status": "failed",
-                "error": "customer.metadata.uid not found",
-            },
-            status_code=400,
-        )
-
-    # Get the type of webhook event sent - used to check the status of PaymentIntents.
-    match event["type"]:
-        case "invoice.paid":
-            _handle_invoice_paid(uid, data)
-        # v2 ...
-        case "checkout.session.completed":
-            handle_checkout_session_completed(uid, data)
-        case "customer.subscription.created" | "customer.subscription.updated":
-            handle_subscription_updated(uid, data)
-        case "customer.subscription.deleted":
-            handle_subscription_cancelled(uid, data)
-
-    return JSONResponse({"status": "success"})
-
-
-def _handle_invoice_paid(uid: str, invoice_data):
-    invoice_id = invoice_data.id
-    line_items = stripe.Invoice._static_request(
-        "get",
-        "/v1/invoices/{invoice}/lines".format(invoice=quote_plus(invoice_id)),
-    )
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(
-        payment_provider=PaymentProvider.STRIPE,
-        invoice_id=invoice_id,
-        amount=line_items.data[0].quantity,
-        charged_amount=line_items.data[0].amount,
-    )
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])
-    if (
-        user.subscription
-        and user.subscription.should_send_monthly_spending_notification()
-    ):
-        send_monthly_spending_notification_email(user)
-
-
-@app.post("/__/stripe/cancel-subscription")
-def cancel_subscription(request: Request):
-    customer = request.user.get_or_create_stripe_customer()
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        stripe.Subscription.delete(sub.id)
-    return RedirectResponse("/account/", status_code=303)
-
-
-def get_user_subscription(user: AppUser):
-    customer = user.search_stripe_customer()
-    if not customer:
+    if not user.email:
+        logger.error(f"User doesn't have an email: {user=}")
         return
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        try:
-            lookup_key = sub.metadata[USER_SUBSCRIPTION_METADATA_FIELD]
-            return available_subscriptions[lookup_key]
-        except KeyError:
-            pass
+
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email,
+        subject=f"[Gooey.AI] Monthly spending has exceeded ${user.subscription.monthly_spending_notification_threshold}",
+        html_body=templates.get_template(
+            "monthly_spending_notification_threshold_email.html"
+        ).render(
+            user=user,
+            account_url=account_url,
+        ),
+    )
+
+    user.subscription.monthly_spending_notification_sent_at = datetime.now(
+        tz=timezone.utc
+    )
+    user.subscription.save(update_fields=["monthly_spending_notification_sent_at"])
+
+
+@transaction.atomic
+def paypal_handle_subscription_updated(subscription: paypal.Subscription):
+    logger.info("Subscription updated")
+
+    plan = PricingPlan.get_by_paypal_plan_id(subscription.plan_id)
+    if not plan:
+        logger.error(f"Invalid plan ID: {subscription.plan_id}")
+        return
+
+    if not subscription.status == "ACTIVE":
+        logger.warning(f"Subscription {subscription.id} is not active")
+        return
+
+    user = AppUser.objects.get(uid=subscription.custom_id)
+    if user.subscription and (
+        user.subscription.payment_provider != PaymentProvider.PAYPAL
+        or user.subscription.external_id != subscription.id
+    ):
+        logger.warning(
+            f"User {user} has different existing subscription {user.subscription}. Cancelling that..."
+        )
+        user.subscription.cancel()
+        user.subscription.delete()
+    elif not user.subscription:
+        user.subscription = Subscription()
+
+    user.subscription.plan = plan.value
+    user.subscription.payment_provider = PaymentProvider.PAYPAL
+    user.subscription.external_id = subscription.id
+
+    user.subscription.full_clean()
+    user.subscription.save()
+    user.save(update_fields=["subscription"])

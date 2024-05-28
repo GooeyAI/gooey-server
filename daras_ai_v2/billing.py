@@ -18,7 +18,7 @@ from payments.plans import PricingPlan
 payment_processing_url = str(
     furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
 )
-stripe_create_checkout_session_url = "/__/stripe/create-checkout-session-v2"
+stripe_create_checkout_session_url = "/__/stripe/create-checkout-session"
 change_subscription_url = "/__/billing/change-subscription"
 change_payment_method_url = "/__/billing/change-payment-method"
 

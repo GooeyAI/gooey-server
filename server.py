@@ -42,6 +42,7 @@ from routers import (
     root,
     slack_api,
     paypal,
+    stripe,
     broadcast_api,
     bots_api,
 )
@@ -60,6 +61,7 @@ app.include_router(slack_api.router, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)
+app.include_router(stripe.router, include_in_schema=False)
 
 app.add_middleware(
     CORSMiddleware,
