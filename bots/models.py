@@ -1065,13 +1065,6 @@ class MessageQuerySet(models.QuerySet):
                         metadata__mime_type__startswith="audio/"
                     ).values_list("url", flat=True)
                 ),
-                "Speech Run URL": (
-                    message.get_previous_by_created_at().saved_run.get_app_url()
-                    if message.role == CHATML_ROLE_ASSISSTANT
-                    and message.get_previous_by_created_at()
-                    and message.get_previous_by_created_at().saved_run
-                    else ""
-                ),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1088,7 +1081,6 @@ class MessageQuerySet(models.QuerySet):
                 "Run URL",
                 "Photo Input",
                 "Audio Input",
-                "Speech Run URL",
             ],
         )
         return df
