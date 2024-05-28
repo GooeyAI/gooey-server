@@ -37,6 +37,7 @@ from bots.models import (
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
+from daras_ai_v2.auto_recharge import user_should_auto_recharge
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -1569,7 +1570,14 @@ class BasePage:
         return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
-        from celeryapp.tasks import gui_runner
+        from celeryapp.tasks import gui_runner, auto_recharge
+
+        if (
+            self.request.user
+            and not self.request.user.is_anonymous
+            and user_should_auto_recharge(self.request.user)
+        ):
+            auto_recharge.delay(user_id=self.request.user.id)
 
         return gui_runner.delay(
             page_cls=self.__class__,
