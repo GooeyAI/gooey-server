@@ -1,5 +1,6 @@
 import typing
 
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
@@ -40,8 +41,7 @@ class AsrPage(BasePage):
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
     class RequestModel(BaseModel):
-        documents: list[str]
-
+        documents: list[FieldHttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
 
@@ -59,7 +59,7 @@ class AsrPage(BasePage):
             description="DEPRECATED: use translation_model & translation_target instead."
         )
 
-        glossary_document: str | None
+        glossary_document: FieldHttpUrl | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):

@@ -23,7 +23,7 @@ RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.07.0.tar.xz' | tar -xJ
     && rm -rf poppler-23.07.0
 
 # install latest pandoc - https://github.com/jgm/pandoc/releases
-RUN wget -qO pandoc.deb 'https://github.com/jgm/pandoc/releases/download/3.1.5/pandoc-3.1.5-1-amd64.deb' \
+RUN wget -qO pandoc.deb 'https://github.com/jgm/pandoc/releases/download/3.1.13/pandoc-3.1.13-1-amd64.deb' \
     && dpkg -i pandoc.deb \
     && rm pandoc.deb
 
@@ -34,6 +34,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	ffmpeg \
     libzbar0 \
 	&& rm -rf /var/lib/apt/lists/*
+
+# because https://github.com/Azure-Samples/cognitive-services-speech-sdk/issues/2204
+RUN wget -qO libssl.deb http://security.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.22_amd64.deb \
+    && dpkg -i libssl.deb \
+    && rm libssl.deb
 
 # copy poetry files
 COPY ./pyproject.toml ./poetry.lock ./

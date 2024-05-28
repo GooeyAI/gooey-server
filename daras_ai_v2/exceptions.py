@@ -6,7 +6,7 @@ from loguru import logger
 from requests import HTTPError
 
 
-def raise_for_status(resp: requests.Response):
+def raise_for_status(resp: requests.Response, is_user_url: bool = False):
     """Raises :class:`HTTPError`, if one occurred."""
 
     http_error_msg = ""
@@ -29,7 +29,14 @@ def raise_for_status(resp: requests.Response):
         http_error_msg = f"{resp.status_code} Server Error: {reason} | URL: {resp.url} | Response: {_response_preview(resp)!r}"
 
     if http_error_msg:
-        raise HTTPError(http_error_msg, response=resp)
+        exc = HTTPError(http_error_msg, response=resp)
+        if is_user_url:
+            raise UserError(
+                f"[{resp.status_code}] You have provided an invalid URL: {resp.url} "
+                "Please make sure the URL is correct and accessible. ",
+            ) from exc
+        else:
+            raise exc
 
 
 def _response_preview(resp: requests.Response) -> bytes:

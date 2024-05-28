@@ -4,7 +4,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from auth.auth_backend import force_authentication
-from bots.models import SavedRun, Workflow
+from bots.models import Workflow, PublishedRun
 from daras_ai_v2.all_pages import all_test_pages
 from daras_ai_v2.base import BasePage
 from server import app
@@ -66,21 +66,22 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
 
 @pytest.mark.django_db
 def test_apis_examples(mock_gui_runner, force_authentication, threadpool_subtest):
-    for page in all_test_pages:
-        for sr in SavedRun.objects.filter(
-            workflow=page.workflow,
-            hidden=False,
-            example_id__isnull=False,
-        ):
-            threadpool_subtest(_test_apis_examples, sr, msg=sr.get_app_url())
+    qs = (
+        PublishedRun.objects.exclude(is_approved_example=False)
+        .exclude(published_run_id="")
+        .order_by("workflow")
+    )
+    for pr in qs:
+        page_cls = Workflow(pr.workflow).page_cls
+        endpoint = f"/v2/{page_cls.slug_versions[0]}/?example_id={pr.published_run_id}"
+        body = page_cls.get_example_request(pr.saved_run.state)[1]
+        threadpool_subtest(_test_apis_examples, endpoint, body, msg=endpoint)
 
 
-def _test_apis_examples(sr: SavedRun):
-    state = sr.state
-    page_cls = Workflow(sr.workflow).page_cls
+def _test_apis_examples(endpoint: str, body: dict):
     r = client.post(
-        f"/v2/{page_cls.slug_versions[0]}/?example_id={sr.example_id}",
-        json=page_cls.get_example_request(state)[1],
+        endpoint,
+        json=body,
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )

@@ -981,7 +981,7 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    raise_for_status(r)
+    raise_for_status(r, is_user_url=True)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:

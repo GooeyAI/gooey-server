@@ -6,9 +6,11 @@ from pydantic import BaseModel
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.lipsync_api import wav2lip
-from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
+from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 CREDITS_PER_MB = 2
 
@@ -21,22 +23,19 @@ class LipsyncPage(BasePage):
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
-    class RequestModel(BaseModel):
-        input_face: str
-        input_audio: str
-
-        face_padding_top: int | None
-        face_padding_bottom: int | None
-        face_padding_left: int | None
-        face_padding_right: int | None
+    class RequestModel(LipsyncSettings, BaseModel):
+        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
+            LipsyncModel.Wav2Lip.name
+        )
+        input_audio: FieldHttpUrl = None
 
     class ResponseModel(BaseModel):
-        output_video: str
+        output_video: FieldHttpUrl
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG
 
-    def render_form_v2(self) -> bool:
+    def render_form_v2(self):
         st.file_uploader(
             """
             #### Input Face
@@ -55,28 +54,43 @@ class LipsyncPage(BasePage):
             key="input_audio",
         )
 
+        enum_selector(
+            LipsyncModel,
+            label="###### Lipsync Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
+
     def validate_form_v2(self):
         assert st.session_state.get("input_audio"), "Please provide an Audio file"
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def render_settings(self):
-        lipsync_settings()
+        lipsync_settings(st.session_state.get("selected_model"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        yield "Running LipSync..."
-
-        state["output_video"] = wav2lip(
-            face=request.input_face,
-            audio=request.input_audio,
-            pads=(
-                request.face_padding_top,
-                request.face_padding_bottom,
-                request.face_padding_left,
-                request.face_padding_right,
-            ),
-        )
+        model = LipsyncModel[request.selected_model]
+        yield f"Running {model.value}..."
+        match model:
+            case LipsyncModel.Wav2Lip:
+                state["output_video"] = run_wav2lip(
+                    face=request.input_face,
+                    audio=request.input_audio,
+                    pads=(
+                        request.face_padding_top or 0,
+                        request.face_padding_bottom or 0,
+                        request.face_padding_left or 0,
+                        request.face_padding_right or 0,
+                    ),
+                )
+            case LipsyncModel.SadTalker:
+                state["output_video"] = run_sadtalker(
+                    request.sadtalker_settings,
+                    face=request.input_face,
+                    audio=request.input_audio,
+                )
 
     def render_example(self, state: dict):
         output_video = state.get("output_video")
@@ -104,7 +118,12 @@ class LipsyncPage(BasePage):
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
 
     def get_cost_note(self) -> str | None:
-        return f"{CREDITS_PER_MB} credits per MB"
+        multiplier = (
+            3
+            if st.session_state.get("lipsync_model") == LipsyncModel.SadTalker.name
+            else 1
+        )
+        return f"{CREDITS_PER_MB * multiplier} credits per MB"
 
     def get_raw_price(self, state: dict) -> float:
         total_bytes = 0
@@ -120,32 +139,7 @@ class LipsyncPage(BasePage):
             total_bytes += float(r.headers.get("Content-length") or "1")
 
         total_mb = total_bytes / 1024 / 1024
-        return total_mb * CREDITS_PER_MB
-
-    def download_blob(self, bucket_name, source_blob_name, destination_file_name):
-        """Downloads a blob from the bucket."""
-        # The ID of your GCS bucket
-        # bucket_name = "your-bucket-name"
-
-        # The ID of your GCS object
-        # source_blob_name = "storage-object-name"
-
-        # The path to which the file should be downloaded
-        # destination_file_name = "local/path/to/file"
-
-        storage_client = storage.Client()
-
-        bucket = storage_client.bucket(bucket_name)
-
-        # Construct a client side representation of a blob.
-        # Note `Bucket.blob` differs from `Bucket.get_blob` as it doesn't retrieve
-        # any content from Google Cloud Storage. As we don't need additional data,
-        # using `Bucket.blob` is preferred here.
-        blob = bucket.blob(source_blob_name)
-        blob.download_to_filename(destination_file_name)
-
-        print(
-            "Downloaded storage object {} from bucket {} to local file {}.".format(
-                source_blob_name, bucket_name, destination_file_name
-            )
+        multiplier = (
+            3 if state.get("lipsync_model") == LipsyncModel.SadTalker.name else 1
         )
+        return total_mb * CREDITS_PER_MB * multiplier
