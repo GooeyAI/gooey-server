@@ -185,11 +185,12 @@ def animation_prompts_editor(
             )
         with col3:
             prompt = st.session_state.get(prompt_key)
-            get_preview_image(
-                prompt,
-                st.session_state,
-            )
-            st.video(st.session_state.get(prompt))
+            if st.session_state.get(prompt) is None:
+                get_preview_image(
+                    prompt,
+                    st.session_state,
+                )
+            st.image(st.session_state.get(prompt))
         with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
             zoom_value = ZoomSettings.get(fp["frame"])
