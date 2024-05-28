@@ -184,7 +184,12 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
-            st.video(st.session_state.get("output_video", None))
+            prompt = st.session_state.get(prompt_key)
+            get_preview_image(
+                prompt,
+                st.session_state,
+            )
+            st.video(st.session_state.get(prompt))
         with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
             zoom_value = ZoomSettings.get(fp["frame"])
@@ -257,6 +262,33 @@ def animation_prompts_editor(
     st.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
     )
+
+
+def get_preview_image(animation_prompt, state: dict):
+    try:
+        state[animation_prompt] = call_celery_task_outfile(
+            "deforum",
+            pipeline=dict(model_id=AnimationModels["protogen_2_2"].value, seed=1),
+            inputs=dict(
+                animation_mode="2D",
+                animation_prompts={0: animation_prompt},
+                max_frames=1,
+                zoom="0:(0)",
+                translation_x="0:(0)",
+                translation_y="0:(0)",
+                rotation_3d_x="0:(0)",
+                rotation_3d_y="0:(0)",
+                rotation_3d_z="0:(0)",
+                translation_z="0:(0)",
+                fps=12,
+            ),
+            content_type="video/mp4",
+            filename=f"gooey.ai animation {animation_prompt}.mp4",
+        )[0]
+    except RuntimeError as e:
+        msg = "\n\n".join(e.args).lower()
+        if "key frame string not correctly formatted" in msg:
+            raise UserError(str(e)) from e
 
 
 def get_last_frame(prompt_list: list) -> int:
@@ -342,8 +374,9 @@ class DeforumSDPage(BasePage):
         col1, col2 = st.columns([2, 11], responsive=False)
         with col1:
             if "max_seconds" not in st.session_state:
-                st.session_state["max_seconds"] = st.session_state.get(
-                    "max_frames", 100
+                st.session_state["max_seconds"] = frames_to_seconds(
+                    st.session_state.get("max_frames", 100),
+                    st.session_state.get("fps", 12),
                 )
             MaxSeconds = st.number_input(
                 label="",
