@@ -57,7 +57,7 @@ def render_payments_setup():
 def render_current_plan(user: AppUser):
     subscription = user.subscription
     plan = PricingPlan(subscription.plan)
-    with border_box(className="w-100 pt-4 p-3 bg-light text-dark"):
+    with border_box(className="w-100 pt-4 p-3 text-dark border-dark"):
         left, right = left_and_right(className="align-items-center")
         with left:
             st.write(

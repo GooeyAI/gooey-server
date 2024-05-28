@@ -2,7 +2,9 @@
     # Template guide
 
     ## Context required:
-    - settings.PAYPAL_CLIENT_ID
+    - settings.PAYPAL_CLIENT_ID: str
+    - settings.PAYMENT_PROCESSING_PAGE_PATH: str
+    - settings.APP_BASE_URL
 
     ## Usage: PayPal One-Time
 
@@ -34,7 +36,10 @@
         async
         defer
         onLoad="renderPaypalSubscriptionButtons()"></script>
+
 <script>
+const paymentProcessingPath = "{{ settings.PAYMENT_PROCESSING_PAGE_PATH }}";  // relative
+const appBaseUrl = "{{ settings.APP_BASE_URL }}";  // base
 
 function renderPaypalAddonButtons() {
     let element = document.querySelector("#paypal-addon-buttons");
@@ -52,7 +57,10 @@ function renderPaypalSubscriptionButtons() {
                 return await subscribeWithPlan(planKey);
             },
             onApprove: function (data, actions) {
-                return actions.redirect(window.location.origin + "/payment-processing/");
+                let paymentProcessingUrl = new URL(paymentProcessingPath, appBaseUrl);
+                paymentProcessingUrl.searchParams.append("provider", "paypal");
+                paymentProcessingUrl.searchParams.append("subscription_id", data.subscriptionID);
+                actions.redirect(paymentProcessingUrl.toString())
             },
         }).render(el);
     }
@@ -153,7 +161,8 @@ async function onApprove(data, actions) {
         } else {
             // (3) Successful transaction -> Show confirmation or thank you message
             // Or go to another URL:  actions.redirect('thank_you.html');
-            actions.redirect(window.location.origin + "/payment-processing/");
+            let paymentProcessingUrl = new URL(paymentProcessingPath, appBaseUrl);
+            actions.redirect(paymentProcessingUrl.toString());
         }
     } catch (error) {
         console.error(error);

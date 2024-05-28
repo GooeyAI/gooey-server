@@ -13,7 +13,7 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_body,
@@ -27,7 +27,6 @@ from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
 from payments.plans import PricingPlan
-from routers.root import page_wrapper, get_og_url_path
 from routers.billing_v2 import (
     BILLING_VERSION_KEY,
     BILLING_VERSION_V2,
@@ -37,6 +36,10 @@ from routers.billing_v2 import (
     handle_subscription_cancelled,
     send_monthly_spending_notification_email,
 )
+from routers.paypal import (
+    handle_subscription_updated as paypal_handle_subscription_updated,
+)
+from routers.root import page_wrapper, get_og_url_path
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -490,6 +493,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                     },
                     status_code=400,
                 )
+
             subscription = stripe.Subscription.retrieve(
                 request.user.subscription.external_id
             )
@@ -540,12 +544,23 @@ def payment_success(request: Request):
 @app.post(settings.PAYMENT_PROCESSING_PAGE_PATH)
 @st.route
 def payment_processing(request: Request):
+    context = {
+        "request": request,
+        "settings": settings,
+        "redirect_url": account_v2_url,
+    }
+
+    if request.query_params.get("provider") == "paypal":
+        if sub_id := request.query_params.get("subscription_id"):
+            sub = paypal.Subscription.retrieve(sub_id)
+            paypal_handle_subscription_updated(sub)
+        else:
+            context["subtext"] = (
+                "PayPal transactions take up to a minute to reflect in your account..."
+            )
+            context["waiting_time"] = 30  # seconds
+
     with page_wrapper(request):
-        context = {
-            "request": request,
-            "settings": settings,
-            "redirect_url": account_v2_url,
-        }
         st.html(templates.get_template("payment_processing.html").render(**context))
     return dict(
         meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")

@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
-import requests
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
