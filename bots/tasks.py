@@ -79,6 +79,12 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
             and references_as_prompt(msg.saved_run.state.get("references", []))
         ),
     )
+    if msg.saved_run:
+        for requested_variable in analysis_sr.state.get("variables", {}).keys():
+            if requested_variable in msg.saved_run.state:
+                variables[requested_variable] = msg.saved_run.state.get(
+                    requested_variable
+                )
 
     # these are resource intensive, so only include them if the script asks for them
     if "messages" in variables:
