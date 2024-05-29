@@ -29,6 +29,7 @@ def get_audio_duration(audio_url: str) -> float:
         tfile.flush()
         f = sf.SoundFile(tfile.name)
         seconds = len(f) / f.samplerate
+        f.close()
         return seconds
 
 
@@ -68,6 +69,18 @@ class LipsyncPage(BasePage):
             """,
             key="input_audio",
         )
+        input_audio = st.session_state.get("input_audio")
+        if (
+            input_audio
+            and not self.is_current_user_paying()
+            and not self.is_current_user_admin()
+            and get_audio_duration(input_audio) > 10
+        ):
+            st.error(
+                "Audio duration is greater than 10 seconds and will be clipped. Please upgrade to process longer audio files.",
+                icon="⚠️",
+                color="orange",
+            )
 
         enum_selector(
             LipsyncModel,
@@ -81,11 +94,38 @@ class LipsyncPage(BasePage):
         assert input_audio, "Please provide an Audio file"
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
-        # free users can only use <10 seconds of audio
-        if not self.is_current_user_paying() and not self.is_current_user_admin():
-            assert (
-                get_audio_duration(input_audio) < 10
-            ), "Free users can only use audio files less than 10 seconds long"
+        # cut the audio to <=10 seconds if user is not paying
+        if (
+            not self.is_current_user_paying()
+            and not self.is_current_user_admin()
+            and get_audio_duration(input_audio) > 10
+        ):
+            import soundfile as sf
+            import tempfile
+            from daras_ai.image_input import upload_file_from_bytes
+
+            with tempfile.NamedTemporaryFile(
+                suffix="." + input_audio.split(".")[-1]
+            ) as src:
+                src.write(requests.get(input_audio).content)
+                src.flush()
+                f = sf.SoundFile(src.name)
+                with tempfile.NamedTemporaryFile(
+                    suffix="." + input_audio.split(".")[-1]
+                ) as dst:
+                    clip = sf.SoundFile(
+                        dst.name, mode="w", samplerate=f.samplerate, channels=f.channels
+                    )
+                    clip.write(f.read(10 * f.samplerate))
+                    clip.flush()
+                    clip.close()
+                    input_audio = upload_file_from_bytes(
+                        filename="clipped_audio.wav",
+                        data=dst.read(),
+                        content_type="audio/wav",
+                    )
+                    st.session_state["input_audio"] = input_audio
+                f.close()
 
     def render_settings(self):
         lipsync_settings(st.session_state.get("selected_model"))
