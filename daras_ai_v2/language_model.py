@@ -65,6 +65,14 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_o = LLMSpec(
+        label="GPT-4o (openai)",
+        model_id="gpt-4o",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=10,
+        is_vision_model=True,
+    )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
         label="GPT-4 Turbo with Vision (openai)",
@@ -880,6 +888,9 @@ def _run_groq_chat(
     avoid_repetition: bool,
     stop: list[str] | None,
 ):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     data = {
         "model": model,
         "messages": messages,
@@ -900,6 +911,15 @@ def _run_groq_chat(
     )
     raise_for_status(r)
     out = r.json()
+
+    record_cost_auto(
+        model=model, sku=ModelSku.llm_prompt, quantity=out["usage"]["prompt_tokens"]
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
     return [choice["message"] for choice in out["choices"]]
 
 

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import json
 from pathlib import Path
 
 import sentry_sdk
@@ -60,6 +61,7 @@ INSTALLED_APPS = [
     "usage_costs",
     "embeddings",
     "handles",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -242,7 +244,7 @@ GROQ_API_KEY = config("GROQ_API_KEY", default="")
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
-APP_BASE_URL = config("APP_BASE_URL", "/")
+APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
@@ -256,8 +258,9 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
-ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default=[])
+ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
+SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
 
 DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
@@ -277,8 +280,14 @@ SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
-LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
+LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
+
+PAYMENT_PROCESSING_PAGE_PATH: str = "/payment-processing/"
+
+ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
+AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
+AUTO_RECHARGE_COOLDOWN_SECONDS = config("AUTO_RECHARGE_COOLDOWN_SECONDS", 60, cast=int)
 
 LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
@@ -286,6 +295,20 @@ LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
+    "STRIPE_PRODUCT_IDS",
+    cast=json.loads,
+)
+
+PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
+PAYPAL_SECRET = config("PAYPAL_SECRET", "")
+PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
+PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
+PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
+PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
+    "PAYPAL_PLAN_IDS",
+    cast=json.loads,
+)
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
@@ -344,11 +367,6 @@ ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 
 GHANA_NLP_SUBKEY = config("GHANA_NLP_SUBKEY", "")
 
-# Paypal
-PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
-PAYPAL_SECRET = config("PAYPAL_SECRET", "")
-PAYPAL_BASE = config("PAYPAL_BASE", "")
-
 VESPA_URL = config("VESPA_URL", "http://localhost:8085")
 VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")
 VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")
@@ -360,3 +378,11 @@ WEB_WIDGET_LIB = config(
     "WEB_WIDGET_LIB",
     "https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@2/dist/lib.js",
 )
+
+MAX_CONCURRENCY_ANON = config("MAX_CONCURRENCY_ANON", 1, cast=int)
+MAX_CONCURRENCY_FREE = config("MAX_CONCURRENCY_FREE", 2, cast=int)
+MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
+
+MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
+MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
+MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)

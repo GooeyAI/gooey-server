@@ -1,4 +1,7 @@
-from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exception_handlers import (
+    request_validation_exception_handler,
+    http_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
@@ -111,6 +114,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(404)
 @app.exception_handler(405)
 async def not_found_exception_handler(request: Request, exc: HTTPException):
+    if not request.headers.get("accept", "").startswith("text/html"):
+        return await http_exception_handler(request, exc)
     return templates.TemplateResponse(
         "errors/404.html",
         {"request": request, "settings": settings},
@@ -120,6 +125,8 @@ async def not_found_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(HTTPException)
 async def server_error_exception_handler(request: Request, exc: HTTPException):
+    if not request.headers.get("accept", "").startswith("text/html"):
+        return await http_exception_handler(request, exc)
     return templates.TemplateResponse(
         "errors/unknown.html",
         {"request": request, "settings": settings},

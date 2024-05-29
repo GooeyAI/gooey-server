@@ -383,11 +383,18 @@ def img2img(
 
             edge = _get_dall_e_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
+            image = rgb_img_to_rgba(image)
+            mask = io.BytesIO()
+            Image.new("RGBA", (edge, edge), (0, 0, 0, 0)).save(mask, format="PNG")
+            mask = mask.getvalue()
 
             client = OpenAI()
             with capture_openai_content_policy_violation():
-                response = client.images.create_variation(
+                response = client.images.edit(
+                    model="dall-e-2",
+                    prompt=prompt,
                     image=image,
+                    mask=mask,
                     n=num_outputs,
                     size=f"{edge}x{edge}",
                     response_format="b64_json",

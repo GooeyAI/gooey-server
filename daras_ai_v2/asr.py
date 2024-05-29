@@ -749,6 +749,7 @@ def run_asr(
                 "diarize": "true",
                 "language": language,
                 "detect_language": "true" if language else "false",
+                "punctuate": "true",
             },
             json={
                 "url": audio_url,
@@ -817,6 +818,9 @@ def run_asr(
             encoding=AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
             audio_channel_count=1,
+        )
+        config.features = cloud_speech.RecognitionFeatures(
+            enable_automatic_punctuation=True,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
         audio.uri = gs_url_to_uri(audio_url)
@@ -1067,3 +1071,7 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
     return (
         f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
     )
+
+
+def should_translate_lang(code: str) -> bool:
+    return code and not code.split("-")[0] != "en"

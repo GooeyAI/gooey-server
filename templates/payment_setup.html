@@ -1,0 +1,209 @@
+{#
+    # Template guide
+
+    ## Context required:
+    - settings.PAYPAL_CLIENT_ID: str
+    - settings.PAYMENT_PROCESSING_PAGE_PATH: str
+    - settings.APP_BASE_URL
+
+    ## Usage: PayPal One-Time
+
+    1. Create a div with `id="paypal-addon-buttons"` where you want to render the PayPal One-Time buttons.
+    2. Use the JavaScript function `setPaypalAddonQuantity(qty)` to set the number of credits to purchase.
+
+    Whenever the user clicks on the one-time button rendered by PayPal, they will be redirected to PayPal
+    to buy `qty` credits.
+
+    ## Usage: PayPal subscriptions
+
+    1. Create a div with `class="paypal-subscription-buttons"` and `data-plan-id="the plan id"` where you want
+       to render the subscribe button for that plan.
+
+    Whenever user clicks on the subscribe button rendered by PayPal, they will be redirected to PayPal to
+    subscribe to that plan.
+#}
+
+<script src="https://js.stripe.com/v3/" async defer></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
+        data-integration-source="button-factory"
+        data-namespace="paypal_one_time"
+        async
+        defer
+        onLoad="renderPaypalAddonButtons()"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&intent=subscription&vault=true&enable-funding=venmo&disable-funding=paylater"
+        data-integration-source="button-factory"
+        data-namespace="paypal_subscription"
+        async
+        defer
+        onLoad="renderPaypalSubscriptionButtons()"></script>
+
+<script>
+const paymentProcessingPath = "{{ settings.PAYMENT_PROCESSING_PAGE_PATH }}";  // relative
+const appBaseUrl = "{{ settings.APP_BASE_URL }}";  // base
+
+function renderPaypalAddonButtons() {
+    let element = document.querySelector("#paypal-addon-buttons");
+    if (!element || element.innerHTML) return;
+
+    window.paypal_one_time.Buttons({createOrder, onApprove}).render("#paypal-addon-buttons");
+}
+
+function renderPaypalSubscriptionButtons() {
+    for (const el of document.querySelectorAll(".paypal-subscription-buttons")) {
+        if (el.innerHTML) continue;
+        let planKey = el.dataset.planKey;
+        window.paypal_subscription.Buttons({
+            createSubscription: async function () {
+                return await subscribeWithPlan(planKey);
+            },
+            onApprove: function (data, actions) {
+                let paymentProcessingUrl = new URL(paymentProcessingPath, appBaseUrl);
+                paymentProcessingUrl.searchParams.append("provider", "paypal");
+                paymentProcessingUrl.searchParams.append("subscription_id", data.subscriptionID);
+                actions.redirect(paymentProcessingUrl.toString())
+            },
+        }).render(el);
+    }
+}
+
+function setupToggleShowElement() {
+    for (const el of document.querySelectorAll("[data-toggle-show]")) {
+        el.addEventListener("click", function () {
+            for (const target of document.querySelectorAll(el.dataset.toggleShow)) {
+                if (target) {
+                    target.style.display = target.style.display === "none" ? "block" : "none";
+                } else {
+                  console.error(`Could not find target element: ${el.dataset.toggleShow}`)
+                }
+            }
+        });
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const observer = new MutationObserver((mutationsList, observer) => {
+        console.log("mutation observed");
+        renderPaypalSubscriptionButtons();
+        setupToggleShowElement();
+    });
+
+    // Start observing the target node for configured mutations
+    observer.observe(document.body, { childList: true, subtree: true });
+});
+
+// -- Setup: PayPal One-time --
+
+let __paypalAddonQuantity = 0;
+function setPaypalAddonQuantity(qty) {
+    __paypalAddonQuantity = qty;
+    renderPaypalAddonButtons();
+}
+function getPaypalAddonQuantity() {
+    return __paypalAddonQuantity;
+}
+
+async function createOrder() {
+    try {
+        const response = await fetch("/__/paypal/orders/create/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            // use the "body" param to optionally pass additional order information
+            // like product ids and quantities
+            body: JSON.stringify({
+                quantity: getPaypalAddonQuantity(),
+            }),
+        });
+        const orderData = await response.json();
+        if (orderData.id) {
+            return orderData.id;
+        } else {
+            const errorDetail = orderData?.details?.[0];
+            const errorMessage = errorDetail
+                ? `${errorDetail.issue} ${errorDetail.description} (${orderData.debug_id})`
+                : JSON.stringify(orderData);
+
+            throw new Error(errorMessage);
+        }
+    } catch (error) {
+        console.error(error);
+        resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+    }
+}
+
+async function onApprove(data, actions) {
+    try {
+        const response = await fetch(`/__/paypal/orders/${data.orderID}/capture`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+
+        const orderData = await response.json();
+        // Three cases to handle:
+        //   (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+        //   (2) Other non-recoverable errors -> Show a failure message
+        //   (3) Successful transaction -> Show confirmation or thank you message
+
+        const errorDetail = orderData?.details?.[0];
+
+        if (errorDetail?.issue === "INSTRUMENT_DECLINED") {
+            // (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+            // recoverable state, per https://developer.paypal.com/docs/checkout/standard/customize/handle-funding-failures/
+            return actions.restart();
+        } else if (errorDetail) {
+            // (2) Other non-recoverable errors -> Show a failure message
+            throw new Error(`${errorDetail.description} (${orderData.debug_id})`);
+        } else if (!orderData.purchase_units) {
+            throw new Error(JSON.stringify(orderData));
+        } else {
+            // (3) Successful transaction -> Show confirmation or thank you message
+            // Or go to another URL:  actions.redirect('thank_you.html');
+            let paymentProcessingUrl = new URL(paymentProcessingPath, appBaseUrl);
+            actions.redirect(paymentProcessingUrl.toString());
+        }
+    } catch (error) {
+        console.error(error);
+        resultMessage(
+            `Sorry, your transaction could not be processed...<br><br>${error}`,
+        );
+    }
+}
+
+function resultMessage(message) {
+    const container = document.querySelector("#paypal-result-message");
+    container.innerHTML = message;
+}
+
+// -- Setup: PayPal Subscriptions --
+
+async function subscribeWithPlan(planKey) {
+    try {
+        const response = await fetch("/__/paypal/subscriptions/create/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                lookup_key: planKey,
+            }),
+        });
+        const subscriptionData = await response.json();
+        if (subscriptionData.id) {
+            return subscriptionData.id;
+        } else {
+            const errorDetail = subscriptionData?.details?.[0];
+            const errorMessage = errorDetail
+                ? `${errorDetail.issue} ${errorDetail.description} (${subscriptionData.debug_id})`
+                : JSON.stringify(subscriptionData);
+
+            throw new Error(errorMessage);
+        }
+    } catch (error) {
+        console.error(error);
+        resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+    }
+}
+</script>

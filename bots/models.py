@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import Q, IntegerChoices
 from django.utils import timezone
 from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -15,7 +15,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2 import icons
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
 
@@ -179,6 +178,11 @@ class SavedRunQuerySet(models.QuerySet):
         return df
 
 
+class RetentionPolicy(IntegerChoices):
+    keep = 0, "Keep"
+    delete = 1, "Delete"
+
+
 class SavedRun(models.Model):
     parent = models.ForeignKey(
         "self",
@@ -228,6 +232,10 @@ class SavedRun(models.Model):
     )
     page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
     page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
+
+    retention_policy = models.IntegerField(
+        choices=RetentionPolicy.choices, default=RetentionPolicy.keep
+    )
 
     is_api_call = models.BooleanField(default=False)
 
@@ -328,6 +336,7 @@ class SavedRun(models.Model):
         *,
         current_user: AppUser,
         request_body: dict,
+        enable_rate_limits: bool = False,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -342,6 +351,7 @@ class SavedRun(models.Model):
                     ),
                     user=current_user,
                     request_body=request_body,
+                    enable_rate_limits=enable_rate_limits,
                 ),
             )
         return result, page.run_doc_sr(run_id, uid)
@@ -585,6 +595,11 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="List of allowed domains for the bot's web integration",
     )
+    web_config_extras = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Extra configuration for the bot's web integration",
+    )
 
     streaming_enabled = models.BooleanField(
         default=False,
@@ -631,6 +646,7 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
+            or self.name
             or (
                 self.platform == Platform.WEB
                 and f"Integration ID {self.api_integration_id()}"
@@ -645,20 +661,23 @@ class BotIntegration(models.Model):
 
         return api_hashids.encode(self.id)
 
-    def get_web_widget_config(self, mode="inline", target="#gooey-embed") -> dict:
-        return dict(
+    def get_web_widget_config(self, target="#gooey-embed") -> dict:
+        config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
-            mode=mode,
-            branding=dict(
-                name=self.name,
-                byLine=self.by_line,
-                description=self.descripton,
-                conversationStarters=self.conversation_starters,
-                photoUrl=self.photo_url,
-                websiteUrl=self.website_url,
+            branding=(
+                self.web_config_extras.get("branding", {})
+                | dict(
+                    name=self.name,
+                    byLine=self.by_line,
+                    description=self.descripton,
+                    conversationStarters=self.conversation_starters,
+                    photoUrl=self.photo_url,
+                    websiteUrl=self.website_url,
+                )
             ),
         )
+        return config
 
 
 class BotIntegrationAnalysisRun(models.Model):
@@ -1040,15 +1059,31 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Message (Local)": message.display_content,
+                "Analysis JSON": message.analysis_result,
                 "Feedback": (
                     message.feedbacks.first().get_display_text()
                     if message.feedbacks.first()
                     else None
                 ),  # only show first feedback as per Sean's request
-                "Analysis JSON": message.analysis_result,
                 "Run Time": (
                     message.saved_run.run_time if message.saved_run else 0
                 ),  # user messages have no run/run_time
+                "Run URL": (
+                    message.saved_run.get_app_url()
+                    if message.saved_run and message.role == CHATML_ROLE_ASSISSTANT
+                    else ""
+                ),
+                "Photo Input": ", ".join(
+                    message.attachments.filter(
+                        metadata__mime_type__startswith="image/"
+                    ).values_list("url", flat=True)
+                ),
+                "Audio Input": ", ".join(
+                    message.attachments.filter(
+                        metadata__mime_type__startswith="audio/"
+                    ).values_list("url", flat=True)
+                ),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1058,9 +1093,13 @@ class MessageQuerySet(models.QuerySet):
                 "Role",
                 "Message (EN)",
                 "Sent",
-                "Feedback",
+                "Message (Local)",
                 "Analysis JSON",
+                "Feedback",
                 "Run Time",
+                "Run URL",
+                "Photo Input",
+                "Audio Input",
             ],
         )
         return df
@@ -1081,12 +1120,24 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Question (Local)": message.get_previous_by_created_at().display_content,
+                "Answer (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
+                "Run URL": message.saved_run.get_app_url(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
             rows,
-            columns=["Name", "Question (EN)", "Answer (EN)", "Sent", "Analysis JSON"],
+            columns=[
+                "Name",
+                "Question (EN)",
+                "Answer (EN)",
+                "Sent",
+                "Question (Local)",
+                "Answer (Local)",
+                "Analysis JSON",
+                "Run URL",
+            ],
         )
         return df
 
@@ -1271,20 +1322,17 @@ class FeedbackQuerySet(models.QuerySet):
             row = {
                 "Name": feedback.message.conversation.get_display_name(),
                 "Question (EN)": feedback.message.get_previous_by_created_at().content,
-                "Question Sent": feedback.message.get_previous_by_created_at()
+                "Answer (EN)": feedback.message.content,
+                "Sent": feedback.message.get_previous_by_created_at()
                 .created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Answer (EN)": feedback.message.content,
-                "Answer Sent": feedback.message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Question (Local)": feedback.message.get_previous_by_created_at().display_content,
+                "Answer (Local)": feedback.message.display_content,
                 "Rating": Feedback.Rating(feedback.rating).label,
                 "Feedback (EN)": feedback.text_english,
-                "Feedback Sent": feedback.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Question Answered": feedback.message.question_answered,
+                "Feedback (Local)": feedback.text,
+                "Run URL": feedback.message.saved_run.get_app_url(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1292,13 +1340,14 @@ class FeedbackQuerySet(models.QuerySet):
             columns=[
                 "Name",
                 "Question (EN)",
-                "Question Sent",
                 "Answer (EN)",
-                "Answer Sent",
+                "Sent",
+                "Question (Local)",
+                "Answer (Local)",
                 "Rating",
                 "Feedback (EN)",
-                "Feedback Sent",
-                "Question Answered",
+                "Feedback (Local)",
+                "Run URL",
             ],
         )
         return df
