@@ -367,7 +367,7 @@ class DeforumSDPage(BasePage):
             st.write("*End of Video*")
 
     def get_cost_note(self) -> str | None:
-        return f"{CREDITS_PER_FRAME} / frame"
+        return f"{st.session_state.get('max_frames')} frames @ {CREDITS_PER_FRAME} Cr /frame"
 
     def additional_notes(self) -> str | None:
         return "Render Time ≈ 3s / frame"
