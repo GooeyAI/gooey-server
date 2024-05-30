@@ -611,16 +611,17 @@ def render_page(
     query_params = st.get_query_params()
     # if the old query param format is provided, redirect to the new format
     # because features like login relies on the new format
-    if query_params.get("example_id"):
+    example_id, run_id, uid = extract_query_params(query_params)
+    if query_params.pop("example_id", None):
         return RedirectResponse(
-            tab.url_path(
-                page_slug,
-                f"{run_slug}-{example_id}" if run_slug else run_slug,
-                example_id=query_params["example_id"],
+            page_cls.app_url(
+                tab=tab,
+                example_id=example_id,
+                run_id=run_id,
+                uid=uid,
+                query_params=query_params,
             )
         )
-    example_id = example_id or query_params.get("example_id")
-    _, run_id, uid = extract_query_params(query_params)
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not st.session_state:
         sr = page.get_sr_from_query_params(example_id, run_id, uid)
