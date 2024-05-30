@@ -324,7 +324,7 @@ def text_area(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     tooltip: str | None = None,
-    reverse_tooltip: bool = False,
+    tooltip_direction: typing.Literal["left", "right"] = "right",
     **props,
 ) -> str:
     style = props.setdefault("style", {})
@@ -362,7 +362,7 @@ def text_area(
             placeholder=placeholder,
             disabled=disabled,
             tooltip=tooltip,
-            tooltip_direction="left" if reverse_tooltip else "right",
+            tooltip_direction=tooltip_direction,
             **props,
         ),
     ).mount()

@@ -539,7 +539,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="task_instructions",
                 height=300,
                 tooltip="[Learn how](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings) to get the most out of your copilot with advanced settings.",
-                reverse_tooltip=True,
+                tooltip_direction="left",
             )
             prompt_vars_widget(
                 "task_instructions",
