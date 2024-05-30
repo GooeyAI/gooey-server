@@ -135,7 +135,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3, col4 = st.columns([2, 7, 2, 2], responsive=False)
+        col1, col2, col3 = st.columns([2, 9, 2], responsive=False)
         fps = st.session_state.get("fps", 12)
         max_seconds = st.session_state.get("max_seconds", 10)
         start = fp["second"]
@@ -166,7 +166,6 @@ def animation_prompts_editor(
                 if next_second > max_seconds:
                     st.error("Please increase Frame Count")
                 else:
-                    # set prompt to previous prompt
                     prompt_st_list.insert(
                         idx + 1,
                         {
@@ -184,23 +183,24 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
-            prompt = st.session_state.get(prompt_key)
-            if st.session_state.get(prompt) is None:
-                get_preview_image(
-                    prompt,
-                    st.session_state,
-                )
-            st.video(st.session_state.get(prompt))
-        with col4:
             zoom_pan_modal = Modal("Zoom/Pan", key="modal-" + fp_key)
             zoom_value = ZoomSettings.get(fp["frame"])
-            zoom_description = '<i class="fa-solid fa-camera-movie"></i>'
-            if zoom_value and zoom_value > 1:
-                zoom_description = f"Out: {round(zoom_value, 3)}"
-            elif zoom_value and zoom_value < 1:
-                zoom_description = f"In: {round(zoom_value, 3)}"
+            hpan_value = HPanSettings.get(fp["frame"])
+            vpan_value = VPanSettings.get(fp["frame"])
+            zoom_pan_description = ""
+            if zoom_value:
+                zoom_pan_description = "Out: " if zoom_value > 1 else "In: "
+                zoom_pan_description += f"{round(zoom_value, 3)}\n"
+            if hpan_value:
+                zoom_pan_description += "Right: " if hpan_value > 1 else "Left: "
+                zoom_pan_description += f"{round(hpan_value, 3)}\n"
+            if vpan_value:
+                zoom_pan_description += "Up: " if vpan_value > 1 else "Down: "
+                zoom_pan_description += f"{round(vpan_value, 3)}"
+            if not zoom_pan_description:
+                zoom_pan_description = '<i class="fa-solid fa-camera-movie"></i>'
             if st.button(
-                zoom_description,
+                zoom_pan_description,
                 key="button-" + fp_key,
                 type="link",
             ):
@@ -263,33 +263,6 @@ def animation_prompts_editor(
     st.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
     )
-
-
-def get_preview_image(animation_prompt, state: dict):
-    try:
-        state[animation_prompt] = call_celery_task_outfile(
-            "deforum",
-            pipeline=dict(model_id=AnimationModels["protogen_2_2"].value, seed=1),
-            inputs=dict(
-                animation_mode="2D",
-                animation_prompts={0: animation_prompt},
-                max_frames=1,
-                zoom="0:(0)",
-                translation_x="0:(0)",
-                translation_y="0:(0)",
-                rotation_3d_x="0:(0)",
-                rotation_3d_y="0:(0)",
-                rotation_3d_z="0:(0)",
-                translation_z="0:(0)",
-                fps=12,
-            ),
-            content_type="video/mp4",
-            filename=f"gooey.ai animation {animation_prompt}.mp4",
-        )[0]
-    except RuntimeError as e:
-        msg = "\n\n".join(e.args).lower()
-        if "key frame string not correctly formatted" in msg:
-            raise UserError(str(e)) from e
 
 
 def get_last_frame(prompt_list: list) -> int:
