@@ -74,23 +74,13 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         assistant_msg=msg.content,
         assistant_msg_local=msg.display_content,
         bot_script=msg.saved_run and msg.saved_run.state.get("bot_script", ""),
-        input_audio=(
-            msg.saved_run
-            and msg.saved_run.state.get("input_audio", "").replace("\n", "\\n")
-        ),
-        input_images=(
-            msg.saved_run
-            and msg.saved_run.state.get("input_images", "").replace("\n", "\\n")
-        ),
-        input_documents=(
-            msg.saved_run
-            and msg.saved_run.state.get("input_documents", "").replace("\n", "\\n")
-        ),
         references=(
             msg.saved_run
             and references_as_prompt(msg.saved_run.state.get("references", []))
         ),
     )
+    if msg.saved_run:
+        variables |= msg.saved_run.state
 
     # these are resource intensive, so only include them if the script asks for them
     if "messages" in variables:
