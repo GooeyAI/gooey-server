@@ -27,7 +27,7 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 
-DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae7b2940-93fc-11ee-8edc-02420a0001cc/Compare%20image%20generators.jpg.png"
+DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/039110ba-1f72-11ef-8d23-02420a00015d/Compare%20image%20generators.jpg"
 
 
 class CompareText2ImgPage(BasePage):
