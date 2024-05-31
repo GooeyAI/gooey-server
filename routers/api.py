@@ -353,9 +353,6 @@ def submit_api_call(
     retention_policy: RetentionPolicy = None,
     enable_rate_limits: bool = False,
 ) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
-    if enable_rate_limits:
-        ensure_rate_limits(page_cls.workflow, user)
-
     # init a new page for every request
     self = page_cls(request=SimpleNamespace(user=user))
 
@@ -381,7 +378,9 @@ def submit_api_call(
         )
     # create a new run
     example_id, run_id, uid = self.create_new_run(
-        is_api_call=True, retention_policy=retention_policy or RetentionPolicy.keep
+        enable_rate_limits=enable_rate_limits,
+        is_api_call=True,
+        retention_policy=retention_policy or RetentionPolicy.keep,
     )
     # submit the task
     result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)

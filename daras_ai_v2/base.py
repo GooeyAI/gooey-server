@@ -1509,12 +1509,11 @@ class BasePage:
 
     def on_submit(self):
         try:
-            ensure_rate_limits(self.workflow, self.request.user)
+            example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
-        example_id, run_id, uid = self.create_new_run()
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
@@ -1535,7 +1534,7 @@ class BasePage:
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, **defaults):
+    def create_new_run(self, *, enable_rate_limits: bool = False, **defaults):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1551,6 +1550,9 @@ class BasePage:
                 uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
             )
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
+
+        if enable_rate_limits:
+            ensure_rate_limits(self.workflow, self.request.user)
 
         run_id = get_random_doc_id()
 
