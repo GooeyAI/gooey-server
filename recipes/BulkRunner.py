@@ -580,7 +580,10 @@ def is_obj(field_props: dict) -> bool:
 
 @st.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
-    dfs = map_parallel(read_df_any, files)
+    try:
+        dfs = map_parallel(read_df_any, files)
+    except ValueError:
+        return []
     return list(
         {
             col: None
