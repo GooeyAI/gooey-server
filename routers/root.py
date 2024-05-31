@@ -88,7 +88,7 @@ async def favicon():
 @st.route
 def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-    match json_data["status"]:
+    match json_data.get("status"):
         case 404:
             template = "errors/404.html"
         case _:
