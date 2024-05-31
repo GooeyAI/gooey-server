@@ -2,10 +2,8 @@ import json
 import math
 import mimetypes
 import typing
-from textwrap import dedent
 
 from django.db.models import QuerySet, Q
-from django.utils.text import slugify
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -16,7 +14,7 @@ from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import settings, icons
+from daras_ai_v2 import icons
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -38,6 +36,7 @@ from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
+    get_web_widget_embed_code,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
@@ -51,7 +50,6 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
@@ -100,16 +98,10 @@ from recipes.DocSearch import (
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
-from routers.root import chat_lib_route
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
-INSTAGRAM_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3e7ebbb6-d6c8-11ee-a182-02420a000125/image.png"
-FACEBOOK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4243ce22-d6db-11ee-8e6a-02420a000126/facebook.png"
-SLACK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ee8c5b1c-d6c8-11ee-b278-02420a000126/image.png"
-WHATSAPP_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/Digital_Inline_Green.png"
-LANDBOT_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3705ed24-d6db-11ee-a22a-02420a000125/landbot.png"
 GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
@@ -1066,279 +1058,175 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         super().render_selected_tab()
 
         if self.tab == RecipeTabs.integrations:
+            self.render_integrations_tab()
+
+    def render_integrations_tab(self):
+        from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+
+        st.newline()
+
+        # not signed in case
+        if not self.request.user or self.request.user.is_anonymous:
+            integration_welcome_screen(title="Connect your Copilot")
             st.newline()
-
-            # not signed in case
-            if not self.request.user or self.request.user.is_anonymous:
-                self.integration_welcome_screen()
-                st.newline()
-                with st.center():
-                    st.anchor(
-                        "Get Started",
-                        href=self.get_auth_url(self.app_url()),
-                        type="primary",
-                    )
-                return
-
-            current_run, published_run = self.get_runs_from_query_params(
-                *extract_query_params(gooey_get_query_params())
-            )  # type: ignore
-
-            # signed in but not on a run the user can edit (admins will never see this)
-            if not self.can_user_edit_run(current_run, published_run):
-                self.integration_welcome_screen(
-                    title="Create your Saved Copilot",
-                )
-                st.newline()
-                with st.center():
-                    st.anchor(
-                        "Run & Save this Copilot",
-                        href=self.get_auth_url(self.app_url()),
-                        type="primary",
-                    )
-                return
-
-            # signed, has submitted run, but not published (admins will never see this)
-            # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
-            if not self.can_user_edit_published_run(published_run):
-                self.integration_welcome_screen(
-                    title="Save your Published Copilot",
-                )
-                st.newline()
-                with st.center():
-                    self._render_published_run_buttons(
-                        current_run=current_run,
-                        published_run=published_run,
-                        redirect_to=self.current_app_url(RecipeTabs.integrations),
-                    )
-                return
-
-            # if we come from an integration redirect, we connect the integrations
-            if "connect_ids" in self.request.query_params:
-                self.integrations_on_connect(current_run, published_run)
-
-            # see which integrations are available to the user for the current published run
-            assert published_run, "At this point, published_run should be available"
-            integrations_q = Q(published_run=published_run) | Q(
-                saved_run__example_id=published_run.published_run_id
-            )
-            if not self.is_current_user_admin():
-                integrations_q &= Q(billing_account_uid=self.request.user.uid)
-
-            integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-                integrations_q
-            ).order_by("platform", "-created_at")
-
-            # signed in, can edit, but no connected botintegrations on this run
-            if not integrations.exists():
-                self.integration_connect_screen()
-                return
-
-            # signed in, can edit, and has connected botintegrations on this run
             with st.center():
-                self.integration_test_config_screen(
-                    integrations, current_run, published_run
+                st.anchor(
+                    "Get Started",
+                    href=self.get_auth_url(self.app_url()),
+                    type="primary",
                 )
+            return
 
-    def integrations_on_connect(self, current_run, published_run):
-        from app_users.models import AppUser
-        from daras_ai_v2.slack_bot import send_confirmation_msg
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
 
-        bi = None
-        for bid in self.request.query_params.getlist("connect_ids"):
-            try:
-                bi = BotIntegration.objects.get(id=bid)
-            except BotIntegration.DoesNotExist:
-                continue
-            if bi.saved_run is not None:
-                with st.center():
-                    st.write(
-                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
-                    )
-                return
-
-            bi.streaming_enabled = True
-            bi.saved_run = current_run
-            if published_run and published_run.saved_run_id == current_run.id:
-                bi.published_run = published_run
-            else:
-                bi.published_run = None
-            if bi.platform == Platform.SLACK:
-                bi.slack_create_personal_channels = False
-                send_confirmation_msg(bi)
-            bi.save()
-
-        if bi:
-            path_params = dict(integration_id=bi.api_integration_id())
-        else:
-            path_params = dict()
-        raise RedirectException(
-            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
-        )
-
-    def integration_welcome_screen(self, title="Connect your Copilot"):
-        with st.center():
-            st.markdown(f"#### {title}")
-
-        col1, col2, col3 = st.columns(
-            3,
-            column_props=dict(
-                style=dict(
-                    display="flex",
-                    flexDirection="column",
-                    alignItems="center",
-                    textAlign="center",
-                    maxWidth="300px",
-                ),
-            ),
-            style={"justifyContent": "center"},
-        )
-        with col1:
-            st.html("🏃‍♀️", style={"fontSize": "4rem"})
-            st.markdown(
-                """
-                1. Fork & Save your Run
-                """
-            )
-            st.caption("Make changes, Submit & Save your perfect workflow")
-        with col2:
-            st.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
-            st.markdown("2. Connect to Slack, Whatsapp or your App")
-            st.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
-        with col3:
-            st.html("📈", style={"fontSize": "4rem"})
-            st.markdown("3. Test, Analyze & Iterate")
-            st.caption("Analyze your usage. Update your Saved Run to test changes.")
-
-    def integration_connect_screen(
-        self, title="Connect your Copilot", status: str | None = None
-    ):
-        from routers.facebook_api import fb_connect_url, wa_connect_url
-        from routers.slack_api import slack_connect_url
-
-        on_connect = self.current_app_url(RecipeTabs.integrations)
-
-        with st.center():
-            st.markdown(
-                f"""
-                #### {title}
-                {status or f'Run Saved ✅ • <b>Connect</b> • <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
-                """,
-                unsafe_allow_html=True,
-            )
-
-            linkstyle = dict(margin=0, display="flex", justifyContent="center", alignItems="center", padding="8px", border="1px solid black", minWidth="120px", width="160px", aspectRatio="5 / 2", overflow="hidden", borderRadius="10px")  # fmt: skip
-            imgstyle = 'style="width: 80%" draggable="false"'
-            rowstyle = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
-            descriptionstyle = dict(
-                color=GRAYCOLOR, textAlign="left", paddingTop="1rem"
-            )
-
-            with st.div():  # outer wrapper to ensure rows are aligned
-                selected_platform = None
-                redirect_url = None
-                with st.div(style=rowstyle, draggable="false"):
-                    if st.button(
-                        f'<img src="{WHATSAPP_IMG}" {imgstyle} alt="Whatsapp">',
-                        ariaLabel="Connect your Whatsapp number",
-                        style=linkstyle,
-                        draggable="false",
-                    ):
-                        selected_platform = Platform.WHATSAPP
-                        redirect_url = wa_connect_url(on_connect)
-                    with st.div(style=descriptionstyle):
-                        st.markdown(
-                            "Bring your own WhatsApp number to connect. "
-                            "Need a new one? Email [sales@gooey.ai](mailto:sales@gooey.ai) for help."
-                        )
-
-                with st.div(style=rowstyle, draggable="false"):
-                    if st.button(
-                        f'<img src="{SLACK_IMG}" {imgstyle} alt="Slack">',
-                        ariaLabel="Connect your Slack Workspace",
-                        style=linkstyle,
-                        draggable="false",
-                    ):
-                        selected_platform = Platform.SLACK
-                        redirect_url = slack_connect_url(on_connect)
-                    with st.div(style=descriptionstyle):
-                        st.markdown(
-                            "Connect to a Slack Channel. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-slack)"
-                        )
-
-                with st.div(style=rowstyle, draggable="false"):
-                    if st.button(
-                        f'<img src="{FACEBOOK_IMG}" {imgstyle} alt="Facebook Messenger">',
-                        ariaLabel="Connect your Facebook Page",
-                        style=linkstyle,
-                        draggable="false",
-                    ):
-                        selected_platform = Platform.FACEBOOK
-                        redirect_url = fb_connect_url(on_connect)
-                    with st.div(style=descriptionstyle):
-                        st.markdown(
-                            "Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)"
-                        )
-
-                with st.div(style=rowstyle, draggable="false"):
-                    if st.button(
-                        f'<img src="{settings.GOOEY_LOGO_IMG}" {imgstyle} alt="Web">',
-                        ariaLabel="Connect to your App or Website",
-                        style=linkstyle,
-                        draggable="false",
-                    ):
-                        bi = BotIntegration.objects.create(
-                            name="Web",
-                            billing_account_uid=self.request.user.uid,
-                            platform=Platform.WEB,
-                        )
-                        selected_platform = Platform.WEB
-                        redirect_url = str(
-                            furl(on_connect).add(
-                                query_params=dict(connect_ids=str(bi.id))
-                            )
-                            / bi.api_integration_id()
-                        )
-                    with st.div(style=descriptionstyle):
-                        st.markdown("Connect to your own App or Website.")
-
-                if redirect_url:
-                    if not self.is_current_user_admin():
-                        send_integration_attempt_email.delay(
-                            user_id=self.request.user.id,
-                            platform=selected_platform,
-                            run_url=self.current_app_url() or "",
-                        )
-                    raise RedirectException(redirect_url)
-
+        # signed in but not on a run the user can edit (admins will never see this)
+        if not self.can_user_edit_run(current_run, published_run):
+            integration_welcome_screen(title="Create your Saved Copilot")
             st.newline()
-            st.write(
-                f"Or use [our API]({self.current_app_url(RecipeTabs.run_as_api)}) to build custom integrations with your server."
-            )
+            with st.center():
+                st.anchor(
+                    "Run & Save this Copilot",
+                    href=self.get_auth_url(self.app_url()),
+                    type="primary",
+                )
+            return
 
-    def integration_test_config_screen(
-        self, integrations: QuerySet[BotIntegration], current_run, published_run
-    ):
-        from daras_ai_v2.base import get_title_breadcrumbs
-        from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+        # signed, has submitted run, but not published (admins will never see this)
+        # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
+        if not self.can_user_edit_published_run(published_run):
+            integration_welcome_screen(title="Save your Published Copilot")
+            st.newline()
+            with st.center():
+                self._render_published_run_buttons(
+                    current_run=current_run,
+                    published_run=published_run,
+                    redirect_to=self.current_app_url(RecipeTabs.integrations),
+                )
+            return
+
+        # if we come from an integration redirect, we connect the integrations
+        if "connect_ids" in self.request.query_params:
+            self.integrations_on_connect(current_run, published_run)
+
+        # see which integrations are available to the user for the current published run
+        assert published_run, "At this point, published_run should be available"
+        integrations_q = Q(published_run=published_run) | Q(
+            saved_run__example_id=published_run.published_run_id
+        )
+        if not self.is_current_user_admin():
+            integrations_q &= Q(billing_account_uid=self.request.user.uid)
+
+        integrations_qs: QuerySet[BotIntegration] = BotIntegration.objects.filter(
+            integrations_q
+        ).order_by("platform", "-created_at")
 
         run_title = get_title_breadcrumbs(
             VideoBotsPage, current_run, published_run
         ).h1_title
 
+        # signed in, can edit, but no connected botintegrations on this run
+        if not integrations_qs.exists():
+            self.render_integrations_add(
+                label="""
+                #### Connect your Copilot
+                Run Saved ✅ • <b>Connect</b> • <span className="text-muted">Test & Configure</span>
+                """,
+                run_title=run_title,
+            )
+            return
+
+        # this gets triggered on the /add route
         if st.session_state.pop("--add-integration", None):
             cancel_url = self.current_app_url(RecipeTabs.integrations)
-            self.integration_connect_screen(
-                "Configure your Copilot: Add a New Integration",
-                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel_url}">Test & Configure</a> ✅',
+            self.render_integrations_add(
+                label=f"""
+                #### Configure your Copilot: Add a New Integration
+                Run Saved ✅ • <b>Connected</b> ✅ • [Test & Configure]({cancel_url}) ✅
+                """,
+                run_title=run_title,
             )
-            if st.button("Return to Test & Configure"):
-                raise RedirectException(cancel_url)
+            with st.center():
+                if st.button("Return to Test & Configure"):
+                    raise RedirectException(cancel_url)
             return
+
+        with st.center():
+            # signed in, can edit, and has connected botintegrations on this run
+            self.render_integrations_settings(
+                integrations=list(integrations_qs), run_title=run_title
+            )
+
+    def render_integrations_add(self, label: str, run_title: str):
+        from routers.facebook_api import fb_connect_url, wa_connect_url
+        from routers.slack_api import slack_connect_url
+
+        st.write(label, unsafe_allow_html=True, className="text-center")
+        st.newline()
+
+        pressed_platform = None
+        with (
+            st.tag("table", className="d-flex justify-content-center"),
+            st.tag("tbody"),
+        ):
+            for choice in connect_choices:
+                with st.tag("tr"):
+                    with st.tag("td"):
+                        if st.button(
+                            f'<img src="{choice.img}" alt="{choice.platform.name}" style="max-width: 80%; max-height: 90%" draggable="false">',
+                            className="p-0 border border-1 border-secondary rounded",
+                            style=dict(width="160px", height="60px"),
+                        ):
+                            pressed_platform = choice.platform
+                    with st.tag("td", className="ps-3"):
+                        st.caption(choice.label)
+
+        if pressed_platform:
+            on_connect = self.current_app_url(RecipeTabs.integrations)
+            match pressed_platform:
+                case Platform.WEB:
+                    bi = BotIntegration.objects.create(
+                        name=run_title,
+                        billing_account_uid=self.request.user.uid,
+                        platform=Platform.WEB,
+                    )
+                    redirect_url = str(
+                        furl(on_connect).add(query_params=dict(connect_ids=str(bi.id)))
+                        / bi.api_integration_id()
+                    )
+                case Platform.WHATSAPP:
+                    redirect_url = wa_connect_url(on_connect)
+                case Platform.SLACK:
+                    redirect_url = slack_connect_url(on_connect)
+                case Platform.FACEBOOK:
+                    redirect_url = fb_connect_url(on_connect)
+                case _:
+                    raise ValueError(f"Unsupported platform: {pressed_platform}")
+
+            if not self.is_current_user_admin():
+                send_integration_attempt_email.delay(
+                    user_id=self.request.user.id,
+                    platform=pressed_platform,
+                    run_url=self.current_app_url() or "",
+                )
+            raise RedirectException(redirect_url)
+
+        st.newline()
+        api_tab_url = self.current_app_url(RecipeTabs.run_as_api)
+        st.write(
+            f"Or use [our API]({api_tab_url}) to build custom integrations with your server.",
+            className="text-center",
+        )
+
+    def render_integrations_settings(
+        self, integrations: list[BotIntegration], run_title: str
+    ):
+        from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
         st.markdown("#### Configure your Copilot")
 
-        if integrations.count() > 1:
+        if len(integrations) > 1:
             with st.div(style={"minWidth": "500px", "textAlign": "left"}):
                 integrations_map = {i.id: i for i in integrations}
                 bi_id = st.selectbox(
@@ -1414,25 +1302,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                    lib_src = furl(settings.APP_BASE_URL) / get_route_url(
-                        chat_lib_route,
-                        dict(
-                            integration_id=bi.api_integration_id(),
-                            integration_name=slugify(bi.name) or "untitled",
-                        ),
-                    )
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=dedent(
-                            f"""
-                            <div id="gooey-embed"></div>
-                            <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
-                            """
-                        ).strip(),
-                        type="secondary",
-                    )
                 else:
                     st.write("Message quicklink not available.")
+
+                if bi.platform == Platform.WEB:
+                    embed_code = get_web_widget_embed_code(bi)
+                    copy_to_clipboard_button(
+                        f"{icons.code} Copy Embed Code",
+                        value=embed_code,
+                        type="secondary",
+                    )
 
             col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
@@ -1454,22 +1333,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ),
                     new_tab=True,
                 )
-
-            # ==== future changes ====
-            # col1, col2 = st.columns(2, style={"alignItems": "center"})
-            # with col1:
-            #     st.write("###### Evaluate ⚖️")
-            #     st.caption(f"Run automated tests against sample user messages.")
-            # with col2:
-            #     st.anchor(
-            #         "Run Bulk Tests",
-            #         BulkRunnerPage.app_url(),
-            #     )
-
-            # st.write("#### Automated Analysis 🧠")
-            # st.caption(
-            #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
-            # )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
                 col1, col2 = st.columns(2, style={"alignItems": "center"})
@@ -1508,10 +1371,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
                 if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
                     st.newline()
-                    st.newline()
                     broadcast_input(bi)
+                    st.write("---")
 
-                st.write("---")
                 col1, col2 = st.columns(2, style={"alignItems": "center"})
                 with col1:
                     st.write("###### Disconnect")
@@ -1527,6 +1389,42 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.published_run = None
                         bi.save()
                         st.experimental_rerun()
+
+    def integrations_on_connect(self, current_run, published_run):
+        from app_users.models import AppUser
+        from daras_ai_v2.slack_bot import send_confirmation_msg
+
+        bi = None
+        for bid in self.request.query_params.getlist("connect_ids"):
+            try:
+                bi = BotIntegration.objects.get(id=bid)
+            except BotIntegration.DoesNotExist:
+                continue
+            if bi.saved_run is not None:
+                with st.center():
+                    st.write(
+                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
+                    )
+                return
+
+            bi.streaming_enabled = True
+            bi.saved_run = current_run
+            if published_run and published_run.saved_run_id == current_run.id:
+                bi.published_run = published_run
+            else:
+                bi.published_run = None
+            if bi.platform == Platform.SLACK:
+                bi.slack_create_personal_channels = False
+                send_confirmation_msg(bi)
+            bi.save()
+
+        if bi:
+            path_params = dict(integration_id=bi.api_integration_id())
+        else:
+            path_params = dict()
+        raise RedirectException(
+            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
+        )
 
 
 def infer_asr_model_and_language(
@@ -1686,3 +1584,68 @@ def convo_window_clipper(
         if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
+
+
+def integration_welcome_screen(title: str):
+    with st.center():
+        st.markdown(f"#### {title}")
+
+    col1, col2, col3 = st.columns(
+        3,
+        column_props=dict(
+            style=dict(
+                display="flex",
+                flexDirection="column",
+                alignItems="center",
+                textAlign="center",
+                maxWidth="300px",
+            ),
+        ),
+        style={"justifyContent": "center"},
+    )
+    with col1:
+        st.html("🏃‍♀️", style={"fontSize": "4rem"})
+        st.markdown(
+            """
+            1. Fork & Save your Run
+            """
+        )
+        st.caption("Make changes, Submit & Save your perfect workflow")
+    with col2:
+        st.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
+        st.markdown("2. Connect to Slack, Whatsapp or your App")
+        st.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
+    with col3:
+        st.html("📈", style={"fontSize": "4rem"})
+        st.markdown("3. Test, Analyze & Iterate")
+        st.caption("Analyze your usage. Update your Saved Run to test changes.")
+
+
+class ConnectChoice(typing.NamedTuple):
+    platform: Platform
+    img: str
+    label: str
+
+
+connect_choices = [
+    ConnectChoice(
+        platform=Platform.WEB,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2bd17e74-1dcf-11ef-8207-02420a000136/thumbs/image_400x400.png",
+        label="Connect to your own App or Website.",
+    ),
+    ConnectChoice(
+        platform=Platform.WHATSAPP,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
+        label="Bring your own WhatsApp number to connect. Need a new one? Email [sales@gooey.ai](mailto:sales@gooey.ai) for help.",
+    ),
+    ConnectChoice(
+        platform=Platform.SLACK,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ee8c5b1c-d6c8-11ee-b278-02420a000126/thumbs/image_400x400.png",
+        label="Connect to a Slack Channel. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-slack)",
+    ),
+    ConnectChoice(
+        platform=Platform.FACEBOOK,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
+        label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
+    ),
+]

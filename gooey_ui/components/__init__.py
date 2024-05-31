@@ -84,15 +84,9 @@ def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **
         )
 
 
-def center(direction="column") -> state.NestingCtx:
+def center(direction="flex-column", className="") -> state.NestingCtx:
     return div(
-        style={
-            "display": "flex",
-            "justifyContent": "center",
-            "alignItems": "center",
-            "textAlign": "center",
-            "flexDirection": direction,
-        }
+        className=f"d-flex justify-content-center align-items-center text-center {direction} {className}"
     )
 
 
