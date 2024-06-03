@@ -1,17 +1,13 @@
+from loguru import logger
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.functional import apply_parallel
-from daras_ai_v2.language_model import (
-    LargeLanguageModels,
-)
+from daras_ai_v2.functional import fetch_parallel
+from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
-from daras_ai_v2.serp_search_locations import (
-    SerpSearchLocation,
-    SerpSearchType,
-)
+from daras_ai_v2.serp_search_locations import SerpSearchLocation, SerpSearchType
 from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.RelatedQnADoc import render_qna_outputs
@@ -122,13 +118,21 @@ class RelatedQnAPage(BasePage):
 
         all_questions = [request.search_query] + related_questions[:9]
 
+        logger.debug(f"Related Questions: {all_questions}")
+
         response.output_queries = []
-        yield from apply_parallel(
-            lambda ques: run_google_gpt(request.copy(), ques, response.output_queries),
-            all_questions,
-            max_workers=4,
-            message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
-        )
+        for i, google_gpt_output in enumerate(
+            fetch_parallel(
+                lambda ques: run_google_gpt(request.copy(), ques),
+                all_questions,
+                max_workers=4,
+            ),
+            start=1,
+        ):
+            if google_gpt_output:
+                response.output_queries.append(google_gpt_output)
+            yield f"[{i}/{len(all_questions)}] Generating answers using {LargeLanguageModels[request.selected_model].value}..."
+
         if not response.output_queries:
             raise EmptySearchResults(request.search_query)
 
@@ -136,8 +140,7 @@ class RelatedQnAPage(BasePage):
 def run_google_gpt(
     request: GoogleGPTPage.RequestModel,
     related_question: str,
-    outputs: list[RelatedGoogleGPTResponse],
-):
+) -> RelatedGoogleGPTResponse | None:
     response = RelatedGoogleGPTResponse.construct()
     request.search_query = related_question
     response.search_query = related_question
@@ -145,5 +148,6 @@ def run_google_gpt(
         for _ in GoogleGPTPage().run_v2(request, response):
             pass
     except EmptySearchResults:
-        return
-    outputs.append(response)
+        return None
+
+    return response
