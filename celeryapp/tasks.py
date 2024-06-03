@@ -10,6 +10,7 @@ import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
+from loguru import logger
 
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
@@ -126,6 +127,7 @@ def gui_runner(
                     try:
                         raise UserError(error_msg) from e
                     except UserError as e:
+                        logger.exception(f"UserError: {e}")
                         sentry_sdk.capture_exception(e, level=e.sentry_level)
                         break
 
