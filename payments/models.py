@@ -25,10 +25,10 @@ def validate_auto_recharge_balance_threshold(value: int):
 
 @dataclass
 class PaymentMethodSummary:
-    payment_method_type: str
-    card_brand: str | None
-    card_last4: str | None
-    billing_email: str | None
+    payment_method_type: str | None = None
+    card_brand: str | None = None
+    card_last4: str | None = None
+    billing_email: str | None = None
 
 
 class SubscriptionQuerySet(models.QuerySet):
@@ -160,33 +160,33 @@ class Subscription(models.Model):
         else:
             raise ValueError("Invalid Payment Provider")
 
-    def get_payment_method_summary(self) -> PaymentMethodSummary | None:
+    def get_payment_method_summary(self) -> PaymentMethodSummary:
+        summary = PaymentMethodSummary()
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 pm = self.stripe_get_default_payment_method()
                 if pm:
-                    return PaymentMethodSummary(
-                        payment_method_type=pm.type,
-                        card_brand=pm.card and pm.card.brand,
-                        card_last4=pm.card and pm.card.last4,
-                        billing_email=pm.billing_details and pm.billing_details.email,
+                    summary.payment_method_type = pm.type
+                    summary.card_brand = pm.card and pm.card.brand
+                    summary.card_last4 = pm.card and pm.card.last4
+                    summary.billing_email = (
+                        pm.billing_details and pm.billing_details.email
                     )
-                else:
-                    return None
             case PaymentProvider.PAYPAL:
                 subscription = paypal.Subscription.retrieve(self.external_id)
                 subscriber = subscription.subscriber
-                if not subscriber or not subscriber.payment_source:
-                    return None
-                try:
-                    return PaymentMethodSummary(
-                        payment_method_type="card",
-                        card_brand=subscriber.payment_source["card"]["brand"],
-                        card_last4=subscriber.payment_source["card"]["last_digits"],
-                        billing_email=subscriber.email_address,
+                if subscriber and subscriber.payment_source:
+                    summary.payment_method_type = "card"
+                    summary.card_brand = subscriber.payment_source.get("card", {}).get(
+                        "brand"
                     )
-                except KeyError:
-                    return None
+                    summary.card_last4 = subscriber.payment_source.get("card", {}).get(
+                        "last_digits"
+                    )
+                if subscriber and subscriber.email_address:
+                    summary.billing_email = subscriber.email_address
+
+        return summary
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
         if self.payment_provider != PaymentProvider.STRIPE:

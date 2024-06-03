@@ -379,7 +379,7 @@ def render_payment_information(user: AppUser):
         st.write(f"{icons.edit} Edit", unsafe_allow_html=True)
 
     pm_summary = user.subscription.get_payment_method_summary()
-    if pm_summary and pm_summary.card_brand:
+    if pm_summary.card_brand and pm_summary.card_last4:
         col1, col2, col3 = st.columns(3, responsive=False)
         with col1:
             st.write("**Payment Method**")
@@ -391,7 +391,7 @@ def render_payment_information(user: AppUser):
         with col3, st.link(to=change_payment_method_url):
             st.button(f"{icons.edit} Edit", type="link")
 
-    if pm_summary and pm_summary.billing_email:
+    if pm_summary.billing_email:
         col1, col2, _ = st.columns(3, responsive=False)
         with col1:
             st.write("**Billing Email**")
