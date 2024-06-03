@@ -86,11 +86,11 @@ Generally speaking, dense embeddings excel at understanding the context of the q
         """,
     )
 
-    ignore_null_docs: bool = False
-
 
 def get_top_k_references(
     request: DocSearchRequest,
+    *,
+    ignore_null_docs: bool = False,
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
@@ -114,7 +114,7 @@ def get_top_k_references(
         selected_asr_model = google_translate_target = None
 
     file_url_metas = flatmap_parallel(doc_or_yt_url_to_metadatas, input_docs)
-    if request.ignore_null_docs:
+    if ignore_null_docs:
         file_url_metas = [
             (url, meta) for url, meta in file_url_metas if not meta.is_null()
         ]

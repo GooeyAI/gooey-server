@@ -250,9 +250,9 @@ class GoogleGPTPage(BasePage):
                     **request.dict(),
                     "documents": list(link_titles.keys()),
                     "search_query": request.search_query,
-                    "ignore_null_docs": True,  # ignore bad links from serper... silently
                 },
             ),
+            ignore_null_docs=True,
         )
         # add pretty titles to references
         for ref in response.references:
