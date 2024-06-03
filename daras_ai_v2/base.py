@@ -66,7 +66,6 @@ from daras_ai_v2.user_date_widgets import (
 from gooey_ui import (
     realtime_clear_subs,
     RedirectException,
-    QueryParamsRedirectException,
 )
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
@@ -673,8 +672,8 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=duplicate_pr.published_run_id),
+            raise RedirectException(
+                self.app_url(example_id=duplicate_pr.published_run_id)
             )
 
         if save_as_new_button:
@@ -686,9 +685,7 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=new_pr.published_run_id)
-            )
+            raise RedirectException(self.app_url(example_id=new_pr.published_run_id))
 
         with st.div(className="mt-4"):
             st.write("#### Version History", className="mb-4")
@@ -730,7 +727,7 @@ class BasePage:
 
         if confirm_button:
             published_run.delete()
-            raise QueryParamsRedirectException(query_params={})
+            raise RedirectException(self.app_url())
 
         if cancel_button:
             modal.close()
@@ -789,7 +786,7 @@ class BasePage:
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
                     )
-                    raise QueryParamsRedirectException(dict())
+                    raise RedirectException(self.app_url())
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -1522,9 +1519,7 @@ class BasePage:
             self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
-        raise QueryParamsRedirectException(
-            self.clean_query_params(example_id=None, run_id=run_id, uid=uid)
-        )
+        raise RedirectException(self.app_url(run_id=run_id, uid=uid))
 
     def should_submit_after_login(self) -> bool:
         return (
