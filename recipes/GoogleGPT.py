@@ -250,6 +250,7 @@ class GoogleGPTPage(BasePage):
                     **request.dict(),
                     "documents": list(link_titles.keys()),
                     "search_query": request.search_query,
+                    "ignore_null_docs": True,  # ignore bad links from serper... silently
                 },
             ),
         )

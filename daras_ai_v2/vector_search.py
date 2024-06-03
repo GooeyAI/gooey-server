@@ -86,6 +86,8 @@ Generally speaking, dense embeddings excel at understanding the context of the q
         """,
     )
 
+    ignore_null_docs: bool = False
+
 
 def get_top_k_references(
     request: DocSearchRequest,
@@ -112,6 +114,10 @@ def get_top_k_references(
         selected_asr_model = google_translate_target = None
 
     file_url_metas = flatmap_parallel(doc_or_yt_url_to_metadatas, input_docs)
+    if request.ignore_null_docs:
+        file_url_metas = [
+            (url, meta) for url, meta in file_url_metas if not meta.is_null()
+        ]
     file_urls, file_metas = zip(*file_url_metas)
 
     yield "Creating knowledge embeddings..."
@@ -306,7 +312,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             )
             raise_for_status(r)
         except requests.RequestException as e:
-            print(f"ignore error while downloading {f_url}: {e}")
+            logger.debug(f"ignore error while downloading {f_url}: {e}")
             name = None
             mime_type = None
             etag = None
@@ -550,7 +556,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
         )
         raise_for_status(r, is_user_url=True)
     except requests.RequestException as e:
-        print(f"ignore error while downloading {f_url}: {e}")
+        logger.debug(f"ignore error while downloading {f_url}: {e}")
         return b"", ""
     f_bytes = r.content
     # if it's a known encoding, standardize to utf-8

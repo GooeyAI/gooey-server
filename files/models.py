@@ -16,6 +16,10 @@ class FileMetadata(models.Model):
             ret += f" - {self.etag}"
         return ret
 
+    def is_null(self):
+        # if all fields other than name are empty, consider it null
+        return not any([self.etag, self.mime_type, self.total_bytes])
+
     class Meta:
         indexes = [
             models.Index(fields=["name", "etag", "mime_type", "total_bytes"]),
