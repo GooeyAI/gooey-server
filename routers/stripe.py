@@ -40,7 +40,7 @@ def create_checkout_session(
             }
         )
 
-    if request.user.subscription and request.user.subscription.plan == plan.value:
+    if request.user.subscription and request.user.subscription.plan == plan.db_value:
         # already subscribed to the same plan
         return RedirectResponse("/", status_code=303)
 
@@ -186,7 +186,7 @@ def _handle_subscription_updated(uid: str, subscription_data):
     elif not user.subscription:
         user.subscription = Subscription()
 
-    user.subscription.plan = plan.value
+    user.subscription.plan = plan.db_value
     user.subscription.payment_provider = PaymentProvider.STRIPE
     user.subscription.external_id = subscription_data.id
 

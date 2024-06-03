@@ -56,7 +56,7 @@ def render_payments_setup():
 
 def render_current_plan(user: AppUser):
     subscription = user.subscription
-    plan = PricingPlan(subscription.plan)
+    plan = PricingPlan.from_sub(subscription)
     with border_box(className="w-100 pt-4 p-3 text-dark border-dark"):
         left, right = left_and_right(className="align-items-center")
         with left:
@@ -104,7 +104,7 @@ def render_credit_balance(user: AppUser):
 
 def render_all_plans(user: AppUser):
     current_plan = (
-        PricingPlan(user.subscription.plan)
+        PricingPlan.from_sub(user.subscription)
         if user.subscription
         else PricingPlan.STARTER
     )
@@ -400,11 +400,7 @@ def render_payment_information(user: AppUser):
 
 
 def format_card_brand(brand: str) -> str:
-    brand = brand.lower()
-    if brand in icons.card_icons:
-        return icons.card_icons[brand]
-    else:
-        return brand.capitalize()
+    return icons.card_icons.get(brand.lower(), brand.capitalize())
 
 
 def render_billing_history(user: AppUser):

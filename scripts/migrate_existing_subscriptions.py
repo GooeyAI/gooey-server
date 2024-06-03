@@ -112,7 +112,7 @@ def run():
 
             with transaction.atomic():
                 user.subscription = Subscription(
-                    plan=plan.value,
+                    plan=plan.db_value,
                     payment_provider=PaymentProvider.STRIPE,
                     external_id=sub.id,
                 )

@@ -8,19 +8,10 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from furl import furl
 
-from .plans import PricingPlan, stripe_get_addon_product
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
+from .plans import PricingPlan, stripe_get_addon_product
 
-
-def validate_addon_amount(value: int):
-    if value not in settings.ADDON_AMOUNT_CHOICES:
-        raise ValidationError(f"{value} not among valid choices")
-
-
-def validate_auto_recharge_balance_threshold(value: int):
-    if value not in settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES:
-        raise ValidationError(f"{value} not among valid choices")
 
 
 @dataclass
@@ -44,20 +35,15 @@ class SubscriptionQuerySet(models.QuerySet):
 
 
 class Subscription(models.Model):
-    plan = models.IntegerField(choices=PricingPlan.choices())
+    plan = models.IntegerField(choices=PricingPlan.db_choices())
     payment_provider = models.IntegerField(choices=PaymentProvider.choices)
     external_id = models.CharField(
         max_length=255,
         help_text="Subscription ID from the payment provider",
     )
     auto_recharge_enabled = models.BooleanField(default=True)
-    auto_recharge_balance_threshold = models.IntegerField(
-        validators=[
-            validate_auto_recharge_balance_threshold,
-        ],
-    )
+    auto_recharge_balance_threshold = models.IntegerField()
     auto_recharge_topup_amount = models.IntegerField(
-        validators=[validate_addon_amount],
         default=settings.ADDON_AMOUNT_CHOICES[0],
     )
     monthly_spending_budget = models.IntegerField(
@@ -85,7 +71,7 @@ class Subscription(models.Model):
         ]
 
     def __str__(self):
-        return PricingPlan(self.plan).title
+        return PricingPlan.from_sub(self).title
 
     def full_clean(self, *args, **kwargs):
         if self.plan and self.auto_recharge_enabled:
@@ -108,14 +94,14 @@ class Subscription(models.Model):
 
     def _get_default_auto_recharge_balance_threshold(self):
         # 25% of the monthly credit subscription
-        threshold = int(PricingPlan(self.plan).credits * 0.25)
+        threshold = int(PricingPlan.from_sub(self).credits * 0.25)
         return nearest_choice(
             settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES, threshold
         )
 
     def _get_default_monthly_spending_budget(self):
         # 3x the monthly subscription charge
-        return 3 * PricingPlan(self.plan).monthly_charge
+        return 3 * PricingPlan.from_sub(self).monthly_charge
 
     def _get_default_monthly_spending_notification_threshold(self):
         # 80% of the monthly budget

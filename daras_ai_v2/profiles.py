@@ -1,4 +1,5 @@
 import hashlib
+import typing
 from html import escape as escape_html
 from dataclasses import dataclass
 
@@ -31,14 +32,12 @@ from gooey_ui.components.pills import pill
 from handles.models import Handle
 
 
-@dataclass
-class ContributionsSummary:
+class ContributionsSummary(typing.NamedTuple):
     total: int
     top_contributions: dict[Workflow, int]  # sorted dict
 
 
-@dataclass
-class PublicRunsSummary:
+class PublicRunsSummary(typing.NamedTuple):
     total: int
     top_workflows: dict[Workflow, int]
 

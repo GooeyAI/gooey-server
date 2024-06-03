@@ -269,7 +269,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
             status_code=400,
         )
 
-    current_plan = PricingPlan(request.user.subscription.plan)
+    current_plan = PricingPlan.from_sub(request.user.subscription)
 
     if new_plan == current_plan:
         return RedirectResponse(account_url, status_code=303)
@@ -385,7 +385,7 @@ def paypal_handle_subscription_updated(subscription: paypal.Subscription):
     elif not user.subscription:
         user.subscription = Subscription()
 
-    user.subscription.plan = plan.value
+    user.subscription.plan = plan.db_value
     user.subscription.payment_provider = PaymentProvider.PAYPAL
     user.subscription.external_id = subscription.id
 
