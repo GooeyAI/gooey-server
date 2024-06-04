@@ -117,7 +117,7 @@ def user_profile_header(request, user: AppUser):
                     pill(
                         f"{icons.github} " + escape_html(user.github_username),
                         unsafe_allow_html=True,
-                        type=None,
+                        text_bg=None,
                         className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
                     )
 

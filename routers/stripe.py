@@ -3,7 +3,6 @@ from urllib.parse import quote_plus
 import stripe
 from django.db import transaction
 from fastapi import APIRouter, Request
-from fastapi.datastructures import FormData
 from fastapi.responses import JSONResponse, RedirectResponse
 from loguru import logger
 
@@ -11,62 +10,16 @@ from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_body,
-    fastapi_request_form,
     get_route_url,
 )
 from payments.models import PaymentProvider, Subscription
 from payments.plans import PricingPlan
 from routers.account import (
     send_monthly_spending_notification_email,
-    payment_processing_route,
     account_route,
 )
 
 router = APIRouter()
-
-
-@router.post("/__/stripe/create-checkout-session")
-def create_checkout_session(
-    request: Request, body_form: FormData = fastapi_request_form
-):
-    if not request.user:
-        return RedirectResponse(
-            request.url_for("login", query_params={"next": request.url.path})
-        )
-
-    lookup_key: str = body_form["lookup_key"]
-    if plan := PricingPlan.get_by_key(lookup_key):
-        line_item = plan.get_stripe_line_item()
-    else:
-        return JSONResponse(
-            {
-                "message": "Invalid plan lookup key",
-            }
-        )
-
-    if request.user.subscription and request.user.subscription.plan == plan.db_value:
-        # already subscribed to the same plan
-        return RedirectResponse("/", status_code=303)
-
-    metadata = {
-        settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: lookup_key,
-    }
-
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[line_item],
-        mode="subscription",
-        success_url=get_route_url(payment_processing_route),
-        cancel_url=get_route_url(account_route),
-        customer=request.user.get_or_create_stripe_customer(),
-        metadata=metadata,
-        subscription_data={"metadata": metadata},
-        allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
-    )
-
-    return RedirectResponse(checkout_session.url, status_code=303)
 
 
 @router.post("/__/stripe/create-portal-session")
