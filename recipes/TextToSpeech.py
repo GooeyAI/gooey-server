@@ -346,9 +346,9 @@ class TextToSpeechPage(BasePage):
                         f"Azure TTS failed: (code: {result.reason}) {result.cancellation_details.error_details}"
                     )
                 stream = speechsdk.AudioDataStream(result)
-                buf = bytes(16_000)
                 ret = bytes()
                 while True:
+                    buf = bytes(16_000)
                     n = stream.read_data(buf)
                     if n <= 0:
                         break

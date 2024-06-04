@@ -143,7 +143,7 @@ def runner(
                 with NestingCtx(root):
                     ret = fn()
             except StopException:
-                pass
+                ret = None
             except RedirectException as e:
                 return RedirectResponse(e.url, status_code=e.status_code)
             if isinstance(ret, Response):

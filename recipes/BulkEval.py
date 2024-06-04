@@ -432,5 +432,8 @@ def iterate(
 
 @st.cache_in_session_state
 def get_nrows(files: list[str]) -> int:
-    dfs = map_parallel(read_df_any, files)
+    try:
+        dfs = map_parallel(read_df_any, files)
+    except ValueError:
+        return 0
     return sum((len(df) for df in dfs), 0)

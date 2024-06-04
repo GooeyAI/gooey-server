@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import HttpUrl
 
+from daras_ai_v2 import settings
+
 if typing.TYPE_CHECKING:
     from pydantic import BaseConfig, AnyUrl
     from pydantic.fields import ModelField
@@ -10,6 +12,8 @@ if typing.TYPE_CHECKING:
 
 
 class FieldHttpUrl(HttpUrl):
+    if settings.DEBUG:
+        tld_required = False
     min_length = 0  # allow empty string
 
     @classmethod

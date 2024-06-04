@@ -2,7 +2,6 @@ import datetime
 import typing
 import uuid
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -17,6 +16,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     doc_url_to_file_metadata,
@@ -138,7 +138,7 @@ List of URLs to the evaluation runs that you requested.
                             keys = {k: k for k in sr.state[field][0].keys()}
                         except (KeyError, IndexError, AttributeError, TypeError):
                             pass
-                elif field_props.get("type") == "object":
+                elif is_obj(field_props):
                     try:
                         keys = {k: k for k in sr.state[field].keys()}
                     except (KeyError, AttributeError, TypeError):
@@ -503,7 +503,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
         request_body = {}
         for field, col in request.input_columns.items():
             parts = field.split(".")
-            field_props = properties.get(parts[0]) or properties.get(parts)
+            field_props = properties.get(parts[0]) or properties.get(field)
             if is_arr(field_props):
                 arr = request_body.setdefault(parts[0], [])
                 for arr_ix in range(arr_len):
@@ -516,8 +516,8 @@ def build_requests_for_df(df, request, df_ix, arr_len):
                         if len(arr) <= arr_ix:
                             arr.append(None)
                         arr[arr_ix] = value
-            elif len(parts) > 1 and field_props.get("type") == "object":
-                obj = request_body.setdefault(parts[0], {})
+            elif len(parts) > 1 and is_obj(field_props):
+                obj = request_body.setdefault(parts[0], sr.state.get(parts[0], {}))
                 obj[parts[1]] = df.at[df_ix, col]
             else:
                 request_body[field] = df.at[df_ix, col]
@@ -564,7 +564,9 @@ def slice_request_df(df, request):
         df_ix += arr_len
 
 
-def is_arr(field_props: dict) -> bool:
+def is_arr(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
     try:
         return field_props["type"] == "array"
     except KeyError:
@@ -574,9 +576,18 @@ def is_arr(field_props: dict) -> bool:
     return False
 
 
+def is_obj(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
+    return bool(field_props.get("type") == "object" or field_props.get("$ref"))
+
+
 @st.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
-    dfs = map_parallel(read_df_any, files)
+    try:
+        dfs = map_parallel(read_df_any, files)
+    except ValueError:
+        return []
     return list(
         {
             col: None

@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
-import requests
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
@@ -89,7 +88,7 @@ async def favicon():
 @st.route
 def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-    match json_data["status"]:
+    match json_data.get("status"):
         case 404:
             template = "errors/404.html"
         case _:
@@ -608,11 +607,23 @@ def render_page(
     if latest_slug != page_slug:
         return RedirectResponse(tab.url_path(latest_slug, run_slug))
 
-    # parse the query params and load the state
-    query_params = st.get_query_params()
-    if not query_params.get("example_id"):
-        query_params["example_id"] = example_id
-    example_id, run_id, uid = extract_query_params(query_params)
+    # if the old query param format is provided, redirect to the new format
+    # because features like login relies on the new format
+    query_params = dict(request.query_params)
+    q_example_id, run_id, uid = extract_query_params(query_params)
+    if q_example_id:
+        query_params.pop("example_id", None)
+        new_url = page_cls.app_url(
+            tab=tab,
+            example_id=q_example_id,
+            run_id=run_id,
+            uid=uid,
+            query_params=query_params,
+        )
+        return RedirectResponse(new_url)
+    # this is because the code still expects example_id to be in the query params
+    st.set_query_params(query_params | dict(example_id=example_id))
+
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not st.session_state:
         sr = page.get_sr_from_query_params(example_id, run_id, uid)

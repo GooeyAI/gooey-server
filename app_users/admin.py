@@ -20,33 +20,45 @@ class AppUserAdmin(admin.ModelAdmin):
             {
                 "fields": [
                     "uid",
-                    "display_name",
-                    "email",
-                    "phone_number",
+                    ("email", "phone_number"),
                     "balance",
+                    "user_subscription",
+                    "stripe_customer_id",
                     "total_payments",
                     "total_charged",
                     "total_usage_cost",
-                    "user_runs",
-                    "view_transactions",
-                    "is_anonymous",
                     "is_disabled",
-                    "photo_url",
-                    "stripe_customer_id",
+                    "is_anonymous",
                     "is_paying",
                     "disable_safety_checker",
+                    "disable_rate_limits",
+                    ("user_runs", "view_transactions"),
                     "created_at",
                     "upgraded_from_anonymous_at",
-                    "open_in_firebase",
-                    "open_in_stripe",
+                    ("open_in_firebase", "open_in_stripe"),
                     "low_balance_email_sent_at",
                 ],
             },
-        )
+        ),
+        (
+            "Profile Options",
+            {
+                "fields": [
+                    "user_handle",
+                    "display_name",
+                    "bio",
+                    ("company", "github_username"),
+                    "website_url",
+                    "banner_url",
+                    "photo_url",
+                ]
+            },
+        ),
     ]
     list_display = [
         "uid",
         "user_handle",
+        "user_subscription",
         "display_name",
         "email",
         "phone_number",
@@ -80,6 +92,8 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_firebase",
         "open_in_stripe",
         "low_balance_email_sent_at",
+        "user_handle",
+        "user_subscription",
     ]
 
     @admin.display(description="User Runs")
@@ -100,6 +114,15 @@ class AppUserAdmin(admin.ModelAdmin):
             )
         return None
 
+    @admin.display(description="User Subscription")
+    def user_subscription(self, user: models.AppUser):
+        if user.subscription:
+            return change_obj_url(
+                user.subscription,
+                label=str(user.subscription),
+            )
+        return None
+
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):
         return "$" + str(
@@ -114,12 +137,13 @@ class AppUserAdmin(admin.ModelAdmin):
 
     @admin.display(description="Total Charged")
     def total_charged(self, user: models.AppUser):
-        return -1 * (
+        credits_charged = -1 * (
             user.transactions.filter(amount__lt=0).aggregate(Sum("amount"))[
                 "amount__sum"
             ]
             or 0
         )
+        return f"{credits_charged} Credits"
 
     @admin.display(description="Total Usage Cost")
     def total_usage_cost(self, user: models.AppUser):

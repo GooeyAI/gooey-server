@@ -20,3 +20,13 @@ chat = '<i class="fa-regular fa-messages"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
+
+# cards
+card_icons = {
+    "visa": '<i class="fa-brands fa-cc-visa"></i>',
+    "mastercard": '<i class="fa-brands fa-cc-mastercard"></i>',
+    "amex": '<i class="fa-brands fa-cc-amex"></i>',
+    "discover": '<i class="fa-brands fa-cc-discover"></i>',
+    "jcb": '<i class="fa-brands fa-cc-jcb"></i>',
+    "diners": '<i class="fa-brands fa-cc-diners-club"></i>',
+}

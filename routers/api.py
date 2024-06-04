@@ -32,6 +32,7 @@ from daras_ai_v2.base import (
     RecipeRunState,
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
+from daras_ai_v2.ratelimits import ensure_rate_limits
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from routers.billing import AccountTabs
 
@@ -64,6 +65,14 @@ class FailedResponseDetail(BaseModel):
 
 class FailedReponseModelV2(BaseModel):
     detail: FailedResponseDetail
+
+
+class GenericErrorResponseDetail(BaseModel):
+    error: str
+
+
+class GenericErrorResponse(BaseModel):
+    detail: GenericErrorResponseDetail
 
 
 ## v3
@@ -113,10 +122,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         __base__=ApiResponseModelV2[page_cls.ResponseModel],
     )
 
+    common_errs = {
+        402: {"model": GenericErrorResponse},
+        429: {"model": GenericErrorResponse},
+    }
+
     @app.post(
         os.path.join(endpoint, ""),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, **common_errs},
         operation_id=page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
@@ -124,7 +138,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         endpoint,
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, **common_errs},
         include_in_schema=False,
     )
     def run_api_json(
@@ -143,13 +157,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "form/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, **common_errs},
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "form"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, **common_errs},
         include_in_schema=False,
     )
     def run_api_form(
@@ -169,7 +183,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async/"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         operation_id="async__" + page_cls.slug_versions[0],
         name=page_cls.title + " (v3 async)",
         tags=[page_cls.title],
@@ -178,7 +192,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         include_in_schema=False,
         status_code=202,
     )
@@ -203,13 +217,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async/form/"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "async/form"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         include_in_schema=False,
     )
     def run_api_form(
@@ -234,7 +248,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.get(
         os.path.join(endpoint, "status/"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
@@ -242,7 +256,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.get(
         os.path.join(endpoint, "status"),
         response_model=response_model,
-        responses={402: {}},
+        responses=common_errs,
         include_in_schema=False,
     )
     def get_run_status(
@@ -318,6 +332,7 @@ def _run_api(
         user=user,
         query_params=query_params,
         retention_policy=RetentionPolicy[run_settings.retention_policy],
+        enable_rate_limits=True,
     )
     response = build_api_response(
         page=page,
@@ -336,6 +351,7 @@ def submit_api_call(
     user: AppUser,
     query_params: dict,
     retention_policy: RetentionPolicy = None,
+    enable_rate_limits: bool = False,
 ) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
     # init a new page for every request
     self = page_cls(request=SimpleNamespace(user=user))
@@ -356,13 +372,15 @@ def submit_api_call(
         account_url = furl(settings.APP_BASE_URL) / AccountTabs.billing.url_path
         raise HTTPException(
             status_code=402,
-            detail={
-                "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
-            },
+            detail=dict(
+                error=f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}"
+            ),
         )
     # create a new run
     example_id, run_id, uid = self.create_new_run(
-        is_api_call=True, retention_policy=retention_policy or RetentionPolicy.keep
+        enable_rate_limits=enable_rate_limits,
+        is_api_call=True,
+        retention_policy=retention_policy or RetentionPolicy.keep,
     )
     # submit the task
     result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
