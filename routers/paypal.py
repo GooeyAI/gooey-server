@@ -17,7 +17,7 @@ from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
 from payments.models import PricingPlan
-from routers.billing import (
+from routers.account import (
     paypal_handle_subscription_updated,
     send_monthly_spending_notification_email,
     payment_processing_route,

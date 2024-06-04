@@ -70,7 +70,7 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.billing import AccountTabs
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (

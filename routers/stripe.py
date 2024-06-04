@@ -16,7 +16,7 @@ from daras_ai_v2.fastapi_tricks import (
 )
 from payments.models import PaymentProvider, Subscription
 from payments.plans import PricingPlan
-from routers.billing import (
+from routers.account import (
     send_monthly_spending_notification_email,
     payment_processing_route,
     account_route,

@@ -15,6 +15,8 @@ from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.plans import PricingPlan
 
+rounded_border = "border shadow-sm rounded"
+
 
 def billing_page(user: AppUser):
     render_payments_setup()
@@ -44,7 +46,7 @@ def billing_page(user: AppUser):
 
 
 def render_payments_setup():
-    from routers.billing import payment_processing_route
+    from routers.account import payment_processing_route
 
     st.html(
         templates.get_template("payment_setup.html").render(
@@ -57,7 +59,7 @@ def render_payments_setup():
 def render_current_plan(user: AppUser):
     subscription = user.subscription
     plan = PricingPlan.from_sub(subscription)
-    with border_box(className="w-100 pt-4 p-3 text-dark border-dark"):
+    with st.div(className=f"{rounded_border} w-100 pt-4 p-3 text-dark border-dark"):
         left, right = left_and_right(className="align-items-center")
         with left:
             st.write(
@@ -123,10 +125,13 @@ def render_all_plans(user: AppUser):
     def _render_plan(plan: PricingPlan):
         nonlocal payment_provider
 
-        extra_class = "border-dark" if plan == current_plan else "bg-light"
+        if plan == current_plan:
+            extra_class = "border-dark"
+        else:
+            extra_class = "bg-light"
         with st.div(className="d-flex flex-column h-100"):
-            with border_box(
-                className=f"flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
+            with st.div(
+                className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
             ):
                 _render_plan_details(plan)
                 _render_plan_action_button(plan, current_plan, payment_provider)
@@ -242,7 +247,7 @@ def update_subscription_button(
 
 
 def render_change_subscription_button(label: str, *, plan: PricingPlan, className: str):
-    from routers.billing import change_subscription
+    from routers.account import change_subscription
 
     st.html(
         f"""
@@ -316,7 +321,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             with st.div(className="d-flex w-100"):
                 if st.button("Buy", type="primary"):
                     if user.subscription.stripe_attempt_addon_purchase(amount):
-                        from routers.billing import payment_processing_route
+                        from routers.account import payment_processing_route
 
                         raise RedirectException(get_route_url(payment_processing_route))
                     else:
@@ -370,7 +375,7 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(user: AppUser):
-    from routers.billing import change_payment_method
+    from routers.account import change_payment_method
 
     assert user.subscription
 
@@ -525,14 +530,6 @@ def render_auto_recharge_section(user: AppUser):
         with transaction.atomic():
             subscription.save()
         st.success("Settings saved!")
-
-
-def border_box(*, className: str = "", **kwargs):
-    className = className + " border shadow-sm rounded"
-    return st.div(
-        className=className,
-        **kwargs,
-    )
 
 
 def left_and_right(**kwargs):

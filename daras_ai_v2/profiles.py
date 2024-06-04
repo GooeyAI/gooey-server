@@ -93,7 +93,7 @@ def user_profile_header(request, user: AppUser):
                 st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
-                from routers.billing import AccountTabs
+                from routers.account import AccountTabs
 
                 with st.link(
                     to=AccountTabs.profile.url_path,
