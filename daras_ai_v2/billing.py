@@ -77,14 +77,12 @@ def render_current_plan(user: AppUser):
             )
         if plan.monthly_charge:
             with right, st.tag("p", className="text-muted"):
-                if next_invoice_ts := st.call_async(
-                    subscription.get_next_invoice_timestamp
+                if next_invoice_ts := st.run_in_thread(
+                    subscription.get_next_invoice_timestamp, cache=True
                 ):
                     st.html("Next invoice on ")
                     pill(
-                        "...",
-                        text_bg="dark",
-                        **render_local_dt_attrs(next_invoice_ts),
+                        "...", text_bg="dark", **render_local_dt_attrs(next_invoice_ts)
                     )
 
         left, right = left_and_right(className="mt-5")
@@ -320,25 +318,35 @@ def render_stripe_addon_button(amount: int, user: AppUser):
     if st.button(f"${amount:,}", type="primary"):
         confirm_purchase_modal.open()
 
-    if confirm_purchase_modal.is_open():
-        with confirm_purchase_modal.container():
-            st.write(
-                f"""
-                    Please confirm your purchase:  
-                     **{amount * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${amount}**.
+    if not confirm_purchase_modal.is_open():
+        return
+    with confirm_purchase_modal.container():
+        st.write(
+            f"""
+                Please confirm your purchase:  
+                 **{amount * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${amount}**.
                  """,
-                className="py-4 d-block",
-            )
-            with st.div(className="d-flex w-100"):
-                if st.button("Buy", type="primary"):
-                    if user.subscription.stripe_attempt_addon_purchase(amount):
-                        from routers.account import payment_processing_route
-
-                        raise RedirectException(get_route_url(payment_processing_route))
-                    else:
-                        st.error("Payment failed... Please try again.")
-                if st.button("Cancel", className="border border-danger text-danger"):
+            className="py-4 d-block text-center",
+        )
+        with st.div(className="d-flex w-100 justify-content-end"):
+            if st.session_state.get("--confirm-purchase"):
+                success = st.run_in_thread(
+                    user.subscription.stripe_attempt_addon_purchase,
+                    args=[amount],
+                    placeholder="Processing payment...",
+                )
+                if success is None:
+                    return
+                st.session_state.pop("--confirm-purchase")
+                if success:
                     confirm_purchase_modal.close()
+                else:
+                    st.error("Payment failed... Please try again.")
+                return
+
+            if st.button("Cancel", className="border border-danger text-danger me-2"):
+                confirm_purchase_modal.close()
+            st.button("Buy", type="primary", key="--confirm-purchase")
 
 
 def render_stripe_subscription_button(
@@ -416,7 +424,9 @@ def render_payment_information(user: AppUser):
         if st.button(f"{icons.edit} Edit", type="link"):
             raise RedirectException(user.subscription.get_external_management_url())
 
-    pm_summary = st.call_async(user.subscription.get_payment_method_summary)
+    pm_summary = st.run_in_thread(
+        user.subscription.get_payment_method_summary, cache=True
+    )
     if not pm_summary:
         return
     pm_summary = PaymentMethodSummary(*pm_summary)

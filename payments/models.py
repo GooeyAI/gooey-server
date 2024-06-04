@@ -258,15 +258,20 @@ class Subscription(models.Model):
             raise ValueError("Invalid Payment Provider")
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
+        from routers.stripe import handle_invoice_paid
+
         invoice = self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars,
             metadata_key="addon",
         )
-        if invoice.status == "open":
-            pm = self.stripe_get_default_payment_method()
-            invoice.pay(payment_method=pm)
-            return True
-        return False
+        if invoice.status != "open":
+            return False
+        pm = self.stripe_get_default_payment_method()
+        invoice = invoice.pay(payment_method=pm)
+        if not invoice.paid:
+            return False
+        handle_invoice_paid(self.user.uid, invoice)
+        return True
 
     def get_external_management_url(self) -> str:
         """

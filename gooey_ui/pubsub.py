@@ -35,20 +35,33 @@ def get_subscriptions() -> list[str]:
         return threadlocal.channels
 
 
-def call_async(fn: typing.Callable, *args, placeholder="...", ex=60, **kwargs):
+def run_in_thread(
+    fn: typing.Callable,
+    *,
+    args: typing.Sequence = None,
+    kwargs: typing.Mapping = None,
+    placeholder: str = "...",
+    cache: bool = False,
+    ex=60,
+):
     from .state import session_state
     from .components import write
 
-    channel_key = f"__async_channel_{fn}"
+    channel_key = f"--thread/{fn}"
     try:
         channel = session_state[channel_key]
     except KeyError:
         channel = session_state[channel_key] = (
-            f"gooey-async-fn/{fn.__name__}/{uuid.uuid1()}"
+            f"gooey-thread-fn/{fn.__name__}/{uuid.uuid1()}"
         )
 
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
+
         def target():
-            realtime_push(channel, dict(ret=fn(*args, **kwargs)), ex=ex)
+            realtime_push(channel, dict(y=fn(*args, **kwargs)), ex=ex)
 
         threading.Thread(target=target).start()
 
@@ -59,12 +72,14 @@ def call_async(fn: typing.Callable, *args, placeholder="...", ex=60, **kwargs):
 
     result = realtime_pull([channel])[0]
     if result:
-        ret = session_state[channel] = result["ret"]
+        ret = result["y"]
+        if cache:
+            session_state[channel] = ret
+        else:
+            session_state.pop(channel_key)
         return ret
-    else:
-        if placeholder:
-            write(placeholder)
-        return None
+    elif placeholder:
+        write(placeholder)
 
 
 def realtime_pull(channels: list[str]) -> list[typing.Any]:

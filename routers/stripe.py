@@ -60,7 +60,7 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:
         case "invoice.paid":
-            _handle_invoice_paid(uid, data)
+            handle_invoice_paid(uid, data)
         case "checkout.session.completed":
             _handle_checkout_session_completed(uid, data)
         case "customer.subscription.created" | "customer.subscription.updated":
@@ -71,7 +71,7 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     return JSONResponse({"status": "success"})
 
 
-def _handle_invoice_paid(uid: str, invoice_data):
+def handle_invoice_paid(uid: str, invoice_data):
     invoice_id = invoice_data.id
     line_items = stripe.Invoice._static_request(
         "get",
