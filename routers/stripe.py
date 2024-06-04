@@ -2,20 +2,24 @@ from urllib.parse import quote_plus
 
 import stripe
 from django.db import transaction
+from fastapi import APIRouter, Request
 from fastapi.datastructures import FormData
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi import APIRouter, Request
 from loguru import logger
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
-from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_body,
+    fastapi_request_form,
+    get_route_url,
+)
 from payments.models import PaymentProvider, Subscription
 from payments.plans import PricingPlan
 from routers.billing import (
     send_monthly_spending_notification_email,
-    account_url,
-    payment_processing_url,
+    payment_processing_route,
+    account_route,
 )
 
 router = APIRouter()
@@ -51,8 +55,8 @@ def create_checkout_session(
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode="subscription",
-        success_url=payment_processing_url,
-        cancel_url=account_url,
+        success_url=get_route_url(payment_processing_route),
+        cancel_url=get_route_url(account_route),
         customer=request.user.get_or_create_stripe_customer(),
         metadata=metadata,
         subscription_data={"metadata": metadata},
@@ -70,7 +74,7 @@ def customer_portal(request: Request):
     customer = request.user.get_or_create_stripe_customer()
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
-        return_url=account_url,
+        return_url=get_route_url(account_route),
     )
     return RedirectResponse(portal_session.url, status_code=303)
 

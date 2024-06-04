@@ -34,7 +34,7 @@ from daras_ai_v2.exceptions import ffmpeg, UserError, raise_for_status
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
-    get_route_url,
+    get_route_path,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
@@ -732,4 +732,4 @@ class RecipeTabs(TabData, Enum):
         if example_id:
             kwargs["example_id"] = example_id
             kwargs["run_slug"] = run_slug or "untitled"
-        return get_route_url(self.route, kwargs)
+        return get_route_path(self.route, kwargs)

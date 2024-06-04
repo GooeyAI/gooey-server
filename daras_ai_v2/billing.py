@@ -8,19 +8,12 @@ import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.fastapi_tricks import get_route_path, get_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.settings import templates
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.plans import PricingPlan
-
-
-payment_processing_url = str(
-    furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
-)
-stripe_create_checkout_session_url = "/__/stripe/create-checkout-session"
-change_subscription_url = "/__/billing/change-subscription"
-change_payment_method_url = "/__/billing/change-payment-method"
 
 
 def billing_page(user: AppUser):
@@ -51,7 +44,14 @@ def billing_page(user: AppUser):
 
 
 def render_payments_setup():
-    st.html(templates.get_template("payment_setup.html").render(settings=settings))
+    from routers.billing import payment_processing_route
+
+    st.html(
+        templates.get_template("payment_setup.html").render(
+            settings=settings,
+            payment_processing_url=get_route_url(payment_processing_route),
+        )
+    )
 
 
 def render_current_plan(user: AppUser):
@@ -242,9 +242,11 @@ def update_subscription_button(
 
 
 def render_change_subscription_button(label: str, *, plan: PricingPlan, className: str):
+    from routers.billing import change_subscription
+
     st.html(
         f"""
-    <form action="{change_subscription_url}" method="post" class="d-inline">
+    <form action="{get_route_path(change_subscription)}" method="post" class="d-inline">
         <input type="hidden" name="lookup_key" value="{plan.key}">
         <button type="submit" class="{className}" data-submit-disabled>{label}</button>
     </form>
@@ -314,7 +316,9 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             with st.div(className="d-flex w-100"):
                 if st.button("Buy", type="primary"):
                     if user.subscription.stripe_attempt_addon_purchase(amount):
-                        raise RedirectException(payment_processing_url)
+                        from routers.billing import payment_processing_route
+
+                        raise RedirectException(get_route_url(payment_processing_route))
                     else:
                         st.error("Payment failed... Please try again.")
                 if st.button("Cancel", className="border border-danger text-danger"):
@@ -328,14 +332,17 @@ def render_stripe_subscription_button(
     className: str = "streamlit-like-btn",
     type: str = "primary",
 ):
+    from routers.stripe import create_checkout_session
+
     if not plan.monthly_charge:
         st.write("Stripe subscription not available")
         return
 
     btn_classes = f"btn btn-theme btn-{type} {className}"
+
     st.html(
         f"""
-    <form action="{stripe_create_checkout_session_url}" method="post" class="d-inline">
+    <form action="{get_route_path(create_checkout_session)}" method="post" class="d-inline">
         <input type="hidden" name="lookup_key" value="{plan.key}">
         <button type="submit" class="{btn_classes}" data-submit-disabled>{label}</button>
     </form>
@@ -363,6 +370,8 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(user: AppUser):
+    from routers.billing import change_payment_method
+
     assert user.subscription
 
     st.write("## Payment Information", id="payment-information", className="d-block")
@@ -388,7 +397,7 @@ def render_payment_information(user: AppUser):
                 f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
                 unsafe_allow_html=True,
             )
-        with col3, st.link(to=change_payment_method_url):
+        with col3, st.link(to=get_route_path(change_payment_method)):
             st.button(f"{icons.edit} Edit", type="link")
 
     if pm_summary.billing_email:

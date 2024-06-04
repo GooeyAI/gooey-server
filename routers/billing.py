@@ -20,6 +20,7 @@ from daras_ai_v2.base import RedirectException
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
+    get_route_path,
     get_route_url,
 )
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -36,17 +37,19 @@ from routers.root import page_wrapper, get_og_url_path
 app = APIRouter()
 
 
-@app.post(settings.PAYMENT_PROCESSING_PAGE_PATH)
+@app.post("/payment-processing/")
 @st.route
-def payment_processing_route(request: Request):
+def payment_processing_route(
+    request: Request, provider: str = None, subscription_id: str = None
+):
     context = {
         "request": request,
         "settings": settings,
-        "redirect_url": account_url,
+        "redirect_url": get_route_url(account_route),
     }
 
-    if request.query_params.get("provider") == "paypal":
-        if sub_id := request.query_params.get("subscription_id"):
+    if provider == "paypal":
+        if sub_id := subscription_id:
             sub = paypal.Subscription.retrieve(sub_id)
             paypal_handle_subscription_updated(sub)
         else:
@@ -77,14 +80,6 @@ def account_route(request: Request):
             robots="noindex,nofollow",
         )
     )
-
-
-payment_processing_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(payment_processing_route.__name__)
-)
-account_url = str(
-    furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
-)
 
 
 @app.post("/account/profile/")
@@ -151,7 +146,7 @@ class AccountTabs(TabData, Enum):
 
     @property
     def url_path(self) -> str:
-        return get_route_url(self.route)
+        return get_route_path(self.route)
 
 
 def billing_tab(request: Request):
@@ -228,7 +223,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
 @app.get("/__/billing/change-payment-method")
 def change_payment_method(request: Request):
     if not request.user or not request.user.subscription:
-        return RedirectResponse(account_url)
+        return RedirectResponse(get_route_url(account_route))
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
@@ -241,8 +236,8 @@ def change_payment_method(request: Request):
                         "subscription_id": request.user.subscription.external_id,
                     },
                 },
-                success_url=payment_processing_url,
-                cancel_url=account_url,
+                success_url=get_route_url(payment_processing_route),
+                cancel_url=get_route_url(account_route),
             )
             return RedirectResponse(session.url, status_code=303)
         case _:
@@ -257,7 +252,7 @@ def change_payment_method(request: Request):
 @app.post("/__/billing/change-subscription")
 def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
     if not request.user:
-        return RedirectResponse(account_url, status_code=303)
+        return RedirectResponse(get_route_url(account_route), status_code=303)
 
     lookup_key = form_data["lookup_key"]
     new_plan = PricingPlan.get_by_key(lookup_key)
@@ -272,12 +267,14 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
     current_plan = PricingPlan.from_sub(request.user.subscription)
 
     if new_plan == current_plan:
-        return RedirectResponse(account_url, status_code=303)
+        return RedirectResponse(get_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
         request.user.subscription.cancel()
         request.user.subscription.delete()
-        return RedirectResponse(payment_processing_url, status_code=303)
+        return RedirectResponse(
+            get_route_url(payment_processing_route), status_code=303
+        )
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
@@ -302,7 +299,9 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
                     settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
                 },
             )
-            return RedirectResponse(payment_processing_url, status_code=303)
+            return RedirectResponse(
+                get_route_url(payment_processing_route), status_code=303
+            )
 
         case PaymentProvider.PAYPAL:
             if not new_plan.monthly_charge:
@@ -349,7 +348,7 @@ def send_monthly_spending_notification_email(user: AppUser):
             "monthly_spending_notification_threshold_email.html"
         ).render(
             user=user,
-            account_url=account_url,
+            account_url=get_route_url(account_route),
         ),
     )
 

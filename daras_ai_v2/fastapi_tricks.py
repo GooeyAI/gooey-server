@@ -7,6 +7,8 @@ from fastapi.routing import APIRoute
 from furl import furl
 from starlette.requests import Request
 
+from daras_ai_v2 import settings
+
 
 async def request_json(request: Request):
     return await request.json()
@@ -55,6 +57,10 @@ def resolve_url(url: str) -> ResolverMatch | None:
 
 
 def get_route_url(route_fn: typing.Callable, params: dict = None) -> str:
+    return str(furl(settings.APP_BASE_URL) / get_route_path(route_fn, params=params))
+
+
+def get_route_path(route_fn: typing.Callable, params: dict = None) -> str:
     from server import app
 
     return os.path.join(app.url_path_for(route_fn.__name__, **(params or {})), "")
