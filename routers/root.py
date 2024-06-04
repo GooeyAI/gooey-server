@@ -662,7 +662,7 @@ def get_run_user(request, uid) -> AppUser | None:
 
 
 @contextmanager
-def page_wrapper(request: Request):
+def page_wrapper(request: Request, className=""):
     context = {
         "request": request,
         "settings": settings,
@@ -673,15 +673,16 @@ def page_wrapper(request: Request):
             request.user.uid
         ).decode()
 
-    st.html(templates.get_template("gtag.html").render(**context))
-    st.html(templates.get_template("header.html").render(**context))
-    st.html(copy_to_clipboard_scripts)
+    with st.div(className="d-flex flex-column min-vh-100"):
+        st.html(templates.get_template("gtag.html").render(**context))
+        st.html(templates.get_template("header.html").render(**context))
+        st.html(copy_to_clipboard_scripts)
 
-    with st.div(id="main-content", className="container"):
-        yield
+        with st.div(id="main-content", className="container " + className):
+            yield
 
-    st.html(templates.get_template("footer.html").render(**context))
-    st.html(templates.get_template("login_scripts.html").render(**context))
+        st.html(templates.get_template("footer.html").render(**context))
+        st.html(templates.get_template("login_scripts.html").render(**context))
 
 
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"

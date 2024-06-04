@@ -42,24 +42,40 @@ app = APIRouter()
 def payment_processing_route(
     request: Request, provider: str = None, subscription_id: str = None
 ):
-    context = {
-        "request": request,
-        "settings": settings,
-        "redirect_url": get_route_url(account_route),
-    }
+    subtext = None
+    waiting_time_sec = 3
 
     if provider == "paypal":
         if sub_id := subscription_id:
             sub = paypal.Subscription.retrieve(sub_id)
             paypal_handle_subscription_updated(sub)
         else:
-            context["subtext"] = (
-                "PayPal transactions take up to a minute to reflect in your account..."
+            subtext = (
+                "PayPal transactions take up to a minute to reflect in your account"
             )
-            context["waiting_time"] = 30  # seconds
+            waiting_time_sec = 30
 
-    with page_wrapper(request):
-        st.html(templates.get_template("payment_processing.html").render(**context))
+    with page_wrapper(request, className="m-auto"):
+        with st.center():
+            with st.div(className="d-flex align-items-center"):
+                st.div(
+                    className="gooey-spinner me-4",
+                    style=dict(height="3rem", width="3rem"),
+                )
+                st.write("# Processing payment...")
+            st.caption(subtext)
+
+    st.js(
+        # language=JavaScript
+        """
+        setTimeout(() => {
+            window.location.href = redirectUrl;
+        }, waitingTimeMs);
+        """,
+        waitingTimeMs=waiting_time_sec * 1000,
+        redirectUrl=(get_route_url(account_route)),
+    )
+
     return dict(
         meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
     )
