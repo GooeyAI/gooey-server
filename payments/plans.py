@@ -215,15 +215,15 @@ class PricingPlan(PricingPlanData, Enum):
         return [(plan.db_value, plan.name) for plan in cls]
 
     @classmethod
-    def from_sub(cls, sub: "Subscription") -> PricingPlan | None:
+    def from_sub(cls, sub: "Subscription") -> PricingPlan:
         return cls.from_db_value(sub.plan)
 
     @classmethod
-    def from_db_value(cls, db_value: int) -> PricingPlan | None:
+    def from_db_value(cls, db_value: int) -> PricingPlan:
         for plan in cls:
             if plan.db_value == db_value:
                 return plan
-        raise UserError(f"Invalid {cls.__name__} {db_value=}")
+        raise ValueError(f"Invalid {cls.__name__} {db_value=}")
 
     @classmethod
     def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
