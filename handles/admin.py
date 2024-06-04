@@ -5,4 +5,4 @@ from .models import Handle
 
 @admin.register(Handle)
 class HandleAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ["name", "redirect_url"]
