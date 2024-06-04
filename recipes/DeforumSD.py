@@ -274,7 +274,7 @@ def frames_to_seconds(frames: int, fps: int) -> float:
 
 
 def seconds_to_frames(seconds: float, fps: int) -> int:
-    return int(seconds * fps)
+    return int(seconds) * int(fps)
 
 
 def zoom_pan_to_string(zoom_dict: dict[int, float]) -> str:
@@ -366,6 +366,21 @@ class DeforumSDPage(BasePage):
         with col2:
             st.write("*End of Video*")
 
+        st.write("#### Step 2: Increase Animation Quality")
+        st.write(
+            "Once you like your keyframes, increase your frames per second for high quality"
+        )
+        st.custom_radio(
+            """###### FPS (Frames per second)""",
+            options=[2, 10, 24],
+            format_func=lambda x: {
+                "2": "Draft: 2 FPS",
+                "10": "Stop-motion: 10 FPS",
+                "24": "Film: 24 FPS",
+            }[str(x)],
+            key="fps",
+        )
+
     def get_cost_note(self) -> str | None:
         return f"{st.session_state.get('max_frames')} frames @ {CREDITS_PER_FRAME} Cr /frame"
 
@@ -453,16 +468,6 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
                 """,
                 key="rotation_3d_x",
             )
-        st.slider(
-            """
-###### FPS (Frames per second)
-Choose fps for the video.
-            """,
-            min_value=10,
-            max_value=60,
-            step=1,
-            key="fps",
-        )
 
     #         st.selectbox(
     #             """
