@@ -4,14 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import stripe
-from django.core.exceptions import ValidationError
 from django.db import models
 from furl import furl
 
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from .plans import PricingPlan, stripe_get_addon_product
-
 
 
 @dataclass

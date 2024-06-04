@@ -70,7 +70,7 @@ def render_current_plan(user: AppUser):
                 ),
                 unsafe_allow_html=True,
             )
-        if plan.monthly_charge:
+        if subscription.payment_provider:
             if next_invoice_date := subscription.get_next_invoice_date():
                 with right, st.tag("p", className="text-muted"):
                     st.html("Next invoice on ")
@@ -80,7 +80,7 @@ def render_current_plan(user: AppUser):
         with left:
             with st.tag("h1", className="my-0"):
                 st.html(plan.pricing_title())
-            if plan.monthly_charge:
+            if subscription.payment_provider:
                 provider = PaymentProvider(subscription.payment_provider)
                 with st.div(className="d-flex align-items-center"):
                     st.caption(
@@ -328,7 +328,7 @@ def render_stripe_subscription_button(
     className: str = "streamlit-like-btn",
     type: str = "primary",
 ):
-    if not plan.monthly_charge:
+    if not plan.supports_stripe():
         st.write("Stripe subscription not available")
         return
 
@@ -347,7 +347,7 @@ def render_paypal_subscription_button(
     *,
     plan: PricingPlan,
 ):
-    if not plan.monthly_charge:
+    if not plan.supports_paypal():
         st.write("Paypal subscription not available")
         return
 

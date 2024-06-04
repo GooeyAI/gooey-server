@@ -281,7 +281,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
 
     match request.user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
-            if not new_plan.monthly_charge:
+            if not new_plan.supports_stripe():
                 return JSONResponse(
                     {
                         "message": f"Stripe subscription not available for {new_plan}",
@@ -305,7 +305,7 @@ def change_subscription(request: Request, form_data: FormData = fastapi_request_
             return RedirectResponse(payment_processing_url, status_code=303)
 
         case PaymentProvider.PAYPAL:
-            if not new_plan.monthly_charge:
+            if not new_plan.supports_paypal():
                 return JSONResponse(
                     {
                         "message": f"Paypal subscription not available for {new_plan}",
