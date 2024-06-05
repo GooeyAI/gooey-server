@@ -1,9 +1,5 @@
-from typing import Literal
-
 import stripe
 from django.core.exceptions import ValidationError
-from django.db import transaction
-from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
@@ -65,7 +61,7 @@ def render_current_plan(user: AppUser):
         else None
     )
 
-    with st.div(className=rounded_border):
+    with st.div(className=f"{rounded_border} border-dark"):
         # ROW 1: Plan title and next invoice date
         left, right = left_and_right()
         with left:
