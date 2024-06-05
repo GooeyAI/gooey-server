@@ -73,7 +73,9 @@ class Subscription(models.Model):
         ]
 
     def __str__(self):
-        ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()} | {self.user}"
+        ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
+        if self.has_user:
+            ret = f"{ret} | {self.user}"
         if self.auto_recharge_enabled:
             ret = f"Auto | {ret}"
         return ret
