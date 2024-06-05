@@ -227,7 +227,11 @@ def account_page_wrapper(request: Request, current_tab: TabData):
 
 @app.get("/__/billing/change-payment-method")
 def change_payment_method(request: Request):
-    if not request.user or not request.user.subscription:
+    if (
+        not request.user
+        or not request.user.subscription
+        or not request.user.subscription.payment_provider
+    ):
         return RedirectResponse(account_url)
 
     match request.user.subscription.payment_provider:

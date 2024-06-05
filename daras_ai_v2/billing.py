@@ -1,4 +1,4 @@
-from textwrap import dedent
+from typing import Literal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -35,7 +35,7 @@ def billing_page(user: AppUser):
     with st.div(className="my-5"):
         render_all_plans(user)
 
-    if user.subscription:
+    if user.subscription and user.subscription.payment_provider:
         if user.subscription.payment_provider == PaymentProvider.STRIPE:
             with st.div(className="my-5"):
                 render_auto_recharge_section(user)
@@ -47,48 +47,52 @@ def billing_page(user: AppUser):
     with st.div(className="my-5"):
         render_billing_history(user)
 
-    return
-
 
 def render_payments_setup():
     st.html(templates.get_template("payment_setup.html").render(settings=settings))
 
 
 def render_current_plan(user: AppUser):
-    subscription = user.subscription
-    plan = PricingPlan.from_sub(subscription)
-    with border_box(className="w-100 pt-4 p-3 text-dark border-dark"):
-        left, right = left_and_right(className="align-items-center")
-        with left:
-            st.write(
-                dedent(
-                    f"""
-                #### Gooey.AI {plan.title}
+    plan = PricingPlan.from_sub(user.subscription)
+    provider = (
+        PaymentProvider(user.subscription.payment_provider)
+        if user.subscription.payment_provider
+        else None
+    )
 
-                [{icons.edit} Manage Subscription](#payment-information)
-                """
-                ),
-                unsafe_allow_html=True,
-            )
-        if subscription.payment_provider:
-            if next_invoice_date := subscription.get_next_invoice_date():
-                with right, st.tag("p", className="text-muted"):
-                    st.html("Next invoice on ")
-                    pill(next_invoice_date.strftime("%b %d, %Y"), type="dark")
-
-        left, right = left_and_right(className="mt-5")
+    with border_box():
+        # ROW 1: Plan title and next invoice date
+        left, right = left_and_right()
         with left:
-            with st.tag("h1", className="my-0"):
-                st.html(plan.pricing_title())
-            if subscription.payment_provider:
-                provider = PaymentProvider(subscription.payment_provider)
-                with st.div(className="d-flex align-items-center"):
-                    st.caption(
-                        f"per month **via {provider.label}**", unsafe_allow_html=True
-                    )
-        with right, st.tag("div", className="text-end"):
-            with st.tag("h1", className="my-0"):
-                st.html(f"{plan.credits:,} credits")
+            st.write(f"#### Gooey.AI {plan.title}")
+
+            if provider:
+                st.write(
+                    f"[{icons.edit} Manage Subscription](#payment-information)",
+                    unsafe_allow_html=True,
+                )
+
+        with right:
+            if provider and (
+                next_invoice_date := user.subscription.get_next_invoice_date()
+            ):
+                st.html("Next invoice on ")
+                pill(next_invoice_date.strftime("%b %d, %Y"), type="dark")
+
+        if plan is PricingPlan.ENTERPRISE:
+            # charge details are not relevant for Enterprise customers
+            return
+
+        # ROW 2: Plan pricing details
+        left, right = left_and_right(className="mt-5 no-margin")
+        with left:
+            st.write(f"# {plan.pricing_title()}")
+            if plan.monthly_charge:
+                provider_text = f" **via {provider.label}**" if provider else ""
+                st.caption("per month" + provider_text)
+
+        with right, st.div(className="text-end"):
+            st.write(f"# {plan.credits:,} credits")
             if plan.monthly_charge:
                 st.write(
                     f"**${plan.monthly_charge:,}** monthly renewal for {plan.credits:,} credits"
@@ -123,20 +127,20 @@ def render_all_plans(user: AppUser):
     def _render_plan(plan: PricingPlan):
         nonlocal payment_provider
 
-        extra_class = "border-dark" if plan == current_plan else "bg-light"
-        with st.div(className="d-flex flex-column h-100"):
-            with border_box(
-                className=f"flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
-            ):
-                _render_plan_details(plan)
-                _render_plan_action_button(plan, current_plan, payment_provider)
+        with (
+            st.div(className="d-flex flex-column h-100"),
+            border_box(
+                type="primary" if plan == current_plan else "secondary",
+                className="flex-grow-1 d-flex flex-column mb-2",
+            ),
+        ):
+            _render_plan_details(plan)
+            _render_plan_action_button(plan, current_plan, payment_provider)
 
     with plans_div:
         grid_layout(4, all_plans, _render_plan, separator=False)
     with st.div(className="my-2 d-flex justify-content-center"):
-        st.caption(
-            f"**[See all features & benefits]({furl(settings.APP_BASE_URL)/'pricing'/''})**"
-        )
+        st.caption(f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**")
 
 
 def _render_plan_details(plan: PricingPlan):
@@ -173,7 +177,7 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             st.html("Contact Us")
-    else:
+    elif current_plan is not PricingPlan.ENTERPRISE:
         update_subscription_button(
             plan=plan,
             current_plan=current_plan,
@@ -509,15 +513,26 @@ def render_auto_recharge_section(user: AppUser):
             st.success("Settings saved!")
 
 
-def border_box(*, className: str = "", **kwargs):
-    className = className + " border shadow-sm rounded"
+def border_box(
+    *,
+    type: Literal["primary", "secondary"] | None = "primary",
+    className: str = "",
+    **props,
+):
+    className += " w-100 border shadow-sm rounded py-4 px-3"
+    match type:
+        case "primary":
+            className += " border-dark text-dark"
+        case "secondary":
+            className += " bg-light text-dark"
+
     return st.div(
         className=className,
-        **kwargs,
+        **props,
     )
 
 
-def left_and_right(**kwargs):
-    className = kwargs.pop("className", "") + " d-flex flex-row justify-content-between"
-    with st.div(className=className, **kwargs):
+def left_and_right(*, className: str = "", **props):
+    className += " d-flex flex-row justify-content-between align-items-center"
+    with st.div(className=className, **props):
         return st.div(), st.div()
