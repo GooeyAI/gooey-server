@@ -19,6 +19,8 @@ from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 
+from celeryapp.tasks import auto_recharge
+from daras_ai_v2.auto_recharge import user_should_auto_recharge
 import gooey_ui as st
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
@@ -366,6 +368,9 @@ def submit_api_call(
     # set streamlit session state
     st.set_session_state(state)
     st.set_query_params(query_params)
+
+    if user_should_auto_recharge(self.request.user):
+        auto_recharge.delay(user_id=self.request.user.id)
 
     # check the balance
     if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():

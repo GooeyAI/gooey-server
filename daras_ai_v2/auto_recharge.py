@@ -54,6 +54,9 @@ def auto_recharge_user(user: AppUser):
 
 
 def user_should_auto_recharge(user: AppUser):
+    """
+    whether an auto recharge should be attempted for the user
+    """
     return (
         user.subscription
         and user.subscription.auto_recharge_enabled
