@@ -343,11 +343,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def render_form_v2(self):
         st.text_area(
-            """
+            f"""
             #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
+            tooltip="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
         )
         prompt_vars_widget(
             "bot_script",
@@ -361,11 +362,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         document_uploader(
-            """
-            #### 📄 Knowledge
-            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
-            """,
+            "#### 📄 Knowledge",
             accept=["audio/*", "application/*", "video/*", "text/*"],
+            tooltip="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
         )
 
         st.markdown("#### Capabilities")
@@ -500,6 +499,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     st.session_state.get("input_glossary_document")
                     or st.session_state.get("output_glossary_document")
                 ),
+                tooltip="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!",
             )
             if enable_glossary:
                 st.caption(
@@ -531,6 +531,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """,
                 key="task_instructions",
                 height=300,
+                tooltip="[Learn how](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings) to get the most out of your copilot with advanced settings.",
+                tooltip_direction="left",
             )
             prompt_vars_widget(
                 "task_instructions",
