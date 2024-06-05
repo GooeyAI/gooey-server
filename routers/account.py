@@ -3,14 +3,11 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from enum import Enum
 
-import stripe
 from django.db import transaction
 from fastapi import APIRouter
 from fastapi.requests import Request
-from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
 from loguru import logger
-from starlette.datastructures import FormData
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
@@ -19,7 +16,6 @@ from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import (
-    fastapi_request_form,
     get_route_path,
     get_route_url,
 )
@@ -234,116 +230,6 @@ def account_page_wrapper(request: Request, current_tab: TabData):
 
         with st.nav_tab_content():
             yield
-
-
-@app.get("/__/billing/change-payment-method")
-def change_payment_method(request: Request):
-    if not request.user or not request.user.subscription:
-        return RedirectResponse(get_route_url(account_route))
-
-    match request.user.subscription.payment_provider:
-        case PaymentProvider.STRIPE:
-            session = stripe.checkout.Session.create(
-                mode="setup",
-                currency="usd",
-                customer=request.user.get_or_create_stripe_customer(),
-                setup_intent_data={
-                    "metadata": {
-                        "subscription_id": request.user.subscription.external_id,
-                    },
-                },
-                success_url=get_route_url(payment_processing_route),
-                cancel_url=get_route_url(account_route),
-            )
-            return RedirectResponse(session.url, status_code=303)
-        case _:
-            return JSONResponse(
-                {
-                    "message": "Not implemented for this payment provider",
-                },
-                status_code=400,
-            )
-
-
-@app.post("/__/billing/change-subscription")
-def change_subscription(request: Request, form_data: FormData = fastapi_request_form):
-    if not request.user:
-        return RedirectResponse(get_route_url(account_route), status_code=303)
-
-    lookup_key = form_data["lookup_key"]
-    new_plan = PricingPlan.get_by_key(lookup_key)
-    if not new_plan:
-        return JSONResponse(
-            {
-                "message": "Invalid plan lookup key",
-            },
-            status_code=400,
-        )
-
-    current_plan = PricingPlan.from_sub(request.user.subscription)
-
-    if new_plan == current_plan:
-        return RedirectResponse(get_route_url(account_route), status_code=303)
-
-    if new_plan == PricingPlan.STARTER:
-        request.user.subscription.cancel()
-        request.user.subscription.delete()
-        return RedirectResponse(
-            get_route_url(payment_processing_route), status_code=303
-        )
-
-    match request.user.subscription.payment_provider:
-        case PaymentProvider.STRIPE:
-            if not new_plan.monthly_charge:
-                return JSONResponse(
-                    {
-                        "message": f"Stripe subscription not available for {new_plan}",
-                    },
-                    status_code=400,
-                )
-
-            subscription = stripe.Subscription.retrieve(
-                request.user.subscription.external_id
-            )
-            stripe.Subscription.modify(
-                subscription.id,
-                items=[
-                    {"id": subscription["items"].data[0], "deleted": True},
-                    new_plan.get_stripe_line_item(),
-                ],
-                metadata={
-                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
-                },
-            )
-            return RedirectResponse(
-                get_route_url(payment_processing_route), status_code=303
-            )
-
-        case PaymentProvider.PAYPAL:
-            if not new_plan.monthly_charge:
-                return JSONResponse(
-                    {
-                        "message": f"Paypal subscription not available for {new_plan}",
-                    },
-                    status_code=400,
-                )
-
-            subscription = paypal.Subscription.retrieve(
-                request.user.subscription.external_id
-            )
-            paypal_plan_info = new_plan.get_paypal_plan()
-            approval_url = subscription.update_plan(
-                plan_id=paypal_plan_info["plan_id"],
-                plan=paypal_plan_info["plan"],
-            )
-            return RedirectResponse(approval_url, status_code=303)
-        case _:
-            return JSONResponse(
-                {
-                    "message": "Not implemented for this payment provider",
-                },
-                status_code=400,
-            )
 
 
 @transaction.atomic

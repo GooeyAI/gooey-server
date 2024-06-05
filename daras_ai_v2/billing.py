@@ -7,9 +7,9 @@ from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, paypal
 from daras_ai_v2.base import RedirectException
-from daras_ai_v2.fastapi_tricks import get_route_path, get_route_url
+from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
@@ -242,30 +242,70 @@ def update_subscription_button(
                         className="d-block py-4",
                     )
                     with st.div(className="d-flex w-100"):
-                        render_change_subscription_button(
+                        if st.button(
                             "Downgrade",
-                            plan=plan,
                             className="btn btn-theme bg-danger border-danger text-white",
-                        )
+                        ):
+                            change_subscription(user, plan)
                         if st.button(
                             "Cancel", className="border border-danger text-danger"
                         ):
                             downgrade_modal.close()
         case _:
-            render_change_subscription_button(label, plan=plan, className=className)
+            if st.button(label, className=className):
+                change_subscription(user, plan)
 
 
-def render_change_subscription_button(label: str, *, plan: PricingPlan, className: str):
-    from routers.account import change_subscription
+def change_subscription(user: AppUser, new_plan: PricingPlan):
+    from routers.account import account_route
+    from routers.account import payment_processing_route
 
-    st.html(
-        f"""
-    <form action="{get_route_path(change_subscription)}" method="post" class="d-inline">
-        <input type="hidden" name="lookup_key" value="{plan.key}">
-        <button type="submit" class="{className}" data-submit-disabled>{label}</button>
-    </form>
-    """
-    )
+    current_plan = PricingPlan.from_sub(user.subscription)
+
+    if new_plan == current_plan:
+        raise RedirectException(get_route_url(account_route), status_code=303)
+
+    if new_plan == PricingPlan.STARTER:
+        user.subscription.cancel()
+        user.subscription.delete()
+        raise RedirectException(
+            get_route_url(payment_processing_route), status_code=303
+        )
+
+    match user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            if not new_plan.monthly_charge:
+                st.error(f"Stripe subscription not available for {new_plan}")
+
+            subscription = stripe.Subscription.retrieve(user.subscription.external_id)
+            stripe.Subscription.modify(
+                subscription.id,
+                items=[
+                    {"id": subscription["items"].data[0], "deleted": True},
+                    new_plan.get_stripe_line_item(),
+                ],
+                metadata={
+                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
+                },
+            )
+            raise RedirectException(
+                get_route_url(payment_processing_route), status_code=303
+            )
+
+        case PaymentProvider.PAYPAL:
+            if not new_plan.monthly_charge:
+                st.error(f"Paypal subscription not available for {new_plan}")
+
+            subscription = paypal.Subscription.retrieve(user.subscription.external_id)
+            paypal_plan_info = new_plan.get_paypal_plan()
+            approval_url = subscription.update_plan(
+                plan_id=paypal_plan_info["plan_id"],
+                plan=paypal_plan_info["plan"],
+            )
+            raise RedirectException(approval_url, status_code=303)
+
+        case _:
+            st.error("Not implemented for this payment provider")
 
 
 def payment_provider_radio(**props) -> str | None:
@@ -409,8 +449,6 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(user: AppUser):
-    from routers.account import change_payment_method
-
     assert user.subscription
 
     st.write("## Payment Information", id="payment-information", className="d-block")
@@ -439,8 +477,9 @@ def render_payment_information(user: AppUser):
                 f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
                 unsafe_allow_html=True,
             )
-        with col3, st.link(to=get_route_path(change_payment_method)):
-            st.button(f"{icons.edit} Edit", type="link")
+        with col3:
+            if st.button(f"{icons.edit} Edit", type="link"):
+                change_payment_method(user)
 
     if pm_summary.billing_email:
         col1, col2, _ = st.columns(3, responsive=False)
@@ -448,6 +487,27 @@ def render_payment_information(user: AppUser):
             st.write("**Billing Email**")
         with col2:
             st.html(pm_summary.billing_email)
+
+
+def change_payment_method(user: AppUser):
+    from routers.account import payment_processing_route
+    from routers.account import account_route
+
+    match user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            session = stripe.checkout.Session.create(
+                mode="setup",
+                currency="usd",
+                customer=user.get_or_create_stripe_customer(),
+                setup_intent_data={
+                    "metadata": {"subscription_id": user.subscription.external_id},
+                },
+                success_url=get_route_url(payment_processing_route),
+                cancel_url=get_route_url(account_route),
+            )
+            raise RedirectException(session.url, status_code=303)
+        case _:
+            st.error("Not implemented for this payment provider")
 
 
 def format_card_brand(brand: str) -> str:
