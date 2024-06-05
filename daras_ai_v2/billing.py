@@ -8,7 +8,7 @@ from daras_ai_v2.base import RedirectException
 from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.settings import templates
-from daras_ai_v2.user_date_widgets import render_local_dt_attrs
+from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.models import PaymentMethodSummary
@@ -72,14 +72,21 @@ def render_current_plan(user: AppUser):
                     f"[{icons.edit} Manage Subscription](#payment-information)",
                     unsafe_allow_html=True,
                 )
-        with right:
+        with right, st.div(className="d-flex align-items-center gap-1"):
             if provider and (
                 next_invoice_ts := st.run_in_thread(
                     user.subscription.get_next_invoice_timestamp, cache=True
                 )
             ):
                 st.html("Next invoice on ")
-                pill("...", text_bg="dark", **render_local_dt_attrs(next_invoice_ts))
+                pill(
+                    "...",
+                    text_bg="dark",
+                    **render_local_date_attrs(
+                        next_invoice_ts,
+                        date_options={"day": "numeric", "month": "long"},
+                    ),
+                )
 
         if plan is PricingPlan.ENTERPRISE:
             # charge details are not relevant for Enterprise customers

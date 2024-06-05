@@ -25,3 +25,14 @@ def render_local_dt_attrs(
         "renderLocalDtDateOptions": date_options or DEFAULT_DATE_OPTIONS,
         "renderLocalDtTimeOptions": time_options or DEFAULT_TIME_OPTIONS,
     }
+
+
+def render_local_date_attrs(
+    dt: datetime.datetime | float, date_options: dict[str, Any] | None = None
+):
+    if isinstance(dt, datetime.datetime):
+        dt = dt.timestamp()
+    return {
+        "renderLocalDt": dt * 1000,
+        "renderLocalDtDateOptions": date_options or DEFAULT_DATE_OPTIONS,
+    }
