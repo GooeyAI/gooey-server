@@ -229,11 +229,6 @@ def update_subscription_button(
 
             if downgrade_modal.is_open():
                 with downgrade_modal.container():
-                    fmt_price = lambda plan: (
-                        f"${plan.monthly_charge:,}/month"
-                        if plan.monthly_charge
-                        else "Free"
-                    )
                     st.write(
                         f"""
     Are you sure you want to change from:  
@@ -254,6 +249,13 @@ def update_subscription_button(
         case _:
             if st.button(label, className=className):
                 change_subscription(user, plan)
+
+
+def fmt_price(plan: PricingPlan) -> str:
+    if plan.monthly_charge:
+        return f"${plan.monthly_charge:,}/month"
+    else:
+        return "Free"
 
 
 def change_subscription(user: AppUser, new_plan: PricingPlan):
@@ -514,7 +516,7 @@ def format_card_brand(brand: str) -> str:
     return icons.card_icons.get(brand.lower(), brand.capitalize())
 
 
-def render_billing_history(user: AppUser):
+def render_billing_history(user: AppUser, limit: int = 50):
     import pandas as pd
 
     txns = user.transactions.filter(amount__gt=0).order_by("-created_at")
@@ -531,10 +533,12 @@ def render_billing_history(user: AppUser):
                     txn.note(),
                     f"${txn.charged_amount / 100:,.2f}",
                 ]
-                for txn in txns
+                for txn in txns[:limit]
             ],
         )
     )
+    if txns.count() > limit:
+        st.caption(f"Showing only the most recent {limit} transactions.")
 
 
 def render_auto_recharge_section(user: AppUser):
