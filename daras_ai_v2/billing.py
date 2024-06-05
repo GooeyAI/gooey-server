@@ -499,23 +499,14 @@ def render_auto_recharge_section(user: AppUser):
             )
             st.write("USD", className="d-block ms-2")
 
-    save_button_key = "save-auto-recharge-settings"
-    with col1:
-        st.button(
-            "Save", type="primary", className="d-none d-lg-block", key=save_button_key
-        )
-    st.button("Save", type="primary", className="d-lg-none", key=save_button_key)
-
-    if st.session_state.get(save_button_key):
+    if st.button("Save", type="primary"):
         try:
             subscription.full_clean()
         except ValidationError as e:
             st.error(str(e))
-            return
-
-        with transaction.atomic():
+        else:
             subscription.save()
-        st.success("Settings saved!")
+            st.success("Settings saved!")
 
 
 def border_box(*, className: str = "", **kwargs):
