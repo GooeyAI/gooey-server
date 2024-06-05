@@ -75,7 +75,7 @@ def render_current_plan(user: AppUser):
                 ),
                 unsafe_allow_html=True,
             )
-        if plan.monthly_charge:
+        if subscription.payment_provider:
             with right, st.tag("p", className="text-muted"):
                 if next_invoice_ts := st.run_in_thread(
                     subscription.get_next_invoice_timestamp, cache=True
@@ -89,7 +89,7 @@ def render_current_plan(user: AppUser):
         with left:
             with st.tag("h1", className="my-0"):
                 st.html(plan.pricing_title())
-            if plan.monthly_charge:
+            if subscription.payment_provider:
                 provider = PaymentProvider(subscription.payment_provider)
                 with st.div(className="d-flex align-items-center"):
                     st.caption(
@@ -274,7 +274,7 @@ def change_subscription(user: AppUser, new_plan: PricingPlan):
 
     match user.subscription.payment_provider:
         case PaymentProvider.STRIPE:
-            if not new_plan.monthly_charge:
+            if not new_plan.supports_stripe():
                 st.error(f"Stripe subscription not available for {new_plan}")
 
             subscription = stripe.Subscription.retrieve(user.subscription.external_id)
@@ -293,7 +293,7 @@ def change_subscription(user: AppUser, new_plan: PricingPlan):
             )
 
         case PaymentProvider.PAYPAL:
-            if not new_plan.monthly_charge:
+            if not new_plan.supports_paypal():
                 st.error(f"Paypal subscription not available for {new_plan}")
 
             subscription = paypal.Subscription.retrieve(user.subscription.external_id)
@@ -396,7 +396,7 @@ def render_stripe_subscription_button(
     plan: PricingPlan,
     btn_type: str,
 ):
-    if not plan.monthly_charge:
+    if not plan.supports_stripe():
         st.write("Stripe subscription not available")
         return
 
@@ -433,7 +433,7 @@ def render_paypal_subscription_button(
     *,
     plan: PricingPlan,
 ):
-    if not plan.monthly_charge:
+    if not plan.supports_paypal():
         st.write("Paypal subscription not available")
         return
 

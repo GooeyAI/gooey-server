@@ -122,7 +122,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
 
     lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
-    if plan is None or not plan.monthly_charge:
+    if plan is None or not plan.supports_paypal():
         return JSONResponse(
             {"error": "Invalid plan key or not supported by PayPal"}, status_code=400
         )

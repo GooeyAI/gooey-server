@@ -14,7 +14,7 @@ client = TestClient(app)
 def test_create_checkout_session(
     plan: PricingPlan, transactional_db, force_authentication: AppUser
 ):
-    if not plan.monthly_charge:
+    if not plan.supports_stripe():
         return
 
     with pytest.raises(RedirectException):

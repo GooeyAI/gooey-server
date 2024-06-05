@@ -8,7 +8,6 @@ from typing import Any
 import stripe
 
 from daras_ai_v2 import paypal, settings
-from daras_ai_v2.exceptions import UserError
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
 
 STRIPE_PRODUCT_NAMES = {
@@ -215,15 +214,15 @@ class PricingPlan(PricingPlanData, Enum):
         return [(plan.db_value, plan.name) for plan in cls]
 
     @classmethod
-    def from_sub(cls, sub: "Subscription") -> PricingPlan | None:
+    def from_sub(cls, sub: "Subscription") -> PricingPlan:
         return cls.from_db_value(sub.plan)
 
     @classmethod
-    def from_db_value(cls, db_value: int) -> PricingPlan | None:
+    def from_db_value(cls, db_value: int) -> PricingPlan:
         for plan in cls:
             if plan.db_value == db_value:
                 return plan
-        raise UserError(f"Invalid {cls.__name__} {db_value=}")
+        raise ValueError(f"Invalid {cls.__name__} {db_value=}")
 
     @classmethod
     def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
@@ -231,13 +230,13 @@ class PricingPlan(PricingPlanData, Enum):
             return cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
 
         for plan in cls:
-            if plan.monthly_charge and plan.get_stripe_product_id() == product.id:
+            if plan.supports_stripe() and plan.get_stripe_product_id() == product.id:
                 return plan
 
     @classmethod
     def get_by_paypal_plan_id(cls, plan_id: str) -> PricingPlan | None:
         for plan in cls:
-            if plan.monthly_charge and plan.get_paypal_plan_id() == plan_id:
+            if plan.supports_paypal() and plan.get_paypal_plan_id() == plan_id:
                 return plan
 
     @classmethod
@@ -246,8 +245,14 @@ class PricingPlan(PricingPlanData, Enum):
             if plan.key == key:
                 return plan
 
+    def supports_stripe(self) -> bool:
+        return bool(self.monthly_charge)
+
+    def supports_paypal(self) -> bool:
+        return bool(self.monthly_charge)
+
     def get_stripe_line_item(self) -> dict[str, Any]:
-        if not self.monthly_charge:
+        if not self.supports_stripe():
             raise ValueError(f"Can't bill {self.title} via Stripe")
 
         if self.key in STRIPE_PRODUCT_NAMES:
@@ -266,7 +271,7 @@ class PricingPlan(PricingPlanData, Enum):
             )
 
     def get_paypal_plan(self) -> dict[str, Any]:
-        if not self.monthly_charge:
+        if not self.supports_paypal():
             raise ValueError(f"Can't bill {self.title} via PayPal")
 
         return make_paypal_recurring_plan(
