@@ -50,7 +50,7 @@ def send_low_balance_email(
     user: AppUser,
     total_credits_consumed: int,
 ):
-    from routers.billing import account_url
+    from routers.account import account_url
 
     recipeints = "support@gooey.ai, devs@gooey.ai"
     html_body = templates.get_template("low_balance_email.html").render(

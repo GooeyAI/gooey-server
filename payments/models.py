@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import typing
 from datetime import datetime, timezone
 
 import stripe
@@ -12,8 +12,7 @@ from daras_ai_v2 import paypal, settings
 from .plans import PricingPlan, stripe_get_addon_product
 
 
-@dataclass
-class PaymentMethodSummary:
+class PaymentMethodSummary(typing.NamedTuple):
     payment_method_type: str | None = None
     card_brand: str | None = None
     card_last4: str | None = None
@@ -74,7 +73,10 @@ class Subscription(models.Model):
         ]
 
     def __str__(self):
-        return PricingPlan.from_sub(self).title
+        ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()} | {self.user}"
+        if self.auto_recharge_enabled:
+            ret = f"Auto | {ret}"
+        return ret
 
     def full_clean(self, *args, **kwargs):
         if self.plan and self.auto_recharge_enabled:
@@ -130,52 +132,45 @@ class Subscription(models.Model):
                     f"Can't cancel subscription for {self.payment_provider}"
                 )
 
-    def get_next_invoice_date(self) -> datetime | None:
+    def get_next_invoice_timestamp(self) -> float | None:
         if self.payment_provider == PaymentProvider.STRIPE:
             subscription = stripe.Subscription.retrieve(self.external_id)
             period_end = subscription.current_period_end
-            return (
-                datetime.fromtimestamp(period_end, tz=timezone.utc)
-                if period_end
-                else None
-            )
+            if not period_end:
+                return None
+            return period_end
         elif self.payment_provider == PaymentProvider.PAYPAL:
             subscription = paypal.Subscription.retrieve(self.external_id)
-            return (
-                subscription.billing_info.next_billing_time
-                if subscription.billing_info
-                else None
-            )
+            if not subscription.billing_info:
+                return None
+            return subscription.billing_info.next_billing_time.timestamp()
         else:
             raise ValueError("Invalid Payment Provider")
 
-    def get_payment_method_summary(self) -> PaymentMethodSummary:
-        summary = PaymentMethodSummary()
+    def get_payment_method_summary(self) -> PaymentMethodSummary | None:
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 pm = self.stripe_get_default_payment_method()
-                if pm:
-                    summary.payment_method_type = pm.type
-                    summary.card_brand = pm.card and pm.card.brand
-                    summary.card_last4 = pm.card and pm.card.last4
-                    summary.billing_email = (
-                        pm.billing_details and pm.billing_details.email
-                    )
+                if not pm:
+                    return None
+                return PaymentMethodSummary(
+                    payment_method_type=pm.type,
+                    card_brand=pm.card and pm.card.brand,
+                    card_last4=pm.card and pm.card.last4,
+                    billing_email=(pm.billing_details and pm.billing_details.email),
+                )
             case PaymentProvider.PAYPAL:
                 subscription = paypal.Subscription.retrieve(self.external_id)
                 subscriber = subscription.subscriber
-                if subscriber and subscriber.payment_source:
-                    summary.payment_method_type = "card"
-                    summary.card_brand = subscriber.payment_source.get("card", {}).get(
-                        "brand"
-                    )
-                    summary.card_last4 = subscriber.payment_source.get("card", {}).get(
-                        "last_digits"
-                    )
-                if subscriber and subscriber.email_address:
-                    summary.billing_email = subscriber.email_address
-
-        return summary
+                if not subscriber:
+                    return None
+                source = subscriber.payment_source or {}
+                return PaymentMethodSummary(
+                    payment_method_type=source and "card",
+                    card_brand=source.get("card", {}).get("brand"),
+                    card_last4=source.get("card", {}).get("last_digits"),
+                    billing_email=subscriber.email_address,
+                )
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
         if self.payment_provider != PaymentProvider.STRIPE:
@@ -267,15 +262,20 @@ class Subscription(models.Model):
         raise ValueError("Invalid Payment Provider")
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
+        from routers.stripe import handle_invoice_paid
+
         invoice = self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars,
             metadata_key="addon",
         )
-        if invoice.status == "open":
-            pm = self.stripe_get_default_payment_method()
-            invoice.pay(payment_method=pm)
-            return True
-        return False
+        if invoice.status != "open":
+            return False
+        pm = self.stripe_get_default_payment_method()
+        invoice = invoice.pay(payment_method=pm)
+        if not invoice.paid:
+            return False
+        handle_invoice_paid(self.user.uid, invoice)
+        return True
 
     def get_external_management_url(self) -> str:
         """

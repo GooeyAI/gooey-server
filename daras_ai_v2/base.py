@@ -70,7 +70,7 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.billing import AccountTabs
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
@@ -1727,7 +1727,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
-                    type="light",
                     className="border border-dark",
                 )
 
@@ -1799,7 +1798,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                             published_run.visibility
                         ).get_badge_html(),
                         unsafe_allow_html=True,
-                        type="light",
                         className="border border-dark",
                     )
 

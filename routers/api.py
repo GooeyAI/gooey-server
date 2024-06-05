@@ -34,7 +34,7 @@ from daras_ai_v2.base import (
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from daras_ai_v2.ratelimits import ensure_rate_limits
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-from routers.billing import AccountTabs
+from routers.account import AccountTabs
 
 app = APIRouter()
 

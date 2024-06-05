@@ -8,15 +8,16 @@ def pill(
     title: str,
     *,
     unsafe_allow_html: bool = False,
-    type: Literal["primary", "secondary", "light", "dark", None] = "light",
+    text_bg: Literal["primary", "secondary", "light", "dark", None] = "light",
     className: str = "",
     **props,
 ):
-    className = className + f" badge rounded-pill"
-    if type:
-        className += f" text-bg-{type}"
+    if not unsafe_allow_html:
+        title = html.escape(title)
 
-    with gui.tag("span", className=className, **props):
-        gui.html(
-            title if unsafe_allow_html else html.escape(title),
-        )
+    className += f" badge rounded-pill"
+    if text_bg:
+        className += f" text-bg-{text_bg}"
+
+    with gui.tag("span", className=className):
+        gui.html(title, **props)

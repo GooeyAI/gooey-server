@@ -2,67 +2,22 @@ from urllib.parse import quote_plus
 
 import stripe
 from django.db import transaction
-from fastapi.datastructures import FormData
-from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from loguru import logger
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
-from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_body,
+    get_route_url,
+)
 from payments.models import PaymentProvider, Subscription
 from payments.plans import PricingPlan
-from routers.billing import (
-    send_monthly_spending_notification_email,
-    account_url,
-    payment_processing_url,
-)
+from payments.tasks import send_monthly_spending_notification_email
+from routers.account import account_route
 
 router = APIRouter()
-
-
-@router.post("/__/stripe/create-checkout-session")
-def create_checkout_session(
-    request: Request, body_form: FormData = fastapi_request_form
-):
-    if not request.user:
-        return RedirectResponse(
-            request.url_for("login", query_params={"next": request.url.path})
-        )
-
-    lookup_key: str = body_form["lookup_key"]
-    if plan := PricingPlan.get_by_key(lookup_key):
-        line_item = plan.get_stripe_line_item()
-    else:
-        return JSONResponse(
-            {
-                "message": "Invalid plan lookup key",
-            }
-        )
-
-    if request.user.subscription and request.user.subscription.plan == plan.db_value:
-        # already subscribed to the same plan
-        return RedirectResponse("/", status_code=303)
-
-    metadata = {
-        settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: lookup_key,
-    }
-
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[line_item],
-        mode="subscription",
-        success_url=payment_processing_url,
-        cancel_url=account_url,
-        customer=request.user.get_or_create_stripe_customer(),
-        metadata=metadata,
-        subscription_data={"metadata": metadata},
-        allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
-    )
-
-    return RedirectResponse(checkout_session.url, status_code=303)
 
 
 @router.post("/__/stripe/create-portal-session")
@@ -70,7 +25,7 @@ def customer_portal(request: Request):
     customer = request.user.get_or_create_stripe_customer()
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
-        return_url=account_url,
+        return_url=get_route_url(account_route),
     )
     return RedirectResponse(portal_session.url, status_code=303)
 
@@ -103,7 +58,7 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:
         case "invoice.paid":
-            _handle_invoice_paid(uid, data)
+            handle_invoice_paid(uid, data)
         case "checkout.session.completed":
             _handle_checkout_session_completed(uid, data)
         case "customer.subscription.created" | "customer.subscription.updated":
@@ -114,7 +69,7 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     return JSONResponse({"status": "success"})
 
 
-def _handle_invoice_paid(uid: str, invoice_data):
+def handle_invoice_paid(uid: str, invoice_data):
     invoice_id = invoice_data.id
     line_items = stripe.Invoice._static_request(
         "get",
@@ -134,7 +89,7 @@ def _handle_invoice_paid(uid: str, invoice_data):
         user.subscription
         and user.subscription.should_send_monthly_spending_notification()
     ):
-        send_monthly_spending_notification_email(user)
+        send_monthly_spending_notification_email.delay(user.id)
 
 
 def _handle_checkout_session_completed(uid: str, session_data):

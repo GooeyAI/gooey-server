@@ -15,15 +15,14 @@ from pydantic import BaseModel
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fastapi_tricks import fastapi_request_json
+from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
 from payments.models import PricingPlan
-from routers.billing import (
-    account_url,
-    payment_processing_url,
+from payments.tasks import send_monthly_spending_notification_email
+from routers.account import (
     paypal_handle_subscription_updated,
-    send_monthly_spending_notification_email,
+    payment_processing_route,
+    account_route,
 )
-
 
 router = APIRouter()
 
@@ -144,8 +143,8 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
-            "return_url": payment_processing_url,
-            "cancel_url": account_url,
+            "return_url": get_route_url(payment_processing_route),
+            "cancel_url": get_route_url(account_route),
         },
     )
     return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
@@ -258,7 +257,7 @@ def _handle_sale_completed(event: SaleCompletedEvent):
         user.subscription
         and user.subscription.should_send_monthly_spending_notification()
     ):
-        send_monthly_spending_notification_email(user)
+        send_monthly_spending_notification_email.delay(user.id)
 
 
 def _handle_subscription_cancelled(subscription: paypal.Subscription):

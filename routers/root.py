@@ -34,7 +34,7 @@ from daras_ai_v2.exceptions import ffmpeg, UserError, raise_for_status
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
-    get_route_url,
+    get_route_path,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
@@ -662,7 +662,7 @@ def get_run_user(request, uid) -> AppUser | None:
 
 
 @contextmanager
-def page_wrapper(request: Request):
+def page_wrapper(request: Request, className=""):
     context = {
         "request": request,
         "settings": settings,
@@ -673,15 +673,16 @@ def page_wrapper(request: Request):
             request.user.uid
         ).decode()
 
-    st.html(templates.get_template("gtag.html").render(**context))
-    st.html(templates.get_template("header.html").render(**context))
-    st.html(copy_to_clipboard_scripts)
+    with st.div(className="d-flex flex-column min-vh-100"):
+        st.html(templates.get_template("gtag.html").render(**context))
+        st.html(templates.get_template("header.html").render(**context))
+        st.html(copy_to_clipboard_scripts)
 
-    with st.div(id="main-content", className="container"):
-        yield
+        with st.div(id="main-content", className="container " + className):
+            yield
 
-    st.html(templates.get_template("footer.html").render(**context))
-    st.html(templates.get_template("login_scripts.html").render(**context))
+        st.html(templates.get_template("footer.html").render(**context))
+        st.html(templates.get_template("login_scripts.html").render(**context))
 
 
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -732,4 +733,4 @@ class RecipeTabs(TabData, Enum):
         if example_id:
             kwargs["example_id"] = example_id
             kwargs["run_slug"] = run_slug or "untitled"
-        return get_route_url(self.route, kwargs)
+        return get_route_path(self.route, kwargs)

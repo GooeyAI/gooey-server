@@ -1,26 +1,24 @@
 from typing import Literal
 
+import stripe
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, paypal
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.fastapi_tricks import get_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.settings import templates
+from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
+from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
 
-
-payment_processing_url = str(
-    furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
-)
-stripe_create_checkout_session_url = "/__/stripe/create-checkout-session"
-change_subscription_url = "/__/billing/change-subscription"
-change_payment_method_url = "/__/billing/change-payment-method"
+rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
 def billing_page(user: AppUser):
@@ -49,7 +47,14 @@ def billing_page(user: AppUser):
 
 
 def render_payments_setup():
-    st.html(templates.get_template("payment_setup.html").render(settings=settings))
+    from routers.account import payment_processing_route
+
+    st.html(
+        templates.get_template("payment_setup.html").render(
+            settings=settings,
+            payment_processing_url=get_route_url(payment_processing_route),
+        )
+    )
 
 
 def render_current_plan(user: AppUser):
@@ -60,7 +65,7 @@ def render_current_plan(user: AppUser):
         else None
     )
 
-    with border_box():
+    with st.div(className=rounded_border):
         # ROW 1: Plan title and next invoice date
         left, right = left_and_right()
         with left:
@@ -71,28 +76,29 @@ def render_current_plan(user: AppUser):
                     f"[{icons.edit} Manage Subscription](#payment-information)",
                     unsafe_allow_html=True,
                 )
-
         with right:
             if provider and (
-                next_invoice_date := user.subscription.get_next_invoice_date()
+                next_invoice_ts := st.run_in_thread(
+                    user.subscription.get_next_invoice_timestamp, cache=True
+                )
             ):
                 st.html("Next invoice on ")
-                pill(next_invoice_date.strftime("%b %d, %Y"), type="dark")
+                pill("...", text_bg="dark", **render_local_dt_attrs(next_invoice_ts))
 
         if plan is PricingPlan.ENTERPRISE:
             # charge details are not relevant for Enterprise customers
             return
 
         # ROW 2: Plan pricing details
-        left, right = left_and_right(className="mt-5 no-margin")
+        left, right = left_and_right(className="mt-5")
         with left:
-            st.write(f"# {plan.pricing_title()}")
+            st.write(f"# {plan.pricing_title()}", className="no-margin")
             if plan.monthly_charge:
                 provider_text = f" **via {provider.label}**" if provider else ""
                 st.caption("per month" + provider_text)
 
         with right, st.div(className="text-end"):
-            st.write(f"# {plan.credits:,} credits")
+            st.write(f"# {plan.credits:,} credits", className="no-margin")
             if plan.monthly_charge:
                 st.write(
                     f"**${plan.monthly_charge:,}** monthly renewal for {plan.credits:,} credits"
@@ -114,31 +120,32 @@ def render_all_plans(user: AppUser):
     )
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
 
-    def _payment_provider_radio(className: str = "", **props) -> PaymentProvider:
-        with st.div(className=className):
-            return PaymentProvider[
-                payment_provider_radio(**props) or PaymentProvider.STRIPE.name
-            ]
-
     st.write("## All Plans")
     plans_div = st.div(className="mb-1")
-    payment_provider = _payment_provider_radio() if not user.subscription else None
+
+    if user.subscription:
+        payment_provider = None
+    else:
+        with st.div():
+            payment_provider = PaymentProvider[
+                payment_provider_radio() or PaymentProvider.STRIPE.name
+            ]
 
     def _render_plan(plan: PricingPlan):
-        nonlocal payment_provider
-
-        with (
-            st.div(className="d-flex flex-column h-100"),
-            border_box(
-                type="primary" if plan == current_plan else "secondary",
-                className="flex-grow-1 d-flex flex-column mb-2",
-            ),
-        ):
-            _render_plan_details(plan)
-            _render_plan_action_button(plan, current_plan, payment_provider)
+        if plan == current_plan:
+            extra_class = "border-dark"
+        else:
+            extra_class = "bg-light"
+        with st.div(className="d-flex flex-column h-100"):
+            with st.div(
+                className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
+            ):
+                _render_plan_details(plan)
+                _render_plan_action_button(user, plan, current_plan, payment_provider)
 
     with plans_div:
         grid_layout(4, all_plans, _render_plan, separator=False)
+
     with st.div(className="my-2 d-flex justify-content-center"):
         st.caption(f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**")
 
@@ -164,6 +171,7 @@ def _render_plan_details(plan: PricingPlan):
 
 
 def _render_plan_action_button(
+    user: AppUser,
     plan: PricingPlan,
     current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
@@ -179,6 +187,7 @@ def _render_plan_action_button(
             st.html("Contact Us")
     elif current_plan is not PricingPlan.ENTERPRISE:
         update_subscription_button(
+            user=user,
             plan=plan,
             current_plan=current_plan,
             className=btn_classes,
@@ -188,22 +197,22 @@ def _render_plan_action_button(
 
 def update_subscription_button(
     *,
+    user: AppUser,
     current_plan: PricingPlan,
     plan: PricingPlan,
     className: str = "",
     payment_provider: PaymentProvider | None = None,
 ):
-    label, type = (
-        ("Upgrade", "primary")
-        if plan.credits > current_plan.credits
-        else ("Downgrade", "secondary")
-    )
-    className += f" btn btn-theme btn-{type}"
+    if plan.credits > current_plan.credits:
+        label, btn_type = ("Upgrade", "primary")
+    else:
+        label, btn_type = ("Downgrade", "secondary")
+    className += f" btn btn-theme btn-{btn_type}"
 
     match payment_provider:
         case PaymentProvider.STRIPE:
             render_stripe_subscription_button(
-                label, plan=plan, className=className, type=type
+                user=user, label=label, plan=plan, btn_type=btn_type
             )
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
@@ -219,11 +228,6 @@ def update_subscription_button(
 
             if downgrade_modal.is_open():
                 with downgrade_modal.container():
-                    fmt_price = lambda plan: (
-                        f"${plan.monthly_charge:,}/month"
-                        if plan.monthly_charge
-                        else "Free"
-                    )
                     st.write(
                         f"""
     Are you sure you want to change from:  
@@ -232,28 +236,77 @@ def update_subscription_button(
                         className="d-block py-4",
                     )
                     with st.div(className="d-flex w-100"):
-                        render_change_subscription_button(
+                        if st.button(
                             "Downgrade",
-                            plan=plan,
                             className="btn btn-theme bg-danger border-danger text-white",
-                        )
+                        ):
+                            change_subscription(user, plan)
                         if st.button(
                             "Cancel", className="border border-danger text-danger"
                         ):
                             downgrade_modal.close()
         case _:
-            render_change_subscription_button(label, plan=plan, className=className)
+            if st.button(label, className=className):
+                change_subscription(user, plan)
 
 
-def render_change_subscription_button(label: str, *, plan: PricingPlan, className: str):
-    st.html(
-        f"""
-    <form action="{change_subscription_url}" method="post" class="d-inline">
-        <input type="hidden" name="lookup_key" value="{plan.key}">
-        <button type="submit" class="{className}" data-submit-disabled>{label}</button>
-    </form>
-    """
-    )
+def fmt_price(plan: PricingPlan) -> str:
+    if plan.monthly_charge:
+        return f"${plan.monthly_charge:,}/month"
+    else:
+        return "Free"
+
+
+def change_subscription(user: AppUser, new_plan: PricingPlan):
+    from routers.account import account_route
+    from routers.account import payment_processing_route
+
+    current_plan = PricingPlan.from_sub(user.subscription)
+
+    if new_plan == current_plan:
+        raise RedirectException(get_route_url(account_route), status_code=303)
+
+    if new_plan == PricingPlan.STARTER:
+        user.subscription.cancel()
+        user.subscription.delete()
+        raise RedirectException(
+            get_route_url(payment_processing_route), status_code=303
+        )
+
+    match user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            if not new_plan.supports_stripe():
+                st.error(f"Stripe subscription not available for {new_plan}")
+
+            subscription = stripe.Subscription.retrieve(user.subscription.external_id)
+            stripe.Subscription.modify(
+                subscription.id,
+                items=[
+                    {"id": subscription["items"].data[0], "deleted": True},
+                    new_plan.get_stripe_line_item(),
+                ],
+                metadata={
+                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
+                },
+            )
+            raise RedirectException(
+                get_route_url(payment_processing_route), status_code=303
+            )
+
+        case PaymentProvider.PAYPAL:
+            if not new_plan.supports_paypal():
+                st.error(f"Paypal subscription not available for {new_plan}")
+
+            subscription = paypal.Subscription.retrieve(user.subscription.external_id)
+            paypal_plan_info = new_plan.get_paypal_plan()
+            approval_url = subscription.update_plan(
+                plan_id=paypal_plan_info["plan_id"],
+                plan=paypal_plan_info["plan"],
+            )
+            raise RedirectException(approval_url, status_code=303)
+
+        case _:
+            st.error("Not implemented for this payment provider")
 
 
 def payment_provider_radio(**props) -> str | None:
@@ -306,45 +359,75 @@ def render_stripe_addon_button(amount: int, user: AppUser):
     if st.button(f"${amount:,}", type="primary"):
         confirm_purchase_modal.open()
 
-    if confirm_purchase_modal.is_open():
-        with confirm_purchase_modal.container():
-            st.write(
-                f"""
+    if not confirm_purchase_modal.is_open():
+        return
+    with confirm_purchase_modal.container():
+        st.write(
+            f"""
                 Please confirm your purchase:  
                  **{amount * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${amount}**.
-             """,
-                className="py-4 d-block",
-            )
-            with st.div(className="d-flex w-100"):
-                if st.button("Buy", type="primary"):
-                    if user.subscription.stripe_attempt_addon_purchase(amount):
-                        raise RedirectException(payment_processing_url)
-                    else:
-                        st.error("Payment failed... Please try again.")
-                if st.button("Cancel", className="border border-danger text-danger"):
+                 """,
+            className="py-4 d-block text-center",
+        )
+        with st.div(className="d-flex w-100 justify-content-end"):
+            if st.session_state.get("--confirm-purchase"):
+                success = st.run_in_thread(
+                    user.subscription.stripe_attempt_addon_purchase,
+                    args=[amount],
+                    placeholder="Processing payment...",
+                )
+                if success is None:
+                    return
+                st.session_state.pop("--confirm-purchase")
+                if success:
                     confirm_purchase_modal.close()
+                else:
+                    st.error("Payment failed... Please try again.")
+                return
+
+            if st.button("Cancel", className="border border-danger text-danger me-2"):
+                confirm_purchase_modal.close()
+            st.button("Buy", type="primary", key="--confirm-purchase")
 
 
 def render_stripe_subscription_button(
-    label: str,
     *,
+    label: str,
+    user: AppUser,
     plan: PricingPlan,
-    className: str = "streamlit-like-btn",
-    type: str = "primary",
+    btn_type: str,
 ):
     if not plan.supports_stripe():
         st.write("Stripe subscription not available")
         return
 
-    btn_classes = f"btn btn-theme btn-{type} {className}"
-    st.html(
-        f"""
-    <form action="{stripe_create_checkout_session_url}" method="post" class="d-inline">
-        <input type="hidden" name="lookup_key" value="{plan.key}">
-        <button type="submit" class="{btn_classes}" data-submit-disabled>{label}</button>
-    </form>
-    """
+    if st.button(label, type=btn_type):
+        create_stripe_checkout_session(user=user, plan=plan)
+
+
+def create_stripe_checkout_session(user: AppUser, plan: PricingPlan):
+    from routers.account import account_route
+    from routers.account import payment_processing_route
+
+    if user.subscription and user.subscription.plan == plan.db_value:
+        # already subscribed to the same plan
+        return
+
+    metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
+    checkout_session = stripe.checkout.Session.create(
+        line_items=[(plan.get_stripe_line_item())],
+        mode="subscription",
+        success_url=get_route_url(payment_processing_route),
+        cancel_url=get_route_url(account_route),
+        customer=user.get_or_create_stripe_customer(),
+        metadata=metadata,
+        subscription_data={"metadata": metadata},
+        allow_promotion_codes=True,
+        saved_payment_method_options={
+            "payment_method_save": "enabled",
+        },
     )
+    raise RedirectException(checkout_session.url, status_code=303)
 
 
 def render_paypal_subscription_button(
@@ -376,13 +459,16 @@ def render_payment_information(user: AppUser):
     with col2:
         provider = PaymentProvider(user.subscription.payment_provider)
         st.write(provider.label)
-    with (
-        col3,
-        st.link(to=user.subscription.get_external_management_url(), target="_blank"),
-    ):
-        st.write(f"{icons.edit} Edit", unsafe_allow_html=True)
+    with col3:
+        if st.button(f"{icons.edit} Edit", type="link"):
+            raise RedirectException(user.subscription.get_external_management_url())
 
-    pm_summary = user.subscription.get_payment_method_summary()
+    pm_summary = st.run_in_thread(
+        user.subscription.get_payment_method_summary, cache=True
+    )
+    if not pm_summary:
+        return
+    pm_summary = PaymentMethodSummary(*pm_summary)
     if pm_summary.card_brand and pm_summary.card_last4:
         col1, col2, col3 = st.columns(3, responsive=False)
         with col1:
@@ -392,8 +478,9 @@ def render_payment_information(user: AppUser):
                 f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
                 unsafe_allow_html=True,
             )
-        with col3, st.link(to=change_payment_method_url):
-            st.button(f"{icons.edit} Edit", type="link")
+        with col3:
+            if st.button(f"{icons.edit} Edit", type="link"):
+                change_payment_method(user)
 
     if pm_summary.billing_email:
         col1, col2, _ = st.columns(3, responsive=False)
@@ -403,11 +490,32 @@ def render_payment_information(user: AppUser):
             st.html(pm_summary.billing_email)
 
 
+def change_payment_method(user: AppUser):
+    from routers.account import payment_processing_route
+    from routers.account import account_route
+
+    match user.subscription.payment_provider:
+        case PaymentProvider.STRIPE:
+            session = stripe.checkout.Session.create(
+                mode="setup",
+                currency="usd",
+                customer=user.get_or_create_stripe_customer(),
+                setup_intent_data={
+                    "metadata": {"subscription_id": user.subscription.external_id},
+                },
+                success_url=get_route_url(payment_processing_route),
+                cancel_url=get_route_url(account_route),
+            )
+            raise RedirectException(session.url, status_code=303)
+        case _:
+            st.error("Not implemented for this payment provider")
+
+
 def format_card_brand(brand: str) -> str:
     return icons.card_icons.get(brand.lower(), brand.capitalize())
 
 
-def render_billing_history(user: AppUser):
+def render_billing_history(user: AppUser, limit: int = 50):
     import pandas as pd
 
     txns = user.transactions.filter(amount__gt=0).order_by("-created_at")
@@ -424,10 +532,12 @@ def render_billing_history(user: AppUser):
                     txn.note(),
                     f"${txn.charged_amount / 100:,.2f}",
                 ]
-                for txn in txns
+                for txn in txns[:limit]
             ],
         )
     )
+    if txns.count() > limit:
+        st.caption(f"Showing only the most recent {limit} transactions.")
 
 
 def render_auto_recharge_section(user: AppUser):
@@ -438,11 +548,11 @@ def render_auto_recharge_section(user: AppUser):
     subscription = user.subscription
 
     st.write("## Auto Recharge & Limits")
-    with st.div(className="d-flex align-items-center"):
+    with st.div(className="h4"):
         auto_recharge_enabled = st.checkbox(
-            "", value=subscription.auto_recharge_enabled
+            "Enable auto recharge",
+            value=subscription.auto_recharge_enabled,
         )
-        st.write("#### Enable auto recharge")
 
     if auto_recharge_enabled != subscription.auto_recharge_enabled:
         subscription.auto_recharge_enabled = auto_recharge_enabled
@@ -511,25 +621,6 @@ def render_auto_recharge_section(user: AppUser):
         else:
             subscription.save()
             st.success("Settings saved!")
-
-
-def border_box(
-    *,
-    type: Literal["primary", "secondary"] | None = "primary",
-    className: str = "",
-    **props,
-):
-    className += " w-100 border shadow-sm rounded py-4 px-3"
-    match type:
-        case "primary":
-            className += " border-dark text-dark"
-        case "secondary":
-            className += " bg-light text-dark"
-
-    return st.div(
-        className=className,
-        **props,
-    )
 
 
 def left_and_right(*, className: str = "", **props):

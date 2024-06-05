@@ -105,6 +105,7 @@ class AppUser(models.Model):
         on_delete=models.SET_NULL,
         related_name="user",
         null=True,
+        blank=True,
     )
 
     created_at = models.DateTimeField(
