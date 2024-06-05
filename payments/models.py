@@ -34,10 +34,14 @@ class SubscriptionQuerySet(models.QuerySet):
 
 class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.db_choices())
-    payment_provider = models.IntegerField(choices=PaymentProvider.choices)
+    payment_provider = models.IntegerField(
+        choices=PaymentProvider.choices, blank=True, null=True, default=None
+    )
     external_id = models.CharField(
         max_length=255,
         help_text="Subscription ID from the payment provider",
+        null=True,
+        blank=True,
     )
     auto_recharge_enabled = models.BooleanField(default=True)
     auto_recharge_balance_threshold = models.IntegerField()
@@ -56,6 +60,7 @@ class Subscription(models.Model):
     )
 
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
+    monthly_budget_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -259,8 +264,7 @@ class Subscription(models.Model):
         if self.payment_provider == PaymentProvider.STRIPE:
             subscription = stripe.Subscription.retrieve(self.external_id)
             return subscription.customer
-        else:
-            raise ValueError("Invalid Payment Provider")
+        raise ValueError("Invalid Payment Provider")
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
         invoice = self.stripe_create_auto_invoice(
@@ -300,6 +304,12 @@ class Subscription(models.Model):
     def has_sent_monthly_spending_notification_this_month(self) -> bool:
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
+            == datetime.now(tz=timezone.utc).strftime("%B %Y")
+        )
+
+    def has_sent_monthly_budget_email_this_month(self) -> bool:
+        return self.monthly_budget_email_sent_at and (
+            self.monthly_budget_email_sent_at.strftime("%B %Y")
             == datetime.now(tz=timezone.utc).strftime("%B %Y")
         )
 
