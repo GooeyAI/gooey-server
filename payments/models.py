@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import typing
-from datetime import datetime, timezone
 
 import stripe
 from django.db import models
-from furl import furl
+from django.utils import timezone
 
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
+from daras_ai_v2.fastapi_tricks import get_route_url
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -219,7 +219,7 @@ class Subscription(models.Model):
                 inv
                 for inv in invoices
                 if inv.status == "paid"
-                and datetime.now(tz=timezone.utc).timestamp() - inv.created
+                and timezone.now().timestamp() - inv.created
                 < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
             ),
             None,
@@ -283,11 +283,13 @@ class Subscription(models.Model):
         """
         Get URL to Stripe/PayPal for user to manage the subscription.
         """
+        from routers.account import account_route
+
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
                     customer=self.stripe_get_customer_id(),
-                    return_url=str(furl(settings.APP_BASE_URL) / "account" / ""),
+                    return_url=get_route_url(account_route),
                 )
                 return portal.url
             case PaymentProvider.PAYPAL:
@@ -306,13 +308,13 @@ class Subscription(models.Model):
     def has_sent_monthly_spending_notification_this_month(self) -> bool:
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
-            == datetime.now(tz=timezone.utc).strftime("%B %Y")
+            == timezone.now().strftime("%B %Y")
         )
 
     def has_sent_monthly_budget_email_this_month(self) -> bool:
         return self.monthly_budget_email_sent_at and (
             self.monthly_budget_email_sent_at.strftime("%B %Y")
-            == datetime.now(tz=timezone.utc).strftime("%B %Y")
+            == timezone.now().strftime("%B %Y")
         )
 
     def should_send_monthly_spending_notification(self) -> bool:
