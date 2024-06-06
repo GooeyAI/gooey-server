@@ -214,18 +214,13 @@ class Subscription(models.Model):
         if open_invoice:
             return open_invoice
 
-        recently_paid_invoice = next(
-            (
-                inv
-                for inv in invoices
-                if inv.status == "paid"
+        for inv in invoices:
+            if (
+                inv.status == "paid"
                 and timezone.now().timestamp() - inv.created
                 < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
-            ),
-            None,
-        )
-        if recently_paid_invoice:
-            return recently_paid_invoice
+            ):
+                return inv
 
         return self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars, metadata_key=metadata_key
