@@ -143,7 +143,10 @@ class Subscription(models.Model):
             return period_end
         elif self.payment_provider == PaymentProvider.PAYPAL:
             subscription = paypal.Subscription.retrieve(self.external_id)
-            if not subscription.billing_info:
+            if (
+                not subscription.billing_info
+                or not subscription.billing_info.next_billing_time
+            ):
                 return None
             return subscription.billing_info.next_billing_time.timestamp()
         else:
