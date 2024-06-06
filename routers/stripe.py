@@ -114,7 +114,6 @@ def _handle_checkout_session_completed(uid: str, session_data):
     )
 
 
-@transaction.atomic
 def _handle_subscription_updated(uid: str, subscription_data):
     logger.info("Subscription updated")
     product = stripe.Product.retrieve(subscription_data.plan.product)

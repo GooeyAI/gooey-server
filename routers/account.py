@@ -229,7 +229,6 @@ def account_page_wrapper(request: Request, current_tab: TabData):
             yield
 
 
-@transaction.atomic
 def paypal_handle_subscription_updated(subscription: paypal.Subscription):
     logger.info("Subscription updated")
 
