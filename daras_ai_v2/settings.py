@@ -248,6 +248,7 @@ APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
+PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
@@ -283,7 +284,6 @@ ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 
-PAYMENT_PROCESSING_PAGE_PATH: str = "/payment-processing/"
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
@@ -294,10 +294,10 @@ LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
 LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
+STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
-STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
-    "STRIPE_PRODUCT_IDS",
-    cast=json.loads,
+STRIPE_ADDON_PRODUCT_NAME = config(
+    "STRIPE_ADDON_PRODUCT_NAME", "Gooey.AI Add-on Credits"
 )
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
@@ -305,10 +305,7 @@ PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
 PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
 PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
-PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
-    "PAYPAL_PLAN_IDS",
-    cast=json.loads,
-)
+PAYPAL_DEFAULT_PRODUCT_NAME: str = config("PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits")  # type: ignore
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 

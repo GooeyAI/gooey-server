@@ -70,7 +70,7 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.billing import AccountTabs
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
@@ -1505,12 +1505,18 @@ class BasePage:
         pass
 
     def on_submit(self):
+        from celeryapp.tasks import auto_recharge
+
         try:
             example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
+
+        if user_should_auto_recharge(self.request.user):
+            auto_recharge.delay(user_id=self.request.user.id)
+
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
@@ -1519,6 +1525,7 @@ class BasePage:
             self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
+
         raise RedirectException(self.app_url(run_id=run_id, uid=uid))
 
     def should_submit_after_login(self) -> bool:
@@ -1574,14 +1581,7 @@ class BasePage:
         return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
-        from celeryapp.tasks import gui_runner, auto_recharge
-
-        if (
-            self.request.user
-            and not self.request.user.is_anonymous
-            and user_should_auto_recharge(self.request.user)
-        ):
-            auto_recharge.delay(user_id=self.request.user.id)
+        from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
             page_cls=self.__class__,
@@ -1727,7 +1727,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
-                    type="light",
                     className="border border-dark",
                 )
 
@@ -1799,7 +1798,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                             published_run.visibility
                         ).get_badge_html(),
                         unsafe_allow_html=True,
-                        type="light",
                         className="border border-dark",
                     )
 

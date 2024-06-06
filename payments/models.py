@@ -1,34 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
+import typing
 
 import stripe
-from django.core.exceptions import ValidationError
 from django.db import models
-from furl import furl
+from django.utils import timezone
 
-from .plans import PricingPlan
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
+from daras_ai_v2.fastapi_tricks import get_route_url
+from .plans import PricingPlan, stripe_get_addon_product
 
 
-def validate_addon_amount(value: int):
-    if value not in settings.ADDON_AMOUNT_CHOICES:
-        raise ValidationError(f"{value} not among valid choices")
-
-
-def validate_auto_recharge_balance_threshold(value: int):
-    if value not in settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES:
-        raise ValidationError(f"{value} not among valid choices")
-
-
-@dataclass
-class PaymentMethodSummary:
-    payment_method_type: str
-    card_brand: str | None
-    card_last4: str | None
-    billing_email: str | None
+class PaymentMethodSummary(typing.NamedTuple):
+    payment_method_type: str | None = None
+    card_brand: str | None = None
+    card_last4: str | None = None
+    billing_email: str | None = None
 
 
 class SubscriptionQuerySet(models.QuerySet):
@@ -44,20 +32,19 @@ class SubscriptionQuerySet(models.QuerySet):
 
 
 class Subscription(models.Model):
-    plan = models.IntegerField(choices=PricingPlan.choices())
-    payment_provider = models.IntegerField(choices=PaymentProvider.choices)
+    plan = models.IntegerField(choices=PricingPlan.db_choices())
+    payment_provider = models.IntegerField(
+        choices=PaymentProvider.choices, blank=True, null=True, default=None
+    )
     external_id = models.CharField(
         max_length=255,
         help_text="Subscription ID from the payment provider",
+        null=True,
+        blank=True,
     )
     auto_recharge_enabled = models.BooleanField(default=True)
-    auto_recharge_balance_threshold = models.IntegerField(
-        validators=[
-            validate_auto_recharge_balance_threshold,
-        ],
-    )
+    auto_recharge_balance_threshold = models.IntegerField()
     auto_recharge_topup_amount = models.IntegerField(
-        validators=[validate_addon_amount],
         default=settings.ADDON_AMOUNT_CHOICES[0],
     )
     monthly_spending_budget = models.IntegerField(
@@ -72,6 +59,7 @@ class Subscription(models.Model):
     )
 
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
+    monthly_budget_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -85,7 +73,12 @@ class Subscription(models.Model):
         ]
 
     def __str__(self):
-        return PricingPlan(self.plan).title
+        ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
+        if self.has_user:
+            ret = f"{ret} | {self.user}"
+        if self.auto_recharge_enabled:
+            ret = f"Auto | {ret}"
+        return ret
 
     def full_clean(self, *args, **kwargs):
         if self.plan and self.auto_recharge_enabled:
@@ -108,14 +101,14 @@ class Subscription(models.Model):
 
     def _get_default_auto_recharge_balance_threshold(self):
         # 25% of the monthly credit subscription
-        threshold = int(PricingPlan(self.plan).credits * 0.25)
+        threshold = int(PricingPlan.from_sub(self).credits * 0.25)
         return nearest_choice(
             settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES, threshold
         )
 
     def _get_default_monthly_spending_budget(self):
         # 3x the monthly subscription charge
-        return 3 * PricingPlan(self.plan).monthly_charge
+        return 3 * PricingPlan.from_sub(self).monthly_charge
 
     def _get_default_monthly_spending_notification_threshold(self):
         # 80% of the monthly budget
@@ -141,22 +134,18 @@ class Subscription(models.Model):
                     f"Can't cancel subscription for {self.payment_provider}"
                 )
 
-    def get_next_invoice_date(self) -> datetime | None:
+    def get_next_invoice_timestamp(self) -> float | None:
         if self.payment_provider == PaymentProvider.STRIPE:
             subscription = stripe.Subscription.retrieve(self.external_id)
             period_end = subscription.current_period_end
-            return (
-                datetime.fromtimestamp(period_end, tz=timezone.utc)
-                if period_end
-                else None
-            )
+            if not period_end:
+                return None
+            return period_end
         elif self.payment_provider == PaymentProvider.PAYPAL:
             subscription = paypal.Subscription.retrieve(self.external_id)
-            return (
-                subscription.billing_info.next_billing_time
-                if subscription.billing_info
-                else None
-            )
+            if not subscription.billing_info:
+                return None
+            return subscription.billing_info.next_billing_time.timestamp()
         else:
             raise ValueError("Invalid Payment Provider")
 
@@ -164,29 +153,26 @@ class Subscription(models.Model):
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 pm = self.stripe_get_default_payment_method()
-                if pm:
-                    return PaymentMethodSummary(
-                        payment_method_type=pm.type,
-                        card_brand=pm.card and pm.card.brand,
-                        card_last4=pm.card and pm.card.last4,
-                        billing_email=pm.billing_details and pm.billing_details.email,
-                    )
-                else:
+                if not pm:
                     return None
+                return PaymentMethodSummary(
+                    payment_method_type=pm.type,
+                    card_brand=pm.card and pm.card.brand,
+                    card_last4=pm.card and pm.card.last4,
+                    billing_email=(pm.billing_details and pm.billing_details.email),
+                )
             case PaymentProvider.PAYPAL:
                 subscription = paypal.Subscription.retrieve(self.external_id)
                 subscriber = subscription.subscriber
-                if not subscriber or not subscriber.payment_source:
+                if not subscriber:
                     return None
-                try:
-                    return PaymentMethodSummary(
-                        payment_method_type="card",
-                        card_brand=subscriber.payment_source["card"]["brand"],
-                        card_last4=subscriber.payment_source["card"]["last_digits"],
-                        billing_email=subscriber.email_address,
-                    )
-                except KeyError:
-                    return None
+                source = subscriber.payment_source or {}
+                return PaymentMethodSummary(
+                    payment_method_type=source and "card",
+                    card_brand=source.get("card", {}).get("brand"),
+                    card_last4=source.get("card", {}).get("last_digits"),
+                    billing_email=subscriber.email_address,
+                )
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
         if self.payment_provider != PaymentProvider.STRIPE:
@@ -228,18 +214,13 @@ class Subscription(models.Model):
         if open_invoice:
             return open_invoice
 
-        recently_paid_invoice = next(
-            (
-                inv
-                for inv in invoices
-                if inv.status == "paid"
-                and datetime.now(tz=timezone.utc).timestamp() - inv.created
+        for inv in invoices:
+            if (
+                inv.status == "paid"
+                and timezone.now().timestamp() - inv.created
                 < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
-            ),
-            None,
-        )
-        if recently_paid_invoice:
-            return recently_paid_invoice
+            ):
+                return inv
 
         return self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars, metadata_key=metadata_key
@@ -259,7 +240,7 @@ class Subscription(models.Model):
             invoice=invoice,
             price_data={
                 "currency": "usd",
-                "product": settings.STRIPE_PRODUCT_IDS["addon"],
+                "product": stripe_get_addon_product().id,
                 "unit_amount_decimal": (
                     settings.ADDON_CREDITS_PER_DOLLAR / 100
                 ),  # in cents
@@ -275,29 +256,35 @@ class Subscription(models.Model):
         if self.payment_provider == PaymentProvider.STRIPE:
             subscription = stripe.Subscription.retrieve(self.external_id)
             return subscription.customer
-        else:
-            raise ValueError("Invalid Payment Provider")
+        raise ValueError("Invalid Payment Provider")
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
+        from routers.stripe import handle_invoice_paid
+
         invoice = self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars,
             metadata_key="addon",
         )
-        if invoice.status == "open":
-            pm = self.stripe_get_default_payment_method()
-            invoice.pay(payment_method=pm)
-            return True
-        return False
+        if invoice.status != "open":
+            return False
+        pm = self.stripe_get_default_payment_method()
+        invoice = invoice.pay(payment_method=pm)
+        if not invoice.paid:
+            return False
+        handle_invoice_paid(self.user.uid, invoice)
+        return True
 
     def get_external_management_url(self) -> str:
         """
         Get URL to Stripe/PayPal for user to manage the subscription.
         """
+        from routers.account import account_route
+
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
                     customer=self.stripe_get_customer_id(),
-                    return_url=str(furl(settings.APP_BASE_URL) / "account" / ""),
+                    return_url=get_route_url(account_route),
                 )
                 return portal.url
             case PaymentProvider.PAYPAL:
@@ -316,7 +303,13 @@ class Subscription(models.Model):
     def has_sent_monthly_spending_notification_this_month(self) -> bool:
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
-            == datetime.now(tz=timezone.utc).strftime("%B %Y")
+            == timezone.now().strftime("%B %Y")
+        )
+
+    def has_sent_monthly_budget_email_this_month(self) -> bool:
+        return self.monthly_budget_email_sent_at and (
+            self.monthly_budget_email_sent_at.strftime("%B %Y")
+            == timezone.now().strftime("%B %Y")
         )
 
     def should_send_monthly_spending_notification(self) -> bool:
