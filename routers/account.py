@@ -35,18 +35,19 @@ app = APIRouter()
 def payment_processing_route(
     request: Request, provider: str = None, subscription_id: str = None
 ):
-    subtext = None
     waiting_time_sec = 3
+    subtext = None
 
     if provider == "paypal":
-        if sub_id := subscription_id:
-            sub = paypal.Subscription.retrieve(sub_id)
-            paypal_handle_subscription_updated(sub)
+        if (sub_id := subscription_id) and st.run_in_thread(
+            threaded_paypal_handle_subscription_updated, args=[sub_id]
+        ):
+            waiting_time_sec = 0
         else:
+            waiting_time_sec = 30
             subtext = (
                 "PayPal transactions take up to a minute to reflect in your account"
             )
-            waiting_time_sec = 30
 
     with page_wrapper(request, className="m-auto"):
         with st.center():
@@ -261,3 +262,12 @@ def paypal_handle_subscription_updated(subscription: paypal.Subscription):
     user.subscription.full_clean()
     user.subscription.save()
     user.save(update_fields=["subscription"])
+
+
+def threaded_paypal_handle_subscription_updated(subscription_id: str) -> bool:
+    """
+    Always returns True when completed (for use in st.run_in_thread())
+    """
+    subscription = paypal.Subscription.retrieve(subscription_id)
+    paypal_handle_subscription_updated(subscription)
+    return True
