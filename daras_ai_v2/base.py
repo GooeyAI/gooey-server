@@ -168,7 +168,15 @@ class BasePage:
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
+        if query_params is None:
+            query_params = {}
 
+        if run_id and uid:
+            query_params |= dict(run_id=run_id, uid=uid)
+        q_example_id = query_params.pop("example_id", None)
+
+        # old urls had example_id as a query param
+        example_id = example_id or q_example_id
         run_slug = None
         if example_id:
             try:
@@ -177,10 +185,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-
-        query_params = cls.clean_query_params(
-            example_id=None, run_id=run_id, uid=uid
-        ) | (query_params or {})
 
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
