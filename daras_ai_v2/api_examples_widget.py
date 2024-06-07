@@ -339,7 +339,7 @@ let response = await fetch("%(api_url)s", {
     // your integration's ID as shown in the Gooey.AI Integrations tab
     "integration_id": "%(integration_id)s",
     // the input text for the bot
-    "input_text": "Hello, world!",
+    "input_prompt": "Hello, world!",
   }),
 });
 // get the server-sent events URL
