@@ -170,7 +170,7 @@ def get_top_k_references(
     # chunk_count = sum(len(ref.document_ids) for ref in embedding_refs)
     # logger.debug(f"Knowledge base has {len(file_ids)} documents ({chunk_count} chunks)")
 
-    yield "Searching knowledge base"
+    yield "Searching knowledge base..."
     s = time()
     search_result = query_vespa(
         request.search_query,
