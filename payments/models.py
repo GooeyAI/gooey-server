@@ -81,21 +81,18 @@ class Subscription(models.Model):
         return ret
 
     def full_clean(self, *args, **kwargs):
-        if self.plan and self.auto_recharge_enabled:
-            if not self.auto_recharge_balance_threshold:
-                self.auto_recharge_balance_threshold = (
-                    self._get_default_auto_recharge_balance_threshold()
-                )
+        if not self.auto_recharge_balance_threshold:
+            self.auto_recharge_balance_threshold = (
+                self._get_default_auto_recharge_balance_threshold()
+            )
 
-            if not self.monthly_spending_budget:
-                self.monthly_spending_budget = (
-                    self._get_default_monthly_spending_budget()
-                )
+        if not self.monthly_spending_budget:
+            self.monthly_spending_budget = self._get_default_monthly_spending_budget()
 
-            if not self.monthly_spending_notification_threshold:
-                self.monthly_spending_notification_threshold = (
-                    self._get_default_monthly_spending_notification_threshold()
-                )
+        if not self.monthly_spending_notification_threshold:
+            self.monthly_spending_notification_threshold = (
+                self._get_default_monthly_spending_notification_threshold()
+            )
 
         return super().full_clean(*args, **kwargs)
 
