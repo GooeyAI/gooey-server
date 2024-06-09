@@ -282,7 +282,10 @@ class PricingPlan(PricingPlanData, Enum):
 
     def get_stripe_product_id(self) -> str:
         for product in stripe.Product.list(expand=["data.default_price"]).data:
-            if product.default_price.unit_amount == self.monthly_charge * 100:  # cents
+            if (
+                product.default_price
+                and product.default_price.unit_amount == self.monthly_charge * 100
+            ):  # cents
                 return product.id
 
         product = stripe.Product.create(

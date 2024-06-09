@@ -92,22 +92,42 @@ def get_user_subscription(user: AppUser):
 
 def run():
     # list active stripe subscriptions
-    for sub in stripe.Subscription.list().data:
+    for sub in stripe.Subscription.list(
+        limit=100,
+        expand=["data.customer"],
+    ).data:
         if (
             sub.metadata.get(USER_SUBSCRIPTION_METADATA_FIELD)
             in available_subscriptions
         ):
-            sub = stripe.Subscription.retrieve(sub.id)
             try:
-                user = AppUser.objects.get(stripe_customer_id=sub.customer)
-            except AppUser.DoesNotExist:
-                logger.warning(f"User not found for subscription {sub.id}")
+                uid = sub.customer.metadata.uid
+            except AttributeError:
+                uid = None
+            if not uid:
+                logger.error(
+                    f"User not found for subscription={sub.id} customer={sub.customer.id}"
+                )
+                continue
+
+            user = AppUser.objects.get_or_create_from_uid(uid)[0]
+            if user.subscription:
+                if (
+                    user.subscription.payment_provider == PaymentProvider.STRIPE
+                    and user.subscription.external_id == sub.id
+                ):
+                    logger.info(f"Same subscription already exists for {user.uid}")
+                else:
+                    logger.critical(
+                        f"[Manual Action Required] User {user.uid} has two active subscriptions:"
+                        f"(Stripe, {sub.id}) and ({PaymentProvider(user.subscription.payment_provider).label}, {user.subscription.external_id})"
+                    )
                 continue
 
             prod = stripe.Product.retrieve(sub.plan.product)
             plan = PricingPlan.get_by_stripe_product(prod)
             if not plan:
-                logger.warning(f"Plan not found for product {prod.id}")
+                logger.critical(f"Plan not found for product {prod.id}")
                 continue
 
             with transaction.atomic():
@@ -115,10 +135,10 @@ def run():
                     plan=plan.db_value,
                     payment_provider=PaymentProvider.STRIPE,
                     external_id=sub.id,
+                    auto_recharge_enabled=False,
                 )
                 user.subscription.full_clean()
                 user.subscription.save()
-
                 user.save(update_fields=["subscription"])
 
             logger.info(f"Updated subscription for {user.uid}")

@@ -94,6 +94,8 @@ class BotInterface:
     recipe_run_state = RecipeRunState.starting
     run_status = "Starting..."
 
+    request_overrides: dict = None
+
     def send_msg(
         self,
         *,
@@ -319,15 +321,17 @@ def _process_and_send_msg(
 
     # # mock testing
     # result = _mock_api_output(input_text)
-    body = {
-        "input_prompt": input_text,
-        "input_audio": input_audio,
-        "input_images": input_images,
-        "input_documents": input_documents,
-        "messages": saved_msgs,
-    }
+    body = dict(
+        input_prompt=input_text,
+        input_audio=input_audio,
+        input_images=input_images,
+        input_documents=input_documents,
+        messages=saved_msgs,
+    )
     if should_translate_lang(bot.language):
         body["user_language"] = bot.language
+    if bot.request_overrides:
+        body = bot.request_overrides | body
     page, result, run_id, uid = submit_api_call(
         page_cls=bot.page_cls,
         user=billing_account_user,

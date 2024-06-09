@@ -167,13 +167,12 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModel(LipsyncSettings, BaseModel):
-        bot_script: str | None
-
-        input_prompt: str
+    class RequestModelBase(BaseModel):
+        input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None
         input_documents: list[FieldHttpUrl] | None
+
         doc_extract_url: str | None = Field(
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
@@ -181,6 +180,8 @@ class VideoBotsPage(BasePage):
 
         # conversation history/context
         messages: list[ConversationEntry] | None
+
+        bot_script: str | None
 
         # tts settings
         tts_provider: (
@@ -274,6 +275,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             title="🛠️ Tools",
             description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
         )
+
+    class RequestModel(LipsyncSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         final_prompt: str | list[ConversationEntry] = []
