@@ -53,15 +53,10 @@ def _auto_recharge_user(user: AppUser):
             spending=dollars_spent,
         )
 
-    # create invoice or get a recent one (recent = created in the last `settings.AUTO_RECHARGE_COOLDOWN_SECONDS` seconds)
-    cooldown_period_start = datetime.now(timezone.utc) - timedelta(
-        seconds=settings.AUTO_RECHARGE_COOLDOWN_SECONDS
-    )
     try:
         invoice = user.subscription.stripe_get_or_create_auto_invoice(
             amount_in_dollars=user.subscription.auto_recharge_topup_amount,
             metadata_key="auto_recharge",
-            created_after=cooldown_period_start,
         )
     except Exception as e:
         raise PaymentFailedException("Failed to create auto-recharge invoice") from e

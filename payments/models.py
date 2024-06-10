@@ -198,15 +198,14 @@ class Subscription(models.Model):
         self,
         amount_in_dollars: int,
         metadata_key: str,
-        created_after: datetime,
     ) -> stripe.Invoice:
         """
         Fetches the relevant invoice, or creates one if it doesn't exist.
 
         This is the fallback order:
-        - An open invoice that has `metadata_key` set
-        - A paid invoice that has `metadata_key` set and was created after `created_after`
-        - A new invoice to charge `amount_in_dollars` USD (with `metadata_key` set to True)
+        - Fetch an open invoice that has `metadata_key` set
+        - Fetch a `metadata_key` invoice that was recently paid
+        - Create an invoice with amount=`amount_in_dollars` and `metadata_key` set to true
         """
         customer_id = self.stripe_get_customer_id()
         invoices = stripe.Invoice.list(
