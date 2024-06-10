@@ -33,7 +33,7 @@ class WebhookHandler:
             user.subscription
             and user.subscription.should_send_monthly_spending_notification()
         ):
-            send_monthly_spending_notification_email.delay(kwargs={"uid": uid})
+            send_monthly_spending_notification_email.delay(uid)
 
     @classmethod
     @transaction.atomic
