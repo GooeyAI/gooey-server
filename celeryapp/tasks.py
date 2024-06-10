@@ -18,15 +18,14 @@ from bots.models import SavedRun, Platform
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.auto_recharge import auto_recharge_user
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
 from gooeysite.bg_db_conn import db_middleware, next_db_safe
+from payments.tasks import run_auto_recharge_async
 
 
 @app.task
@@ -143,7 +142,9 @@ def gui_runner(
         save(done=True)
         if not is_api_call:
             send_email_on_completion(page, sr)
+
         run_low_balance_email_check(uid)
+        run_auto_recharge_async.apply(kwargs={"uid": uid})
 
 
 def err_msg_for_exc(e: Exception):
@@ -253,11 +254,3 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
         subject=f"{user.display_name} Attempted to Connect to {platform.label}",
         html_body=html_body,
     )
-
-
-@app.task
-def auto_recharge(*, user_id: int):
-    redis_lock_key = f"gooey/auto_recharge/{user_id}"
-    with redis_lock(redis_lock_key):
-        user = AppUser.objects.get(id=user_id)
-        auto_recharge_user(user)
