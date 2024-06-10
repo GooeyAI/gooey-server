@@ -16,7 +16,7 @@ from payments.auto_recharge import (
 
 
 @app.task
-def send_monthly_spending_notification_email(*, uid: str):
+def send_monthly_spending_notification_email(uid: str):
     from routers.account import account_route
 
     user = AppUser.objects.get(uid=uid)
@@ -46,7 +46,13 @@ def send_monthly_spending_notification_email(*, uid: str):
 
 
 @app.task
-def run_auto_recharge_async(*, uid: str):
+def run_auto_recharge_gracefully(uid: str):
+    """
+    Wrapper over auto_recharge_user, that handles exceptions so that it can:
+    - log exceptions
+    - send emails when auto-recharge fails
+    - not retry if this is run as a background task
+    """
     try:
         auto_recharge_user(uid)
     except AutoRechargeCooldownException as e:
@@ -56,19 +62,19 @@ def run_auto_recharge_async(*, uid: str):
         )
         return
     except MonthlyBudgetReachedException as e:
-        send_monthly_budget_reached_email(uid=uid)
+        send_monthly_budget_reached_email(uid)
         logger.info(
             f"Rejected auto-recharge because user has reached monthly budget"
             f"{uid=}, spending=${e.spending}, budget=${e.budget}"
         )
         return
     except (PaymentFailedException, Exception) as e:
-        send_auto_recharge_failed_email(uid=uid)
+        send_auto_recharge_failed_email(uid)
         logger.exception("Payment failed when attempting to auto-recharge", uid=uid)
         return
 
 
-def send_monthly_budget_reached_email(*, uid: str):
+def send_monthly_budget_reached_email(uid: str):
     from routers.account import account_route
 
     user = AppUser.objects.get(uid=uid)
@@ -93,7 +99,7 @@ def send_monthly_budget_reached_email(*, uid: str):
     user.subscription.save(update_fields=["monthly_budget_email_sent_at"])
 
 
-def send_auto_recharge_failed_email(*, uid: str):
+def send_auto_recharge_failed_email(uid: str):
     from routers.account import account_route
 
     user = AppUser.objects.get(uid=uid)

@@ -25,7 +25,7 @@ from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
 from gooeysite.bg_db_conn import db_middleware, next_db_safe
-from payments.tasks import run_auto_recharge_async
+from payments.tasks import run_auto_recharge_gracefully
 
 
 @app.task
@@ -144,7 +144,7 @@ def gui_runner(
             send_email_on_completion(page, sr)
 
         run_low_balance_email_check(uid)
-        run_auto_recharge_async.apply(kwargs={"uid": uid})
+        run_auto_recharge_gracefully(uid)
 
 
 def err_msg_for_exc(e: Exception):

@@ -19,8 +19,6 @@ from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 
-from celeryapp.tasks import auto_recharge
-from daras_ai_v2.auto_recharge import user_should_auto_recharge
 import gooey_ui as st
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
@@ -34,8 +32,8 @@ from daras_ai_v2.base import (
     RecipeRunState,
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
-from daras_ai_v2.ratelimits import ensure_rate_limits
 from gooeysite.bg_db_conn import get_celery_result_db_safe
+from payments.auto_recharge import should_attempt_auto_recharge
 from routers.account import AccountTabs
 
 app = APIRouter()
@@ -369,11 +367,8 @@ def submit_api_call(
     st.set_session_state(state)
     st.set_query_params(query_params)
 
-    if user_should_auto_recharge(self.request.user):
-        auto_recharge.delay(user_id=self.request.user.id)
-
     # check the balance
-    if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
+    if not self.check_credits() and not should_attempt_auto_recharge(self.request.user):
         account_url = furl(settings.APP_BASE_URL) / AccountTabs.billing.url_path
         raise HTTPException(
             status_code=402,
