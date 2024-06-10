@@ -254,12 +254,10 @@ def _render_update_subscription_button(
         case "Downgrade":
             downgrade_modal = Modal(
                 "Confirm downgrade",
-                key=f"change-sub-{plan.key}-modal",
+                key=f"downgrade-plan-modal-{plan.key}",
             )
             if st.button(
-                label,
-                className=className,
-                key=f"change-sub-{plan.key}-modal-open-btn",
+                label, className=className, key=f"downgrade-button-{plan.key}"
             ):
                 downgrade_modal.open()
 

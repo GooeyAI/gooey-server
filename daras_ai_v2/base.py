@@ -11,7 +11,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-from loguru import logger
 import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
