@@ -96,13 +96,13 @@ def gui_runner(
         page.dump_state_to_sr(st.session_state | output, sr)
 
     try:
-        gen = page.run(st.session_state)
+        gen = page.run_with_auto_recharge(st.session_state)
         save()
         while True:
             # record time
             start_time = time()
             try:
-                # advance the generator (to further progress of run())
+                # advance the generator (to further progress of run_with_auto_recharge())
                 yield_val = next_db_safe(gen)
                 # increment total time taken after every iteration
                 run_time += time() - start_time
