@@ -698,6 +698,7 @@ def custom_radio(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    custom_input: int,
 ) -> T | None:
     if not key:
         key = md5_values("custom_radio", label, options, help, label_visibility)
@@ -710,6 +711,8 @@ def custom_radio(
         disabled=disabled,
         label_visibility=label_visibility,
     )
+    if custom_input:
+        value = custom_input
     is_custom = value not in options
     custom = {
         "label": "Custom",
@@ -719,7 +722,6 @@ def custom_radio(
             max_value=60,
             step=1,
             key=key,
-            style={"margin-top": "-28px"},
         ),
     }
     with div(className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}):

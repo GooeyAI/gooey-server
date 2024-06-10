@@ -274,7 +274,7 @@ def frames_to_seconds(frames: int, fps: int) -> float:
 
 
 def seconds_to_frames(seconds: float, fps: int) -> int:
-    return int(seconds) * int(fps)
+    return int(seconds * int(fps))
 
 
 def zoom_pan_to_string(zoom_dict: dict[int, float]) -> str:
@@ -379,6 +379,7 @@ class DeforumSDPage(BasePage):
                 "24": "Film: 24 FPS",
             }[str(x)],
             key="fps",
+            custom_input=12,
         )
 
     def get_cost_note(self) -> str | None:
