@@ -11,6 +11,7 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
+from loguru import logger
 import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
@@ -24,6 +25,7 @@ from sentry_sdk.tracing import (
 )
 from starlette.requests import Request
 
+from daras_ai_v2.exceptions import UserError
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -37,7 +39,6 @@ from bots.models import (
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.auto_recharge import user_should_auto_recharge
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -71,6 +72,11 @@ from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
 from routers.account import AccountTabs
+from payments.auto_recharge import (
+    AutoRechargeException,
+    auto_recharge_user,
+    should_attempt_auto_recharge,
+)
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
@@ -1355,6 +1361,29 @@ class BasePage:
     def render_usage_guide(self):
         raise NotImplementedError
 
+    def run_with_auto_recharge(self, state: dict) -> typing.Iterator[str | None]:
+        if not self.check_credits() and should_attempt_auto_recharge(self.request.user):
+            yield "Low balance detected. Recharging..."
+            try:
+                auto_recharge_user(uid=self.request.user.uid)
+            except AutoRechargeException as e:
+                # raise this error only if another auto-recharge
+                # procedure didn't complete successfully
+                self.request.user.refresh_from_db()
+                if not self.check_credits():
+                    raise UserError(str(e)) from e
+            else:
+                self.request.user.refresh_from_db()
+
+        if not self.check_credits():
+            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+            error_msg = self.generate_credit_error_message(
+                example_id=example_id, run_id=run_id, uid=uid
+            )
+            raise UserError(error_msg)
+
+        yield from self.run(state)
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
         request = self.RequestModel.parse_obj(state)
@@ -1505,8 +1534,6 @@ class BasePage:
         pass
 
     def on_submit(self):
-        from celeryapp.tasks import auto_recharge
-
         try:
             example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
@@ -1514,10 +1541,10 @@ class BasePage:
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
 
-        if user_should_auto_recharge(self.request.user):
-            auto_recharge.delay(user_id=self.request.user.id)
-
-        if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
+        if not self.check_credits() and not should_attempt_auto_recharge(
+            self.request.user
+        ):
+            # insufficient balance for this run and auto-recharge isn't setup
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
                 example_id, run_id, uid
@@ -1978,6 +2005,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         manage_api_keys(self.request.user)
 
     def check_credits(self) -> bool:
+        if not settings.CREDITS_TO_DEDUCT_PER_RUN:
+            return True
+
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
         return self.request.user.balance >= self.get_price_roundoff(st.session_state)
