@@ -1,3 +1,5 @@
+from typing import Literal
+
 import stripe
 from django.core.exceptions import ValidationError
 
@@ -15,6 +17,9 @@ from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
+
+
+PlanActionLabel = Literal["Upgrade", "Downgrade", "Contact Us", "Your Plan"]
 
 
 def billing_page(user: AppUser):
@@ -126,11 +131,11 @@ def render_all_plans(user: AppUser):
     st.write("## All Plans")
     plans_div = st.div(className="mb-1")
 
-    if user.subscription:
-        payment_provider = None
+    if user.subscription and user.subscription.payment_provider:
+        selected_payment_provider = None
     else:
         with st.div():
-            payment_provider = PaymentProvider[
+            selected_payment_provider = PaymentProvider[
                 payment_provider_radio() or PaymentProvider.STRIPE.name
             ]
 
@@ -144,7 +149,9 @@ def render_all_plans(user: AppUser):
                 className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
             ):
                 _render_plan_details(plan)
-                _render_plan_action_button(user, plan, current_plan, payment_provider)
+                _render_plan_action_button(
+                    user, plan, current_plan, selected_payment_provider
+                )
 
     with plans_div:
         grid_layout(4, all_plans, _render_plan, separator=False)
@@ -188,30 +195,44 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             st.html("Contact Us")
-    elif current_plan is not PricingPlan.ENTERPRISE:
-        update_subscription_button(
-            user=user,
-            plan=plan,
-            current_plan=current_plan,
-            className=btn_classes,
-            payment_provider=payment_provider,
-        )
-
-
-def update_subscription_button(
-    *,
-    user: AppUser,
-    current_plan: PricingPlan,
-    plan: PricingPlan,
-    className: str = "",
-    payment_provider: PaymentProvider | None = None,
-):
-    if plan.credits > current_plan.credits:
-        label, btn_type = ("Upgrade", "primary")
+    elif user.subscription and not user.subscription.payment_provider:
+        # don't show upgrade/downgrade buttons for enterprise customers
+        # assumption: anyone without a payment provider attached is admin/enterprise
+        return
     else:
-        label, btn_type = ("Downgrade", "secondary")
-    className += f" btn btn-theme btn-{btn_type}"
+        if plan.credits > current_plan.credits:
+            label, btn_type = ("Upgrade", "primary")
+        else:
+            label, btn_type = ("Downgrade", "secondary")
 
+        if user.subscription and user.subscription.payment_provider:
+            # subscription exists, show upgrade/downgrade button
+            _render_update_subscription_button(
+                label,
+                user=user,
+                current_plan=current_plan,
+                plan=plan,
+                className=f"{btn_classes} btn btn-theme btn-{btn_type}",
+            )
+        else:
+            assert payment_provider is not None  # for sanity
+            _render_create_subscription_button(
+                label,
+                btn_type=btn_type,
+                user=user,
+                plan=plan,
+                payment_provider=payment_provider,
+            )
+
+
+def _render_create_subscription_button(
+    label: PlanActionLabel,
+    *,
+    btn_type: str,
+    user: AppUser,
+    plan: PricingPlan,
+    payment_provider: PaymentProvider,
+):
     match payment_provider:
         case PaymentProvider.STRIPE:
             render_stripe_subscription_button(
@@ -219,13 +240,26 @@ def update_subscription_button(
             )
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
-        case _ if label == "Downgrade":
+
+
+def _render_update_subscription_button(
+    label: PlanActionLabel,
+    *,
+    user: AppUser,
+    current_plan: PricingPlan,
+    plan: PricingPlan,
+    className: str = "",
+):
+    match label:
+        case "Downgrade":
             downgrade_modal = Modal(
                 "Confirm downgrade",
-                key=f"downgrade-plan-modal-{plan.key}",
+                key=f"change-sub-{plan.key}-modal",
             )
             if st.button(
-                label, className=className, key=f"downgrade-button-{plan.key}"
+                label,
+                className=className,
+                key=f"change-sub-{plan.key}-modal-open-btn",
             ):
                 downgrade_modal.open()
 
@@ -404,7 +438,10 @@ def render_stripe_subscription_button(
         st.write("Stripe subscription not available")
         return
 
-    if st.button(label, type=btn_type):
+    # IMPORTANT: key=... is needed here to maintain uniqueness
+    # of buttons with the same label. otherwise, all buttons
+    # will be the same to the server
+    if st.button(label, key=f"sub-new-{plan.key}", type=btn_type):
         create_stripe_checkout_session(user=user, plan=plan)
 
 
@@ -412,8 +449,8 @@ def create_stripe_checkout_session(user: AppUser, plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    if user.subscription and user.subscription.plan == plan.db_value:
-        # already subscribed to the same plan
+    if user.subscription:
+        # already subscribed to some plan
         return
 
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
@@ -463,7 +500,7 @@ def render_payment_information(user: AppUser):
         provider = PaymentProvider(user.subscription.payment_provider)
         st.write(provider.label)
     with col3:
-        if st.button(f"{icons.edit} Edit", type="link"):
+        if st.button(f"{icons.edit} Edit", type="link", key="manage-sub"):
             raise RedirectException(user.subscription.get_external_management_url())
 
     pm_summary = st.run_in_thread(
@@ -482,7 +519,7 @@ def render_payment_information(user: AppUser):
                 unsafe_allow_html=True,
             )
         with col3:
-            if st.button(f"{icons.edit} Edit", type="link"):
+            if st.button(f"{icons.edit} Edit", type="link", key="change-pm"):
                 change_payment_method(user)
 
     if pm_summary.billing_email:
