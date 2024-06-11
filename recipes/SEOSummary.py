@@ -6,6 +6,7 @@ import readability
 import requests
 from furl import furl
 from html_sanitizer import Sanitizer
+from loguru import logger
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -415,7 +416,7 @@ def _summarize_url(url: str, enable_html: bool):
     try:
         title, summary = _call_summarize_url(url)
     except (requests.RequestException, etree.LxmlError) as e:
-        print(f"ignore error while downloading {url}: {e}")
+        logger.warning(f"ignore error while downloading {url}: {e}")
         return None
 
     title = html_to_text(title)

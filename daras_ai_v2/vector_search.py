@@ -309,7 +309,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             )
             raise_for_status(r)
         except requests.RequestException as e:
-            print(f"ignore error while downloading {f_url}: {e}")
+            logger.warning(f"ignore error while downloading {f_url}: {e}")
             name = None
             mime_type = None
             etag = None
@@ -657,7 +657,7 @@ def download_content_bytes(
         )
         raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
-        print(f"ignore error while downloading {f_url}: {e}")
+        logger.warning(f"ignore error while downloading {f_url}: {e}")
         return b"", ""
     f_bytes = r.content
     # if it's a known encoding, standardize to utf-8
