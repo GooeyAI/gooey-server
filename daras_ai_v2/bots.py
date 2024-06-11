@@ -315,7 +315,7 @@ def _process_and_send_msg(
     recieved_time: datetime,
 ):
     # get latest messages for context
-    saved_msgs = bot.convo.msgs_as_llm_context()
+    saved_msgs = bot.convo.msgs_for_llm_context()
 
     # # mock testing
     # result = _mock_api_output(input_text)
