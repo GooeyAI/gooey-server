@@ -698,7 +698,6 @@ def custom_radio(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-    custom_input: int,
 ) -> T | None:
     if not key:
         key = md5_values("custom_radio", label, options, help, label_visibility)
@@ -710,9 +709,8 @@ def custom_radio(
         help=help,
         disabled=disabled,
         label_visibility=label_visibility,
+        validate_value=False,
     )
-    if custom_input:
-        value = custom_input
     is_custom = value not in options
     custom = {
         "label": "Custom",
@@ -758,6 +756,7 @@ def radio(
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
+    validate_value: bool = True,
 ) -> T | None:
     if not options:
         return None
@@ -765,7 +764,7 @@ def radio(
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.setdefault(key, value)
-    if value not in options and checked_by_default:
+    if (value not in options and validate_value) and checked_by_default:
         value = state.session_state[key] = options[0]
     if label_visibility != "visible":
         label = None
