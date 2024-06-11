@@ -290,13 +290,13 @@ class TextToSpeechPage(BasePage):
                 voice_model = self._get_elevenlabs_voice_model(state)
                 voice_id = self._get_elevenlabs_voice_id(state)
 
-                stability = state.get("elevenlabs_stability", 0.5)
-                similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+                stability = state.get("elevenlabs_stability") or 0.5
+                similarity_boost = state.get("elevenlabs_similarity_boost") or 0.75
                 voice_settings = dict(
                     stability=stability, similarity_boost=similarity_boost
                 )
                 if voice_model == "eleven_multilingual_v2":
-                    voice_settings["style"] = state.get("elevenlabs_style", 0.0)
+                    voice_settings["style"] = state.get("elevenlabs_style") or 0
                     voice_settings["speaker_boost"] = state.get(
                         "elevenlabs_speaker_boost", True
                     )

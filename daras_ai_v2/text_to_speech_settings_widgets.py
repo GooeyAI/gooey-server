@@ -508,7 +508,6 @@ def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
         headers={"Accept": "application/json", "xi-api-key": api_key},
     )
     raise_for_status(r)
-    print(r.json()["voices"])
     sorted_voices = sorted(
         r.json()["voices"],
         key=lambda v: (_elevenlabs_category_order.get(v["category"], 0), v["name"]),
