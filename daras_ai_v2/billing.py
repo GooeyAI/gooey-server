@@ -323,6 +323,10 @@ def change_subscription(user: AppUser, new_plan: PricingPlan):
                 metadata={
                     settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
                 },
+                # charge the full new amount today, without prorations
+                # see: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                billing_cycle_anchor="now",
+                proration_behavior="none",
             )
             raise RedirectException(
                 get_route_url(payment_processing_route), status_code=303
