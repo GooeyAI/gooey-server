@@ -3,7 +3,7 @@ import time
 import typing
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -78,7 +78,7 @@ class TextToSpeechPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
-        elevenlabs_style: float | None
+        elevenlabs_style: float | None = Field(0)
         elevenlabs_speaker_boost: bool | None
 
         azure_voice_name: str | None

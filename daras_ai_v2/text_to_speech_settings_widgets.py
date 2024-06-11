@@ -444,7 +444,6 @@ def elevenlabs_settings():
                 max_value=1.0,
                 step=0.05,
                 key="elevenlabs_style",
-                value=0.0,
             )
         with col2:
             st.checkbox(
