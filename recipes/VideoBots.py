@@ -137,7 +137,6 @@ class VideoBotsPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
-        "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,

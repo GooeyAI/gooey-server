@@ -16,7 +16,6 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
-    ELEVEN_LABS_VOICES,
     ELEVEN_LABS_MODELS,
     text_to_speech_settings,
     TextToSpeechProviders,
@@ -26,6 +25,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OPENAI_TTS_VOICES_T,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
+    OLD_ELEVEN_LABS_VOICES,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -49,7 +49,6 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
-        "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
@@ -314,6 +313,10 @@ class TextToSpeechPage(BasePage):
                         "voice_settings": voice_settings,
                     },
                 )
+                if response.status_code == 400 and '"voice_not_found"' in response.text:
+                    raise UserError(
+                        f"ElevenLabs Voice {voice_id} not found. If you're trying to use a custom voice, please provide your elevenlabs_api_key."
+                    )
                 raise_for_status(response)
 
                 yield "Uploading Audio file..."
@@ -394,19 +397,17 @@ class TextToSpeechPage(BasePage):
         assert voice_model in ELEVEN_LABS_MODELS, f"Invalid model: {voice_model}"
         return voice_model
 
-    def _get_elevenlabs_voice_id(self, state: dict[str, str]):
-        if state.get("elevenlabs_voice_id"):
-            if not state.get("elevenlabs_api_key"):
-                raise UserError(
-                    "ElevenLabs API key is required to use a custom voice_id"
-                )
+    def _get_elevenlabs_voice_id(self, state: dict[str, str]) -> str:
+        try:
             return state["elevenlabs_voice_id"]
-        else:
+        except KeyError:
             # default to first in the mapping
-            default_voice_name = next(iter(ELEVEN_LABS_VOICES))
+            default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
             voice_name = state.get("elevenlabs_voice_name", default_voice_name)
-            assert voice_name in ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
-            return ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
+            assert (
+                voice_name in OLD_ELEVEN_LABS_VOICES
+            ), f"Invalid voice_name: {voice_name}"
+            return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
 
     def _get_elevenlabs_api_key(self, state: dict[str, str]) -> tuple[str, bool]:
         """

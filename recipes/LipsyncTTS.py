@@ -25,7 +25,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
     sane_defaults = {
-        "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
