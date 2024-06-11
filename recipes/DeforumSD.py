@@ -34,7 +34,6 @@ AnimationPrompts = list[_AnimationPrompt]
 ZoomSettings: dict[int, float] = {0: 1.004}
 HPanSettings: dict[int, float] = {0: 0}
 VPanSettings: dict[int, float] = {0: 0}
-MaxSeconds: int = 10
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -135,7 +134,9 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3 = st.columns([2, 9, 2], responsive=False)
+        col1, col2, col3 = st.columns(
+            [2, 9, 2], responsive=False, style={"text-align": "center;"}
+        )
         fps = st.session_state.get("fps", 12)
         max_seconds = st.session_state.get("max_seconds", 10)
         start = fp["second"]
@@ -153,7 +154,10 @@ def animation_prompts_editor(
                 className="gui-input-smaller",
             )
             if idx != 0 and st.button(
-                "🗑️", help=f"Remove Frame {idx + 1}", type="tertiary"
+                "🗑️",
+                help=f"Remove Frame {idx + 1}",
+                type="tertiary",
+                style={"float": "left;"},
             ):
                 prompt_st_list.pop(idx)
                 st.experimental_rerun()
@@ -161,6 +165,7 @@ def animation_prompts_editor(
                 '<i class="fa-regular fa-plus"></i>',
                 help=f"Insert Frame after Frame {idx + 1}",
                 type="tertiary",
+                style={"float": "left;"},
             ):
                 next_second = round((start + end) / 2, 2)
                 if next_second > max_seconds:
@@ -211,7 +216,7 @@ def animation_prompts_editor(
                         f"#### Keyframe second {start} until {end}",
                     )
                     st.caption(
-                        f"Starting at second {start} and until second {end}, how do you want the camera to move?"
+                        f"Starting at second {start} and until second {end}, how do you want the camera to move? (Reasonable valuables would be ±0.005)"
                     )
                     zoom_pan_slider = st.slider(
                         label="""
@@ -270,7 +275,7 @@ def get_last_frame(prompt_list: list) -> int:
 
 
 def frames_to_seconds(frames: int, fps: int) -> float:
-    return round(frames / fps, 2)
+    return round(frames / int(fps), 2)
 
 
 def seconds_to_frames(seconds: float, fps: int) -> int:
@@ -347,20 +352,19 @@ class DeforumSDPage(BasePage):
 
         col1, col2 = st.columns([2, 11], responsive=False)
         with col1:
-            if "max_seconds" not in st.session_state:
-                st.session_state["max_seconds"] = frames_to_seconds(
-                    st.session_state.get("max_frames", 100),
-                    st.session_state.get("fps", 12),
-                )
-            MaxSeconds = st.number_input(
+            st.number_input(
                 label="",
                 key="max_seconds",
                 min_value=0,
                 step=0.1,
+                value=frames_to_seconds(
+                    st.session_state.get("max_frames", 100),
+                    st.session_state.get("fps", 12),
+                ),
                 className="gui-input-smaller",
             )
             st.session_state["max_frames"] = seconds_to_frames(
-                MaxSeconds, st.session_state.get("fps", 12)
+                st.session_state.get("max_seconds", 10), st.session_state.get("fps", 12)
             )
 
         with col2:

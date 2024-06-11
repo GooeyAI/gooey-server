@@ -722,6 +722,7 @@ def custom_radio(
             max_value=60,
             step=1,
             key=key,
+            style={"margin-top": "-8px"},
         ),
     }
     with div(className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}):
