@@ -838,10 +838,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
             query_msgs = query_msgs[clip_idx:]
 
-            chat_history = "\n".join(
-                f'{entry["role"]}: """{get_entry_text(entry)}"""'
-                for entry in query_msgs
-            )
+            chat_history = messages_as_prompt(query_msgs)
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
@@ -1408,6 +1405,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         raise RedirectException(
             self.current_app_url(RecipeTabs.integrations, path_params=path_params)
         )
+
+
+def messages_as_prompt(query_msgs: list[dict]) -> str:
+    return "\n".join(
+        f'{entry["role"]}: """{get_entry_text(entry)}"""' for entry in query_msgs
+    )
 
 
 def infer_asr_model_and_language(
