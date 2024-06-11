@@ -31,6 +31,33 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
 
+class TextToSpeechSettings(BaseModel):
+    tts_provider: typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+
+    uberduck_voice_name: str | None
+    uberduck_speaking_rate: float | None
+
+    google_voice_name: str | None
+    google_speaking_rate: float | None
+    google_pitch: float | None
+
+    bark_history_prompt: str | None
+
+    elevenlabs_voice_name: str | None
+    elevenlabs_api_key: str | None
+    elevenlabs_voice_id: str | None
+    elevenlabs_model: str | None
+    elevenlabs_stability: float | None
+    elevenlabs_similarity_boost: float | None
+    elevenlabs_style: float | None = Field(0)
+    elevenlabs_speaker_boost: bool | None
+
+    azure_voice_name: str | None
+
+    openai_voice_name: OPENAI_TTS_VOICES_T | None
+    openai_tts_model: OPENAI_TTS_MODELS_T | None
+
+
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3621e11a-88d9-11ee-b549-02420a000167/Compare%20AI%20voice%20generators.png.png"
@@ -56,35 +83,11 @@ class TextToSpeechPage(BasePage):
         "openai_tts_model": "tts-1",
     }
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BaseModel):
         text_prompt: str
 
-        tts_provider: (
-            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
-        )
-
-        uberduck_voice_name: str | None
-        uberduck_speaking_rate: float | None
-
-        google_voice_name: str | None
-        google_speaking_rate: float | None
-        google_pitch: float | None
-
-        bark_history_prompt: str | None
-
-        elevenlabs_voice_name: str | None
-        elevenlabs_api_key: str | None
-        elevenlabs_voice_id: str | None
-        elevenlabs_model: str | None
-        elevenlabs_stability: float | None
-        elevenlabs_similarity_boost: float | None
-        elevenlabs_style: float | None = Field(0)
-        elevenlabs_speaker_boost: bool | None
-
-        azure_voice_name: str | None
-
-        openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model: OPENAI_TTS_MODELS_T | None
+    class RequestModel(TextToSpeechSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         audio_url: FieldHttpUrl
