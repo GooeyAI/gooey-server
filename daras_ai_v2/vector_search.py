@@ -89,12 +89,14 @@ Generally speaking, dense embeddings excel at understanding the context of the q
 
 def get_top_k_references(
     request: DocSearchRequest,
+    is_user_url: bool = True,
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
 
     Args:
         request: the document search request
+        is_user_url: whether the url is user-uploaded
 
     Returns:
         the top k documents
@@ -128,9 +130,10 @@ def get_top_k_references(
             file_meta=file_meta,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
-            selected_asr_model=selected_asr_model,
             google_translate_target=google_translate_target,
+            selected_asr_model=selected_asr_model,
             embedding_model=embedding_model,
+            is_user_url=is_user_url,
         ),
         file_urls,
         file_metas,
@@ -374,9 +377,10 @@ def get_embeds_for_doc(
     file_meta: FileMetadata,
     max_context_words: int,
     scroll_jump: int,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
+    is_user_url: bool,
 ) -> typing.Iterator[tuple[SearchReference, np.ndarray]]:
     """
     Get document embeddings for a given document url.
@@ -389,6 +393,7 @@ def get_embeds_for_doc(
         embedding_model: selected embedding model
         google_translate_target: target language for google translate
         selected_asr_model: selected ASR model (used for audio files)
+        is_user_url: whether the url is user-uploaded
 
     Returns:
         list of (metadata, embeddings) tuples
@@ -397,6 +402,7 @@ def get_embeds_for_doc(
         f_url=f_url,
         file_meta=file_meta,
         selected_asr_model=selected_asr_model,
+        is_user_url=is_user_url,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -517,12 +523,13 @@ def doc_url_to_text_pages(
     f_url: str,
     file_meta: FileMetadata,
     selected_asr_model: str | None,
+    is_user_url: bool = True,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
     """
     f_bytes, mime_type = download_content_bytes(
-        f_url=f_url, mime_type=file_meta.mime_type
+        f_url=f_url, mime_type=file_meta.mime_type, is_user_url=is_user_url
     )
     if not f_bytes:
         return []
@@ -535,7 +542,9 @@ def doc_url_to_text_pages(
     )
 
 
-def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
+def download_content_bytes(
+    *, f_url: str, mime_type: str, is_user_url: bool = True
+) -> tuple[bytes, str]:
     if is_yt_url(f_url):
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
@@ -548,7 +557,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         )
-        raise_for_status(r, is_user_url=True)
+        raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
         print(f"ignore error while downloading {f_url}: {e}")
         return b"", ""
@@ -775,9 +784,10 @@ def get_or_create_embeddings(
     *,
     max_context_words: int,
     scroll_jump: int,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
+    is_user_url: bool,
 ) -> EmbeddedFile:
     """
     Return Vespa document ids and document tags
@@ -809,6 +819,7 @@ def get_or_create_embeddings(
                 google_translate_target=google_translate_target or "",
                 selected_asr_model=selected_asr_model or "",
                 embedding_model=embedding_model,
+                is_user_url=is_user_url,
             )
             with transaction.atomic():
                 file_meta.save()
@@ -826,12 +837,13 @@ def create_embeddings_in_search_db(
     *,
     f_url: str,
     file_meta: FileMetadata,
+    file_id: str,
     max_context_words: int,
     scroll_jump: int,
-    file_id: str,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
+    is_user_url: bool,
 ) -> list[EmbeddingsReference]:
     refs = []
     vespa = get_vespa_app()
@@ -840,9 +852,10 @@ def create_embeddings_in_search_db(
         file_meta=file_meta,
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
-        embedding_model=embedding_model,
         google_translate_target=google_translate_target,
         selected_asr_model=selected_asr_model,
+        embedding_model=embedding_model,
+        is_user_url=is_user_url,
     ):
         doc_id = file_id + "/" + hashlib.sha256(str(ref).encode()).hexdigest()
         db_ref = EmbeddingsReference(
