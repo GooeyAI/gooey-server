@@ -225,7 +225,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
-                        value=zoom_value or 0,
+                        value=0,
                     )
                     hpan_slider = st.slider(
                         label="""
@@ -234,7 +234,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
-                        value=hpan_value or 0,
+                        value=0,
                     )
                     vpan_slider = st.slider(
                         label="""
@@ -243,7 +243,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
-                        value=vpan_value or 0,
+                        value=0,
                     )
                     if st.button("Save"):
                         ZoomSettings.update({fp["frame"]: 1 + zoom_pan_slider})
