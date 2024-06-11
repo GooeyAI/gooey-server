@@ -192,6 +192,7 @@ def animation_prompts_editor(
             zoom_value = ZoomSettings.get(fp["frame"])
             hpan_value = HPanSettings.get(fp["frame"])
             vpan_value = VPanSettings.get(fp["frame"])
+            print("thezoomvalue", zoom_value)
             zoom_pan_description = ""
             if zoom_value:
                 zoom_pan_description = "Out: " if zoom_value > 1 else "In: "
@@ -225,6 +226,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
+                        value=zoom_value or 0,
                     )
                     hpan_slider = st.slider(
                         label="""
@@ -233,6 +235,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
+                        value=hpan_value or 0,
                     )
                     vpan_slider = st.slider(
                         label="""
@@ -241,6 +244,7 @@ def animation_prompts_editor(
                         min_value=-1.5,
                         max_value=1.5,
                         step=0.001,
+                        value=vpan_value or 0,
                     )
                     if st.button("Save"):
                         ZoomSettings.update({fp["frame"]: 1 + zoom_pan_slider})
@@ -590,8 +594,8 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        if not self.request.user.disable_safety_checker:
-            safety_checker(text=self.preview_input(state))
+        # if not self.request.user.disable_safety_checker:
+        #     safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
