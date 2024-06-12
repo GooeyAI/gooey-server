@@ -16,16 +16,15 @@ class LipsyncModel(Enum):
 
 class SadTalkerSettings(BaseModel):
     still: bool = Field(
-        False, title="Still (fewer head motion, works with preprocess 'full')"
+        True, title="Still (fewer head motion, works with preprocess 'full')"
     )
     preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = Field(
-        "crop", title="Preprocess"
+        "resize", title="Preprocess"
     )
     pose_style: int = Field(0, title="Pose Style")
     expression_scale: float = Field(1.0, title="Expression Scale")
     ref_eyeblink: FieldHttpUrl = Field(None, title="Reference Eyeblink")
     ref_pose: FieldHttpUrl = Field(None, title="Reference Pose")
-    input_yaw: list[int] = Field(None, title="Input Yaw (comma separated)")
     input_pitch: list[int] = Field(None, title="Input Pitch (comma separated)")
     input_roll: list[int] = Field(None, title="Input Roll (comma separated)")
     # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None

@@ -39,9 +39,6 @@ def sadtalker_settings(settings: SadTalkerSettings):
         **field_label_val(settings, "expression_scale"),
     )
 
-    # st.selectbox("Face Enhancer", [None, "gfpgan", "RestoreFormer"], value=settings.enhancer)
-    # st.selectbox("Background Enhancer", [None, "realesrgan"], value=settings.background_enhancer)
-
     settings.ref_eyeblink = (
         st.file_uploader(
             **field_label_val(settings, "ref_eyeblink"),
@@ -54,18 +51,6 @@ def sadtalker_settings(settings: SadTalkerSettings):
         st.file_uploader("Reference Pose", value=settings.ref_pose, accept=[".mp4"])
         or None
     )
-
-    input_yaw = st.text_input(
-        "Input Yaw (comma separated)",
-        value=", ".join(map(str, settings.input_yaw or [])),
-    )
-    try:
-        settings.input_yaw = (
-            list(map(int, filter(None, input_yaw.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_yaw = None
-        st.error("Please enter comma separated integers for Input Yaw")
 
     input_pitch = st.text_input(
         "Input Pitch (comma separated)",
