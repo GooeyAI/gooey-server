@@ -66,17 +66,16 @@ from daras_ai_v2.user_date_widgets import (
 from gooey_ui import (
     realtime_clear_subs,
     RedirectException,
-    QueryParamsRedirectException,
 )
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.billing import AccountTabs
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec2100aa-1f6e-11ef-ba0b-02420a000159/Main.jpg"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -673,8 +672,8 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=duplicate_pr.published_run_id),
+            raise RedirectException(
+                self.app_url(example_id=duplicate_pr.published_run_id)
             )
 
         if save_as_new_button:
@@ -686,9 +685,7 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=new_pr.published_run_id)
-            )
+            raise RedirectException(self.app_url(example_id=new_pr.published_run_id))
 
         with st.div(className="mt-4"):
             st.write("#### Version History", className="mb-4")
@@ -730,7 +727,7 @@ class BasePage:
 
         if confirm_button:
             published_run.delete()
-            raise QueryParamsRedirectException(query_params={})
+            raise RedirectException(self.app_url())
 
         if cancel_button:
             modal.close()
@@ -789,7 +786,7 @@ class BasePage:
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
                     )
-                    raise QueryParamsRedirectException(dict())
+                    raise RedirectException(self.app_url())
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -1508,13 +1505,18 @@ class BasePage:
         pass
 
     def on_submit(self):
+        from celeryapp.tasks import auto_recharge
+
         try:
-            ensure_rate_limits(self.workflow, self.request.user)
+            example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
-        example_id, run_id, uid = self.create_new_run()
+
+        if user_should_auto_recharge(self.request.user):
+            auto_recharge.delay(user_id=self.request.user.id)
+
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
@@ -1523,9 +1525,8 @@ class BasePage:
             self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
-        raise QueryParamsRedirectException(
-            self.clean_query_params(example_id=None, run_id=run_id, uid=uid)
-        )
+
+        raise RedirectException(self.app_url(run_id=run_id, uid=uid))
 
     def should_submit_after_login(self) -> bool:
         return (
@@ -1535,7 +1536,7 @@ class BasePage:
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, **defaults):
+    def create_new_run(self, *, enable_rate_limits: bool = False, **defaults):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1551,6 +1552,9 @@ class BasePage:
                 uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
             )
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
+
+        if enable_rate_limits:
+            ensure_rate_limits(self.workflow, self.request.user)
 
         run_id = get_random_doc_id()
 
@@ -1577,14 +1581,7 @@ class BasePage:
         return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
-        from celeryapp.tasks import gui_runner, auto_recharge
-
-        if (
-            self.request.user
-            and not self.request.user.is_anonymous
-            and user_should_auto_recharge(self.request.user)
-        ):
-            auto_recharge.delay(user_id=self.request.user.id)
+        from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
             page_cls=self.__class__,
@@ -1730,7 +1727,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
-                    type="light",
                     className="border border-dark",
                 )
 
@@ -1802,7 +1798,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                             published_run.visibility
                         ).get_badge_html(),
                         unsafe_allow_html=True,
-                        type="light",
                         className="border border-dark",
                     )
 

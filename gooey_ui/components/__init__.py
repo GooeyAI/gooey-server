@@ -84,15 +84,9 @@ def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **
         )
 
 
-def center(direction="column") -> state.NestingCtx:
+def center(direction="flex-column", className="") -> state.NestingCtx:
     return div(
-        style={
-            "display": "flex",
-            "justifyContent": "center",
-            "alignItems": "center",
-            "textAlign": "center",
-            "flexDirection": direction,
-        }
+        className=f"d-flex justify-content-center align-items-center text-center {direction} {className}"
     )
 
 
@@ -890,6 +884,7 @@ def checkbox(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    **props,
 ) -> bool:
     value = _input_widget(
         input_type="checkbox",
@@ -900,6 +895,7 @@ def checkbox(
         disabled=disabled,
         label_visibility=label_visibility,
         default_value_attr="defaultChecked",
+        **props,
     )
     return bool(value)
 

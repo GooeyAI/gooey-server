@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import datetime
 from time import time
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Type, TypeVar
 
 import requests
 from furl import furl
@@ -15,8 +15,12 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import get_redis_cache
 
 
+T = TypeVar("T", bound="PaypalResource")
+
+
 class PaypalResource(BaseModel):
     _api_endpoint: str | None = None
+    _api_list_items_key: str | None = None
 
     id: str
     create_time: datetime
@@ -24,7 +28,47 @@ class PaypalResource(BaseModel):
     links: list
 
     @classmethod
-    def retrieve(cls, resource_id: str):
+    def list(cls: Type[T], list_all: bool = False, **params) -> list[T]:
+        if not list_all:
+            return cls._list(**params)
+
+        page_size = 20
+        result = []
+        params.update(page_size=page_size, total_required=True)
+        items_key = cls._get_api_list_items_key()
+        for page in range(1, 6):
+            # return maximum of 20 x 5 = 100 items
+            r = requests.get(
+                str(furl(settings.PAYPAL_BASE) / cls._api_endpoint),
+                headers=get_default_headers(),
+                params=params | {"page": page},
+            )
+            raise_for_status(r)
+            body = r.json()
+            result += [cls.parse_obj(item) for item in body[items_key]]
+            if page * page_size >= body["total_items"]:
+                break
+
+        return result
+
+    @classmethod
+    def _list(cls: Type[T], **params) -> list[T]:
+        if not cls._api_endpoint:
+            raise NotImplementedError(f"API endpoint not defined for {cls.__name__}")
+
+        r = requests.get(
+            str(furl(settings.PAYPAL_BASE) / cls._api_endpoint),
+            headers=get_default_headers(),
+            params=params,
+        )
+        raise_for_status(r)
+        return [
+            cls.parse_obj(item)
+            for item in r.json().get(cls._get_api_list_items_key(), [])
+        ]
+
+    @classmethod
+    def retrieve(cls: Type[T], resource_id: str) -> T:
         if not cls._api_endpoint:
             raise NotImplementedError(f"API endpoint not defined for {cls.__name__}")
 
@@ -36,7 +80,7 @@ class PaypalResource(BaseModel):
         return cls.parse_obj(r.json())
 
     @classmethod
-    def create(cls, **data) -> PaypalResource:
+    def create(cls: Type[T], **data) -> T:
         if not cls._api_endpoint:
             raise NotImplementedError(f"API endpoint not defined for {cls.__name__}")
 
@@ -47,6 +91,10 @@ class PaypalResource(BaseModel):
         )
         raise_for_status(r)
         return cls.parse_obj(r.json())
+
+    @classmethod
+    def _get_api_list_items_key(cls) -> str:
+        return cls._api_list_items_key or cls.__name__.lower() + "s"
 
     def get_resource_url(self) -> furl:
         if not self._api_endpoint:
@@ -174,6 +222,23 @@ class Subscription(PaypalResource):
             },
         )
         raise_for_status(r)
+
+
+class Plan(PaypalResource):
+    _api_endpoint = "v1/billing/plans"
+
+    name: str
+    status: Literal["CREATED", "ACTIVE", "INACTIVE"]
+    product_id: str | None
+    billing_cycles: list[dict[str, Any]] | None
+
+
+class Product(PaypalResource):
+    _api_endpoint = "v1/catalogs/products"
+
+    name: str
+    type: Literal["PHYSICAL", "DIGITAL", "SERVICE"] | None
+    description: str | None
 
 
 class Sale(PaypalResource):

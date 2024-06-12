@@ -2,6 +2,7 @@ import queue
 import threading
 import uuid
 from threading import Thread
+from typing import Any
 
 import hashids
 from fastapi import APIRouter, HTTPException
@@ -28,19 +29,9 @@ api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT)
 MSG_ID_PREFIX = "web-"
 
 
-class CreateStreamRequest(BaseModel):
+class CreateStreamRequestBase(BaseModel):
     integration_id: str = Field(
         description="Your Integration ID as shown in the Copilot Integrations tab"
-    )
-
-    input_text: str = None
-    input_audio: str = None
-    input_images: list[str] = None
-    input_documents: list[str] = None
-
-    button_pressed: ButtonPressed = Field(
-        default=None,
-        description="The button that was pressed by the user.",
     )
 
     conversation_id: str = Field(
@@ -63,6 +54,21 @@ class CreateStreamRequest(BaseModel):
         "If not provided, a random ID will be generated and returned in the response. "
         "This is useful for tracking messages in the conversation.",
     )
+
+    button_pressed: ButtonPressed = Field(
+        default=None,
+        description="The button that was pressed by the user.",
+    )
+
+
+class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
+    input_text: str = Field(
+        None, deprecated=True, description="Use `input_prompt` instead"
+    )
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+        self.input_prompt = self.input_prompt or self.input_text
 
 
 class CreateStreamResponse(BaseModel):
@@ -87,7 +93,9 @@ class CreateStreamResponse(BaseModel):
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
-    get_redis_cache().set(f"gooey/stream-init/v1/{request_id}", request.json(), ex=600)
+    get_redis_cache().set(
+        f"gooey/stream-init/v1/{request_id}", request.json(exclude_unset=True), ex=600
+    )
     stream_url = str(
         furl(settings.API_BASE_URL)
         / app.url_path_for(stream_response.__name__, request_id=request_id)
@@ -216,6 +224,7 @@ class ApiInterface(BotInterface):
 
     def __init__(self, request: CreateStreamRequest):
         self.request = request
+        self.request_overrides = request.dict(exclude_unset=True)
         try:
             self.bot_id = api_hashids.decode(request.integration_id)[0]
             assert BotIntegration.objects.filter(id=self.bot_id).exists()
@@ -282,7 +291,7 @@ class ApiInterface(BotInterface):
             )
         )
 
-        if request.input_text:
+        if request.input_prompt:
             self.input_type = "text"
         elif request.input_audio:
             self.input_type = "audio"
@@ -290,7 +299,8 @@ class ApiInterface(BotInterface):
             self.input_type = "image"
         elif request.input_documents:
             self.input_type = "document"
-        elif request.button_pressed:
+        elif button := request.button_pressed:
+            button.context_msg_id = MSG_ID_PREFIX + button.context_msg_id
             self.input_type = "interactive"
         else:
             raise HTTPException(
@@ -368,7 +378,7 @@ class ApiInterface(BotInterface):
         pass
 
     def get_input_text(self) -> str | None:
-        return self.request.input_text
+        return self.request.input_prompt
 
     def get_input_audio(self) -> str | None:
         return self.request.input_audio

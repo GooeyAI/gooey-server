@@ -34,7 +34,7 @@ from daras_ai_v2.exceptions import ffmpeg, UserError, raise_for_status
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
-    get_route_url,
+    get_route_path,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
@@ -88,7 +88,7 @@ async def favicon():
 @st.route
 def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-    match json_data["status"]:
+    match json_data.get("status"):
         case 404:
             template = "errors/404.html"
         case _:
@@ -607,11 +607,23 @@ def render_page(
     if latest_slug != page_slug:
         return RedirectResponse(tab.url_path(latest_slug, run_slug))
 
-    # parse the query params and load the state
-    query_params = st.get_query_params()
-    if not query_params.get("example_id"):
-        query_params["example_id"] = example_id
-    example_id, run_id, uid = extract_query_params(query_params)
+    # if the old query param format is provided, redirect to the new format
+    # because features like login relies on the new format
+    query_params = dict(request.query_params)
+    q_example_id, run_id, uid = extract_query_params(query_params)
+    if q_example_id:
+        query_params.pop("example_id", None)
+        new_url = page_cls.app_url(
+            tab=tab,
+            example_id=q_example_id,
+            run_id=run_id,
+            uid=uid,
+            query_params=query_params,
+        )
+        return RedirectResponse(new_url)
+    # this is because the code still expects example_id to be in the query params
+    st.set_query_params(query_params | dict(example_id=example_id))
+
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not st.session_state:
         sr = page.get_sr_from_query_params(example_id, run_id, uid)
@@ -650,7 +662,7 @@ def get_run_user(request, uid) -> AppUser | None:
 
 
 @contextmanager
-def page_wrapper(request: Request):
+def page_wrapper(request: Request, className=""):
     context = {
         "request": request,
         "settings": settings,
@@ -661,15 +673,16 @@ def page_wrapper(request: Request):
             request.user.uid
         ).decode()
 
-    st.html(templates.get_template("gtag.html").render(**context))
-    st.html(templates.get_template("header.html").render(**context))
-    st.html(copy_to_clipboard_scripts)
+    with st.div(className="d-flex flex-column min-vh-100"):
+        st.html(templates.get_template("gtag.html").render(**context))
+        st.html(templates.get_template("header.html").render(**context))
+        st.html(copy_to_clipboard_scripts)
 
-    with st.div(id="main-content", className="container"):
-        yield
+        with st.div(id="main-content", className="container " + className):
+            yield
 
-    st.html(templates.get_template("footer.html").render(**context))
-    st.html(templates.get_template("login_scripts.html").render(**context))
+        st.html(templates.get_template("footer.html").render(**context))
+        st.html(templates.get_template("login_scripts.html").render(**context))
 
 
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -720,4 +733,4 @@ class RecipeTabs(TabData, Enum):
         if example_id:
             kwargs["example_id"] = example_id
             kwargs["run_slug"] = run_slug or "untitled"
-        return get_route_url(self.route, kwargs)
+        return get_route_path(self.route, kwargs)

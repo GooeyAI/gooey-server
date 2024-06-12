@@ -1,0 +1,30 @@
+{% set dollars_spent = user.get_dollars_spent_this_month() %}
+{% set monthly_budget = user.subscription.monthly_spending_budget %}
+{% set threshold = user.subscription.auto_recharge_balance_threshold %}
+
+<p>
+  Hey, {{ user.first_name() }}!
+</p>
+
+<p>
+  Your Gooey.AI Credit balance is below your auto-recharge threshold
+  of ${{ threshold }}, but auto-recharges have been paused because your
+  have already exceeded your monthly budget of ${{ monthly_budget }}.
+</p>
+
+<p>
+  Please visit your <a href="{{ account_url }}">billing settings</a> to
+  review limits or manually top-up your account.
+</p>
+
+<ul>
+  <li>Credit Balance: {{ user.balance }} credits</li>
+  <li>Monthly Budget: ${{ monthly_budget }}</li>
+  <li>Spending this month: ${{ dollars_spent }}</li>
+</ul>
+
+<p>
+  Best Wishes,
+  <br>
+  Gooey.AI Team
+</p>

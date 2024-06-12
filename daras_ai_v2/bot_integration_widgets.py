@@ -1,5 +1,5 @@
-import json
 from itertools import zip_longest
+from textwrap import dedent
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -11,11 +11,11 @@ from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs, chat_route
+from routers.root import RecipeTabs, chat_route, chat_lib_route
 
 
 def general_integration_settings(bi: BotIntegration, current_user: AppUser):
@@ -249,7 +249,7 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
     elif bi.platform == Platform.WEB:
         return str(
             furl(settings.APP_BASE_URL)
-            / get_route_url(
+            / get_route_path(
                 chat_route,
                 dict(
                     integration_id=bi.api_integration_id(),
@@ -259,6 +259,22 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
         )
     else:
         return None
+
+
+def get_web_widget_embed_code(bi: BotIntegration) -> str:
+    lib_src = furl(settings.APP_BASE_URL) / get_route_path(
+        chat_lib_route,
+        dict(
+            integration_id=bi.api_integration_id(),
+            integration_name=slugify(bi.name) or "untitled",
+        ),
+    )
+    return dedent(
+        f"""
+        <div id="gooey-embed"></div>
+        <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
+        """
+    ).strip()
 
 
 def web_widget_config(bi: BotIntegration, user: AppUser | None):

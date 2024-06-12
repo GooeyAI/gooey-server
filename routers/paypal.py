@@ -4,7 +4,6 @@ from typing import Literal
 
 import pydantic
 import requests
-from django.db import transaction
 from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.requests import Request
@@ -16,15 +15,14 @@ from pydantic import BaseModel
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fastapi_tricks import fastapi_request_json
-from payments.models import PricingPlan, Subscription
-from routers.billing import send_monthly_spending_notification_email
-
-
-payment_processing_url = str(
-    furl(settings.APP_BASE_URL) / settings.PAYMENT_PROCESSING_PAGE_PATH
+from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
+from payments.models import PricingPlan
+from payments.tasks import send_monthly_spending_notification_email
+from routers.account import (
+    paypal_handle_subscription_updated,
+    payment_processing_route,
+    account_route,
 )
-account_url = str(furl(settings.APP_BASE_URL) / "account" / "v2" / "/")
 
 router = APIRouter()
 
@@ -124,7 +122,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
 
     lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
-    if plan is None or not plan.paypal:
+    if plan is None or not plan.supports_paypal():
         return JSONResponse(
             {"error": "Invalid plan key or not supported by PayPal"}, status_code=400
         )
@@ -137,15 +135,16 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
             {"error": "User already has an active subscription"}, status_code=400
         )
 
+    paypal_plan_info = plan.get_paypal_plan()
     pp_subscription = paypal.Subscription.create(
-        plan_id=plan.paypal["plan_id"],
+        plan_id=paypal_plan_info["plan_id"],
         custom_id=request.user.uid,
-        plan=plan.paypal and plan.paypal.get("plan", {}),
+        plan=paypal_plan_info.get("plan", {}),
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
-            "return_url": payment_processing_url,
-            "cancel_url": account_url,
+            "return_url": get_route_url(payment_processing_route),
+            "cancel_url": get_route_url(account_route),
         },
     )
     return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
@@ -171,7 +170,7 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
             _handle_sale_completed(event)
         case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
             event = SubscriptionEvent.parse_obj(event)
-            handle_subscription_updated(event.resource)
+            paypal_handle_subscription_updated(event.resource)
         case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
             event = SubscriptionEvent.parse_obj(event)
             _handle_subscription_cancelled(event.resource)
@@ -258,42 +257,7 @@ def _handle_sale_completed(event: SaleCompletedEvent):
         user.subscription
         and user.subscription.should_send_monthly_spending_notification()
     ):
-        send_monthly_spending_notification_email(user)
-
-
-@transaction.atomic
-def handle_subscription_updated(subscription: paypal.Subscription):
-    logger.info("Subscription updated")
-
-    plan = PricingPlan.get_by_paypal_plan_id(subscription.plan_id)
-    if not plan:
-        logger.error(f"Invalid plan ID: {subscription.plan_id}")
-        return
-
-    if not subscription.status == "ACTIVE":
-        logger.warning(f"Subscription {subscription.id} is not active")
-        return
-
-    user = AppUser.objects.get(uid=subscription.custom_id)
-    if user.subscription and (
-        user.subscription.payment_provider != PaymentProvider.PAYPAL
-        or user.subscription.external_id != subscription.id
-    ):
-        logger.warning(
-            f"User {user} has different existing subscription {user.subscription}. Cancelling that..."
-        )
-        user.subscription.cancel()
-        user.subscription.delete()
-    elif not user.subscription:
-        user.subscription = Subscription()
-
-    user.subscription.plan = plan.value
-    user.subscription.payment_provider = PaymentProvider.PAYPAL
-    user.subscription.external_id = subscription.id
-
-    user.subscription.full_clean()
-    user.subscription.save()
-    user.save(update_fields=["subscription"])
+        send_monthly_spending_notification_email.delay(user.id)
 
 
 def _handle_subscription_cancelled(subscription: paypal.Subscription):

@@ -564,7 +564,9 @@ def slice_request_df(df, request):
         df_ix += arr_len
 
 
-def is_arr(field_props: dict) -> bool:
+def is_arr(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
     try:
         return field_props["type"] == "array"
     except KeyError:
@@ -574,13 +576,18 @@ def is_arr(field_props: dict) -> bool:
     return False
 
 
-def is_obj(field_props: dict) -> bool:
+def is_obj(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
     return bool(field_props.get("type") == "object" or field_props.get("$ref"))
 
 
 @st.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
-    dfs = map_parallel(read_df_any, files)
+    try:
+        dfs = map_parallel(read_df_any, files)
+    except ValueError:
+        return []
     return list(
         {
             col: None

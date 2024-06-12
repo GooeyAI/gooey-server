@@ -1,4 +1,5 @@
 import hashlib
+import typing
 from html import escape as escape_html
 from dataclasses import dataclass
 
@@ -31,14 +32,12 @@ from gooey_ui.components.pills import pill
 from handles.models import Handle
 
 
-@dataclass
-class ContributionsSummary:
+class ContributionsSummary(typing.NamedTuple):
     total: int
     top_contributions: dict[Workflow, int]  # sorted dict
 
 
-@dataclass
-class PublicRunsSummary:
+class PublicRunsSummary(typing.NamedTuple):
     total: int
     top_workflows: dict[Workflow, int]
 
@@ -94,7 +93,7 @@ def user_profile_header(request, user: AppUser):
                 st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
-                from routers.billing import AccountTabs
+                from routers.account import AccountTabs
 
                 with st.link(
                     to=AccountTabs.profile.url_path,
@@ -118,7 +117,7 @@ def user_profile_header(request, user: AppUser):
                     pill(
                         f"{icons.github} " + escape_html(user.github_username),
                         unsafe_allow_html=True,
-                        type=None,
+                        text_bg=None,
                         className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
                     )
 
