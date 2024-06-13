@@ -1,10 +1,9 @@
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
-
-from app_users import models
 from django.db.models import Sum
 
-from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
+from app_users import models
+from bots.admin_links import open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
 from usage_costs.models import UsageCost
 
@@ -22,7 +21,7 @@ class AppUserAdmin(admin.ModelAdmin):
                     "uid",
                     ("email", "phone_number"),
                     "balance",
-                    "user_subscription",
+                    "subscription",
                     "stripe_customer_id",
                     "total_payments",
                     "total_charged",
@@ -44,7 +43,7 @@ class AppUserAdmin(admin.ModelAdmin):
             "Profile Options",
             {
                 "fields": [
-                    "user_handle",
+                    "handle",
                     "display_name",
                     "bio",
                     ("company", "github_username"),
@@ -57,8 +56,8 @@ class AppUserAdmin(admin.ModelAdmin):
     ]
     list_display = [
         "uid",
-        "user_handle",
-        "user_subscription",
+        "handle",
+        "subscription",
         "display_name",
         "email",
         "phone_number",
@@ -92,9 +91,8 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_firebase",
         "open_in_stripe",
         "low_balance_email_sent_at",
-        "user_handle",
-        "user_subscription",
     ]
+    autocomplete_fields = ["handle", "subscription"]
 
     @admin.display(description="User Runs")
     def user_runs(self, user: models.AppUser):
@@ -104,24 +102,6 @@ class AppUserAdmin(admin.ModelAdmin):
             instance_id=user.uid,
             show_add=False,
         )
-
-    @admin.display(description="User Handle")
-    def user_handle(self, user: models.AppUser):
-        if user.handle:
-            return change_obj_url(
-                user.handle,
-                label=str(user.handle),
-            )
-        return None
-
-    @admin.display(description="User Subscription")
-    def user_subscription(self, user: models.AppUser):
-        if user.subscription:
-            return change_obj_url(
-                user.subscription,
-                label=str(user.subscription),
-            )
-        return None
 
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):

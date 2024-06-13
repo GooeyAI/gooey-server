@@ -14,12 +14,10 @@ from bots.models import (
     BotIntegration,
     Conversation,
     Platform,
-    SavedRun,
     BotIntegrationAnalysisRun,
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
-from daras_ai_v2.language_model import get_entry_text
 from daras_ai_v2.slack_bot import (
     fetch_channel_members,
     create_personal_channel,
@@ -27,7 +25,7 @@ from daras_ai_v2.slack_bot import (
 )
 from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-from recipes.VideoBots import ReplyButton
+from recipes.VideoBots import ReplyButton, messages_as_prompt
 
 MAX_PROMPT_LEN = 100_000
 
@@ -66,39 +64,31 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         uid=msg.conversation.bot_integration.billing_account_uid
     )
     analysis_sr = anal.get_active_saved_run()
+    variables = analysis_sr.state.get("variables", {})
 
-    # add variables to the script
-    variables = analysis_sr.state.get("variables", {}) | dict(
-        user_msg=msg.get_previous_by_created_at().content,
-        assistant_msg=msg.content,
-        bot_script=msg.saved_run and msg.saved_run.state.get("bot_script", ""),
-        references=(
-            msg.saved_run
-            and references_as_prompt(msg.saved_run.state.get("references", []))
-        ),
-    )
-
-    # these are resource intensive, so only include them if the script asks for them
+    # add the state variables requested by the script
+    if msg.saved_run:
+        fill_req_vars_from_state(msg.saved_run.state, variables)
     if "messages" in variables:
-        variables["messages"] = "\n".join(
-            f'{entry["role"]}: """{get_entry_text(entry)}"""'
-            for entry in msg.conversation.msgs_as_llm_context()
+        variables["messages"] = messages_as_prompt(
+            msg.conversation.msgs_for_llm_context()
         )
-
     if "conversations" in variables:
-        conversations = []
-        for convo in msg.conversation.bot_integration.conversations.order_by(
-            "-created_at"
-        ):
-            if sum(map(len, conversations)) > MAX_PROMPT_LEN:
-                break
-            conversations.append(
-                "\n".join(
-                    f'{entry["role"]}: """{get_entry_text(entry)}"""'
-                    for entry in convo.msgs_as_llm_context()
+        variables["conversations"] = conversations_as_prompt(msg)
+
+    # these vars always show up on the UI
+    variables |= dict(
+        user_msg=msg.get_previous_by_created_at().content,
+        user_msg_local=msg.get_previous_by_created_at().display_content,
+        assistant_msg=msg.content,
+        assistant_msg_local=msg.display_content,
+    )
+    if msg.saved_run:
+        for requested_variable in analysis_sr.state.get("variables", {}).keys():
+            if requested_variable in msg.saved_run.state:
+                variables[requested_variable] = msg.saved_run.state.get(
+                    requested_variable
                 )
-            )
-        variables["conversations"] = "\n####\n".join(conversations)
 
     # make the api call
     result, sr = analysis_sr.submit_api_call(
@@ -130,6 +120,26 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         # save the result
         msg._analysis_started = True  # prevent infinite recursion
         msg.save(update_fields=["analysis_result"])
+
+
+def conversations_as_prompt(msg: Message) -> str:
+    ret = ""
+    for convo in msg.conversation.bot_integration.conversations.order_by("-created_at"):
+        if len(ret) > MAX_PROMPT_LEN:
+            break
+        ret += messages_as_prompt(convo.msgs_for_llm_context()) + "\n####\n"
+    return ret.strip()
+
+
+def fill_req_vars_from_state(state: dict, req_vars: dict):
+    for key in req_vars.keys():
+        try:
+            value = state[key]
+        except KeyError:
+            continue
+        if key == "references":
+            value = references_as_prompt(value)
+        req_vars[key] = value
 
 
 def send_broadcast_msgs_chunked(

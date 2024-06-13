@@ -1,18 +1,21 @@
+{% set dollars_spent = user.get_dollars_spent_this_month() %}
+
 <p>
     Hi, {{ user.first_name() }}!
 </p>
 
 <p>
-    You have exceeded your notification threshold of ${{ user.subscription.monthly_spending_notification_threshold }}
-    in spending this month.
+    Your spend on Gooey.AI so far this month is ${{ dollars_spent }}, exceeding your notification threshold
+    of ${{ user.subscription.monthly_spending_notification_threshold }}. 
 </p>
+
 <p>
     Your monthly budget is ${{ user.subscription.monthly_spending_budget }}, after which auto-recharge will be
     paused and all runs / API calls will be rejected.
 </p>
 
 <p>
-    Please visit your <a href="{{ account_url }}">billing settings</a> to review limits / manually top-up your account.
+    Please visit your <a href="{{ account_url }}">billing settings</a> to review limits and manually top-up your account.
 </p>
 
 <p>

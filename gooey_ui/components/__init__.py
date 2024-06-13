@@ -126,6 +126,7 @@ def error(
     *,
     unsafe_allow_html=False,
     color="rgba(255, 108, 108, 0.2)",
+    **props,
 ):
     if not isinstance(body, str):
         body = repr(body)
@@ -142,7 +143,7 @@ def error(
     ):
         markdown(icon)
         with div():
-            markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
+            markdown(dedent(body), unsafe_allow_html=unsafe_allow_html, **props)
 
 
 def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
@@ -945,6 +946,7 @@ def checkbox(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    **props,
 ) -> bool:
     value = _input_widget(
         input_type="checkbox",
@@ -955,6 +957,7 @@ def checkbox(
         disabled=disabled,
         label_visibility=label_visibility,
         default_value_attr="defaultChecked",
+        **props,
     )
     return bool(value)
 

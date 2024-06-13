@@ -97,7 +97,7 @@ from recipes.DocSearch import (
 )
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
-from recipes.TextToSpeech import TextToSpeechPage
+from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
@@ -137,7 +137,6 @@ class VideoBotsPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
-        "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
@@ -167,13 +166,12 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModel(LipsyncSettings, BaseModel):
-        bot_script: str | None
-
-        input_prompt: str
+    class RequestModelBase(BaseModel):
+        input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None
         input_documents: list[FieldHttpUrl] | None
+
         doc_extract_url: str | None = Field(
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
@@ -182,25 +180,7 @@ class VideoBotsPage(BasePage):
         # conversation history/context
         messages: list[ConversationEntry] | None
 
-        # tts settings
-        tts_provider: (
-            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
-        )
-        uberduck_voice_name: str | None
-        uberduck_speaking_rate: float | None
-        google_voice_name: str | None
-        google_speaking_rate: float | None
-        google_pitch: float | None
-        bark_history_prompt: str | None
-        elevenlabs_voice_name: str | None
-        elevenlabs_api_key: str | None
-        elevenlabs_voice_id: str | None
-        elevenlabs_model: str | None
-        elevenlabs_stability: float | None
-        elevenlabs_similarity_boost: float | None
-        azure_voice_name: str | None
-        openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model: OPENAI_TTS_MODELS_T | None
+        bot_script: str | None
 
         # llm settings
         selected_model: (
@@ -274,6 +254,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             title="🛠️ Tools",
             description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
         )
+
+    class RequestModel(LipsyncSettings, TextToSpeechSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         final_prompt: str | list[ConversationEntry] = []
@@ -855,10 +838,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
             query_msgs = query_msgs[clip_idx:]
 
-            chat_history = "\n".join(
-                f'{entry["role"]}: """{get_entry_text(entry)}"""'
-                for entry in query_msgs
-            )
+            chat_history = messages_as_prompt(query_msgs)
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
@@ -1425,6 +1405,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         raise RedirectException(
             self.current_app_url(RecipeTabs.integrations, path_params=path_params)
         )
+
+
+def messages_as_prompt(query_msgs: list[dict]) -> str:
+    return "\n".join(
+        f'{entry["role"]}: """{get_entry_text(entry)}"""' for entry in query_msgs
+    )
 
 
 def infer_asr_model_and_language(
