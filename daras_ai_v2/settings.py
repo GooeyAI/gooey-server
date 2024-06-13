@@ -385,3 +385,6 @@ MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
 MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
 MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
 MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
+
+DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
+DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
