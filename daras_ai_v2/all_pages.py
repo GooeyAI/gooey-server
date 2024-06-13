@@ -15,6 +15,7 @@ from recipes.DocSearch import DocSearchPage
 from recipes.DocSummary import DocSummaryPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
+from recipes.Functions import FunctionsPage
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.GoogleImageGen import GoogleImageGenPage
 from recipes.ImageSegmentation import ImageSegmentationPage
@@ -57,6 +58,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         DocSearchPage,
         SmartGPTPage,
         DocSummaryPage,
+        FunctionsPage,
     ],
     "Videos, Lipsync, & Speech": [
         LipsyncPage,

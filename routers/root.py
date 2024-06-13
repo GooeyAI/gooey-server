@@ -88,7 +88,7 @@ async def favicon():
 @st.route
 def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-    match json_data.get("status"):
+    match json_data["status"]:
         case 404:
             template = "errors/404.html"
         case _:
@@ -470,6 +470,7 @@ def integrations_route(
 
 
 @app.post("/chat/")
+@app.post("/chats/")
 @st.route
 def chat_explore_route(request: Request):
     from daras_ai_v2 import chat_explore
