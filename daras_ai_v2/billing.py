@@ -627,7 +627,7 @@ def render_auto_recharge_section(user: AppUser):
             )
             st.write("USD", className="d-block ms-2")
 
-    if st.button("Save", type="primary", key="save-auto-rechareg-and-limits"):
+    if st.button("Save", type="primary", key="save-auto-recharge-and-limits"):
         try:
             subscription.full_clean()
         except ValidationError as e:
