@@ -27,7 +27,6 @@ BASE_HANDLE_BLACKLIST = [
     "team",
     "about",
     "blog",
-    "contact",
     "sales",
 ]
 COMMON_EMAIL_DOMAINS = [
