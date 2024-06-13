@@ -1,3 +1,4 @@
+import json
 import typing
 
 import requests
@@ -53,7 +54,7 @@ class FunctionsPage(BasePage):
         r = requests.post(
             settings.DENO_FUNCTIONS_URL,
             headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
-            data=request.code,
+            json=request.code,
         )
         data = r.json()
         response.logs = data.get("logs")

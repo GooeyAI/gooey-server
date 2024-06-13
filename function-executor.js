@@ -4,7 +4,7 @@ Deno.serve(async (req) => {
   }
 
   let logs = captureConsole();
-  let code = await req.text();
+  let code = await req.json();
   let status, response;
 
   try {
