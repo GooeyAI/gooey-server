@@ -15,6 +15,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
     doc_extract_selector,
 )
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
@@ -271,7 +272,7 @@ def render_doc_search_step(state: dict):
         )
 
 
-class EmptySearchResults(Exception):
+class EmptySearchResults(UserError):
     def __init__(self, search_query: str):
         self.search_query = search_query
         super().__init__(f"Your search “{search_query}” did not match any documents.")
