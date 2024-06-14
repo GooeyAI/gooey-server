@@ -835,7 +835,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = request.messages + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
+            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2, model.name)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = messages_as_prompt(query_msgs)
@@ -911,13 +911,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
             model.context_window
-            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
+            - calc_gpt_tokens(filter(None, [system_prompt, user_input]), model.name)
             - request.max_tokens
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
             request.messages,
             max_history_tokens,
+            model.name,
         )
         history_prompt = request.messages[clip_idx:]
         response.final_prompt = list(
@@ -926,7 +927,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # ensure input script is not too big
         max_allowed_tokens = model.context_window - calc_gpt_tokens(
-            response.final_prompt
+            response.final_prompt, model.name
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
@@ -1565,9 +1566,10 @@ def convo_window_clipper(
     max_tokens,
     *,
     step=2,
+    used_model="gpt-4"
 ):
     for i in range(len(window) - 2, -1, -step):
-        if calc_gpt_tokens(window[i:]) > max_tokens:
+        if calc_gpt_tokens(window[i:], used_model) > max_tokens:
             return i + step
     return 0
 

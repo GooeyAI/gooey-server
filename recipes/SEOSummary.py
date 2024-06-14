@@ -368,10 +368,11 @@ def _gen_final_prompt(
         ]
     )
 
+    used_model = LargeLanguageModels[request.selected_model]
     max_allowed_tokens = (
-        LargeLanguageModels[request.selected_model].context_window
+        used_model.context_window
         - request.max_tokens
-        - calc_gpt_tokens(end_input_prompt)
+        - calc_gpt_tokens(end_input_prompt, used_model.name)
     )
 
     state["final_prompt"] = request.task_instructions.strip() + "\n\n"
@@ -399,7 +400,7 @@ def _gen_final_prompt(
 
         # used too many tokens, abort!
         if (
-            calc_gpt_tokens(state["final_prompt"] + next_prompt_part)
+            calc_gpt_tokens(state["final_prompt"] + next_prompt_part, used_model.name)
             > max_allowed_tokens
         ):
             continue

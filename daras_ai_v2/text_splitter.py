@@ -40,11 +40,11 @@ default_separators = (
 threadlocal = threading.local()
 
 
-def default_length_function(text: str) -> int:
+def default_length_function(text: str, used_model: str = "gpt-4") -> int:
     try:
         enc = threadlocal.enc
     except AttributeError:
-        enc = tiktoken.encoding_for_model("gpt-4")
+        enc = tiktoken.encoding_for_model(used_model)
         threadlocal.enc = enc
     return len(enc.encode(text))
 

@@ -5,6 +5,33 @@ category = ModelCategory.LLM
 
 
 def run():
+    # GPT-4o
+
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-4o",
+        sku=ModelSku.llm_prompt,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_4_o.name,
+            unit_cost=0.005,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/api/pricing/",
+        ),
+    )
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-4o",
+        sku=ModelSku.llm_completion,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_4_o.name,
+            unit_cost=0.015,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/api/pricing/",
+        ),
+    )
+
     # GPT-4-Turbo
 
     for model in ["gpt-4-0125-preview", "gpt-4-1106-preview"]:
