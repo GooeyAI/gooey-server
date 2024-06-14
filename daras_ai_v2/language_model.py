@@ -318,13 +318,14 @@ class LargeLanguageModels(Enum):
 
 def calc_gpt_tokens(
     prompt: str | list[str] | dict | list[dict],
+    used_model: str,
 ) -> int:
     if isinstance(prompt, (str, dict)):
         messages = [prompt]
     else:
         messages = prompt
     combined = msgs_to_prompt_str(messages)
-    return default_length_function(combined)
+    return default_length_function(combined, used_model)
 
 
 class ConversationEntry(typing_extensions.TypedDict):
@@ -810,14 +811,16 @@ def record_openai_llm_usage(
         model=used_model,
         sku=ModelSku.llm_prompt,
         quantity=sum(
-            default_length_function(get_entry_text(entry)) for entry in messages
+            default_length_function(get_entry_text(entry), used_model)
+            for entry in messages
         ),
     )
     record_cost_auto(
         model=used_model,
         sku=ModelSku.llm_completion,
         quantity=sum(
-            default_length_function(get_entry_text(entry)) for entry in choices
+            default_length_function(get_entry_text(entry), used_model)
+            for entry in choices
         ),
     )
 

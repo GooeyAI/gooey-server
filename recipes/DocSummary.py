@@ -216,7 +216,8 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     safety_buffer = 100
     prompt_token_count = (
-        calc_gpt_tokens(task_instructions + merge_instructions) + safety_buffer
+        calc_gpt_tokens(task_instructions + merge_instructions, model.name)
+        + safety_buffer
     )
 
     # to merge 2 outputs, we need to have at least 1/3 of the max tokens available
