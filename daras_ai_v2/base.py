@@ -796,8 +796,11 @@ class BasePage:
             or cls.workflow.label
         )
 
-    def get_explore_image(self, state: dict) -> str:
-        return self.explore_image or ""
+    def get_explore_image(self) -> str:
+        meta = self.workflow.get_or_create_metadata()
+        img = meta.default_image or self.explore_image or ""
+        fallback_img = self.fallback_preivew_image()
+        return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -925,9 +928,7 @@ class BasePage:
             page = page_cls()
             root_run = page.get_root_published_run()
             state = root_run.saved_run.to_dict()
-            preview_image = meta_preview_url(
-                page.get_explore_image(state), page.fallback_preivew_image()
-            )
+            preview_image = page.get_explore_image()
 
             with st.link(to=page.app_url()):
                 st.html(
@@ -937,7 +938,7 @@ class BasePage:
                     """
                 )
                 st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(page.preview_description(state))
+            st.caption(root_run.notes or page.preview_description(state))
 
         grid_layout(4, page_clses, _render)
 
@@ -1911,6 +1912,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             or state.get("title")
         )
 
+    # this is mostly depreated in favour of PublishedRun.notes
     def preview_description(self, state: dict) -> str:
         return ""
 
