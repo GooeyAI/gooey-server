@@ -605,9 +605,7 @@ def render_page(
 
     # ensure the new example_id path param
     if request.query_params.get("example_id"):
-        new_url = page_cls.app_url(
-            tab=tab, example_id=example_id, query_params=dict(request.query_params)
-        )
+        new_url = page_cls.app_url(tab=tab, query_params=dict(request.query_params))
         return RedirectResponse(new_url, status_code=301)
 
     # this is because the code still expects example_id to be in the query params

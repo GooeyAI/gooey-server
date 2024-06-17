@@ -66,7 +66,5 @@ def test_all_examples(threadpool_subtest):
 
 
 def _test_post_path(url):
-    with open("urls.2.txt", "a") as f:
-        f.write(url + "\n")
     r = client.post(url, json={}, allow_redirects=True)
     assert r.ok, r.content
