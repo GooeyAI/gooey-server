@@ -16,15 +16,15 @@ from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 
-META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
-EXPLORE_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
+META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f2c0056a-2c88-11ef-9c40-02420a0001b3/Translation.jpg"
+EXPLORE_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fce91234-2c88-11ef-9862-02420a0001b2/square_translations.png"
 
 
 class TranslationPage(BasePage):
-    title = "Compare AI Translation Tools"
+    title = "Compare Translations"
     explore_image = EXPLORE_IMG
     workflow = Workflow.TRANSLATION
-    slug_versions = ["translate", "txt2txt", "translation"]
+    slug_versions = ["translate"]
 
     sane_defaults = dict(
         translation_model=TranslationModels.google.name, translation_target="en"
@@ -61,7 +61,7 @@ class TranslationPage(BasePage):
         return META_IMG
 
     def preview_description(self, state: dict):
-        return "Translate your text to over 200+ languages using the best AI private and public translation and transliteration tools available from Google, Microsoft, Meta, [Ghana NLP](https://ghananlp.org/) and more!"
+        return "Compare the best AI translation models in the world from Google, Azure, Meta and LLMs to determine which work best you."
 
     def render_description(self):
         st.markdown(self.preview_description(st.session_state))
