@@ -78,6 +78,8 @@ text2img_model_ids = {
     Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
+}
+dall_e_model_ids = {
     Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.dall_e_3: "dall-e-3",
 }
@@ -289,7 +291,7 @@ def text2img(
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=text2img_model_ids[Text2ImgModels[selected_model]],
+                    model=dall_e_model_ids[Text2ImgModels[selected_model]],
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
