@@ -271,7 +271,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         raw_output_text: list[str] | None
 
         # doc search
-        references: list[SearchReference] | None
+        references: list[SearchReference] | None = []
         final_search_query: str | None
         final_keyword_query: str | list[str] | None
 
@@ -829,7 +829,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.raw_input_text = user_input
 
         # if documents are provided, run doc search on the saved msgs and get back the references
-        references = None
         if request.documents:
             # formulate the search query as a history of all the messages
             query_msgs = request.messages + [
@@ -874,7 +873,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # return
 
             # perform doc search
-            references = yield from get_top_k_references(
+            response.references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
                     {
                         **st.session_state,
@@ -884,21 +883,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ),
             )
             if request.use_url_shortener:
-                for reference in references:
+                for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
                         url=reference["url"],
                         user=self.request.user,
                         workflow=Workflow.VIDEO_BOTS,
                     )[0].shortened_url()
-            response.references = references
         # if doc search is successful, add the search results to the user prompt
-        if references:
+        if response.references:
             # add task instructions
             task_instructions = render_prompt_vars(
                 request.task_instructions, st.session_state
             )
             user_input = (
-                references_as_prompt(references)
+                references_as_prompt(response.references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_input
             )
@@ -960,9 +958,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
-            # save model response
+            # save model response without citations
             response.raw_output_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, references))
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
 
@@ -976,14 +974,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     glossary_url=request.output_glossary_document,
                     model=translation_model,
                 )
+                # save translated response for tts
                 response.raw_tts_text = [
-                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    "".join(
+                        snippet for snippet, _ in parse_refs(text, response.references)
+                    )
                     for text in output_text
                 ]
 
-            if references:
+            if response.references:
                 all_refs_list = apply_response_formattings_prefix(
-                    output_text, references, citation_style
+                    output_text, response.references, citation_style
                 )
             else:
                 all_refs_list = None
