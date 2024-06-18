@@ -52,30 +52,6 @@ def sadtalker_settings(settings: SadTalkerSettings):
         or None
     )
 
-    input_pitch = st.text_input(
-        "Input Pitch (comma separated)",
-        value=", ".join(map(str, settings.input_pitch or [])),
-    )
-    try:
-        settings.input_pitch = (
-            list(map(int, filter(None, input_pitch.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_pitch = None
-        st.error("Please enter comma separated integers for Input Pitch")
-
-    input_roll = st.text_input(
-        "Input Roll (comma separated)",
-        value=", ".join(map(str, settings.input_roll or [])),
-    )
-    try:
-        settings.input_roll = (
-            list(map(int, filter(None, input_roll.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_roll = None
-        st.error("Please enter comma separated integers for Input Roll")
-
 
 def wav2lip_settings():
     st.write("##### ⌖ Lipsync Face Padding")

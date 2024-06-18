@@ -25,8 +25,6 @@ class SadTalkerSettings(BaseModel):
     expression_scale: float = Field(1.0, title="Expression Scale")
     ref_eyeblink: FieldHttpUrl = Field(None, title="Reference Eyeblink")
     ref_pose: FieldHttpUrl = Field(None, title="Reference Pose")
-    input_pitch: list[int] = Field(None, title="Input Pitch (comma separated)")
-    input_roll: list[int] = Field(None, title="Input Roll (comma separated)")
     # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None
     # background_enhancer: typing.Literal["realesrgan"] =None
 
