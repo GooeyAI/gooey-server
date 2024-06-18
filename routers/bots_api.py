@@ -299,7 +299,8 @@ class ApiInterface(BotInterface):
             self.input_type = "image"
         elif request.input_documents:
             self.input_type = "document"
-        elif request.button_pressed:
+        elif button := request.button_pressed:
+            button.context_msg_id = MSG_ID_PREFIX + button.context_msg_id
             self.input_type = "interactive"
         else:
             raise HTTPException(

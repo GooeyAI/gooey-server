@@ -36,8 +36,6 @@ CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISTANT = "assistant"
 CHATML_ROLE_USER = "user"
 
-AZURE_OPENAI_MODEL_PREFIX = "openai-"
-
 EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 # nice for showing streaming progress
@@ -67,7 +65,7 @@ class LLMSpec(typing.NamedTuple):
 class LargeLanguageModels(Enum):
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
-        model_id="gpt-4o",
+        model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o"),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=10,
@@ -76,14 +74,17 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
         label="GPT-4 Turbo with Vision (openai)",
-        model_id="gpt-4-turbo-2024-04-09",
+        model_id=(
+            "openai-gpt-4-turbo-2024-04-09-prod-eastus2-1",
+            "gpt-4-turbo-2024-04-09",
+        ),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=6,
         is_vision_model=True,
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision (openai)",
+        label="GPT-4 Vision (openai) 🔻",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -109,7 +110,7 @@ class LargeLanguageModels(Enum):
         price=10,
     )
     gpt_4_32k = LLMSpec(
-        label="GPT-4 32K (openai)",
+        label="GPT-4 32K (openai) 🔻",
         model_id="openai-gpt-4-32k-prod-ca-1",
         llm_api=LLMApis.openai,
         context_window=32_768,
@@ -132,7 +133,7 @@ class LargeLanguageModels(Enum):
         price=2,
     )
     gpt_3_5_turbo_instruct = LLMSpec(
-        label="GPT-3.5 Instruct (openai)",
+        label="GPT-3.5 Instruct (openai) 🔻",
         model_id="gpt-3.5-turbo-instruct",
         llm_api=LLMApis.openai,
         context_window=4096,
@@ -864,10 +865,17 @@ def _run_openai_text(
 def get_openai_client(model: str):
     import openai
 
-    if model.startswith(AZURE_OPENAI_MODEL_PREFIX):
+    if "-ca-" in model:
         client = openai.AzureOpenAI(
-            api_key=settings.AZURE_OPENAI_KEY,
-            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_KEY_CA,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_CA,
+            api_version="2023-10-01-preview",
+            max_retries=0,
+        )
+    elif "-eastus2-" in model:
+        client = openai.AzureOpenAI(
+            api_key=settings.AZURE_OPENAI_KEY_EASTUS2,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_EASTUS2,
             api_version="2023-10-01-preview",
             max_retries=0,
         )

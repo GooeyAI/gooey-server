@@ -197,7 +197,7 @@ if not DEBUG:
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
-        traces_sample_rate=0.01,
+        traces_sample_rate=0.005,
         send_default_pii=True,
         integrations=[
             ThreadingIntegration(propagate_hub=True),
@@ -355,8 +355,10 @@ AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.
 
 AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
 
-AZURE_OPENAI_ENDPOINT = config("AZURE_OPENAI_ENDPOINT", "")
-AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
+AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
+AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")
+AZURE_OPENAI_ENDPOINT_EASTUS2 = config("AZURE_OPENAI_ENDPOINT_EASTUS2", "")
+AZURE_OPENAI_KEY_EASTUS2 = config("AZURE_OPENAI_KEY_EASTUS2", "")
 
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 
@@ -383,3 +385,6 @@ MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
 MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
 MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
 MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
+
+DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
+DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")

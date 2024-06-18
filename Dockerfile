@@ -65,4 +65,5 @@ HEALTHCHECK CMD \
     || bash -c 'poetry run celery -A celeryapp inspect ping -d celery@$HOSTNAME' \
     || exit 1
 
-CMD poetry run ./scripts/run-prod.sh
+ENTRYPOINT ["poetry", "run"]
+CMD ["./scripts/run-prod.sh"]

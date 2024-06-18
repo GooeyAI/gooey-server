@@ -168,7 +168,15 @@ class BasePage:
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
+        if query_params is None:
+            query_params = {}
 
+        if run_id and uid:
+            query_params |= dict(run_id=run_id, uid=uid)
+        q_example_id = query_params.pop("example_id", None)
+
+        # old urls had example_id as a query param
+        example_id = example_id or q_example_id
         run_slug = None
         if example_id:
             try:
@@ -177,10 +185,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-
-        query_params = cls.clean_query_params(
-            example_id=None, run_id=run_id, uid=uid
-        ) | (query_params or {})
 
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
@@ -796,8 +800,11 @@ class BasePage:
             or cls.workflow.label
         )
 
-    def get_explore_image(self, state: dict) -> str:
-        return self.explore_image or ""
+    def get_explore_image(self) -> str:
+        meta = self.workflow.get_or_create_metadata()
+        img = meta.default_image or self.explore_image or ""
+        fallback_img = self.fallback_preivew_image()
+        return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -925,9 +932,7 @@ class BasePage:
             page = page_cls()
             root_run = page.get_root_published_run()
             state = root_run.saved_run.to_dict()
-            preview_image = meta_preview_url(
-                page.get_explore_image(state), page.fallback_preivew_image()
-            )
+            preview_image = page.get_explore_image()
 
             with st.link(to=page.app_url()):
                 st.html(
@@ -937,7 +942,7 @@ class BasePage:
                     """
                 )
                 st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(page.preview_description(state))
+            st.caption(root_run.notes or page.preview_description(state))
 
         grid_layout(4, page_clses, _render)
 
@@ -1911,6 +1916,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             or state.get("title")
         )
 
+    # this is mostly depreated in favour of PublishedRun.notes
     def preview_description(self, state: dict) -> str:
         return ""
 

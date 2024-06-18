@@ -30,7 +30,7 @@ from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
-from daras_ai_v2.exceptions import ffmpeg, UserError, raise_for_status
+from daras_ai_v2.exceptions import ffmpeg, UserError
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
@@ -88,7 +88,7 @@ async def favicon():
 @st.route
 def handle_error(request: Request, json_data: dict):
     context = {"request": request, "settings": settings}
-    match json_data.get("status"):
+    match json_data["status"]:
         case 404:
             template = "errors/404.html"
         case _:
@@ -337,7 +337,7 @@ Authorization: Bearer GOOEY_API_KEY
 def examples_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, run_slug, RecipeTabs.examples, example_id)
+    return render_page(request, page_slug, RecipeTabs.examples, example_id)
 
 
 @app.post("/{page_slug}/api/")
@@ -347,7 +347,7 @@ def examples_route(
 def api_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, run_slug, RecipeTabs.run_as_api, example_id)
+    return render_page(request, page_slug, RecipeTabs.run_as_api, example_id)
 
 
 @app.post("/{page_slug}/history/")
@@ -357,7 +357,7 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, run_slug, RecipeTabs.history, example_id)
+    return render_page(request, page_slug, RecipeTabs.history, example_id)
 
 
 @app.post("/{page_slug}/saved/")
@@ -367,7 +367,7 @@ def history_route(
 def save_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, run_slug, RecipeTabs.saved, example_id)
+    return render_page(request, page_slug, RecipeTabs.saved, example_id)
 
 
 @app.post("/{page_slug}/integrations/add/")
@@ -381,9 +381,7 @@ def add_integrations_route(
     example_id: str = None,
 ):
     st.session_state["--add-integration"] = True
-    return render_page(
-        request, page_slug, run_slug, RecipeTabs.integrations, example_id
-    )
+    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @app.post("/{page_slug}/integrations/{integration_id}/stats/")
@@ -403,7 +401,7 @@ def integrations_stats_route(
         st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
-    return render_page(request, "stats", run_slug, RecipeTabs.integrations, example_id)
+    return render_page(request, "stats", RecipeTabs.integrations, example_id)
 
 
 @app.post("/{page_slug}/integrations/{integration_id}/analysis/")
@@ -464,12 +462,11 @@ def integrations_route(
             st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
         except IndexError:
             raise HTTPException(status_code=404)
-    return render_page(
-        request, page_slug, run_slug, RecipeTabs.integrations, example_id
-    )
+    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @app.post("/chat/")
+@app.post("/chats/")
 @st.route
 def chat_explore_route(request: Request):
     from daras_ai_v2 import chat_explore
@@ -568,7 +565,7 @@ def recipe_page_or_handle(
     try:
         handle = Handle.objects.get_by_name(page_slug)
     except Handle.DoesNotExist:
-        return render_page(request, page_slug, run_slug, RecipeTabs.run, example_id)
+        return render_page(request, page_slug, RecipeTabs.run, example_id)
     else:
         return render_page_for_handle(request, handle)
 
@@ -588,11 +585,7 @@ def render_page_for_handle(request: Request, handle: Handle):
 
 
 def render_page(
-    request: Request,
-    page_slug: str,
-    run_slug: str | None,
-    tab: "RecipeTabs",
-    example_id: str | None,
+    request: Request, page_slug: str, tab: "RecipeTabs", example_id: str | None
 ):
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
@@ -605,24 +598,19 @@ def render_page(
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
-        return RedirectResponse(tab.url_path(latest_slug, run_slug))
+        new_url = furl(
+            settings.APP_BASE_URL, query_params=request.query_params
+        ) / request.url.path.replace(page_slug, latest_slug, 1)
+        return RedirectResponse(str(new_url), status_code=301)
 
-    # if the old query param format is provided, redirect to the new format
-    # because features like login relies on the new format
-    query_params = dict(request.query_params)
-    q_example_id, run_id, uid = extract_query_params(query_params)
-    if q_example_id:
-        query_params.pop("example_id", None)
-        new_url = page_cls.app_url(
-            tab=tab,
-            example_id=q_example_id,
-            run_id=run_id,
-            uid=uid,
-            query_params=query_params,
-        )
-        return RedirectResponse(new_url)
+    # ensure the new example_id path param
+    if request.query_params.get("example_id"):
+        new_url = page_cls.app_url(tab=tab, query_params=dict(request.query_params))
+        return RedirectResponse(new_url, status_code=301)
+
     # this is because the code still expects example_id to be in the query params
-    st.set_query_params(query_params | dict(example_id=example_id))
+    st.set_query_params(dict(request.query_params) | dict(example_id=example_id))
+    _, run_id, uid = extract_query_params(request.query_params)
 
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not st.session_state:

@@ -212,10 +212,15 @@ def update_subscription_button(
         label, btn_type = ("Downgrade", "secondary")
     className += f" btn btn-theme btn-{btn_type}"
 
+    key = f"change-sub-{plan.key}"
     match payment_provider:
         case PaymentProvider.STRIPE:
             render_stripe_subscription_button(
-                user=user, label=label, plan=plan, btn_type=btn_type
+                user=user,
+                label=label,
+                plan=plan,
+                btn_type=btn_type,
+                key=key,
             )
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
@@ -225,7 +230,9 @@ def update_subscription_button(
                 key=f"downgrade-plan-modal-{plan.key}",
             )
             if st.button(
-                label, className=className, key=f"downgrade-button-{plan.key}"
+                label,
+                className=className,
+                key=key,
             ):
                 downgrade_modal.open()
 
@@ -242,14 +249,17 @@ def update_subscription_button(
                         if st.button(
                             "Downgrade",
                             className="btn btn-theme bg-danger border-danger text-white",
+                            key=f"{key}-confirm",
                         ):
                             change_subscription(user, plan)
                         if st.button(
-                            "Cancel", className="border border-danger text-danger"
+                            "Cancel",
+                            className="border border-danger text-danger",
+                            key=f"{key}-cancel",
                         ):
                             downgrade_modal.close()
         case _:
-            if st.button(label, className=className):
+            if st.button(label, className=className, key=key):
                 change_subscription(user, plan)
 
 
@@ -399,12 +409,13 @@ def render_stripe_subscription_button(
     user: AppUser,
     plan: PricingPlan,
     btn_type: str,
+    key: str,
 ):
     if not plan.supports_stripe():
         st.write("Stripe subscription not available")
         return
 
-    if st.button(label, type=btn_type):
+    if st.button(label, type=btn_type, key=key):
         create_stripe_checkout_session(user=user, plan=plan)
 
 
@@ -463,7 +474,7 @@ def render_payment_information(user: AppUser):
         provider = PaymentProvider(user.subscription.payment_provider)
         st.write(provider.label)
     with col3:
-        if st.button(f"{icons.edit} Edit", type="link"):
+        if st.button(f"{icons.edit} Edit", type="link", key="manage-payment-provider"):
             raise RedirectException(user.subscription.get_external_management_url())
 
     pm_summary = st.run_in_thread(
@@ -482,7 +493,7 @@ def render_payment_information(user: AppUser):
                 unsafe_allow_html=True,
             )
         with col3:
-            if st.button(f"{icons.edit} Edit", type="link"):
+            if st.button(f"{icons.edit} Edit", type="link", key="edit-payment-method"):
                 change_payment_method(user)
 
     if pm_summary.billing_email:
@@ -616,7 +627,7 @@ def render_auto_recharge_section(user: AppUser):
             )
             st.write("USD", className="d-block ms-2")
 
-    if st.button("Save", type="primary"):
+    if st.button("Save", type="primary", key="save-auto-recharge-and-limits"):
         try:
             subscription.full_clean()
         except ValidationError as e:

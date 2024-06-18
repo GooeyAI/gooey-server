@@ -50,9 +50,13 @@ def render_analysis_results_page(
 
     _autorefresh_script()
 
-    results = fetch_analysis_results(bi)
+    try:
+        results = fetch_analysis_results(bi)
+    except Message.DoesNotExist:
+        results = None
     if not results:
-        st.write("No analysis results found")
+        with st.center():
+            st.error("No analysis results found")
         return
 
     with st.div(className="pb-5 pt-3"):
