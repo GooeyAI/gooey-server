@@ -1,0 +1,146 @@
+# A Caprover one-click-app
+#
+captainVersion: 4
+services:
+  $$cap_appname-postgres:
+    image: postgres:15.2
+    environment:
+      POSTGRES_DB: gooey
+      POSTGRES_USER: gooey
+      POSTGRES_PASSWORD: $$cap_pg_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - $$cap_appname-postgres-data:/var/lib/postgresql/data
+    restart: always
+    caproverExtra:
+      notExposeAsWebApp: "true"
+
+  $$cap_appname-redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - $$cap_appname-redis-data:/data
+    restart: always
+    caproverExtra:
+      notExposeAsWebApp: "true"
+
+  $$cap_appname-admin:
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      RUN_DJANGO: 1
+      SECRET_KEY: $$cap_secret_key
+      SENTRY_DSN: $$cap_sentry_dsn_admin
+      PGHOST: srv-captain--$$cap_appname-pg
+      PGPORT: 5432
+      PGDATABASE: gooey
+      PGUSER: gooey
+      PGPASSWORD: $$cap_pg_password
+    command:
+      - poetry
+      - run
+      - ./scripts/run-prod.sh
+    caproverExtra:
+      containerHttpPort: '8000'
+      dockerfilePath: './Dockerfile'
+
+  $$cap_appname-api:
+    depends_on:
+      - redis
+      - postgres
+      - $$cap_appname-admin
+    environment:
+      SECRET_KEY: $$cap_secret_key
+      SENTRY_DSN: $$cap_sentry_dsn_api
+      PGHOST: srv-captain--$$cap_appname-pg
+      PGPORT: 5432
+      PGDATABASE: gooey
+      PGUSER: gooey
+      PGPASSWORD: $$cap_pg_password
+      REDIS_URL: redis://srv-captain--$$cap_appname-redis:6379
+    command:
+      - poetry
+      - run
+      - ./scripts/run-prod.sh
+    caproverExtra:
+      containerHttpPort: '8080'
+      dockerfilePath: './Dockerfile'
+
+  $$cap_appname-celery:
+    depends_on:
+      - redis
+      - postgres
+      - $$cap_appname-admin
+    environment:
+      RUN_CELERY: 1
+      SECRET_KEY: $$cap_secret_key
+      SENTRY_DSN: $$cap_sentry_dsn_celery
+      PGHOST: srv-captain--$$cap_appname-pg
+      PGPORT: 5432
+      PGDATABASE: gooey
+      PGUSER: gooey
+      PGPASSWORD: $$cap_pg_password
+      REDIS_URL: redis://srv-captain--$$cap_appname-redis:6379
+    command:
+      - poetry
+      - run
+      - ./scripts/run-celery.sh
+    caproverExtra:
+      notExposeAsWebApp: "true"
+      dockerfilePath: './Dockerfile'
+
+  $$cap_appname-ui:
+    image: # placeholder!
+    depends_on:
+      - $$cap_appname-api
+    environment:
+      APP_BASE_URL: $$cap_appname.$$cap_root_domain
+    caproverExtra:
+      containerHttpPort: '3000'
+      dockerfilePath: './Dockerfile'
+
+caproverOneClickApp:
+  variables:
+    - id: $$cap_pg_password
+      label: Postgres Password
+      description: "Must be at least 12 characters long (note: cannot contain '@')."
+      validRegex: /^[^\@]{12,}$/
+    - id: $$cap_secret_key
+      label: Secret Key
+      description: "Must be at least 12 characters long."
+      validRegex: /^.{12,}$/
+    - id: $$cap_app_url
+      label: App URL
+      description: "The base URL for the app (the UI service)"
+      validRegex: /^https?:\/\/[a-z0-9]+\.[a-z0-9]+$/
+      defaultValue: $$cap_appname-ui.$$cap_root_domain
+    - id: $$cap_api_url
+      label: API URL
+      description: "The base URL for the API service"
+      validRegex: /^https?:\/\/[a-z0-9]+\.[a-z0-9]+$/
+      defaultValue: $$cap_appname-api.$$cap_root_domain
+    - id: $$cap_sentry_dsn_admin
+      label: Sentry DSN (Admin)
+      description: "Sentry DSN for the admin service."
+      validRegex: /^http[s]?:\/\/[a-z0-9]+@[a-z0-9]+\/[0-9]+$/
+    - id: $$cap_sentry_dsn_api
+      label: Sentry DSN (API)
+      description: "Sentry DSN for the API service."
+      validRegex: /^http[s]?:\/\/[a-z0-9]+@[a-z0-9]+\/[0-9]+$/
+    - id: $$cap_sentry_dsn_celery
+      label: Sentry DSN (Celery)
+      description: "Sentry DSN for the Celery service."
+      validRegex: /^http[s]?:\/\/[a-z0-9]+@[a-z0-9]+\/[0-9]+$/
+  instructions:
+    start: "Gooey.AI!"
+    end: >-
+      Your Gooey.AI instance is now successfully deployed!
+
+      Make sure to install the Gooey.AI UI service from the Caprover dashboard to complete the setup.
+    displayName: Gooey.AI
+    isOfficial: true
+    description: Stand on the shoulders of every AI giant
+    documentation: "https://docs.gooey.ai" 
