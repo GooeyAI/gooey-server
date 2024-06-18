@@ -886,7 +886,7 @@ def get_openai_client(model: str):
         )
     return client
 
-
+@retry_if(groq_cloud_should_retry)
 def _run_groq_chat(
     *,
     model: str,
