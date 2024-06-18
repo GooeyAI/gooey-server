@@ -27,6 +27,7 @@ services:
       notExposeAsWebApp: "true"
 
   $$cap_appname-admin:
+    image: $$cap_server_img 
     depends_on:
       - redis
       - postgres
@@ -39,15 +40,11 @@ services:
       PGDATABASE: gooey
       PGUSER: gooey
       PGPASSWORD: $$cap_pg_password
-    command:
-      - poetry
-      - run
-      - ./scripts/run-prod.sh
     caproverExtra:
       containerHttpPort: '8000'
-      dockerfilePath: './Dockerfile'
 
   $$cap_appname-api:
+    image: $$cap_server_img
     depends_on:
       - redis
       - postgres
@@ -61,15 +58,11 @@ services:
       PGUSER: gooey
       PGPASSWORD: $$cap_pg_password
       REDIS_URL: redis://srv-captain--$$cap_appname-redis:6379
-    command:
-      - poetry
-      - run
-      - ./scripts/run-prod.sh
     caproverExtra:
       containerHttpPort: '8080'
-      dockerfilePath: './Dockerfile'
 
   $$cap_appname-celery:
+    image: $$cap_server_img
     depends_on:
       - redis
       - postgres
@@ -84,16 +77,11 @@ services:
       PGUSER: gooey
       PGPASSWORD: $$cap_pg_password
       REDIS_URL: redis://srv-captain--$$cap_appname-redis:6379
-    command:
-      - poetry
-      - run
-      - ./scripts/run-celery.sh
     caproverExtra:
       notExposeAsWebApp: "true"
-      dockerfilePath: './Dockerfile'
 
   $$cap_appname-ui:
-    image: # placeholder!
+    image: $$cap_ui_img
     depends_on:
       - $$cap_appname-api
     environment:
@@ -104,6 +92,14 @@ services:
 
 caproverOneClickApp:
   variables:
+    - id: $$cap_server_img
+      label: Server Image
+      description: "The Docker image for the server service."
+      validRegex: /^{1,}$/
+    - id: $$cap_ui_img
+      label: UI Image
+      description: "The Docker image for the UI service."
+      validRegex: /^{1,}$/
     - id: $$cap_pg_password
       label: Postgres Password
       description: "Must be at least 12 characters long (note: cannot contain '@')."
