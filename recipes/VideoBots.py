@@ -8,7 +8,7 @@ from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, SavedRun, PublishedRun
 from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
@@ -1088,10 +1088,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 )
             return
 
-        # if we come from an integration redirect, we connect the integrations
-        if "connect_ids" in self.request.query_params:
-            self.integrations_on_connect(current_run, published_run)
-
         # see which integrations are available to the user for the current published run
         assert published_run, "At this point, published_run should be available"
         integrations_q = Q(published_run=published_run) | Q(
@@ -1165,7 +1161,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         gui.caption(choice.label)
 
         if pressed_platform:
-            on_connect = self.current_app_url(RecipeTabs.integrations)
+            current_run, published_run = (
+                self.get_current_sr(),
+                self.get_current_published_run(),
+            )
+            current_run_id, published_run_id = (
+                current_run.run_id if current_run else None
+            ), (published_run.published_run_id if published_run else None)
             match pressed_platform:
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
@@ -1173,16 +1175,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         billing_account_uid=self.request.user.uid,
                         platform=Platform.WEB,
                     )
-                    redirect_url = str(
-                        furl(on_connect).add(query_params=dict(connect_ids=str(bi.id)))
-                        / bi.api_integration_id()
-                    )
+                    redirect_url = connect(bi, current_run, published_run)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(on_connect)
+                    redirect_url = wa_connect_url(current_run_id, published_run_id)
                 case Platform.SLACK:
-                    redirect_url = slack_connect_url(on_connect)
+                    redirect_url = slack_connect_url(current_run_id, published_run_id)
                 case Platform.FACEBOOK:
-                    redirect_url = fb_connect_url(on_connect)
+                    redirect_url = fb_connect_url(current_run_id, published_run_id)
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1416,41 +1415,34 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.save()
                         gui.rerun()
 
-    def integrations_on_connect(self, current_run, published_run):
-        from app_users.models import AppUser
-        from daras_ai_v2.slack_bot import send_confirmation_msg
 
-        bi = None
-        for bid in self.request.query_params.getlist("connect_ids"):
-            try:
-                bi = BotIntegration.objects.get(id=bid)
-            except BotIntegration.DoesNotExist:
-                continue
-            if bi.saved_run is not None:
-                with gui.center():
-                    gui.write(
-                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
-                    )
-                return
+def connect(
+    bi: BotIntegration, current_run: SavedRun, published_run: PublishedRun | None
+) -> RedirectException:
+    """
+    Connect the bot integration to the provided saved and published runs.
+    Returns a redirect exception to the integrations page for that bot integration.
+    """
 
-            bi.streaming_enabled = True
-            bi.saved_run = current_run
-            if published_run and published_run.saved_run_id == current_run.id:
-                bi.published_run = published_run
-            else:
-                bi.published_run = None
-            if bi.platform == Platform.SLACK:
-                bi.slack_create_personal_channels = False
-                send_confirmation_msg(bi)
-            bi.save()
+    from daras_ai_v2.slack_bot import send_confirmation_msg
 
-        if bi:
-            path_params = dict(integration_id=bi.api_integration_id())
-        else:
-            path_params = dict()
-        raise gui.RedirectException(
-            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
-        )
+    print(f"Connecting {bi} to {current_run} and {published_run}")
+
+    bi.streaming_enabled = True
+    bi.saved_run = current_run
+    if published_run and published_run.saved_run.id == current_run.id:
+        bi.published_run = published_run
+    else:
+        bi.published_run = None
+    if bi.platform == Platform.SLACK:
+        bi.slack_create_personal_channels = False
+        send_confirmation_msg(bi)
+    bi.save()
+
+    path_params = dict(integration_id=bi.api_integration_id())
+    return RedirectException(
+        VideoBotsPage.current_app_url(RecipeTabs.integrations, path_params=path_params)
+    )
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
