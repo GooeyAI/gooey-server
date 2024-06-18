@@ -48,7 +48,10 @@ def sadtalker_settings(settings: SadTalkerSettings):
     )
 
     settings.ref_pose = (
-        st.file_uploader("Reference Pose", value=settings.ref_pose, accept=[".mp4"])
+        st.file_uploader(
+            **field_label_val(settings, "ref_pose"),
+            accept=[".mp4"],
+        )
         or None
     )
 
