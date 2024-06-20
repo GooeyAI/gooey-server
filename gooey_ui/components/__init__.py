@@ -350,6 +350,7 @@ def text_area(
         max_height = "90vh"
         rows = nrows_for_text(value, height)
     style.setdefault("maxHeight", max_height)
+    style.setdefault("height", height)
     props.setdefault("rows", rows)
     state.RenderTreeNode(
         name="textarea",
