@@ -107,6 +107,7 @@ class CompareText2ImgPage(BasePage):
             """,
             key="text_prompt",
             placeholder="Iron man",
+            height=200
         )
         st.caption(
             """

@@ -133,7 +133,7 @@ class CompareLLMPage(BasePage):
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        _render_outputs(st.session_state, 450)
+        _render_outputs(st.session_state, 200)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
