@@ -221,8 +221,16 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_3_5_sonnet = LLMSpec(
+        label="Claude 3.5 Sonnet (Anthropic)",
+        model_id="claude-3-5-sonnet-20240620",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=15,
+        is_vision_model=True,
+    )
     claude_3_opus = LLMSpec(
-        label="Claude 3 Opus 💎 (Anthropic)",
+        label="Claude 3 Opus [L] (Anthropic)",
         model_id="claude-3-opus-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -230,7 +238,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
     )
     claude_3_sonnet = LLMSpec(
-        label="Claude 3 Sonnet 🔷 (Anthropic)",
+        label="Claude 3 Sonnet [M] (Anthropic)",
         model_id="claude-3-sonnet-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -238,7 +246,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
     )
     claude_3_haiku = LLMSpec(
-        label="Claude 3 Haiku 🔹 (Anthropic)",
+        label="Claude 3 Haiku [S] (Anthropic)",
         model_id="claude-3-haiku-20240307",
         llm_api=LLMApis.anthropic,
         context_window=200_000,

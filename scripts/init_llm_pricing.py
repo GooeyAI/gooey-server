@@ -539,6 +539,15 @@ def run():
     # Claude
 
     llm_pricing_create(
+        model_id="claude-3-5-sonnet-20240620",
+        model_name=LargeLanguageModels.claude_3_5_sonnet.name,
+        unit_cost_input=3,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+    )
+    llm_pricing_create(
         model_id="claude-3-opus-20240229",
         model_name=LargeLanguageModels.claude_3_opus.name,
         unit_cost_input=15,
@@ -576,7 +585,7 @@ def llm_pricing_create(
     provider: ModelProvider,
     pricing_url: str,
 ):
-    ModelPricing.objects.get_or_create(
+    obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
         sku=ModelSku.llm_prompt,
         defaults=dict(
@@ -588,7 +597,9 @@ def llm_pricing_create(
             pricing_url=pricing_url,
         ),
     )
-    ModelPricing.objects.get_or_create(
+    if created:
+        print(f"created {obj}")
+    obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
         sku=ModelSku.llm_completion,
         defaults=dict(
@@ -600,3 +611,5 @@ def llm_pricing_create(
             pricing_url=pricing_url,
         ),
     )
+    if created:
+        print(f"created {obj}")
