@@ -141,6 +141,11 @@ def fb_connect_redirect(request: Request):
     retry_button = (
         f'<a href="{fb_connect_url(current_run_id, published_run_id)}">Retry</a>'
     )
+    if not current_run_id or not published_run_id:
+        return HTMLResponse(
+            f"<p>Oh No! Something went wrong here. Please go back to the integration page and try again or contact support. </p>",
+            status_code=400,
+        )
     current_run = SavedRun.objects.get(run_id=current_run_id)
     published_run = PublishedRun.objects.filter(
         published_run_id=published_run_id
