@@ -109,7 +109,7 @@ def call_celery_task_outfile(
     *,
     pipeline: dict,
     inputs: dict,
-    content_type: str,
+    content_type: str | None,
     filename: str,
     num_outputs: int = 1,
 ):

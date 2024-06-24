@@ -9,12 +9,13 @@ import numpy as np
 from furl import furl
 
 from daras_ai.image_input import resize_img_scale
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
+
+BLANK_OPTION = "———"
 
 
 def _default_format(value: typing.Any) -> str:
@@ -656,9 +657,10 @@ def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
+    *,
     key: str = None,
     help: str = None,
-    *,
+    value: T = None,
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
@@ -669,10 +671,9 @@ def horizontal_radio(
     options = list(options)
     if not key:
         key = md5_values("horizontal_radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if (key not in state.session_state or value not in options) and checked_by_default:
-        value = options[0]
-    state.session_state.setdefault(key, value)
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
+        value = state.session_state[key] = options[0]
     if label_visibility != "visible":
         label = None
     markdown(label)
