@@ -400,7 +400,7 @@ def multiselect(
     value = state.session_state.get(key) or []
     if not isinstance(value, list):
         value = [value]
-    value = [o if o in options else options[0] for o in value]
+    value = [o for o in value if o in options]
     if not allow_none and not value:
         value = [options[0]]
     state.session_state[key] = value
