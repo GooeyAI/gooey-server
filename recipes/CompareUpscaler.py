@@ -59,7 +59,7 @@ class CompareUpscalerPage(BasePage):
         request: "CompareUpscalerPage.RequestModel",
         response: "CompareUpscalerPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
-        if not self.request.user.disable_safety_checker:
+        if not self.request.user.disable_safety_checker and request.input_image:
             yield "Running safety checker..."
             safety_checker(image=request.input_image)
 
