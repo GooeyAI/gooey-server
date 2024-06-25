@@ -31,7 +31,8 @@
    - Cloud Speech Administrator
    - Cloud Translation API Admin
    - Firebase Authentication Admin
-5. Download the `serviceAccountKey.json` and save it to the project root.
+   - Storage Admin
+5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
 
 * Run tests to see if everything is working fine:
   ``` 
