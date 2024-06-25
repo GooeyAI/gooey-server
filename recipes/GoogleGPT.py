@@ -123,7 +123,7 @@ class GoogleGPTPage(BasePage):
         ).strip(), "Please enter a search query"
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
 
         refs = st.session_state.get("references", [])
         render_sources_widget(refs)
@@ -203,7 +203,6 @@ class GoogleGPTPage(BasePage):
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
-                height=200,
             )
 
         references = st.session_state.get("references", [])

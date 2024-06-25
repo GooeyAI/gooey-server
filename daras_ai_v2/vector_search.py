@@ -889,7 +889,6 @@ def render_sources_widget(refs: list[SearchReference]):
             + "```text\n"
             + "\n".join(f"[{idx + 1}] {ref['url']}" for idx, ref in enumerate(refs))
             + "\n```",
-            height=200,
             disabled=True,
         )
 

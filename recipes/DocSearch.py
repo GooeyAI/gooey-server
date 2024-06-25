@@ -115,7 +115,7 @@ class DocSearchPage(BasePage):
         ]
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
         refs = st.session_state.get("references", [])
         render_sources_widget(refs)
 
@@ -268,7 +268,6 @@ def render_doc_search_step(state: dict):
             help=f"output {idx}",
             disabled=True,
             value=text,
-            height=200,
         )
 
 

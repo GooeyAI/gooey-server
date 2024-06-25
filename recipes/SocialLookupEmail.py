@@ -123,7 +123,6 @@ class SocialLookupEmailPage(BasePage):
             #### Email Prompt
             """,
             key="input_prompt",
-            height=200,
         )
 
     def render_settings(self):
@@ -211,7 +210,7 @@ class SocialLookupEmailPage(BasePage):
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area("Final Prompt", disabled=True, value=final_prompt, height=200)
+            st.text_area("Final Prompt", disabled=True, value=final_prompt)
         else:
             st.div()
 

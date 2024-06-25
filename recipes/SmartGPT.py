@@ -67,21 +67,18 @@ class SmartGPTPage(BasePage):
 ##### Step 1: CoT Prompt
                 """,
             key="cot_prompt",
-            height=150,
         )
         st.text_area(
             """
 ##### Step 2: Reflexion Prompt
                 """,
             key="reflexion_prompt",
-            height=150,
         )
         st.text_area(
             """
 ##### Step 3: DERA Prompt 
                 """,
             key="dera_prompt",
-            height=150,
         )
         language_model_settings()
 
@@ -178,7 +175,7 @@ class SmartGPTPage(BasePage):
         state["output_text"] = dera_outputs
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
 
     def render_example(self, state: dict):
         st.write("**Prompt**")
@@ -198,7 +195,6 @@ class SmartGPTPage(BasePage):
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
-                height=200,
             )
 
     def preview_description(self, state: dict) -> str:
