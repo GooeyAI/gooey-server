@@ -43,7 +43,7 @@ def _test_get_path(path):
 
 
 @pytest.mark.django_db
-def test_all_tabs(threadpool_subtest):
+def test_all_tabs(force_authentication, threadpool_subtest):
     for page_cls in all_api_pages + all_hidden_pages:
         for slug in page_cls.slug_versions:
             for tab in RecipeTabs:
@@ -66,5 +66,12 @@ def test_all_examples(threadpool_subtest):
 
 
 def _test_post_path(url):
-    r = client.post(url, json={}, allow_redirects=True)
-    assert r.ok, r.content
+    for _ in range(10):
+        r = client.post(url, json={}, allow_redirects=False)
+        if r.is_redirect:
+            url = r.headers["Location"]
+            continue
+        assert r.ok, r.content
+        return
+    else:
+        assert False, f"Too many redirects: {url}"
