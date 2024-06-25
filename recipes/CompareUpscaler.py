@@ -40,10 +40,10 @@ class CompareUpscalerPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
-        ] = Field(description="Output Images")
+        ] = Field({}, description="Output Images")
         output_videos: dict[
             typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
-        ] = Field(description="Output Videos")
+        ] = Field({}, description="Output Videos")
 
     def validate_form_v2(self):
         assert st.session_state.get(
