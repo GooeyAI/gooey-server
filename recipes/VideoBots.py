@@ -658,53 +658,45 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         final_search_query = st.session_state.get("final_search_query")
         if final_search_query:
             st.text_area(
-                "**Final Search Query**", value=final_search_query, disabled=True
+                "###### `final_search_query`", value=final_search_query, disabled=True
             )
 
         final_keyword_query = st.session_state.get("final_keyword_query")
         if final_keyword_query:
             if isinstance(final_keyword_query, list):
-                st.write("**Final Keyword Query**")
+                st.write("###### `final_keyword_query`")
                 st.json(final_keyword_query)
             else:
                 st.text_area(
-                    "**Final Keyword Query**",
+                    "###### `final_keyword_query`",
                     value=str(final_keyword_query),
                     disabled=True,
                 )
 
         references = st.session_state.get("references", [])
         if references:
-            st.write("**References**")
-            st.json(references, expanded=False)
+            st.write("###### `references`")
+            st.json(references)
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
-                text_output("**Final Prompt**", value=final_prompt, height=300)
+                text_output("###### `final_prompt`", value=final_prompt, height=300)
             else:
-                st.write("**Final Prompt**")
+                st.write("###### `final_prompt`")
                 st.json(final_prompt)
 
-        for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
-            st.text_area(
-                f"**Raw Text Response {idx + 1}**",
-                value=text,
-                disabled=True,
-            )
-
-        col1, col2 = st.columns(2)
-        with col1:
-            for idx, text in enumerate(st.session_state.get("output_text", [])):
+        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
+            for idx, text in enumerate(st.session_state.get(k, [])):
                 st.text_area(
-                    f"**Final Response {idx + 1}**",
+                    f"###### `{k}[{idx}]`",
                     value=text,
                     disabled=True,
                 )
-        with col2:
-            for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
-                st.write(f"**Generated Audio {idx + 1}**")
-                st.audio(audio_url)
+
+        for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
+            st.write(f"###### `output_audio[{idx}]`")
+            st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
         total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
