@@ -14,7 +14,7 @@ from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -437,7 +437,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.session_state.get("document_model"),
             ),
         ):
-            doc_model_descriptions = azure_form_recognizer_models()
+            if settings.AZURE_FORM_RECOGNIZER_KEY:
+                doc_model_descriptions = azure_form_recognizer_models()
+            else:
+                doc_model_descriptions = {}
             st.selectbox(
                 f"{field_desc(self.RequestModel, 'document_model')}",
                 key="document_model",

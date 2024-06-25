@@ -1,6 +1,7 @@
 import pytest
 
 from daras_ai.image_input import storage_blob_for
+from daras_ai_v2 import settings
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
 from tests.test_translation import _test_run_google_translate_one
@@ -62,6 +63,7 @@ def glossary_url():
         GlossaryResource.objects.all().delete()
 
 
+@pytest.mark.skipif(not settings.GS_BUCKET_NAME, reason="No GCS bucket")
 @pytest.mark.django_db
 def test_run_google_translate_glossary(glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
