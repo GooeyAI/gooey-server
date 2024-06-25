@@ -319,7 +319,7 @@ def audio(src: str, caption: str = None, show_download_button: bool = False):
 def text_area(
     label: str,
     value: str = "",
-    height: int = 100,
+    height: int = 500,
     key: str = None,
     help: str = None,
     placeholder: str = None,
@@ -346,9 +346,9 @@ def text_area(
         label = None
     if disabled:
         max_height = f"{height}px"
-        rows = nrows_for_text(value, height, min_rows=1)
+        rows = nrows_for_text(value, height)
     else:
-        max_height = "90vh"
+        max_height = "50vh"
         rows = nrows_for_text(value, height)
     style.setdefault("maxHeight", max_height)
     props.setdefault("rows", rows)
@@ -370,13 +370,16 @@ def text_area(
 def nrows_for_text(
     text: str,
     max_height_px: int,
-    min_rows: int = 2,
+    min_rows: int = 1,
     row_height_px: int = 30,
-    row_width_px: int = 80,
+    row_width_px: int = 70,
 ) -> int:
     max_rows = max_height_px // row_height_px
     nrows = math.ceil(
-        sum(len(line) / row_width_px for line in (text or "").strip().splitlines())
+        sum(
+            math.ceil(len(line) / row_width_px)
+            for line in (text or "").splitlines(keepends=True)
+        )
     )
     nrows = min(max(nrows, min_rows), max_rows)
     return nrows
