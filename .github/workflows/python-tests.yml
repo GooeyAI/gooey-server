@@ -1,0 +1,105 @@
+name: Python tests
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10.12"]
+
+    # Service containers to run with `test`
+    services:
+      # https://docs.github.com/en/actions/using-containerized-services/creating-postgresql-service-containers
+      postgres:
+        # Docker Hub image
+        image: postgres:15.2
+        # Provide the password for postgres
+        env:
+          POSTGRES_DB: gooey
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --name postgres
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+      # https://docs.github.com/en/actions/using-containerized-services/creating-redis-service-containers
+      redis:
+        # Docker Hub image
+        image: redis
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps tcp port 6379 on service container to the host
+          - 6379:6379
+    steps:
+    - name: Increase max_connections
+      run: |
+        docker exec -i postgres bash << EOF
+          sed -i -e 's/max_connections = 100/max_connections = 10000/' /var/lib/postgresql/data/postgresql.conf
+        EOF
+    - name: Restart postgres
+      run: |
+        docker restart --time 0 postgres && sleep 5
+
+    - uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+          libpoppler-cpp-dev \
+          python3-opencv \
+          postgresql-client \
+          libzbar0
+
+    - name: Install python dependencies
+      run: |
+        pip install -U poetry pip && poetry install --only main --no-interaction
+
+#    - name: Load secrets into env
+#      uses: oNaiPs/secrets-to-env-action@v1
+#      with:
+#        secrets: ${{ toJSON(secrets) }}
+
+    - name: Test with pytest
+      env:
+        PGHOST: localhost
+        PGPORT: 5432
+        PGDATABASE: gooey
+        PGUSER: postgres
+        PGPASSWORD: password
+        REDIS_URL: redis://localhost:6379/0
+        REDIS_CACHE_URL: redis://localhost:6379/1
+        APP_BASE_URL: http://localhost:3000
+        API_BASE_URL: http://localhost:8080
+        ADMIN_BASE_URL: http://localhost:8000
+        GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        GS_BUCKET_NAME: ${{ secrets.GS_BUCKET_NAME }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        ELEVEN_LABS_API_KEY: ${{ secrets.ELEVEN_LABS_API_KEY }}
+        AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
+        AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+        AZURE_FORM_RECOGNIZER_ENDPOINT: ${{ secrets.AZURE_FORM_RECOGNIZER_ENDPOINT }}
+        AZURE_FORM_RECOGNIZER_KEY: ${{ secrets.AZURE_FORM_RECOGNIZER_KEY }}
+      run: |
+        poetry run ./scripts/run-tests.sh
