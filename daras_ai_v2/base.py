@@ -1109,7 +1109,7 @@ class BasePage:
                 ), "invalid published run: without a saved run"
                 sr = pr.saved_run
             else:
-                sr = cls.recipe_doc_sr(create=True)
+                sr = cls.recipe_doc_sr()
             return sr
         except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
             raise HTTPException(status_code=404)
@@ -1124,20 +1124,24 @@ class BasePage:
         published_run, _ = PublishedRun.objects.get_or_create(
             workflow=cls.workflow,
             published_run_id="",
-            defaults={
-                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
-                "created_by": None,
-                "last_edited_by": None,
-                "title": cls.title,
-                "notes": cls().preview_description(state=cls.sane_defaults),
-                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-                "is_approved_example": True,
-            },
+            defaults=dict(
+                saved_run=lambda: SavedRun.objects.get_or_create(
+                    example_id="", workflow=cls.workflow
+                )[0],
+                created_by=None,
+                last_edited_by=None,
+                title=cls.title,
+                notes=cls().preview_description(state=cls.sane_defaults),
+                visibility=lambda: PublishedRunVisibility(
+                    PublishedRunVisibility.PUBLIC
+                ),
+                is_approved_example=True,
+            ),
         )
         return published_run
 
     @classmethod
-    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+    def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
         if create:
             return cls.get_or_create_root_published_run().saved_run
         else:
