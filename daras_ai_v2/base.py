@@ -1108,7 +1108,7 @@ class BasePage:
                 ), "invalid published run: without a saved run"
                 sr = pr.saved_run
             else:
-                sr = cls.recipe_doc_sr()
+                sr = cls.recipe_doc_sr(create=True)
             return sr
         except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
             raise HTTPException(status_code=404)
