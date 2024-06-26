@@ -227,7 +227,7 @@ os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
 GCP_REGION = config("GCP_REGION", default="us-central1")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")

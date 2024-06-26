@@ -33,6 +33,7 @@
    - Firebase Authentication Admin
    - Storage Admin
 5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
+6. Add your project & bucket name to `.env`
 
 * Run tests to see if everything is working fine:
   ``` 
