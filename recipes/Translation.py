@@ -1,43 +1,38 @@
 import typing
+
 from pydantic import BaseModel, Field, HttpUrl
 
 import gooey_ui as st
-from daras_ai_v2.base import BasePage
 from bots.models import Workflow
-
 from daras_ai_v2.asr import (
     TranslationModels,
     translation_model_selector,
     translation_language_selector,
     run_translate,
 )
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.text_output_widget import text_outputs
-from recipes.DocSearch import render_documents
-
-META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f2c0056a-2c88-11ef-9c40-02420a0001b3/Translation.jpg"
-EXPLORE_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fce91234-2c88-11ef-9862-02420a0001b2/square_translations.png"
 
 
 class TranslationPage(BasePage):
-    title = "Compare Translations"
-    explore_image = EXPLORE_IMG
+    title = "Compare AI Translations"
     workflow = Workflow.TRANSLATION
-    slug_versions = ["translate"]
-
-    sane_defaults = dict(
-        translation_model=TranslationModels.google.name, translation_target="en"
-    )
+    slug_versions = ["translate", "translation", "compare-ai-translation"]
 
     class RequestModel(BaseModel):
-        texts: list[str]
+        texts: list[str] = Field([])
 
-        translation_model: typing.Literal[tuple(e.name for e in TranslationModels)]
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)]
+        ) | None = Field(TranslationModels.google.name)
+
         translation_source: str | None = Field(
             title="Source Translation Language",
         )
         translation_target: str = Field(
+            "en",
             title="Target Translation Language",
         )
 
@@ -56,15 +51,6 @@ class TranslationPage(BasePage):
             "translation_model",
             "translation_target",
         ]
-
-    def preview_image(self, state: dict) -> str | None:
-        return META_IMG
-
-    def preview_description(self, state: dict):
-        return "Compare the best AI translation models in the world from Google, Azure, Meta and LLMs to determine which work best you."
-
-    def render_description(self):
-        st.markdown(self.preview_description(st.session_state))
 
     def related_workflows(self) -> list:
         from recipes.asr_page import AsrPage
