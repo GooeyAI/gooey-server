@@ -577,7 +577,7 @@ def file_uploader(
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
     optional: bool = False,
-) -> str | list[str]:
+) -> str | list[str] | None:
     if label_visibility != "visible":
         label = None
     key = upload_key or key
@@ -595,14 +595,14 @@ def file_uploader(
             label, value=bool(state.session_state.get(key, value)), disabled=disabled
         ):
             state.session_state.pop(key, None)
-            return ""
+            return None
         label = None
     value = state.session_state.setdefault(key, value)
     if not value:
         if accept_multiple_files:
             value = []
         else:
-            value = ""
+            value = None
     state.session_state[key] = value
     state.RenderTreeNode(
         name="input",
@@ -618,7 +618,7 @@ def file_uploader(
             uploadMeta=upload_meta,
         ),
     ).mount()
-    return value or ""
+    return value
 
 
 def json(value: typing.Any, expanded: bool = False, depth: int = 1):

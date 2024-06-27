@@ -13,7 +13,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.field_render import field_title_desc
@@ -199,7 +199,7 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
         aggregations: list[list[AggFunctionResult]] | None
 
     def render_form_v2(self):
-        files = document_uploader(
+        files = bulk_documents_uploader(
             f"##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )

@@ -2,12 +2,13 @@ import random
 import threading
 import typing
 
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -25,7 +26,10 @@ from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
 )
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    bulk_documents_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
@@ -34,7 +38,6 @@ from daras_ai_v2.functional import (
     flatapply_parallel,
 )
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
-from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -81,7 +84,11 @@ class DocExtractPage(BasePage):
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
-        glossary_document: FieldHttpUrl | None
+        glossary_document: FieldHttpUrl | None = Field(
+            title="Translation Glossary",
+            description="""Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).""",
+        )
 
         task_instructions: str | None
 
@@ -101,7 +108,7 @@ class DocExtractPage(BasePage):
         return DEFAULT_YOUTUBE_BOT_META_IMG
 
     def render_form_v2(self):
-        document_uploader(
+        bulk_documents_uploader(
             "#### 🤖 Youtube/PDF/Drive URLs",
             accept=("audio/*", "application/pdf", "video/*"),
         )
@@ -132,15 +139,17 @@ class DocExtractPage(BasePage):
             height=300,
         )
         language_model_settings()
-        "##### Document AI Model"
+
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
+
         google_translate_language_selector()
-        glossary_input()
+        st.file_uploader(
+            label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+            key="glossary_document",
+            accept=SUPPORTED_SPREADSHEET_TYPES,
+        )
         st.write("---")
-        # enum_selector(
-        #     AsrOutputFormat, label="###### Output Format", key="output_format"
-        # )
 
     def related_workflows(self) -> list:
         from recipes.asr_page import AsrPage

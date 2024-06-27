@@ -11,7 +11,7 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.field_render import field_title_desc
@@ -104,7 +104,7 @@ List of URLs to the evaluation runs that you requested.
             flatten_dict_key="url",
         )
 
-        files = document_uploader(
+        files = bulk_documents_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )

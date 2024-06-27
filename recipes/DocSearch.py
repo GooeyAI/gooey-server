@@ -8,7 +8,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     is_user_uploaded_url,
     citation_style_selector,
     doc_search_advanced_settings,
@@ -93,7 +93,7 @@ class DocSearchPage(BasePage):
 
     def render_form_v2(self):
         st.text_area("#### Search Query", key="search_query")
-        document_uploader("#### Documents")
+        bulk_documents_uploader("#### Documents")
         prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
