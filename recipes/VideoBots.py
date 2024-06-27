@@ -43,8 +43,9 @@ from daras_ai_v2.doc_search_settings_widgets import (
     keyword_instructions_widget,
     doc_search_advanced_settings,
     doc_extract_selector,
-    document_uploader,
+    bulk_documents_uploader,
     citation_style_selector,
+    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -52,7 +53,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.glossary import glossary_input, validate_glossary_document
+from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -86,8 +87,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from gooey_ui import RedirectException
@@ -343,7 +342,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             use_selectbox=True,
         )
 
-        document_uploader(
+        bulk_documents_uploader(
             """
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
@@ -477,7 +476,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
         if (
             st.session_state.get("user_language")
-            and TranslationModels[translation_model].supports_glossary()
+            and TranslationModels[translation_model].supports_glossary
         ):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
@@ -494,13 +493,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
                     """
                 )
-                glossary_input(
+                st.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
                     key="input_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
-                glossary_input(
+                st.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
                     key="output_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
             else:
                 st.session_state["input_glossary_document"] = None

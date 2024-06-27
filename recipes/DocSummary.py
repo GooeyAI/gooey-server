@@ -9,7 +9,7 @@ from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
 )
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -91,7 +91,7 @@ class DocSummaryPage(BasePage):
         return DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
-        document_uploader("#### 📎 Documents")
+        bulk_documents_uploader("#### 📎 Documents")
         st.text_area("#### 👩‍💻 Instructions", key="task_instructions")
 
     def render_settings(self):

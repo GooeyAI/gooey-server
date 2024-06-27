@@ -272,15 +272,21 @@ class AsrOutputFormat(Enum):
     vtt = "VTT"
 
 
-class TranslationModels(Enum):
-    google = "Google Translate"
-    ghana_nlp = "Ghana NLP"
+class TranslationModel(typing.NamedTuple):
+    label: str
+    supports_glossary: bool = False
+    supports_auto_detect: bool = False
 
-    def supports_glossary(self) -> bool:
-        return self in {self.google}
 
-    def supports_auto_detect(self) -> bool:
-        return self in {self.google}
+class TranslationModels(TranslationModel, Enum):
+    google = TranslationModel(
+        label="Google Translate",
+        supports_glossary=True,
+        supports_auto_detect=True,
+    )
+    ghana_nlp = TranslationModel(
+        label="Ghana NLP Translate",
+    )
 
 
 def translation_language_selector(
@@ -305,7 +311,7 @@ def translation_language_selector(
     return st.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: languages[k] if k else BLANK_OPTION,
+        format_func=lang_format_func,
         options=options,
         **kwargs,
     )
@@ -1071,4 +1077,4 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
 
 
 def should_translate_lang(code: str) -> bool:
-    return code and not code.split("-")[0] != "en"
+    return code and code.split("-")[0] != "en"
