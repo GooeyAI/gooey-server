@@ -2,6 +2,7 @@ import base64
 import json
 import mimetypes
 import re
+import sys
 import typing
 from enum import Enum
 from functools import wraps
@@ -13,6 +14,7 @@ from aifail import (
     retry_if,
     vertex_ai_should_retry,
     try_all,
+    groq_cloud_should_retry
 )
 from django.conf import settings
 from loguru import logger
@@ -898,7 +900,8 @@ def _run_groq_chat(
 ):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
-
+    logger.add(sys.stdout, level="DEBUG")
+    logger.info("💥TEST MESSAGE==================================================================")
     data = {
         "model": model,
         "messages": messages,
@@ -917,6 +920,8 @@ def _run_groq_chat(
             "Authorization": f"Bearer {settings.GROQ_API_KEY}",
         },
     )
+    logger.info("💥💥💥💥💥")
+    logger.info(r)
     raise_for_status(r)
     out = r.json()
 
