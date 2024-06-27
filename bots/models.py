@@ -1124,7 +1124,7 @@ class MessageQuerySet(models.QuerySet):
                 "Question (Local)": message.get_previous_by_created_at().display_content,
                 "Answer (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
-                "Run URL": message.saved_run.get_app_url(),
+                "Run URL": (message.saved_run and message.saved_run.get_app_url()),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(

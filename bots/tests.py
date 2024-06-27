@@ -3,6 +3,7 @@ import uuid
 
 from app_users.models import AppUser
 from daras_ai_v2.functional import map_parallel
+from recipes.VideoBotsStats import get_tabular_data
 from .models import (
     Message,
     Conversation,
@@ -115,8 +116,12 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     msgs = Message.objects.filter(conversation__in=convos)
 
     # valid option but no data
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Name",
     )
     assert df.shape[0] == 0
     assert "Name" in df.columns
@@ -143,15 +148,23 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     convos = Conversation.objects.filter(bot_integration=bi)
     msgs = Message.objects.filter(conversation__in=convos)
     assert msgs.count() == 2
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Name",
     )
     assert df.shape[0] == 1
     assert "Name" in df.columns
 
     # invalid sort option should be ignored
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Invalid"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Invalid",
     )
     assert df.shape[0] == 1
     assert "Name" in df.columns
