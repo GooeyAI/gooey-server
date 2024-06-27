@@ -40,7 +40,7 @@ class TranslationPage(BasePage):
     slug_versions = ["translate", "translation", "compare-ai-translation"]
 
     class BaseRequestModel(BaseModel):
-        texts: list[str] = Field([])
+        texts: list[str] | None = Field([])
 
         selected_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)]
