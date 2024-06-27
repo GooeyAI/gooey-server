@@ -45,6 +45,15 @@ class SadTalkerSettings(BaseModel):
     )
     # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None
     # background_enhancer: typing.Literal["realesrgan"] =None
+    input_yaw: list[int] = Field(
+        None, title="Input Yaw (comma separated)", deprecated=True
+    )
+    input_pitch: list[int] = Field(
+        None, title="Input Pitch (comma separated)", deprecated=True
+    )
+    input_roll: list[int] = Field(
+        None, title="Input Roll (comma separated)", deprecated=True
+    )
 
 
 class LipsyncSettings(BaseModel):
