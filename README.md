@@ -1,5 +1,23 @@
 ## What is Gooey Server?
-Gooey Server is a no-code/low-code AI orchestration engine. It allows users to discover, customize, and deploy AI "recipes" using the best of private and open source AI, all using a single API with a single auth token. Recipes are workflows that incorporate various models to accomplish a task; they are designed to be highly customizable and shareable. 
+Gooey.AI is a low-code AI recipe platform and Gooey Server is our core repo. It allows users to discover, customize, and deploy AI "recipes" using the best of private and open source AI, all using a single API with a single auth token. Recipes are workflows that incorporate various models to accomplish a task; they are designed to be highly customizable and shareable. 
+
+### Who is this for and why would I want to use it?
+For the vast majority of developers, we DO NOT recommend running or forking Gooey Server; use our APIs or client SDK instead. The repo is intended only for developers that want to run and deploy their own server cluster or run Gooey locally for development purposes. Specifically, this repo may be for you if:
+You want to create a new recipe (instead of changing the parameters on an existing one)
+You want to add an AI model that we currently don’t support. 
+You are an enterprise who has specific requirements regarding data practices, such as using specific cloud providers.
+You want to add some other functionality that we don’t support.
+
+### Prerequisites
+Google JSON key - only for auth / storage. 
+Updated DB fixture
+OS: Mac or Linux. Likely works on other *nix, but this is untested. 
+
+### Issues that contributors could work on:
+Firebase / Supabase migration. 
+Provide a simpler workaround for localhost auth. 
+Provide an open source alternative to Google auth for use in VPC. 
+Provide a way to do storage locally. 
 
 ## Setup (Mac)
 
