@@ -79,7 +79,7 @@ class CompareLLMPage(BasePage):
             """,
             key="input_prompt",
             help="What a fine day..",
-            height=300,
+            height=200,
         )
         prompt_vars_widget("input_prompt")
 
@@ -133,7 +133,7 @@ class CompareLLMPage(BasePage):
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        _render_outputs(st.session_state, 200)
+        _render_outputs(st.session_state, 140)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

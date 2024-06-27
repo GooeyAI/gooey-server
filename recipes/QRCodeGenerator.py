@@ -184,6 +184,7 @@ class QRCodeGeneratorPage(BasePage):
                     """,
                     key=QrSources.qr_code_data.name,
                     placeholder="https://www.gooey.ai",
+                    height=50
                 )
 
             case QrSources.qr_code_input_image.name:
