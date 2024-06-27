@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
 from app_users.models import AppUser
-from bots.admin_links import list_related_html_url, change_obj_url
+from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
 from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
@@ -29,11 +29,14 @@ from bots.models import (
     BotIntegrationAnalysisRun,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from daras_ai_v2.fastapi_tricks import get_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
+from recipes.VideoBots import VideoBotsPage
+from routers.root import integrations_stats_route
 
 fb_fields = [
     "fb_page_id",
@@ -160,7 +163,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "view_messsages",
         "created_at",
         "updated_at",
-        "api_integration_id",
+        "api_integration_stats_url",
     ]
 
     fieldsets = [
@@ -173,7 +176,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "published_run",
                     "billing_account_uid",
                     "user_language",
-                    "api_integration_id",
+                    "api_integration_stats_url",
                 ],
             },
         ),
@@ -247,6 +250,21 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         )
         html = mark_safe(html)
         return html
+
+    @admin.display(description="Integration Stats")
+    def api_integration_stats_url(self, bi: BotIntegration):
+
+        integration_id = bi.api_integration_id()
+        return open_in_new_tab(
+            url=get_route_url(
+                integrations_stats_route,
+                params=dict(
+                    page_slug=VideoBotsPage.slug_versions[-1],
+                    integration_id=integration_id,
+                ),
+            ),
+            label=integration_id,
+        )
 
 
 @admin.register(PublishedRun)

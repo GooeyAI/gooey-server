@@ -437,12 +437,7 @@ class VideoBotsStatsPage(BasePage):
             rating=Feedback.Rating.RATING_THUMBS_DOWN,
         ).count()
         run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
-        connection_detail = (
-            bi.fb_page_name
-            or bi.wa_phone_number
-            or bi.ig_username
-            or (bi.slack_team_name + " - " + bi.slack_channel_name)
-        )
+        connection_detail = bi.get_display_name()
         st.markdown(
             f"""
                 - Platform: {Platform(bi.platform).name.capitalize()}
