@@ -23,7 +23,7 @@ class TranslationOptions(BaseModel):
     translation_source: str | None = Field(
         title="Source Translation Language",
     )
-    translation_target: str = Field(
+    translation_target: str | None = Field(
         "en",
         title="Target Translation Language",
     )
