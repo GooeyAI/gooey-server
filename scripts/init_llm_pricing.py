@@ -5,6 +5,27 @@ category = ModelCategory.LLM
 
 
 def run():
+    # GPT-4o
+
+    llm_pricing_create(
+        model_id="gpt-4o",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+    llm_pricing_create(
+        model_id="openai-gpt-4o-prod-eastus2-1",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.azure_openai,
+        pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+    )
+
     # GPT-4-Turbo
 
     for model in ["gpt-4-0125-preview", "gpt-4-1106-preview"]:
@@ -575,6 +596,18 @@ def run():
         pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
     )
 
+    # SEA-LION
+
+    llm_pricing_create(
+        model_id="aisingapore/sea-lion-7b-instruct",
+        model_name=LargeLanguageModels.sea_lion_7b_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
 
 def llm_pricing_create(
     model_id: str,
@@ -583,7 +616,8 @@ def llm_pricing_create(
     unit_cost_output: float,
     unit_quantity: int,
     provider: ModelProvider,
-    pricing_url: str,
+    pricing_url: str = "",
+    notes: str = "",
 ):
     obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
@@ -609,6 +643,7 @@ def llm_pricing_create(
             category=category,
             provider=provider,
             pricing_url=pricing_url,
+            notes=notes,
         ),
     )
     if created:

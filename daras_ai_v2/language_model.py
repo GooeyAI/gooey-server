@@ -18,6 +18,7 @@ from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
+    ChatCompletion,
 )
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
@@ -40,6 +41,8 @@ EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 # nice for showing streaming progress
 SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 
 class LLMApis(Enum):
@@ -636,6 +639,9 @@ def _run_self_hosted_chat(
     avoid_repetition: bool,
     stop: list[str] | None,
 ) -> list[dict]:
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     # sea lion doesnt support system prompt
     if model == LargeLanguageModels.sea_lion_7b_instruct.model_id:
         for i, entry in enumerate(messages):
@@ -656,6 +662,19 @@ def _run_self_hosted_chat(
             repetition_penalty=1.15 if avoid_repetition else 1,
         ),
     )
+
+    if usage := ret.get("usage"):
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.llm_prompt,
+            quantity=usage["prompt_tokens"],
+        )
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.llm_completion,
+            quantity=usage["completion_tokens"],
+        )
+
     return [
         {
             "role": CHATML_ROLE_ASSISTANT,
@@ -757,7 +776,7 @@ def _run_openai_chat(
         presence_penalty = 0
     if isinstance(model, str):
         model = [model]
-    r, used_model = try_all(
+    completion, used_model = try_all(
         *[
             _get_chat_completions_create(
                 model=model_str,
@@ -780,10 +799,10 @@ def _run_openai_chat(
         ],
     )
     if stream:
-        return _stream_openai_chunked(r, used_model, messages)
+        return _stream_openai_chunked(completion, used_model, messages)
     else:
-        ret = [choice.message.dict() for choice in r.choices]
-        record_openai_llm_usage(used_model, messages, ret)
+        ret = [choice.message.dict() for choice in completion.choices]
+        record_openai_llm_usage(used_model, completion, messages, ret)
         return ret
 
 
@@ -809,6 +828,7 @@ def _stream_openai_chunked(
     ret = []
     chunk_size = start_chunk_size
 
+    completion_chunk = None
     for completion_chunk in r:
         changed = False
         for choice in completion_chunk.choices:
@@ -860,28 +880,42 @@ def _stream_openai_chunked(
         entry["content"] += entry["chunk"]
     yield ret
 
-    record_openai_llm_usage(used_model, messages, ret)
+    if not completion_chunk:
+        return
+    record_openai_llm_usage(used_model, completion_chunk, messages, ret)
 
 
 def record_openai_llm_usage(
-    used_model: str, messages: list[ConversationEntry], choices: list[ConversationEntry]
+    model: str,
+    completion: ChatCompletion | ChatCompletionChunk,
+    messages: list[ConversationEntry],
+    choices: list[ConversationEntry],
 ):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
+    if completion.usage:
+        prompt_tokens = completion.usage.prompt_tokens
+        completion_tokens = completion.usage.completion_tokens
+    else:
+        prompt_tokens = sum(
+            default_length_function(get_entry_text(entry), model=completion.model)
+            for entry in messages
+        )
+        completion_tokens = sum(
+            default_length_function(get_entry_text(entry), model=completion.model)
+            for entry in choices
+        )
+
     record_cost_auto(
-        model=used_model,
+        model=model,
         sku=ModelSku.llm_prompt,
-        quantity=sum(
-            default_length_function(get_entry_text(entry)) for entry in messages
-        ),
+        quantity=prompt_tokens,
     )
     record_cost_auto(
-        model=used_model,
+        model=model,
         sku=ModelSku.llm_completion,
-        quantity=sum(
-            default_length_function(get_entry_text(entry)) for entry in choices
-        ),
+        quantity=completion_tokens,
     )
 
 
@@ -928,14 +962,14 @@ def _run_openai_text(
 def get_openai_client(model: str):
     import openai
 
-    if "-ca-" in model:
+    if model.startswith(AZURE_OPENAI_MODEL_PREFIX) and "-ca-" in model:
         client = openai.AzureOpenAI(
             api_key=settings.AZURE_OPENAI_KEY_CA,
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_CA,
             api_version="2023-10-01-preview",
             max_retries=0,
         )
-    elif "-eastus2-" in model:
+    elif model.startswith(AZURE_OPENAI_MODEL_PREFIX) and "-eastus2-" in model:
         client = openai.AzureOpenAI(
             api_key=settings.AZURE_OPENAI_KEY_EASTUS2,
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_EASTUS2,
