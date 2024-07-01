@@ -48,6 +48,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -1123,20 +1124,24 @@ class BasePage:
         published_run, _ = PublishedRun.objects.get_or_create(
             workflow=cls.workflow,
             published_run_id="",
-            defaults={
-                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
-                "created_by": None,
-                "last_edited_by": None,
-                "title": cls.title,
-                "notes": cls().preview_description(state=cls.sane_defaults),
-                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-                "is_approved_example": True,
-            },
+            defaults=dict(
+                saved_run=lambda: SavedRun.objects.get_or_create(
+                    example_id="", workflow=cls.workflow
+                )[0],
+                created_by=None,
+                last_edited_by=None,
+                title=cls.title,
+                notes=cls().preview_description(state=cls.sane_defaults),
+                visibility=lambda: PublishedRunVisibility(
+                    PublishedRunVisibility.PUBLIC
+                ),
+                is_approved_example=True,
+            ),
         )
         return published_run
 
     @classmethod
-    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+    def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
         if create:
             return cls.get_or_create_root_published_run().saved_run
         else:
@@ -1739,23 +1744,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
-    def ensure_authentication(self, next_url: str | None = None):
-        if not self.request.user or self.request.user.is_anonymous:
-            raise RedirectException(self.get_auth_url(next_url))
-
-    def get_auth_url(self, next_url: str | None = None) -> str:
-        return furl(
-            "/login",
-            query_params={"next": furl(next_url or self.request.url).set(origin=None)},
-        ).tostr()
-
     def _history_tab(self):
-        assert self.request, "request must be set to render history tab"
-        if not self.request.user:
-            redirect_url = furl(
-                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
-            )
-            raise RedirectException(str(redirect_url))
+        self.ensure_authentication(anon_ok=True)
+
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
@@ -1787,6 +1778,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 # language=HTML
                 f"""<button type="button" class="btn btn-theme">Load More</button>"""
             )
+
+    def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
+        if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
+            raise RedirectException(self.get_auth_url(next_url))
+
+    def get_auth_url(self, next_url: str | None = None) -> str:
+        from routers.root import login
+
+        next_url = str(furl(next_url or self.request.url).set(origin=None))
+        return str(furl(get_route_path(login), query_params=dict(next=next_url)))
 
     def _render_run_preview(self, saved_run: SavedRun):
         published_run: PublishedRun | None = (

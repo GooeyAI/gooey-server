@@ -292,7 +292,7 @@ def parse_refs(
         yield end_text, {}
 
 
-def render_output_with_refs(state, height):
+def render_output_with_refs(state, height=500):
     output_text = state.get("output_text", [])
     for text in output_text:
         html = render_text_with_refs(text, state.get("references", []))

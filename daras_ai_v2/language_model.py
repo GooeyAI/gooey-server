@@ -1,5 +1,4 @@
 import base64
-import json
 import mimetypes
 import re
 import typing
@@ -25,6 +24,7 @@ from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_byt
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functions import LLMTools
+from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
@@ -49,6 +49,7 @@ class LLMApis(Enum):
     # together = 4
     groq = 5
     anthropic = 6
+    self_hosted = 7
 
 
 class LLMSpec(typing.NamedTuple):
@@ -221,8 +222,16 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_3_5_sonnet = LLMSpec(
+        label="Claude 3.5 Sonnet (Anthropic)",
+        model_id="claude-3-5-sonnet-20240620",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=15,
+        is_vision_model=True,
+    )
     claude_3_opus = LLMSpec(
-        label="Claude 3 Opus 💎 (Anthropic)",
+        label="Claude 3 Opus [L] (Anthropic)",
         model_id="claude-3-opus-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -230,7 +239,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
     )
     claude_3_sonnet = LLMSpec(
-        label="Claude 3 Sonnet 🔷 (Anthropic)",
+        label="Claude 3 Sonnet [M] (Anthropic)",
         model_id="claude-3-sonnet-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -238,12 +247,20 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
     )
     claude_3_haiku = LLMSpec(
-        label="Claude 3 Haiku 🔹 (Anthropic)",
+        label="Claude 3 Haiku [S] (Anthropic)",
         model_id="claude-3-haiku-20240307",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
         price=2,
         is_vision_model=True,
+    )
+
+    sea_lion_7b_instruct = LLMSpec(
+        label="SEA-LION-7B-Instruct (aisingapore)",
+        model_id="aisingapore/sea-lion-7b-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=2048,
+        price=1,
     )
 
     # https://platform.openai.com/docs/models/gpt-3
@@ -586,6 +603,15 @@ def _run_chat_model(
                 temperature=temperature,
                 stop=stop,
             )
+        case LLMApis.self_hosted:
+            return _run_self_hosted_chat(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                avoid_repetition=avoid_repetition,
+                stop=stop,
+            )
         # case LLMApis.together:
         #     if tools:
         #         raise UserError("Only OpenAI chat models support Tools")
@@ -599,6 +625,43 @@ def _run_chat_model(
         #     )
         case _:
             raise UserError(f"Unsupported chat api: {api}")
+
+
+def _run_self_hosted_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_tokens: int,
+    temperature: float,
+    avoid_repetition: bool,
+    stop: list[str] | None,
+) -> list[dict]:
+    # sea lion doesnt support system prompt
+    if model == LargeLanguageModels.sea_lion_7b_instruct.model_id:
+        for i, entry in enumerate(messages):
+            if entry["role"] == CHATML_ROLE_SYSTEM:
+                messages[i]["role"] = CHATML_ROLE_USER
+                messages.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
+
+    ret = call_celery_task(
+        "llm.chat",
+        pipeline=dict(
+            model_id=model,
+        ),
+        inputs=dict(
+            messages=messages,
+            max_new_tokens=max_tokens,
+            stop_strings=stop,
+            temperature=temperature,
+            repetition_penalty=1.15 if avoid_repetition else 1,
+        ),
+    )
+    return [
+        {
+            "role": CHATML_ROLE_ASSISTANT,
+            "content": ret["generated_text"],
+        }
+    ]
 
 
 def _run_anthropic_chat(

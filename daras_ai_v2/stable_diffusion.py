@@ -55,10 +55,10 @@ class Text2ImgModels(Enum):
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
 
-    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
-    openjourney = "Open Journey (PromptHero) 🐢"
-    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    openjourney = "Open Journey (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
@@ -213,10 +213,12 @@ def sd_upscale(
     guidance_scale: float,
     seed: int = 42,
 ):
+    from daras_ai_v2.upscaler_models import UpscalerModels
+
     return call_sd_multi(
         "diffusion.upscale",
         pipeline={
-            "model_id": "stabilityai/stable-diffusion-x4-upscaler",
+            "model_id": UpscalerModels.sd_x4.model_id,
             # "scheduler": "UniPCMultistepScheduler",
             "disable_safety_checker": True,
             "seed": seed,

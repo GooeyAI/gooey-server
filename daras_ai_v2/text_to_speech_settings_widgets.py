@@ -195,7 +195,10 @@ def openai_tts_settings():
 
 
 def azure_tts_selector():
-    voices = azure_tts_voices()
+    if settings.AZURE_SPEECH_KEY:
+        voices = azure_tts_voices()
+    else:
+        voices = {}
     st.selectbox(
         label="""
         ###### Azure TTS Voice name
@@ -208,7 +211,7 @@ def azure_tts_selector():
 
 def azure_tts_settings():
     voice_name = st.session_state.get("azure_voice_name")
-    if not voice_name:
+    if not voice_name or not settings.AZURE_SPEECH_KEY:
         return
     try:
         voice = azure_tts_voices()[voice_name]
@@ -382,7 +385,10 @@ def elevenlabs_selector(page):
                 Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
                 """
             )
-        voices = default_elevenlabs_voices()
+        if settings.ELEVEN_LABS_API_KEY:
+            voices = default_elevenlabs_voices()
+        else:
+            voices = {}
 
     page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
         "elevenlabs_api_key"

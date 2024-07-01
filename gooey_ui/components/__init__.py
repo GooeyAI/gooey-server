@@ -9,12 +9,13 @@ import numpy as np
 from furl import furl
 
 from daras_ai.image_input import resize_img_scale
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
+
+BLANK_OPTION = "———"
 
 
 def _default_format(value: typing.Any) -> str:
@@ -318,7 +319,7 @@ def audio(src: str, caption: str = None, show_download_button: bool = False):
 def text_area(
     label: str,
     value: str = "",
-    height: int = 100,
+    height: int = 500,
     key: str = None,
     help: str = None,
     placeholder: str = None,
@@ -345,9 +346,9 @@ def text_area(
         label = None
     if disabled:
         max_height = f"{height}px"
-        rows = nrows_for_text(value, height, min_rows=1)
+        rows = nrows_for_text(value, height)
     else:
-        max_height = "90vh"
+        max_height = "50vh"
         rows = nrows_for_text(value, height)
     style.setdefault("maxHeight", max_height)
     props.setdefault("rows", rows)
@@ -369,13 +370,16 @@ def text_area(
 def nrows_for_text(
     text: str,
     max_height_px: int,
-    min_rows: int = 2,
+    min_rows: int = 1,
     row_height_px: int = 30,
-    row_width_px: int = 80,
+    row_width_px: int = 70,
 ) -> int:
     max_rows = max_height_px // row_height_px
     nrows = math.ceil(
-        sum(len(line) / row_width_px for line in (text or "").strip().splitlines())
+        sum(
+            math.ceil(len(line) / row_width_px)
+            for line in (text or "").splitlines(keepends=True)
+        )
     )
     nrows = min(max(nrows, min_rows), max_rows)
     return nrows
@@ -399,7 +403,7 @@ def multiselect(
     value = state.session_state.get(key) or []
     if not isinstance(value, list):
         value = [value]
-    value = [o if o in options else options[0] for o in value]
+    value = [o for o in value if o in options]
     if not allow_none and not value:
         value = [options[0]]
     state.session_state[key] = value
@@ -656,9 +660,10 @@ def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
+    *,
     key: str = None,
     help: str = None,
-    *,
+    value: T = None,
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
@@ -669,10 +674,9 @@ def horizontal_radio(
     options = list(options)
     if not key:
         key = md5_values("horizontal_radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if (key not in state.session_state or value not in options) and checked_by_default:
-        value = options[0]
-    state.session_state.setdefault(key, value)
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
+        value = state.session_state[key] = options[0]
     if label_visibility != "visible":
         label = None
     markdown(label)

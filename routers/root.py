@@ -598,15 +598,19 @@ def render_page(
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
-        new_url = furl(
-            settings.APP_BASE_URL, query_params=request.query_params
-        ) / request.url.path.replace(page_slug, latest_slug, 1)
-        return RedirectResponse(str(new_url), status_code=301)
+        new_url = furl(request.url)
+        for i, seg in enumerate(new_url.path.segments):
+            if seg == page_slug:
+                new_url.path.segments[i] = latest_slug
+                break
+        return RedirectResponse(new_url.pathstr, status_code=301)
 
     # ensure the new example_id path param
     if request.query_params.get("example_id"):
-        new_url = page_cls.app_url(tab=tab, query_params=dict(request.query_params))
-        return RedirectResponse(new_url, status_code=301)
+        new_url = furl(
+            page_cls.app_url(tab=tab, query_params=dict(request.query_params))
+        )
+        return RedirectResponse(new_url.pathstr, status_code=301)
 
     # this is because the code still expects example_id to be in the query params
     st.set_query_params(dict(request.query_params) | dict(example_id=example_id))

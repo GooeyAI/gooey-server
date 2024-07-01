@@ -160,7 +160,6 @@ class LetterWriterPage(BasePage):
             Briefly describe the task for the language model
             """,
             key="prompt_header",
-            height=200,
         )
 
         st.write("---")

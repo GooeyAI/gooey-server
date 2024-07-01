@@ -306,6 +306,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
+                used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len
                 ):
@@ -333,8 +334,13 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if pr and pr.title:
+                            if (
+                                pr
+                                and pr.title
+                                and f"({pr.title}) {col}" not in used_col_names
+                            ):
                                 col = f"({pr.title}) {col}"
+                                used_col_names.add(col)
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)

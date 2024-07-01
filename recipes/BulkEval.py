@@ -321,7 +321,7 @@ Here's what you uploaded:
                 continue
             st.write(f"###### {doc}")
             for i, prompt in enumerate(prompts):
-                st.text_area("", value=prompt, height=200, key=f"--final-prompt-{i}")
+                st.text_area("", value=prompt, key=f"--final-prompt-{i}")
 
 
 class TaskResult(typing.NamedTuple):

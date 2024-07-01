@@ -640,10 +640,10 @@ class BotIntegration(models.Model):
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
-            or self.ig_username
-            or self.fb_page_name
             or self.wa_phone_number_id
+            or self.fb_page_name
             or self.fb_page_id
+            or self.ig_username
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
@@ -656,7 +656,6 @@ class BotIntegration(models.Model):
 
     get_display_name.short_description = "Bot"
 
-    @admin.display(description="API integraton_id")
     def api_integration_id(self):
         from routers.bots_api import api_hashids
 
@@ -987,6 +986,7 @@ class Conversation(models.Model):
             )
             or self.fb_page_id
             or self.slack_user_id
+            or self.web_user_id
         )
 
     get_display_name.short_description = "User"
@@ -1124,7 +1124,7 @@ class MessageQuerySet(models.QuerySet):
                 "Question (Local)": message.get_previous_by_created_at().display_content,
                 "Answer (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
-                "Run URL": message.saved_run.get_app_url(),
+                "Run URL": (message.saved_run and message.saved_run.get_app_url()),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
