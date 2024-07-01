@@ -629,6 +629,7 @@ def llm_pricing_create(
             category=category,
             provider=provider,
             pricing_url=pricing_url,
+            notes=notes,
         ),
     )
     if created:
