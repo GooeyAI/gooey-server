@@ -40,7 +40,7 @@ class TranslationPage(BasePage):
     slug_versions = ["translate", "translation", "compare-ai-translation"]
 
     class BaseRequestModel(BaseModel):
-        texts: list[str] | None = Field([])
+        texts: list[str] = Field([])
 
         selected_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)]
@@ -50,7 +50,7 @@ class TranslationPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        output_texts: list[str]
+        output_texts: list[str] = Field([])
 
     def run_v2(
         self,
