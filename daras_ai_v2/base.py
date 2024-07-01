@@ -71,6 +71,7 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
+from gooeysite.custom_create import get_or_create_lazy
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
@@ -1121,22 +1122,28 @@ class BasePage:
 
     @classmethod
     def get_or_create_root_published_run(cls) -> PublishedRun:
-        published_run, _ = PublishedRun.objects.get_or_create(
-            workflow=cls.workflow,
-            published_run_id="",
-            defaults=dict(
-                saved_run=lambda: SavedRun.objects.get_or_create(
-                    example_id="", workflow=cls.workflow
-                )[0],
+        def get_defaults():
+            return dict(
+                saved_run=(
+                    SavedRun.objects.get_or_create(
+                        example_id="",
+                        workflow=cls.workflow,
+                        defaults=dict(state=cls.load_state_defaults({})),
+                    )[0]
+                ),
                 created_by=None,
                 last_edited_by=None,
                 title=cls.title,
                 notes=cls().preview_description(state=cls.sane_defaults),
-                visibility=lambda: PublishedRunVisibility(
-                    PublishedRunVisibility.PUBLIC
-                ),
+                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
                 is_approved_example=True,
-            ),
+            )
+
+        published_run, _ = get_or_create_lazy(
+            PublishedRun,
+            workflow=cls.workflow,
+            published_run_id="",
+            get_defaults=get_defaults,
         )
         return published_run
 
@@ -1666,16 +1673,21 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
 
-    def load_state_from_sr(self, sr: SavedRun) -> dict:
+    @classmethod
+    def load_state_from_sr(cls, sr: SavedRun) -> dict:
         state = sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
-        for k, v in self.RequestModel.schema()["properties"].items():
+        return cls.load_state_defaults(state)
+
+    @classmethod
+    def load_state_defaults(cls, state: dict):
+        for k, v in cls.RequestModel.schema()["properties"].items():
             try:
                 state.setdefault(k, copy(v["default"]))
             except KeyError:
                 pass
-        for k, v in self.sane_defaults.items():
+        for k, v in cls.sane_defaults.items():
             state.setdefault(k, v)
         return state
 
