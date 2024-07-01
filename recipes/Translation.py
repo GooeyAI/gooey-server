@@ -106,14 +106,13 @@ class TranslationPage(BasePage):
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
                 key="translation_source",
-                allow_none=True,
+                allow_none=translation_model.supports_auto_detect,
             )
         with col2:
             translation_language_selector(
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                 key="translation_target",
-                allow_none=translation_model.supports_auto_detect,
             )
 
     def render_settings(self):
