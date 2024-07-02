@@ -603,14 +603,14 @@ def render_page(
             if seg == page_slug:
                 new_url.path.segments[i] = latest_slug
                 break
-        return RedirectResponse(new_url.pathstr, status_code=301)
+        return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
     # ensure the new example_id path param
     if request.query_params.get("example_id"):
         new_url = furl(
             page_cls.app_url(tab=tab, query_params=dict(request.query_params))
         )
-        return RedirectResponse(new_url.pathstr, status_code=301)
+        return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
     # this is because the code still expects example_id to be in the query params
     st.set_query_params(dict(request.query_params) | dict(example_id=example_id))
