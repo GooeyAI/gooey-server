@@ -31,7 +31,7 @@ class LipsyncPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
-        seconds: float
+        seconds: float = 0
         truncated: bool = False
 
     def preview_image(self, state: dict) -> str | None:
