@@ -1613,8 +1613,9 @@ class BasePage:
             is_api_call=is_api_call,
         )
 
-    def realtime_channel_name(self, run_id, uid):
-        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+    @classmethod
+    def realtime_channel_name(cls, run_id, uid):
+        return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
