@@ -197,7 +197,7 @@ if not DEBUG:
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
-        traces_sample_rate=0.01,
+        traces_sample_rate=0.005,
         send_default_pii=True,
         integrations=[
             ThreadingIntegration(propagate_hub=True),
@@ -227,7 +227,7 @@ os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
 GCP_REGION = config("GCP_REGION", default="us-central1")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
@@ -248,6 +248,7 @@ APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
+PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
@@ -283,7 +284,6 @@ ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 
-PAYMENT_PROCESSING_PAGE_PATH: str = "/payment-processing/"
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
@@ -293,11 +293,12 @@ LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
 LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
-stripe.api_key = config("STRIPE_SECRET_KEY", None)
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", None)
+stripe.api_key = STRIPE_SECRET_KEY
+STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
-STRIPE_PRODUCT_IDS: dict[str, str] = config(  # type: ignore
-    "STRIPE_PRODUCT_IDS",
-    cast=json.loads,
+STRIPE_ADDON_PRODUCT_NAME = config(
+    "STRIPE_ADDON_PRODUCT_NAME", "Gooey.AI Add-on Credits"
 )
 
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
@@ -305,10 +306,7 @@ PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
 PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
 PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
-PAYPAL_PLAN_IDS: dict[str, str] = config(  # type: ignore
-    "PAYPAL_PLAN_IDS",
-    cast=json.loads,
-)
+PAYPAL_DEFAULT_PRODUCT_NAME: str = config("PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits")  # type: ignore
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
@@ -355,11 +353,12 @@ AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
 AZURE_SPEECH_REGION = config("AZURE_SPEECH_REGION", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.com"
+AZURE_TTS_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com"
 
-AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
-
-AZURE_OPENAI_ENDPOINT = config("AZURE_OPENAI_ENDPOINT", "")
-AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
+AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
+AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")
+AZURE_OPENAI_ENDPOINT_EASTUS2 = config("AZURE_OPENAI_ENDPOINT_EASTUS2", "")
+AZURE_OPENAI_KEY_EASTUS2 = config("AZURE_OPENAI_KEY_EASTUS2", "")
 
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 
@@ -386,3 +385,6 @@ MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
 MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
 MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
 MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
+
+DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
+DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")

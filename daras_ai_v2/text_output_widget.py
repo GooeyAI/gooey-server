@@ -7,7 +7,7 @@ def text_outputs(
     label: str,
     *,
     key: str = None,
-    value: str = None,
+    value: str | list = None,
     height: int = 200,
 ):
     value = value or st.session_state.get(key)

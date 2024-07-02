@@ -48,6 +48,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -66,17 +67,17 @@ from daras_ai_v2.user_date_widgets import (
 from gooey_ui import (
     realtime_clear_subs,
     RedirectException,
-    QueryParamsRedirectException,
 )
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.billing import AccountTabs
+from gooeysite.custom_create import get_or_create_lazy
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec2100aa-1f6e-11ef-ba0b-02420a000159/Main.jpg"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -169,7 +170,15 @@ class BasePage:
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
+        if query_params is None:
+            query_params = {}
 
+        if run_id and uid:
+            query_params |= dict(run_id=run_id, uid=uid)
+        q_example_id = query_params.pop("example_id", None)
+
+        # old urls had example_id as a query param
+        example_id = example_id or q_example_id
         run_slug = None
         if example_id:
             try:
@@ -178,10 +187,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-
-        query_params = cls.clean_query_params(
-            example_id=None, run_id=run_id, uid=uid
-        ) | (query_params or {})
 
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
@@ -673,8 +678,8 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=duplicate_pr.published_run_id),
+            raise RedirectException(
+                self.app_url(example_id=duplicate_pr.published_run_id)
             )
 
         if save_as_new_button:
@@ -686,9 +691,7 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=new_pr.published_run_id)
-            )
+            raise RedirectException(self.app_url(example_id=new_pr.published_run_id))
 
         with st.div(className="mt-4"):
             st.write("#### Version History", className="mb-4")
@@ -730,7 +733,7 @@ class BasePage:
 
         if confirm_button:
             published_run.delete()
-            raise QueryParamsRedirectException(query_params={})
+            raise RedirectException(self.app_url())
 
         if cancel_button:
             modal.close()
@@ -789,7 +792,7 @@ class BasePage:
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
                     )
-                    raise QueryParamsRedirectException(dict())
+                    raise RedirectException(self.app_url())
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -799,8 +802,11 @@ class BasePage:
             or cls.workflow.label
         )
 
-    def get_explore_image(self, state: dict) -> str:
-        return self.explore_image or ""
+    def get_explore_image(self) -> str:
+        meta = self.workflow.get_or_create_metadata()
+        img = meta.default_image or self.explore_image or ""
+        fallback_img = self.fallback_preivew_image()
+        return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -928,9 +934,7 @@ class BasePage:
             page = page_cls()
             root_run = page.get_root_published_run()
             state = root_run.saved_run.to_dict()
-            preview_image = meta_preview_url(
-                page.get_explore_image(state), page.fallback_preivew_image()
-            )
+            preview_image = page.get_explore_image()
 
             with st.link(to=page.app_url()):
                 st.html(
@@ -940,7 +944,7 @@ class BasePage:
                     """
                 )
                 st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(page.preview_description(state))
+            st.caption(root_run.notes or page.preview_description(state))
 
         grid_layout(4, page_clses, _render)
 
@@ -1118,23 +1122,33 @@ class BasePage:
 
     @classmethod
     def get_or_create_root_published_run(cls) -> PublishedRun:
-        published_run, _ = PublishedRun.objects.get_or_create(
+        def get_defaults():
+            return dict(
+                saved_run=(
+                    SavedRun.objects.get_or_create(
+                        example_id="",
+                        workflow=cls.workflow,
+                        defaults=dict(state=cls.load_state_defaults({})),
+                    )[0]
+                ),
+                created_by=None,
+                last_edited_by=None,
+                title=cls.title,
+                notes=cls().preview_description(state=cls.sane_defaults),
+                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
+                is_approved_example=True,
+            )
+
+        published_run, _ = get_or_create_lazy(
+            PublishedRun,
             workflow=cls.workflow,
             published_run_id="",
-            defaults={
-                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
-                "created_by": None,
-                "last_edited_by": None,
-                "title": cls.title,
-                "notes": cls().preview_description(state=cls.sane_defaults),
-                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-                "is_approved_example": True,
-            },
+            get_defaults=get_defaults,
         )
         return published_run
 
     @classmethod
-    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+    def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
         if create:
             return cls.get_or_create_root_published_run().saved_run
         else:
@@ -1508,13 +1522,18 @@ class BasePage:
         pass
 
     def on_submit(self):
+        from celeryapp.tasks import auto_recharge
+
         try:
-            ensure_rate_limits(self.workflow, self.request.user)
+            example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
-        example_id, run_id, uid = self.create_new_run()
+
+        if user_should_auto_recharge(self.request.user):
+            auto_recharge.delay(user_id=self.request.user.id)
+
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
@@ -1523,9 +1542,8 @@ class BasePage:
             self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
-        raise QueryParamsRedirectException(
-            self.clean_query_params(example_id=None, run_id=run_id, uid=uid)
-        )
+
+        raise RedirectException(self.app_url(run_id=run_id, uid=uid))
 
     def should_submit_after_login(self) -> bool:
         return (
@@ -1535,7 +1553,7 @@ class BasePage:
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, **defaults):
+    def create_new_run(self, *, enable_rate_limits: bool = False, **defaults):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1551,6 +1569,9 @@ class BasePage:
                 uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
             )
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
+
+        if enable_rate_limits:
+            ensure_rate_limits(self.workflow, self.request.user)
 
         run_id = get_random_doc_id()
 
@@ -1577,14 +1598,7 @@ class BasePage:
         return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
-        from celeryapp.tasks import gui_runner, auto_recharge
-
-        if (
-            self.request.user
-            and not self.request.user.is_anonymous
-            and user_should_auto_recharge(self.request.user)
-        ):
-            auto_recharge.delay(user_id=self.request.user.id)
+        from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
             page_cls=self.__class__,
@@ -1599,8 +1613,9 @@ class BasePage:
             is_api_call=is_api_call,
         )
 
-    def realtime_channel_name(self, run_id, uid):
-        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+    @classmethod
+    def realtime_channel_name(cls, run_id, uid):
+        return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
@@ -1659,16 +1674,21 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
 
-    def load_state_from_sr(self, sr: SavedRun) -> dict:
+    @classmethod
+    def load_state_from_sr(cls, sr: SavedRun) -> dict:
         state = sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
-        for k, v in self.RequestModel.schema()["properties"].items():
+        return cls.load_state_defaults(state)
+
+    @classmethod
+    def load_state_defaults(cls, state: dict):
+        for k, v in cls.RequestModel.schema()["properties"].items():
             try:
                 state.setdefault(k, copy(v["default"]))
             except KeyError:
                 pass
-        for k, v in self.sane_defaults.items():
+        for k, v in cls.sane_defaults.items():
             state.setdefault(k, v)
         return state
 
@@ -1730,7 +1750,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
-                    type="light",
                     className="border border-dark",
                 )
 
@@ -1738,23 +1757,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
-    def ensure_authentication(self, next_url: str | None = None):
-        if not self.request.user or self.request.user.is_anonymous:
-            raise RedirectException(self.get_auth_url(next_url))
-
-    def get_auth_url(self, next_url: str | None = None) -> str:
-        return furl(
-            "/login",
-            query_params={"next": furl(next_url or self.request.url).set(origin=None)},
-        ).tostr()
-
     def _history_tab(self):
-        assert self.request, "request must be set to render history tab"
-        if not self.request.user:
-            redirect_url = furl(
-                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
-            )
-            raise RedirectException(str(redirect_url))
+        self.ensure_authentication(anon_ok=True)
+
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
@@ -1787,6 +1792,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 f"""<button type="button" class="btn btn-theme">Load More</button>"""
             )
 
+    def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
+        if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
+            raise RedirectException(self.get_auth_url(next_url))
+
+    def get_auth_url(self, next_url: str | None = None) -> str:
+        from routers.root import login
+
+        next_url = str(furl(next_url or self.request.url).set(origin=None))
+        return str(furl(get_route_path(login), query_params=dict(next=next_url)))
+
     def _render_run_preview(self, saved_run: SavedRun):
         published_run: PublishedRun | None = (
             saved_run.parent_version.published_run if saved_run.parent_version else None
@@ -1802,7 +1817,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                             published_run.visibility
                         ).get_badge_html(),
                         unsafe_allow_html=True,
-                        type="light",
                         className="border border-dark",
                     )
 
@@ -1916,6 +1930,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             or state.get("title")
         )
 
+    # this is mostly depreated in favour of PublishedRun.notes
     def preview_description(self, state: dict) -> str:
         return ""
 

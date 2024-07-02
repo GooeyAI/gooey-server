@@ -57,50 +57,15 @@ class TextToSpeechProviders(Enum):
     OPEN_AI = "OpenAI"
 
 
-# Mapping from Eleven Labs Voice Name -> Voice ID
-ELEVEN_LABS_VOICES = {
-    "Rachel": "21m00Tcm4TlvDq8ikWAM",
-    "Clyde": "2EiwWnXFnvU5JabPnv8n",
-    "Domi": "AZnzlk1XvdvUeBnXmlld",
-    "Dave": "CYw3kZ02Hs0563khs1Fj",
-    "Fin": "D38z5RcWu1voky8WS1ja",
-    "Bella": "EXAVITQu4vr4xnSDxMaL",
-    "Antoni": "ErXwobaYiN019PkySvjV",
-    "Thomas": "GBv7mTt0atIp3Br8iCZE",
-    "Charlie": "IKne3meq5aSn9XLyUdCD",
-    "Emily": "LcfcDJNUP1GQjkzn1xUU",
-    "Elli": "MF3mGyEYCl7XYWbV9V6O",
-    "Callum": "N2lVS1w4EtoT3dr4eOWO",
-    "Patrick": "ODq5zmih8GrVes37Dizd",
-    "Harry": "SOYHLrjzK2X1ezoPC6cr",
-    "Liam": "TX3LPaxmHKxFdv7VOQHJ",
-    "Dorothy": "ThT5KcBeYPX3keUQqHPh",
-    "Josh": "TxGEqnHWrfWFTfGW9XjX",
-    "Arnold": "VR6AewLTigWG4xSOukaG",
-    "Charlotte": "XB0fDUnXU5powFXDhCwa",
-    "Matilda": "XrExE9yKIg1WjnnlVkGX",
-    "Matthew": "Yko7PKHZNXotIFUBG7I9",
-    "James": "ZQe5CZNOzWyzPSCn5a3c",
-    "Joseph": "Zlb1dXrM653N07WRdFW3",
-    "Jeremy": "bVMeCyTHy58xNoL34h3p",
-    "Michael": "flq6f7yk4E4fJM5XTYuZ",
-    "Ethan": "g5CIjZEefAph4nQFvHAz",
-    "Gigi": "jBpfuIE2acCO8z3wKNLl",
-    "Freya": "jsCqWAovK2LkecY7zXl4",
-    "Grace": "oWAxZDx7w5VEj9dCyTzz",
-    "Daniel": "onwK4e9ZLuTAKqWW03F9",
-    "Serena": "pMsXgVXv3BLzUgSXRplE",
-    "Adam": "pNInz6obpgDQGcFmaJgB",
-    "Nicole": "piTKgcLEGmPE4e6mEKli",
-    "Jessie": "t0jbNlBVZ17f02VDIeMI",
-    "Ryan": "wViXBPUzp2ZZixB1xQuM",
-    "Sam": "yoZ06aMxZJJ28mfd3POQ",
-    "Glinda": "z9fAnlkpzviPz146aGWa",
-    "Giovanni": "zcAOhNBS3c14rBihAFp1",
-    "Mimi": "zrHiDhphv9ZnVXBqCLjz",
-}
+# This exists only for backwards compatiblity
+OLD_ELEVEN_LABS_VOICES = { "Rachel": "21m00Tcm4TlvDq8ikWAM", "Clyde": "2EiwWnXFnvU5JabPnv8n", "Domi": "AZnzlk1XvdvUeBnXmlld", "Dave": "CYw3kZ02Hs0563khs1Fj", "Fin": "D38z5RcWu1voky8WS1ja", "Bella": "EXAVITQu4vr4xnSDxMaL", "Antoni": "ErXwobaYiN019PkySvjV", "Thomas": "GBv7mTt0atIp3Br8iCZE", "Charlie": "IKne3meq5aSn9XLyUdCD", "Emily": "LcfcDJNUP1GQjkzn1xUU", "Elli": "MF3mGyEYCl7XYWbV9V6O", "Callum": "N2lVS1w4EtoT3dr4eOWO", "Patrick": "ODq5zmih8GrVes37Dizd", "Harry": "SOYHLrjzK2X1ezoPC6cr", "Liam": "TX3LPaxmHKxFdv7VOQHJ", "Dorothy": "ThT5KcBeYPX3keUQqHPh", "Josh": "TxGEqnHWrfWFTfGW9XjX", "Arnold": "VR6AewLTigWG4xSOukaG", "Charlotte": "XB0fDUnXU5powFXDhCwa", "Matilda": "XrExE9yKIg1WjnnlVkGX", "Matthew": "Yko7PKHZNXotIFUBG7I9", "James": "ZQe5CZNOzWyzPSCn5a3c", "Joseph": "Zlb1dXrM653N07WRdFW3", "Jeremy": "bVMeCyTHy58xNoL34h3p", "Michael": "flq6f7yk4E4fJM5XTYuZ", "Ethan": "g5CIjZEefAph4nQFvHAz", "Gigi": "jBpfuIE2acCO8z3wKNLl", "Freya": "jsCqWAovK2LkecY7zXl4", "Grace": "oWAxZDx7w5VEj9dCyTzz", "Daniel": "onwK4e9ZLuTAKqWW03F9", "Serena": "pMsXgVXv3BLzUgSXRplE", "Adam": "pNInz6obpgDQGcFmaJgB", "Nicole": "piTKgcLEGmPE4e6mEKli", "Jessie": "t0jbNlBVZ17f02VDIeMI", "Ryan": "wViXBPUzp2ZZixB1xQuM", "Sam": "yoZ06aMxZJJ28mfd3POQ", "Glinda": "z9fAnlkpzviPz146aGWa", "Giovanni": "zcAOhNBS3c14rBihAFp1", "Mimi": "zrHiDhphv9ZnVXBqCLjz" }  # fmt:skip
 
-# Mapping from Model ID -> Title in UI
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def default_elevenlabs_voices() -> dict[str, str]:
+    return fetch_elevenlabs_voices(settings.ELEVEN_LABS_API_KEY)
+
+
 ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v2": "Multilingual V2 - High quality speech in 29 languages",
     "eleven_turbo_v2": "English V2 - Very low latency text-to-speech",
@@ -230,7 +195,10 @@ def openai_tts_settings():
 
 
 def azure_tts_selector():
-    voices = azure_tts_voices()
+    if settings.AZURE_SPEECH_KEY:
+        voices = azure_tts_voices()
+    else:
+        voices = {}
     st.selectbox(
         label="""
         ###### Azure TTS Voice name
@@ -243,7 +211,7 @@ def azure_tts_selector():
 
 def azure_tts_settings():
     voice_name = st.session_state.get("azure_voice_name")
-    if not voice_name:
+    if not voice_name or not settings.AZURE_SPEECH_KEY:
         return
     try:
         voice = azure_tts_voices()[voice_name]
@@ -372,12 +340,20 @@ def elevenlabs_selector(page):
             SESSION_ELEVENLABS_API_KEY
         )
 
+    # for backwards compat
+    if old_voice_name := st.session_state.pop("elevenlabs_voice_name", None):
+        try:
+            st.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
+                old_voice_name
+            ]
+        except KeyError:
+            pass
+
     elevenlabs_use_custom_key = st.checkbox(
         "Use custom API key + Voice ID",
         value=bool(st.session_state.get("elevenlabs_api_key")),
     )
     if elevenlabs_use_custom_key:
-        st.session_state["elevenlabs_voice_name"] = None
         elevenlabs_api_key = st.text_input(
             """
             ###### Your ElevenLabs API key
@@ -387,29 +363,19 @@ def elevenlabs_selector(page):
             """,
             key="elevenlabs_api_key",
         )
-
-        selected_voice_id = st.session_state.get("elevenlabs_voice_id")
-        elevenlabs_voices = (
-            {selected_voice_id: selected_voice_id} if selected_voice_id else {}
-        )
-
         if elevenlabs_api_key:
             try:
-                elevenlabs_voices = fetch_elevenlabs_voices(elevenlabs_api_key)
+                voices = fetch_elevenlabs_voices(elevenlabs_api_key)
             except requests.exceptions.HTTPError as e:
                 st.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
-
-        st.selectbox(
-            """
-            ###### Voice ID (ElevenLabs)
-            """,
-            key="elevenlabs_voice_id",
-            options=elevenlabs_voices.keys(),
-            format_func=elevenlabs_voices.__getitem__,
-        )
+                return
+            selected_voice_id = st.session_state.get("elevenlabs_voice_id")
+            if selected_voice_id and selected_voice_id not in voices:
+                voices[selected_voice_id] = selected_voice_id
+        else:
+            voices = {}
     else:
         st.session_state["elevenlabs_api_key"] = None
-        st.session_state["elevenlabs_voice_id"] = None
         if not (
             page and (page.is_current_user_paying() or page.is_current_user_admin())
         ):
@@ -419,24 +385,25 @@ def elevenlabs_selector(page):
                 Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
                 """
             )
-
-        st.session_state.update(elevenlabs_api_key=None, elevenlabs_voice_id=None)
-        st.selectbox(
-            """
-            ###### Voice Name (ElevenLabs)
-            """,
-            key="elevenlabs_voice_name",
-            format_func=str,
-            options=ELEVEN_LABS_VOICES.keys(),
-        )
+        if settings.ELEVEN_LABS_API_KEY:
+            voices = default_elevenlabs_voices()
+        else:
+            voices = {}
 
     page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
         "elevenlabs_api_key"
     )
-
     st.selectbox(
         """
-        ###### Voice Model
+        ###### Voice
+        """,
+        key="elevenlabs_voice_id",
+        options=voices.keys(),
+        format_func=voices.__getitem__,
+    )
+    st.selectbox(
+        """
+        ###### Model
         """,
         key="elevenlabs_model",
         format_func=ELEVEN_LABS_MODELS.__getitem__,
@@ -483,7 +450,6 @@ def elevenlabs_settings():
                 max_value=1.0,
                 step=0.05,
                 key="elevenlabs_style",
-                value=0.0,
             )
         with col2:
             st.checkbox(
@@ -547,7 +513,6 @@ def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
         headers={"Accept": "application/json", "xi-api-key": api_key},
     )
     raise_for_status(r)
-    print(r.json()["voices"])
     sorted_voices = sorted(
         r.json()["voices"],
         key=lambda v: (_elevenlabs_category_order.get(v["category"], 0), v["name"]),

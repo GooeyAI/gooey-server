@@ -4,39 +4,16 @@ import os
 import typing
 from time import time
 
-import requests
-from furl import furl
-
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import raise_for_status, GPUError
+from daras_ai_v2.exceptions import GPUError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-
-
-class GpuEndpoints:
-    deepfloyd_if = settings.GPU_SERVER_1.copy().set(port=5018) / "deepfloyd_if"
-
-
-def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
-    b64_data = call_gpu_server(endpoint=endpoint, input_data=input_data)
-    if not isinstance(b64_data, list):
-        b64_data = [b64_data]
-    return [b64_img_decode(item) for item in b64_data]
 
 
 def b64_img_decode(b64_data):
     if not b64_data:
         raise ValueError("Empty Ouput")
     return base64.b64decode(b64_data[b64_data.find(",") + 1 :])
-
-
-def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
-    r = requests.post(
-        f"{endpoint}/predictions",
-        json={"input": input_data},
-    )
-    raise_for_status(r)
-    return r.json()["output"]
 
 
 def call_sd_multi(
@@ -47,61 +24,14 @@ def call_sd_multi(
     prompt = inputs["prompt"]
     num_images_per_prompt = inputs["num_images_per_prompt"]
     num_outputs = len(prompt) * num_images_per_prompt
-    # sd
-    if not isinstance(pipeline["model_id"], list):
-        return call_celery_task_outfile(
-            endpoint,
-            pipeline=pipeline,
-            inputs=inputs,
-            content_type="image/png",
-            filename=f"gooey.ai - {prompt}.png",
-            num_outputs=num_outputs,
-        )
-
-    # deepfloyd
-    base = GpuEndpoints.deepfloyd_if
-    inputs["num_inference_steps"] = [inputs["num_inference_steps"], 50, 75]
-    inputs["guidance_scale"] = [inputs["guidance_scale"], 4, 9]
-    return call_gooey_gpu(
-        endpoint=base / "/text2img/",
-        content_type="image/png",
+    return call_celery_task_outfile(
+        endpoint,
         pipeline=pipeline,
         inputs=inputs,
+        content_type="image/png",
+        filename=f"gooey.ai - {prompt}.png",
         num_outputs=num_outputs,
-        filename=prompt,
     )
-
-
-def call_gooey_gpu(
-    *,
-    endpoint: furl,
-    content_type: str,
-    pipeline: dict,
-    inputs: dict,
-    filename: str,
-    num_outputs: int = 1,
-) -> list[str]:
-    blobs = [
-        storage_blob_for(f"gooey.ai - {filename} ({i + 1}).png")
-        for i in range(num_outputs)
-    ]
-    pipeline["upload_urls"] = [
-        blob.generate_signed_url(
-            version="v4",
-            # This URL is valid for 15 minutes
-            expiration=datetime.timedelta(hours=12),
-            # Allow PUT requests using this URL.
-            method="PUT",
-            content_type=content_type,
-        )
-        for blob in blobs
-    ]
-    r = requests.post(
-        str(endpoint),
-        json={"pipeline": pipeline, "inputs": inputs},
-    )
-    raise_for_status(r)
-    return [blob.public_url for blob in blobs]
 
 
 def call_celery_task_outfile(
@@ -109,7 +39,7 @@ def call_celery_task_outfile(
     *,
     pipeline: dict,
     inputs: dict,
-    content_type: str,
+    content_type: str | None,
     filename: str,
     num_outputs: int = 1,
 ):

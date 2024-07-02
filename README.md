@@ -14,6 +14,33 @@
 * Run `./manage.py migrate`
 * Install the zbar library (`brew install zbar`)
 
+### Create a google cloud / firebase account
+
+1. Create a [google cloud](https://console.cloud.google.com/) project
+2. Create a [firebase project](https://console.firebase.google.com/) (using the same google cloud project) 
+3. Enable the following services:
+   - [Firestore](https://console.firebase.google.com/project/_/firestore)
+   - [Authentication](https://console.firebase.google.com/project/_/authentication)
+   - [Storage](https://console.firebase.google.com/project/_/storage)
+   - [Speech-to-Text](https://console.cloud.google.com/marketplace/product/google/speech.googleapis.com)
+   - [Text-to-Speech](https://console.cloud.google.com/marketplace/product/google/texttospeech.googleapis.com)
+   - [Translation API](https://console.cloud.google.com/marketplace/product/google/translate.googleapis.com)
+   - [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+4. Go to IAM, Create a service account with following roles:
+   - Cloud Datastore User
+   - Cloud Speech Administrator
+   - Cloud Translation API Admin
+   - Firebase Authentication Admin
+   - Storage Admin
+5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
+6. Add your project & bucket name to `.env`
+
+* Run tests to see if everything is working fine:
+  ``` 
+  ./scripts/run-tests.sh
+  ```
+  (If you run into issues with the number of open files, you can remove the limit with `ulimit -n unlimited`)
+
 ## Run
 
 You can start all required processes in one command with Honcho:
@@ -42,10 +69,6 @@ to run it.
 
 **Note:** the Celery worker must be manually restarted on code changes. You
 can do this by stopping and starting Honcho.
-
-## To run any recipe 
-
-* Save `serviceAccountKey.json` to project root
 
 ## To run vespa (used for vector search)
 
@@ -175,12 +198,6 @@ cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
 # upload the fixture
 docker exec -it $cid poetry run ./manage.py runscript upload_fixture
-```
-
-Save the new fixture url in `scripts/run-tests.sh` and run the tests -
-
-```bash
-./scripts/run-tests.sh
 ```
 
 To load the fixture on local db -

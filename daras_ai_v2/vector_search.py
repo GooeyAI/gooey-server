@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import io
 import mimetypes
+import multiprocessing
 import random
 import re
 import tempfile
@@ -87,14 +88,39 @@ Generally speaking, dense embeddings excel at understanding the context of the q
     )
 
 
+def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
+    """
+    Convert a list of references to a prompt containing the formatted search results.
+
+    Args:
+        references: list of references
+        sep: separator between references in the prompt
+
+    Returns:
+        prompt string
+    """
+    return sep.join(
+        f'''\
+Search Result: [{idx + 1}]
+Title: """{remove_quotes(ref["title"])}"""
+Snippet: """
+{remove_quotes(ref["snippet"])}
+"""\
+'''
+        for idx, ref in enumerate(references)
+    )
+
+
 def get_top_k_references(
     request: DocSearchRequest,
+    is_user_url: bool = True,
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
 
     Args:
         request: the document search request
+        is_user_url: whether the url is user-uploaded
 
     Returns:
         the top k documents
@@ -128,9 +154,10 @@ def get_top_k_references(
             file_meta=file_meta,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
-            selected_asr_model=selected_asr_model,
             google_translate_target=google_translate_target,
+            selected_asr_model=selected_asr_model,
             embedding_model=embedding_model,
+            is_user_url=is_user_url,
         ),
         file_urls,
         file_metas,
@@ -144,7 +171,7 @@ def get_top_k_references(
     # chunk_count = sum(len(ref.document_ids) for ref in embedding_refs)
     # logger.debug(f"Knowledge base has {len(file_ids)} documents ({chunk_count} chunks)")
 
-    yield "Searching knowledge base"
+    yield "Searching knowledge base..."
     s = time()
     search_result = query_vespa(
         request.search_query,
@@ -233,29 +260,6 @@ def get_vespa_app():
     return Vespa(url=settings.VESPA_URL)
 
 
-def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
-    """
-    Convert a list of references to a prompt containing the formatted search results.
-
-    Args:
-        references: list of references
-        sep: separator between references in the prompt
-
-    Returns:
-        prompt string
-    """
-    return sep.join(
-        f'''\
-Search Result: [{idx + 1}]
-Title: """{remove_quotes(ref["title"])}"""
-Snippet: """
-{remove_quotes(ref["snippet"])}
-"""\
-'''
-        for idx, ref in enumerate(references)
-    )
-
-
 def doc_or_yt_url_to_metadatas(f_url: str) -> list[tuple[str, FileMetadata]]:
     if is_yt_url(f_url):
         entries = yt_dlp_get_video_entries(f_url)
@@ -306,7 +310,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             )
             raise_for_status(r)
         except requests.RequestException as e:
-            print(f"ignore error while downloading {f_url}: {e}")
+            logger.warning(f"ignore error while downloading {f_url}: {e}")
             name = None
             mime_type = None
             etag = None
@@ -357,15 +361,106 @@ def yt_dlp_extract_info(url: str) -> dict:
         return data
 
 
-def translate_split_refs(
-    refs: list[SearchReference], google_translate_target: str | None
-):
-    if not google_translate_target:
-        return
-    snippets = [ref["snippet"] for ref in refs]
-    translated_snippets = run_google_translate(snippets, google_translate_target)
-    for ref, translated_snippet in zip(refs, translated_snippets):
-        ref["snippet"] = translated_snippet
+def get_or_create_embeddings(
+    f_url: str,
+    file_meta: FileMetadata,
+    *,
+    max_context_words: int,
+    scroll_jump: int,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
+    embedding_model: EmbeddingModels,
+    is_user_url: bool,
+) -> EmbeddedFile:
+    """
+    Return Vespa document ids and document tags
+    for a given document url + metadata.
+    """
+    lookup = dict(
+        url=f_url,
+        metadata__name=file_meta.name,
+        metadata__etag=file_meta.etag,
+        metadata__mime_type=file_meta.mime_type,
+        metadata__total_bytes=file_meta.total_bytes,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+        google_translate_target=google_translate_target or "",
+        selected_asr_model=selected_asr_model or "",
+        embedding_model=embedding_model.name,
+    )
+    file_id = hashlib.sha256(str(lookup).encode()).hexdigest()
+    with redis_lock(f"gooey/get_or_create_embeddings/v1/{file_id}"):
+        try:
+            return EmbeddedFile.objects.filter(**lookup).order_by("-updated_at")[0]
+        except IndexError:
+            refs = create_embeddings_in_search_db(
+                f_url=f_url,
+                file_meta=file_meta,
+                file_id=file_id,
+                max_context_words=max_context_words,
+                scroll_jump=scroll_jump,
+                google_translate_target=google_translate_target or "",
+                selected_asr_model=selected_asr_model or "",
+                embedding_model=embedding_model,
+                is_user_url=is_user_url,
+            )
+            with transaction.atomic():
+                file_meta.save()
+                embedded_file = EmbeddedFile.objects.get_or_create(
+                    **lookup,
+                    defaults=dict(metadata=file_meta, vespa_file_id=file_id),
+                )[0]
+                for ref in refs:
+                    ref.embedded_file = embedded_file
+                EmbeddingsReference.objects.bulk_create(refs)
+            return embedded_file
+
+
+def create_embeddings_in_search_db(
+    *,
+    f_url: str,
+    file_meta: FileMetadata,
+    file_id: str,
+    max_context_words: int,
+    scroll_jump: int,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
+    embedding_model: EmbeddingModels,
+    is_user_url: bool,
+) -> list[EmbeddingsReference]:
+    refs = []
+    vespa = get_vespa_app()
+    for ref, embedding in get_embeds_for_doc(
+        f_url=f_url,
+        file_meta=file_meta,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+        google_translate_target=google_translate_target,
+        selected_asr_model=selected_asr_model,
+        embedding_model=embedding_model,
+        is_user_url=is_user_url,
+    ):
+        doc_id = file_id + "/" + hashlib.sha256(str(ref).encode()).hexdigest()
+        db_ref = EmbeddingsReference(
+            vespa_doc_id=doc_id,
+            url=ref["url"],
+            title=ref["title"],
+            snippet=ref["snippet"],
+        )
+        refs.append(db_ref)
+        vespa.feed_data_point(
+            schema=settings.VESPA_SCHEMA,
+            data_id=doc_id,
+            fields=format_embedding_row(
+                doc_id=doc_id,
+                created_at=db_ref.created_at,
+                file_id=file_id,
+                ref=ref,
+                embedding=embedding,
+            ),
+            operation_type="feed",
+        )
+    return refs
 
 
 def get_embeds_for_doc(
@@ -374,9 +469,10 @@ def get_embeds_for_doc(
     file_meta: FileMetadata,
     max_context_words: int,
     scroll_jump: int,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
+    is_user_url: bool,
 ) -> typing.Iterator[tuple[SearchReference, np.ndarray]]:
     """
     Get document embeddings for a given document url.
@@ -389,6 +485,7 @@ def get_embeds_for_doc(
         embedding_model: selected embedding model
         google_translate_target: target language for google translate
         selected_asr_model: selected ASR model (used for audio files)
+        is_user_url: whether the url is user-uploaded
 
     Returns:
         list of (metadata, embeddings) tuples
@@ -397,6 +494,7 @@ def get_embeds_for_doc(
         f_url=f_url,
         file_meta=file_meta,
         selected_asr_model=selected_asr_model,
+        is_user_url=is_user_url,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -415,6 +513,17 @@ def get_embeds_for_doc(
         [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
         max_workers=2,
     )
+
+
+def translate_split_refs(
+    refs: list[SearchReference], google_translate_target: str | None
+):
+    if not google_translate_target:
+        return
+    snippets = [ref["snippet"] for ref in refs]
+    translated_snippets = run_google_translate(snippets, google_translate_target)
+    for ref, translated_snippet in zip(refs, translated_snippets):
+        ref["snippet"] = translated_snippet
 
 
 def pages_to_split_refs(
@@ -478,10 +587,6 @@ def pages_to_split_refs(
     return refs
 
 
-def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
-    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
-
-
 sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)
 
 
@@ -517,12 +622,13 @@ def doc_url_to_text_pages(
     f_url: str,
     file_meta: FileMetadata,
     selected_asr_model: str | None,
+    is_user_url: bool = True,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
     """
     f_bytes, mime_type = download_content_bytes(
-        f_url=f_url, mime_type=file_meta.mime_type
+        f_url=f_url, mime_type=file_meta.mime_type, is_user_url=is_user_url
     )
     if not f_bytes:
         return []
@@ -535,7 +641,9 @@ def doc_url_to_text_pages(
     )
 
 
-def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
+def download_content_bytes(
+    *, f_url: str, mime_type: str, is_user_url: bool = True
+) -> tuple[bytes, str]:
     if is_yt_url(f_url):
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
@@ -548,9 +656,9 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         )
-        raise_for_status(r, is_user_url=True)
+        raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
-        print(f"ignore error while downloading {f_url}: {e}")
+        logger.warning(f"ignore error while downloading {f_url}: {e}")
         return b"", ""
     f_bytes = r.content
     # if it's a known encoding, standardize to utf-8
@@ -607,6 +715,10 @@ def any_bytes_to_text_pages_or_df(
     return [text]
 
 
+def is_yt_url(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+
 def pdf_or_tabular_bytes_to_text_pages_or_df(
     *,
     f_url: str,
@@ -632,10 +744,6 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
     else:
         df.columns = [THEAD + col + THEAD for col in df.columns]
         return pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=["sections"])
-
-
-def is_yt_url(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
 
 
 def tabular_bytes_to_str_df(
@@ -726,6 +834,15 @@ def get_pdf_num_pages(f_bytes: bytes) -> int:
                 raise ValueError(f"Unexpected PDF Info: {line}")
 
 
+def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
+    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
+
+
+# dont use more than 1GB of memory for pandoc in total
+MAX_PANDOC_MEM_MB = 512
+_pandoc_lock = multiprocessing.Semaphore(4)  # semaphore ensures max pandoc processes
+
+
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
     """
     Convert document to text using pandoc.
@@ -739,13 +856,21 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         extracted text content of document
     """
     with (
+        _pandoc_lock,
         tempfile.NamedTemporaryFile("wb", suffix="." + safe_filename(f_name)) as infile,
         tempfile.NamedTemporaryFile("r") as outfile,
     ):
         infile.write(f_bytes)
         call_cmd(
-            "pandoc", "--standalone", infile.name, "--to", to, "--output", outfile.name
-        )
+            "pandoc",
+            # https://pandoc.org/MANUAL.html#a-note-on-security
+            "+RTS", f"-M{MAX_PANDOC_MEM_MB}M", "-RTS", "--sandbox",
+            "--standalone",
+            infile.name,
+            "--to", to,
+            "--output",
+            outfile.name,
+        )  # fmt: skip
         return outfile.read()
 
 
@@ -764,107 +889,8 @@ def render_sources_widget(refs: list[SearchReference]):
             + "```text\n"
             + "\n".join(f"[{idx + 1}] {ref['url']}" for idx, ref in enumerate(refs))
             + "\n```",
-            height=200,
             disabled=True,
         )
-
-
-def get_or_create_embeddings(
-    f_url: str,
-    file_meta: FileMetadata,
-    *,
-    max_context_words: int,
-    scroll_jump: int,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
-    embedding_model: EmbeddingModels,
-) -> EmbeddedFile:
-    """
-    Return Vespa document ids and document tags
-    for a given document url + metadata.
-    """
-    lookup = dict(
-        url=f_url,
-        metadata__name=file_meta.name,
-        metadata__etag=file_meta.etag,
-        metadata__mime_type=file_meta.mime_type,
-        metadata__total_bytes=file_meta.total_bytes,
-        max_context_words=max_context_words,
-        scroll_jump=scroll_jump,
-        google_translate_target=google_translate_target or "",
-        selected_asr_model=selected_asr_model or "",
-        embedding_model=embedding_model.name,
-    )
-    file_id = hashlib.sha256(str(lookup).encode()).hexdigest()
-    with redis_lock(f"gooey/get_or_create_embeddings/v1/{file_id}"):
-        try:
-            return EmbeddedFile.objects.filter(**lookup).order_by("-updated_at")[0]
-        except IndexError:
-            refs = create_embeddings_in_search_db(
-                f_url=f_url,
-                file_meta=file_meta,
-                file_id=file_id,
-                max_context_words=max_context_words,
-                scroll_jump=scroll_jump,
-                google_translate_target=google_translate_target or "",
-                selected_asr_model=selected_asr_model or "",
-                embedding_model=embedding_model,
-            )
-            with transaction.atomic():
-                file_meta.save()
-                embedded_file = EmbeddedFile.objects.get_or_create(
-                    **lookup,
-                    defaults=dict(metadata=file_meta, vespa_file_id=file_id),
-                )[0]
-                for ref in refs:
-                    ref.embedded_file = embedded_file
-                EmbeddingsReference.objects.bulk_create(refs)
-            return embedded_file
-
-
-def create_embeddings_in_search_db(
-    *,
-    f_url: str,
-    file_meta: FileMetadata,
-    max_context_words: int,
-    scroll_jump: int,
-    file_id: str,
-    embedding_model: EmbeddingModels,
-    google_translate_target: str | None = None,
-    selected_asr_model: str | None = None,
-) -> list[EmbeddingsReference]:
-    refs = []
-    vespa = get_vespa_app()
-    for ref, embedding in get_embeds_for_doc(
-        f_url=f_url,
-        file_meta=file_meta,
-        max_context_words=max_context_words,
-        scroll_jump=scroll_jump,
-        embedding_model=embedding_model,
-        google_translate_target=google_translate_target,
-        selected_asr_model=selected_asr_model,
-    ):
-        doc_id = file_id + "/" + hashlib.sha256(str(ref).encode()).hexdigest()
-        db_ref = EmbeddingsReference(
-            vespa_doc_id=doc_id,
-            url=ref["url"],
-            title=ref["title"],
-            snippet=ref["snippet"],
-        )
-        refs.append(db_ref)
-        vespa.feed_data_point(
-            schema=settings.VESPA_SCHEMA,
-            data_id=doc_id,
-            fields=format_embedding_row(
-                doc_id=doc_id,
-                created_at=db_ref.created_at,
-                file_id=file_id,
-                ref=ref,
-                embedding=embedding,
-            ),
-            operation_type="feed",
-        )
-    return refs
 
 
 def format_embedding_row(

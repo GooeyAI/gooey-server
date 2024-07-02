@@ -2,10 +2,10 @@ import hashlib
 import json
 import threading
 import typing
+import uuid
 from contextlib import contextmanager
 from functools import lru_cache
 from time import time
-
 
 from loguru import logger
 
@@ -35,6 +35,53 @@ def get_subscriptions() -> list[str]:
         return threadlocal.channels
 
 
+def run_in_thread(
+    fn: typing.Callable,
+    *,
+    args: typing.Sequence = None,
+    kwargs: typing.Mapping = None,
+    placeholder: str = "...",
+    cache: bool = False,
+    ex=60,
+):
+    from .state import session_state
+    from .components import write
+
+    channel_key = f"--thread/{fn}"
+    try:
+        channel = session_state[channel_key]
+    except KeyError:
+        channel = session_state[channel_key] = (
+            f"gooey-thread-fn/{fn.__name__}/{uuid.uuid1()}"
+        )
+
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
+
+        def target():
+            realtime_push(channel, dict(y=fn(*args, **kwargs)), ex=ex)
+
+        threading.Thread(target=target).start()
+
+    try:
+        return session_state[channel]
+    except KeyError:
+        pass
+
+    result = realtime_pull([channel])[0]
+    if result:
+        ret = result["y"]
+        if cache:
+            session_state[channel] = ret
+        else:
+            session_state.pop(channel_key)
+        return ret
+    elif placeholder:
+        write(placeholder)
+
+
 def realtime_pull(channels: list[str]) -> list[typing.Any]:
     channels = [f"gooey-gui/state/{channel}" for channel in channels]
     threadlocal.channels = channels
@@ -45,13 +92,13 @@ def realtime_pull(channels: list[str]) -> list[typing.Any]:
     return out
 
 
-def realtime_push(channel: str, value: typing.Any = "ping"):
+def realtime_push(channel: str, value: typing.Any = "ping", ex=None):
     from fastapi.encoders import jsonable_encoder
 
     channel = f"gooey-gui/state/{channel}"
     msg = json.dumps(jsonable_encoder(value))
     r = get_redis()
-    r.set(channel, msg)
+    r.set(channel, msg, ex=ex)
     r.publish(channel, json.dumps(time()))
     if isinstance(value, dict):
         run_status = value.get("__run_status")

@@ -11,7 +11,7 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.field_render import field_title_desc
@@ -104,7 +104,7 @@ List of URLs to the evaluation runs that you requested.
             flatten_dict_key="url",
         )
 
-        files = document_uploader(
+        files = bulk_documents_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
@@ -306,6 +306,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
+                used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len
                 ):
@@ -333,8 +334,13 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if pr and pr.title:
+                            if (
+                                pr
+                                and pr.title
+                                and f"({pr.title}) {col}" not in used_col_names
+                            ):
                                 col = f"({pr.title}) {col}"
+                                used_col_names.add(col)
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
@@ -564,7 +570,9 @@ def slice_request_df(df, request):
         df_ix += arr_len
 
 
-def is_arr(field_props: dict) -> bool:
+def is_arr(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
     try:
         return field_props["type"] == "array"
     except KeyError:
@@ -574,13 +582,18 @@ def is_arr(field_props: dict) -> bool:
     return False
 
 
-def is_obj(field_props: dict) -> bool:
+def is_obj(field_props: dict | None) -> bool:
+    if not field_props:
+        return False
     return bool(field_props.get("type") == "object" or field_props.get("$ref"))
 
 
 @st.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
-    dfs = map_parallel(read_df_any, files)
+    try:
+        dfs = map_parallel(read_df_any, files)
+    except ValueError:
+        return []
     return list(
         {
             col: None

@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
 from app_users.models import AppUser
-from bots.admin_links import list_related_html_url, change_obj_url
+from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
 from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
@@ -27,13 +27,18 @@ from bots.models import (
     MessageAttachment,
     WorkflowMetadata,
     BotIntegrationAnalysisRun,
+    Workflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from celeryapp.tasks import gui_runner
+from daras_ai_v2.fastapi_tricks import get_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
+from recipes.VideoBots import VideoBotsPage
+from routers.root import integrations_stats_route
 
 fb_fields = [
     "fb_page_id",
@@ -160,7 +165,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "view_messsages",
         "created_at",
         "updated_at",
-        "api_integration_id",
+        "api_integration_stats_url",
     ]
 
     fieldsets = [
@@ -173,7 +178,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "published_run",
                     "billing_account_uid",
                     "user_language",
-                    "api_integration_id",
+                    "api_integration_stats_url",
                 ],
             },
         ),
@@ -248,6 +253,21 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         html = mark_safe(html)
         return html
 
+    @admin.display(description="Integration Stats")
+    def api_integration_stats_url(self, bi: BotIntegration):
+
+        integration_id = bi.api_integration_id()
+        return open_in_new_tab(
+            url=get_route_url(
+                integrations_stats_route,
+                params=dict(
+                    page_slug=VideoBotsPage.slug_versions[-1],
+                    integration_id=integration_id,
+                ),
+            ),
+            label=integration_id,
+        )
+
 
 @admin.register(PublishedRun)
 class PublishedRunAdmin(admin.ModelAdmin):
@@ -306,10 +326,17 @@ class SavedRunAdmin(admin.ModelAdmin):
         "is_api_call",
         "created_at",
         "updated_at",
+        "run_status",
+        "error_msg",
     ]
     list_filter = [
         "workflow",
         "is_api_call",
+        "is_flagged",
+        ("run_status", admin.EmptyFieldListFilter),
+        ("error_msg", admin.EmptyFieldListFilter),
+        "created_at",
+        "retention_policy",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version"]
@@ -327,7 +354,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "is_api_call",
     ]
 
-    actions = [export_to_csv, export_to_excel]
+    actions = [export_to_csv, export_to_excel, "rerun_tasks"]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
@@ -372,6 +399,29 @@ class SavedRunAdmin(admin.ModelAdmin):
         ]
         return list_related_html_url(
             saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
+        )
+
+    @admin.action(description="Re-Run Tasks")
+    def rerun_tasks(self, request, queryset):
+        sr: SavedRun
+        for sr in queryset.all():
+            page_cls = Workflow(sr.workflow).page_cls
+            pr = sr.parent_published_run()
+            gui_runner.delay(
+                page_cls=page_cls,
+                user_id=AppUser.objects.get(uid=sr.uid).id,
+                run_id=sr.run_id,
+                uid=sr.uid,
+                state=sr.to_dict(),
+                channel=page_cls.realtime_channel_name(sr.run_id, sr.uid),
+                query_params=page_cls.clean_query_params(
+                    example_id=pr and pr.published_run_id, run_id=sr.run_id, uid=sr.uid
+                ),
+                is_api_call=sr.is_api_call,
+            )
+        self.message_user(
+            request,
+            f"Started re-running {queryset.count()} tasks in the background.",
         )
 
 

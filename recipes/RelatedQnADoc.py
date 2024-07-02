@@ -57,7 +57,7 @@ class RelatedQnADocPage(BasePage):
         DocSearchPage.validate_form_v2(self)
 
     def render_output(self):
-        render_qna_outputs(st.session_state, 300)
+        render_qna_outputs(st.session_state)
 
     def render_example(self, state: dict):
         st.write("**Search Query**")
@@ -143,7 +143,7 @@ def run_doc_search(
     outputs.append(response)
 
 
-def render_qna_outputs(state, height, show_count=None):
+def render_qna_outputs(state, height=500, show_count=None):
     output_queries = state.get("output_queries", [])[:show_count]
     for i, result in enumerate(output_queries):
         output_text = result.get("output_text", [])

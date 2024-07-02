@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
@@ -105,6 +103,7 @@ class AppUser(models.Model):
         on_delete=models.SET_NULL,
         related_name="user",
         null=True,
+        blank=True,
     )
 
     created_at = models.DateTimeField(
@@ -265,7 +264,7 @@ class AppUser(models.Model):
             return customer
 
     def get_dollars_spent_this_month(self) -> float:
-        today = datetime.now(tz=timezone.utc)
+        today = timezone.now()
         cents_spent = self.transactions.filter(
             created_at__month=today.month,
             created_at__year=today.year,

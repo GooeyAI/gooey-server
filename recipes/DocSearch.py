@@ -8,13 +8,14 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     is_user_uploaded_url,
     citation_style_selector,
     doc_search_advanced_settings,
     query_instructions_widget,
     doc_extract_selector,
 )
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
@@ -92,7 +93,7 @@ class DocSearchPage(BasePage):
 
     def render_form_v2(self):
         st.text_area("#### Search Query", key="search_query")
-        document_uploader("#### Documents")
+        bulk_documents_uploader("#### Documents")
         prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
@@ -114,7 +115,7 @@ class DocSearchPage(BasePage):
         ]
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
         refs = st.session_state.get("references", [])
         render_sources_widget(refs)
 
@@ -267,11 +268,10 @@ def render_doc_search_step(state: dict):
             help=f"output {idx}",
             disabled=True,
             value=text,
-            height=200,
         )
 
 
-class EmptySearchResults(Exception):
+class EmptySearchResults(UserError):
     def __init__(self, search_query: str):
         self.search_query = search_query
         super().__init__(f"Your search “{search_query}” did not match any documents.")

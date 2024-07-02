@@ -9,7 +9,7 @@ from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
 )
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -91,8 +91,8 @@ class DocSummaryPage(BasePage):
         return DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
-        document_uploader("#### 📎 Documents")
-        st.text_area("#### 👩‍💻 Instructions", key="task_instructions", height=150)
+        bulk_documents_uploader("#### 📎 Documents")
+        st.text_area("#### 👩‍💻 Instructions", key="task_instructions")
 
     def render_settings(self):
         st.text_area(
@@ -101,7 +101,6 @@ class DocSummaryPage(BasePage):
 Prompt for merging several outputs together 
         """,
             key="merge_instructions",
-            height=150,
         )
 
         #         enum_selector(
@@ -123,7 +122,7 @@ Prompt for merging several outputs together
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -142,7 +141,6 @@ Prompt for merging several outputs together
             st.text_area(
                 "**Final Prompt**",
                 value=final_prompt,
-                height=400,
                 disabled=True,
             )
         else:
@@ -155,7 +153,6 @@ Prompt for merging several outputs together
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
-                height=200,
             )
 
     def related_workflows(self) -> list:

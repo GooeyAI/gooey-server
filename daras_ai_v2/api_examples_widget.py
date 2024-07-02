@@ -1,5 +1,6 @@
 import json
 import shlex
+import threading
 from textwrap import indent
 
 from furl import furl
@@ -20,6 +21,10 @@ def get_filenames(request_body):
             if not is_user_uploaded_url(item):
                 continue
             yield key, furl(item).path.segments[-1]
+
+
+# because black is not thread-safe
+black_import_lock = threading.Lock()
 
 
 def api_example_generator(
@@ -183,8 +188,9 @@ while True:
 result = response.json()
 print(response.status_code, result)
 """
-        from black import format_str
-        from black.mode import Mode
+        with black_import_lock:
+            from black import format_str
+            from black.mode import Mode
 
         py_code = format_str(py_code, mode=Mode())
         st.write(
@@ -339,7 +345,7 @@ let response = await fetch("%(api_url)s", {
     // your integration's ID as shown in the Gooey.AI Integrations tab
     "integration_id": "%(integration_id)s",
     // the input text for the bot
-    "input_text": "Hello, world!",
+    "input_prompt": "Hello, world!",
   }),
 });
 // get the server-sent events URL

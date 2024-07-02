@@ -3,7 +3,7 @@ import time
 import typing
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -16,7 +16,6 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
-    ELEVEN_LABS_VOICES,
     ELEVEN_LABS_MODELS,
     text_to_speech_settings,
     TextToSpeechProviders,
@@ -26,9 +25,39 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OPENAI_TTS_VOICES_T,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
+    OLD_ELEVEN_LABS_VOICES,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
+
+
+class TextToSpeechSettings(BaseModel):
+    tts_provider: typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+
+    uberduck_voice_name: str | None
+    uberduck_speaking_rate: float | None
+
+    google_voice_name: str | None
+    google_speaking_rate: float | None
+    google_pitch: float | None
+
+    bark_history_prompt: str | None
+
+    elevenlabs_voice_name: str | None = Field(
+        deprecated=True, description="Use `elevenlabs_voice_id` instead"
+    )
+    elevenlabs_api_key: str | None
+    elevenlabs_voice_id: str | None
+    elevenlabs_model: str | None
+    elevenlabs_stability: float | None
+    elevenlabs_similarity_boost: float | None
+    elevenlabs_style: float | None = Field(0)
+    elevenlabs_speaker_boost: bool | None
+
+    azure_voice_name: str | None
+
+    openai_voice_name: OPENAI_TTS_VOICES_T | None
+    openai_tts_model: OPENAI_TTS_MODELS_T | None
 
 
 class TextToSpeechPage(BasePage):
@@ -49,7 +78,6 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
-        "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
@@ -57,35 +85,11 @@ class TextToSpeechPage(BasePage):
         "openai_tts_model": "tts-1",
     }
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BaseModel):
         text_prompt: str
 
-        tts_provider: (
-            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
-        )
-
-        uberduck_voice_name: str | None
-        uberduck_speaking_rate: float | None
-
-        google_voice_name: str | None
-        google_speaking_rate: float | None
-        google_pitch: float | None
-
-        bark_history_prompt: str | None
-
-        elevenlabs_voice_name: str | None
-        elevenlabs_api_key: str | None
-        elevenlabs_voice_id: str | None
-        elevenlabs_model: str | None
-        elevenlabs_stability: float | None
-        elevenlabs_similarity_boost: float | None
-        elevenlabs_style: float | None
-        elevenlabs_speaker_boost: bool | None
-
-        azure_voice_name: str | None
-
-        openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model: OPENAI_TTS_MODELS_T | None
+    class RequestModel(TextToSpeechSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         audio_url: FieldHttpUrl
@@ -291,13 +295,13 @@ class TextToSpeechPage(BasePage):
                 voice_model = self._get_elevenlabs_voice_model(state)
                 voice_id = self._get_elevenlabs_voice_id(state)
 
-                stability = state.get("elevenlabs_stability", 0.5)
-                similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+                stability = state.get("elevenlabs_stability") or 0.5
+                similarity_boost = state.get("elevenlabs_similarity_boost") or 0.75
                 voice_settings = dict(
                     stability=stability, similarity_boost=similarity_boost
                 )
                 if voice_model == "eleven_multilingual_v2":
-                    voice_settings["style"] = state.get("elevenlabs_style", 0.0)
+                    voice_settings["style"] = state.get("elevenlabs_style") or 0
                     voice_settings["speaker_boost"] = state.get(
                         "elevenlabs_speaker_boost", True
                     )
@@ -314,6 +318,10 @@ class TextToSpeechPage(BasePage):
                         "voice_settings": voice_settings,
                     },
                 )
+                if response.status_code == 400 and '"voice_not_found"' in response.text:
+                    raise UserError(
+                        f"ElevenLabs Voice {voice_id} not found. If you're trying to use a custom voice, please provide your elevenlabs_api_key."
+                    )
                 raise_for_status(response)
 
                 yield "Uploading Audio file..."
@@ -394,19 +402,15 @@ class TextToSpeechPage(BasePage):
         assert voice_model in ELEVEN_LABS_MODELS, f"Invalid model: {voice_model}"
         return voice_model
 
-    def _get_elevenlabs_voice_id(self, state: dict[str, str]):
-        if state.get("elevenlabs_voice_id"):
-            if not state.get("elevenlabs_api_key"):
-                raise UserError(
-                    "ElevenLabs API key is required to use a custom voice_id"
-                )
-            return state["elevenlabs_voice_id"]
-        else:
-            # default to first in the mapping
-            default_voice_name = next(iter(ELEVEN_LABS_VOICES))
-            voice_name = state.get("elevenlabs_voice_name", default_voice_name)
-            assert voice_name in ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
-            return ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
+    def _get_elevenlabs_voice_id(self, state: dict[str, str]) -> str:
+        if voice_id := state.get("elevenlabs_voice_id"):
+            return voice_id
+
+        # default to first in the mapping
+        default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
+        voice_name = state.get("elevenlabs_voice_name", default_voice_name)
+        assert voice_name in OLD_ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
+        return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
 
     def _get_elevenlabs_api_key(self, state: dict[str, str]) -> tuple[str, bool]:
         """
