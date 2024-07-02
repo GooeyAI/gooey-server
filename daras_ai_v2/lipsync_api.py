@@ -5,7 +5,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from daras_ai_v2.exceptions import UserError, GPUError
-from daras_ai_v2.gpu_server import call_celery_task_outfile
+from daras_ai_v2.gpu_server import call_celery_task_outfile_with_ret
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
@@ -44,22 +44,40 @@ class LipsyncSettings(BaseModel):
     sadtalker_settings: SadTalkerSettings = None
 
 
-def run_sadtalker(settings: SadTalkerSettings, face: str, audio: str):
-    return call_celery_task_outfile(
+def run_sadtalker(
+    settings: SadTalkerSettings,
+    face: str,
+    audio: str,
+    truncate_to_seconds: float | None = None,
+) -> tuple[str, float]:
+    links, metadata = call_celery_task_outfile_with_ret(
         "lipsync.sadtalker",
         pipeline=dict(
             model_id="SadTalker_V0.0.2_512.safetensors",
             preprocess=settings.preprocess,
         ),
-        inputs=settings.dict() | dict(source_image=face, driven_audio=audio),
+        inputs=settings.dict()
+        | dict(
+            source_image=face,
+            driven_audio=audio,
+            truncate_to_seconds=truncate_to_seconds,
+        ),
         content_type="video/mp4",
         filename=f"gooey.ai lipsync.mp4",
-    )[0]
+    )
+
+    return links[0], metadata["output"]["duration_sec"]
 
 
-def run_wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> bytes:
+def run_wav2lip(
+    *,
+    face: str,
+    audio: str,
+    pads: tuple[int, int, int, int],
+    truncate_to_seconds: float | None = None,
+) -> tuple[str, float]:
     try:
-        return call_celery_task_outfile(
+        links, metadata = call_celery_task_outfile_with_ret(
             "wav2lip",
             pipeline=dict(
                 model_id="wav2lip_gan.pth",
@@ -72,10 +90,12 @@ def run_wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> by
                 # "out_height": 480,
                 # "smooth": True,
                 # "fps": 25,
+                truncate_to_seconds=truncate_to_seconds,
             ),
             content_type="video/mp4",
             filename=f"gooey.ai lipsync.mp4",
-        )[0]
+        )
+        return links[0], metadata["output"]["duration_sec"]
     except ValueError as e:
         msg = "\n\n".join(e.args).lower()
         if "unsupported" in msg:
