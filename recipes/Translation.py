@@ -39,14 +39,14 @@ class TranslationPage(BasePage):
     workflow = Workflow.TRANSLATION
     slug_versions = ["translate", "translation", "compare-ai-translation"]
 
-    class BaseRequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         texts: list[str] = Field([])
 
         selected_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)]
         ) | None = Field(TranslationModels.google.name)
 
-    class RequestModel(TranslationOptions, BaseRequestModel):
+    class RequestModel(TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):

@@ -63,7 +63,7 @@ class DocSearchPage(BasePage):
         "dense_weight": 1.0,
     }
 
-    class RequestModel(DocSearchRequest):
+    class RequestModel(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
 

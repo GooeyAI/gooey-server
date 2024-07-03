@@ -19,7 +19,7 @@ class EmbeddingsPage(BasePage):
     slug_versions = ["embeddings", "embed", "text-embedings"]
     price = 1
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         texts: list[str]
         selected_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
 

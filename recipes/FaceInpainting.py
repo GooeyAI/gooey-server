@@ -44,7 +44,7 @@ class FaceInpaintingPage(BasePage):
         "upscale_factor": 1.0,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
         text_prompt: str
 

@@ -27,7 +27,7 @@ class SmartGPTPage(BasePage):
     slug_versions = ["SmartGPT"]
     price = 20
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_prompt: str
 
         cot_prompt: str | None

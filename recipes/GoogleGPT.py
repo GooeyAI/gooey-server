@@ -73,7 +73,7 @@ class GoogleGPTPage(BasePage):
         dense_weight=1.0,
     )
 
-    class RequestModel(GoogleSearchMixin, BaseModel):
+    class RequestModel(GoogleSearchMixin, BasePage.RequestModel):
         search_query: str
         site_filter: str
 

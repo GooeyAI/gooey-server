@@ -41,7 +41,7 @@ class AsrPage(BasePage):
 
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
-    class BaseRequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
@@ -57,7 +57,7 @@ class AsrPage(BasePage):
             description="use `translation_model` & `translation_target` instead.",
         )
 
-    class RequestModel(TranslationOptions, BaseRequestModel):
+    class RequestModel(TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):

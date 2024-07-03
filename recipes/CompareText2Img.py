@@ -49,7 +49,7 @@ class CompareText2ImgPage(BasePage):
         "dall_e_3_style": "vivid",
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         text_prompt: str
         negative_prompt: str | None
 

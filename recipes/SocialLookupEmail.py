@@ -38,7 +38,7 @@ class SocialLookupEmailPage(BasePage):
         "sampling_temperature": 0.5,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         email_address: str
 
         input_prompt: str | None
