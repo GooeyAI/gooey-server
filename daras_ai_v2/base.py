@@ -796,11 +796,7 @@ class BasePage:
 
     @classmethod
     def get_recipe_title(cls) -> str:
-        return (
-            cls.get_or_create_root_published_run().title
-            or cls.title
-            or cls.workflow.label
-        )
+        return cls.get_root_published_run().title or cls.title or cls.workflow.label
 
     def get_explore_image(self) -> str:
         meta = self.workflow.get_or_create_metadata()
@@ -1077,10 +1073,6 @@ class BasePage:
             return cls.get_root_published_run()
 
     @classmethod
-    def get_root_published_run(cls) -> PublishedRun:
-        return cls.get_published_run(published_run_id="")
-
-    @classmethod
     def get_published_run(cls, *, published_run_id: str):
         return PublishedRun.objects.get(
             workflow=cls.workflow,
@@ -1121,36 +1113,9 @@ class BasePage:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
-    def get_or_create_root_published_run(cls) -> PublishedRun:
-        def get_defaults():
-            return dict(
-                saved_run=(
-                    SavedRun.objects.get_or_create(
-                        example_id="",
-                        workflow=cls.workflow,
-                        defaults=dict(state=cls.load_state_defaults({})),
-                    )[0]
-                ),
-                created_by=None,
-                last_edited_by=None,
-                title=cls.title,
-                notes=cls().preview_description(state=cls.sane_defaults),
-                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-                is_approved_example=True,
-            )
-
-        published_run, _ = get_or_create_lazy(
-            PublishedRun,
-            workflow=cls.workflow,
-            published_run_id="",
-            get_defaults=get_defaults,
-        )
-        return published_run
-
-    @classmethod
     def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
         if create:
-            return cls.get_or_create_root_published_run().saved_run
+            return cls.get_root_published_run().saved_run
         else:
             return cls.get_root_published_run().saved_run
 
@@ -1169,17 +1134,33 @@ class BasePage:
             return SavedRun.objects.get(**config)
 
     @classmethod
+    def get_root_published_run(cls) -> PublishedRun:
+        return PublishedRun.objects.get_or_create_with_version(
+            workflow=cls.workflow,
+            published_run_id="",
+            saved_run=SavedRun.objects.get_or_create(
+                example_id="",
+                workflow=cls.workflow,
+                defaults=dict(state=cls.load_state_defaults({})),
+            )[0],
+            user=None,
+            title=cls.title,
+            notes=cls().preview_description(state=cls.sane_defaults),
+            visibility=PublishedRunVisibility.PUBLIC,
+        )[0]
+
+    @classmethod
     def create_published_run(
         cls,
         *,
         published_run_id: str,
         saved_run: SavedRun,
-        user: AppUser,
+        user: AppUser | None,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
     ):
-        return PublishedRun.objects.create_published_run(
+        return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
             published_run_id=published_run_id,
             saved_run=saved_run,

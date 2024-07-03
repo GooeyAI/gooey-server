@@ -17,6 +17,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
+from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -117,42 +118,43 @@ class Workflow(models.IntegerChoices):
         return workflow_map[self]
 
     def get_or_create_metadata(self) -> "WorkflowMetadata":
-        metadata, _created = WorkflowMetadata.objects.get_or_create(
+        return get_or_create_lazy(
+            WorkflowMetadata,
             workflow=self,
-            defaults=dict(
-                short_title=lambda: (
+            create=lambda **kwargs: WorkflowMetadata.objects.create(
+                **kwargs,
+                short_title=(
                     self.page_cls.get_root_published_run().title or self.page_cls.title
                 ),
                 default_image=self.page_cls.explore_image or "",
-                meta_title=lambda: (
+                meta_title=(
                     self.page_cls.get_root_published_run().title or self.page_cls.title
                 ),
-                meta_description=lambda: (
+                meta_description=(
                     self.page_cls().preview_description(state={})
                     or self.page_cls.get_root_published_run().notes
                 ),
                 meta_image=self.page_cls.explore_image or "",
             ),
-        )
-        return metadata
+        )[0]
 
 
 class WorkflowMetadata(models.Model):
     workflow = models.IntegerField(choices=Workflow.choices, unique=True)
-    short_title = models.TextField()
-    help_url = models.URLField(blank=True, default="")
 
-    # TODO: support the below fields
+    short_title = models.TextField(help_text="Title used in breadcrumbs")
     default_image = models.URLField(
-        blank=True, default="", help_text="(not implemented)"
+        blank=True, default="", help_text="Image shown on explore page"
     )
 
     meta_title = models.TextField()
     meta_description = models.TextField(blank=True, default="")
     meta_image = CustomURLField(default="", blank=True)
+
     meta_keywords = models.JSONField(
-        default=list, blank=True, help_text="(not implemented)"
+        default=list, blank=True, help_text="(Not implemented)"
     )
+    help_url = models.URLField(blank=True, default="", help_text="(Not implemented)")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1442,34 +1444,58 @@ class FeedbackComment(models.Model):
 
 
 class PublishedRunQuerySet(models.QuerySet):
-    def create_published_run(
+    def get_or_create_with_version(
         self,
         *,
         workflow: Workflow,
         published_run_id: str,
         saved_run: SavedRun,
-        user: AppUser,
+        user: AppUser | None,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return get_or_create_lazy(
+            PublishedRun,
+            workflow=workflow,
+            published_run_id=published_run_id,
+            create=lambda **kwargs: self.create_with_version(
+                **kwargs,
+                saved_run=saved_run,
+                user=user,
+                title=title,
+                notes=notes,
+                visibility=visibility,
+            ),
+        )
+
+    def create_with_version(
+        self,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser | None,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
     ):
         with transaction.atomic():
-            published_run = PublishedRun(
+            pr = self.create(
                 workflow=workflow,
                 published_run_id=published_run_id,
                 created_by=user,
                 last_edited_by=user,
                 title=title,
             )
-            published_run.save()
-            published_run.add_version(
+            pr.add_version(
                 user=user,
                 saved_run=saved_run,
                 title=title,
                 visibility=visibility,
                 notes=notes,
             )
-            return published_run
+            return pr
 
 
 class PublishedRun(models.Model):
@@ -1571,7 +1597,7 @@ class PublishedRun(models.Model):
         notes: str,
         visibility: PublishedRunVisibility,
     ) -> "PublishedRun":
-        return PublishedRun.objects.create_published_run(
+        return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
@@ -1589,7 +1615,7 @@ class PublishedRun(models.Model):
     def add_version(
         self,
         *,
-        user: AppUser,
+        user: AppUser | None,
         saved_run: SavedRun,
         visibility: PublishedRunVisibility,
         title: str,
