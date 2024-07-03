@@ -269,6 +269,18 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         )
 
 
+@admin.register(PublishedRunVersion)
+class PublishedRunVersionAdmin(admin.ModelAdmin):
+    search_fields = ["id", "version_id", "published_run__published_run_id"]
+    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+
+
+class PublishedRunVersionInline(admin.TabularInline):
+    model = PublishedRunVersion
+    extra = 0
+    autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
+
+
 @admin.register(PublishedRun)
 class PublishedRunAdmin(admin.ModelAdmin):
     list_display = [
@@ -290,6 +302,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+    inlines = [PublishedRunVersionInline]
 
     def view_user(self, published_run: PublishedRun):
         if published_run.created_by is None:
@@ -423,12 +436,6 @@ class SavedRunAdmin(admin.ModelAdmin):
             request,
             f"Started re-running {queryset.count()} tasks in the background.",
         )
-
-
-@admin.register(PublishedRunVersion)
-class PublishedRunVersionAdmin(admin.ModelAdmin):
-    search_fields = ["id", "version_id", "published_run__published_run_id"]
-    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
