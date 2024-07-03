@@ -21,6 +21,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.auto_recharge import auto_recharge_user
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.fastapi_tricks import extract_model_fields
 from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
@@ -82,13 +83,8 @@ def gui_runner(
         }
         output = (
             status
-            |
-            # extract outputs from local state
-            {
-                k: v
-                for k, v in st.session_state.items()
-                if k in page.ResponseModel.__fields__
-            }
+            # extract outputs from session state
+            | extract_model_fields(page.ResponseModel, st.session_state)
             | extra_output
         )
         # send outputs to ui
@@ -97,7 +93,7 @@ def gui_runner(
         page.dump_state_to_sr(st.session_state | output, sr)
 
     try:
-        gen = page.run(st.session_state)
+        gen = page.main(sr, st.session_state)
         save()
         while True:
             # record time

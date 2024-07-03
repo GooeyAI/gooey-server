@@ -17,7 +17,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 
@@ -50,8 +50,6 @@ class CompareLLMPage(BasePage):
         max_tokens: int | None
         sampling_temperature: float | None
 
-        variables: dict[str, typing.Any] | None
-
         response_format_type: ResponseFormatType = Field(
             None,
             title="Response Format",
@@ -81,7 +79,6 @@ class CompareLLMPage(BasePage):
             help="What a fine day..",
             height=300,
         )
-        prompt_vars_widget("input_prompt")
 
         enum_multiselect(
             LargeLanguageModels,

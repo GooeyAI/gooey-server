@@ -10,7 +10,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
-from daras_ai_v2.prompt_vars import prompt_vars_widget
+from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
@@ -110,9 +110,6 @@ These instructions run before the knowledge base is search and should reduce the
         key="query_instructions",
         height=300,
     )
-    prompt_vars_widget(
-        "query_instructions",
-    )
 
 
 def keyword_instructions_widget():
@@ -123,9 +120,6 @@ def keyword_instructions_widget():
         """,
         key="keyword_instructions",
         height=300,
-    )
-    prompt_vars_widget(
-        "keyword_instructions",
     )
 
 

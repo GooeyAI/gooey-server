@@ -1,4 +1,3 @@
-import json
 import typing
 
 import requests
@@ -9,6 +8,7 @@ from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.prompt_vars import variables_input
 
 
 class ConsoleLogs(BaseModel):
@@ -26,6 +26,11 @@ class FunctionsPage(BasePage):
             None,
             title="Code",
             description="The JS code to be executed.",
+        )
+        variables: dict[str, typing.Any] = Field(
+            {},
+            title="Variables",
+            description="Variables to be used in the code",
         )
 
     class ResponseModel(BaseModel):
@@ -51,10 +56,11 @@ class FunctionsPage(BasePage):
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
         yield "Running your code..."
+        # this will run functions/executor.js in deno deploy
         r = requests.post(
             settings.DENO_FUNCTIONS_URL,
             headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
-            json=request.code,
+            json=dict(code=request.code, variables=request.variables or {}),
         )
         data = r.json()
         response.logs = data.get("logs")
@@ -67,8 +73,10 @@ class FunctionsPage(BasePage):
         st.text_area(
             "##### " + field_title_desc(self.RequestModel, "code"),
             key="code",
-            height=500,
         )
+
+    def render_variables(self):
+        variables_input(template_keys=["code"], allow_add=True)
 
     def render_output(self):
         if error := st.session_state.get("error"):

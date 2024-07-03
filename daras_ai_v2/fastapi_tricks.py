@@ -5,6 +5,7 @@ from urllib.parse import parse_qs
 from fastapi import Depends
 from fastapi.routing import APIRoute
 from furl import furl
+from pydantic import BaseModel
 from starlette.requests import Request
 
 from daras_ai_v2 import settings
@@ -64,3 +65,29 @@ def get_route_path(route_fn: typing.Callable, params: dict = None) -> str:
     from server import app
 
     return os.path.join(app.url_path_for(route_fn.__name__, **(params or {})), "")
+
+
+def extract_model_fields(
+    model: typing.Type[BaseModel],
+    state: dict,
+    include_all: bool = True,
+    preferred_fields: list[str] = None,
+    diff_from: dict | None = None,
+) -> dict:
+    """
+    Include a field in result if:
+    - include_all is true
+    - field is required
+    - field is preferred
+    - diff_from is provided and field value differs from diff_from
+    """
+    return {
+        field_name: state.get(field_name)
+        for field_name, field in model.__fields__.items()
+        if (
+            include_all
+            or field.required
+            or (preferred_fields and field_name in preferred_fields)
+            or (diff_from and state.get(field_name) != diff_from.get(field_name))
+        )
+    }
