@@ -39,9 +39,6 @@ def sadtalker_settings(settings: SadTalkerSettings):
         **field_label_val(settings, "expression_scale"),
     )
 
-    # st.selectbox("Face Enhancer", [None, "gfpgan", "RestoreFormer"], value=settings.enhancer)
-    # st.selectbox("Background Enhancer", [None, "realesrgan"], value=settings.background_enhancer)
-
     settings.ref_eyeblink = (
         st.file_uploader(
             **field_label_val(settings, "ref_eyeblink"),
@@ -51,45 +48,12 @@ def sadtalker_settings(settings: SadTalkerSettings):
     )
 
     settings.ref_pose = (
-        st.file_uploader("Reference Pose", value=settings.ref_pose, accept=[".mp4"])
+        st.file_uploader(
+            **field_label_val(settings, "ref_pose"),
+            accept=[".mp4"],
+        )
         or None
     )
-
-    input_yaw = st.text_input(
-        "Input Yaw (comma separated)",
-        value=", ".join(map(str, settings.input_yaw or [])),
-    )
-    try:
-        settings.input_yaw = (
-            list(map(int, filter(None, input_yaw.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_yaw = None
-        st.error("Please enter comma separated integers for Input Yaw")
-
-    input_pitch = st.text_input(
-        "Input Pitch (comma separated)",
-        value=", ".join(map(str, settings.input_pitch or [])),
-    )
-    try:
-        settings.input_pitch = (
-            list(map(int, filter(None, input_pitch.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_pitch = None
-        st.error("Please enter comma separated integers for Input Pitch")
-
-    input_roll = st.text_input(
-        "Input Roll (comma separated)",
-        value=", ".join(map(str, settings.input_roll or [])),
-    )
-    try:
-        settings.input_roll = (
-            list(map(int, filter(None, input_roll.strip().split(",")))) or None
-        )
-    except ValueError:
-        settings.input_roll = None
-        st.error("Please enter comma separated integers for Input Roll")
 
 
 def wav2lip_settings():
