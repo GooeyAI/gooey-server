@@ -85,7 +85,7 @@ class TextToSpeechPage(BasePage):
         "openai_tts_model": "tts-1",
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         text_prompt: str
 
     class RequestModel(TextToSpeechSettings, RequestModelBase):

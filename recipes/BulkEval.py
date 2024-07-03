@@ -168,7 +168,7 @@ Summarize and score every row of any CSV, google sheet or excel with GPT4 (or an
 
         return [BulkRunnerPage, VideoBotsPage, AsrPage, DocSearchPage]
 
-    class RequestModel(LLMSettingsMixin, BaseModel):
+    class RequestModel(LLMSettingsMixin, BasePage.RequestModel):
         documents: list[str] = Field(
             title="Input Data Spreadsheet",
             description="""

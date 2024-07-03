@@ -19,7 +19,7 @@ class LetterWriterPage(BasePage):
     workflow = Workflow.LETTER_WRITER
     slug_versions = ["LetterWriter"]
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         action_id: str
 
         prompt_header: str | None

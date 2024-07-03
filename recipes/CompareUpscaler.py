@@ -21,7 +21,7 @@ class CompareUpscalerPage(BasePage):
     workflow = Workflow.COMPARE_UPSCALER
     slug_versions = ["compare-ai-upscalers"]
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl | None = Field(None, description="Input Image")
         input_video: FieldHttpUrl | None = Field(None, description="Input Video")
 

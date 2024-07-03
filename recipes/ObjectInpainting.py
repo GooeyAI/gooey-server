@@ -45,7 +45,7 @@ class ObjectInpaintingPage(BasePage):
         "seed": 42,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
         text_prompt: str
 

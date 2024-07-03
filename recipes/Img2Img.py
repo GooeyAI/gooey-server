@@ -41,7 +41,7 @@ class Img2ImgPage(BasePage):
         "controlnet_conditioning_scale": [1.0],
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
         text_prompt: str | None
 

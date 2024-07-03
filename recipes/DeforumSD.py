@@ -180,7 +180,7 @@ class DeforumSDPage(BasePage):
         selected_model=AnimationModels.protogen_2_2.name,
     )
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         # input_prompt: str
         animation_prompts: AnimationPrompts
         max_frames: int | None

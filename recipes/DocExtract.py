@@ -76,7 +76,7 @@ class DocExtractPage(BasePage):
     ]
     price = 500
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
         sheet_url: FieldHttpUrl | None

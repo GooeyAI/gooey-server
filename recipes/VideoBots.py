@@ -165,7 +165,7 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None

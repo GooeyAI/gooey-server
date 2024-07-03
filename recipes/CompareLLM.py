@@ -38,7 +38,7 @@ class CompareLLMPage(BasePage):
         "sampling_temperature": 0.7,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_prompt: str | None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
@@ -141,7 +141,7 @@ class CompareLLMPage(BasePage):
             st.write("**Prompt**")
             st.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
             for key, value in state.get("variables", {}).items():
-                st.text_area(f"`{key}`", value=value, disabled=True)
+                st.text_area(f"`{key}`", value=str(value), disabled=True)
         with col2:
             _render_outputs(state, 300)
 
