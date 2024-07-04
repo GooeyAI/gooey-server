@@ -33,6 +33,7 @@ from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
+    twilio_specific_settings,
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
@@ -98,6 +99,7 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from routers.twilio_api import twilio_connect
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -1143,21 +1145,66 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.newline()
 
         pressed_platform = None
-        with (
-            st.tag("table", className="d-flex justify-content-center"),
-            st.tag("tbody"),
+        if st.session_state.get("__twilio_redirect_url") == "connecting...":
+            st.write(
+                "[Contact Us](sales@gooey.ai) to set up a Twilio phone number for you. Or enter your own [Twilio credentials](twilio.com/console):"
+            )
+
+            st.text_input("Account SID", key="twilio_account_sid", type="password")
+            st.text_input("Auth Token", key="twilio_auth_token", type="password")
+            st.text_input("Phone Number", key="twilio_phone_number")
+            st.text_input("Phone Number SID", key="twilio_phone_number_sid")
+            if st.button(
+                "Connect", key="twilio_connect", type="primary", style={"width": "100%"}
+            ):
+                current_run = self.get_current_sr()
+                published_run = self.get_current_published_run()
+                assert current_run and published_run, "Run should be available"
+                twilio_account_sid = st.session_state.pop("twilio_account_sid")
+                twilio_auth_token = st.session_state.pop("twilio_auth_token")
+                twilio_phone_number = st.session_state.pop("twilio_phone_number")
+                twilio_phone_number_sid = st.session_state.pop(
+                    "twilio_phone_number_sid"
+                )
+                bi = twilio_connect(
+                    current_run=current_run,
+                    published_run=published_run,
+                    twilio_account_sid=twilio_account_sid,
+                    twilio_auth_token=twilio_auth_token,
+                    twilio_phone_number=twilio_phone_number,
+                    twilio_phone_number_sid=twilio_phone_number_sid,
+                    billing_user=self.request.user,
+                )
+                st.session_state["__twilio_redirect_url"] = self.current_app_url(
+                    RecipeTabs.integrations,
+                    path_params=dict(integration_id=bi.api_integration_id()),
+                )
+                pressed_platform = Platform.TWILIO
+            else:
+                return
+
+        if pressed_platform == None:
+            with (
+                st.tag("table", className="d-flex justify-content-center"),
+                st.tag("tbody"),
+            ):
+                for choice in connect_choices:
+                    with st.tag("tr"):
+                        with st.tag("td"):
+                            if st.button(
+                                f'<img src="{choice.img}" alt="{choice.platform.name}" style="max-width: 80%; max-height: 90%" draggable="false">',
+                                className="p-0 border border-1 border-secondary rounded",
+                                style=dict(width="160px", height="60px"),
+                            ):
+                                pressed_platform = choice.platform
+                        with st.tag("td", className="ps-3"):
+                            st.caption(choice.label)
+
+        if pressed_platform == Platform.TWILIO and not st.session_state.get(
+            "__twilio_redirect_url"
         ):
-            for choice in connect_choices:
-                with st.tag("tr"):
-                    with st.tag("td"):
-                        if st.button(
-                            f'<img src="{choice.img}" alt="{choice.platform.name}" style="max-width: 80%; max-height: 90%" draggable="false">',
-                            className="p-0 border border-1 border-secondary rounded",
-                            style=dict(width="160px", height="60px"),
-                        ):
-                            pressed_platform = choice.platform
-                    with st.tag("td", className="ps-3"):
-                        st.caption(choice.label)
+            st.session_state["__twilio_redirect_url"] = "connecting..."
+            st.experimental_rerun()
 
         if pressed_platform:
             on_connect = self.current_app_url(RecipeTabs.integrations)
@@ -1178,6 +1225,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     redirect_url = slack_connect_url(on_connect)
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(on_connect)
+                case Platform.TWILIO:
+                    redirect_url = st.session_state.pop("__twilio_redirect_url")
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1253,6 +1302,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                if bi.twilio_phone_number:
+                    copy_to_clipboard_button(
+                        f'<i class="fa-regular fa-link"></i> Copy Phone Number',
+                        value=bi.twilio_phone_number,
+                        type="secondary",
+                    )
 
             col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
@@ -1272,6 +1327,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                elif bi.platform == Platform.TWILIO and test_link:
+                    pass
                 elif test_link:
                     st.anchor(
                         f"{icon} Message {bi.get_display_name()}",
@@ -1281,6 +1338,24 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                 else:
                     st.write("Message quicklink not available.")
+
+                if bi.twilio_phone_number:
+                    st.anchor(
+                        '<i class="fa-regular fa-phone"></i> Start Voice Call',
+                        f"tel:{bi.twilio_phone_number}",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                    st.anchor(
+                        '<i class="fa-regular fa-sms"></i> Send SMS',
+                        f"sms:{bi.twilio_phone_number}",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                elif bi.platform == Platform.TWILIO:
+                    st.write(
+                        "Phone number incorrectly configured. Please re-add the integration and double check spelling. [Contact Us](support@gooey.ai) if you need help."
+                    )
 
                 if bi.platform == Platform.WEB:
                     embed_code = get_web_widget_embed_code(bi)
@@ -1310,6 +1385,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ),
                     new_tab=True,
                 )
+                if bi.platform == Platform.TWILIO and test_link:
+                    st.anchor(
+                        f"{icon} View Calls/Messages",
+                        test_link,
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
                 col1, col2 = st.columns(2, style={"alignItems": "center"})
@@ -1344,9 +1426,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
                     slack_specific_settings(bi, run_title)
+                if bi.platform == Platform.TWILIO:
+                    twilio_specific_settings(bi)
                 general_integration_settings(bi, self.request.user)
 
-                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
                     st.newline()
                     broadcast_input(bi)
                     st.write("---")
@@ -1630,5 +1714,10 @@ connect_choices = [
         platform=Platform.FACEBOOK,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
+    ),
+    ConnectChoice(
+        platform=Platform.TWILIO,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6b30b13a-3980-11ef-b8f4-02420a000119/Twilio-logo-red.svg.png",
+        label="Connect a Twilio phone number to chat via SMS or Voice calls.",
     ),
 ]
