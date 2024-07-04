@@ -21,6 +21,15 @@ def render():
         render_components()
 
 
+def show_source_code(fn):
+    def wrapper(*args, **kwargs):
+        out = fn(*args, **kwargs)
+        code_block(inspect.getsource(fn))
+        return out
+
+    return wrapper
+
+
 def get_source_code(fn: callable):
     source_code = inspect.getsource(fn)
     return source_code
@@ -32,6 +41,7 @@ def render_layouts():
     # Full Width Layout
     sub_section_title("Full Width Layout")
 
+    @show_source_code
     def full_width_layout():
         with gui.tag("div", className="container-fluid bg-light p-4"):
             with gui.tag("div", className="row"):
@@ -39,11 +49,11 @@ def render_layouts():
                     gui.html("This is a full width layout")
 
     full_width_layout()
-    code_block(get_source_code(full_width_layout))
 
     # 1/2 Layout
     sub_section_title("Full Width 1/2 Layout")
 
+    @show_source_code
     def half_width_layout():
         with gui.tag("div", className="container-fluid p-2"):
             with gui.tag("div", className="row"):
@@ -53,11 +63,11 @@ def render_layouts():
                     gui.html("This is a 1/2 width layout")
 
     half_width_layout()
-    code_block(get_source_code(half_width_layout))
 
     # 1/3 Layout
     sub_section_title("Full Width 1/3 Layout")
 
+    @show_source_code
     def third_width_layout():
         with gui.tag("div", className="container-fluid p-2"):
             with gui.tag("div", className="row"):
@@ -69,12 +79,12 @@ def render_layouts():
                     gui.html("This is a 1/3 width layout")
 
     third_width_layout()
-    code_block(get_source_code(third_width_layout))
 
     # Responsive 1/3 Layout
     sub_section_title("Responsive 1/3 Layout")
     gui.write("These columns will go full width on small devices")
 
+    @show_source_code
     def responsive_third_width_layout():
         with gui.tag("div", className="container-fluid p-2"):
             with gui.tag("div", className="row"):
@@ -86,7 +96,6 @@ def render_layouts():
                     gui.html("This is a responsive 1/3 width layout")
 
     responsive_third_width_layout()
-    code_block(get_source_code(responsive_third_width_layout))
 
 
 def render_content():
@@ -99,6 +108,7 @@ def render_content():
                 def render_headings():
                     sub_section_title("Headings")
 
+                    @show_source_code
                     def render_h1_to_h6_headings():
                         with gui.tag("h1"):
                             gui.html("This is a h1 heading")
@@ -114,7 +124,6 @@ def render_content():
                             gui.html("This is a h6 heading")
 
                     render_h1_to_h6_headings()
-                    code_block(get_source_code(render_h1_to_h6_headings))
 
                 render_headings()
 
@@ -122,23 +131,24 @@ def render_content():
             with gui.tag("div", className="col-12 col-md-6"):
                 sub_section_title("Normal Text")
 
+                @show_source_code
                 def normal_text():
                     gui.write("This is a normal text")
 
                 normal_text()
-                code_block(get_source_code(normal_text))
 
                 sub_section_title("Link")
 
+                @show_source_code
                 def link():
                     with gui.tag("a", href="https://www.gooey.ai"):
                         gui.html("This is a link")
 
                 link()
-                code_block(get_source_code(link))
 
                 sub_section_title("Colored Text")
 
+                @show_source_code
                 def colored_text():
                     with gui.tag("p", className="text-primary"):
                         gui.html("This is a primary text")
@@ -156,7 +166,6 @@ def render_content():
                         gui.html("This is a light text")
 
                 colored_text()
-                code_block(get_source_code(colored_text))
 
 
 def render_components():
@@ -180,6 +189,7 @@ def render_components():
             render_inputs()
             section_title("File Upload Button")
 
+            @show_source_code
             def file_upload():
                 file = gui.file_uploader(
                     "**Upload Any File**",
@@ -190,13 +200,13 @@ def render_components():
                 )
 
             file_upload()
-            code_block(get_source_code(file_upload))
 
 
 def render_inputs():
     section_title("Inputs")
     sub_section_title("Text Area")
 
+    @show_source_code
     def text_area():
         gui.text_area(
             "Label: Take some input from user",
@@ -208,10 +218,10 @@ def render_inputs():
         )
 
     text_area()
-    code_block(get_source_code(text_area))
 
     sub_section_title("Multi Select")
 
+    @show_source_code
     def multi_select():
         gui.multiselect(
             "Label: Click below to select multiple options",
@@ -219,23 +229,22 @@ def render_inputs():
         )
 
     multi_select()
-    code_block(get_source_code(multi_select))
 
 
 def render_alerts():
     section_title("Alerts")
 
+    @show_source_code
     def success_alert():
         gui.success("Yay, this is done!")
 
     success_alert()
-    code_block(get_source_code(success_alert))
 
+    @show_source_code
     def error_alert():
         gui.error("Oops, please try again!")
 
     error_alert()
-    code_block(get_source_code(error_alert))
 
 
 def render_tabs_example():
@@ -243,6 +252,7 @@ def render_tabs_example():
     # Rounded Tabs
     sub_section_title("Rounded Tabs")
 
+    @show_source_code
     def rounded_tabs():
         tab1, tab2, tab3 = gui.tabs(["Tab 1", "Tab 2", "Tab 3"])
         with tab1:
@@ -253,12 +263,12 @@ def render_tabs_example():
             gui.write("This is tab 3 content")
 
     rounded_tabs()
-    code_block(get_source_code(rounded_tabs))
 
     # Underline Tabs
     selected_tab = "Tab 1"
     sub_section_title("Underline Tabs")
 
+    @show_source_code
     def underline_tabs():
         with gui.nav_tabs():
             for name in ["Tab 1", "Tab 2", "Tab 4"]:
@@ -274,12 +284,12 @@ def render_tabs_example():
                 gui.write("This is tab 3 content")
 
     underline_tabs()
-    code_block(get_source_code(underline_tabs))
 
 
 def buttons_group():
     sub_section_title("Buttons")
 
+    @show_source_code
     def buttons():
         with gui.tag("div"):
             with gui.tag("div", className="d-flex justify-content-around"):
@@ -289,16 +299,17 @@ def buttons_group():
                 gui.button("Link Button", key="test3", type="link")
 
     buttons()
-    code_block(get_source_code(buttons))
 
 
 def code_block(content: str):
+    code_lines = content.split("\n")[1:]
+    formatted_code = "\n".join(code_lines)
     with gui.tag("div", className="mt-4"):
         gui.write(
             rf"""
                 ```python %s
             """
-            % content,
+            % formatted_code,
             unsafe_allow_html=True,
         )
 
