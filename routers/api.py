@@ -19,22 +19,21 @@ from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 
-from celeryapp.tasks import auto_recharge
-from daras_ai_v2.auto_recharge import user_should_auto_recharge
 import gooey_ui as st
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import RetentionPolicy
+from celeryapp.tasks import auto_recharge
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
+from daras_ai_v2.auto_recharge import user_should_auto_recharge
 from daras_ai_v2.base import (
     BasePage,
-    StateKeys,
     RecipeRunState,
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
-from daras_ai_v2.ratelimits import ensure_rate_limits
+from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from routers.account import AccountTabs
 
@@ -119,9 +118,14 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         settings=(RunSettings, RunSettings()),
     )
     # encapsulate the response model with the ApiResponseModel
+    response_output_model = create_model(
+        page_cls.__name__ + "Output",
+        __base__=page_cls.ResponseModel,
+        called_functions=(list[CalledFunctionResponse], None),
+    )
     response_model = create_model(
         page_cls.__name__ + "Response",
-        __base__=ApiResponseModelV2[page_cls.ResponseModel],
+        __base__=ApiResponseModelV2[response_output_model],
     )
 
     common_errs = {
@@ -244,7 +248,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
     response_model = create_model(
         page_cls.__name__ + "StatusResponse",
-        __base__=AsyncStatusResponseModelV3[page_cls.ResponseModel],
+        __base__=AsyncStatusResponseModelV3[response_output_model],
     )
 
     @app.get(
@@ -281,7 +285,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             status = self.get_run_state(sr.to_dict())
             ret |= {"detail": sr.run_status or "", "status": status}
             if status == RecipeRunState.completed and sr.state:
-                ret |= {"output": sr.state}
+                ret |= {"output": sr.api_output()}
                 if sr.retention_policy == RetentionPolicy.delete:
                     sr.state = {}
                     sr.save(update_fields=["state"])
@@ -382,14 +386,14 @@ def submit_api_call(
             ),
         )
     # create a new run
-    example_id, run_id, uid = self.create_new_run(
+    sr = self.create_new_run(
         enable_rate_limits=enable_rate_limits,
         is_api_call=True,
         retention_policy=retention_policy or RetentionPolicy.keep,
     )
     # submit the task
-    result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
-    return self, result, run_id, uid
+    result = self.call_runner_task(sr.example_id, sr.run_id, sr.uid, is_api_call=True)
+    return self, result, sr.run_id, sr.uid
 
 
 def build_api_response(
@@ -419,20 +423,18 @@ def build_api_response(
         # wait for the result
         get_celery_result_db_safe(result)
         sr = page.run_doc_sr(run_id, uid)
-        state = sr.to_dict()
         if sr.retention_policy == RetentionPolicy.delete:
             sr.state = {}
             sr.save(update_fields=["state"])
         # check for errors
-        err_msg = state.get(StateKeys.error_msg)
-        if err_msg:
+        if sr.error_msg:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "id": run_id,
                     "url": web_url,
                     "created_at": sr.created_at.isoformat(),
-                    "error": err_msg,
+                    "error": sr.error_msg,
                 },
             )
         else:
@@ -441,7 +443,7 @@ def build_api_response(
                 "id": run_id,
                 "url": web_url,
                 "created_at": sr.created_at.isoformat(),
-                "output": state,
+                "output": sr.api_output(),
             }
 
 

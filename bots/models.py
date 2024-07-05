@@ -17,6 +17,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
+from functions.models import CalledFunction, CalledFunctionResponse
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
@@ -369,6 +370,15 @@ class SavedRun(models.Model):
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
+
+    def api_output(self, state: dict = None) -> dict:
+        state = state or self.state
+        if self.state.get("functions"):
+            state["called_functions"] = [
+                CalledFunctionResponse.from_db(called_fn)
+                for called_fn in self.called_functions.all()
+            ]
+        return state
 
 
 def _parse_dt(dt) -> datetime.datetime | None:

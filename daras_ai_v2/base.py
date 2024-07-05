@@ -1,6 +1,7 @@
 import datetime
 import html
 import inspect
+import json
 import math
 import typing
 import uuid
@@ -18,7 +19,7 @@ from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
@@ -53,6 +54,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params import (
     gooey_get_query_params,
 )
@@ -64,6 +66,16 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.user_date_widgets import (
     render_local_dt_attrs,
 )
+from functions.models import (
+    RecipeFunction,
+    FunctionTrigger,
+)
+from functions.recipe_functions import (
+    functions_input,
+    call_recipe_functions,
+    is_functions_enabled,
+    render_called_functions,
+)
 from gooey_ui import (
     realtime_clear_subs,
     RedirectException,
@@ -71,7 +83,6 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from gooeysite.custom_create import get_or_create_lazy
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
@@ -117,7 +128,28 @@ class BasePage:
 
     explore_image: str = None
 
-    RequestModel: typing.Type[BaseModel]
+    template_keys: typing.Iterable[str] = (
+        "task_instructions",
+        "query_instructions",
+        "keyword_instructions",
+        "input_prompt",
+        "bot_script",
+        "text_prompt",
+        "search_query",
+        "title",
+    )
+
+    class RequestModel(BaseModel):
+        functions: list[RecipeFunction] | None = Field(
+            None,
+            title="🧩 Functions",
+        )
+        variables: dict[str, typing.Any] = Field(
+            None,
+            title="⌥ Variables",
+            description="Variables to be used as Jinja prompt templates and in functions as arguments",
+        )
+
     ResponseModel: typing.Type[BaseModel]
 
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
@@ -1310,12 +1342,18 @@ class BasePage:
         st.caption(ret, line_clamp=1, unsafe_allow_html=True)
 
     def _render_step_row(self):
-        with st.expander("**ℹ️ Details**"):
+        key = "details-expander"
+        with st.expander("**ℹ️ Details**", key=key):
+            if not st.session_state.get(key):
+                return
             col1, col2 = st.columns([1, 2])
             with col1:
                 self.render_description()
             with col2:
                 placeholder = st.div()
+                render_called_functions(
+                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.pre
+                )
                 try:
                     self.render_steps()
                 except NotImplementedError:
@@ -1323,6 +1361,9 @@ class BasePage:
                 else:
                     with placeholder:
                         st.write("##### 👣 Steps")
+                render_called_functions(
+                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.post
+                )
 
     def _render_help(self):
         placeholder = st.div()
@@ -1338,9 +1379,13 @@ class BasePage:
                     """
                 )
 
+        key = "discord-expander"
         with st.expander(
-            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**"
+            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
+            key=key,
         ):
+            if not st.session_state.get(key):
+                return
             st.markdown(
                 """
                 <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
@@ -1352,6 +1397,27 @@ class BasePage:
 
     def render_usage_guide(self):
         raise NotImplementedError
+
+    def main(self, sr: SavedRun, state: dict) -> typing.Iterator[str | None]:
+        yield from call_recipe_functions(
+            saved_run=sr,
+            current_user=self.request.user,
+            request_model=self.RequestModel,
+            response_model=self.ResponseModel,
+            state=state,
+            trigger=FunctionTrigger.pre,
+        )
+
+        yield from self.run(state)
+
+        yield from call_recipe_functions(
+            saved_run=sr,
+            current_user=self.request.user,
+            request_model=self.RequestModel,
+            response_model=self.ResponseModel,
+            state=state,
+            trigger=FunctionTrigger.post,
+        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
@@ -1373,7 +1439,7 @@ class BasePage:
         self.ResponseModel.validate(response)
 
     def run_v2(
-        self, request: BaseModel, response: BaseModel
+        self, request: RequestModel, response: BaseModel
     ) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
@@ -1400,8 +1466,11 @@ class BasePage:
 
     def _render_input_col(self):
         self.render_form_v2()
+        self.render_variables()
+
         with st.expander("⚙️ Settings"):
             self.render_settings()
+
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
@@ -1409,6 +1478,13 @@ class BasePage:
                 "[privacy policy](https://gooey.ai/privacy)._"
             )
         return submitted
+
+    def render_variables(self):
+        st.write("---")
+        functions_input(self.request.user)
+        variables_input(
+            template_keys=self.template_keys, allow_add=is_functions_enabled()
+        )
 
     @classmethod
     def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
@@ -1506,7 +1582,7 @@ class BasePage:
         from celeryapp.tasks import auto_recharge
 
         try:
-            example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
+            sr = self.create_new_run(enable_rate_limits=True)
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
@@ -1516,15 +1592,15 @@ class BasePage:
             auto_recharge.delay(user_id=self.request.user.id)
 
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-            st.session_state[StateKeys.run_status] = None
-            st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
-                example_id, run_id, uid
+            sr.run_status = ""
+            sr.error_msg = self.generate_credit_error_message(
+                sr.example_id, sr.run_id, sr.uid
             )
-            self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
+            sr.save(update_fields=["run_status", "error_msg"])
         else:
-            self.call_runner_task(example_id, run_id, uid)
+            self.call_runner_task(sr.example_id, sr.run_id, sr.uid)
 
-        raise RedirectException(self.app_url(run_id=run_id, uid=uid))
+        raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def should_submit_after_login(self) -> bool:
         return (
@@ -1534,7 +1610,9 @@ class BasePage:
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, *, enable_rate_limits: bool = False, **defaults):
+    def create_new_run(
+        self, *, enable_rate_limits: bool = False, **defaults
+    ) -> SavedRun:
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1574,9 +1652,23 @@ class BasePage:
             create=True,
             defaults=dict(parent=parent, parent_version=parent_version) | defaults,
         )
-        self.dump_state_to_sr(st.session_state, sr)
 
-        return None, run_id, uid
+        # ensure the request is validated
+        state = st.session_state | json.loads(
+            self.RequestModel.parse_obj(st.session_state).json(exclude_unset=True)
+        )
+        self.dump_state_to_sr(state, sr)
+
+        return sr
+
+    def dump_state_to_sr(self, state: dict, sr: SavedRun):
+        sr.set(
+            {
+                field_name: deepcopy(state[field_name])
+                for field_name in self.fields_to_save()
+                if field_name in state
+            }
+        )
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
         from celeryapp.tasks import gui_runner
@@ -1672,15 +1764,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         for k, v in cls.sane_defaults.items():
             state.setdefault(k, v)
         return state
-
-    def dump_state_to_sr(self, state: dict, sr: SavedRun):
-        sr.set(
-            {
-                field_name: deepcopy(state[field_name])
-                for field_name in self.fields_to_save()
-                if field_name in state
-            }
-        )
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -2058,7 +2141,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
-        output = extract_model_fields(self.ResponseModel, state, include_all=True)
+        sr = self.get_current_sr()
+        output = sr.api_output(extract_model_fields(self.ResponseModel, state))
         if as_async:
             return dict(
                 run_id=run_id,
@@ -2146,7 +2230,7 @@ def render_output_caption():
 def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
-    include_all: bool = False,
+    include_all: bool = True,
     preferred_fields: list[str] = None,
     diff_from: dict | None = None,
 ) -> dict:
