@@ -342,17 +342,19 @@ class SavedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        parent_pr: "PublishedRun" = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
         # run in a thread to avoid messing up threadlocals
         with ThreadPool(1) as pool:
-            pr = self.parent_published_run()
-            query_params = dict(
-                example_id=(pr and pr.published_run_id) or self.example_id,
-                run_id=self.run_id,
-                uid=self.uid,
-            )
+            if parent_pr and parent_pr.saved_run == self:
+                # avoid passing run_id and uid for examples
+                query_params = dict(example_id=parent_pr.published_run_id)
+            else:
+                query_params = dict(
+                    example_id=self.example_id, run_id=self.run_id, uid=self.uid
+                )
             page, result, run_id, uid = pool.apply(
                 submit_api_call,
                 kwds=dict(
@@ -1676,6 +1678,20 @@ class PublishedRun(models.Model):
                 "run_count"
             ]
             or 0
+        )
+
+    def submit_api_call(
+        self,
+        *,
+        current_user: AppUser,
+        request_body: dict,
+        enable_rate_limits: bool = False,
+    ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+        return self.saved_run.submit_api_call(
+            current_user=current_user,
+            request_body=request_body,
+            enable_rate_limits=enable_rate_limits,
+            parent_pr=self,
         )
 
 

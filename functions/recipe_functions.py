@@ -44,6 +44,7 @@ def call_recipe_functions(
         page_cls, sr, pr = url_to_runs(fun.url)
         result, sr = sr.submit_api_call(
             current_user=current_user,
+            parent_pr=pr,
             request_body=dict(
                 variables=sr.state.get("variables", {})
                 | variables
