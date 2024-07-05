@@ -36,31 +36,25 @@ def gui_runner(
     user_id: str,
     run_id: str,
     uid: str,
-    state: dict,
     channel: str,
-    query_params: dict = None,
-    is_api_call: bool = False,
 ):
-    page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
-
     def event_processor(event, hint):
         event["request"] = {
             "method": "POST",
-            "url": page.app_url(query_params=query_params),
-            "data": state,
+            "url": page.app_url(query_params=st.get_query_params()),
+            "data": st.session_state,
         }
         return event
 
+    page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
     page.setup_sentry(event_processor=event_processor)
-
     sr = page.run_doc_sr(run_id, uid)
-    sr.is_api_call = is_api_call
+    st.set_session_state(sr.to_dict())
+    set_query_params(dict(run_id=run_id, uid=uid))
 
-    st.set_session_state(state)
     run_time = 0
     yield_val = None
     error_msg = None
-    set_query_params(query_params or {})
 
     @db_middleware
     def save(done=False):
@@ -118,11 +112,7 @@ def gui_runner(
                 run_time += time() - start_time
 
                 if isinstance(e, HTTPException) and e.status_code == 402:
-                    error_msg = page.generate_credit_error_message(
-                        example_id=query_params.get("example_id"),
-                        run_id=run_id,
-                        uid=uid,
-                    )
+                    error_msg = page.generate_credit_error_message(run_id, uid)
                     try:
                         raise UserError(error_msg) from e
                     except UserError as e:
@@ -141,7 +131,7 @@ def gui_runner(
                 save()
     finally:
         save(done=True)
-        if not is_api_call:
+        if not sr.is_api_call:
             send_email_on_completion(page, sr)
         run_low_balance_email_check(uid)
 

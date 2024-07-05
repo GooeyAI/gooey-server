@@ -392,7 +392,7 @@ def submit_api_call(
         retention_policy=retention_policy or RetentionPolicy.keep,
     )
     # submit the task
-    result = self.call_runner_task(sr.example_id, sr.run_id, sr.uid, is_api_call=True)
+    result = self.call_runner_task(sr)
     return self, result, sr.run_id, sr.uid
 
 
