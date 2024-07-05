@@ -347,18 +347,23 @@ class SavedRun(models.Model):
 
         # run in a thread to avoid messing up threadlocals
         with ThreadPool(1) as pool:
+            pr = self.parent_published_run()
+            query_params = dict(
+                example_id=(pr and pr.published_run_id) or self.example_id,
+                run_id=self.run_id,
+                uid=self.uid,
+            )
             page, result, run_id, uid = pool.apply(
                 submit_api_call,
                 kwds=dict(
                     page_cls=Workflow(self.workflow).page_cls,
-                    query_params=dict(
-                        example_id=self.example_id, run_id=self.run_id, uid=self.uid
-                    ),
+                    query_params=query_params,
                     user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
                 ),
             )
+
         return result, page.run_doc_sr(run_id, uid)
 
     def get_creator(self) -> AppUser | None:
