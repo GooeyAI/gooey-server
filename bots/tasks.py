@@ -23,7 +23,7 @@ from daras_ai_v2.slack_bot import (
     create_personal_channel,
     SlackBot,
 )
-from routers.twilio_api import start_voice_call, send_sms_message
+from routers.twilio_api import create_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton, messages_as_prompt
@@ -209,7 +209,7 @@ def send_broadcast_msg(
                 )[0]
             case Platform.TWILIO:
                 if medium == "Voice Call":
-                    start_voice_call(convo, text, audio)
+                    create_voice_call(convo, text, audio)
                 else:
                     send_sms_message(convo, text, media_url=audio)
             case _:

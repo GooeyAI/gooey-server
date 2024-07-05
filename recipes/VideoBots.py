@@ -1159,13 +1159,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ):
                 current_run = self.get_current_sr()
                 published_run = self.get_current_published_run()
-                assert current_run and published_run, "Run should be available"
                 twilio_account_sid = st.session_state.pop("twilio_account_sid")
                 twilio_auth_token = st.session_state.pop("twilio_auth_token")
                 twilio_phone_number = st.session_state.pop("twilio_phone_number")
                 twilio_phone_number_sid = st.session_state.pop(
                     "twilio_phone_number_sid"
                 )
+                if (
+                    not current_run
+                    or not published_run
+                    or not twilio_account_sid
+                    or not twilio_auth_token
+                    or not twilio_phone_number
+                    or not twilio_phone_number_sid
+                ):
+                    st.error("Please fill in all fields.")
+                    return
+
                 bi = twilio_connect(
                     current_run=current_run,
                     published_run=published_run,
@@ -1189,6 +1199,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.tag("tbody"),
             ):
                 for choice in connect_choices:
+                    if (
+                        choice.platform == Platform.TWILIO
+                        and not self.is_current_user_admin()
+                    ):
+                        continue  # only admins can connect to Twilio for now
                     with st.tag("tr"):
                         with st.tag("td"):
                             if st.button(

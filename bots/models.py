@@ -1061,6 +1061,7 @@ class Conversation(models.Model):
             or self.fb_page_id
             or self.slack_user_id
             or self.web_user_id
+            or self.twilio_phone_number
         )
 
     get_display_name.short_description = "User"

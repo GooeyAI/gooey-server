@@ -4,25 +4,40 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 from app_users.models import AppUser
 from bots.models import Conversation, BotIntegration, SavedRun, PublishedRun, Platform
+from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2 import settings
-from starlette.background import BackgroundTasks
 
 from furl import furl
 from fastapi import APIRouter, Response
+from starlette.background import BackgroundTasks
 from daras_ai_v2.fastapi_tricks import fastapi_request_urlencoded_body
 import base64
 
 router = APIRouter()
 
 
+def translate(text: str, bi: BotIntegration) -> str:
+    if text and should_translate_lang(bi.user_language):
+        return run_google_translate(
+            [text],
+            bi.user_language,
+            glossary_url=bi.saved_run.state.get("output_glossary_document"),
+        )[0]
+    else:
+        return text
+
+
 @router.post("/__/twilio/voice/")
-def twilio_voice_call(data: dict = fastapi_request_urlencoded_body):
+def twilio_voice_call(
+    background_tasks: BackgroundTasks, data: dict = fastapi_request_urlencoded_body
+):
     """Handle incoming Twilio voice call."""
 
     # data = {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['ringing'], 'CallToken': ['XXXX'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'StirVerstat': ['XXXX'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
 
     account_sid = data["AccountSid"][0]
     phone_number = data["To"][0]
+    user_phone_number = data["From"][0]
 
     try:
         bi = BotIntegration.objects.get(
@@ -31,78 +46,37 @@ def twilio_voice_call(data: dict = fastapi_request_urlencoded_body):
     except BotIntegration.DoesNotExist:
         return Response(status_code=404)
 
+    text = bi.twilio_initial_text.strip()
+    audio_url = bi.twilio_initial_audio_url.strip()
+    if not text and not audio_url:
+        text = translate(
+            f"Welcome to {bi.name}! Please ask your question and press 0 if the end of your question isn't detected.",
+            bi,
+        )
+
     if bi.twilio_use_missed_call:
         resp = VoiceResponse()
         resp.reject()
 
-        # TODO: use start_voice_call to call the user back after a short delay
+        background_tasks.add_task(
+            start_voice_call_session, text, audio_url, bi, user_phone_number
+        )
 
         return Response(str(resp), headers={"Content-Type": "text/xml"})
 
-    resp = VoiceResponse()
-
-    gather = Gather(
-        input="speech",  # also supports dtmf (keypad input) and a combination of both
-        timeout=20,  # users get 20 to start speaking
-        speechTimeout=3,  # a 3 second pause ends the input
-        action=url_for(twilio_voice_call_ask),  # the URL to send the user's question to
-        method="POST",
-        finish_on_key="0",  # user can press 0 to end the input
-        language=bi.twilio_asr_language,
-        speech_model="phone_call",  # optimized for phone call audio
-        enhanced=True,  # only phone_call model supports enhanced
-    )
-
-    # say the initial text/audio while allowing the user to interrupt with their question if they want
-    if bi.twilio_initial_text.strip():
-        gather.say(bi.twilio_initial_text, voice=bi.twilio_voice)
-    if bi.twilio_initial_audio_url.strip():
-        gather.play(bi.twilio_initial_audio_url)
-    if not bi.twilio_initial_text and not bi.twilio_initial_audio_url:
-        gather.say(
-            f"Welcome to {bi.name}! Please ask your question and press 0 if the end of your question isn't detected.",
-            voice=bi.twilio_voice,
-        )
-
-    resp.append(gather)
-
-    # if the user doesn't say anything, we'll ask them to call back in a quieter environment
-    resp.say(
-        "Sorry, I didn't get that. Please call again in a more quiet environment.",
-        voice=bi.twilio_voice,
-    )
-
-    return Response(str(resp), headers={"Content-Type": "text/xml"})
-
-
-@router.post("/__/twilio/voice/listen/{bi_id}/")
-def twilio_voice_call_listen(bi_id: int):
-    """Listen for a response. Not the initial call, but has just responded to a question."""
-
-    try:
-        bi = BotIntegration.objects.get(id=bi_id)
-    except BotIntegration.DoesNotExist:
-        return Response(status_code=404)
+    text = base64.b64encode(text.encode()).decode() if text else "N"
+    audio_url = base64.b64encode(audio_url.encode()).decode() if audio_url else "N"
 
     resp = VoiceResponse()
-
-    resp.gather(
-        input="speech",  # also supports dtmf (keypad input) and a combination of both
-        timeout=20,  # users get 20 to start speaking
-        speechTimeout=3,  # a 3 second pause ends the input
-        action=url_for(twilio_voice_call_ask),  # the URL to send the user's question to
-        method="POST",
-        finish_on_key="0",  # user can press 0 to end the input
-        language=bi.twilio_asr_language,
-        speech_model="phone_call",  # optimized for phone call audio
-        enhanced=True,  # only phone_call model supports enhanced
+    resp.redirect(
+        url_for(twilio_voice_call_response, bi_id=bi.id, text=text, audio_url=audio_url)
     )
 
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
 
 @router.post("/__/twilio/voice/ask/")
-def twilio_voice_call_ask(
+def twilio_voice_call_asked(
     background_tasks: BackgroundTasks, data: dict = fastapi_request_urlencoded_body
 ):
     """After the initial call, the user has been asked a question. Handle their question."""
@@ -124,7 +98,7 @@ def twilio_voice_call_ask(
         return Response(status_code=404)
 
     # start processing the user's question
-    queue_name = f"Queue for {bi.name} ({user_phone_number})"
+    queue_name = f"{bi.id}-{user_phone_number}"
     bot = TwilioVoice(
         incoming_number=user_phone_number,
         queue_name=queue_name,
@@ -132,7 +106,17 @@ def twilio_voice_call_ask(
         audio=None,
         bi=bi,
     )
-    background_tasks.add_task(msg_handler, bot)
+
+    def msg_handler_with_error_handling(bot: TwilioVoice):
+        """Handle the user's question and catch any errors to make sure they don't get stuck in the queue until it times out."""
+        try:
+            msg_handler(bot)
+        except Exception:
+            bot.send_msg(
+                text=translate("Sorry, an error occurred. Please try again later.", bi),
+            )
+
+    background_tasks.add_task(msg_handler_with_error_handling, bot)
 
     # send back waiting audio
     resp = VoiceResponse()
@@ -180,7 +164,6 @@ def twilio_voice_call_respond(
     text: str | None,
     audio_url: str | None,
     queue_name: str,
-    user_phone_number: str,
     bi: BotIntegration,
 ):
     """Respond to the user in the queue with the given text and audio URL."""
@@ -209,24 +192,46 @@ def twilio_voice_call_respond(
 
 
 @router.post("/__/twilio/voice/response/{bi_id}/{text}/{audio_url}/")
-def twilio_voice_call_response(
-    bi_id: int, text: str, audio_url: str, data: dict = fastapi_request_urlencoded_body
-):
+def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
     """Response is ready, user has been dequeued, send the response."""
-
-    print("Twilio voice response", data)
 
     text = base64.b64decode(text).decode() if text != "N" else ""
     audio_url = base64.b64decode(audio_url).decode() if audio_url != "N" else ""
 
+    try:
+        bi = BotIntegration.objects.get(id=bi_id)
+    except BotIntegration.DoesNotExist:
+        return Response(status_code=404)
+
     resp = VoiceResponse()
 
-    if text:
-        resp.say(text)
-    if audio_url:
-        resp.play(audio_url)
+    gather = Gather(
+        input="speech",  # also supports dtmf (keypad input) and a combination of both
+        timeout=20,  # users get 20 to start speaking
+        speechTimeout=3,  # a 3 second pause ends the input
+        action=url_for(
+            twilio_voice_call_asked
+        ),  # the URL to send the user's question to
+        method="POST",
+        finish_on_key="0",  # user can press 0 to end the input
+        language=bi.twilio_asr_language,
+        speech_model="phone_call",  # optimized for phone call audio
+        enhanced=True,  # only phone_call model supports enhanced
+    )
 
-    resp.redirect(url_for(twilio_voice_call_listen, bi_id=bi_id))
+    # by attaching to gather, we allow the user to interrupt with the next question while the response is playing
+    if text:
+        gather.say(text, voice=bi.twilio_voice)
+    if audio_url:
+        gather.play(audio_url)
+
+    resp.append(gather)
+
+    # if the user doesn't say anything, we'll ask them to call back in a quieter environment
+    resp.say(
+        "Sorry, I didn't get that. Please call again in a more quiet environment.",
+        voice=bi.twilio_voice,
+    )
 
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
@@ -254,12 +259,41 @@ def twilio_voice_call_error():
 
 
 @router.post("/__/twilio/sms/")
-def twilio_sms(data: dict = fastapi_request_urlencoded_body):
+def twilio_sms(
+    background_tasks: BackgroundTasks, data: dict = fastapi_request_urlencoded_body
+):
     """Handle incoming Twilio SMS."""
-    print("Twilio SMS", data)
+    from daras_ai_v2.twilio_bot import TwilioSMS
+    from daras_ai_v2.bots import msg_handler
+
+    phone_number = data["To"][0]
+    user_phone_number = data["From"][0]
+
+    try:
+        bi = BotIntegration.objects.get(twilio_phone_number=phone_number)
+    except BotIntegration.DoesNotExist:
+        return Response(status_code=404)
+
+    convo, created = Conversation.objects.get_or_create(
+        bot_integration=bi, twilio_phone_number=user_phone_number
+    )
+    bot = TwilioSMS(
+        sid=data["MessageSid"][0],
+        convo=convo,
+        text=data["Body"][0],
+        bi=bi,
+    )
+    background_tasks.add_task(msg_handler, bot)
 
     resp = MessagingResponse()
-    resp.message("Thank you for your message!")
+
+    if created and bi.twilio_initial_text.strip():
+        resp.message(bi.twilio_initial_text)
+
+    if bi.twilio_waiting_text.strip():
+        resp.message(bi.twilio_waiting_text)
+    else:
+        resp.message(translate("Please wait while we process your request.", bi))
 
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
@@ -276,8 +310,31 @@ def twilio_sms_error():
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
 
-def start_voice_call(convo: Conversation, text: str | None, audio_url: str | None):
-    """Start a new voice call saying the given text and audio URL. Useful for notifications."""
+def start_voice_call_session(
+    text: str, audio_url: str, bi: BotIntegration, user_phone_number: str
+):
+    client = Client(bi.twilio_account_sid, bi.twilio_auth_token)
+
+    resp = VoiceResponse()
+
+    text = base64.b64encode(text.encode()).decode() if text else "N"
+    audio_url = base64.b64encode(audio_url.encode()).decode() if audio_url else "N"
+
+    resp.redirect(
+        url_for(twilio_voice_call_response, bi_id=bi.id, text=text, audio_url=audio_url)
+    )
+
+    call = client.calls.create(
+        twiml=str(resp),
+        to=user_phone_number,
+        from_=bi.twilio_phone_number,
+    )
+
+    return call
+
+
+def create_voice_call(convo: Conversation, text: str | None, audio_url: str | None):
+    """Create a new voice call saying the given text and audio URL and then hanging up. Useful for notifications."""
 
     assert (
         convo.twilio_phone_number

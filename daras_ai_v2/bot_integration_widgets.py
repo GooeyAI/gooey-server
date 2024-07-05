@@ -26,24 +26,33 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
         st.session_state[f"_bi_show_feedback_buttons_{bi.id}"] = (
             BotIntegration._meta.get_field("show_feedback_buttons").default
         )
+        st.session_state[f"_bi_user_language_{bi.id}"] = BotIntegration._meta.get_field(
+            "user_language"
+        ).default
         st.session_state["analysis_urls"] = []
         st.session_state.pop("--list-view:analysis_urls", None)
 
-    bi.streaming_enabled = st.checkbox(
-        "**📡 Streaming Enabled**",
-        value=bi.streaming_enabled,
-        key=f"_bi_streaming_enabled_{bi.id}",
-    )
-    st.caption("Responses will be streamed to the user in real-time if enabled.")
-    bi.show_feedback_buttons = st.checkbox(
-        "**👍🏾 👎🏽 Show Feedback Buttons**",
-        value=bi.show_feedback_buttons,
-        key=f"_bi_show_feedback_buttons_{bi.id}",
-    )
-    st.caption(
-        "Users can rate and provide feedback on every copilot response if enabled."
-    )
+    if bi.platform != Platform.TWILIO:
+        bi.streaming_enabled = st.checkbox(
+            "**📡 Streaming Enabled**",
+            value=bi.streaming_enabled,
+            key=f"_bi_streaming_enabled_{bi.id}",
+        )
+        st.caption("Responses will be streamed to the user in real-time if enabled.")
+        bi.show_feedback_buttons = st.checkbox(
+            "**👍🏾 👎🏽 Show Feedback Buttons**",
+            value=bi.show_feedback_buttons,
+            key=f"_bi_show_feedback_buttons_{bi.id}",
+        )
+        st.caption(
+            "Users can rate and provide feedback on every copilot response if enabled."
+        )
 
+    bi.user_language = st.text_input(
+        "##### 🌐 User Language",
+        value=bi.user_language,
+        key=f"_bi_user_language_{bi.id}",
+    )
     st.caption(
         "Please note that this language is distinct from the one provided in the workflow settings. Hence, this allows you to integrate the same bot in many languages."
     )
@@ -827,7 +836,7 @@ def twilio_specific_settings(bi: BotIntegration):
         key=f"_bi_twilio_initial_audio_url_{bi.id}",
     )
     bi.twilio_waiting_audio_url = st.file_uploader(
-        "###### 🔊 Waiting Audio (played while waiting for a response -- Voice)",
+        "###### 🎵 Waiting Audio (played while waiting for a response -- Voice)",
         accept=["audio/*"],
         key=f"_bi_twilio_waiting_audio_url_{bi.id}",
     )
@@ -839,7 +848,6 @@ def twilio_specific_settings(bi: BotIntegration):
         "📞 Use Missed Call",
         value=bi.twilio_use_missed_call,
         key=f"_bi_twilio_use_missed_call_{bi.id}",
-        disabled=True,
     )
     st.caption(
         "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."

@@ -5,7 +5,53 @@ from daras_ai_v2.asr import run_google_translate, should_translate_lang
 
 
 class TwilioSMS(BotInterface):
-    pass
+    platform = Platform.TWILIO
+
+    def __init__(self, *, sid: str, convo: Conversation, text: str, bi: BotIntegration):
+        self.convo = convo
+
+        self._text = text
+        self.input_type = "text"
+
+        self.user_msg_id = sid
+        self.bot_id = bi.id
+        self.user_id = convo.twilio_phone_number
+
+        self._unpack_bot_integration()
+        self.bi = bi
+
+    def get_input_text(self) -> str | None:
+        return self._text
+
+    def send_msg(
+        self,
+        *,
+        text: str | None = None,
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
+        should_translate: bool = False,
+        update_msg_id: str | None = None,
+    ) -> str | None:
+        from routers.twilio_api import send_sms_message
+
+        assert buttons is None, "Interactive mode is not implemented yet"
+        assert update_msg_id is None, "Twilio does not support un-sms-ing things"
+
+        if text and should_translate and should_translate_lang(self.language):
+            text = run_google_translate(
+                [text], self.language, glossary_url=self.output_glossary
+            )[0]
+
+        return send_sms_message(
+            self.convo,
+            text=text,
+            media_url=audio or video or (documents[0] if documents else None),
+        ).sid
+
+    def mark_read(self):
+        pass  # handled in the webhook
 
 
 class TwilioVoice(BotInterface):
@@ -62,8 +108,8 @@ class TwilioVoice(BotInterface):
         text: str | None = None,
         audio: str | None = None,
         video: str | None = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
         should_translate: bool = False,
         update_msg_id: str | None = None,
     ) -> str | None:
@@ -87,7 +133,6 @@ class TwilioVoice(BotInterface):
         return twilio_voice_call_respond(
             text=text,
             audio_url=audio,
-            user_phone_number=self.user_id,
             queue_name=self.user_msg_id,
             bi=self.bi,
         )
