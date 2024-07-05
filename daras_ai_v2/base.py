@@ -1593,12 +1593,10 @@ class BasePage:
 
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             sr.run_status = ""
-            sr.error_msg = self.generate_credit_error_message(
-                sr.example_id, sr.run_id, sr.uid
-            )
+            sr.error_msg = self.generate_credit_error_message(sr.run_id, sr.uid)
             sr.save(update_fields=["run_status", "error_msg"])
         else:
-            self.call_runner_task(sr.example_id, sr.run_id, sr.uid)
+            self.call_runner_task(sr)
 
         raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
@@ -1670,31 +1668,25 @@ class BasePage:
             }
         )
 
-    def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
+    def call_runner_task(self, sr: SavedRun):
         from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
             page_cls=self.__class__,
             user_id=self.request.user.id,
-            run_id=run_id,
-            uid=uid,
-            state=st.session_state,
-            channel=self.realtime_channel_name(run_id, uid),
-            query_params=self.clean_query_params(
-                example_id=example_id, run_id=run_id, uid=uid
-            ),
-            is_api_call=is_api_call,
+            run_id=sr.run_id,
+            uid=sr.uid,
+            channel=self.realtime_channel_name(sr.run_id, sr.uid),
         )
 
     @classmethod
     def realtime_channel_name(cls, run_id, uid):
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
-    def generate_credit_error_message(self, example_id, run_id, uid) -> str:
+    def generate_credit_error_message(self, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if self.request.user.is_anonymous:
             account_url.query.params["next"] = self.app_url(
-                example_id=example_id,
                 run_id=run_id,
                 uid=uid,
                 query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
