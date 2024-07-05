@@ -551,12 +551,13 @@ def anchor(
 form_submit_button = button
 
 
-def expander(label: str, *, expanded: bool = False, **props):
+def expander(label: str, *, expanded: bool = False, key: str = None, **props):
     node = state.RenderTreeNode(
         name="expander",
         props=dict(
             label=dedent(label),
             open=expanded,
+            name=key or md5_values(label, expanded, props),
             **props,
         ),
     )

@@ -97,7 +97,7 @@ def gui_runner(
         page.dump_state_to_sr(st.session_state | output, sr)
 
     try:
-        gen = page.run(st.session_state)
+        gen = page.main(sr, st.session_state)
         save()
         while True:
             # record time
