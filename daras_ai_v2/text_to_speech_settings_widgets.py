@@ -7,6 +7,7 @@ from daras_ai_v2.azure_asr import azure_auth_header
 
 import gooey_ui as st
 from daras_ai_v2 import settings
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -28,24 +29,18 @@ UBERDUCK_VOICES = {
 }
 
 
-class OpenAI_TTS_Models(str, Enum):
+class OpenAI_TTS_Models(GooeyEnum):
     tts_1 = "tts-1"
     tts_1_hd = "tts-1-hd"
 
 
-OPENAI_TTS_MODELS_T = typing.Literal[tuple(e.name for e in OpenAI_TTS_Models)]
-
-
-class OpenAI_TTS_Voices(str, Enum):
+class OpenAI_TTS_Voices(GooeyEnum):
     alloy = "alloy"
     echo = "echo"
     fable = "fable"
     onyx = "onyx"
     nova = "nova"
     shimmer = "shimmer"
-
-
-OPENAI_TTS_VOICES_T = typing.Literal[tuple(e.name for e in OpenAI_TTS_Voices)]
 
 
 class TextToSpeechProviders(Enum):

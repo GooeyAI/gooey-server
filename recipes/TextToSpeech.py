@@ -21,8 +21,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_provider_selector,
     azure_tts_voices,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
     OLD_ELEVEN_LABS_VOICES,
@@ -56,8 +54,8 @@ class TextToSpeechSettings(BaseModel):
 
     azure_voice_name: str | None
 
-    openai_voice_name: OPENAI_TTS_VOICES_T | None
-    openai_tts_model: OPENAI_TTS_MODELS_T | None
+    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
+    openai_tts_model: OpenAI_TTS_Models.api_choices | None
 
 
 class TextToSpeechPage(BasePage):
@@ -81,8 +79,6 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "openai_voice_name": "alloy",
-        "openai_tts_model": "tts-1",
     }
 
     class RequestModelBase(BasePage.RequestModel):
