@@ -19,7 +19,7 @@ from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
@@ -1583,6 +1583,10 @@ class BasePage:
 
         try:
             sr = self.create_new_run(enable_rate_limits=True)
+        except ValidationError as e:
+            st.session_state[StateKeys.run_status] = None
+            st.session_state[StateKeys.error_msg] = str(e)
+            return
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
