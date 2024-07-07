@@ -4741,13 +4741,13 @@ dev = ["mypy", "pylint", "pytest", "pytest-asyncio", "pytest-recording", "respx"
 
 [[package]]
 name = "requests"
-version = "2.31.0"
+version = "2.32.3"
 description = "Python HTTP for Humans."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f"},
-    {file = "requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1"},
+    {file = "requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6"},
+    {file = "requests-2.32.3.tar.gz", hash = "sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760"},
 ]
 
 [package.dependencies]
@@ -6391,22 +6391,34 @@ multidict = ">=4.0"
 
 [[package]]
 name = "yt-dlp"
-version = "2023.10.13"
-description = "A youtube-dl fork with additional features and patches"
+version = "2024.7.2"
+description = "A feature-rich command-line audio/video downloader"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "yt-dlp-2023.10.13.tar.gz", hash = "sha256:e026ea1c435ff36eef1215bc4c5bb8c479938b90054997ba99f63a4541fe63b4"},
-    {file = "yt_dlp-2023.10.13-py2.py3-none-any.whl", hash = "sha256:2b069f22675532eebacdfd6372b1825651a751fef848de9ae6efe6491b2dc38a"},
+    {file = "yt_dlp-2024.7.2-py3-none-any.whl", hash = "sha256:4f76b48244c783e6ac06e8d7627bcf62cbeb4f6d79ba7e3cfc8249e680d4e691"},
+    {file = "yt_dlp-2024.7.2.tar.gz", hash = "sha256:2b0c86b579d4a044eaf3c4b00e3d7b24d82e6e26869fa11c288ea4395b387f41"},
 ]
 
 [package.dependencies]
-brotli = {version = "*", markers = "platform_python_implementation == \"CPython\""}
-brotlicffi = {version = "*", markers = "platform_python_implementation != \"CPython\""}
+brotli = {version = "*", markers = "implementation_name == \"cpython\""}
+brotlicffi = {version = "*", markers = "implementation_name != \"cpython\""}
 certifi = "*"
 mutagen = "*"
 pycryptodomex = "*"
-websockets = "*"
+requests = ">=2.32.2,<3"
+urllib3 = ">=1.26.17,<3"
+websockets = ">=12.0"
+
+[package.extras]
+build = ["build", "hatchling", "pip", "setuptools", "wheel"]
+curl-cffi = ["curl-cffi (==0.5.10)"]
+dev = ["autopep8 (>=2.0,<3.0)", "pre-commit", "pytest (>=8.1,<9.0)", "ruff (>=0.5.0,<0.6.0)"]
+py2exe = ["py2exe (>=0.12)"]
+pyinstaller = ["pyinstaller (>=6.7.0)"]
+secretstorage = ["cffi", "secretstorage"]
+static-analysis = ["autopep8 (>=2.0,<3.0)", "ruff (>=0.5.0,<0.6.0)"]
+test = ["pytest (>=8.1,<9.0)"]
 
 [[package]]
 name = "zipp"
@@ -6426,4 +6438,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "51cec8cd0df55b484b5d2d36bc08ea69104896c7b043dac50a054f0b5c89645f"
+content-hash = "fa29696b70dce0df83af18fb12a0f311dd05dccabfc7d3fe9ffe71630e042f14"
