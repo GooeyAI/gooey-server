@@ -26,114 +26,93 @@ from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_ema
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
-from gooeysite.bg_db_conn import db_middleware, next_db_safe
+from gooeysite.bg_db_conn import db_middleware
+
+DEFAULT_RUN_STATUS = "Running..."
 
 
 @app.task
 def gui_runner(
     *,
     page_cls: typing.Type[BasePage],
-    user_id: str,
+    user_id: int,
     run_id: str,
     uid: str,
     channel: str,
 ):
-    def event_processor(event, hint):
-        event["request"] = {
-            "method": "POST",
-            "url": page.app_url(query_params=st.get_query_params()),
-            "data": st.session_state,
-        }
-        return event
-
-    page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
-    page.setup_sentry(event_processor=event_processor)
-    sr = page.run_doc_sr(run_id, uid)
-    st.set_session_state(sr.to_dict())
-    set_query_params(dict(run_id=run_id, uid=uid))
-
-    run_time = 0
-    yield_val = None
+    start_time = time()
     error_msg = None
 
     @db_middleware
-    def save(done=False):
+    def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
+        if isinstance(yield_val, tuple):
+            run_status, extra_output = yield_val
+        else:
+            run_status = yield_val
+            extra_output = {}
+
         if done:
-            # clear run status
             run_status = None
         else:
-            # set run status to the yield value of generator
-            run_status = yield_val or "Running..."
-        if isinstance(run_status, tuple):
-            run_status, extra_output = run_status
-        else:
-            extra_output = {}
-        # set run status and run time
-        status = {
-            StateKeys.run_time: run_time,
-            StateKeys.error_msg: error_msg,
-            StateKeys.run_status: run_status,
-        }
+            run_status = run_status or DEFAULT_RUN_STATUS
+
         output = (
-            status
-            |
-            # extract outputs from local state
+            # extract status of the run
             {
+                StateKeys.error_msg: error_msg,
+                StateKeys.run_time: time() - start_time,
+                StateKeys.run_status: run_status,
+            }
+            # extract outputs from local state
+            | {
                 k: v
                 for k, v in st.session_state.items()
                 if k in page.ResponseModel.__fields__
             }
+            # add extra outputs from the run
             | extra_output
         )
+
         # send outputs to ui
         realtime_push(channel, output)
         # save to db
         page.dump_state_to_sr(st.session_state | output, sr)
 
+    user = AppUser.objects.get(id=user_id)
+    page = page_cls(request=SimpleNamespace(user=user))
+    page.setup_sentry()
+    sr = page.run_doc_sr(run_id, uid)
+    st.set_session_state(sr.to_dict())
+    set_query_params(dict(run_id=run_id, uid=uid))
+
     try:
-        gen = page.main(sr, st.session_state)
-        save()
-        while True:
-            # record time
-            start_time = time()
+        save_on_step()
+        for val in page.main(sr, st.session_state):
+            save_on_step(val)
+    # render errors nicely
+    except Exception as e:
+        if isinstance(e, HTTPException) and e.status_code == 402:
+            error_msg = page.generate_credit_error_message(run_id, uid)
             try:
-                # advance the generator (to further progress of run())
-                yield_val = next_db_safe(gen)
-                # increment total time taken after every iteration
-                run_time += time() - start_time
-                continue
-            # run completed
-            except StopIteration:
-                run_time += time() - start_time
-                sr.transaction, sr.price = page.deduct_credits(st.session_state)
-                break
-            # render errors nicely
-            except Exception as e:
-                run_time += time() - start_time
-
-                if isinstance(e, HTTPException) and e.status_code == 402:
-                    error_msg = page.generate_credit_error_message(run_id, uid)
-                    try:
-                        raise UserError(error_msg) from e
-                    except UserError as e:
-                        sentry_sdk.capture_exception(e, level=e.sentry_level)
-                        break
-
-                if isinstance(e, UserError):
-                    sentry_level = e.sentry_level
-                else:
-                    sentry_level = "error"
-                    traceback.print_exc()
-                sentry_sdk.capture_exception(e, level=sentry_level)
-                error_msg = err_msg_for_exc(e)
-                break
-            finally:
-                save()
+                raise UserError(error_msg) from e
+            except UserError as e:
+                sentry_sdk.capture_exception(e, level=e.sentry_level)
+        else:
+            if isinstance(e, UserError):
+                sentry_level = e.sentry_level
+            else:
+                sentry_level = "error"
+                traceback.print_exc()
+            sentry_sdk.capture_exception(e, level=sentry_level)
+            error_msg = err_msg_for_exc(e)
+    # run completed successfully, deduct credits
+    else:
+        sr.transaction, sr.price = page.deduct_credits(st.session_state)
     finally:
-        save(done=True)
+        save_on_step(done=True)
         if not sr.is_api_call:
             send_email_on_completion(page, sr)
-        run_low_balance_email_check(uid)
+        run_low_balance_email_check(user)
 
 
 def err_msg_for_exc(e: Exception):
@@ -162,11 +141,10 @@ def err_msg_for_exc(e: Exception):
         return f"{type(e).__name__}: {e}"
 
 
-def run_low_balance_email_check(uid: str):
+def run_low_balance_email_check(user: AppUser):
     # don't send email if feature is disabled
     if not settings.LOW_BALANCE_EMAIL_ENABLED:
         return
-    user = AppUser.objects.get(uid=uid)
     # don't send email if user is not paying or has enough balance
     if not user.is_paying or user.balance > settings.LOW_BALANCE_EMAIL_CREDITS:
         return

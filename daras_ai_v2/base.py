@@ -262,11 +262,31 @@ class BasePage:
     def get_dynamic_meta_title(self) -> str | None:
         return None
 
-    def setup_sentry(self, event_processor: typing.Callable = None):
-        def add_user_to_event(event, hint):
-            user = self.request and self.request.user
-            if not user:
-                return event
+    def setup_sentry(self):
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_transaction_name(
+                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
+            )
+            scope.add_event_processor(self.sentry_event_set_request)
+            scope.add_event_processor(self.sentry_event_set_user)
+
+    def sentry_event_set_request(self, event, hint):
+        request = event.setdefault("request", {})
+        request.setdefault("method", "POST")
+        request["data"] = st.session_state
+        if url := request.get("url"):
+            f = furl(url)
+            request["url"] = str(
+                furl(settings.APP_BASE_URL, path=f.pathstr, query=f.querystr).url
+            )
+        else:
+            request["url"] = self.app_url(
+                tab=self.tab, query_params=st.get_query_params()
+            )
+        return event
+
+    def sentry_event_set_user(self, event, hint):
+        if user := self.request and self.request.user:
             event["user"] = {
                 "id": user.id,
                 "name": user.display_name,
@@ -282,20 +302,12 @@ class BasePage:
                         "is_anonymous",
                         "is_disabled",
                         "disable_safety_checker",
+                        "disable_rate_limits",
                         "created_at",
                     ]
                 },
             }
-            return event
-
-        with sentry_sdk.configure_scope() as scope:
-            scope.set_extra("base_url", self.app_url())
-            scope.set_transaction_name(
-                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
-            )
-            scope.add_event_processor(add_user_to_event)
-            if event_processor:
-                scope.add_event_processor(event_processor)
+        return event
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
