@@ -23,7 +23,7 @@ def workflow_url_input(
     current_user: AppUser | None = None,
     allow_none: bool = False,
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
-    added_options = init_workflow_selector(internal_state, key)
+    init_workflow_selector(internal_state, key)
 
     col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
     if not internal_state.get("workflow") and internal_state.get("url"):
@@ -40,7 +40,7 @@ def workflow_url_input(
         internal_state["workflow"] = page_cls.workflow
         with col1:
             options = get_published_run_options(page_cls, current_user=current_user)
-            options.update(added_options)
+            options.update(internal_state.get("--added_workflows", {}))
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -109,7 +109,7 @@ def init_workflow_selector(
         try:
             _, sr, pr = url_to_runs(str(internal_state["url"]))
         except Exception:
-            return {}
+            return
 
         workflow = sr.workflow
         page_cls = Workflow(workflow).page_cls
@@ -122,9 +122,7 @@ def init_workflow_selector(
         internal_state["workflow"] = workflow
         internal_state["url"] = url
 
-        return {url: title}
-
-    return {}
+        internal_state.setdefault("--added_workflows", {})[url] = title
 
 
 def url_to_runs(

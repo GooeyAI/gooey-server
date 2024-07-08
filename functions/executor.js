@@ -1,17 +1,21 @@
+//
+// To update this, run:
+//    deployctl deploy --include functions/executor.js functions/executor.js --prod
+// (Exclude --prod when testing in development)
+//
 Deno.serve(async (req) => {
   if (!isAuthenticated(req)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
   let logs = captureConsole();
-  let code = await req.json();
+  let { code, variables } = await req.json();
   let status, response;
 
   try {
-    let Deno = undefined; // Deno should not available to user code
-    let retval = eval(code);
+    let retval = isolatedEval(code, variables);
     if (retval instanceof Function) {
-      retval = retval();
+      retval = retval(variables);
     }
     if (retval instanceof Promise) {
       retval = await retval;
@@ -26,6 +30,14 @@ Deno.serve(async (req) => {
   let body = JSON.stringify({ ...response, logs });
   return new Response(body, { status });
 });
+
+function isolatedEval(code, variables) {
+  // Hide global objects
+  let Deno = undefined;
+  let globalThis = undefined;
+  let window = undefined;
+  return eval(code);
+}
 
 function isAuthenticated(req) {
   let authorization = req.headers.get("Authorization");

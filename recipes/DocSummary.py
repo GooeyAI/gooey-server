@@ -57,7 +57,7 @@ class DocSummaryPage(BasePage):
         "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
         task_instructions: str | None

@@ -24,7 +24,7 @@ from openai.types.chat import (
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
-from daras_ai_v2.functions import LLMTools
+from functions.recipe_functions import LLMTools
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.text_splitter import (
     default_length_function,

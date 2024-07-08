@@ -93,7 +93,9 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
 
     # make the api call
     result, sr = analysis_sr.submit_api_call(
-        current_user=billing_account, request_body=dict(variables=variables)
+        current_user=billing_account,
+        request_body=dict(variables=variables),
+        parent_pr=anal.published_run,
     )
 
     # save the run before the result is ready

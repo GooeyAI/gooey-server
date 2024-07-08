@@ -47,7 +47,7 @@ class ImageSegmentationPage(BasePage):
         "obj_pos_y": 0.5,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
 
         selected_model: (

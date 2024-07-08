@@ -50,7 +50,7 @@ class GoogleImageGenPage(BasePage):
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 
-    class RequestModel(GoogleSearchLocationMixin, BaseModel):
+    class RequestModel(GoogleSearchLocationMixin, BasePage.RequestModel):
         search_query: str
         text_prompt: str
 

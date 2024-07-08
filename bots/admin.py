@@ -1,5 +1,6 @@
 import datetime
 import json
+from types import SimpleNamespace
 
 import django.db.models
 from django import forms
@@ -287,6 +288,18 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         )
 
 
+@admin.register(PublishedRunVersion)
+class PublishedRunVersionAdmin(admin.ModelAdmin):
+    search_fields = ["id", "version_id", "published_run__published_run_id"]
+    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+
+
+class PublishedRunVersionInline(admin.TabularInline):
+    model = PublishedRunVersion
+    extra = 0
+    autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
+
+
 @admin.register(PublishedRun)
 class PublishedRunAdmin(admin.ModelAdmin):
     list_display = [
@@ -308,6 +321,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+    inlines = [PublishedRunVersionInline]
 
     def view_user(self, published_run: PublishedRun):
         if published_run.created_by is None:
@@ -423,30 +437,14 @@ class SavedRunAdmin(admin.ModelAdmin):
     def rerun_tasks(self, request, queryset):
         sr: SavedRun
         for sr in queryset.all():
-            page_cls = Workflow(sr.workflow).page_cls
-            pr = sr.parent_published_run()
-            gui_runner.delay(
-                page_cls=page_cls,
-                user_id=AppUser.objects.get(uid=sr.uid).id,
-                run_id=sr.run_id,
-                uid=sr.uid,
-                state=sr.to_dict(),
-                channel=page_cls.realtime_channel_name(sr.run_id, sr.uid),
-                query_params=page_cls.clean_query_params(
-                    example_id=pr and pr.published_run_id, run_id=sr.run_id, uid=sr.uid
-                ),
-                is_api_call=sr.is_api_call,
+            page = Workflow(sr.workflow).page_cls(
+                request=SimpleNamespace(user=AppUser.objects.get(uid=sr.uid))
             )
+            page.call_runner_task(sr)
         self.message_user(
             request,
             f"Started re-running {queryset.count()} tasks in the background.",
         )
-
-
-@admin.register(PublishedRunVersion)
-class PublishedRunVersionAdmin(admin.ModelAdmin):
-    search_fields = ["id", "version_id", "published_run__published_run_id"]
-    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):

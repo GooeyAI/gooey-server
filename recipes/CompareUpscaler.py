@@ -21,7 +21,7 @@ class CompareUpscalerPage(BasePage):
     workflow = Workflow.COMPARE_UPSCALER
     slug_versions = ["compare-ai-upscalers"]
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl | None = Field(None, description="Input Image")
         input_video: FieldHttpUrl | None = Field(None, description="Input Video")
 
@@ -183,10 +183,10 @@ class CompareUpscalerPage(BasePage):
 
 def _render_outputs(state):
     for key in state.get("selected_models") or []:
-        img = state.get("output_images", {}).get(key)
+        img = (state.get("output_images") or {}).get(key)
         if img:
             st.image(img, caption=UpscalerModels[key].label, show_download_button=True)
 
-        vid = state.get("output_videos", {}).get(key)
+        vid = (state.get("output_videos") or {}).get(key)
         if vid:
             st.video(vid, caption=UpscalerModels[key].label, show_download_button=True)

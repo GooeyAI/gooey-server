@@ -78,7 +78,7 @@ class QRCodeGeneratorPage(BasePage):
         super().__init__(*args, **kwargs)
         self.__dict__.update(self.sane_defaults)
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         qr_code_data: str | None
         qr_code_input_image: FieldHttpUrl | None
         qr_code_vcard: VCARD | None

@@ -208,6 +208,23 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
+@app.post("/components/")
+@st.route
+def component_page(request: Request):
+    import components_doc
+
+    with page_wrapper(request):
+        components_doc.render()
+
+    return {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=components_doc.META_TITLE,
+            description=components_doc.META_DESCRIPTION,
+        ),
+    }
+
+
 @app.post("/explore/")
 @st.route
 def explore_page(request: Request):

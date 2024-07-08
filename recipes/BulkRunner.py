@@ -45,7 +45,7 @@ class BulkRunnerPage(BasePage):
     slug_versions = ["bulk-runner", "bulk"]
     price = 1
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
@@ -318,7 +318,9 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     result, sr = sr.submit_api_call(
-                        current_user=self.request.user, request_body=request_body
+                        current_user=self.request.user,
+                        request_body=request_body,
+                        parent_pr=pr,
                     )
                     get_celery_result_db_safe(result)
                     sr.refresh_from_db()
@@ -388,7 +390,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 documents=response.output_documents
             ).dict(exclude_unset=True)
             result, sr = sr.submit_api_call(
-                current_user=self.request.user, request_body=request_body
+                current_user=self.request.user, request_body=request_body, parent_pr=pr
             )
             get_celery_result_db_safe(result)
             sr.refresh_from_db()
@@ -426,7 +428,7 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        added_options = init_workflow_selector(d, key)
+        init_workflow_selector(d, key)
 
         col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
@@ -466,7 +468,7 @@ To get started:
                 options = get_published_run_options(
                     page_cls, current_user=self.request.user
                 )
-                options.update(added_options)
+                options.update(d.get("--added_workflows", {}))
                 with st.div(className="pt-1"):
                     url = st.selectbox(
                         "",

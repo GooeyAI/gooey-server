@@ -23,7 +23,7 @@ class LipsyncPage(BasePage):
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
-    class RequestModel(LipsyncSettings, BaseModel):
+    class RequestModel(LipsyncSettings, BasePage.RequestModel):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )

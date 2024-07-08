@@ -37,7 +37,7 @@ class Text2AudioPage(BasePage):
         seed=42,
     )
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         text_prompt: str
         negative_prompt: str | None
 
