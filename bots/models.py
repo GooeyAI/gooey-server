@@ -58,11 +58,14 @@ class Platform(models.IntegerChoices):
     WHATSAPP = (3, "WhatsApp")
     SLACK = (4, "Slack")
     WEB = (5, "Web")
+    TWILIO = (6, "Twilio")
 
     def get_icon(self):
         match self:
             case Platform.WEB:
                 return f'<i class="fa-regular fa-globe"></i>'
+            case Platform.TWILIO:
+                return f'<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
             case _:
                 return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
 
@@ -605,6 +608,67 @@ class BotIntegration(models.Model):
         help_text="Extra configuration for the bot's web integration",
     )
 
+    twilio_account_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio account sid as found on twilio.com/console (mandatory)",
+    )
+    twilio_auth_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio auth token as found on twilio.com/console (mandatory)",
+    )
+    twilio_phone_number = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio unformatted phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
+    )
+    twilio_phone_number_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (mandatory)",
+    )
+    twilio_default_to_gooey_asr = models.BooleanField(
+        default=False,
+        help_text="If true, the bot will use Gooey ASR for speech recognition instead of Twilio's when available on the attached run",
+    )
+    twilio_default_to_gooey_tts = models.BooleanField(
+        default=False,
+        help_text="If true, the bot will use Gooey TTS for text to speech instead of Twilio's when available on the attached run",
+    )
+    twilio_voice = models.TextField(
+        default="woman",
+        help_text="The voice to use for Twilio TTS ('man', 'woman', or Amazon Polly/Google Voices: https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages)",
+    )
+    twilio_initial_text = models.TextField(
+        default="",
+        blank=True,
+        help_text="The initial text to send to the user when a call is started",
+    )
+    twilio_initial_audio_url = models.TextField(
+        default="",
+        blank=True,
+        help_text="The initial audio url to play to the user when a call is started",
+    )
+    twilio_use_missed_call = models.BooleanField(
+        default=False,
+        help_text="If true, the bot will reject incoming calls and call back the user instead so they don't get charged for the call",
+    )
+    twilio_waiting_audio_url = models.TextField(
+        default="",
+        blank=True,
+        help_text="The audio url to play to the user while waiting for a response if using voice",
+    )
+    twilio_waiting_text = models.TextField(
+        default="",
+        blank=True,
+        help_text="The text to send to the user while waiting for a response if using sms",
+    )
+    twilio_asr_language = models.TextField(
+        default="en-US",
+        help_text="The language to use for Twilio ASR (https://www.twilio.com/docs/voice/twiml/gather#languagetags)",
+    )
+
     streaming_enabled = models.BooleanField(
         default=False,
         help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
@@ -650,6 +714,7 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
+            or self.twilio_phone_number
             or self.name
             or (
                 self.platform == Platform.WEB
@@ -945,6 +1010,12 @@ class Conversation(models.Model):
         help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
+    twilio_phone_number = models.TextField(
+        blank=True,
+        default="",
+        help_text="User's Twilio phone number (mandatory)",
+    )
+
     web_user_id = models.CharField(
         max_length=512,
         blank=True,
@@ -990,6 +1061,7 @@ class Conversation(models.Model):
             or self.fb_page_id
             or self.slack_user_id
             or self.web_user_id
+            or self.twilio_phone_number
         )
 
     get_display_name.short_description = "User"
