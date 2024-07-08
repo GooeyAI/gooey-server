@@ -817,7 +817,12 @@ class ConversationQuerySet(models.QuerySet):
     def get_unique_users(self) -> "ConversationQuerySet":
         """Get unique conversations"""
         return self.distinct(
-            "fb_page_id", "ig_account_id", "wa_phone_number", "slack_user_id"
+            "fb_page_id",
+            "ig_account_id",
+            "wa_phone_number",
+            "slack_user_id",
+            "twilio_phone_number",
+            "web_user_id",
         )
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
