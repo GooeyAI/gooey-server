@@ -2,6 +2,7 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2.bots import BotInterface, ReplyButton
 
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
+from uuid import uuid4
 
 
 class TwilioSMS(BotInterface):
@@ -62,11 +63,14 @@ class TwilioVoice(BotInterface):
         *,
         incoming_number: str,
         queue_name: str,
+        call_sid: str,
         text: str | None = None,
         audio: str | None = None,
         bi: BotIntegration,
     ):
-        self.user_msg_id = queue_name
+        self.user_msg_id = uuid4().hex
+        self._queue_name = queue_name
+        self._call_sid = call_sid
         self.bot_id = bi.id
         self.user_id = incoming_number
 
@@ -81,11 +85,7 @@ class TwilioVoice(BotInterface):
                 bot_integration=bi,
             )[0]
 
-        if (
-            audio
-            and bi.twilio_default_to_gooey_asr
-            and bi.saved_run.state.get("asr_model")
-        ):
+        if audio:
             self.input_type = "audio"
         else:
             self.input_type = "text"
@@ -120,6 +120,7 @@ class TwilioVoice(BotInterface):
         assert buttons is None, "Interactive mode is not implemented yet"
         assert update_msg_id is None, "Twilio does not support un-saying things"
 
+        # don't send both audio and text version of the same message
         if self.bi.twilio_default_to_gooey_tts and audio:
             text = None
         else:
@@ -130,12 +131,15 @@ class TwilioVoice(BotInterface):
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
 
-        return twilio_voice_call_respond(
+        twilio_voice_call_respond(
             text=text,
             audio_url=audio,
-            queue_name=self.user_msg_id,
+            queue_name=self._queue_name,
+            call_sid=self._call_sid,
             bi=self.bi,
         )
+
+        return uuid4().hex
 
     def mark_read(self):
         pass  # handled in the webhook

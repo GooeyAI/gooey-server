@@ -812,10 +812,9 @@ def twilio_specific_settings(bi: BotIntegration):
         "🎤 Default to Gooey ASR",
         value=bi.twilio_default_to_gooey_asr,
         key=f"_bi_twilio_default_to_gooey_asr_{bi.id}",
-        disabled=True,
     )
     st.caption(
-        "Use Gooey's ASR for transcribing incoming audio messages (must also be enabled on the underlying run)."
+        "Use Gooey's ASR for transcribing incoming audio messages (must also be enabled on the underlying run). Does not support interruptions."
     )
     bi.twilio_default_to_gooey_tts = st.checkbox(
         "📢 Default to Gooey TTS",
@@ -830,15 +829,21 @@ def twilio_specific_settings(bi: BotIntegration):
         value=bi.twilio_initial_text,
         key=f"_bi_twilio_initial_text_{bi.id}",
     )
-    bi.twilio_initial_audio_url = st.file_uploader(
-        "###### 🔊 Initial Audio (played at the beginning of each call)",
-        accept=["audio/*"],
-        key=f"_bi_twilio_initial_audio_url_{bi.id}",
+    bi.twilio_initial_audio_url = (
+        st.file_uploader(
+            "###### 🔊 Initial Audio (played at the beginning of each call)",
+            accept=["audio/*"],
+            key=f"_bi_twilio_initial_audio_url_{bi.id}",
+        )
+        or ""
     )
-    bi.twilio_waiting_audio_url = st.file_uploader(
-        "###### 🎵 Waiting Audio (played while waiting for a response -- Voice)",
-        accept=["audio/*"],
-        key=f"_bi_twilio_waiting_audio_url_{bi.id}",
+    bi.twilio_waiting_audio_url = (
+        st.file_uploader(
+            "###### 🎵 Waiting Audio (played while waiting for a response -- Voice)",
+            accept=["audio/*"],
+            key=f"_bi_twilio_waiting_audio_url_{bi.id}",
+        )
+        or ""
     )
     bi.twilio_waiting_text = st.text_area(
         "###### 📝 Waiting Text (texted while waiting for a response -- SMS)",

@@ -1199,11 +1199,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.tag("tbody"),
             ):
                 for choice in connect_choices:
-                    if (
-                        choice.platform == Platform.TWILIO
-                        and not self.is_current_user_admin()
-                    ):
-                        continue  # only admins can connect to Twilio for now
                     with st.tag("tr"):
                         with st.tag("td"):
                             if st.button(
@@ -1732,7 +1727,7 @@ connect_choices = [
     ),
     ConnectChoice(
         platform=Platform.TWILIO,
-        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6b30b13a-3980-11ef-b8f4-02420a000119/Twilio-logo-red.svg.png",
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/22b4b384-3d54-11ef-88d7-02420a000135/Twilio-logo-red.svg.png",
         label="Connect a Twilio phone number to chat via SMS or Voice calls.",
     ),
 ]
