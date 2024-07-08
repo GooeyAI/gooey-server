@@ -17,6 +17,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
+from functions.models import CalledFunction, CalledFunctionResponse
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
@@ -344,23 +345,30 @@ class SavedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        parent_pr: "PublishedRun" = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
         # run in a thread to avoid messing up threadlocals
         with ThreadPool(1) as pool:
+            if parent_pr and parent_pr.saved_run == self:
+                # avoid passing run_id and uid for examples
+                query_params = dict(example_id=parent_pr.published_run_id)
+            else:
+                query_params = dict(
+                    example_id=self.example_id, run_id=self.run_id, uid=self.uid
+                )
             page, result, run_id, uid = pool.apply(
                 submit_api_call,
                 kwds=dict(
                     page_cls=Workflow(self.workflow).page_cls,
-                    query_params=dict(
-                        example_id=self.example_id, run_id=self.run_id, uid=self.uid
-                    ),
+                    query_params=query_params,
                     user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
                 ),
             )
+
         return result, page.run_doc_sr(run_id, uid)
 
     def get_creator(self) -> AppUser | None:
@@ -372,6 +380,15 @@ class SavedRun(models.Model):
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
+
+    def api_output(self, state: dict = None) -> dict:
+        state = state or self.state
+        if self.state.get("functions"):
+            state["called_functions"] = [
+                CalledFunctionResponse.from_db(called_fn)
+                for called_fn in self.called_functions.all()
+            ]
+        return state
 
 
 def _parse_dt(dt) -> datetime.datetime | None:
@@ -1733,6 +1750,20 @@ class PublishedRun(models.Model):
                 "run_count"
             ]
             or 0
+        )
+
+    def submit_api_call(
+        self,
+        *,
+        current_user: AppUser,
+        request_body: dict,
+        enable_rate_limits: bool = False,
+    ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+        return self.saved_run.submit_api_call(
+            current_user=current_user,
+            request_body=request_body,
+            enable_rate_limits=enable_rate_limits,
+            parent_pr=self,
         )
 
 

@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "embeddings",
     "handles",
     "payments",
+    "functions",
 ]
 
 MIDDLEWARE = [

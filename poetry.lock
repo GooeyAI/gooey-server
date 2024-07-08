@@ -6595,13 +6595,13 @@ multidict = ">=4.0"
 
 [[package]]
 name = "yt-dlp"
-version = "2023.11.16"
-description = "A youtube-dl fork with additional features and patches"
+version = "2024.7.2"
+description = "A feature-rich command-line audio/video downloader"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "yt-dlp-2023.11.16.tar.gz", hash = "sha256:f0ccdaf12e08b15902601a4671c7ab12906d7b11de3ae75fa6506811c24ec5da"},
-    {file = "yt_dlp-2023.11.16-py2.py3-none-any.whl", hash = "sha256:0322ba85aa4afdb75f8641ed550e5958964daff034aeb477abb15031fd9a51ed"},
+    {file = "yt_dlp-2024.7.2-py3-none-any.whl", hash = "sha256:4f76b48244c783e6ac06e8d7627bcf62cbeb4f6d79ba7e3cfc8249e680d4e691"},
+    {file = "yt_dlp-2024.7.2.tar.gz", hash = "sha256:2b0c86b579d4a044eaf3c4b00e3d7b24d82e6e26869fa11c288ea4395b387f41"},
 ]
 
 [package.dependencies]
@@ -6610,9 +6610,19 @@ brotlicffi = {version = "*", markers = "implementation_name != \"cpython\""}
 certifi = "*"
 mutagen = "*"
 pycryptodomex = "*"
-requests = ">=2.31.0,<3"
+requests = ">=2.32.2,<3"
 urllib3 = ">=1.26.17,<3"
-websockets = "*"
+websockets = ">=12.0"
+
+[package.extras]
+build = ["build", "hatchling", "pip", "setuptools", "wheel"]
+curl-cffi = ["curl-cffi (==0.5.10)"]
+dev = ["autopep8 (>=2.0,<3.0)", "pre-commit", "pytest (>=8.1,<9.0)", "ruff (>=0.5.0,<0.6.0)"]
+py2exe = ["py2exe (>=0.12)"]
+pyinstaller = ["pyinstaller (>=6.7.0)"]
+secretstorage = ["cffi", "secretstorage"]
+static-analysis = ["autopep8 (>=2.0,<3.0)", "ruff (>=0.5.0,<0.6.0)"]
+test = ["pytest (>=8.1,<9.0)"]
 
 [[package]]
 name = "zipp"
@@ -6632,4 +6642,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "472b879ca24219285b6a19f69fac52133a7c7b605c377c09dcd7d276d7f9c4b3"
+content-hash = "fa29696b70dce0df83af18fb12a0f311dd05dccabfc7d3fe9ffe71630e042f14"

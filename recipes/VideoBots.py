@@ -52,7 +52,6 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
-from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -71,7 +70,7 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
@@ -89,6 +88,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from functions.recipe_functions import LLMTools
 from gooey_ui import RedirectException
 from recipes.DocSearch import (
     get_top_k_references,
@@ -165,7 +165,7 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None
@@ -246,8 +246,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )
-
-        variables: dict[str, typing.Any] | None
 
         tools: list[LLMTools] | None = Field(
             title="🛠️ Tools",
@@ -330,9 +328,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """,
             key="bot_script",
             height=300,
-        )
-        prompt_vars_widget(
-            "bot_script",
         )
 
         enum_selector(
@@ -519,9 +514,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="task_instructions",
                 height=300,
             )
-            prompt_vars_widget(
-                "task_instructions",
-            )
 
             citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
@@ -604,7 +596,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         references = st.session_state.get("references", [])
         if not references:
             return
-        with st.expander("💁‍♀️ Sources"):
+        key = "sources-expander"
+        with st.expander("💁‍♀️ Sources", key=key):
+            if not st.session_state.get(key):
+                return
             for idx, ref in enumerate(references):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
@@ -691,7 +686,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.json(final_prompt)
 
         for k in ["raw_output_text", "output_text", "raw_tts_text"]:
-            for idx, text in enumerate(st.session_state.get(k, [])):
+            for idx, text in enumerate(st.session_state.get(k) or []):
                 st.text_area(
                     f"###### `{k}[{idx}]`",
                     value=text,

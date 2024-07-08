@@ -14,7 +14,7 @@ class ChyronPlantPage(BasePage):
     workflow = Workflow.CHYRON_PLANT
     slug_versions = ["ChyronPlant"]
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         midi_notes: str
 
         midi_notes_prompt: str | None
