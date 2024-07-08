@@ -208,10 +208,6 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
-async def request_json(request: Request):
-    return await request.json()
-
-
 @app.post("/components/")
 @st.route
 def component_page(request: Request):

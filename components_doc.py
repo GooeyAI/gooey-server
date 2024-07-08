@@ -1,6 +1,7 @@
-import gooey_ui as gui
-from gooey_ui import state
 import inspect
+from functools import wraps
+
+import gooey_ui as gui
 
 META_TITLE = "Gooey Components"
 META_DESCRIPTION = "Explore the Gooey Component Library"
@@ -22,6 +23,7 @@ def render():
 
 
 def show_source_code(fn):
+    @wraps(fn)
     def wrapper(*args, **kwargs):
         out = fn(*args, **kwargs)
         code_block(inspect.getsource(fn))
@@ -30,176 +32,172 @@ def show_source_code(fn):
     return wrapper
 
 
-def get_source_code(fn: callable):
-    source_code = inspect.getsource(fn)
-    return source_code
-
-
 def render_layouts():
     section_title("Layouts")
 
     # Full Width Layout
     sub_section_title("Full Width Layout")
-
-    @show_source_code
-    def full_width_layout():
-        with gui.tag("div", className="container-fluid bg-light p-4"):
-            with gui.tag("div", className="row"):
-                with gui.tag("div", className="col-12"):
-                    gui.html("This is a full width layout")
-
     full_width_layout()
 
     # 1/2 Layout
     sub_section_title("Full Width 1/2 Layout")
-
-    @show_source_code
-    def half_width_layout():
-        with gui.tag("div", className="container-fluid p-2"):
-            with gui.tag("div", className="row"):
-                with gui.tag("div", className="col-6 border"):
-                    gui.html("This is a 1/2 width layout")
-                with gui.tag("div", className="col-6 border"):
-                    gui.html("This is a 1/2 width layout")
-
     half_width_layout()
 
     # 1/3 Layout
     sub_section_title("Full Width 1/3 Layout")
-
-    @show_source_code
-    def third_width_layout():
-        with gui.tag("div", className="container-fluid p-2"):
-            with gui.tag("div", className="row"):
-                with gui.tag("div", className="col-4 border"):
-                    gui.html("This is a 1/3 width layout")
-                with gui.tag("div", className="col-4 border"):
-                    gui.html("This is a 1/3 width layout")
-                with gui.tag("div", className="col-4 border"):
-                    gui.html("This is a 1/3 width layout")
-
     third_width_layout()
 
     # Responsive 1/3 Layout
     sub_section_title("Responsive 1/3 Layout")
     gui.write("These columns will go full width on small devices")
-
-    @show_source_code
-    def responsive_third_width_layout():
-        with gui.tag("div", className="container-fluid p-2"):
-            with gui.tag("div", className="row"):
-                with gui.tag("div", className="col-12 col-md-4 border"):
-                    gui.html("This is a responsive 1/3 width layout")
-                with gui.tag("div", className="col-12 col-md-4 border"):
-                    gui.html("This is a responsive 1/3 width layout")
-                with gui.tag("div", className="col-12 col-md-4 border"):
-                    gui.html("This is a responsive 1/3 width layout")
-
     responsive_third_width_layout()
+
+
+@show_source_code
+def full_width_layout():
+    with gui.div(className="w-100 bg-light p-4"):
+        gui.html("This is a full width layout")
+
+
+@show_source_code
+def half_width_layout():
+    col1, col2 = gui.columns(2, responsive=False)
+    with col1:
+        with gui.div(className="border"):
+            gui.html("This is a 1/2 width layout")
+    with col2:
+        with gui.div(className="border"):
+            gui.html("This is a 1/2 width layout")
+
+
+@show_source_code
+def third_width_layout():
+    col1, col2, col3 = gui.columns(3, responsive=False)
+    with col1:
+        with gui.div(className="border"):
+            gui.html("This is a 1/3 width layout")
+    with col2:
+        with gui.div(className="border"):
+            gui.html("This is a 1/3 width layout")
+    with col3:
+        with gui.div(className="border"):
+            gui.html("This is a 1/3 width layout")
+
+
+@show_source_code
+def responsive_third_width_layout():
+    col1, col2, col3 = gui.columns(3)
+    with col1:
+        with gui.div(className="border"):
+            gui.html("This is a responsive 1/3 width layout")
+    with col2:
+        with gui.div(className="border"):
+            gui.html("This is a responsive 1/3 width layout")
+    with col3:
+        with gui.div(className="border"):
+            gui.html("This is a responsive 1/3 width layout")
 
 
 def render_content():
     section_title("Content")
-    with gui.tag("div", className="container-fluid"):
-        with gui.tag("div", className="row"):
-            # LEFT SIDE
-            with gui.tag("div", className="col-12 col-md-6"):
+    with gui.tag("div", className="container-fluid"), gui.tag("div", className="row"):
+        # LEFT SIDE
+        with gui.tag("div", className="col-12 col-md-6"):
+            render_headings()
+        # RIGHT SIDE
+        with gui.tag("div", className="col-12 col-md-6"):
+            sub_section_title("Normal Text")
+            normal_text()
 
-                def render_headings():
-                    sub_section_title("Headings")
+            sub_section_title("Link")
+            link()
 
-                    @show_source_code
-                    def render_h1_to_h6_headings():
-                        with gui.tag("h1"):
-                            gui.html("This is a h1 heading")
-                        with gui.tag("h2"):
-                            gui.html("This is a h2 heading")
-                        with gui.tag("h3"):
-                            gui.html("This is a h3 heading")
-                        with gui.tag("h4"):
-                            gui.html("This is a h4 heading")
-                        with gui.tag("h5"):
-                            gui.html("This is a h5 heading")
-                        with gui.tag("h6"):
-                            gui.html("This is a h6 heading")
+            sub_section_title("Colored Text")
+            colored_text()
 
-                    render_h1_to_h6_headings()
 
-                render_headings()
+def render_headings():
+    sub_section_title("Headings")
+    render_h1_to_h6_headings()
 
-            # RIGHT SIDE
-            with gui.tag("div", className="col-12 col-md-6"):
-                sub_section_title("Normal Text")
 
-                @show_source_code
-                def normal_text():
-                    gui.write("This is a normal text")
+@show_source_code
+def render_h1_to_h6_headings():
+    with gui.tag("h1"):
+        gui.html("This is a h1 heading")
+    with gui.tag("h2"):
+        gui.html("This is a h2 heading")
+    with gui.tag("h3"):
+        gui.html("This is a h3 heading")
+    with gui.tag("h4"):
+        gui.html("This is a h4 heading")
+    with gui.tag("h5"):
+        gui.html("This is a h5 heading")
+    with gui.tag("h6"):
+        gui.html("This is a h6 heading")
 
-                normal_text()
 
-                sub_section_title("Link")
+@show_source_code
+def normal_text():
+    gui.write("This is a normal text")
 
-                @show_source_code
-                def link():
-                    with gui.tag("a", href="https://www.gooey.ai"):
-                        gui.html("This is a link")
 
-                link()
+@show_source_code
+def link():
+    with gui.tag("a", href="https://www.gooey.ai"):
+        gui.html("This is a link")
 
-                sub_section_title("Colored Text")
 
-                @show_source_code
-                def colored_text():
-                    with gui.tag("p", className="text-primary"):
-                        gui.html("This is a primary text")
-                    with gui.tag("p", className="text-secondary"):
-                        gui.html("This is a secondary text")
-                    with gui.tag("p", className="text-success"):
-                        gui.html("This is a success text")
-                    with gui.tag("p", className="text-danger"):
-                        gui.html("This is a danger text")
-                    with gui.tag("p", className="text-warning"):
-                        gui.html("This is a warning text")
-                    with gui.tag("p", className="text-info"):
-                        gui.html("This is a info text")
-                    with gui.tag("p", className="text-light bg-dark"):
-                        gui.html("This is a light text")
-
-                colored_text()
+@show_source_code
+def colored_text():
+    with gui.tag("p", className="text-primary"):
+        gui.html("This is a primary text")
+    with gui.tag("p", className="text-secondary"):
+        gui.html("This is a secondary text")
+    with gui.tag("p", className="text-success"):
+        gui.html("This is a success text")
+    with gui.tag("p", className="text-danger"):
+        gui.html("This is a danger text")
+    with gui.tag("p", className="text-warning"):
+        gui.html("This is a warning text")
+    with gui.tag("p", className="text-info"):
+        gui.html("This is a info text")
+    with gui.tag("p", className="text-light bg-dark"):
+        gui.html("This is a light text")
 
 
 def render_components():
     section_title("Components")
-    with gui.tag("div", className="container-fluid"):
-        with gui.tag("div", className="row"):
-            # LEFT SIDE
-            with gui.tag("div", className="col-12 col-md-6"):
-                # BUTTONS
-                buttons_group()
+    with gui.tag("div", className="container-fluid"), gui.tag("div", className="row"):
+        # LEFT SIDE
+        with gui.tag("div", className="col-12 col-md-6"):
+            # BUTTONS
+            buttons_group()
 
-                # TABS
-                render_tabs_example()
+            # TABS
+            render_tabs_example()
 
-            # RIGHT SIDE
-            with gui.tag("div", className="col-12 col-md-6"):
-                # ALERTS
-                render_alerts()
+        # RIGHT SIDE
+        with gui.tag("div", className="col-12 col-md-6"):
+            # ALERTS
+            render_alerts()
 
-            # Inputs
-            render_inputs()
-            section_title("File Upload Button")
+        # Inputs
+        render_inputs()
 
-            @show_source_code
-            def file_upload():
-                file = gui.file_uploader(
-                    "**Upload Any File**",
-                    key="file_uploader_test0",
-                    help="Attach a video/audio/file to this.",
-                    optional=True,
-                    accept=["audio/*"],
-                )
+        section_title("File Upload Button")
+        file_upload()
 
-            file_upload()
+
+@show_source_code
+def file_upload():
+    gui.file_uploader(
+        "**Upload Any File**",
+        key="file_uploader_test0",
+        help="Attach a video/audio/file to this.",
+        optional=True,
+        accept=["audio/*"],
+    )
 
 
 def render_inputs():
@@ -288,17 +286,16 @@ def render_tabs_example():
 
 def buttons_group():
     sub_section_title("Buttons")
-
-    @show_source_code
-    def buttons():
-        with gui.tag("div"):
-            with gui.tag("div", className="d-flex justify-content-around"):
-                gui.button("Primary", key="test0", type="primary")
-                gui.button("Secondary", key="test1")
-                gui.button("Tertiary", key="test3", type="tertiary")
-                gui.button("Link Button", key="test3", type="link")
-
     buttons()
+
+
+@show_source_code
+def buttons():
+    with gui.tag("div"), gui.tag("div", className="d-flex justify-content-around"):
+        gui.button("Primary", key="test0", type="primary")
+        gui.button("Secondary", key="test1")
+        gui.button("Tertiary", key="test3", type="tertiary")
+        gui.button("Link Button", key="test3", type="link")
 
 
 def code_block(content: str):
@@ -315,9 +312,11 @@ def code_block(content: str):
 
 
 def section_title(title: str):
-    with gui.tag("div", className="mb-4 mt-4 bg-light border-1 p-2"):
-        with gui.tag("h3", style={"font-weight": "500", "margin": "0"}):
-            gui.html(title.upper())
+    with (
+        gui.tag("div", className="mb-4 mt-4 bg-light border-1 p-2"),
+        gui.tag("h3", style={"font-weight": "500", "margin": "0"}),
+    ):
+        gui.html(title.upper())
 
 
 def sub_section_title(title: str):
