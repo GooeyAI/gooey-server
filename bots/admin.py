@@ -71,6 +71,21 @@ slack_fields = [
     "slack_create_personal_channels",
 ]
 web_fields = ["web_allowed_origins", "web_config_extras"]
+twilio_fields = [
+    "twilio_account_sid",
+    "twilio_auth_token",
+    "twilio_phone_number",
+    "twilio_phone_number_sid",
+    "twilio_default_to_gooey_asr",
+    "twilio_default_to_gooey_tts",
+    "twilio_voice",
+    "twilio_asr_language",
+    "twilio_initial_text",
+    "twilio_initial_audio_url",
+    "twilio_use_missed_call",
+    "twilio_waiting_audio_url",
+    "twilio_waiting_text",
+]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -133,12 +148,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "slack_channel_name",
         "slack_channel_hook_url",
         "slack_access_token",
+        "twilio_phone_number",
     ]
     list_display = [
         "name",
         "get_display_name",
         "platform",
         "wa_phone_number",
+        "twilio_phone_number",
         "created_at",
         "updated_at",
         "billing_account_uid",
@@ -193,6 +210,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *wa_fields,
                     *slack_fields,
                     *web_fields,
+                    *twilio_fields,
                 ]
             },
         ),
@@ -489,6 +507,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "slack_user_name",
         "slack_channel_id",
         "slack_channel_name",
+        "twilio_phone_number",
     ] + [f"bot_integration__{field}" for field in BotIntegrationAdmin.search_fields]
     actions = [export_to_csv, export_to_excel]
 
