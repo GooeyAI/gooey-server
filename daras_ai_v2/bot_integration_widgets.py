@@ -324,6 +324,8 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             dict(
                 mode="inline",
                 showSources=True,
+                enablePhotoUpload=False,
+                enableLipsyncVideo=False,
                 enableAudioMessage=True,
                 branding=(
                     dict(showPoweredByGooey=True)
@@ -338,9 +340,15 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             config["showSources"] = st.checkbox(
                 "Show Sources", value=config["showSources"]
             )
+            config["enablePhotoUpload"] = st.checkbox(
+                "Allow Photo Upload", value=config["enablePhotoUpload"]
+            )
         with scol2:
             config["enableAudioMessage"] = st.checkbox(
                 "Enable Audio Message", value=config["enableAudioMessage"]
+            )
+            config["enableLipsyncVideo"] = st.checkbox(
+                "Enable Lipsync Video", value=config["enableLipsyncVideo"]
             )
             # config["branding"]["showPoweredByGooey"] = st.checkbox(
             #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
