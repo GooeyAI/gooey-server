@@ -972,12 +972,11 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
         call_cmd(
             "yt-dlp",
             "--no-playlist",
-            "--format",
-            "bestaudio",
-            "--output",
-            infile,
+            "--max-downloads", "1",
+            "--format", "bestaudio",
+            "--output", infile,
             youtube_url,
-        )
+        )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory
