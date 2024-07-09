@@ -5,6 +5,7 @@ import typing
 from enum import Enum
 from functools import wraps
 
+import aifail
 import requests
 import typing_extensions
 from aifail import (
@@ -984,6 +985,16 @@ def get_openai_client(model: str):
     return client
 
 
+def groq_should_retry(e: Exception) -> bool:
+    return isinstance(e, requests.HTTPError) and e.response.status_code in [
+        429,
+        502,
+        503,
+        504,
+    ]
+
+
+@aifail.retry_if(groq_should_retry)
 def _run_groq_chat(
     *,
     model: str,
