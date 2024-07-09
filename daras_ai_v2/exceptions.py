@@ -1,5 +1,6 @@
 import json
 import subprocess
+import typing
 
 import requests
 from loguru import logger
@@ -81,11 +82,15 @@ def ffprobe(filename: str) -> dict:
     return json.loads(text)
 
 
-def call_cmd(*args, err_msg: str = "") -> str:
+def call_cmd(
+    *args, err_msg: str = "", ok_returncodes: typing.Iterable[int] = ()
+) -> str:
     logger.info("$ " + " ".join(map(str, args)))
     try:
         return subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
     except subprocess.CalledProcessError as e:
+        if e.returncode in ok_returncodes:
+            return e.output
         err_msg = err_msg or f"{str(args[0]).capitalize()} Error"
         try:
             raise subprocess.SubprocessError(e.output) from e

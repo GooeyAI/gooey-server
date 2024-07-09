@@ -14,7 +14,6 @@ import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -980,6 +979,8 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
             "--format", "bestaudio",
             "--output", infile,
             youtube_url,
+            # ignore MaxDownloadsReached - https://github.com/ytdl-org/youtube-dl/blob/a452f9437c8a3048f75fc12f75bcfd3eed78430f/youtube_dl/__init__.py#L468
+            ok_returncodes={101},
         )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
