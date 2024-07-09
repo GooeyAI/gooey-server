@@ -80,7 +80,7 @@ ua-parser = "^0.18.0"
 user-agents = "^2.2.0"
 openpyxl = "^3.1.2"
 loguru = "^0.7.2"
-aifail = "0.2.0"
+aifail = {git = "https://github.com/GooeyAI/aifail/", rev = "0.3.0"}
 pytest-playwright = "^0.4.3"
 emoji = "^2.10.1"
 pyvespa = "^0.39.0"

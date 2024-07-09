@@ -13,17 +13,21 @@ files = [
 
 [[package]]
 name = "aifail"
-version = "0.2.0"
+version = "0.3.0"
 description = ""
 optional = false
-python-versions = ">=3.10,<4.0"
-files = [
-    {file = "aifail-0.2.0-py3-none-any.whl", hash = "sha256:83f3a842dbe523ee10a4d53ee00f06e794176122b93b57752566fb98d60db603"},
-    {file = "aifail-0.2.0.tar.gz", hash = "sha256:d3e19e16740577181922055883a00e894d11413d12803e8d443094846040d6df"},
-]
+python-versions = "^3.10"
+files = []
+develop = false
 
 [package.dependencies]
-loguru = ">=0.7.2,<0.8.0"
+loguru = "^0.7.2"
+
+[package.source]
+type = "git"
+url = "https://github.com/GooeyAI/aifail/"
+reference = "0.3.0"
+resolved_reference = "577487ad5ccbf3d70d4610a6b7d09e45a4951a73"
 
 [[package]]
 name = "aiohttp"
@@ -6438,4 +6442,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "fa29696b70dce0df83af18fb12a0f311dd05dccabfc7d3fe9ffe71630e042f14"
+content-hash = "cc79f3b414323945ade371a12c4071eb50b9988715f0d094e4e9ef34008c3fe2"

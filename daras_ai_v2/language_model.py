@@ -25,12 +25,12 @@ from openai.types.chat import (
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
-from functions.recipe_functions import LLMTools
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
 )
+from functions.recipe_functions import LLMTools
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -985,16 +985,7 @@ def get_openai_client(model: str):
     return client
 
 
-def groq_should_retry(e: Exception) -> bool:
-    return isinstance(e, requests.HTTPError) and e.response.status_code in [
-        429,
-        502,
-        503,
-        504,
-    ]
-
-
-@aifail.retry_if(groq_should_retry)
+@aifail.retry_if(aifail.http_should_retry)
 def _run_groq_chat(
     *,
     model: str,
