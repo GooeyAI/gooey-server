@@ -32,7 +32,7 @@ def variables_input(
         else:
             template_var_names |= jinja2.meta.find_undeclared_variables(parsed)
 
-    old_vars = st.session_state.get(key, {})
+    old_vars = st.session_state.get(key) or {}
 
     var_add_key = f"--{key}:add_btn"
     var_name_key = f"--{key}:add_name"
