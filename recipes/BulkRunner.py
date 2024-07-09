@@ -641,7 +641,7 @@ def list_view_editor(
         st.session_state[key] = ret
         return ret
 
-    old_lst = st.session_state.setdefault(key, [])
+    old_lst = st.session_state.get(key) or []
     add_key = f"--{key}:add"
     if st.session_state.get(add_key):
         old_lst.append({})
