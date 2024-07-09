@@ -1,3 +1,4 @@
+import multiprocessing
 import os.path
 import os.path
 import tempfile
@@ -964,8 +965,11 @@ def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
+_yt_dlp_lock = multiprocessing.Semaphore(1)
+
+
 def download_youtube_to_wav(youtube_url: str) -> bytes:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _yt_dlp_lock, tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
         # run yt-dlp to download audio
