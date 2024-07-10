@@ -8,12 +8,12 @@ Deno.serve(async (req) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  let logs = captureConsole();
-  let { code, variables } = await req.json();
+  let { tag, code, variables } = await req.json();
+  let { mockConsole, logs } = captureConsole(tag);
   let status, response;
 
   try {
-    let retval = isolatedEval(code, variables);
+    let retval = isolatedEval(mockConsole, code, variables);
     if (retval instanceof Function) {
       retval = retval(variables);
     }
@@ -31,11 +31,9 @@ Deno.serve(async (req) => {
   return new Response(body, { status });
 });
 
-function isolatedEval(code, variables) {
+function isolatedEval(console, code, variables) {
   // Hide global objects
-  let Deno = undefined;
-  let globalThis = undefined;
-  let window = undefined;
+  let Deno, global, self, globalThis, window;
   return eval(code);
 }
 
@@ -47,22 +45,22 @@ function isAuthenticated(req) {
   return token === Deno.env.get("GOOEY_AUTH_TOKEN");
 }
 
-function captureConsole() {
+function captureConsole(tag) {
   let logs = [];
-
-  let oldLog = console.log;
-  console.log = (...args) => {
-    logs.push({ level: "log", message: args.map(toString).join(" ") });
-    oldLog(...args);
-  };
-
+  let prefix = `[${tag}]`;
+  let realLog = console.log;
   let oldError = console.error;
-  console.error = (...args) => {
-    logs.push({ level: "error", message: args.map(toString).join(" ") });
-    oldError(...args);
+  let mockConsole = {
+    log(...args) {
+      logs.push({ level: "log", message: args.map(toString).join(" ") });
+      realLog(prefix, ...args);
+    },
+    error(...args) {
+      logs.push({ level: "error", message: args.map(toString).join(" ") });
+      oldError(prefix, ...args);
+    },
   };
-
-  return logs;
+  return { mockConsole, logs };
 }
 
 function toString(obj) {

@@ -1567,25 +1567,29 @@ class BasePage:
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
-        started_at_text()
+        created_at = st.session_state.get("created_at")
+        if not created_at:
+            return
+
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        started_at_text(created_at)
+
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
-        if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, str):
-                created_at = datetime.datetime.fromisoformat(created_at)
-            with st.countdown_timer(
-                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
-                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
-            ):
-                if self.is_current_user_owner() and self.request.user.email:
-                    st.write(
-                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
-                    )
+        with st.countdown_timer(
+            end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
+            delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+        ):
+            if self.is_current_user_owner() and self.request.user.email:
                 st.write(
-                    f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
-                      for inspiration."""
+                    f"""We'll email **{self.request.user.email}** when your workflow is done."""
                 )
+            st.write(
+                f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
+                  for inspiration."""
+            )
 
     def estimate_run_duration(self) -> int | None:
         pass
@@ -1903,7 +1907,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
-            started_at_text()
+            started_at_text(saved_run.created_at)
             html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
@@ -2193,7 +2197,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
-def started_at_text():
+def started_at_text(dt: datetime.datetime):
     with st.div(className="d-flex"):
         text = "Started"
         if seed := st.session_state.get("seed"):
@@ -2202,7 +2206,7 @@ def started_at_text():
         st.caption(
             "...",
             className="text-black",
-            **render_local_dt_attrs(timezone.now()),
+            **render_local_dt_attrs(dt),
         )
 
 
