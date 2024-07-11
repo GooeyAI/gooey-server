@@ -5,7 +5,6 @@ from twilio.twiml.messaging_response import MessagingResponse
 from app_users.models import AppUser
 from bots.models import Conversation, BotIntegration, SavedRun, PublishedRun, Platform
 from phonenumber_field.phonenumber import PhoneNumber
-from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2 import settings
 
 from furl import furl
@@ -15,19 +14,6 @@ from daras_ai_v2.fastapi_tricks import fastapi_request_urlencoded_body
 import base64
 
 router = APIRouter()
-
-
-def translate(text: str, bi: BotIntegration) -> str:
-    if text and should_translate_lang(bi.user_language):
-        return run_google_translate(
-            [text],
-            bi.user_language,
-            glossary_url=bi.get_active_saved_run().state.get(
-                "output_glossary_document"
-            ),
-        )[0]
-    else:
-        return text
 
 
 def say(resp: VoiceResponse, text: str, bi: BotIntegration):
@@ -82,9 +68,8 @@ def twilio_voice_call(
     text = bi.twilio_initial_text.strip()
     audio_url = bi.twilio_initial_audio_url.strip()
     if not text and not audio_url:
-        text = translate(
+        text = bi.translate(
             f"Welcome to {bi.name}! Please ask your question and press 0 if the end of your question isn't detected.",
-            bi,
         )
 
     if bi.twilio_use_missed_call:
@@ -142,20 +127,11 @@ def twilio_voice_call_asked(
         bi=bi,
     )
 
-    def msg_handler_with_error_handling(bot: TwilioVoice):
-        """Handle the user's question and catch any errors to make sure they don't get stuck in the queue until it times out."""
-        try:
-            msg_handler(bot)
-        except Exception:
-            bot.send_msg(
-                text=translate("Sorry, an error occurred. Please try again later.", bi),
-            )
-
-    background_tasks.add_task(msg_handler_with_error_handling, bot)
+    background_tasks.add_task(msg_handler, bot)
 
     # send back waiting audio
     resp = VoiceResponse()
-    say(resp, translate("I heard ", bi) + text, bi)
+    say(resp, bot.translate("I heard ") + text, bi)
 
     resp.enqueue(
         name=queue_name,
@@ -200,16 +176,7 @@ def twilio_voice_call_asked_audio(
         bi=bi,
     )
 
-    def msg_handler_with_error_handling(bot: TwilioVoice):
-        """Handle the user's question and catch any errors to make sure they don't get stuck in the queue until it times out."""
-        try:
-            msg_handler(bot)
-        except Exception:
-            bot.send_msg(
-                text=translate("Sorry, an error occurred. Please try again later.", bi),
-            )
-
-    background_tasks.add_task(msg_handler_with_error_handling, bot)
+    background_tasks.add_task(msg_handler, bot)
 
     # send back waiting audio
     resp = VoiceResponse()
@@ -339,9 +306,8 @@ def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
     # if the user doesn't say anything, we'll ask them to call back in a quieter environment
     say(
         resp,
-        translate(
-            "Sorry, I didn't get that. Please call again in a more quiet environment.",
-            bi,
+        bi.translate(
+            "Sorry, I didn't get that. Please call again in a more quiet environment."
         ),
         bi,
     )
@@ -409,7 +375,7 @@ def twilio_sms(
     if bi.twilio_waiting_text.strip():
         resp.message(bi.twilio_waiting_text)
     else:
-        resp.message(translate("Please wait while we process your request.", bi))
+        resp.message(bot.translate("Please wait while we process your request."))
 
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
@@ -474,7 +440,9 @@ def create_voice_call(convo: Conversation, text: str | None, audio_url: str | No
     return call
 
 
-def send_sms_message(convo: Conversation, text: str, media_url: str | None = None):
+def send_sms_message(
+    convo: Conversation, text: str | None, media_url: str | None = None
+):
     """Send an SMS message to the given conversation."""
 
     assert (
@@ -486,7 +454,7 @@ def send_sms_message(convo: Conversation, text: str, media_url: str | None = Non
     client = Client(account_sid, auth_token)
 
     message = client.messages.create(
-        body=text,
+        body=text or "",
         media_url=media_url,
         from_=convo.bot_integration.twilio_phone_number.as_e164,
         to=convo.twilio_phone_number.as_e164,

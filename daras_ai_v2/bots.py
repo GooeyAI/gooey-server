@@ -84,7 +84,7 @@ class BotInterface:
 
     page_cls: typing.Type[BasePage] | None
     query_params: dict
-    language: str
+    language: str | None
     billing_account_uid: str
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
@@ -140,37 +140,44 @@ class BotInterface:
         return f"{self.platform.name}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
     def _unpack_bot_integration(self):
-        bi = self.convo.bot_integration
-        if bi.published_run:
-            self.page_cls = Workflow(bi.published_run.workflow).page_cls
+        self.bi = self.convo.bot_integration
+        if self.bi.published_run:
+            self.page_cls = Workflow(self.bi.published_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
-                example_id=bi.published_run.published_run_id,
+                example_id=self.bi.published_run.published_run_id,
                 run_id="",
                 uid="",
             )
-            saved_run = bi.published_run.saved_run
+            saved_run = self.bi.published_run.saved_run
             self.input_glossary = saved_run.state.get("input_glossary_document")
             self.output_glossary = saved_run.state.get("output_glossary_document")
             self.language = saved_run.state.get("user_language")
-        elif bi.saved_run:
-            self.page_cls = Workflow(bi.saved_run.workflow).page_cls
+        elif self.bi.saved_run:
+            self.page_cls = Workflow(self.bi.saved_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
-                example_id=bi.saved_run.example_id,
-                run_id=bi.saved_run.run_id,
-                uid=bi.saved_run.uid,
+                example_id=self.bi.saved_run.example_id,
+                run_id=self.bi.saved_run.run_id,
+                uid=self.bi.saved_run.uid,
             )
-            self.input_glossary = bi.saved_run.state.get("input_glossary_document")
-            self.output_glossary = bi.saved_run.state.get("output_glossary_document")
-            self.language = bi.saved_run.state.get("user_language")
+            self.input_glossary = self.bi.saved_run.state.get("input_glossary_document")
+            self.output_glossary = self.bi.saved_run.state.get(
+                "output_glossary_document"
+            )
+            self.language = self.bi.saved_run.state.get("user_language")
         else:
             self.page_cls = None
             self.query_params = {}
 
-        self.billing_account_uid = bi.billing_account_uid
-        if should_translate_lang(bi.user_language):
-            self.language = bi.user_language
-        self.show_feedback_buttons = bi.show_feedback_buttons
-        self.streaming_enabled = bi.streaming_enabled
+        self.billing_account_uid = self.bi.billing_account_uid
+        if should_translate_lang(self.bi.user_language):
+            self.language = self.bi.user_language
+        else:
+            self.language = None
+        self.show_feedback_buttons = self.bi.show_feedback_buttons
+        self.streaming_enabled = self.bi.streaming_enabled
+
+    def translate(self, text: str | None) -> str:
+        return self.bi.translate(text or "")
 
 
 def _echo(bot, input_text):
@@ -199,8 +206,17 @@ def _mock_api_output(input_text):
     }
 
 
-@db_middleware
 def msg_handler(bot: BotInterface):
+    try:
+        _msg_handler(bot)
+    except Exception:
+        bot.send_msg(
+            text=bot.translate("Sorry, an error occurred. Please try again later."),
+        )
+
+
+@db_middleware
+def _msg_handler(bot: BotInterface):
     recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)

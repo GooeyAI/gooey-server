@@ -764,6 +764,21 @@ class BotIntegration(models.Model):
         )
         return config
 
+    def translate(self, text: str) -> str:
+        from daras_ai_v2.asr import run_google_translate, should_translate_lang
+
+        if text and should_translate_lang(self.user_language):
+            active_run = self.get_active_saved_run()
+            return run_google_translate(
+                [text],
+                self.user_language,
+                glossary_url=(
+                    active_run.state.get("output_glossary") if active_run else None
+                ),
+            )[0]
+        else:
+            return text
+
 
 class BotIntegrationAnalysisRun(models.Model):
     bot_integration = models.ForeignKey(

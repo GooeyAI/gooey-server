@@ -2,7 +2,6 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from phonenumber_field.phonenumber import PhoneNumber
 
-from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from uuid import uuid4
 
 
@@ -20,7 +19,6 @@ class TwilioSMS(BotInterface):
         self.user_id = convo.twilio_phone_number.as_e164
 
         self._unpack_bot_integration()
-        self.bi = bi
 
     def get_input_text(self) -> str | None:
         return self._text
@@ -41,10 +39,8 @@ class TwilioSMS(BotInterface):
         assert buttons is None, "Interactive mode is not implemented yet"
         assert update_msg_id is None, "Twilio does not support un-sms-ing things"
 
-        if text and should_translate and should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+        if should_translate:
+            text = self.translate(text)
 
         return send_sms_message(
             self.convo,
@@ -95,7 +91,6 @@ class TwilioVoice(BotInterface):
         self._audio = audio
 
         self._unpack_bot_integration()
-        self.bi = bi
 
     def get_input_text(self) -> str | None:
         return self._text
@@ -127,10 +122,8 @@ class TwilioVoice(BotInterface):
         else:
             audio = None
 
-        if text and should_translate and should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+        if should_translate:
+            text = self.translate(text)
 
         twilio_voice_call_respond(
             text=text,
