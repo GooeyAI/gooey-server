@@ -1,8 +1,14 @@
-from datetime import datetime, timedelta, timezone
+import traceback
+
+import sentry_sdk
+from loguru import logger
 
 from app_users.models import AppUser, PaymentProvider
-from daras_ai_v2 import settings
 from daras_ai_v2.redis_cache import redis_lock
+from payments.tasks import (
+    send_monthly_budget_reached_email,
+    send_auto_recharge_failed_email,
+)
 
 
 class AutoRechargeException(Exception):
@@ -24,11 +30,42 @@ class AutoRechargeCooldownException(AutoRechargeException):
     pass
 
 
-def auto_recharge_user(uid: str):
-    with redis_lock(f"gooey/auto_recharge_user/{uid}"):
-        user: AppUser = AppUser.objects.get(uid=uid)
-        if should_attempt_auto_recharge(user):
+def should_attempt_auto_recharge(user: AppUser):
+    return (
+        user.subscription
+        and user.subscription.auto_recharge_enabled
+        and user.subscription.payment_provider
+        and user.balance < user.subscription.auto_recharge_balance_threshold
+    )
+
+
+def run_auto_recharge_gracefully(user: AppUser):
+    """
+    Wrapper over _auto_recharge_user, that handles exceptions so that it can:
+    - log exceptions
+    - send emails when auto-recharge fails
+    - not retry if this is run as a background task
+
+    Meant to be used in conjunction with should_attempt_auto_recharge
+    """
+    try:
+        with redis_lock(f"gooey/auto_recharge_user/v1/{user.uid}"):
             _auto_recharge_user(user)
+    except AutoRechargeCooldownException as e:
+        logger.info(
+            f"Rejected auto-recharge because auto-recharge is in cooldown period for user"
+            f"{user=}, {e=}"
+        )
+    except MonthlyBudgetReachedException as e:
+        send_monthly_budget_reached_email(user)
+        logger.info(
+            f"Rejected auto-recharge because user has reached monthly budget"
+            f"{user=}, spending=${e.spending}, budget=${e.budget}"
+        )
+    except Exception as e:
+        traceback.print_exc()
+        sentry_sdk.capture_exception(e)
+        send_auto_recharge_failed_email(user)
 
 
 def _auto_recharge_user(user: AppUser):
@@ -82,12 +119,3 @@ def _auto_recharge_user(user: AppUser):
         StripeWebhookHandler.handle_invoice_paid(
             uid=user.uid, invoice_data=invoice_data
         )
-
-
-def should_attempt_auto_recharge(user: AppUser):
-    return (
-        user.subscription
-        and user.subscription.auto_recharge_enabled
-        and user.subscription.payment_provider
-        and user.balance < user.subscription.auto_recharge_balance_threshold
-    )

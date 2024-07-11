@@ -25,7 +25,6 @@ from sentry_sdk.tracing import (
 )
 from starlette.requests import Request
 
-from daras_ai_v2.exceptions import UserError
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -49,6 +48,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -83,12 +83,11 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
-from routers.account import AccountTabs
 from payments.auto_recharge import (
-    AutoRechargeException,
-    auto_recharge_user,
     should_attempt_auto_recharge,
+    run_auto_recharge_gracefully,
 )
+from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
@@ -1415,30 +1414,9 @@ class BasePage:
     def render_usage_guide(self):
         raise NotImplementedError
 
-    def run_with_auto_recharge(self, state: dict) -> typing.Iterator[str | None]:
-        if not self.check_credits() and should_attempt_auto_recharge(self.request.user):
-            yield "Low balance detected. Recharging..."
-            try:
-                auto_recharge_user(uid=self.request.user.uid)
-            except AutoRechargeException as e:
-                # raise this error only if another auto-recharge
-                # procedure didn't complete successfully
-                self.request.user.refresh_from_db()
-                if not self.check_credits():
-                    raise UserError(str(e)) from e
-            else:
-                self.request.user.refresh_from_db()
-
-        if not self.check_credits():
-            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-            error_msg = self.generate_credit_error_message(
-                example_id=example_id, run_id=run_id, uid=uid
-            )
-            raise UserError(error_msg)
-
-        yield from self.run(state)
-
     def main(self, sr: SavedRun, state: dict) -> typing.Iterator[str | None]:
+        yield from self.ensure_credits_and_auto_recharge(sr, state)
+
         yield from call_recipe_functions(
             saved_run=sr,
             current_user=self.request.user,
@@ -1465,15 +1443,12 @@ class BasePage:
         response = self.ResponseModel.construct()
 
         # run the recipe
-        gen = self.run_v2(request, response)
-        while True:
-            try:
-                val = next(gen)
-            except StopIteration:
-                break
-            finally:
+        try:
+            for val in self.run_v2(request, response):
                 state.update(response.dict(exclude_unset=True))
-            yield val
+                yield val
+        finally:
+            state.update(response.dict(exclude_unset=True))
 
         # validate the response if successful
         self.ResponseModel.validate(response)
@@ -1634,15 +1609,7 @@ class BasePage:
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
 
-        if not self.check_credits() and not should_attempt_auto_recharge(
-            self.request.user
-        ):
-            # insufficient balance for this run and auto-recharge isn't setup
-            sr.run_status = ""
-            sr.error_msg = self.generate_credit_error_message(sr.run_id, sr.uid)
-            sr.save(update_fields=["run_status", "error_msg"])
-        else:
-            self.call_runner_task(sr)
+        self.call_runner_task(sr)
 
         raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
@@ -1715,15 +1682,19 @@ class BasePage:
         )
 
     def call_runner_task(self, sr: SavedRun):
-        from celeryapp.tasks import gui_runner
+        from celeryapp.tasks import runner_task, post_runner_tasks
 
-        return gui_runner.delay(
-            page_cls=self.__class__,
-            user_id=self.request.user.id,
-            run_id=sr.run_id,
-            uid=sr.uid,
-            channel=self.realtime_channel_name(sr.run_id, sr.uid),
+        chain = (
+            runner_task.s(
+                page_cls=self.__class__,
+                user_id=self.request.user.id,
+                run_id=sr.run_id,
+                uid=sr.uid,
+                channel=self.realtime_channel_name(sr.run_id, sr.uid),
+            )
+            | post_runner_tasks.s()
         )
+        return chain.apply_async()
 
     @classmethod
     def realtime_channel_name(cls, run_id, uid):
@@ -2099,13 +2070,27 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         manage_api_keys(self.request.user)
 
-    def check_credits(self) -> bool:
+    def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:
-            return True
-
+            return
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
-        return self.request.user.balance >= self.get_price_roundoff(st.session_state)
+
+        user = self.request.user
+        price = self.get_price_roundoff(state)
+
+        if user.balance >= price:
+            return
+
+        if should_attempt_auto_recharge(user):
+            yield "Low balance detected. Recharging..."
+            run_auto_recharge_gracefully(user)
+            user.refresh_from_db()
+
+        if user.balance >= price:
+            return
+
+        raise InsufficientCredits(self.request.user, sr)
 
     def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
         assert (

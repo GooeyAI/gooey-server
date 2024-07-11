@@ -14,7 +14,7 @@ from fastapi import HTTPException
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
-from bots.models import SavedRun, Platform
+from bots.models import SavedRun, Platform, Workflow
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
@@ -24,22 +24,24 @@ from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_ema
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
-from gooeysite.bg_db_conn import db_middleware, next_db_safe
-from payments.tasks import run_auto_recharge_gracefully
 from gooeysite.bg_db_conn import db_middleware
+from payments.auto_recharge import (
+    should_attempt_auto_recharge,
+    run_auto_recharge_gracefully,
+)
 
 DEFAULT_RUN_STATUS = "Running..."
 
 
 @app.task
-def gui_runner(
+def runner_task(
     *,
     page_cls: typing.Type[BasePage],
     user_id: int,
     run_id: str,
     uid: str,
     channel: str,
-):
+) -> int:
     start_time = time()
     error_msg = None
 
@@ -89,36 +91,50 @@ def gui_runner(
         save_on_step()
         for val in page.main(sr, st.session_state):
             save_on_step(val)
+
     # render errors nicely
     except Exception as e:
-        if isinstance(e, HTTPException) and e.status_code == 402:
-            error_msg = page.generate_credit_error_message(run_id, uid)
-            try:
-                raise UserError(error_msg) from e
-            except UserError as e:
-                sentry_sdk.capture_exception(e, level=e.sentry_level)
+        if isinstance(e, UserError):
+            sentry_level = e.sentry_level
         else:
-            if isinstance(e, UserError):
-                sentry_level = e.sentry_level
-            else:
-                sentry_level = "error"
-                traceback.print_exc()
-            sentry_sdk.capture_exception(e, level=sentry_level)
-            error_msg = err_msg_for_exc(e)
+            sentry_level = "error"
+            traceback.print_exc()
+        sentry_sdk.capture_exception(e, level=sentry_level)
+        error_msg = err_msg_for_exc(e)
+        sr.error_type = type(e).__qualname__
+        sr.error_code = getattr(e, "status_code", None)
+
     # run completed successfully, deduct credits
     else:
         sr.transaction, sr.price = page.deduct_credits(st.session_state)
+
+    # save everything, mark run as completed
     finally:
         save_on_step(done=True)
-        if not sr.is_api_call:
-            send_email_on_completion(page, sr)
 
-        run_low_balance_email_check(user)
-        run_auto_recharge_gracefully(uid)
+    return sr.id
+
+
+@app.task
+def post_runner_tasks(saved_run_id: int):
+    sr = SavedRun.objects.get(id=saved_run_id)
+    user = AppUser.objects.get(uid=sr.uid)
+
+    if not sr.is_api_call:
+        send_email_on_completion(sr)
+
+    if should_attempt_auto_recharge(user):
+        run_auto_recharge_gracefully(user)
+
+    run_low_balance_email_check(user)
 
 
 def err_msg_for_exc(e: Exception):
-    if isinstance(e, requests.HTTPError):
+    if isinstance(e, UserError):
+        return e.message
+    elif isinstance(e, HTTPException):
+        return f"(HTTP {e.status_code}) {e.detail})"
+    elif isinstance(e, requests.HTTPError):
         response: requests.Response = e.response
         try:
             err_body = response.json()
@@ -135,10 +151,6 @@ def err_msg_for_exc(e: Exception):
                     return f"(GPU) {err_type}: {err_str}"
             err_str = str(err_body)
         return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    elif isinstance(e, HTTPException):
-        return f"(HTTP {e.status_code}) {e.detail})"
-    elif isinstance(e, UserError):
-        return e.message
     else:
         return f"{type(e).__name__}: {e}"
 
@@ -179,7 +191,7 @@ def run_low_balance_email_check(user: AppUser):
         user.save(update_fields=["low_balance_email_sent_at"])
 
 
-def send_email_on_completion(page: BasePage, sr: SavedRun):
+def send_email_on_completion(sr: SavedRun):
     run_time_sec = sr.run_time.total_seconds()
     if (
         run_time_sec <= settings.SEND_RUN_EMAIL_AFTER_SEC
@@ -191,9 +203,16 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
     )
     if not to_address:
         return
-    prompt = (page.preview_input(sr.state) or "").strip()
-    title = (sr.state.get("__title") or page.title).strip()
-    subject = f"🌻 “{truncate_text_words(prompt, maxlen=50)}” {title} is done"
+
+    workflow = Workflow(sr.workflow)
+    page_cls = workflow.page_cls
+    prompt = (page_cls.preview_input(sr.state) or "").strip().replace("\n", " ")
+    recipe_title = page_cls.get_recipe_title()
+
+    subject = (
+        f"🌻 “{truncate_text_words(prompt, maxlen=50) or 'Run'}” {recipe_title} is done"
+    )
+
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
         to_address=to_address,
@@ -202,7 +221,7 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
             run_time_sec=round(run_time_sec),
             app_url=sr.get_app_url(),
             prompt=prompt,
-            title=title,
+            recipe_title=recipe_title,
         ),
         message_stream="gooey-ai-workflows",
     )

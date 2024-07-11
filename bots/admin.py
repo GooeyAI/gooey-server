@@ -31,7 +31,7 @@ from bots.models import (
     Workflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from celeryapp.tasks import gui_runner
+from celeryapp.tasks import runner_task
 from daras_ai_v2.fastapi_tricks import get_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (

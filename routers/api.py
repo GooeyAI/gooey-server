@@ -5,11 +5,13 @@ import os.path
 import typing
 from types import SimpleNamespace
 
+import line_profiler
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
 from fastapi import Response
+from fastapi.exceptions import RequestValidationError
 from furl import furl
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
@@ -18,25 +20,28 @@ from pydantic.generics import GenericModel
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
+from starlette.status import (
+    HTTP_402_PAYMENT_REQUIRED,
+    HTTP_429_TOO_MANY_REQUESTS,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_400_BAD_REQUEST,
+)
 
 import gooey_ui as st
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import RetentionPolicy
-from celeryapp.tasks import auto_recharge
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
-from daras_ai_v2.auto_recharge import user_should_auto_recharge
 from daras_ai_v2.base import (
     BasePage,
     RecipeRunState,
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
+from daras_ai_v2.polygon_fitter import line
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-from payments.auto_recharge import should_attempt_auto_recharge
-from routers.account import AccountTabs
 
 app = APIRouter()
 
@@ -93,7 +98,7 @@ class AsyncApiResponseModelV3(BaseResponseModelV3):
 
 
 class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
-    run_time_sec: int = Field(description="Total run time in seconds")
+    run_time_sec: float = Field(description="Total run time in seconds")
     status: RecipeRunState = Field(description="Status of the run")
     detail: str = Field(
         description="Details about the status of the run as a human readable string"
@@ -130,14 +135,17 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
 
     common_errs = {
-        402: {"model": GenericErrorResponse},
-        429: {"model": GenericErrorResponse},
+        HTTP_402_PAYMENT_REQUIRED: {"model": GenericErrorResponse},
+        HTTP_429_TOO_MANY_REQUESTS: {"model": GenericErrorResponse},
     }
 
     @app.post(
         os.path.join(endpoint, ""),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, **common_errs},
+        responses={
+            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+            **common_errs,
+        },
         operation_id=page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
@@ -145,7 +153,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         endpoint,
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, **common_errs},
+        responses={
+            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+            **common_errs,
+        },
         include_in_schema=False,
     )
     def run_api_json(
@@ -164,13 +175,21 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "form/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, **common_errs},
+        responses={
+            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+            **common_errs,
+        },
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "form"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, **common_errs},
+        responses={
+            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+            **common_errs,
+        },
         include_in_schema=False,
     )
     def run_api_form(
@@ -224,16 +243,22 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async/form/"),
         response_model=response_model,
-        responses=common_errs,
+        responses={
+            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+            **common_errs,
+        },
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "async/form"),
         response_model=response_model,
-        responses=common_errs,
+        responses={
+            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+            **common_errs,
+        },
         include_in_schema=False,
     )
-    def run_api_form(
+    def run_api_form_async(
         request: Request,
         response: Response,
         user: AppUser = Depends(api_auth_header),
@@ -279,9 +304,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             "created_at": sr.created_at.isoformat(),
             "run_time_sec": sr.run_time.total_seconds(),
         }
-        if sr.error_msg:
+        if sr.error_code:
+            raise HTTPException(sr.error_code, detail=ret | {"error": sr.error_msg})
+        elif sr.error_msg:
             ret |= {"status": "failed", "detail": sr.error_msg}
-            return ret
         else:
             status = self.get_run_state(sr.to_dict())
             ret |= {"detail": sr.run_status or "", "status": status}
@@ -311,7 +337,10 @@ def _parse_form_data(
         try:
             is_str = request_model.schema()["properties"][key]["type"] == "string"
         except KeyError:
-            raise HTTPException(status_code=400, detail=f'Inavlid file field "{key}"')
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail=dict(error=f'Inavlid file field "{key}"'),
+            )
         if is_str:
             page_request_data[key] = urls[0]
         else:
@@ -320,7 +349,7 @@ def _parse_form_data(
     try:
         page_request = request_model.parse_obj(page_request_data)
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=e.errors())
+        raise RequestValidationError(e.errors(), body=page_request_data)
     return page_request
 
 
@@ -374,21 +403,15 @@ def submit_api_call(
     st.set_session_state(state)
     st.set_query_params(query_params)
 
-    # check the balance
-    if not self.check_credits() and not should_attempt_auto_recharge(self.request.user):
-        account_url = furl(settings.APP_BASE_URL) / AccountTabs.billing.url_path
-        raise HTTPException(
-            status_code=402,
-            detail=dict(
-                error=f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}"
-            ),
-        )
     # create a new run
-    sr = self.create_new_run(
-        enable_rate_limits=enable_rate_limits,
-        is_api_call=True,
-        retention_policy=retention_policy or RetentionPolicy.keep,
-    )
+    try:
+        sr = self.create_new_run(
+            enable_rate_limits=enable_rate_limits,
+            is_api_call=True,
+            retention_policy=retention_policy or RetentionPolicy.keep,
+        )
+    except ValidationError as e:
+        raise RequestValidationError(e.errors(), body=request_body)
     # submit the task
     result = self.call_runner_task(sr)
     return self, result, sr.run_id, sr.uid
@@ -427,7 +450,7 @@ def build_api_response(
         # check for errors
         if sr.error_msg:
             raise HTTPException(
-                status_code=500,
+                status_code=sr.error_code or HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "id": run_id,
                     "url": web_url,
