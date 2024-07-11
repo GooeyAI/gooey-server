@@ -5,12 +5,10 @@ from twilio.twiml.messaging_response import MessagingResponse
 from app_users.models import AppUser
 from bots.models import Conversation, BotIntegration, SavedRun, PublishedRun, Platform
 from phonenumber_field.phonenumber import PhoneNumber
-from daras_ai_v2 import settings
 
-from furl import furl
 from fastapi import APIRouter, Response
 from starlette.background import BackgroundTasks
-from daras_ai_v2.fastapi_tricks import fastapi_request_urlencoded_body
+from daras_ai_v2.fastapi_tricks import fastapi_request_urlencoded_body, get_route_url
 import base64
 
 router = APIRouter()
@@ -87,7 +85,10 @@ def twilio_voice_call(
 
     resp = VoiceResponse()
     resp.redirect(
-        url_for(twilio_voice_call_response, bi_id=bi.id, text=text, audio_url=audio_url)
+        get_route_url(
+            twilio_voice_call_response,
+            dict(bi_id=bi.id, text=text, audio_url=audio_url),
+        )
     )
 
     return Response(str(resp), headers={"Content-Type": "text/xml"})
@@ -135,7 +136,7 @@ def twilio_voice_call_asked(
 
     resp.enqueue(
         name=queue_name,
-        wait_url=url_for(twilio_voice_call_wait, bi_id=bi.id),
+        wait_url=get_route_url(twilio_voice_call_wait, dict(bi_id=bi.id)),
         wait_url_method="POST",
     )
 
@@ -182,7 +183,7 @@ def twilio_voice_call_asked_audio(
     resp = VoiceResponse()
     resp.enqueue(
         name=queue_name,
-        wait_url=url_for(twilio_voice_call_wait, bi_id=bi.id),
+        wait_url=get_route_url(twilio_voice_call_wait, dict(bi_id=bi.id)),
         wait_url_method="POST",
     )
 
@@ -241,8 +242,9 @@ def twilio_voice_call_respond(
     assert queue_sid, "Queue not found"
 
     client.queues(queue_sid).members(call_sid).update(
-        url=url_for(
-            twilio_voice_call_response, bi_id=bi.id, text=text, audio_url=audio_url
+        url=get_route_url(
+            twilio_voice_call_response,
+            dict(bi_id=bi.id, text=text, audio_url=audio_url),
         ),
         method="POST",
     )
@@ -274,7 +276,7 @@ def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
         # try recording 3 times to give the user a chance to start speaking
         for _ in range(3):
             resp.record(
-                action=url_for(twilio_voice_call_asked_audio),
+                action=get_route_url(twilio_voice_call_asked_audio),
                 method="POST",
                 timeout=3,
                 finish_on_key="0",
@@ -285,7 +287,7 @@ def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
             input="speech",  # also supports dtmf (keypad input) and a combination of both
             timeout=20,  # users get 20 to start speaking
             speechTimeout=3,  # a 3 second pause ends the input
-            action=url_for(
+            action=get_route_url(
                 twilio_voice_call_asked
             ),  # the URL to send the user's question to
             method="POST",
@@ -403,7 +405,10 @@ def start_voice_call_session(
     audio_url = base64.b64encode(audio_url.encode()).decode() if audio_url else "N"
 
     resp.redirect(
-        url_for(twilio_voice_call_response, bi_id=bi.id, text=text, audio_url=audio_url)
+        get_route_url(
+            twilio_voice_call_response,
+            dict(bi_id=bi.id, text=text, audio_url=audio_url),
+        )
     )
 
     call = client.calls.create(
@@ -463,17 +468,6 @@ def send_sms_message(
     return message
 
 
-def url_for(fx, **kwargs):
-    """Get the URL for the given Twilio endpoint."""
-
-    return (
-        furl(
-            settings.APP_BASE_URL,
-        )
-        / router.url_path_for(fx.__name__, **kwargs)
-    ).tostr()
-
-
 def twilio_connect(
     current_run: SavedRun,
     published_run: PublishedRun,
@@ -489,15 +483,15 @@ def twilio_connect(
     client = Client(twilio_account_sid, twilio_auth_token)
     client.incoming_phone_numbers(twilio_phone_number_sid).update(
         sms_fallback_method="POST",
-        sms_fallback_url=url_for(twilio_sms_error),
+        sms_fallback_url=get_route_url(twilio_sms_error),
         sms_method="POST",
-        sms_url=url_for(twilio_sms),
+        sms_url=get_route_url(twilio_sms),
         # status_callback_method="POST", # uncomment for debugging
-        # status_callback=url_for(twilio_voice_call_status),
+        # status_callback=get_route_url(twilio_voice_call_status),
         voice_fallback_method="POST",
-        voice_fallback_url=url_for(twilio_voice_call_error),
+        voice_fallback_url=get_route_url(twilio_voice_call_error),
         voice_method="POST",
-        voice_url=url_for(twilio_voice_call),
+        voice_url=get_route_url(twilio_voice_call),
     )
 
     # create bot integration
