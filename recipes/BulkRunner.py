@@ -11,7 +11,7 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.field_render import field_title_desc
@@ -45,7 +45,7 @@ class BulkRunnerPage(BasePage):
     slug_versions = ["bulk-runner", "bulk"]
     price = 1
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
@@ -104,7 +104,7 @@ List of URLs to the evaluation runs that you requested.
             flatten_dict_key="url",
         )
 
-        files = document_uploader(
+        files = bulk_documents_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
@@ -306,6 +306,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
+                used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len
                 ):
@@ -317,7 +318,9 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     result, sr = sr.submit_api_call(
-                        current_user=self.request.user, request_body=request_body
+                        current_user=self.request.user,
+                        request_body=request_body,
+                        parent_pr=pr,
                     )
                     get_celery_result_db_safe(result)
                     sr.refresh_from_db()
@@ -333,8 +336,13 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if pr and pr.title:
+                            if (
+                                pr
+                                and pr.title
+                                and f"({pr.title}) {col}" not in used_col_names
+                            ):
                                 col = f"({pr.title}) {col}"
+                                used_col_names.add(col)
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
@@ -382,7 +390,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 documents=response.output_documents
             ).dict(exclude_unset=True)
             result, sr = sr.submit_api_call(
-                current_user=self.request.user, request_body=request_body
+                current_user=self.request.user, request_body=request_body, parent_pr=pr
             )
             get_celery_result_db_safe(result)
             sr.refresh_from_db()
@@ -420,7 +428,7 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        added_options = init_workflow_selector(d, key)
+        init_workflow_selector(d, key)
 
         col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
@@ -460,7 +468,7 @@ To get started:
                 options = get_published_run_options(
                     page_cls, current_user=self.request.user
                 )
-                options.update(added_options)
+                options.update(d.get("--added_workflows", {}))
                 with st.div(className="pt-1"):
                     url = st.selectbox(
                         "",
@@ -633,7 +641,7 @@ def list_view_editor(
         st.session_state[key] = ret
         return ret
 
-    old_lst = st.session_state.setdefault(key, [])
+    old_lst = st.session_state.get(key) or []
     add_key = f"--{key}:add"
     if st.session_state.get(add_key):
         old_lst.append({})

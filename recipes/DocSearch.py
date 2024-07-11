@@ -8,7 +8,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
     is_user_uploaded_url,
     citation_style_selector,
     doc_search_advanced_settings,
@@ -22,7 +22,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -63,7 +63,7 @@ class DocSearchPage(BasePage):
         "dense_weight": 1.0,
     }
 
-    class RequestModel(DocSearchRequest):
+    class RequestModel(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
 
@@ -78,8 +78,6 @@ class DocSearchPage(BasePage):
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
-        variables: dict[str, typing.Any] | None
-
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -93,8 +91,7 @@ class DocSearchPage(BasePage):
 
     def render_form_v2(self):
         st.text_area("#### Search Query", key="search_query")
-        document_uploader("#### Documents")
-        prompt_vars_widget("task_instructions", "query_instructions")
+        bulk_documents_uploader("#### Documents")
 
     def validate_form_v2(self):
         search_query = st.session_state.get("search_query", "").strip()
@@ -115,7 +112,7 @@ class DocSearchPage(BasePage):
         ]
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
         refs = st.session_state.get("references", [])
         render_sources_widget(refs)
 
@@ -268,7 +265,6 @@ def render_doc_search_step(state: dict):
             help=f"output {idx}",
             disabled=True,
             value=text,
-            height=200,
         )
 
 

@@ -1,17 +1,21 @@
+//
+// To update this, run:
+//    deployctl deploy --include functions/executor.js functions/executor.js --prod
+// (Exclude --prod when testing in development)
+//
 Deno.serve(async (req) => {
   if (!isAuthenticated(req)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  let logs = captureConsole();
-  let code = await req.json();
+  let { tag, code, variables } = await req.json();
+  let { mockConsole, logs } = captureConsole(tag);
   let status, response;
 
   try {
-    let Deno = undefined; // Deno should not available to user code
-    let retval = eval(code);
+    let retval = isolatedEval(mockConsole, code, variables);
     if (retval instanceof Function) {
-      retval = retval();
+      retval = retval(variables);
     }
     if (retval instanceof Promise) {
       retval = await retval;
@@ -27,6 +31,12 @@ Deno.serve(async (req) => {
   return new Response(body, { status });
 });
 
+function isolatedEval(console, code, variables) {
+  // Hide global objects
+  let Deno, global, self, globalThis, window;
+  return eval(code);
+}
+
 function isAuthenticated(req) {
   let authorization = req.headers.get("Authorization");
   if (!authorization) return false;
@@ -35,22 +45,22 @@ function isAuthenticated(req) {
   return token === Deno.env.get("GOOEY_AUTH_TOKEN");
 }
 
-function captureConsole() {
+function captureConsole(tag) {
   let logs = [];
-
-  let oldLog = console.log;
-  console.log = (...args) => {
-    logs.push({ level: "log", message: args.map(toString).join(" ") });
-    oldLog(...args);
-  };
-
+  let prefix = `[${tag}]`;
+  let realLog = console.log;
   let oldError = console.error;
-  console.error = (...args) => {
-    logs.push({ level: "error", message: args.map(toString).join(" ") });
-    oldError(...args);
+  let mockConsole = {
+    log(...args) {
+      logs.push({ level: "log", message: args.map(toString).join(" ") });
+      realLog(prefix, ...args);
+    },
+    error(...args) {
+      logs.push({ level: "error", message: args.map(toString).join(" ") });
+      oldError(prefix, ...args);
+    },
   };
-
-  return logs;
+  return { mockConsole, logs };
 }
 
 function toString(obj) {

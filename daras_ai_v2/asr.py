@@ -1,6 +1,8 @@
+import multiprocessing
 import os.path
 import os.path
 import tempfile
+import typing
 from enum import Enum
 
 import requests
@@ -12,7 +14,6 @@ import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -36,6 +37,7 @@ TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
+# https://cloud.google.com/translate/docs/languages#roman
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 
 # https://cloud.google.com/speech-to-text/docs/speech-to-text-supported-languages
@@ -270,15 +272,21 @@ class AsrOutputFormat(Enum):
     vtt = "VTT"
 
 
-class TranslationModels(Enum):
-    google = "Google Translate"
-    ghana_nlp = "Ghana NLP"
+class TranslationModel(typing.NamedTuple):
+    label: str
+    supports_glossary: bool = False
+    supports_auto_detect: bool = False
 
-    def supports_glossary(self) -> bool:
-        return self in {self.google}
 
-    def supports_auto_detect(self) -> bool:
-        return self in {self.google}
+class TranslationModels(TranslationModel, Enum):
+    google = TranslationModel(
+        label="Google Translate",
+        supports_glossary=True,
+        supports_auto_detect=True,
+    )
+    ghana_nlp = TranslationModel(
+        label="Ghana NLP Translate",
+    )
 
 
 def translation_language_selector(
@@ -303,7 +311,7 @@ def translation_language_selector(
     return st.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: languages[k] if k else BLANK_OPTION,
+        format_func=lang_format_func,
         options=options,
         **kwargs,
     )
@@ -395,15 +403,6 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
-def get_language_in_collection(langcode: str, languages):
-    import langcodes
-
-    for lang in languages:
-        if langcodes.get(lang).language == langcodes.get(langcode).language:
-            return langcode
-    return None
-
-
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
@@ -484,26 +483,17 @@ def run_ghana_nlp_translate(
     target_language: str,
     source_language: str,
 ) -> list[str]:
-    import langcodes
-
     assert (
-        target_language in GHANA_NLP_SUPPORTED
-    ), "Ghana NLP does not support this target language"
-    assert source_language, "Source language is required for Ghana NLP"
-
-    if source_language not in GHANA_NLP_SUPPORTED:
-        src = langcodes.Language.get(source_language).language
-        for lang in GHANA_NLP_SUPPORTED:
-            if src == langcodes.Language.get(lang).language:
-                source_language = lang
-                break
-    assert (
-        source_language in GHANA_NLP_SUPPORTED
-    ), "Ghana NLP does not support this source language"
-
+        source_language and target_language
+    ), "Both Source & Target language is required for Ghana NLP"
+    source_language = normalised_lang_in_collection(
+        source_language, GHANA_NLP_SUPPORTED
+    )
+    target_language = normalised_lang_in_collection(
+        target_language, GHANA_NLP_SUPPORTED
+    )
     if source_language == target_language:
         return texts
-
     return map_parallel(
         lambda doc: _call_ghana_nlp_chunked(doc, source_language, target_language),
         texts,
@@ -550,50 +540,67 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
-    import langcodes
 
-    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    supported_languages = google_translate_target_languages()
     if source_language:
-        source_language = langcodes.Language.get(source_language).to_tag()
-        source_language = get_language_in_collection(
-            source_language, google_translate_source_languages().keys()
-        )  # this will default to autodetect if language is not found as supported
-    target_language = langcodes.Language.get(target_language).to_tag()
-    target_language: str | None = get_language_in_collection(
-        target_language, google_translate_target_languages().keys()
+        try:
+            source_language = normalised_lang_in_collection(
+                source_language, supported_languages
+            )
+        except UserError:
+            source_language = None  # autodetect
+    target_language = normalised_lang_in_collection(
+        target_language, supported_languages
     )
-    if not target_language:
-        raise UserError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
-        language_codes = [source_language] * len(texts)
+        detected_source_languges = [source_language] * len(texts)
     else:
         translate_client = translate.Client()
         detections = flatten(
             translate_client.detect_language(texts[i : i + TRANSLATE_BATCH_SIZE])
             for i in range(0, len(texts), TRANSLATE_BATCH_SIZE)
         )
-        language_codes = [detection["language"] for detection in detections]
+        detected_source_languges = [detection["language"] for detection in detections]
+
+    # fix for when sometimes google might detect a different language than the user provided one
+    if source_language:
+        detected_source_languges = [
+            code if source_language in code.split("-")[0] else source_language
+            for code in detected_source_languges
+        ]
 
     return map_parallel(
-        lambda text, source: _translate_text(
-            text, source, target_language, glossary_url
+        lambda text, src_lang: _translate_text(
+            text, target_language, src_lang, glossary_url
         ),
         texts,
-        language_codes,
+        detected_source_languges,
         max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
+    import langcodes
+
+    for candidate in collection:
+        if langcodes.get(candidate).language == langcodes.get(target).language:
+            return candidate
+
+    raise UserError(
+        f"Unsupported language: {target!r} | must be one of {set(collection)}"
     )
 
 
 def _translate_text(
     text: str,
-    source_language: str,
     target_language: str,
+    source_language: str,
     glossary_url: str | None,
 ) -> str:
     is_romanized = source_language.endswith("-Latn")
-    source_language = source_language.replace("-Latn", "")
+    source_language = source_language.split("-")[0]
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
@@ -601,9 +608,6 @@ def _translate_text(
     # prevent incorrect API calls
     if not text or source_language == target_language or source_language == "und":
         return text
-
-    if source_language == "wo-SN" or target_language == "wo-SN":
-        return _MinT_translate_one_text(text, source_language, target_language)
 
     config = {
         "target_language_code": target_language,
@@ -614,7 +618,6 @@ def _translate_text(
     if source_language != "auto":
         config["source_language_code"] = source_language
 
-    # glossary does not work with transliteration
     if glossary_url and not enable_transliteration:
         from glossary_resources.models import GlossaryResource
 
@@ -961,20 +964,24 @@ def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
+_yt_dlp_lock = multiprocessing.Semaphore(1)
+
+
 def download_youtube_to_wav(youtube_url: str) -> bytes:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _yt_dlp_lock, tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
         # run yt-dlp to download audio
         call_cmd(
             "yt-dlp",
             "--no-playlist",
-            "--format",
-            "bestaudio",
-            "--output",
-            infile,
+            "--max-downloads", "1",
+            "--format", "bestaudio",
+            "--output", infile,
             youtube_url,
-        )
+            # ignore MaxDownloadsReached - https://github.com/ytdl-org/youtube-dl/blob/a452f9437c8a3048f75fc12f75bcfd3eed78430f/youtube_dl/__init__.py#L468
+            ok_returncodes={101},
+        )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory
@@ -1074,4 +1081,4 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
 
 
 def should_translate_lang(code: str) -> bool:
-    return code and not code.split("-")[0] != "en"
+    return code and code.split("-")[0] != "en"

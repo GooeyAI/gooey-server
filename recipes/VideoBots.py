@@ -14,7 +14,7 @@ from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -43,16 +43,16 @@ from daras_ai_v2.doc_search_settings_widgets import (
     keyword_instructions_widget,
     doc_search_advanced_settings,
     doc_extract_selector,
-    document_uploader,
+    bulk_documents_uploader,
     citation_style_selector,
+    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
-from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.glossary import glossary_input, validate_glossary_document
+from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -70,7 +70,7 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
@@ -86,10 +86,9 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from functions.recipe_functions import LLMTools
 from gooey_ui import RedirectException
 from recipes.DocSearch import (
     get_top_k_references,
@@ -166,7 +165,7 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None
@@ -248,8 +247,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
             LipsyncModel.Wav2Lip.name
         )
 
-        variables: dict[str, typing.Any] | None
-
         tools: list[LLMTools] | None = Field(
             title="🛠️ Tools",
             description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
@@ -271,7 +268,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         raw_output_text: list[str] | None
 
         # doc search
-        references: list[SearchReference] | None
+        references: list[SearchReference] | None = []
         final_search_query: str | None
         final_keyword_query: str | list[str] | None
 
@@ -332,9 +329,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             key="bot_script",
             height=300,
         )
-        prompt_vars_widget(
-            "bot_script",
-        )
 
         enum_selector(
             LargeLanguageModels,
@@ -343,7 +337,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             use_selectbox=True,
         )
 
-        document_uploader(
+        bulk_documents_uploader(
             """
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
@@ -437,7 +431,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.session_state.get("document_model"),
             ),
         ):
-            doc_model_descriptions = azure_form_recognizer_models()
+            if settings.AZURE_FORM_RECOGNIZER_KEY:
+                doc_model_descriptions = azure_form_recognizer_models()
+            else:
+                doc_model_descriptions = {}
             st.selectbox(
                 f"{field_desc(self.RequestModel, 'document_model')}",
                 key="document_model",
@@ -474,7 +471,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
         if (
             st.session_state.get("user_language")
-            and TranslationModels[translation_model].supports_glossary()
+            and TranslationModels[translation_model].supports_glossary
         ):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
@@ -491,13 +488,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
                     """
                 )
-                glossary_input(
+                st.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
                     key="input_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
-                glossary_input(
+                st.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
                     key="output_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
             else:
                 st.session_state["input_glossary_document"] = None
@@ -514,9 +513,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """,
                 key="task_instructions",
                 height=300,
-            )
-            prompt_vars_widget(
-                "task_instructions",
             )
 
             citation_style_selector()
@@ -600,7 +596,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         references = st.session_state.get("references", [])
         if not references:
             return
-        with st.expander("💁‍♀️ Sources"):
+        key = "sources-expander"
+        with st.expander("💁‍♀️ Sources", key=key):
+            if not st.session_state.get(key):
+                return
             for idx, ref in enumerate(references):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
@@ -658,53 +657,45 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         final_search_query = st.session_state.get("final_search_query")
         if final_search_query:
             st.text_area(
-                "**Final Search Query**", value=final_search_query, disabled=True
+                "###### `final_search_query`", value=final_search_query, disabled=True
             )
 
         final_keyword_query = st.session_state.get("final_keyword_query")
         if final_keyword_query:
             if isinstance(final_keyword_query, list):
-                st.write("**Final Keyword Query**")
+                st.write("###### `final_keyword_query`")
                 st.json(final_keyword_query)
             else:
                 st.text_area(
-                    "**Final Keyword Query**",
+                    "###### `final_keyword_query`",
                     value=str(final_keyword_query),
                     disabled=True,
                 )
 
         references = st.session_state.get("references", [])
         if references:
-            st.write("**References**")
-            st.json(references, expanded=False)
+            st.write("###### `references`")
+            st.json(references)
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
-                text_output("**Final Prompt**", value=final_prompt, height=300)
+                text_output("###### `final_prompt`", value=final_prompt, height=300)
             else:
-                st.write("**Final Prompt**")
+                st.write("###### `final_prompt`")
                 st.json(final_prompt)
 
-        for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
-            st.text_area(
-                f"**Raw Text Response {idx + 1}**",
-                value=text,
-                disabled=True,
-            )
-
-        col1, col2 = st.columns(2)
-        with col1:
-            for idx, text in enumerate(st.session_state.get("output_text", [])):
+        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
+            for idx, text in enumerate(st.session_state.get(k) or []):
                 st.text_area(
-                    f"**Final Response {idx + 1}**",
+                    f"###### `{k}[{idx}]`",
                     value=text,
                     disabled=True,
                 )
-        with col2:
-            for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
-                st.write(f"**Generated Audio {idx + 1}**")
-                st.audio(audio_url)
+
+        for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
+            st.write(f"###### `output_audio[{idx}]`")
+            st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
         total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
@@ -829,7 +820,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.raw_input_text = user_input
 
         # if documents are provided, run doc search on the saved msgs and get back the references
-        references = None
         if request.documents:
             # formulate the search query as a history of all the messages
             query_msgs = request.messages + [
@@ -874,7 +864,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # return
 
             # perform doc search
-            references = yield from get_top_k_references(
+            response.references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
                     {
                         **st.session_state,
@@ -884,21 +874,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ),
             )
             if request.use_url_shortener:
-                for reference in references:
+                for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
                         url=reference["url"],
                         user=self.request.user,
                         workflow=Workflow.VIDEO_BOTS,
                     )[0].shortened_url()
-            response.references = references
         # if doc search is successful, add the search results to the user prompt
-        if references:
+        if response.references:
             # add task instructions
             task_instructions = render_prompt_vars(
                 request.task_instructions, st.session_state
             )
             user_input = (
-                references_as_prompt(references)
+                references_as_prompt(response.references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_input
             )
@@ -960,9 +949,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
-            # save model response
+            # save model response without citations
             response.raw_output_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, references))
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
 
@@ -976,14 +965,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     glossary_url=request.output_glossary_document,
                     model=translation_model,
                 )
+                # save translated response for tts
                 response.raw_tts_text = [
-                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    "".join(
+                        snippet for snippet, _ in parse_refs(text, response.references)
+                    )
                     for text in output_text
                 ]
 
-            if references:
+            if response.references:
                 all_refs_list = apply_response_formattings_prefix(
-                    output_text, references, citation_style
+                    output_text, response.references, citation_style
                 )
             else:
                 all_refs_list = None

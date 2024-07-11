@@ -290,13 +290,12 @@ class ApiInterface(BotInterface):
                 created_at=self.convo.created_at.isoformat(),
             )
         )
-
-        if request.input_prompt:
+        if request.input_images:
+            self.input_type = "image"
+        elif request.input_prompt:
             self.input_type = "text"
         elif request.input_audio:
             self.input_type = "audio"
-        elif request.input_images:
-            self.input_type = "image"
         elif request.input_documents:
             self.input_type = "document"
         elif button := request.button_pressed:

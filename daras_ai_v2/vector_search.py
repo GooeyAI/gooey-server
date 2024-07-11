@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import io
 import mimetypes
+import multiprocessing
 import random
 import re
 import tempfile
@@ -170,7 +171,7 @@ def get_top_k_references(
     # chunk_count = sum(len(ref.document_ids) for ref in embedding_refs)
     # logger.debug(f"Knowledge base has {len(file_ids)} documents ({chunk_count} chunks)")
 
-    yield "Searching knowledge base"
+    yield "Searching knowledge base..."
     s = time()
     search_result = query_vespa(
         request.search_query,
@@ -837,6 +838,11 @@ def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
     return furl(url).set(fragment_args={"page": page_num} if page_num else {})
 
 
+# dont use more than 1GB of memory for pandoc in total
+MAX_PANDOC_MEM_MB = 512
+_pandoc_lock = multiprocessing.Semaphore(4)  # semaphore ensures max pandoc processes
+
+
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
     """
     Convert document to text using pandoc.
@@ -850,13 +856,21 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         extracted text content of document
     """
     with (
+        _pandoc_lock,
         tempfile.NamedTemporaryFile("wb", suffix="." + safe_filename(f_name)) as infile,
         tempfile.NamedTemporaryFile("r") as outfile,
     ):
         infile.write(f_bytes)
         call_cmd(
-            "pandoc", "--standalone", infile.name, "--to", to, "--output", outfile.name
-        )
+            "pandoc",
+            # https://pandoc.org/MANUAL.html#a-note-on-security
+            "+RTS", f"-M{MAX_PANDOC_MEM_MB}M", "-RTS", "--sandbox",
+            "--standalone",
+            infile.name,
+            "--to", to,
+            "--output",
+            outfile.name,
+        )  # fmt: skip
         return outfile.read()
 
 
@@ -875,7 +889,6 @@ def render_sources_widget(refs: list[SearchReference]):
             + "```text\n"
             + "\n".join(f"[{idx + 1}] {ref['url']}" for idx, ref in enumerate(refs))
             + "\n```",
-            height=200,
             disabled=True,
         )
 

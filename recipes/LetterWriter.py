@@ -19,7 +19,7 @@ class LetterWriterPage(BasePage):
     workflow = Workflow.LETTER_WRITER
     slug_versions = ["LetterWriter"]
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         action_id: str
 
         prompt_header: str | None
@@ -160,7 +160,6 @@ class LetterWriterPage(BasePage):
             Briefly describe the task for the language model
             """,
             key="prompt_header",
-            height=200,
         )
 
         st.write("---")

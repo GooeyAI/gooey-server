@@ -21,8 +21,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_provider_selector,
     azure_tts_voices,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
     OLD_ELEVEN_LABS_VOICES,
@@ -43,7 +41,9 @@ class TextToSpeechSettings(BaseModel):
 
     bark_history_prompt: str | None
 
-    elevenlabs_voice_name: str | None
+    elevenlabs_voice_name: str | None = Field(
+        deprecated=True, description="Use `elevenlabs_voice_id` instead"
+    )
     elevenlabs_api_key: str | None
     elevenlabs_voice_id: str | None
     elevenlabs_model: str | None
@@ -54,8 +54,8 @@ class TextToSpeechSettings(BaseModel):
 
     azure_voice_name: str | None
 
-    openai_voice_name: OPENAI_TTS_VOICES_T | None
-    openai_tts_model: OPENAI_TTS_MODELS_T | None
+    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
+    openai_tts_model: OpenAI_TTS_Models.api_choices | None
 
 
 class TextToSpeechPage(BasePage):
@@ -79,11 +79,9 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "openai_voice_name": "alloy",
-        "openai_tts_model": "tts-1",
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         text_prompt: str
 
     class RequestModel(TextToSpeechSettings, RequestModelBase):
@@ -401,16 +399,14 @@ class TextToSpeechPage(BasePage):
         return voice_model
 
     def _get_elevenlabs_voice_id(self, state: dict[str, str]) -> str:
-        try:
-            return state["elevenlabs_voice_id"]
-        except KeyError:
-            # default to first in the mapping
-            default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
-            voice_name = state.get("elevenlabs_voice_name", default_voice_name)
-            assert (
-                voice_name in OLD_ELEVEN_LABS_VOICES
-            ), f"Invalid voice_name: {voice_name}"
-            return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
+        if voice_id := state.get("elevenlabs_voice_id"):
+            return voice_id
+
+        # default to first in the mapping
+        default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
+        voice_name = state.get("elevenlabs_voice_name", default_voice_name)
+        assert voice_name in OLD_ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
+        return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
 
     def _get_elevenlabs_api_key(self, state: dict[str, str]) -> tuple[str, bool]:
         """

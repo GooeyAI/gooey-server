@@ -17,7 +17,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 
@@ -38,7 +38,7 @@ class CompareLLMPage(BasePage):
         "sampling_temperature": 0.7,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         input_prompt: str | None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
@@ -49,8 +49,6 @@ class CompareLLMPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
-
-        variables: dict[str, typing.Any] | None
 
         response_format_type: ResponseFormatType = Field(
             None,
@@ -81,7 +79,6 @@ class CompareLLMPage(BasePage):
             help="What a fine day..",
             height=300,
         )
-        prompt_vars_widget("input_prompt")
 
         enum_multiselect(
             LargeLanguageModels,
@@ -141,7 +138,7 @@ class CompareLLMPage(BasePage):
             st.write("**Prompt**")
             st.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
             for key, value in state.get("variables", {}).items():
-                st.text_area(f"`{key}`", value=value, disabled=True)
+                st.text_area(f"`{key}`", value=str(value), disabled=True)
         with col2:
             _render_outputs(state, 300)
 

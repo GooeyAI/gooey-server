@@ -17,6 +17,8 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
+from functions.models import CalledFunction, CalledFunctionResponse
+from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -99,6 +101,7 @@ class Workflow(models.IntegerChoices):
     BULK_RUNNER = (30, "Bulk Runner")
     BULK_EVAL = (31, "Bulk Evaluator")
     FUNCTIONS = (32, "Functions")
+    TRANSLATION = (33, "Translation")
 
     @property
     def short_slug(self):
@@ -116,42 +119,43 @@ class Workflow(models.IntegerChoices):
         return workflow_map[self]
 
     def get_or_create_metadata(self) -> "WorkflowMetadata":
-        metadata, _created = WorkflowMetadata.objects.get_or_create(
+        return get_or_create_lazy(
+            WorkflowMetadata,
             workflow=self,
-            defaults=dict(
-                short_title=lambda: (
+            create=lambda **kwargs: WorkflowMetadata.objects.create(
+                **kwargs,
+                short_title=(
                     self.page_cls.get_root_published_run().title or self.page_cls.title
                 ),
                 default_image=self.page_cls.explore_image or "",
-                meta_title=lambda: (
+                meta_title=(
                     self.page_cls.get_root_published_run().title or self.page_cls.title
                 ),
-                meta_description=lambda: (
+                meta_description=(
                     self.page_cls().preview_description(state={})
                     or self.page_cls.get_root_published_run().notes
                 ),
                 meta_image=self.page_cls.explore_image or "",
             ),
-        )
-        return metadata
+        )[0]
 
 
 class WorkflowMetadata(models.Model):
     workflow = models.IntegerField(choices=Workflow.choices, unique=True)
-    short_title = models.TextField()
-    help_url = models.URLField(blank=True, default="")
 
-    # TODO: support the below fields
+    short_title = models.TextField(help_text="Title used in breadcrumbs")
     default_image = models.URLField(
-        blank=True, default="", help_text="(not implemented)"
+        blank=True, default="", help_text="Image shown on explore page"
     )
 
     meta_title = models.TextField()
     meta_description = models.TextField(blank=True, default="")
     meta_image = CustomURLField(default="", blank=True)
+
     meta_keywords = models.JSONField(
-        default=list, blank=True, help_text="(not implemented)"
+        default=list, blank=True, help_text="(Not implemented)"
     )
+    help_url = models.URLField(blank=True, default="", help_text="(Not implemented)")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -338,23 +342,30 @@ class SavedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        parent_pr: "PublishedRun" = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
         # run in a thread to avoid messing up threadlocals
         with ThreadPool(1) as pool:
+            if parent_pr and parent_pr.saved_run == self:
+                # avoid passing run_id and uid for examples
+                query_params = dict(example_id=parent_pr.published_run_id)
+            else:
+                query_params = dict(
+                    example_id=self.example_id, run_id=self.run_id, uid=self.uid
+                )
             page, result, run_id, uid = pool.apply(
                 submit_api_call,
                 kwds=dict(
                     page_cls=Workflow(self.workflow).page_cls,
-                    query_params=dict(
-                        example_id=self.example_id, run_id=self.run_id, uid=self.uid
-                    ),
+                    query_params=query_params,
                     user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
                 ),
             )
+
         return result, page.run_doc_sr(run_id, uid)
 
     def get_creator(self) -> AppUser | None:
@@ -366,6 +377,15 @@ class SavedRun(models.Model):
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
+
+    def api_output(self, state: dict = None) -> dict:
+        state = state or self.state
+        if self.state.get("functions"):
+            state["called_functions"] = [
+                CalledFunctionResponse.from_db(called_fn)
+                for called_fn in self.called_functions.all()
+            ]
+        return state
 
 
 def _parse_dt(dt) -> datetime.datetime | None:
@@ -640,10 +660,10 @@ class BotIntegration(models.Model):
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
-            or self.ig_username
-            or self.fb_page_name
             or self.wa_phone_number_id
+            or self.fb_page_name
             or self.fb_page_id
+            or self.ig_username
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
@@ -656,7 +676,6 @@ class BotIntegration(models.Model):
 
     get_display_name.short_description = "Bot"
 
-    @admin.display(description="API integraton_id")
     def api_integration_id(self):
         from routers.bots_api import api_hashids
 
@@ -987,6 +1006,7 @@ class Conversation(models.Model):
             )
             or self.fb_page_id
             or self.slack_user_id
+            or self.web_user_id
         )
 
     get_display_name.short_description = "User"
@@ -1124,7 +1144,7 @@ class MessageQuerySet(models.QuerySet):
                 "Question (Local)": message.get_previous_by_created_at().display_content,
                 "Answer (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
-                "Run URL": message.saved_run.get_app_url(),
+                "Run URL": (message.saved_run and message.saved_run.get_app_url()),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1441,34 +1461,58 @@ class FeedbackComment(models.Model):
 
 
 class PublishedRunQuerySet(models.QuerySet):
-    def create_published_run(
+    def get_or_create_with_version(
         self,
         *,
         workflow: Workflow,
         published_run_id: str,
         saved_run: SavedRun,
-        user: AppUser,
+        user: AppUser | None,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return get_or_create_lazy(
+            PublishedRun,
+            workflow=workflow,
+            published_run_id=published_run_id,
+            create=lambda **kwargs: self.create_with_version(
+                **kwargs,
+                saved_run=saved_run,
+                user=user,
+                title=title,
+                notes=notes,
+                visibility=visibility,
+            ),
+        )
+
+    def create_with_version(
+        self,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser | None,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
     ):
         with transaction.atomic():
-            published_run = PublishedRun(
+            pr = self.create(
                 workflow=workflow,
                 published_run_id=published_run_id,
                 created_by=user,
                 last_edited_by=user,
                 title=title,
             )
-            published_run.save()
-            published_run.add_version(
+            pr.add_version(
                 user=user,
                 saved_run=saved_run,
                 title=title,
                 visibility=visibility,
                 notes=notes,
             )
-            return published_run
+            return pr
 
 
 class PublishedRun(models.Model):
@@ -1570,7 +1614,7 @@ class PublishedRun(models.Model):
         notes: str,
         visibility: PublishedRunVisibility,
     ) -> "PublishedRun":
-        return PublishedRun.objects.create_published_run(
+        return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
@@ -1588,7 +1632,7 @@ class PublishedRun(models.Model):
     def add_version(
         self,
         *,
-        user: AppUser,
+        user: AppUser | None,
         saved_run: SavedRun,
         visibility: PublishedRunVisibility,
         title: str,
@@ -1634,6 +1678,20 @@ class PublishedRun(models.Model):
                 "run_count"
             ]
             or 0
+        )
+
+    def submit_api_call(
+        self,
+        *,
+        current_user: AppUser,
+        request_body: dict,
+        enable_rate_limits: bool = False,
+    ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+        return self.saved_run.submit_api_call(
+            current_user=current_user,
+            request_body=request_body,
+            enable_rate_limits=enable_rate_limits,
+            parent_pr=self,
         )
 
 

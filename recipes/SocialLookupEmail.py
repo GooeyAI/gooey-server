@@ -38,7 +38,7 @@ class SocialLookupEmailPage(BasePage):
         "sampling_temperature": 0.5,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         email_address: str
 
         input_prompt: str | None
@@ -123,7 +123,6 @@ class SocialLookupEmailPage(BasePage):
             #### Email Prompt
             """,
             key="input_prompt",
-            height=200,
         )
 
     def render_settings(self):
@@ -211,7 +210,7 @@ class SocialLookupEmailPage(BasePage):
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area("Final Prompt", disabled=True, value=final_prompt, height=200)
+            st.text_area("Final Prompt", disabled=True, value=final_prompt)
         else:
             st.div()
 
@@ -239,7 +238,8 @@ def _input_variables(state: dict):
 def get_profile_for_email(email_address) -> dict | None:
     r = requests.post(
         "https://api.apollo.io/v1/people/match",
-        json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
+        headers={"X-Api-Key": settings.APOLLO_API_KEY, "Cache-Control": "no-cache"},
+        json={"email": email_address},
     )
     raise_for_status(r)
 

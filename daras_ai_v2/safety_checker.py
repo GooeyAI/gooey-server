@@ -30,7 +30,7 @@ def safety_checker_text(text_input: str):
     result, sr = (
         CompareLLMPage()
         .get_published_run(published_run_id=settings.SAFTY_CHECKER_EXAMPLE_ID)
-        .saved_run.submit_api_call(
+        .submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),
         )

@@ -10,7 +10,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
-from daras_ai_v2.prompt_vars import prompt_vars_widget
+from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
@@ -33,12 +33,11 @@ def is_user_uploaded_url(url: str) -> bool:
     return _user_media_url_prefix in url
 
 
-def document_uploader(
+def bulk_documents_uploader(
     label: str,
     key: str = "documents",
     accept: typing.Iterable[str] = None,
-    accept_multiple_files=True,
-) -> list[str] | str:
+) -> list[str]:
     st.write(label, className="gui-input")
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
@@ -47,12 +46,8 @@ def document_uploader(
     if st.session_state.get(f"__custom_checkbox_{key}"):
         if not custom_key in st.session_state:
             st.session_state[custom_key] = "\n".join(documents)
-        if accept_multiple_files:
-            widget = st.text_area
-            kwargs = dict(height=150)
-        else:
-            widget = st.text_input
-            kwargs = {}
+        widget = st.text_area
+        kwargs = dict(height=150)
         text_value = widget(
             label,
             key=custom_key,
@@ -66,10 +61,7 @@ def document_uploader(
             },
             **kwargs,
         )
-        if accept_multiple_files:
-            st.session_state[key] = filter(None, text_value.strip().splitlines())
-        else:
-            st.session_state[key] = text_value
+        st.session_state[key] = filter(None, text_value.strip().splitlines())
     else:
         st.session_state.pop(custom_key, None)
         st.file_uploader(
@@ -77,17 +69,16 @@ def document_uploader(
             label_visibility="collapsed",
             key=key,
             accept=accept,
-            accept_multiple_files=accept_multiple_files,
+            accept_multiple_files=True,
         )
     st.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
-    documents = st.session_state.get(key, [])
-    if accept_multiple_files:
-        try:
-            documents = list(_expand_gdrive_folders(documents))
-        except Exception as e:
-            capture_exception(e)
-            st.error(f"Error expanding gdrive folders: {e}")
-    st.session_state[key] = documents
+    documents = st.session_state.setdefault(key, [])
+    try:
+        documents = list(_expand_gdrive_folders(documents))
+        st.session_state[key] = documents
+    except Exception as e:
+        capture_exception(e)
+        st.error(f"Error expanding gdrive folders: {e}")
     st.session_state[custom_key] = "\n".join(documents)
     return documents
 
@@ -119,9 +110,6 @@ These instructions run before the knowledge base is search and should reduce the
         key="query_instructions",
         height=300,
     )
-    prompt_vars_widget(
-        "query_instructions",
-    )
 
 
 def keyword_instructions_widget():
@@ -132,9 +120,6 @@ def keyword_instructions_widget():
         """,
         key="keyword_instructions",
         height=300,
-    )
-    prompt_vars_widget(
-        "keyword_instructions",
     )
 
 

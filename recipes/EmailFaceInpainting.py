@@ -1,7 +1,6 @@
 import re
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
@@ -9,8 +8,10 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -38,7 +39,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "twitter_handle": "seanb",
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         email_address: str | None
         twitter_handle: str | None
 

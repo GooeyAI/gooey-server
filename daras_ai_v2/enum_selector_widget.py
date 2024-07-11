@@ -4,8 +4,7 @@ from typing import TypeVar, Type
 
 import gooey_ui as st
 from daras_ai_v2.grid_layout_widget import grid_layout
-
-BLANK_OPTION = "———"
+from gooey_ui import BLANK_OPTION
 
 E = TypeVar("E", bound=Type[enum.Enum])
 

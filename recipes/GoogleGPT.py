@@ -17,7 +17,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.prompt_vars import render_prompt_vars, variables_input
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -73,7 +73,7 @@ class GoogleGPTPage(BasePage):
         dense_weight=1.0,
     )
 
-    class RequestModel(GoogleSearchMixin, BaseModel):
+    class RequestModel(GoogleSearchMixin, BasePage.RequestModel):
         search_query: str
         site_filter: str
 
@@ -100,8 +100,6 @@ class GoogleGPTPage(BasePage):
             "dense_weight"
         ].field_info
 
-        variables: dict[str, typing.Any] | None
-
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -115,7 +113,6 @@ class GoogleGPTPage(BasePage):
     def render_form_v2(self):
         st.text_area("#### Google Search Query", key="search_query")
         st.text_input("Search on a specific site *(optional)*", key="site_filter")
-        prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
         assert st.session_state.get(
@@ -123,7 +120,7 @@ class GoogleGPTPage(BasePage):
         ).strip(), "Please enter a search query"
 
     def render_output(self):
-        render_output_with_refs(st.session_state, 300)
+        render_output_with_refs(st.session_state)
 
         refs = st.session_state.get("references", [])
         render_sources_widget(refs)
@@ -203,7 +200,6 @@ class GoogleGPTPage(BasePage):
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
-                height=200,
             )
 
         references = st.session_state.get("references", [])

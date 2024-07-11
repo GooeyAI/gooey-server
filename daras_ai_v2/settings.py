@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "embeddings",
     "handles",
     "payments",
+    "functions",
 ]
 
 MIDDLEWARE = [
@@ -197,7 +198,7 @@ if not DEBUG:
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
-        traces_sample_rate=0.01,
+        traces_sample_rate=0.005,
         send_default_pii=True,
         integrations=[
             ThreadingIntegration(propagate_hub=True),
@@ -227,7 +228,7 @@ os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
 GCP_REGION = config("GCP_REGION", default="us-central1")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
@@ -293,7 +294,8 @@ LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
 LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
-stripe.api_key = config("STRIPE_SECRET_KEY", None)
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", None)
+stripe.api_key = STRIPE_SECRET_KEY
 STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 STRIPE_ADDON_PRODUCT_NAME = config(
@@ -352,8 +354,7 @@ AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
 AZURE_SPEECH_REGION = config("AZURE_SPEECH_REGION", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.com"
-
-AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
+AZURE_TTS_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com"
 
 AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
 AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")

@@ -89,7 +89,7 @@ class ModelPricing(models.Model):
     unit_cost = models.DecimalField(
         max_digits=max_digits,
         decimal_places=decimal_places,
-        help_text="The cost per unit.",
+        help_text="The cost per unit (in dollars).",
     )
     unit_quantity = models.PositiveIntegerField(
         help_text="The quantity of the unit. (e.g. 1000 tokens)", default=1

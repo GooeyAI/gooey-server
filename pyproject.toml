@@ -9,7 +9,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 streamlit = "^1.15.2"
-openai = "^1.2.0"
+openai = "^1.35.7"
 python-decouple = "^3.6"
 requests = "^2.28.1"
 glom = "^22.1.0"
@@ -21,9 +21,9 @@ fastapi = "^0.85.0"
 uvicorn = { extras = ["standard"], version = "^0.18.3" }
 firebase-admin = "^6.0.0"
 # mediapipe for M1 macs
-mediapipe-silicon = { version = "^0.8.11", markers = "platform_machine == 'arm64'", platform = "darwin" }
+mediapipe-silicon = { version = "^0.9.2", markers = "platform_machine == 'arm64'", platform = "darwin" }
 # mediapipe for others
-mediapipe = { version = "^0.8.11", markers = "platform_machine != 'arm64'" }
+mediapipe = { version = "^0.9.2", markers = "platform_machine != 'arm64'" }
 furl = "^2.1.3"
 itsdangerous = "^2.1.2"
 pytest = "^7.2.0"
@@ -44,10 +44,10 @@ pdftotext = "^2.2.2"
 "pdfminer.six" = "^20221105"
 google-api-python-client = "^2.80.0"
 oauth2client = "^4.1.3"
-tiktoken = "^0.3.2"
+tiktoken = "^0.7.0"
 google-cloud-translate = "^3.12.0"
 google-cloud-speech = "^2.21.0"
-yt-dlp = "^2023.3.4"
+yt-dlp = "^2024.7.2"
 nltk = "^3.8.1"
 Jinja2 = "^3.1.2"
 Django = "^4.2"
@@ -79,7 +79,7 @@ ua-parser = "^0.18.0"
 user-agents = "^2.2.0"
 openpyxl = "^3.1.2"
 loguru = "^0.7.2"
-aifail = "0.2.0"
+aifail = {git = "https://github.com/GooeyAI/aifail/", rev = "0.3.0"}
 pytest-playwright = "^0.4.3"
 emoji = "^2.10.1"
 pyvespa = "^0.39.0"

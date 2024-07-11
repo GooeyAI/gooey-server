@@ -1,6 +1,7 @@
 import datetime
 import html
 import inspect
+import json
 import math
 import typing
 import uuid
@@ -18,7 +19,7 @@ from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
@@ -48,10 +49,12 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params import (
     gooey_get_query_params,
 )
@@ -62,6 +65,16 @@ from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.user_date_widgets import (
     render_local_dt_attrs,
+)
+from functions.models import (
+    RecipeFunction,
+    FunctionTrigger,
+)
+from functions.recipe_functions import (
+    functions_input,
+    call_recipe_functions,
+    is_functions_enabled,
+    render_called_functions,
 )
 from gooey_ui import (
     realtime_clear_subs,
@@ -120,7 +133,28 @@ class BasePage:
 
     explore_image: str = None
 
-    RequestModel: typing.Type[BaseModel]
+    template_keys: typing.Iterable[str] = (
+        "task_instructions",
+        "query_instructions",
+        "keyword_instructions",
+        "input_prompt",
+        "bot_script",
+        "text_prompt",
+        "search_query",
+        "title",
+    )
+
+    class RequestModel(BaseModel):
+        functions: list[RecipeFunction] | None = Field(
+            None,
+            title="🧩 Functions",
+        )
+        variables: dict[str, typing.Any] = Field(
+            None,
+            title="⌥ Variables",
+            description="Variables to be used as Jinja prompt templates and in functions as arguments",
+        )
+
     ResponseModel: typing.Type[BaseModel]
 
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
@@ -173,7 +207,15 @@ class BasePage:
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
+        if query_params is None:
+            query_params = {}
 
+        if run_id and uid:
+            query_params |= dict(run_id=run_id, uid=uid)
+        q_example_id = query_params.pop("example_id", None)
+
+        # old urls had example_id as a query param
+        example_id = example_id or q_example_id
         run_slug = None
         if example_id:
             try:
@@ -182,10 +224,6 @@ class BasePage:
                 pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
-
-        query_params = cls.clean_query_params(
-            example_id=None, run_id=run_id, uid=uid
-        ) | (query_params or {})
 
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
@@ -229,11 +267,31 @@ class BasePage:
     def get_dynamic_meta_title(self) -> str | None:
         return None
 
-    def setup_sentry(self, event_processor: typing.Callable = None):
-        def add_user_to_event(event, hint):
-            user = self.request and self.request.user
-            if not user:
-                return event
+    def setup_sentry(self):
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_transaction_name(
+                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
+            )
+            scope.add_event_processor(self.sentry_event_set_request)
+            scope.add_event_processor(self.sentry_event_set_user)
+
+    def sentry_event_set_request(self, event, hint):
+        request = event.setdefault("request", {})
+        request.setdefault("method", "POST")
+        request["data"] = st.session_state
+        if url := request.get("url"):
+            f = furl(url)
+            request["url"] = str(
+                furl(settings.APP_BASE_URL, path=f.pathstr, query=f.querystr).url
+            )
+        else:
+            request["url"] = self.app_url(
+                tab=self.tab, query_params=st.get_query_params()
+            )
+        return event
+
+    def sentry_event_set_user(self, event, hint):
+        if user := self.request and self.request.user:
             event["user"] = {
                 "id": user.id,
                 "name": user.display_name,
@@ -249,20 +307,12 @@ class BasePage:
                         "is_anonymous",
                         "is_disabled",
                         "disable_safety_checker",
+                        "disable_rate_limits",
                         "created_at",
                     ]
                 },
             }
-            return event
-
-        with sentry_sdk.configure_scope() as scope:
-            scope.set_extra("base_url", self.app_url())
-            scope.set_transaction_name(
-                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
-            )
-            scope.add_event_processor(add_user_to_event)
-            if event_processor:
-                scope.add_event_processor(event_processor)
+        return event
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
@@ -795,14 +845,13 @@ class BasePage:
 
     @classmethod
     def get_recipe_title(cls) -> str:
-        return (
-            cls.get_or_create_root_published_run().title
-            or cls.title
-            or cls.workflow.label
-        )
+        return cls.get_root_published_run().title or cls.title or cls.workflow.label
 
-    def get_explore_image(self, state: dict) -> str:
-        return self.explore_image or ""
+    def get_explore_image(self) -> str:
+        meta = self.workflow.get_or_create_metadata()
+        img = meta.default_image or self.explore_image or ""
+        fallback_img = self.fallback_preivew_image()
+        return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -930,9 +979,7 @@ class BasePage:
             page = page_cls()
             root_run = page.get_root_published_run()
             state = root_run.saved_run.to_dict()
-            preview_image = meta_preview_url(
-                page.get_explore_image(state), page.fallback_preivew_image()
-            )
+            preview_image = page.get_explore_image()
 
             with st.link(to=page.app_url()):
                 st.html(
@@ -942,7 +989,7 @@ class BasePage:
                     """
                 )
                 st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(page.preview_description(state))
+            st.caption(root_run.notes or page.preview_description(state))
 
         grid_layout(4, page_clses, _render)
 
@@ -1075,10 +1122,6 @@ class BasePage:
             return cls.get_root_published_run()
 
     @classmethod
-    def get_root_published_run(cls) -> PublishedRun:
-        return cls.get_published_run(published_run_id="")
-
-    @classmethod
     def get_published_run(cls, *, published_run_id: str):
         return PublishedRun.objects.get(
             workflow=cls.workflow,
@@ -1119,26 +1162,9 @@ class BasePage:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
-    def get_or_create_root_published_run(cls) -> PublishedRun:
-        published_run, _ = PublishedRun.objects.get_or_create(
-            workflow=cls.workflow,
-            published_run_id="",
-            defaults={
-                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
-                "created_by": None,
-                "last_edited_by": None,
-                "title": cls.title,
-                "notes": cls().preview_description(state=cls.sane_defaults),
-                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-                "is_approved_example": True,
-            },
-        )
-        return published_run
-
-    @classmethod
-    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+    def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
         if create:
-            return cls.get_or_create_root_published_run().saved_run
+            return cls.get_root_published_run().saved_run
         else:
             return cls.get_root_published_run().saved_run
 
@@ -1157,17 +1183,33 @@ class BasePage:
             return SavedRun.objects.get(**config)
 
     @classmethod
+    def get_root_published_run(cls) -> PublishedRun:
+        return PublishedRun.objects.get_or_create_with_version(
+            workflow=cls.workflow,
+            published_run_id="",
+            saved_run=SavedRun.objects.get_or_create(
+                example_id="",
+                workflow=cls.workflow,
+                defaults=dict(state=cls.load_state_defaults({})),
+            )[0],
+            user=None,
+            title=cls.title,
+            notes=cls().preview_description(state=cls.sane_defaults),
+            visibility=PublishedRunVisibility.PUBLIC,
+        )[0]
+
+    @classmethod
     def create_published_run(
         cls,
         *,
         published_run_id: str,
         saved_run: SavedRun,
-        user: AppUser,
+        user: AppUser | None,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
     ):
-        return PublishedRun.objects.create_published_run(
+        return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
             published_run_id=published_run_id,
             saved_run=saved_run,
@@ -1317,12 +1359,18 @@ class BasePage:
         st.caption(ret, line_clamp=1, unsafe_allow_html=True)
 
     def _render_step_row(self):
-        with st.expander("**ℹ️ Details**"):
+        key = "details-expander"
+        with st.expander("**ℹ️ Details**", key=key):
+            if not st.session_state.get(key):
+                return
             col1, col2 = st.columns([1, 2])
             with col1:
                 self.render_description()
             with col2:
                 placeholder = st.div()
+                render_called_functions(
+                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.pre
+                )
                 try:
                     self.render_steps()
                 except NotImplementedError:
@@ -1330,6 +1378,9 @@ class BasePage:
                 else:
                     with placeholder:
                         st.write("##### 👣 Steps")
+                render_called_functions(
+                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.post
+                )
 
     def _render_help(self):
         placeholder = st.div()
@@ -1345,9 +1396,13 @@ class BasePage:
                     """
                 )
 
+        key = "discord-expander"
         with st.expander(
-            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**"
+            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
+            key=key,
         ):
+            if not st.session_state.get(key):
+                return
             st.markdown(
                 """
                 <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
@@ -1383,6 +1438,27 @@ class BasePage:
 
         yield from self.run(state)
 
+    def main(self, sr: SavedRun, state: dict) -> typing.Iterator[str | None]:
+        yield from call_recipe_functions(
+            saved_run=sr,
+            current_user=self.request.user,
+            request_model=self.RequestModel,
+            response_model=self.ResponseModel,
+            state=state,
+            trigger=FunctionTrigger.pre,
+        )
+
+        yield from self.run(state)
+
+        yield from call_recipe_functions(
+            saved_run=sr,
+            current_user=self.request.user,
+            request_model=self.RequestModel,
+            response_model=self.ResponseModel,
+            state=state,
+            trigger=FunctionTrigger.post,
+        )
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
         request = self.RequestModel.parse_obj(state)
@@ -1403,7 +1479,7 @@ class BasePage:
         self.ResponseModel.validate(response)
 
     def run_v2(
-        self, request: BaseModel, response: BaseModel
+        self, request: RequestModel, response: BaseModel
     ) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
@@ -1430,8 +1506,11 @@ class BasePage:
 
     def _render_input_col(self):
         self.render_form_v2()
+        self.render_variables()
+
         with st.expander("⚙️ Settings"):
             self.render_settings()
+
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
@@ -1439,6 +1518,13 @@ class BasePage:
                 "[privacy policy](https://gooey.ai/privacy)._"
             )
         return submitted
+
+    def render_variables(self):
+        st.write("---")
+        functions_input(self.request.user)
+        variables_input(
+            template_keys=self.template_keys, allow_add=is_functions_enabled()
+        )
 
     @classmethod
     def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
@@ -1509,32 +1595,40 @@ class BasePage:
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
-        started_at_text()
+        created_at = st.session_state.get("created_at")
+        if not created_at:
+            return
+
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        started_at_text(created_at)
+
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
-        if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, str):
-                created_at = datetime.datetime.fromisoformat(created_at)
-            with st.countdown_timer(
-                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
-                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
-            ):
-                if self.is_current_user_owner() and self.request.user.email:
-                    st.write(
-                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
-                    )
+        with st.countdown_timer(
+            end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
+            delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+        ):
+            if self.is_current_user_owner() and self.request.user.email:
                 st.write(
-                    f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
-                      for inspiration."""
+                    f"""We'll email **{self.request.user.email}** when your workflow is done."""
                 )
+            st.write(
+                f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
+                  for inspiration."""
+            )
 
     def estimate_run_duration(self) -> int | None:
         pass
 
     def on_submit(self):
         try:
-            example_id, run_id, uid = self.create_new_run(enable_rate_limits=True)
+            sr = self.create_new_run(enable_rate_limits=True)
+        except ValidationError as e:
+            st.session_state[StateKeys.run_status] = None
+            st.session_state[StateKeys.error_msg] = str(e)
+            return
         except RateLimitExceeded as e:
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
@@ -1544,15 +1638,13 @@ class BasePage:
             self.request.user
         ):
             # insufficient balance for this run and auto-recharge isn't setup
-            st.session_state[StateKeys.run_status] = None
-            st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
-                example_id, run_id, uid
-            )
-            self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
+            sr.run_status = ""
+            sr.error_msg = self.generate_credit_error_message(sr.run_id, sr.uid)
+            sr.save(update_fields=["run_status", "error_msg"])
         else:
-            self.call_runner_task(example_id, run_id, uid)
+            self.call_runner_task(sr)
 
-        raise RedirectException(self.app_url(run_id=run_id, uid=uid))
+        raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def should_submit_after_login(self) -> bool:
         return (
@@ -1562,7 +1654,9 @@ class BasePage:
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self, *, enable_rate_limits: bool = False, **defaults):
+    def create_new_run(
+        self, *, enable_rate_limits: bool = False, **defaults
+    ) -> SavedRun:
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1602,34 +1696,43 @@ class BasePage:
             create=True,
             defaults=dict(parent=parent, parent_version=parent_version) | defaults,
         )
-        self.dump_state_to_sr(st.session_state, sr)
 
-        return None, run_id, uid
+        # ensure the request is validated
+        state = st.session_state | json.loads(
+            self.RequestModel.parse_obj(st.session_state).json(exclude_unset=True)
+        )
+        self.dump_state_to_sr(state, sr)
 
-    def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
+        return sr
+
+    def dump_state_to_sr(self, state: dict, sr: SavedRun):
+        sr.set(
+            {
+                field_name: deepcopy(state[field_name])
+                for field_name in self.fields_to_save()
+                if field_name in state
+            }
+        )
+
+    def call_runner_task(self, sr: SavedRun):
         from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
             page_cls=self.__class__,
             user_id=self.request.user.id,
-            run_id=run_id,
-            uid=uid,
-            state=st.session_state,
-            channel=self.realtime_channel_name(run_id, uid),
-            query_params=self.clean_query_params(
-                example_id=example_id, run_id=run_id, uid=uid
-            ),
-            is_api_call=is_api_call,
+            run_id=sr.run_id,
+            uid=sr.uid,
+            channel=self.realtime_channel_name(sr.run_id, sr.uid),
         )
 
-    def realtime_channel_name(self, run_id, uid):
-        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+    @classmethod
+    def realtime_channel_name(cls, run_id, uid):
+        return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
-    def generate_credit_error_message(self, example_id, run_id, uid) -> str:
+    def generate_credit_error_message(self, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if self.request.user.is_anonymous:
             account_url.query.params["next"] = self.app_url(
-                example_id=example_id,
                 run_id=run_id,
                 uid=uid,
                 query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
@@ -1682,27 +1785,23 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
 
-    def load_state_from_sr(self, sr: SavedRun) -> dict:
+    @classmethod
+    def load_state_from_sr(cls, sr: SavedRun) -> dict:
         state = sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
-        for k, v in self.RequestModel.schema()["properties"].items():
+        return cls.load_state_defaults(state)
+
+    @classmethod
+    def load_state_defaults(cls, state: dict):
+        for k, v in cls.RequestModel.schema()["properties"].items():
             try:
                 state.setdefault(k, copy(v["default"]))
             except KeyError:
                 pass
-        for k, v in self.sane_defaults.items():
+        for k, v in cls.sane_defaults.items():
             state.setdefault(k, v)
         return state
-
-    def dump_state_to_sr(self, state: dict, sr: SavedRun):
-        sr.set(
-            {
-                field_name: deepcopy(state[field_name])
-                for field_name in self.fields_to_save()
-                if field_name in state
-            }
-        )
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -1760,23 +1859,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
-    def ensure_authentication(self, next_url: str | None = None):
-        if not self.request.user or self.request.user.is_anonymous:
-            raise RedirectException(self.get_auth_url(next_url))
-
-    def get_auth_url(self, next_url: str | None = None) -> str:
-        return furl(
-            "/login",
-            query_params={"next": furl(next_url or self.request.url).set(origin=None)},
-        ).tostr()
-
     def _history_tab(self):
-        assert self.request, "request must be set to render history tab"
-        if not self.request.user:
-            redirect_url = furl(
-                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
-            )
-            raise RedirectException(str(redirect_url))
+        self.ensure_authentication(anon_ok=True)
+
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
@@ -1809,6 +1894,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 f"""<button type="button" class="btn btn-theme">Load More</button>"""
             )
 
+    def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
+        if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
+            raise RedirectException(self.get_auth_url(next_url))
+
+    def get_auth_url(self, next_url: str | None = None) -> str:
+        from routers.root import login
+
+        next_url = str(furl(next_url or self.request.url).set(origin=None))
+        return str(furl(get_route_path(login), query_params=dict(next=next_url)))
+
     def _render_run_preview(self, saved_run: SavedRun):
         published_run: PublishedRun | None = (
             saved_run.parent_version.published_run if saved_run.parent_version else None
@@ -1838,7 +1933,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
-            started_at_text()
+            started_at_text(saved_run.created_at)
             html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
@@ -1937,6 +2032,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             or state.get("title")
         )
 
+    # this is mostly depreated in favour of PublishedRun.notes
     def preview_description(self, state: dict) -> str:
         return ""
 
@@ -2086,7 +2182,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
-        output = extract_model_fields(self.ResponseModel, state, include_all=True)
+        sr = self.get_current_sr()
+        output = sr.api_output(extract_model_fields(self.ResponseModel, state))
         if as_async:
             return dict(
                 run_id=run_id,
@@ -2129,7 +2226,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
-def started_at_text():
+def started_at_text(dt: datetime.datetime):
     with st.div(className="d-flex"):
         text = "Started"
         if seed := st.session_state.get("seed"):
@@ -2138,7 +2235,7 @@ def started_at_text():
         st.caption(
             "...",
             className="text-black",
-            **render_local_dt_attrs(timezone.now()),
+            **render_local_dt_attrs(dt),
         )
 
 
@@ -2174,7 +2271,7 @@ def render_output_caption():
 def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
-    include_all: bool = False,
+    include_all: bool = True,
     preferred_fields: list[str] = None,
     diff_from: dict | None = None,
 ) -> dict:

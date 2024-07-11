@@ -1,3 +1,4 @@
+import pytest
 from decouple import config
 from starlette.testclient import TestClient
 
@@ -12,6 +13,9 @@ def test_slack_safe_channel_name():
     assert safe_channel_name("My, Awesome, Channel %") == "my-awesome-channel"
 
 
+@pytest.mark.skipif(
+    not config("TEST_SLACK_TEAM_ID", None), reason="No test slack team id"
+)
 def test_slack_get_response_for_msg_id(transactional_db):
     team_id = config("TEST_SLACK_TEAM_ID")
     user_id = config("TEST_SLACK_USER_ID")

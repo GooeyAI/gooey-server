@@ -418,6 +418,8 @@ def _summarize_url(url: str, enable_html: bool):
     except (requests.RequestException, etree.LxmlError) as e:
         logger.warning(f"ignore error while downloading {url}: {e}")
         return None
+    if not summary:
+        return None
 
     title = html_to_text(title)
     if enable_html:
@@ -427,7 +429,6 @@ def _summarize_url(url: str, enable_html: bool):
 
     title = title.strip()
     summary = summary.strip()
-
     if not summary:
         return None
 
@@ -444,12 +445,15 @@ def html_to_text(text):
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 
-def _call_summarize_url(url: str) -> (str, str):
+def _call_summarize_url(url: str) -> tuple[str | None, str | None]:
     r = requests.get(
         url,
         headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
     )
     raise_for_status(r)
+    # we only support HTML for now
+    if "text/html" not in r.headers.get("content-type", ""):
+        return None, None
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()
