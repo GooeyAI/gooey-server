@@ -1,5 +1,6 @@
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2.bots import BotInterface, ReplyButton
+from phonenumber_field.phonenumber import PhoneNumber
 
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from uuid import uuid4
@@ -16,7 +17,7 @@ class TwilioSMS(BotInterface):
 
         self.user_msg_id = sid
         self.bot_id = bi.id
-        self.user_id = convo.twilio_phone_number
+        self.user_id = convo.twilio_phone_number.as_e164
 
         self._unpack_bot_integration()
         self.bi = bi
@@ -76,12 +77,12 @@ class TwilioVoice(BotInterface):
 
         try:
             self.convo = Conversation.objects.get(
-                twilio_phone_number=incoming_number,
+                twilio_phone_number=PhoneNumber.from_string(incoming_number),
                 bot_integration=bi,
             )
         except Conversation.DoesNotExist:
             self.convo = Conversation.objects.get_or_create(
-                twilio_phone_number=incoming_number,
+                twilio_phone_number=PhoneNumber.from_string(incoming_number),
                 bot_integration=bi,
             )[0]
 

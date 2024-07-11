@@ -635,7 +635,7 @@ class BotIntegration(models.Model):
         default="",
         help_text="Twilio auth token as found on twilio.com/console (mandatory)",
     )
-    twilio_phone_number = models.TextField(
+    twilio_phone_number = PhoneNumberField(
         blank=True,
         default="",
         help_text="Twilio unformatted phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
@@ -731,7 +731,7 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
-            or self.twilio_phone_number
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
             or self.name
             or (
                 self.platform == Platform.WEB
@@ -1032,7 +1032,7 @@ class Conversation(models.Model):
         help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
-    twilio_phone_number = models.TextField(
+    twilio_phone_number = PhoneNumberField(
         blank=True,
         default="",
         help_text="User's Twilio phone number (mandatory)",
@@ -1083,7 +1083,7 @@ class Conversation(models.Model):
             or self.fb_page_id
             or self.slack_user_id
             or self.web_user_id
-            or self.twilio_phone_number
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
         )
 
     get_display_name.short_description = "User"

@@ -1310,7 +1310,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if bi.twilio_phone_number:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy Phone Number',
-                        value=bi.twilio_phone_number,
+                        value=bi.twilio_phone_number.as_e164,
                         type="secondary",
                     )
 
@@ -1347,13 +1347,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if bi.twilio_phone_number:
                     st.anchor(
                         '<i class="fa-regular fa-phone"></i> Start Voice Call',
-                        f"tel:{bi.twilio_phone_number}",
+                        f"tel:{bi.twilio_phone_number.as_e164}",
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
                     st.anchor(
                         '<i class="fa-regular fa-sms"></i> Send SMS',
-                        f"sms:{bi.twilio_phone_number}",
+                        f"sms:{bi.twilio_phone_number.as_e164}",
                         unsafe_allow_html=True,
                         new_tab=True,
                     )

@@ -4,6 +4,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 from app_users.models import AppUser
 from bots.models import Conversation, BotIntegration, SavedRun, PublishedRun, Platform
+from phonenumber_field.phonenumber import PhoneNumber
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2 import settings
 
@@ -72,7 +73,8 @@ def twilio_voice_call(
 
     try:
         bi = BotIntegration.objects.get(
-            twilio_account_sid=account_sid, twilio_phone_number=phone_number
+            twilio_account_sid=account_sid,
+            twilio_phone_number=PhoneNumber.from_string(phone_number),
         )
     except BotIntegration.DoesNotExist:
         return Response(status_code=404)
@@ -381,12 +383,15 @@ def twilio_sms(
     user_phone_number = data["From"][0]
 
     try:
-        bi = BotIntegration.objects.get(twilio_phone_number=phone_number)
+        bi = BotIntegration.objects.get(
+            twilio_phone_number=PhoneNumber.from_string(phone_number)
+        )
     except BotIntegration.DoesNotExist:
         return Response(status_code=404)
 
     convo, created = Conversation.objects.get_or_create(
-        bot_integration=bi, twilio_phone_number=user_phone_number
+        bot_integration=bi,
+        twilio_phone_number=PhoneNumber.from_string(user_phone_number),
     )
     bot = TwilioSMS(
         sid=data["MessageSid"][0],
@@ -438,7 +443,7 @@ def start_voice_call_session(
     call = client.calls.create(
         twiml=str(resp),
         to=user_phone_number,
-        from_=bi.twilio_phone_number,
+        from_=bi.twilio_phone_number.as_e164,
     )
 
     return call
@@ -462,8 +467,8 @@ def create_voice_call(convo: Conversation, text: str | None, audio_url: str | No
 
     call = client.calls.create(
         twiml=str(resp),
-        to=convo.twilio_phone_number,
-        from_=bi.twilio_phone_number,
+        to=convo.twilio_phone_number.as_e164,
+        from_=bi.twilio_phone_number.as_e164,
     )
 
     return call
@@ -483,8 +488,8 @@ def send_sms_message(convo: Conversation, text: str, media_url: str | None = Non
     message = client.messages.create(
         body=text,
         media_url=media_url,
-        from_=convo.bot_integration.twilio_phone_number,
-        to=convo.twilio_phone_number,
+        from_=convo.bot_integration.twilio_phone_number.as_e164,
+        to=convo.twilio_phone_number.as_e164,
     )
 
     return message
@@ -542,6 +547,6 @@ def twilio_connect(
         user_language=current_run.state.get("user_language") or "en",
         twilio_account_sid=twilio_account_sid,
         twilio_auth_token=twilio_auth_token,
-        twilio_phone_number=twilio_phone_number,
+        twilio_phone_number=PhoneNumber.from_string(twilio_phone_number),
         twilio_phone_number_sid=twilio_phone_number_sid,
     )
