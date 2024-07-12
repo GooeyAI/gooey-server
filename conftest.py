@@ -51,16 +51,17 @@ redis_qs = defaultdict(queue.Queue)
 
 
 @pytest.fixture
-def mock_gui_runner():
+def mock_celery_tasks():
     with (
-        patch("celeryapp.tasks.gui_runner", _mock_gui_runner),
+        patch("celeryapp.tasks.runner_task", _mock_runner_task),
+        patch("celeryapp.tasks.post_runner_tasks", _mock_post_runner_tasks),
         patch("daras_ai_v2.bots.realtime_subscribe", _mock_realtime_subscribe),
     ):
         yield
 
 
 @app.task
-def _mock_gui_runner(
+def _mock_runner_task(
     *, page_cls: typing.Type[BasePage], run_id: str, uid: str, **kwargs
 ):
     sr = page_cls.run_doc_sr(run_id, uid)
@@ -68,6 +69,11 @@ def _mock_gui_runner(
     sr.save()
     channel = page_cls().realtime_channel_name(run_id, uid)
     _mock_realtime_push(channel, sr.to_dict())
+
+
+@app.task
+def _mock_post_runner_tasks(*args, **kwargs):
+    pass
 
 
 def _mock_realtime_push(channel, value):

@@ -5,7 +5,6 @@ import os.path
 import typing
 from types import SimpleNamespace
 
-import line_profiler
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Form
@@ -39,7 +38,6 @@ from daras_ai_v2.base import (
     RecipeRunState,
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
-from daras_ai_v2.polygon_fitter import line
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
