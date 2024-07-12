@@ -209,10 +209,11 @@ def _mock_api_output(input_text):
 def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
-    except Exception:
+    except Exception as e:
         bot.send_msg(
             text=bot.translate("Sorry, an error occurred. Please try again later."),
         )
+        capture_exception(e)
 
 
 @db_middleware

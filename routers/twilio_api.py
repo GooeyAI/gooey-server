@@ -10,6 +10,7 @@ from fastapi import APIRouter, Response
 from starlette.background import BackgroundTasks
 from daras_ai_v2.fastapi_tricks import fastapi_request_urlencoded_body, get_route_url
 import base64
+from sentry_sdk import capture_exception
 
 router = APIRouter()
 
@@ -37,8 +38,9 @@ def say(resp: VoiceResponse, text: str, bi: BotIntegration):
             sr = page.run_doc_sr(run_id, uid)
             state = sr.to_dict()
             resp.play(state["audio_url"])
-        except Exception:
+        except Exception as e:
             resp.say(text, voice=bi.twilio_voice)
+            capture_exception(e)
     else:
         resp.say(text, voice=bi.twilio_voice)
 
@@ -60,7 +62,8 @@ def twilio_voice_call(
             twilio_account_sid=account_sid,
             twilio_phone_number=PhoneNumber.from_string(phone_number),
         )
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     text = bi.twilio_initial_text.strip()
@@ -114,7 +117,8 @@ def twilio_voice_call_asked(
         bi = BotIntegration.objects.get(
             twilio_account_sid=account_sid, twilio_phone_number=phone_number
         )
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     # start processing the user's question
@@ -163,7 +167,8 @@ def twilio_voice_call_asked_audio(
         bi = BotIntegration.objects.get(
             twilio_account_sid=account_sid, twilio_phone_number=phone_number
         )
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     # start processing the user's question
@@ -196,7 +201,8 @@ def twilio_voice_call_wait(bi_id: int):
 
     try:
         bi = BotIntegration.objects.get(id=bi_id)
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     resp = VoiceResponse()
@@ -219,39 +225,6 @@ def twilio_voice_call_wait(bi_id: int):
     return Response(str(resp), headers={"Content-Type": "text/xml"})
 
 
-def twilio_voice_call_respond(
-    text: str | None,
-    audio_url: str | None,
-    queue_name: str,
-    call_sid: str,
-    bi: BotIntegration,
-):
-    """Respond to the user in the queue with the given text and audio URL."""
-
-    text = text
-    audio_url = audio_url
-    text = base64.b64encode(text.encode()).decode() if text else "N"
-    audio_url = base64.b64encode(audio_url.encode()).decode() if audio_url else "N"
-
-    queue_sid = None
-    client = Client(bi.twilio_account_sid, bi.twilio_auth_token)
-    for queue in client.queues.list():
-        if queue.friendly_name == queue_name:
-            queue_sid = queue.sid
-            break
-    assert queue_sid, "Queue not found"
-
-    client.queues(queue_sid).members(call_sid).update(
-        url=get_route_url(
-            twilio_voice_call_response,
-            dict(bi_id=bi.id, text=text, audio_url=audio_url),
-        ),
-        method="POST",
-    )
-
-    return queue_sid
-
-
 @router.post("/__/twilio/voice/response/{bi_id}/{text}/{audio_url}/")
 def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
     """Response is ready, user has been dequeued, send the response and ask for the next one."""
@@ -261,7 +234,8 @@ def twilio_voice_call_response(bi_id: int, text: str, audio_url: str):
 
     try:
         bi = BotIntegration.objects.get(id=bi_id)
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     resp = VoiceResponse()
@@ -354,7 +328,8 @@ def twilio_sms(
         bi = BotIntegration.objects.get(
             twilio_phone_number=PhoneNumber.from_string(phone_number)
         )
-    except BotIntegration.DoesNotExist:
+    except BotIntegration.DoesNotExist as e:
+        capture_exception(e)
         return Response(status_code=404)
 
     convo, created = Conversation.objects.get_or_create(
@@ -418,54 +393,6 @@ def start_voice_call_session(
     )
 
     return call
-
-
-def create_voice_call(convo: Conversation, text: str | None, audio_url: str | None):
-    """Create a new voice call saying the given text and audio URL and then hanging up. Useful for notifications."""
-
-    assert (
-        convo.twilio_phone_number
-    ), "This is not a Twilio conversation, it has no phone number."
-
-    bi: BotIntegration = convo.bot_integration
-    client = Client(bi.twilio_account_sid, bi.twilio_auth_token)
-
-    resp = VoiceResponse()
-    if text:
-        say(resp, text, bi)
-    if audio_url:
-        resp.play(audio_url)
-
-    call = client.calls.create(
-        twiml=str(resp),
-        to=convo.twilio_phone_number.as_e164,
-        from_=bi.twilio_phone_number.as_e164,
-    )
-
-    return call
-
-
-def send_sms_message(
-    convo: Conversation, text: str | None, media_url: str | None = None
-):
-    """Send an SMS message to the given conversation."""
-
-    assert (
-        convo.twilio_phone_number
-    ), "This is not a Twilio conversation, it has no phone number."
-
-    account_sid = convo.bot_integration.twilio_account_sid
-    auth_token = convo.bot_integration.twilio_auth_token
-    client = Client(account_sid, auth_token)
-
-    message = client.messages.create(
-        body=text or "",
-        media_url=media_url,
-        from_=convo.bot_integration.twilio_phone_number.as_e164,
-        to=convo.twilio_phone_number.as_e164,
-    )
-
-    return message
 
 
 def twilio_connect(
