@@ -145,7 +145,6 @@ class BasePage:
 
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
-            None,
             title="🧩 Functions",
         )
         variables: dict[str, typing.Any] = Field(

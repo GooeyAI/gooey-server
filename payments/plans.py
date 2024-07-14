@@ -211,7 +211,7 @@ class PricingPlan(PricingPlanData, Enum):
 
     @classmethod
     def db_choices(cls):
-        return [(plan.db_value, plan.name) for plan in cls]
+        return [(plan.db_value, plan.title) for plan in cls]
 
     @classmethod
     def from_sub(cls, sub: "Subscription") -> PricingPlan:
@@ -240,7 +240,7 @@ class PricingPlan(PricingPlanData, Enum):
                 return plan
 
     @classmethod
-    def get_by_key(cls, key: str):
+    def get_by_key(cls, key: str) -> PricingPlan | None:
         for plan in cls:
             if plan.key == key:
                 return plan

@@ -1,6 +1,7 @@
 import stripe
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import fastapi_request_body
@@ -33,6 +34,8 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
             },
             status_code=400,
         )
+
+    logger.info(f"Received event: {event['type']}")
 
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:

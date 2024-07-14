@@ -579,16 +579,17 @@ def render_billing_history(user: AppUser, limit: int = 50):
     st.write("## Billing History", className="d-block")
     st.table(
         pd.DataFrame.from_records(
-            columns=[""] * 3,
-            data=[
-                [
-                    txn.created_at.strftime("%m/%d/%Y"),
-                    txn.note(),
-                    f"${txn.charged_amount / 100:,.2f}",
-                ]
+            [
+                {
+                    "Date": txn.created_at.strftime("%m/%d/%Y"),
+                    "Description": txn.reason_note(),
+                    "Amount": f"-${txn.charged_amount / 100:,.2f}",
+                    "Credits": f"+{txn.amount:,}",
+                    "Balance": f"{txn.end_balance:,}",
+                }
                 for txn in txns[:limit]
-            ],
-        )
+            ]
+        ),
     )
     if txns.count() > limit:
         st.caption(f"Showing only the most recent {limit} transactions.")

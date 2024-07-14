@@ -10,10 +10,10 @@ from daras_ai_v2.settings import templates
 
 
 @app.task
-def send_monthly_spending_notification_email(uid: str):
+def send_monthly_spending_notification_email(user_id: int):
     from routers.account import account_route
 
-    user = AppUser.objects.get(uid=uid)
+    user = AppUser.objects.get(id=user_id)
     if not user.email:
         logger.error(f"User doesn't have an email: {user=}")
         return

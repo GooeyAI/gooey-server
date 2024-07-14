@@ -192,19 +192,24 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "invoice_id",
         "user",
         "amount",
+        "dollar_amount",
         "end_balance",
         "payment_provider",
-        "dollar_amount",
+        "reason",
+        "plan",
         "created_at",
     ]
     readonly_fields = ["created_at"]
     list_filter = [
-        "created_at",
+        "reason",
         ("payment_provider", admin.EmptyFieldListFilter),
         "payment_provider",
+        "plan",
+        "created_at",
     ]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
+    search_fields = ["invoice_id"]
 
     @admin.display(description="Charged Amount")
     def dollar_amount(self, obj: models.AppUserTransaction):

@@ -12,12 +12,12 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel
 
-from app_users.models import AppUser, PaymentProvider
+from app_users.models import PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
 from payments.models import PricingPlan
-from payments.webhooks import PaypalWebhookHandler
+from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
 from routers.account import payment_processing_route, account_route
 
 router = APIRouter()
@@ -166,6 +166,24 @@ def capture_order(order_id: str):
     return JSONResponse(response.json(), response.status_code)
 
 
+def _handle_invoice_paid(order_id: str):
+    response = requests.get(
+        str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}"),
+        headers={"Authorization": paypal.generate_auth_header()},
+    )
+    raise_for_status(response)
+    order = response.json()
+    purchase_unit = order["purchase_units"][0]
+    uid = purchase_unit["payments"]["captures"][0]["custom_id"]
+    add_balance_for_payment(
+        uid=uid,
+        amount=int(purchase_unit["items"][0]["quantity"]),
+        invoice_id=order_id,
+        payment_provider=PaymentProvider.PAYPAL,
+        charged_amount=int(float(purchase_unit["amount"]["value"]) * 100),
+    )
+
+
 @router.post("/__/paypal/webhook")
 def webhook(request: Request, payload: dict = fastapi_request_json):
     if not paypal.verify_webhook_event(payload, headers=request.headers):
@@ -194,24 +212,3 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
             logger.error(f"Unhandled PayPal webhook event: {event.event_type}")
 
     return JSONResponse({}, status_code=200)
-
-
-def _handle_invoice_paid(order_id: str):
-    response = requests.get(
-        str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}"),
-        headers={"Authorization": paypal.generate_auth_header()},
-    )
-    raise_for_status(response)
-    order = response.json()
-    purchase_unit = order["purchase_units"][0]
-    uid = purchase_unit["payments"]["captures"][0]["custom_id"]
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(
-        payment_provider=PaymentProvider.PAYPAL,
-        invoice_id=order_id,
-        amount=int(purchase_unit["items"][0]["quantity"]),
-        charged_amount=int(float(purchase_unit["amount"]["value"]) * 100),
-    )
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])

@@ -116,6 +116,4 @@ def _auto_recharge_user(user: AppUser):
         ) from e
     else:
         assert invoice_data.paid
-        StripeWebhookHandler.handle_invoice_paid(
-            uid=user.uid, invoice_data=invoice_data
-        )
+        StripeWebhookHandler.handle_invoice_paid(uid=user.uid, invoice=invoice_data)

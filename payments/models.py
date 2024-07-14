@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import typing
 
 import stripe
@@ -221,7 +222,7 @@ class Subscription(models.Model):
         for inv in invoices:
             if (
                 inv.status == "paid"
-                and timezone.now().timestamp() - inv.created
+                and abs(time.time() - inv.created)
                 < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
             ):
                 return inv
