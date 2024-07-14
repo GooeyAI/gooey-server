@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import typing
 
 import stripe
@@ -43,19 +44,23 @@ class Subscription(models.Model):
         blank=True,
     )
     auto_recharge_enabled = models.BooleanField(default=True)
-    auto_recharge_balance_threshold = models.IntegerField()
     auto_recharge_topup_amount = models.IntegerField(
-        default=settings.ADDON_AMOUNT_CHOICES[0],
+        default=settings.ADDON_AMOUNT_CHOICES[0]
     )
+    auto_recharge_balance_threshold = models.IntegerField(
+        null=True, blank=True
+    )  # dynamic default (see: full_clean)
     monthly_spending_budget = models.IntegerField(
         null=True,
         blank=True,
         help_text="In USD, pause auto-recharge just before the spending exceeds this amount in a calendar month",
+        # dynamic default (see: full_clean)
     )
     monthly_spending_notification_threshold = models.IntegerField(
         null=True,
         blank=True,
         help_text="In USD, send an email when spending crosses this threshold in a calendar month",
+        # dynamic default (see: full_clean)
     )
 
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
@@ -140,7 +145,10 @@ class Subscription(models.Model):
             return period_end
         elif self.payment_provider == PaymentProvider.PAYPAL:
             subscription = paypal.Subscription.retrieve(self.external_id)
-            if not subscription.billing_info:
+            if (
+                not subscription.billing_info
+                or not subscription.billing_info.next_billing_time
+            ):
                 return None
             return subscription.billing_info.next_billing_time.timestamp()
         else:
@@ -196,9 +204,9 @@ class Subscription(models.Model):
         Fetches the relevant invoice, or creates one if it doesn't exist.
 
         This is the fallback order:
-        - Fetch an open invoice with metadata_key in the metadata
-        - Fetch a $metadata_key invoice that was recently paid
-        - Create an invoice with amount=amount_in_dollars and $metadata_key
+        - Fetch an open invoice that has `metadata_key` set
+        - Fetch a `metadata_key` invoice that was recently paid
+        - Create an invoice with amount=`amount_in_dollars` and `metadata_key` set to true
         """
         customer_id = self.stripe_get_customer_id()
         invoices = stripe.Invoice.list(
@@ -214,7 +222,7 @@ class Subscription(models.Model):
         for inv in invoices:
             if (
                 inv.status == "paid"
-                and timezone.now().timestamp() - inv.created
+                and abs(time.time() - inv.created)
                 < settings.AUTO_RECHARGE_COOLDOWN_SECONDS
             ):
                 return inv
@@ -256,7 +264,7 @@ class Subscription(models.Model):
         raise ValueError("Invalid Payment Provider")
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
-        from routers.stripe import handle_invoice_paid
+        from payments.webhooks import StripeWebhookHandler
 
         invoice = self.stripe_create_auto_invoice(
             amount_in_dollars=amount_in_dollars,
@@ -268,7 +276,7 @@ class Subscription(models.Model):
         invoice = invoice.pay(payment_method=pm)
         if not invoice.paid:
             return False
-        handle_invoice_paid(self.user.uid, invoice)
+        StripeWebhookHandler.handle_invoice_paid(self.user.uid, invoice)
         return True
 
     def get_external_management_url(self) -> str:

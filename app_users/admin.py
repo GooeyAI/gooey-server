@@ -192,25 +192,38 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "invoice_id",
         "user",
         "amount",
+        "dollar_amount",
         "end_balance",
         "payment_provider",
-        "dollar_amount",
+        "reason",
+        "plan",
         "created_at",
     ]
-    readonly_fields = ["created_at"]
+    readonly_fields = ["view_payment_provider_url", "created_at"]
     list_filter = [
-        "created_at",
+        "reason",
         ("payment_provider", admin.EmptyFieldListFilter),
         "payment_provider",
+        "plan",
+        "created_at",
     ]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
+    search_fields = ["invoice_id"]
 
     @admin.display(description="Charged Amount")
     def dollar_amount(self, obj: models.AppUserTransaction):
         if not obj.payment_provider:
             return
         return f"${obj.charged_amount / 100}"
+
+    @admin.display(description="Payment Provider URL")
+    def view_payment_provider_url(self, txn: models.AppUserTransaction):
+        url = txn.payment_provider_url()
+        if url:
+            return open_in_new_tab(url, label=url)
+        else:
+            raise txn.DoesNotExist
 
 
 @admin.register(LogEntry)

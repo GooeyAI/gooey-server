@@ -1,10 +1,14 @@
 from fastapi.exception_handlers import (
-    request_validation_exception_handler,
     http_exception_handler,
+    request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
+from starlette.status import (
+    HTTP_404_NOT_FOUND,
+    HTTP_405_METHOD_NOT_ALLOWED,
+)
 
 from daras_ai_v2.pydantic_validation import convert_errors
 from daras_ai_v2.settings import templates
@@ -113,8 +117,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return await request_validation_exception_handler(request, exc)
 
 
-@app.exception_handler(404)
-@app.exception_handler(405)
+@app.exception_handler(HTTP_404_NOT_FOUND)
+@app.exception_handler(HTTP_405_METHOD_NOT_ALLOWED)
 async def not_found_exception_handler(request: Request, exc: HTTPException):
     if not request.headers.get("accept", "").startswith("text/html"):
         return await http_exception_handler(request, exc)

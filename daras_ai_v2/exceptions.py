@@ -3,8 +3,16 @@ import subprocess
 import typing
 
 import requests
+from furl import furl
 from loguru import logger
 from requests import HTTPError
+from starlette.status import HTTP_402_PAYMENT_REQUIRED
+
+from daras_ai_v2 import settings
+
+if typing.TYPE_CHECKING:
+    from bots.models import SavedRun
+    from bots.models import AppUser
 
 
 def raise_for_status(resp: requests.Response, is_user_url: bool = False):
@@ -47,14 +55,52 @@ def _response_preview(resp: requests.Response) -> bytes:
 
 
 class UserError(Exception):
-    def __init__(self, message: str, sentry_level: str = "info"):
+    def __init__(
+        self, message: str, sentry_level: str = "info", status_code: int = None
+    ):
         self.message = message
         self.sentry_level = sentry_level
+        self.status_code = status_code
         super().__init__(message)
 
 
 class GPUError(UserError):
     pass
+
+
+class InsufficientCredits(UserError):
+    def __init__(self, user: "AppUser", sr: "SavedRun"):
+        from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+
+        account_url = furl(settings.APP_BASE_URL) / "account/"
+        if user.is_anonymous:
+            account_url.query.params["next"] = sr.get_app_url(
+                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
+            )
+            # language=HTML
+            message = f"""
+<p data-{SUBMIT_AFTER_LOGIN_Q}>
+Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
+</p>
+
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
+and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
+"""
+        else:
+            # language=HTML
+            message = f"""
+<p>
+Doh! You’re out of Gooey.AI credits.
+</p>
+
+<p>
+Please <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+</p>
+
+We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
+"""
+
+        super().__init__(message, status_code=HTTP_402_PAYMENT_REQUIRED)
 
 
 FFMPEG_ERR_MSG = (
