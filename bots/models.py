@@ -635,7 +635,7 @@ class BotIntegration(models.Model):
         default="",
         help_text="Twilio auth token as found on twilio.com/console (mandatory)",
     )
-    twilio_phone_number = models.TextField(
+    twilio_phone_number = PhoneNumberField(
         blank=True,
         default="",
         help_text="Twilio unformatted phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
@@ -731,7 +731,7 @@ class BotIntegration(models.Model):
             or " | #".join(
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
-            or self.twilio_phone_number
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
             or self.name
             or (
                 self.platform == Platform.WEB
@@ -763,6 +763,21 @@ class BotIntegration(models.Model):
             ),
         )
         return config
+
+    def translate(self, text: str) -> str:
+        from daras_ai_v2.asr import run_google_translate, should_translate_lang
+
+        if text and should_translate_lang(self.user_language):
+            active_run = self.get_active_saved_run()
+            return run_google_translate(
+                [text],
+                self.user_language,
+                glossary_url=(
+                    active_run.state.get("output_glossary") if active_run else None
+                ),
+            )[0]
+        else:
+            return text
 
 
 class BotIntegrationAnalysisRun(models.Model):
@@ -834,7 +849,12 @@ class ConversationQuerySet(models.QuerySet):
     def get_unique_users(self) -> "ConversationQuerySet":
         """Get unique conversations"""
         return self.distinct(
-            "fb_page_id", "ig_account_id", "wa_phone_number", "slack_user_id"
+            "fb_page_id",
+            "ig_account_id",
+            "wa_phone_number",
+            "slack_user_id",
+            "twilio_phone_number",
+            "web_user_id",
         )
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
@@ -1027,7 +1047,7 @@ class Conversation(models.Model):
         help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
-    twilio_phone_number = models.TextField(
+    twilio_phone_number = PhoneNumberField(
         blank=True,
         default="",
         help_text="User's Twilio phone number (mandatory)",
@@ -1078,7 +1098,7 @@ class Conversation(models.Model):
             or self.fb_page_id
             or self.slack_user_id
             or self.web_user_id
-            or self.twilio_phone_number
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
         )
 
     get_display_name.short_description = "User"
