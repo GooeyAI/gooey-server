@@ -297,7 +297,12 @@ def _render_update_subscription_button(
                             downgrade_modal.close()
         case _:
             if st.button(label, className=className, key=key):
-                change_subscription(user, plan)
+                change_subscription(
+                    user,
+                    plan,
+                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                    billing_cycle_anchor="now",
+                )
 
 
 def fmt_price(plan: PricingPlan) -> str:
@@ -307,7 +312,7 @@ def fmt_price(plan: PricingPlan) -> str:
         return "Free"
 
 
-def change_subscription(user: AppUser, new_plan: PricingPlan):
+def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -338,9 +343,7 @@ def change_subscription(user: AppUser, new_plan: PricingPlan):
                 metadata={
                     settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
                 },
-                # charge the full new amount today, without prorations
-                # see: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                billing_cycle_anchor="now",
+                **kwargs,
                 proration_behavior="none",
             )
             raise RedirectException(

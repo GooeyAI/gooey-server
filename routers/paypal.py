@@ -208,7 +208,5 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
         case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
             subscription = SubscriptionEvent.parse_obj(event).resource
             PaypalWebhookHandler.handle_subscription_cancelled(subscription)
-        case _:
-            logger.error(f"Unhandled PayPal webhook event: {event.event_type}")
 
-    return JSONResponse({}, status_code=200)
+    return JSONResponse({})

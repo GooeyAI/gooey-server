@@ -199,7 +199,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "plan",
         "created_at",
     ]
-    readonly_fields = ["created_at"]
+    readonly_fields = ["view_payment_provider_url", "created_at"]
     list_filter = [
         "reason",
         ("payment_provider", admin.EmptyFieldListFilter),
@@ -216,6 +216,14 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         if not obj.payment_provider:
             return
         return f"${obj.charged_amount / 100}"
+
+    @admin.display(description="Payment Provider URL")
+    def view_payment_provider_url(self, txn: models.AppUserTransaction):
+        url = txn.payment_provider_url()
+        if url:
+            return open_in_new_tab(url, label=url)
+        else:
+            raise txn.DoesNotExist
 
 
 @admin.register(LogEntry)

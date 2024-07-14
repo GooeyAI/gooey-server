@@ -4,6 +4,7 @@ from django.db import models, IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from firebase_admin import auth
+from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField, StrippedTextField
@@ -378,3 +379,15 @@ class AppUserTransaction(models.Model):
                 return "Addon purchase"
             case TransactionReason.DEDUCT:
                 return "Run deduction"
+
+    def payment_provider_url(self) -> str | None:
+        match self.payment_provider:
+            case PaymentProvider.STRIPE:
+                return str(
+                    furl("https://dashboard.stripe.com/invoices/") / self.invoice_id
+                )
+            case PaymentProvider.PAYPAL:
+                return str(
+                    furl("https://www.paypal.com/unifiedtransactions/details/payment/")
+                    / self.invoice_id
+                )
