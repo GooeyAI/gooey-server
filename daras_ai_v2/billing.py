@@ -427,22 +427,7 @@ def render_stripe_addon_button(dollat_amt: int, user: AppUser):
         if user.subscription:
             confirm_purchase_modal.open()
         else:
-            from routers.account import account_route
-            from routers.account import payment_processing_route
-
-            line_item = available_subscriptions["addon"]["stripe"].copy()
-            line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
-
-            checkout_session = stripe.checkout.Session.create(
-                line_items=[line_item],
-                mode="payment",
-                success_url=get_route_url(payment_processing_route),
-                cancel_url=get_route_url(account_route),
-                customer=user.get_or_create_stripe_customer(),
-                invoice_creation={"enabled": True},
-                allow_promotion_codes=True,
-            )
-            raise RedirectException(checkout_session.url, status_code=303)
+            stripe_addon_checkout_redirect(user, dollat_amt)
 
     if not confirm_purchase_modal.is_open():
         return
@@ -475,6 +460,24 @@ def render_stripe_addon_button(dollat_amt: int, user: AppUser):
             st.button("Buy", type="primary", key="--confirm-purchase")
 
 
+def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
+    from routers.account import account_route
+    from routers.account import payment_processing_route
+
+    line_item = available_subscriptions["addon"]["stripe"].copy()
+    line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
+    checkout_session = stripe.checkout.Session.create(
+        line_items=[line_item],
+        mode="payment",
+        success_url=get_route_url(payment_processing_route),
+        cancel_url=get_route_url(account_route),
+        customer=user.get_or_create_stripe_customer(),
+        invoice_creation={"enabled": True},
+        allow_promotion_codes=True,
+    )
+    raise RedirectException(checkout_session.url, status_code=303)
+
+
 def render_stripe_subscription_button(
     *,
     label: str,
@@ -491,10 +494,10 @@ def render_stripe_subscription_button(
     # of buttons with the same label. otherwise, all buttons
     # will be the same to the server
     if st.button(label, key=key, type=btn_type):
-        create_stripe_checkout_session(user=user, plan=plan)
+        stripe_subscription_checkout_redirect(user=user, plan=plan)
 
 
-def create_stripe_checkout_session(user: AppUser, plan: PricingPlan):
+def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
