@@ -174,11 +174,11 @@ def _handle_invoice_paid(order_id: str):
     raise_for_status(response)
     order = response.json()
     purchase_unit = order["purchase_units"][0]
-    uid = purchase_unit["payments"]["captures"][0]["custom_id"]
+    payment_capture = purchase_unit["payments"]["captures"][0]
     add_balance_for_payment(
-        uid=uid,
+        uid=payment_capture["custom_id"],
         amount=int(purchase_unit["items"][0]["quantity"]),
-        invoice_id=order_id,
+        invoice_id=payment_capture["id"],
         payment_provider=PaymentProvider.PAYPAL,
         charged_amount=int(float(purchase_unit["amount"]["value"]) * 100),
     )
