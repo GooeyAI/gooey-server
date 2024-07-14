@@ -1,119 +1,12 @@
 import stripe
 from django.db import transaction
 from loguru import logger
-from requests.models import HTTPError
 
 from app_users.models import AppUser, PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal
 from .models import Subscription
 from .plans import PricingPlan
 from .tasks import send_monthly_spending_notification_email
-
-
-def add_balance_for_payment(
-    *,
-    uid: str,
-    amount: int,
-    invoice_id: str,
-    payment_provider: PaymentProvider,
-    charged_amount: int,
-    **kwargs,
-):
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(
-        amount=amount,
-        invoice_id=invoice_id,
-        charged_amount=charged_amount,
-        payment_provider=payment_provider,
-        **kwargs,
-    )
-
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])
-
-    if (
-        user.subscription
-        and user.subscription.should_send_monthly_spending_notification()
-    ):
-        send_monthly_spending_notification_email.delay(user.id)
-
-
-@transaction.atomic
-def _after_subscription_updated(
-    *, provider: PaymentProvider, uid: str, sub_id: str, plan: PricingPlan
-):
-    if not is_sub_active(provider=provider, sub_id=sub_id):
-        # subscription is not in an active state, just ignore
-        logger.info(
-            "Subscription is not active. Ignoring event",
-            provider=provider,
-            sub_id=sub_id,
-        )
-        return
-
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    # select_for_update: we want to lock the row until we are done reading &
-    # updating the subscription
-    #
-    # anther transaction shouldn't update the subscription in the meantime
-    user: AppUser = AppUser.objects.select_for_update().get(pk=user.pk)
-    if not user.subscription:
-        # new subscription
-        logger.info("Creating new subscription for user", uid=uid)
-        user.subscription = Subscription.objects.get_or_create(
-            payment_provider=provider,
-            external_id=sub_id,
-            defaults={"plan": plan.db_value},
-        )[0]
-        user.subscription.plan = plan.db_value
-
-    elif is_same_sub(user.subscription, provider=provider, sub_id=sub_id):
-        if user.subscription.plan == plan.db_value:
-            # same subscription exists with the same plan in DB
-            logger.info("Nothing to do")
-            return
-        else:
-            # provider & sub_id is same, but plan is different. so we update only the plan
-            logger.info("Updating plan for user", uid=uid)
-            user.subscription.plan = plan.db_value
-
-    else:
-        logger.critical(
-            "Invalid state: last subscription was not cleared for user", uid=uid
-        )
-
-        # we have a different existing subscription in DB
-        # this is invalid state! we should cancel the subscription if it is active
-        if is_sub_active(
-            provider=user.subscription.payment_provider,
-            sub_id=user.subscription.external_id,
-        ):
-            logger.critical(
-                "Found existing active subscription for user. Cancelling that...",
-                uid=uid,
-                provider=user.subscription.get_payment_provider_display(),
-                sub_id=user.subscription.external_id,
-            )
-            user.subscription.cancel()
-
-        logger.info("Creating new subscription for user", uid=uid)
-        user.subscription = Subscription(
-            payment_provider=provider, plan=plan, external_id=sub_id
-        )
-
-    user.subscription.full_clean()
-    user.subscription.save()
-    user.save(update_fields=["subscription"])
-
-
-def _after_subscription_cancelled(*, provider: PaymentProvider, uid: str, sub_id: str):
-    user = AppUser.objects.get_or_create_from_uid(uid=uid)[0]
-    if user.subscription and is_same_sub(
-        user.subscription, provider=provider, sub_id=sub_id
-    ):
-        user.subscription = None
-        user.save(update_fields=["subscription"])
 
 
 class PaypalWebhookHandler:
@@ -158,17 +51,26 @@ class PaypalWebhookHandler:
         assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
-        assert plan, f"Plan {pp_sub.plan_id} not found"
+        assert plan, f"Plan with id={pp_sub.plan_id} not found"
 
-        _after_subscription_updated(
-            provider=cls.PROVIDER, uid=pp_sub.custom_id, sub_id=pp_sub.id, plan=plan
+        if pp_sub.status.lower() != "active":
+            logger.info(
+                "Subscription is not active. Ignoring event", subscription=pp_sub
+            )
+            return
+
+        _set_user_subscription(
+            provider=cls.PROVIDER,
+            plan=plan,
+            uid=pp_sub.custom_id,
+            external_id=pp_sub.id,
         )
 
     @classmethod
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
-        _after_subscription_cancelled(
-            provider=cls.PROVIDER, uid=pp_sub.custom_id, sub_id=pp_sub.id
+        _remove_subscription_for_user(
+            provider=cls.PROVIDER, uid=pp_sub.custom_id, external_id=pp_sub.id
         )
 
 
@@ -218,13 +120,12 @@ class StripeWebhookHandler:
             sub_id
         ), f"subscription_id is missing in setup_intent metadata {setup_intent}"
 
-        if is_sub_active(provider=PaymentProvider.STRIPE, sub_id=sub_id):
-            stripe.Subscription.modify(
-                sub_id, default_payment_method=setup_intent.payment_method
-            )
+        stripe.Subscription.modify(
+            sub_id, default_payment_method=setup_intent.payment_method
+        )
 
     @classmethod
-    def handle_subscription_updated(cls, uid: str, stripe_sub):
+    def handle_subscription_updated(cls, uid: str, stripe_sub: stripe.Subscription):
         logger.info(f"Stripe subscription updated: {stripe_sub.id}")
 
         assert stripe_sub.plan, f"Stripe subscription {stripe_sub.id} is missing plan"
@@ -239,52 +140,94 @@ class StripeWebhookHandler:
                 f"PricingPlan not found for product {stripe_sub.plan.product}"
             )
 
-        _after_subscription_updated(
-            provider=cls.PROVIDER, uid=uid, sub_id=stripe_sub.id, plan=plan
+        if stripe_sub.status.lower() != "active":
+            logger.info(
+                "Subscription is not active. Ignoring event", subscription=stripe_sub
+            )
+            return
+
+        _set_user_subscription(
+            provider=cls.PROVIDER,
+            plan=plan,
+            uid=uid,
+            external_id=stripe_sub.id,
         )
 
     @classmethod
     def handle_subscription_cancelled(cls, uid: str, stripe_sub):
         logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
-
-        _after_subscription_cancelled(
-            provider=cls.PROVIDER, uid=uid, sub_id=stripe_sub.id
+        _remove_subscription_for_user(
+            provider=cls.PROVIDER, uid=uid, external_id=stripe_sub.id
         )
 
 
-def is_same_sub(
-    subscription: Subscription, *, provider: PaymentProvider, sub_id: str
-) -> bool:
-    return (
-        subscription.payment_provider == provider and subscription.external_id == sub_id
+def add_balance_for_payment(
+    *,
+    uid: str,
+    amount: int,
+    invoice_id: str,
+    payment_provider: PaymentProvider,
+    charged_amount: int,
+    **kwargs,
+):
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    user.add_balance(
+        amount=amount,
+        invoice_id=invoice_id,
+        charged_amount=charged_amount,
+        payment_provider=payment_provider,
+        **kwargs,
     )
 
+    if not user.is_paying:
+        user.is_paying = True
+        user.save(update_fields=["is_paying"])
 
-def is_sub_active(*, provider: PaymentProvider, sub_id: str) -> bool:
-    match provider:
-        case PaymentProvider.PAYPAL:
-            try:
-                sub = paypal.Subscription.retrieve(sub_id)
-            except HTTPError as e:
-                if e.response.status_code != 404:
-                    # if not 404, it likely means there is a bug in our code...
-                    # we want to know about it, but not break the end user experience
-                    logger.exception(f"Unexpected PayPal error for sub: {sub_id}")
-                return False
+    if (
+        user.subscription
+        and user.subscription.should_send_monthly_spending_notification()
+    ):
+        send_monthly_spending_notification_email.delay(user.id)
 
-            return sub.status == "ACTIVE"
 
-        case PaymentProvider.STRIPE:
-            try:
-                sub = stripe.Subscription.retrieve(sub_id)
-            except stripe.error.InvalidRequestError as e:
-                if e.http_status != 404:
-                    # if not 404, it likely means there is a bug in our code...
-                    # we want to know about it, but not break the end user experience
-                    logger.exception(f"Unexpected Stripe error for sub: {sub_id}")
-                return False
-            except stripe.error.StripeError as e:
-                logger.exception(f"Unexpected Stripe error for sub: {sub_id}")
-                return False
+def _set_user_subscription(
+    *, provider: PaymentProvider, plan: PricingPlan, uid: str, external_id: str
+):
+    with transaction.atomic():
+        subscription, created = Subscription.objects.get_or_create(
+            payment_provider=provider,
+            external_id=external_id,
+            defaults=dict(plan=plan.db_value),
+        )
+        subscription.plan = plan.db_value
+        subscription.full_clean()
+        subscription.save()
 
-            return sub.status == "active"
+        user = AppUser.objects.get_or_create_from_uid(uid)[0]
+        existing = user.subscription
+
+        user.subscription = subscription
+        user.save(update_fields=["subscription"])
+
+    if not existing:
+        return
+
+    # cancel existing subscription if it's not the same as the new one
+    if existing.external_id != external_id:
+        existing.cancel()
+
+    # delete old db record if it exists
+    if existing.id != subscription.id:
+        existing.delete()
+
+
+def _remove_subscription_for_user(
+    *, uid: str, provider: PaymentProvider, external_id: str
+):
+    AppUser.objects.filter(
+        uid=uid,
+        subscription__payment_provider=provider,
+        subscription__external_id=external_id,
+    ).update(
+        subscription=None,
+    )
