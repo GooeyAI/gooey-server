@@ -166,7 +166,6 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
 
     match event.event_type:
         case "PAYMENT.SALE.COMPLETED":
-            print(event)
             event = SaleCompletedEvent.parse_obj(event)
             _handle_sale_completed(event)
         case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
@@ -208,7 +207,6 @@ def _handle_invoice_paid(order_id: str):
     )
     raise_for_status(response)
     order = response.json()
-    print(order)
     purchase_unit = order["purchase_units"][0]
     uid = purchase_unit["payments"]["captures"][0]["custom_id"]
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
