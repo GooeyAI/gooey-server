@@ -15,6 +15,7 @@ from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
+from scripts.migrate_existing_subscriptions import available_subscriptions
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
@@ -32,14 +33,15 @@ def billing_page(user: AppUser):
         render_credit_balance(user)
 
     with st.div(className="my-5"):
-        render_all_plans(user)
+        selected_payment_provider = render_all_plans(user)
+
+    with st.div(className="my-5"):
+        render_addon_section(user, selected_payment_provider)
 
     if user.subscription and user.subscription.payment_provider:
         if user.subscription.payment_provider == PaymentProvider.STRIPE:
             with st.div(className="my-5"):
                 render_auto_recharge_section(user)
-        with st.div(className="my-5"):
-            render_addon_section(user)
         with st.div(className="my-5"):
             render_payment_information(user)
 
@@ -120,7 +122,7 @@ def render_credit_balance(user: AppUser):
     )
 
 
-def render_all_plans(user: AppUser):
+def render_all_plans(user: AppUser) -> PaymentProvider:
     current_plan = (
         PricingPlan.from_sub(user.subscription)
         if user.subscription
@@ -158,6 +160,8 @@ def render_all_plans(user: AppUser):
 
     with st.div(className="my-2 d-flex justify-content-center"):
         st.caption(f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**")
+
+    return selected_payment_provider
 
 
 def _render_plan_details(plan: PricingPlan):
@@ -370,44 +374,72 @@ def payment_provider_radio(**props) -> str | None:
         )
 
 
-def render_addon_section(user: AppUser):
-    assert user.subscription
-
-    st.write("# Purchase More Credits")
+def render_addon_section(user: AppUser, selected_payment_provider: PaymentProvider):
+    if user.subscription:
+        st.write("# Purchase More Credits")
+    else:
+        st.write("# Purchase Credits")
     st.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    provider = PaymentProvider(user.subscription.payment_provider)
+    if user.subscription:
+        provider = PaymentProvider(user.subscription.payment_provider)
+    else:
+        provider = selected_payment_provider
     match provider:
         case PaymentProvider.STRIPE:
-            for amount in settings.ADDON_AMOUNT_CHOICES:
-                render_stripe_addon_button(amount, user=user)
+            render_stripe_addon_buttons(user)
         case PaymentProvider.PAYPAL:
-            for amount in settings.ADDON_AMOUNT_CHOICES:
-                render_paypal_addon_button(amount)
-            st.div(
-                id="paypal-addon-buttons",
-                className="mt-2",
-                style={"width": "fit-content"},
-            )
-            st.div(id="paypal-result-message")
+            render_paypal_addon_buttons()
 
 
-def render_paypal_addon_button(amount: int):
-    st.html(
-        f"""
-    <button class="streamlit-like-btn paypal-checkout-option"
-            onClick="setPaypalAddonQuantity({amount * settings.ADDON_CREDITS_PER_DOLLAR});"
-            type="button"
-            data-submit-disabled
-    >${amount:,}</button>
-    """
+def render_paypal_addon_buttons():
+    selected_amt = st.horizontal_radio(
+        "",
+        settings.ADDON_AMOUNT_CHOICES,
+        format_func=lambda amt: f"${amt:,}",
+        checked_by_default=False,
     )
+    if selected_amt:
+        st.js(
+            f"setPaypalAddonQuantity({int(selected_amt) * settings.ADDON_CREDITS_PER_DOLLAR})"
+        )
+    st.div(
+        id="paypal-addon-buttons",
+        className="mt-2",
+        style={"width": "fit-content"},
+    )
+    st.div(id="paypal-result-message")
 
 
-def render_stripe_addon_button(amount: int, user: AppUser):
-    confirm_purchase_modal = Modal("Confirm Purchase", key=f"confirm-purchase-{amount}")
-    if st.button(f"${amount:,}", type="primary"):
-        confirm_purchase_modal.open()
+def render_stripe_addon_buttons(user: AppUser):
+    for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
+        render_stripe_addon_button(dollat_amt, user)
+
+
+def render_stripe_addon_button(dollat_amt: int, user: AppUser):
+    confirm_purchase_modal = Modal(
+        "Confirm Purchase", key=f"confirm-purchase-{dollat_amt}"
+    )
+    if st.button(f"${dollat_amt:,}", type="primary"):
+        if user.subscription:
+            confirm_purchase_modal.open()
+        else:
+            from routers.account import account_route
+            from routers.account import payment_processing_route
+
+            line_item = available_subscriptions["addon"]["stripe"].copy()
+            line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
+
+            checkout_session = stripe.checkout.Session.create(
+                line_items=[line_item],
+                mode="payment",
+                success_url=get_route_url(payment_processing_route),
+                cancel_url=get_route_url(account_route),
+                customer=user.get_or_create_stripe_customer(),
+                invoice_creation={"enabled": True},
+                allow_promotion_codes=True,
+            )
+            raise RedirectException(checkout_session.url, status_code=303)
 
     if not confirm_purchase_modal.is_open():
         return
@@ -415,7 +447,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
         st.write(
             f"""
                 Please confirm your purchase:  
-                 **{amount * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${amount}**.
+                 **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollat_amt}**.
                  """,
             className="py-4 d-block text-center",
         )
@@ -423,7 +455,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             if st.session_state.get("--confirm-purchase"):
                 success = st.run_in_thread(
                     user.subscription.stripe_attempt_addon_purchase,
-                    args=[amount],
+                    args=[dollat_amt],
                     placeholder="Processing payment...",
                 )
                 if success is None:
