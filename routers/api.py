@@ -15,6 +15,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic import create_model
+from pydantic.error_wrappers import ErrorWrapper
 from pydantic.generics import GenericModel
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
@@ -322,7 +323,13 @@ def _parse_form_data(
     form_data: FormData,
     page_request_json: str,
 ):
-    page_request_data = json.loads(page_request_json)
+    # load the json data
+    try:
+        page_request_data = json.loads(page_request_json)
+    except json.JSONDecodeError as e:
+        raise RequestValidationError(
+            [ErrorWrapper(e, ("body", e.pos))], body=e.doc
+        ) from e
     # fill in the file urls from the form data
     for key in form_data.keys():
         uf_list = form_data.getlist(key)
@@ -347,7 +354,7 @@ def _parse_form_data(
     try:
         page_request = request_model.parse_obj(page_request_data)
     except ValidationError as e:
-        raise RequestValidationError(e.errors(), body=page_request_data)
+        raise RequestValidationError(e.raw_errors, body=page_request_data) from e
     return page_request
 
 
@@ -409,7 +416,7 @@ def submit_api_call(
             retention_policy=retention_policy or RetentionPolicy.keep,
         )
     except ValidationError as e:
-        raise RequestValidationError(e.errors(), body=request_body)
+        raise RequestValidationError(e.raw_errors, body=st.session_state) from e
     # submit the task
     result = self.call_runner_task(sr)
     return self, result, sr.run_id, sr.uid
