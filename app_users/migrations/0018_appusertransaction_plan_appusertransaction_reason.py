@@ -13,8 +13,6 @@ def forwards_func(apps, schema_editor):
     db_alias = schema_editor.connection.alias
     objects = AppUserTransaction.objects.using(db_alias)
 
-    objects.filter(amount__lte=0).update(reason=TransactionReason.DEDUCT)
-
     for transaction in objects.filter(amount__gt=0):
         # For old transactions, we didn't have a subscription field.
         # It just so happened that all monthly subscriptions we offered had
@@ -29,6 +27,7 @@ def forwards_func(apps, schema_editor):
             ):
                 transaction.plan = plan.db_value
                 transaction.reason = TransactionReason.SUBSCRIBE
+                break
         transaction.save(update_fields=["reason", "plan"])
 
 
@@ -47,7 +46,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='appusertransaction',
             name='reason',
-            field=models.IntegerField(choices=[(1, 'Deduct'), (2, 'Addon'), (3, 'Subscribe'), (4, 'Sub-Create'), (5, 'Sub-Cycle'), (6, 'Sub-Update'), (7, 'Auto-Recharge')], default=0, help_text='The reason for this transaction.<br><br>Deduct: Credits deducted due to a run.<br>Addon: User purchased an add-on.<br>Subscribe: Applies to subscriptions where no distinction was made between create, update and cycle.<br>Sub-Create: A subscription was created.<br>Sub-Cycle: A subscription advanced into a new period.<br>Sub-Update: A subscription was updated.<br>Auto-Recharge: Credits auto-recharged due to low balance.'),
+            field=models.IntegerField(choices=[(1, 'Deduct'), (2, 'Addon'), (3, 'Subscribe'), (4, 'Sub-Create'), (5, 'Sub-Cycle'), (6, 'Sub-Update'), (7, 'Auto-Recharge')], default=1, help_text='The reason for this transaction.<br><br>Deduct: Credits deducted due to a run.<br>Addon: User purchased an add-on.<br>Subscribe: Applies to subscriptions where no distinction was made between create, update and cycle.<br>Sub-Create: A subscription was created.<br>Sub-Cycle: A subscription advanced into a new period.<br>Sub-Update: A subscription was updated.<br>Auto-Recharge: Credits auto-recharged due to low balance.'),
         ),
         migrations.RunPython(forwards_func, migrations.RunPython.noop),
         migrations.AlterField(
