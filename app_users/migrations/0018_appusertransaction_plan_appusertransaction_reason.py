@@ -13,23 +13,22 @@ def forwards_func(apps, schema_editor):
     db_alias = schema_editor.connection.alias
     objects = AppUserTransaction.objects.using(db_alias)
 
-    for transaction in objects.all():
-        if transaction.amount <= 0:
-            transaction.reason = TransactionReason.DEDUCT
-        else:
-            # For old transactions, we didn't have a subscription field.
-            # It just so happened that all monthly subscriptions we offered had
-            # different amounts from the one-time purchases.
-            # This uses that heuristic to determine whether a transaction
-            # was a subscription payment or a one-time purchase.
-            transaction.reason = TransactionReason.ADDON
-            for plan in PricingPlan:
-                if (
-                    transaction.amount == plan.credits
-                    and transaction.charged_amount == plan.monthly_charge * 100
-                ):
-                    transaction.plan = plan.db_value
-                    transaction.reason = TransactionReason.SUBSCRIBE
+    objects.filter(amount__lte=0).update(reason=TransactionReason.DEDUCT)
+
+    for transaction in objects.filter(amount__gt=0):
+        # For old transactions, we didn't have a subscription field.
+        # It just so happened that all monthly subscriptions we offered had
+        # different amounts from the one-time purchases.
+        # This uses that heuristic to determine whether a transaction
+        # was a subscription payment or a one-time purchase.
+        transaction.reason = TransactionReason.ADDON
+        for plan in PricingPlan:
+            if (
+                transaction.amount == plan.credits
+                and transaction.charged_amount == plan.monthly_charge * 100
+            ):
+                transaction.plan = plan.db_value
+                transaction.reason = TransactionReason.SUBSCRIBE
         transaction.save(update_fields=["reason", "plan"])
 
 
