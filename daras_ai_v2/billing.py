@@ -474,6 +474,9 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
         customer=user.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
+        saved_payment_method_options={
+            "payment_method_save": "enabled",
+        },
     )
     raise RedirectException(checkout_session.url, status_code=303)
 
