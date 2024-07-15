@@ -19,6 +19,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
+from orgs.views import orgs_page
 
 from routers.custom_api_router import CustomAPIRouter
 
@@ -139,6 +140,24 @@ def api_keys_route(request: Request):
     )
 
 
+@app.post("/orgs/")
+@st.route
+def orgs_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.orgs):
+        orgs_tab(request)
+
+    url = get_og_url_path(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title="Teams • Gooey.AI",
+            description="Your teams.",
+            robots="noindex,nofollow",
+        )
+    )
+
+
 class TabData(typing.NamedTuple):
     title: str
     route: typing.Callable
@@ -149,6 +168,7 @@ class AccountTabs(TabData, Enum):
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
+    orgs = TabData(title=f"{icons.company} Teams", route=orgs_route)
 
     @property
     def url_path(self) -> str:
@@ -206,6 +226,10 @@ def all_saved_runs_tab(request: Request):
 def api_keys_tab(request: Request):
     gui.write("# 🔐 API Keys")
     manage_api_keys(request.user)
+
+
+def orgs_tab(request: Request):
+    orgs_page(request.user)
 
 
 @contextmanager
