@@ -14,9 +14,14 @@ link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
 copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
+time = '<i class="fa-regular fa-clock"></i>'
 
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'
+admin = '<i class="fa-solid fa-shield-halved"></i>'
+remove_user = '<i class="fa-solid fa-user-minus"></i>'
+add_user = '<i class="fa-solid fa-user-plus"></i>'
+transfer_ownership = '<i class="fa-solid fa-right-left"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

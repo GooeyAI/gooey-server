@@ -657,6 +657,27 @@ def table(df: "pd.DataFrame"):
                             html(dedent(str(value)))
 
 
+def raw_table(header: list[str], className: str = "", **props) -> state.NestingCtx:
+    className = "table " + className
+    with tag("table", className=className, **props):
+        if header:
+            with tag("thead"), tag("tr"):
+                for col in header:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+
+        return tag("tbody")
+
+
+def table_row(values: list[str], **props):
+    row = tag("tr", **props)
+    with row:
+        for v in values:
+            with tag("td"):
+                html(html_lib.escape(v))
+    return row
+
+
 def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
