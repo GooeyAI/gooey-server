@@ -986,8 +986,18 @@ class BasePage:
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                     """
                 )
-                st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(root_run.notes or page.preview_description(state))
+                st.markdown(
+                    f"###### {root_run.title or page.title}",
+                )
+            with st.link(
+                to=page.app_url(), className="text-decoration-none cursor-pointer"
+            ):
+                st.caption(
+                    root_run.notes or page.preview_description(state),
+                    className="text-decoration-none",
+                    line_clamp=7,
+                    line_clamp_expand=False,
+                )
 
         grid_layout(4, page_clses, _render)
 

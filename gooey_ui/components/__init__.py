@@ -96,7 +96,12 @@ def newline():
 
 
 def markdown(
-    body: str | None, *, line_clamp: int = None, unsafe_allow_html=False, **props
+    body: str | None,
+    *,
+    line_clamp: int = None,
+    line_clamp_expand: bool = True,
+    unsafe_allow_html=False,
+    **props,
 ):
     if body is None:
         return _node("markdown", body="", **props)
@@ -105,7 +110,13 @@ def markdown(
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
-    return _node("markdown", body=dedent(body).strip(), lineClamp=line_clamp, **props)
+    return _node(
+        "markdown",
+        body=dedent(body).strip(),
+        lineClamp=line_clamp,
+        lineClampExpand=line_clamp_expand,
+        **props,
+    )
 
 
 def _node(name: str, **props):
