@@ -444,14 +444,18 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         rating=Feedback.Rating.RATING_THUMBS_DOWN,
     ).count()
     run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
-    connection_detail = bi.get_display_name()
+    connection_detail = (
+        f"- Connected to: {bi.get_display_name()}"
+        if bi.get_display_name() != bi.name
+        else ""
+    )
     st.markdown(
         f"""
             - Platform: {Platform(bi.platform).name.capitalize()}
             - Created on: {bi.created_at.strftime("%b %d, %Y")}
             - Last Updated: {bi.updated_at.strftime("%b %d, %Y")}
             - {run_link}
-            - Connected to: {connection_detail}
+            {connection_detail}
             * {users.count()} Users
             * {num_active_users_last_7_days} Active Users (Last 7 Days)
             * {num_active_users_last_30_days} Active Users (Last 30 Days)
