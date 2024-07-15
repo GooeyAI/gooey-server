@@ -38,7 +38,10 @@ from daras_ai_v2.functional import (
     flatapply_parallel,
 )
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.settings import service_account_key_path
@@ -138,7 +141,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             key="task_instructions",
             height=300,
         )
-        language_model_settings()
+        language_model_settings(show_response_format=False)
 
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")

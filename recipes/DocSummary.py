@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -16,6 +16,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
+    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
@@ -71,6 +72,11 @@ class DocSummaryPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
+
+        response_format_type: ResponseFormatType = Field(
+            None,
+            title="Response Format",
+        )
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 
@@ -240,6 +246,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )[0]
 
     state["prompt_tree"] = prompt_tree = []

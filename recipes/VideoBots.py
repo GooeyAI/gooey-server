@@ -537,7 +537,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             doc_search_advanced_settings()
             st.write("---")
 
-        language_model_settings(show_selector=False)
+        language_model_settings(show_selector=False, show_response_format=False)
 
         st.write("---")
 

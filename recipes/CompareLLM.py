@@ -7,8 +7,7 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect, BLANK_OPTION
-from daras_ai_v2.field_render import field_title
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
@@ -17,7 +16,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 
@@ -97,15 +96,6 @@ class CompareLLMPage(BasePage):
 
     def render_settings(self):
         language_model_settings(show_selector=False)
-        st.selectbox(
-            f"###### {field_title(self.RequestModel, 'response_format_type')}",
-            options=[None, "json_object"],
-            key="response_format_type",
-            format_func={
-                None: BLANK_OPTION,
-                "json_object": "JSON Object",
-            }.__getitem__,
-        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)

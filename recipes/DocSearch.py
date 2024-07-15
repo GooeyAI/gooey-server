@@ -2,7 +2,7 @@ import math
 import typing
 
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -19,10 +19,11 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
+    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -75,6 +76,11 @@ class DocSearchPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
+
+        response_format_type: ResponseFormatType = Field(
+            None,
+            title="Response Format",
+        )
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
@@ -202,6 +208,7 @@ class DocSearchPage(BasePage):
             prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
 
         citation_style = (

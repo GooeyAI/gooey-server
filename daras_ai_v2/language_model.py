@@ -65,6 +65,7 @@ class LLMSpec(typing.NamedTuple):
     is_chat_model: bool = True
     is_vision_model: bool = False
     is_deprecated: bool = False
+    supports_json: bool = False
 
 
 class LargeLanguageModels(Enum):
@@ -76,6 +77,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         price=10,
         is_vision_model=True,
+        supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-4o-mini
     gpt_4_o_mini = LLMSpec(
@@ -97,6 +99,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         price=6,
         is_vision_model=True,
+        supports_json=True,
     )
     gpt_4_vision = LLMSpec(
         label="GPT-4 Vision (openai) 🔻",
@@ -114,6 +117,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=5,
+        supports_json=True,
     )
 
     # https://platform.openai.com/docs/models/gpt-4
@@ -358,6 +362,7 @@ class LargeLanguageModels(Enum):
         self.is_deprecated = spec.is_deprecated
         self.is_chat_model = spec.is_chat_model
         self.is_vision_model = spec.is_vision_model
+        self.supports_json = spec.supports_json
 
     @property
     def value(self):

@@ -1,12 +1,13 @@
 import gooey_ui as st
 
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.language_model import LargeLanguageModels
 
 
-def language_model_settings(show_selector=True):
+def language_model_settings(show_selector=True, show_response_format=True):
     st.write("##### 🔠 Language Model Settings")
 
+    selected_model = None
     if show_selector:
         enum_selector(
             LargeLanguageModels,
@@ -14,6 +15,9 @@ def language_model_settings(show_selector=True):
             key="selected_model",
             use_selectbox=True,
         )
+        selected_model = LargeLanguageModels[
+            st.session_state.get("selected_model") or LargeLanguageModels.gpt_4.name
+        ]
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 
@@ -28,12 +32,7 @@ How many answers should the copilot generate? Additional answer outputs increase
             min_value=1,
             max_value=4,
         )
-    if (
-        show_selector
-        and not LargeLanguageModels[
-            st.session_state.get("selected_model") or LargeLanguageModels.gpt_4.name
-        ].is_chat_model
-    ):
+    if selected_model and selected_model.is_chat_model:
         with col2:
             st.slider(
                 label="""
@@ -67,4 +66,15 @@ Generate multiple responses and choose the best one.
             key="sampling_temperature",
             min_value=0.0,
             max_value=2.0,
+        )
+
+    if show_response_format and (not selected_model or selected_model.supports_json):
+        st.selectbox(
+            f"###### Response Format",
+            options=[None, "json_object"],
+            key="response_format_type",
+            format_func={
+                None: BLANK_OPTION,
+                "json_object": "JSON Object",
+            }.__getitem__,
         )
