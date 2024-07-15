@@ -37,15 +37,6 @@ from daras_ai_v2.language_model import (
 from gooey_ui import RedirectException
 from recipes.VideoBots import VideoBotsPage
 
-ID_COLUMNS = [
-    "conversation__fb_page_id",
-    "conversation__ig_account_id",
-    "conversation__wa_phone_number",
-    "conversation__slack_user_id",
-    "conversation__twilio_phone_number",
-    "conversation__web_user_id",
-]
-
 
 class VideoBotsStatsPage(BasePage):
     title = "Copilot Analytics"  # "Create Interactive Video Bots"
@@ -415,9 +406,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=7),
         )
-        .distinct(
-            *ID_COLUMNS,
-        )
+        .get_unique_users()
         .count()
     )
     num_active_users_last_30_days = (
@@ -425,9 +414,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=30),
         )
-        .distinct(
-            *ID_COLUMNS,
-        )
+        .get_unique_users()
         .count()
     )
     positive_feedbacks = Feedback.objects.filter(
@@ -485,7 +472,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(
             Senders=Count(
                 Concat(
-                    *ID_COLUMNS,
+                    *Message.CONVO_ID_COLUMNS(),
                 ),
                 distinct=True,
             )

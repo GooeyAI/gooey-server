@@ -877,14 +877,7 @@ class ConvoState(models.IntegerChoices):
 class ConversationQuerySet(models.QuerySet):
     def get_unique_users(self) -> models.QuerySet["Conversation"]:
         """Get unique conversations"""
-        return self.distinct(
-            "fb_page_id",
-            "ig_account_id",
-            "wa_phone_number",
-            "slack_user_id",
-            "twilio_phone_number",
-            "web_user_id",
-        )
+        return self.distinct(*Conversation.ID_COLUMNS())
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
@@ -1117,18 +1110,35 @@ class Conversation(models.Model):
     def __str__(self):
         return f"{self.get_display_name()} <> {self.bot_integration}"
 
+    @classmethod
+    def ID_COLUMNS(cls):
+        return [
+            "fb_page_id",
+            "ig_account_id",
+            "slack_user_id",
+            "web_user_id",
+            "wa_phone_number",
+            "twilio_phone_number",
+        ]
+
+    def get_id(self):
+        self_id = None
+        for col in self.ID_COLUMNS():
+            if getattr(self, col):
+                self_id = getattr(self, col)
+                break
+        return self_id
+
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
             or self.ig_username
             or self.fb_page_name
             or " in #".join(
                 filter(None, [self.slack_user_name, self.slack_channel_name])
             )
-            or self.fb_page_id
-            or self.slack_user_id
-            or self.web_user_id
-            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or self.get_id()
         )
 
     get_display_name.short_description = "User"
@@ -1166,6 +1176,10 @@ class Conversation(models.Model):
 
 
 class MessageQuerySet(models.QuerySet):
+    def get_unique_users(self) -> "MessageQuerySet":
+        """Get unique users"""
+        return self.distinct(*Message.CONVO_ID_COLUMNS())
+
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
 
@@ -1397,6 +1411,10 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
+
+    @classmethod
+    def CONVO_ID_COLUMNS(cls):
+        return [f"conversation__{col}" for col in Conversation.ID_COLUMNS()]
 
 
 class MessageAttachment(models.Model):
