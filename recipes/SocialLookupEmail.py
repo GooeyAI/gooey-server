@@ -126,7 +126,7 @@ class SocialLookupEmailPage(BasePage):
         )
 
     def render_settings(self):
-        language_model_settings()
+        language_model_settings(show_response_format=False)
 
         # st.text_input("URL 1", key="url1")
         # st.text_input("URL 2", key="url2")

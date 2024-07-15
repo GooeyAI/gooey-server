@@ -1,7 +1,7 @@
 import typing
 
 import jinja2.sandbox
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -80,7 +80,7 @@ class SmartGPTPage(BasePage):
                 """,
             key="dera_prompt",
         )
-        language_model_settings()
+        language_model_settings(show_response_format=False)
 
     def related_workflows(self):
         from recipes.CompareLLM import CompareLLMPage

@@ -181,7 +181,7 @@ SearchSEO > Page Parsing > GPT3
         st.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
         st.checkbox("Enable HTML Formatting", key="enable_html")
 
-        language_model_settings()
+        language_model_settings(show_response_format=False)
 
         st.write("---")
 
