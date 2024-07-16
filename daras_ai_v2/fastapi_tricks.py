@@ -57,7 +57,7 @@ def resolve_url(url: str) -> ResolverMatch | None:
 
 
 def get_api_route_url(
-    route_fn: typing.Callable, path_params: dict = None, *, query_params: dict = None
+    route_fn: typing.Callable, *, path_params: dict = None, query_params: dict = None
 ) -> str:
     return str(
         furl(settings.API_BASE_URL, query_params=query_params)
@@ -65,8 +65,8 @@ def get_api_route_url(
     )
 
 
-def get_route_url(
-    route_fn: typing.Callable, path_params: dict = None, *, query_params: dict = None
+def get_app_route_url(
+    route_fn: typing.Callable, *, path_params: dict = None, query_params: dict = None
 ) -> str:
     return str(
         furl(settings.APP_BASE_URL, query_params=query_params)

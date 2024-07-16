@@ -4,7 +4,7 @@ from loguru import logger
 from app_users.models import AppUser
 from celeryapp import app
 from daras_ai_v2 import settings
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 
@@ -28,7 +28,7 @@ def send_monthly_spending_notification_email(user_id: int):
             "monthly_spending_notification_threshold_email.html"
         ).render(
             user=user,
-            account_url=get_route_url(account_route),
+            account_url=get_app_route_url(account_route),
         ),
     )
 
@@ -47,7 +47,7 @@ def send_monthly_budget_reached_email(user: AppUser):
 
     email_body = templates.get_template("monthly_budget_reached_email.html").render(
         user=user,
-        account_url=get_route_url(account_route),
+        account_url=get_app_route_url(account_route),
     )
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
@@ -71,7 +71,7 @@ def send_auto_recharge_failed_email(user: AppUser):
 
     email_body = templates.get_template("auto_recharge_failed_email.html").render(
         user=user,
-        account_url=get_route_url(account_route),
+        account_url=get_app_route_url(account_route),
     )
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,

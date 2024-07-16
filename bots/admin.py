@@ -31,8 +31,7 @@ from bots.models import (
     Workflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from celeryapp.tasks import runner_task
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -277,7 +276,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
         integration_id = bi.api_integration_id()
         return open_in_new_tab(
-            url=get_route_url(
+            url=get_app_route_url(
                 integrations_stats_route,
                 path_params=dict(
                     page_slug=VideoBotsPage.slug_versions[-1],
