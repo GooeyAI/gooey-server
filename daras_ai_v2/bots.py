@@ -87,7 +87,7 @@ class BotInterface:
 
     page_cls: typing.Type[BasePage] = None
     query_params: dict
-    language: str = None
+    user_language: str = None
     billing_account_uid: str
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
@@ -128,9 +128,9 @@ class BotInterface:
             user_language = None
 
         if should_translate_lang(self.bi.user_language):
-            self.language = self.bi.user_language
+            self.user_language = self.bi.user_language
         elif should_translate_lang(user_language):
-            self.language = user_language
+            self.user_language = user_language
 
         self.billing_account_uid = self.bi.billing_account_uid
         self.show_feedback_buttons = self.bi.show_feedback_buttons
@@ -144,7 +144,41 @@ class BotInterface:
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
+        update_msg_id: str = None,
         should_translate: bool = False,
+    ) -> str | None:
+        """
+        Send a message response to the user using the bot's platform API
+
+        :param text: The text to send
+        :param audio: The audio URL to send
+        :param video: The video URL to send
+        :param buttons: The interactive reply buttons to send
+        :param documents: The document URLs to send
+        :param update_msg_id: The message ID of the message to update in-place
+        :param should_translate: The messages from the saved run itself should automatically be translated,
+            so we don't need to translate them again. This flag is for when we need to translate hardcoded text
+        :return: The message ID of the sent message
+        """
+        if should_translate:
+            text = self.translate_response(text)
+        return self._send_msg(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            documents=documents,
+            update_msg_id=update_msg_id,
+        )
+
+    def _send_msg(
+        self,
+        *,
+        text: str | None = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
         update_msg_id: str = None,
     ) -> str | None:
         raise NotImplementedError
@@ -179,10 +213,10 @@ class BotInterface:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform.name}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
-    def translate(self, text: str | None) -> str:
-        if text and self.language:
+    def translate_response(self, text: str | None) -> str:
+        if text and self.user_language:
             return run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
+                [text], self.user_language, glossary_url=self.output_glossary
             )[0]
         else:
             return text or ""
@@ -351,8 +385,8 @@ def _process_and_send_msg(
         input_documents=input_documents,
         messages=saved_msgs,
     )
-    if should_translate_lang(bot.language):
-        body["user_language"] = bot.language
+    if bot.user_language:
+        body["user_language"] = bot.user_language
     if bot.request_overrides:
         body = bot.request_overrides | body
     page, result, run_id, uid = submit_api_call(

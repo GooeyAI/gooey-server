@@ -33,7 +33,7 @@ class TwilioSMS(BotInterface):
     def get_input_text(self) -> str | None:
         return self._text
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str | None = None,
@@ -41,15 +41,10 @@ class TwilioSMS(BotInterface):
         video: str | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
-        should_translate: bool = False,
         update_msg_id: str | None = None,
     ) -> str | None:
         assert buttons is None, "Interactive mode is not implemented yet"
         assert update_msg_id is None, "Twilio does not support un-sms-ing things"
-
-        if should_translate:
-            text = self.translate(text)
-
         return send_sms_message(
             self.convo,
             text=text,
@@ -155,7 +150,7 @@ class TwilioVoice(BotInterface):
     def get_input_audio(self) -> str | None:
         return self._audio_url
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str | None = None,
@@ -163,7 +158,6 @@ class TwilioVoice(BotInterface):
         video: str | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
-        should_translate: bool = False,
         update_msg_id: str | None = None,
     ) -> str | None:
         from routers.twilio_api import twilio_voice_call_response

@@ -5,9 +5,7 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
-    run_google_translate,
     audio_bytes_to_wav,
-    should_translate_lang,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
@@ -97,7 +95,7 @@ class WhatsappBot(BotInterface):
             context_msg_id=self.input_message["context"]["id"],
         )
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str = None,
@@ -105,10 +103,8 @@ class WhatsappBot(BotInterface):
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
-        should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        text = self.translate(text)
         return self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -366,7 +362,7 @@ class FacebookBot(BotInterface):
 
         self._access_token = bi.fb_page_access_token
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str = None,
@@ -374,10 +370,8 @@ class FacebookBot(BotInterface):
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
-        should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        text = self.translate(text)
         text = text or "\u200b"  # handle empty text with zero-width space
         return send_fb_msg(
             access_token=self._access_token,

@@ -53,7 +53,9 @@ def twilio_voice_call(
     if not text and not audio_url:
         text = DEFAULT_INITIAL_TEXT.format(bot_name=bi.name)
 
-    resp = create_voice_call_response(bot, text=text, audio_url=audio_url)
+    resp = create_voice_call_response(
+        bot, text=text, audio_url=audio_url, should_translate=True
+    )
 
     if bi.twilio_use_missed_call:
         # if not data.get("StirVerstat"):
@@ -95,7 +97,7 @@ def delete_queue(bi: BotIntegration, queue_sid: str):
 
 
 def create_voice_call_response(
-    bot: TwilioVoice, *, text: str, audio_url: str
+    bot: TwilioVoice, *, text: str, audio_url: str, should_translate: bool = False
 ) -> VoiceResponse:
     resp = VoiceResponse()
 
@@ -107,7 +109,7 @@ def create_voice_call_response(
         if audio_url:
             resp.play(audio_url)
         elif text:
-            resp_say_or_tts_play(bot, resp, text)
+            resp_say_or_tts_play(bot, resp, text, should_translate=should_translate)
 
         # try recording 3 times to give the user a chance to start speaking
         for _ in range(3):
@@ -135,12 +137,12 @@ def create_voice_call_response(
         if audio_url:
             gather.play(audio_url)
         elif text:
-            resp_say_or_tts_play(bot, gather, text)
+            resp_say_or_tts_play(bot, gather, text, should_translate=should_translate)
 
         resp.append(gather)
 
     # if the user doesn't say anything, we'll ask them to call back in a quieter environment
-    resp_say_or_tts_play(bot, resp, SILENCE_RESPONSE)
+    resp_say_or_tts_play(bot, resp, SILENCE_RESPONSE, should_translate=True)
 
     return resp
 
@@ -156,7 +158,9 @@ def twilio_voice_call_asked(
 
     resp = VoiceResponse()
     if bot.input_type == "text":
-        resp_say_or_tts_play(bot, resp, "I heard " + bot.get_input_text())
+        resp_say_or_tts_play(
+            bot, resp, "I heard " + bot.get_input_text(), should_translate=True
+        )
     # send back waiting audio, and wait for the msg_handler to send the response
     resp.enqueue(
         name=bot.twilio_queue.friendly_name,
@@ -192,10 +196,17 @@ def twilio_voice_call_status(data: dict = fastapi_request_urlencoded_body):
     return Response(status_code=204)
 
 
-def resp_say_or_tts_play(bot: TwilioVoice, resp: VoiceResponse | Gather, text: str):
+def resp_say_or_tts_play(
+    bot: TwilioVoice,
+    resp: VoiceResponse | Gather,
+    text: str,
+    *,
+    should_translate: bool = False,
+):
     """Say the given text using the bot integration's voice. If the bot integration is set to use Gooey TTS, use that instead."""
 
-    text = bot.translate(text)
+    if should_translate:
+        text = bot.translate_response(text)
 
     if bot.use_gooey_tts:
         try:
@@ -251,9 +262,11 @@ def twilio_sms(
     resp = MessagingResponse()
 
     if bot.bi.twilio_waiting_text.strip():
-        resp.message(bot.bi.twilio_waiting_text)
+        text = bot.bi.twilio_waiting_text
+
     else:
-        resp.message(bot.translate("Please wait while we process your request."))
+        text = "Please wait while we process your request."
+    resp.message(bot.translate_response(text))
 
     return twiml_response(resp)
 
