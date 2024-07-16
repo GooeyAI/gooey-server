@@ -1,3 +1,4 @@
+import multiprocessing
 import os.path
 import os.path
 import tempfile
@@ -13,7 +14,6 @@ import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -964,20 +964,24 @@ def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
+_yt_dlp_lock = multiprocessing.Semaphore(1)
+
+
 def download_youtube_to_wav(youtube_url: str) -> bytes:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _yt_dlp_lock, tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
         # run yt-dlp to download audio
         call_cmd(
             "yt-dlp",
             "--no-playlist",
-            "--format",
-            "bestaudio",
-            "--output",
-            infile,
+            "--max-downloads", "1",
+            "--format", "bestaudio",
+            "--output", infile,
             youtube_url,
-        )
+            # ignore MaxDownloadsReached - https://github.com/ytdl-org/youtube-dl/blob/a452f9437c8a3048f75fc12f75bcfd3eed78430f/youtube_dl/__init__.py#L468
+            ok_returncodes={101},
+        )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory

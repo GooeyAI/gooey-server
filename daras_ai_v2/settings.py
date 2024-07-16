@@ -263,7 +263,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
-SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
+SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 5)
 
 DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
     # tab names
@@ -295,9 +295,10 @@ LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
 LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", None)
-stripe.api_key = STRIPE_SECRET_KEY
-STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+stripe.api_key = STRIPE_SECRET_KEY
+
+STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ADDON_PRODUCT_NAME = config(
     "STRIPE_ADDON_PRODUCT_NAME", "Gooey.AI Add-on Credits"
 )

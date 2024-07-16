@@ -1,3 +1,5 @@
+from typing import Literal
+
 import stripe
 from django.core.exceptions import ValidationError
 
@@ -13,8 +15,12 @@ from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
+from scripts.migrate_existing_subscriptions import available_subscriptions
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
+
+
+PlanActionLabel = Literal["Upgrade", "Downgrade", "Contact Us", "Your Plan"]
 
 
 def billing_page(user: AppUser):
@@ -27,14 +33,15 @@ def billing_page(user: AppUser):
         render_credit_balance(user)
 
     with st.div(className="my-5"):
-        render_all_plans(user)
+        selected_payment_provider = render_all_plans(user)
+
+    with st.div(className="my-5"):
+        render_addon_section(user, selected_payment_provider)
 
     if user.subscription and user.subscription.payment_provider:
         if user.subscription.payment_provider == PaymentProvider.STRIPE:
             with st.div(className="my-5"):
                 render_auto_recharge_section(user)
-        with st.div(className="my-5"):
-            render_addon_section(user)
         with st.div(className="my-5"):
             render_payment_information(user)
 
@@ -115,7 +122,7 @@ def render_credit_balance(user: AppUser):
     )
 
 
-def render_all_plans(user: AppUser):
+def render_all_plans(user: AppUser) -> PaymentProvider:
     current_plan = (
         PricingPlan.from_sub(user.subscription)
         if user.subscription
@@ -126,11 +133,11 @@ def render_all_plans(user: AppUser):
     st.write("## All Plans")
     plans_div = st.div(className="mb-1")
 
-    if user.subscription:
-        payment_provider = None
+    if user.subscription and user.subscription.payment_provider:
+        selected_payment_provider = None
     else:
         with st.div():
-            payment_provider = PaymentProvider[
+            selected_payment_provider = PaymentProvider[
                 payment_provider_radio() or PaymentProvider.STRIPE.name
             ]
 
@@ -144,13 +151,17 @@ def render_all_plans(user: AppUser):
                 className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
             ):
                 _render_plan_details(plan)
-                _render_plan_action_button(user, plan, current_plan, payment_provider)
+                _render_plan_action_button(
+                    user, plan, current_plan, selected_payment_provider
+                )
 
     with plans_div:
         grid_layout(4, all_plans, _render_plan, separator=False)
 
     with st.div(className="my-2 d-flex justify-content-center"):
         st.caption(f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**")
+
+    return selected_payment_provider
 
 
 def _render_plan_details(plan: PricingPlan):
@@ -188,33 +199,47 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             st.html("Contact Us")
-    elif current_plan is not PricingPlan.ENTERPRISE:
-        update_subscription_button(
-            user=user,
-            plan=plan,
-            current_plan=current_plan,
-            className=btn_classes,
-            payment_provider=payment_provider,
-        )
-
-
-def update_subscription_button(
-    *,
-    user: AppUser,
-    current_plan: PricingPlan,
-    plan: PricingPlan,
-    className: str = "",
-    payment_provider: PaymentProvider | None = None,
-):
-    if plan.credits > current_plan.credits:
-        label, btn_type = ("Upgrade", "primary")
+    elif user.subscription and not user.subscription.payment_provider:
+        # don't show upgrade/downgrade buttons for enterprise customers
+        # assumption: anyone without a payment provider attached is admin/enterprise
+        return
     else:
-        label, btn_type = ("Downgrade", "secondary")
-    className += f" btn btn-theme btn-{btn_type}"
+        if plan.credits > current_plan.credits:
+            label, btn_type = ("Upgrade", "primary")
+        else:
+            label, btn_type = ("Downgrade", "secondary")
 
-    key = f"change-sub-{plan.key}"
+        if user.subscription and user.subscription.payment_provider:
+            # subscription exists, show upgrade/downgrade button
+            _render_update_subscription_button(
+                label,
+                user=user,
+                current_plan=current_plan,
+                plan=plan,
+                className=f"{btn_classes} btn btn-theme btn-{btn_type}",
+            )
+        else:
+            assert payment_provider is not None  # for sanity
+            _render_create_subscription_button(
+                label,
+                btn_type=btn_type,
+                user=user,
+                plan=plan,
+                payment_provider=payment_provider,
+            )
+
+
+def _render_create_subscription_button(
+    label: PlanActionLabel,
+    *,
+    btn_type: str,
+    user: AppUser,
+    plan: PricingPlan,
+    payment_provider: PaymentProvider,
+):
     match payment_provider:
         case PaymentProvider.STRIPE:
+            key = f"stripe-sub-{plan.key}"
             render_stripe_subscription_button(
                 user=user,
                 label=label,
@@ -224,7 +249,19 @@ def update_subscription_button(
             )
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
-        case _ if label == "Downgrade":
+
+
+def _render_update_subscription_button(
+    label: PlanActionLabel,
+    *,
+    user: AppUser,
+    current_plan: PricingPlan,
+    plan: PricingPlan,
+    className: str = "",
+):
+    key = f"change-sub-{plan.key}"
+    match label:
+        case "Downgrade":
             downgrade_modal = Modal(
                 "Confirm downgrade",
                 key=f"downgrade-plan-modal-{plan.key}",
@@ -260,7 +297,12 @@ def update_subscription_button(
                             downgrade_modal.close()
         case _:
             if st.button(label, className=className, key=key):
-                change_subscription(user, plan)
+                change_subscription(
+                    user,
+                    plan,
+                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                    billing_cycle_anchor="now",
+                )
 
 
 def fmt_price(plan: PricingPlan) -> str:
@@ -270,7 +312,7 @@ def fmt_price(plan: PricingPlan) -> str:
         return "Free"
 
 
-def change_subscription(user: AppUser, new_plan: PricingPlan):
+def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -301,9 +343,7 @@ def change_subscription(user: AppUser, new_plan: PricingPlan):
                 metadata={
                     settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
                 },
-                # charge the full new amount today, without prorations
-                # see: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                billing_cycle_anchor="now",
+                **kwargs,
                 proration_behavior="none",
             )
             raise RedirectException(
@@ -337,44 +377,57 @@ def payment_provider_radio(**props) -> str | None:
         )
 
 
-def render_addon_section(user: AppUser):
-    assert user.subscription
-
-    st.write("# Purchase More Credits")
+def render_addon_section(user: AppUser, selected_payment_provider: PaymentProvider):
+    if user.subscription:
+        st.write("# Purchase More Credits")
+    else:
+        st.write("# Purchase Credits")
     st.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    provider = PaymentProvider(user.subscription.payment_provider)
+    if user.subscription:
+        provider = PaymentProvider(user.subscription.payment_provider)
+    else:
+        provider = selected_payment_provider
     match provider:
         case PaymentProvider.STRIPE:
-            for amount in settings.ADDON_AMOUNT_CHOICES:
-                render_stripe_addon_button(amount, user=user)
+            render_stripe_addon_buttons(user)
         case PaymentProvider.PAYPAL:
-            for amount in settings.ADDON_AMOUNT_CHOICES:
-                render_paypal_addon_button(amount)
-            st.div(
-                id="paypal-addon-buttons",
-                className="mt-2",
-                style={"width": "fit-content"},
-            )
-            st.div(id="paypal-result-message")
+            render_paypal_addon_buttons()
 
 
-def render_paypal_addon_button(amount: int):
-    st.html(
-        f"""
-    <button class="streamlit-like-btn paypal-checkout-option"
-            onClick="setPaypalAddonQuantity({amount * settings.ADDON_CREDITS_PER_DOLLAR});"
-            type="button"
-            data-submit-disabled
-    >${amount:,}</button>
-    """
+def render_paypal_addon_buttons():
+    selected_amt = st.horizontal_radio(
+        "",
+        settings.ADDON_AMOUNT_CHOICES,
+        format_func=lambda amt: f"${amt:,}",
+        checked_by_default=False,
     )
+    if selected_amt:
+        st.js(
+            f"setPaypalAddonQuantity({int(selected_amt) * settings.ADDON_CREDITS_PER_DOLLAR})"
+        )
+    st.div(
+        id="paypal-addon-buttons",
+        className="mt-2",
+        style={"width": "fit-content"},
+    )
+    st.div(id="paypal-result-message")
 
 
-def render_stripe_addon_button(amount: int, user: AppUser):
-    confirm_purchase_modal = Modal("Confirm Purchase", key=f"confirm-purchase-{amount}")
-    if st.button(f"${amount:,}", type="primary"):
-        confirm_purchase_modal.open()
+def render_stripe_addon_buttons(user: AppUser):
+    for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
+        render_stripe_addon_button(dollat_amt, user)
+
+
+def render_stripe_addon_button(dollat_amt: int, user: AppUser):
+    confirm_purchase_modal = Modal(
+        "Confirm Purchase", key=f"confirm-purchase-{dollat_amt}"
+    )
+    if st.button(f"${dollat_amt:,}", type="primary"):
+        if user.subscription:
+            confirm_purchase_modal.open()
+        else:
+            stripe_addon_checkout_redirect(user, dollat_amt)
 
     if not confirm_purchase_modal.is_open():
         return
@@ -382,7 +435,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
         st.write(
             f"""
                 Please confirm your purchase:  
-                 **{amount * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${amount}**.
+                 **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollat_amt}**.
                  """,
             className="py-4 d-block text-center",
         )
@@ -390,7 +443,7 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             if st.session_state.get("--confirm-purchase"):
                 success = st.run_in_thread(
                     user.subscription.stripe_attempt_addon_purchase,
-                    args=[amount],
+                    args=[dollat_amt],
                     placeholder="Processing payment...",
                 )
                 if success is None:
@@ -407,6 +460,27 @@ def render_stripe_addon_button(amount: int, user: AppUser):
             st.button("Buy", type="primary", key="--confirm-purchase")
 
 
+def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
+    from routers.account import account_route
+    from routers.account import payment_processing_route
+
+    line_item = available_subscriptions["addon"]["stripe"].copy()
+    line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
+    checkout_session = stripe.checkout.Session.create(
+        line_items=[line_item],
+        mode="payment",
+        success_url=get_route_url(payment_processing_route),
+        cancel_url=get_route_url(account_route),
+        customer=user.get_or_create_stripe_customer(),
+        invoice_creation={"enabled": True},
+        allow_promotion_codes=True,
+        saved_payment_method_options={
+            "payment_method_save": "enabled",
+        },
+    )
+    raise RedirectException(checkout_session.url, status_code=303)
+
+
 def render_stripe_subscription_button(
     *,
     label: str,
@@ -419,16 +493,19 @@ def render_stripe_subscription_button(
         st.write("Stripe subscription not available")
         return
 
-    if st.button(label, type=btn_type, key=key):
-        create_stripe_checkout_session(user=user, plan=plan)
+    # IMPORTANT: key=... is needed here to maintain uniqueness
+    # of buttons with the same label. otherwise, all buttons
+    # will be the same to the server
+    if st.button(label, key=key, type=btn_type):
+        stripe_subscription_checkout_redirect(user=user, plan=plan)
 
 
-def create_stripe_checkout_session(user: AppUser, plan: PricingPlan):
+def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    if user.subscription and user.subscription.plan == plan.db_value:
-        # already subscribed to the same plan
+    if user.subscription:
+        # already subscribed to some plan
         return
 
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
@@ -543,16 +620,17 @@ def render_billing_history(user: AppUser, limit: int = 50):
     st.write("## Billing History", className="d-block")
     st.table(
         pd.DataFrame.from_records(
-            columns=[""] * 3,
-            data=[
-                [
-                    txn.created_at.strftime("%m/%d/%Y"),
-                    txn.note(),
-                    f"${txn.charged_amount / 100:,.2f}",
-                ]
+            [
+                {
+                    "Date": txn.created_at.strftime("%m/%d/%Y"),
+                    "Description": txn.reason_note(),
+                    "Amount": f"-${txn.charged_amount / 100:,.2f}",
+                    "Credits": f"+{txn.amount:,}",
+                    "Balance": f"{txn.end_balance:,}",
+                }
                 for txn in txns[:limit]
-            ],
-        )
+            ]
+        ),
     )
     if txns.count() > limit:
         st.caption(f"Showing only the most recent {limit} transactions.")

@@ -215,9 +215,23 @@ class SavedRun(models.Model):
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
-    error_msg = models.TextField(default="", blank=True)
+    error_msg = models.TextField(
+        default="",
+        blank=True,
+        help_text="The error message. If this is not set, the run is deemed successful.",
+    )
     run_time = models.DurationField(default=datetime.timedelta, blank=True)
     run_status = models.TextField(default="", blank=True)
+
+    error_code = models.IntegerField(
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The HTTP status code of the error. If this is not set, 500 is assumed.",
+    )
+    error_type = models.TextField(
+        default="", blank=True, help_text="The exception type"
+    )
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
@@ -285,9 +299,12 @@ class SavedRun(models.Model):
     def parent_published_run(self) -> typing.Optional["PublishedRun"]:
         return self.parent_version and self.parent_version.published_run
 
-    def get_app_url(self):
+    def get_app_url(self, query_params: dict = None):
         return Workflow(self.workflow).page_cls.app_url(
-            example_id=self.example_id, run_id=self.run_id, uid=self.uid
+            example_id=self.example_id,
+            run_id=self.run_id,
+            uid=self.uid,
+            query_params=query_params,
         )
 
     def to_dict(self) -> dict:
@@ -1716,9 +1733,9 @@ class PublishedRun(models.Model):
             visibility=visibility,
         )
 
-    def get_app_url(self):
+    def get_app_url(self, query_params: dict = None):
         return Workflow(self.workflow).page_cls.app_url(
-            example_id=self.published_run_id
+            example_id=self.published_run_id, query_params=query_params
         )
 
     def add_version(

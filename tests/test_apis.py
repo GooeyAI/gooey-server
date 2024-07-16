@@ -15,7 +15,7 @@ client = TestClient(app)
 
 
 @pytest.mark.django_db
-def test_apis_sync(mock_gui_runner, force_authentication, threadpool_subtest):
+def test_apis_sync(mock_celery_tasks, force_authentication, threadpool_subtest):
     for page_cls in all_test_pages:
         threadpool_subtest(_test_api_sync, page_cls)
 
@@ -32,7 +32,7 @@ def _test_api_sync(page_cls: typing.Type[BasePage]):
 
 
 @pytest.mark.django_db
-def test_apis_async(mock_gui_runner, force_authentication, threadpool_subtest):
+def test_apis_async(mock_celery_tasks, force_authentication, threadpool_subtest):
     for page_cls in all_test_pages:
         threadpool_subtest(_test_api_async, page_cls)
 
@@ -65,7 +65,7 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
 
 
 @pytest.mark.django_db
-def test_apis_examples(mock_gui_runner, force_authentication, threadpool_subtest):
+def test_apis_examples(mock_celery_tasks, force_authentication, threadpool_subtest):
     qs = (
         PublishedRun.objects.exclude(is_approved_example=False)
         .exclude(published_run_id="")

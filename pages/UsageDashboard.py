@@ -1,15 +1,21 @@
 import numpy as np
+from fsspec.transaction import Transaction
 
 from gooeysite import wsgi
 
 assert wsgi
 
 import plotly.graph_objects as go
-from django.db.models import Q, QuerySet, Count, Func
+from django.db.models import Q, QuerySet, Count, Func, F
 
 from bots.models import SavedRun, Workflow
 
-from app_users.models import AppUser
+from app_users.models import (
+    AppUser,
+    AppUserTransaction,
+    PaymentProvider,
+    TransactionReason,
+)
 import datetime
 import pandas as pd
 import plotly.express as px
@@ -214,6 +220,43 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         function="date_trunc",
         datepart=datepart,
         template="%(function)s('%(datepart)s', %(expressions)s)",
+    )
+
+    st.write(
+        """
+### Distribution of Transaction Amounts
+        """
+    )
+
+    group_txns_by = st.selectbox(
+        "Group By", options=[None, "payment_provider", "reason"]
+    )
+
+    txns = AppUserTransaction.objects.filter(
+        **time_selector, charged_amount__gt=0
+    ).values(
+        "payment_provider",
+        "reason",
+        datepart=datepart_func,
+        charged_dollars=F("charged_amount") / 100,
+    )
+    txns_df = pd.DataFrame.from_records(txns)
+    txns_df.payment_provider = txns_df.payment_provider.apply(
+        lambda x: PaymentProvider(x).label if x else None
+    )
+    txns_df.reason = txns_df.reason.apply(
+        lambda x: TransactionReason(x).label if x else None
+    )
+    st.plotly_chart(
+        px.violin(
+            txns_df,
+            y="charged_dollars",
+            x="datepart",
+            color=group_txns_by,
+            box=True,
+            points="all",
+        ),
+        use_container_width=True,
     )
 
     st.write(

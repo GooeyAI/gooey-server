@@ -238,7 +238,8 @@ def _input_variables(state: dict):
 def get_profile_for_email(email_address) -> dict | None:
     r = requests.post(
         "https://api.apollo.io/v1/people/match",
-        json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
+        headers={"X-Api-Key": settings.APOLLO_API_KEY, "Cache-Control": "no-cache"},
+        json={"email": email_address},
     )
     raise_for_status(r)
 

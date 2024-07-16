@@ -38,7 +38,6 @@ from bots.models import (
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.auto_recharge import user_should_auto_recharge
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -49,6 +48,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -83,6 +83,10 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
+from payments.auto_recharge import (
+    should_attempt_auto_recharge,
+    run_auto_recharge_gracefully,
+)
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
@@ -141,7 +145,6 @@ class BasePage:
 
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
-            None,
             title="🧩 Functions",
         )
         variables: dict[str, typing.Any] = Field(
@@ -1411,6 +1414,8 @@ class BasePage:
         raise NotImplementedError
 
     def main(self, sr: SavedRun, state: dict) -> typing.Iterator[str | None]:
+        yield from self.ensure_credits_and_auto_recharge(sr, state)
+
         yield from call_recipe_functions(
             saved_run=sr,
             current_user=self.request.user,
@@ -1437,15 +1442,12 @@ class BasePage:
         response = self.ResponseModel.construct()
 
         # run the recipe
-        gen = self.run_v2(request, response)
-        while True:
-            try:
-                val = next(gen)
-            except StopIteration:
-                break
-            finally:
+        try:
+            for val in self.run_v2(request, response):
                 state.update(response.dict(exclude_unset=True))
-            yield val
+                yield val
+        finally:
+            state.update(response.dict(exclude_unset=True))
 
         # validate the response if successful
         self.ResponseModel.validate(response)
@@ -1567,32 +1569,34 @@ class BasePage:
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
-        started_at_text()
+        created_at = st.session_state.get("created_at")
+        if not created_at:
+            return
+
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        started_at_text(created_at)
+
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
-        if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, str):
-                created_at = datetime.datetime.fromisoformat(created_at)
-            with st.countdown_timer(
-                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
-                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
-            ):
-                if self.is_current_user_owner() and self.request.user.email:
-                    st.write(
-                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
-                    )
+        with st.countdown_timer(
+            end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
+            delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+        ):
+            if self.is_current_user_owner() and self.request.user.email:
                 st.write(
-                    f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
-                      for inspiration."""
+                    f"""We'll email **{self.request.user.email}** when your workflow is done."""
                 )
+            st.write(
+                f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
+                  for inspiration."""
+            )
 
     def estimate_run_duration(self) -> int | None:
         pass
 
     def on_submit(self):
-        from celeryapp.tasks import auto_recharge
-
         try:
             sr = self.create_new_run(enable_rate_limits=True)
         except ValidationError as e:
@@ -1604,15 +1608,7 @@ class BasePage:
             st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
 
-        if user_should_auto_recharge(self.request.user):
-            auto_recharge.delay(user_id=self.request.user.id)
-
-        if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-            sr.run_status = ""
-            sr.error_msg = self.generate_credit_error_message(sr.run_id, sr.uid)
-            sr.save(update_fields=["run_status", "error_msg"])
-        else:
-            self.call_runner_task(sr)
+        self.call_runner_task(sr)
 
         raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
@@ -1685,15 +1681,19 @@ class BasePage:
         )
 
     def call_runner_task(self, sr: SavedRun):
-        from celeryapp.tasks import gui_runner
+        from celeryapp.tasks import runner_task, post_runner_tasks
 
-        return gui_runner.delay(
-            page_cls=self.__class__,
-            user_id=self.request.user.id,
-            run_id=sr.run_id,
-            uid=sr.uid,
-            channel=self.realtime_channel_name(sr.run_id, sr.uid),
+        chain = (
+            runner_task.s(
+                page_cls=self.__class__,
+                user_id=self.request.user.id,
+                run_id=sr.run_id,
+                uid=sr.uid,
+                channel=self.realtime_channel_name(sr.run_id, sr.uid),
+            )
+            | post_runner_tasks.s()
         )
+        return chain.apply_async()
 
     @classmethod
     def realtime_channel_name(cls, run_id, uid):
@@ -1903,7 +1903,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
-            started_at_text()
+            started_at_text(saved_run.created_at)
             html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
@@ -2069,10 +2069,27 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         manage_api_keys(self.request.user)
 
-    def check_credits(self) -> bool:
+    def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
+        if not settings.CREDITS_TO_DEDUCT_PER_RUN:
+            return
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
-        return self.request.user.balance >= self.get_price_roundoff(st.session_state)
+
+        user = self.request.user
+        price = self.get_price_roundoff(state)
+
+        if user.balance >= price:
+            return
+
+        if should_attempt_auto_recharge(user):
+            yield "Low balance detected. Recharging..."
+            run_auto_recharge_gracefully(user)
+            user.refresh_from_db()
+
+        if user.balance >= price:
+            return
+
+        raise InsufficientCredits(self.request.user, sr)
 
     def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
         assert (
@@ -2193,7 +2210,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
-def started_at_text():
+def started_at_text(dt: datetime.datetime):
     with st.div(className="d-flex"):
         text = "Started"
         if seed := st.session_state.get("seed"):
@@ -2202,7 +2219,7 @@ def started_at_text():
         st.caption(
             "...",
             className="text-black",
-            **render_local_dt_attrs(timezone.now()),
+            **render_local_dt_attrs(dt),
         )
 
 

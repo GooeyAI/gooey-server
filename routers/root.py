@@ -208,7 +208,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
-@app.post("/components/")
+@app.post("/GuiComponents/")
 @st.route
 def component_page(request: Request):
     import components_doc

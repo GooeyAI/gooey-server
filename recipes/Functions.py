@@ -7,6 +7,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.prompt_vars import variables_input
 
@@ -55,13 +56,19 @@ class FunctionsPage(BasePage):
         request: "FunctionsPage.RequestModel",
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
+        query_params = st.get_query_params()
+        run_id = query_params.get("run_id")
+        uid = query_params.get("uid")
+        tag = f"run_id={run_id}&uid={uid}"
+
         yield "Running your code..."
         # this will run functions/executor.js in deno deploy
         r = requests.post(
             settings.DENO_FUNCTIONS_URL,
             headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
-            json=dict(code=request.code, variables=request.variables or {}),
+            json=dict(code=request.code, variables=request.variables or {}, tag=tag),
         )
+        raise_for_status(r)
         data = r.json()
         response.logs = data.get("logs")
         if r.ok:

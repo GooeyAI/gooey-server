@@ -11,7 +11,7 @@ client = TestClient(app)
 
 
 @pytest.mark.django_db
-def test_send_msg_streaming(mock_gui_runner, force_authentication):
+def test_send_msg_streaming(mock_celery_tasks, force_authentication):
     r = client.post(
         "/v3/integrations/stream/",
         json={

@@ -2,29 +2,24 @@ import typing
 from contextlib import contextmanager
 from enum import Enum
 
-from django.db import transaction
 from fastapi import APIRouter
 from fastapi.requests import Request
 from furl import furl
 from loguru import logger
+from requests.models import HTTPError
 
 import gooey_ui as st
-from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.billing import billing_page
-from daras_ai_v2.fastapi_tricks import (
-    get_route_path,
-    get_route_url,
-)
+from daras_ai_v2.fastapi_tricks import get_route_path, get_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from gooey_ui.components.pills import pill
-from payments.models import Subscription
-from payments.plans import PricingPlan
+from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
 
 app = APIRouter()
@@ -33,20 +28,25 @@ app = APIRouter()
 @app.post("/payment-processing/")
 @st.route
 def payment_processing_route(
-    request: Request, provider: str = None, subscription_id: str = None
+    request: Request, provider: str | None = None, subscription_id: str | None = None
 ):
-    subtext = None
     waiting_time_sec = 3
+    subtext = None
 
     if provider == "paypal":
-        if sub_id := subscription_id:
-            sub = paypal.Subscription.retrieve(sub_id)
-            paypal_handle_subscription_updated(sub)
+        success = st.run_in_thread(
+            threaded_paypal_handle_subscription_updated,
+            args=[subscription_id],
+        )
+        if success:
+            # immediately redirect
+            waiting_time_sec = 0
         else:
+            # either failed or still running. in either case, wait 30s before redirecting
+            waiting_time_sec = 30
             subtext = (
                 "PayPal transactions take up to a minute to reflect in your account"
             )
-            waiting_time_sec = 30
 
     with page_wrapper(request, className="m-auto"):
         with st.center():
@@ -56,7 +56,9 @@ def payment_processing_route(
                     style=dict(height="3rem", width="3rem"),
                 )
                 st.write("# Processing payment...")
-            st.caption(subtext)
+
+            if subtext:
+                st.caption(subtext)
 
     st.js(
         # language=JavaScript
@@ -229,36 +231,14 @@ def account_page_wrapper(request: Request, current_tab: TabData):
             yield
 
 
-@transaction.atomic
-def paypal_handle_subscription_updated(subscription: paypal.Subscription):
-    logger.info("Subscription updated")
-
-    plan = PricingPlan.get_by_paypal_plan_id(subscription.plan_id)
-    if not plan:
-        logger.error(f"Invalid plan ID: {subscription.plan_id}")
-        return
-
-    if not subscription.status == "ACTIVE":
-        logger.warning(f"Subscription {subscription.id} is not active")
-        return
-
-    user = AppUser.objects.get(uid=subscription.custom_id)
-    if user.subscription and (
-        user.subscription.payment_provider != PaymentProvider.PAYPAL
-        or user.subscription.external_id != subscription.id
-    ):
-        logger.warning(
-            f"User {user} has different existing subscription {user.subscription}. Cancelling that..."
-        )
-        user.subscription.cancel()
-        user.subscription.delete()
-    elif not user.subscription:
-        user.subscription = Subscription()
-
-    user.subscription.plan = plan.db_value
-    user.subscription.payment_provider = PaymentProvider.PAYPAL
-    user.subscription.external_id = subscription.id
-
-    user.subscription.full_clean()
-    user.subscription.save()
-    user.save(update_fields=["subscription"])
+def threaded_paypal_handle_subscription_updated(subscription_id: str) -> bool:
+    """
+    Always returns True when completed (for use in st.run_in_thread())
+    """
+    try:
+        subscription = paypal.Subscription.retrieve(subscription_id)
+        PaypalWebhookHandler.handle_subscription_updated(subscription)
+    except HTTPError:
+        logger.exception(f"Unexpected PayPal error for sub: {subscription_id}")
+        return False
+    return True

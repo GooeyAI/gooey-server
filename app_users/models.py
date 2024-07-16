@@ -4,6 +4,7 @@ from django.db import models, IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from firebase_admin import auth
+from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField, StrippedTextField
@@ -172,6 +173,7 @@ class AppUser(models.Model):
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
         user.save(update_fields=["balance"])
+        kwargs.setdefault("plan", user.subscription and user.subscription.plan)
         return AppUserTransaction.objects.create(
             user=self,
             invoice_id=invoice_id,
@@ -273,6 +275,18 @@ class AppUser(models.Model):
         return (cents_spent or 0) / 100
 
 
+class TransactionReason(models.IntegerChoices):
+    DEDUCT = 1, "Deduct"
+    ADDON = 2, "Addon"
+
+    SUBSCRIBE = 3, "Subscribe"
+    SUBSCRIPTION_CREATE = 4, "Sub-Create"
+    SUBSCRIPTION_CYCLE = 5, "Sub-Cycle"
+    SUBSCRIPTION_UPDATE = 6, "Sub-Update"
+
+    AUTO_RECHARGE = 7, "Auto-Recharge"
+
+
 class AppUserTransaction(models.Model):
     user = models.ForeignKey(
         "AppUser", on_delete=models.CASCADE, related_name="transactions"
@@ -307,6 +321,25 @@ class AppUserTransaction(models.Model):
         default=0,
     )
 
+    reason = models.IntegerField(
+        choices=TransactionReason.choices,
+        help_text="The reason for this transaction.<br><br>"
+        f"{TransactionReason.DEDUCT.label}: Credits deducted due to a run.<br>"
+        f"{TransactionReason.ADDON.label}: User purchased an add-on.<br>"
+        f"{TransactionReason.SUBSCRIBE.label}: Applies to subscriptions where no distinction was made between create, update and cycle.<br>"
+        f"{TransactionReason.SUBSCRIPTION_CREATE.label}: A subscription was created.<br>"
+        f"{TransactionReason.SUBSCRIPTION_CYCLE.label}: A subscription advanced into a new period.<br>"
+        f"{TransactionReason.SUBSCRIPTION_UPDATE.label}: A subscription was updated.<br>"
+        f"{TransactionReason.AUTO_RECHARGE.label}: Credits auto-recharged due to low balance.",
+    )
+    plan = models.IntegerField(
+        choices=PricingPlan.db_choices(),
+        help_text="User's plan at the time of this transaction.",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
@@ -320,32 +353,41 @@ class AppUserTransaction(models.Model):
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"
 
-    def get_subscription_plan(self) -> PricingPlan | None:
-        """
-        It just so happened that all monthly subscriptions we offered had
-        different amounts from the one-time purchases.
-        This uses that heuristic to determine whether a transaction
-        was a subscription payment or a one-time purchase.
+    def save(self, *args, **kwargs):
+        if self.reason is None:
+            if self.amount <= 0:
+                self.reason = TransactionReason.DEDUCT
+            else:
+                self.reason = TransactionReason.ADDON
+        super().save(*args, **kwargs)
 
-        TODO: Implement this more robustly
-        """
-        if self.amount <= 0:
-            # credits deducted
-            return None
-
-        for plan in PricingPlan:
-            if (
-                self.amount == plan.credits
-                and self.charged_amount == plan.monthly_charge * 100
+    def reason_note(self) -> str:
+        match self.reason:
+            case (
+                TransactionReason.SUBSCRIPTION_CREATE
+                | TransactionReason.SUBSCRIPTION_CYCLE
+                | TransactionReason.SUBSCRIPTION_UPDATE
+                | TransactionReason.SUBSCRIBE
             ):
-                return plan
+                ret = "Subscription payment"
+                if self.plan:
+                    ret += f": {PricingPlan.from_db_value(self.plan).title}"
+                return ret
+            case TransactionReason.AUTO_RECHARGE:
+                return "Auto recharge"
+            case TransactionReason.ADDON:
+                return "Addon purchase"
+            case TransactionReason.DEDUCT:
+                return "Run deduction"
 
-        return None
-
-    def note(self) -> str:
-        if self.amount <= 0:
-            return ""
-        elif plan := self.get_subscription_plan():
-            return f"Subscription payment: {plan.title} (+{self.amount:,} credits)"
-        else:
-            return f"Addon purchase (+{self.amount:,} credits)"
+    def payment_provider_url(self) -> str | None:
+        match self.payment_provider:
+            case PaymentProvider.STRIPE:
+                return str(
+                    furl("https://dashboard.stripe.com/invoices/") / self.invoice_id
+                )
+            case PaymentProvider.PAYPAL:
+                return str(
+                    furl("https://www.paypal.com/unifiedtransactions/details/payment/")
+                    / self.invoice_id
+                )
