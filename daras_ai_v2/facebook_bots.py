@@ -36,7 +36,7 @@ class WhatsappBot(BotInterface):
             bot_integration=bi,
             wa_phone_number="+" + self.user_id,
         )[0]
-        self._unpack_bot_integration()
+        super().__init__()
 
     def get_input_text(self) -> str | None:
         try:
@@ -108,10 +108,7 @@ class WhatsappBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        if text and should_translate and should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+        text = self.translate(text)
         return self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -364,7 +361,7 @@ class FacebookBot(BotInterface):
                 fb_page_id=self.user_id,
                 ig_account_id=self.user_id,
             )[0]
-        self._unpack_bot_integration()
+        super().__init__()
         self.bot_id = bi.fb_page_id
 
         self._access_token = bi.fb_page_access_token
@@ -380,10 +377,7 @@ class FacebookBot(BotInterface):
         should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
-        if text and should_translate and should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+        text = self.translate(text)
         text = text or "\u200b"  # handle empty text with zero-width space
         return send_fb_msg(
             access_token=self._access_token,

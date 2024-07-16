@@ -23,7 +23,7 @@ from daras_ai_v2.slack_bot import (
     create_personal_channel,
     SlackBot,
 )
-from daras_ai_v2.twilio_bot import create_voice_call, send_sms_message
+from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton, messages_as_prompt
@@ -154,7 +154,6 @@ def send_broadcast_msgs_chunked(
     buttons: list[ReplyButton] = None,
     convo_qs: QuerySet[Conversation],
     bi: BotIntegration,
-    medium: str,
 ):
     convo_ids = list(convo_qs.values_list("id", flat=True))
     for i in range(0, len(convo_ids), 100):
@@ -166,7 +165,6 @@ def send_broadcast_msgs_chunked(
             documents=documents,
             bi_id=bi.id,
             convo_ids=convo_ids[i : i + 100],
-            medium=medium,
         )
 
 
@@ -180,7 +178,7 @@ def send_broadcast_msg(
     documents: list[str] = None,
     bi_id: int,
     convo_ids: list[int],
-    medium: str,
+    medium: str = "Voice Call",
 ):
     bi = BotIntegration.objects.get(id=bi_id)
     convos = Conversation.objects.filter(id__in=convo_ids)
@@ -211,7 +209,7 @@ def send_broadcast_msg(
                 )[0]
             case Platform.TWILIO:
                 if medium == "Voice Call":
-                    create_voice_call(convo, text, audio)
+                    send_single_voice_call(convo, text, audio)
                 else:
                     send_sms_message(convo, text, media_url=audio)
             case _:

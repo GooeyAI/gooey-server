@@ -99,7 +99,7 @@ class SlackBot(BotInterface):
         else:
             self._actions = None
 
-        self._unpack_bot_integration()
+        super().__init__()
 
     def get_input_text(self) -> str | None:
         return self._text
@@ -148,11 +148,8 @@ class SlackBot(BotInterface):
         documents: list[str] = None,
         should_translate: bool = False,
         update_msg_id: str | None = None,
-    ) -> str | None:
-        if text and should_translate and should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+    ):
+        text = self.translate(text)
         text = text or "\u200b"  # handle empty text with zero-width space
 
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
@@ -228,10 +225,7 @@ class SlackBot(BotInterface):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()
         if not text:
             return
-        if should_translate_lang(self.language):
-            text = run_google_translate(
-                [text], self.language, glossary_url=self.output_glossary
-            )[0]
+        text = self.translate(text)
         self._read_rcpt_ts = chat_post_message(
             text=text,
             channel=self.bot_id,

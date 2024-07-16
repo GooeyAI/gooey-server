@@ -368,17 +368,18 @@ class SavedRun(models.Model):
 
         # run in a thread to avoid messing up threadlocals
         with ThreadPool(1) as pool:
+            page_cls = Workflow(self.workflow).page_cls
             if parent_pr and parent_pr.saved_run == self:
                 # avoid passing run_id and uid for examples
                 query_params = dict(example_id=parent_pr.published_run_id)
             else:
-                query_params = dict(
+                query_params = page_cls.clean_query_params(
                     example_id=self.example_id, run_id=self.run_id, uid=self.uid
                 )
             page, result, run_id, uid = pool.apply(
                 submit_api_call,
                 kwds=dict(
-                    page_cls=Workflow(self.workflow).page_cls,
+                    page_cls=page_cls,
                     query_params=query_params,
                     user=current_user,
                     request_body=request_body,
@@ -645,12 +646,12 @@ class BotIntegration(models.Model):
     twilio_account_sid = models.TextField(
         blank=True,
         default="",
-        help_text="Twilio account sid as found on twilio.com/console (mandatory)",
+        help_text="Twilio account sid as found on twilio.com/console (If not provided we'll use Gooey's Twilio Account)",
     )
     twilio_auth_token = models.TextField(
         blank=True,
         default="",
-        help_text="Twilio auth token as found on twilio.com/console (mandatory)",
+        help_text="Twilio auth token as found on twilio.com/console (If not provided we'll use Gooey's Twilio Account)",
     )
     twilio_phone_number = PhoneNumberField(
         blank=True,
@@ -660,19 +661,11 @@ class BotIntegration(models.Model):
     twilio_phone_number_sid = models.TextField(
         blank=True,
         default="",
-        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (mandatory)",
+        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming",
     )
-    twilio_default_to_gooey_asr = models.BooleanField(
+    twilio_use_missed_call = models.BooleanField(
         default=False,
-        help_text="If true, the bot will use Gooey ASR for speech recognition instead of Twilio's when available on the attached run",
-    )
-    twilio_default_to_gooey_tts = models.BooleanField(
-        default=False,
-        help_text="If true, the bot will use Gooey TTS for text to speech instead of Twilio's when available on the attached run",
-    )
-    twilio_voice = models.TextField(
-        default="woman",
-        help_text="The voice to use for Twilio TTS ('man', 'woman', or Amazon Polly/Google Voices: https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages)",
+        help_text="If true, the bot will reject incoming calls and call back the user instead so they don't get charged for the call",
     )
     twilio_initial_text = models.TextField(
         default="",
@@ -684,22 +677,24 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="The initial audio url to play to the user when a call is started",
     )
-    twilio_use_missed_call = models.BooleanField(
-        default=False,
-        help_text="If true, the bot will reject incoming calls and call back the user instead so they don't get charged for the call",
+    twilio_waiting_text = models.TextField(
+        default="",
+        blank=True,
+        help_text="The text to send to the user while waiting for a response if using sms",
     )
     twilio_waiting_audio_url = models.TextField(
         default="",
         blank=True,
         help_text="The audio url to play to the user while waiting for a response if using voice",
     )
-    twilio_waiting_text = models.TextField(
+    twilio_tts_voice = models.TextField(
         default="",
         blank=True,
-        help_text="The text to send to the user while waiting for a response if using sms",
+        help_text="The voice to use for Twilio TTS ('man', 'woman', or Amazon Polly/Google Voices: https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages)",
     )
     twilio_asr_language = models.TextField(
-        default="en-US",
+        default="",
+        blank=True,
         help_text="The language to use for Twilio ASR (https://www.twilio.com/docs/voice/twiml/gather#languagetags)",
     )
 
@@ -721,6 +716,7 @@ class BotIntegration(models.Model):
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
+            models.Index(fields=["twilio_account_sid", "twilio_phone_number"]),
         ]
 
     def __str__(self):
@@ -758,7 +754,7 @@ class BotIntegration(models.Model):
 
     get_display_name.short_description = "Bot"
 
-    def api_integration_id(self):
+    def api_integration_id(self) -> str:
         from routers.bots_api import api_hashids
 
         return api_hashids.encode(self.id)
@@ -795,6 +791,14 @@ class BotIntegration(models.Model):
             )[0]
         else:
             return text
+
+    def get_twilio_client(self):
+        import twilio.rest
+
+        return twilio.rest.Client(
+            self.twilio_account_sid or settings.TWILIO_ACCOUNT_SID,
+            self.twilio_auth_token or settings.TWILIO_AUTH_TOKEN,
+        )
 
 
 class BotIntegrationAnalysisRun(models.Model):
@@ -863,7 +867,7 @@ class ConvoState(models.IntegerChoices):
 
 
 class ConversationQuerySet(models.QuerySet):
-    def get_unique_users(self) -> "ConversationQuerySet":
+    def get_unique_users(self) -> models.QuerySet["Conversation"]:
         """Get unique conversations"""
         return self.distinct(
             "fb_page_id",
@@ -1098,6 +1102,7 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
+            models.Index(fields=["bot_integration", "twilio_phone_number"]),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
 

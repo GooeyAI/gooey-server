@@ -306,7 +306,7 @@ class ApiInterface(BotInterface):
                 status_code=400, detail="No input provided. Please provide input."
             )
 
-        self._unpack_bot_integration()
+        super().__init__()
 
     def runner(self):
         try:

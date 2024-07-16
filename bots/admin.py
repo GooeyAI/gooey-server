@@ -76,15 +76,13 @@ twilio_fields = [
     "twilio_auth_token",
     "twilio_phone_number",
     "twilio_phone_number_sid",
-    "twilio_default_to_gooey_asr",
-    "twilio_default_to_gooey_tts",
-    "twilio_voice",
+    "twilio_use_missed_call",
+    "twilio_tts_voice",
     "twilio_asr_language",
     "twilio_initial_text",
     "twilio_initial_audio_url",
-    "twilio_use_missed_call",
-    "twilio_waiting_audio_url",
     "twilio_waiting_text",
+    "twilio_waiting_audio_url",
 ]
 
 
@@ -274,12 +272,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     @admin.display(description="Integration Stats")
     def api_integration_stats_url(self, bi: BotIntegration):
+        if not bi.id:
+            raise bi.DoesNotExist
 
         integration_id = bi.api_integration_id()
         return open_in_new_tab(
             url=get_route_url(
                 integrations_stats_route,
-                params=dict(
+                path_params=dict(
                     page_slug=VideoBotsPage.slug_versions[-1],
                     integration_id=integration_id,
                 ),
