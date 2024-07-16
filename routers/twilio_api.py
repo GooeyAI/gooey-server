@@ -47,7 +47,14 @@ def twilio_voice_call(
 ):
     """Handle incoming Twilio voice call."""
 
-    bot = TwilioVoice.from_data(data)
+    try:
+        bot = TwilioVoice.from_data(data)
+    except BotIntegration.DoesNotExist as e:
+        logger.debug(f"could not find bot integration for {data=} {e=}")
+        resp = VoiceResponse()
+        resp.reject()
+        return twiml_response(resp)
+
     bi = bot.bi
 
     initial_text = bi.twilio_initial_text.strip()
@@ -60,13 +67,17 @@ def twilio_voice_call(
     )
 
     if bi.twilio_use_missed_call:
-        # if not data.get("StirVerstat"):
-        background_tasks.add_task(bot.start_voice_call_session, resp)
-        sleep(1)
+        background_tasks.add_task(callback_after_missed_call, bot=bot, resp=resp)
         resp = VoiceResponse()
         resp.reject()
 
     return twiml_response(resp)
+
+
+def callback_after_missed_call(*, bot: TwilioVoice, resp: VoiceResponse):
+    # if data.get("StirVerstat"):
+    sleep(1)
+    bot.start_voice_call_session(resp)
 
 
 @router.post("/__/twilio/voice/response/")
@@ -109,14 +120,13 @@ def create_voice_call_response(
             resp_say_or_tts_play(bot, resp, text, should_translate=should_translate)
 
         # try recording 3 times to give the user a chance to start speaking
-        for _ in range(3):
-            resp.record(
-                action=action,
-                method="POST",
-                timeout=3,
-                finish_on_key="0",
-                play_beep=False,
-            )
+        resp.record(
+            action=action,
+            method="POST",
+            timeout=5,
+            finish_on_key="0",
+            play_beep=False,
+        )
     else:
         gather = Gather(
             input="speech",  # also supports dtmf (keypad input) and a combination of both
@@ -257,7 +267,6 @@ def twilio_sms(
 
     if bot.bi.twilio_waiting_text.strip():
         text = bot.bi.twilio_waiting_text
-
     else:
         text = "Please wait while we process your request."
     resp.message(bot.translate_response(text))

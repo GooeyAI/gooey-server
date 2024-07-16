@@ -16,7 +16,12 @@ class TwilioSMS(BotInterface):
     platform = Platform.TWILIO
 
     def __init__(self, data: dict):
-        bi = BotIntegration.objects.get(twilio_phone_number=data["To"][0])
+        account_sid = data["AccountSid"][0]
+        if account_sid == settings.TWILIO_ACCOUNT_SID:
+            account_sid = ""
+        bi = BotIntegration.objects.get(
+            account_sid=account_sid, twilio_phone_number=data["To"][0]
+        )
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi, twilio_phone_number=data["From"][0]
         )[0]
@@ -85,22 +90,22 @@ class TwilioVoice(BotInterface):
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['ringing'], 'CallToken': ['XXXX'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'StirVerstat': ['XXXX'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Confidence': ['0.9128386'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'Language': ['en-US'], 'SpeechResult': ['Hello.'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'RecordingDuration': ['XXXX'], 'RecordingSid': ['XXXX'], 'RecordingUrl': ['https://api.twilio.com/2010-04-01/Accounts/AC5bac377df5bf25292fe863b9ddb2db2e/Recordings/RE0a6ed1afa9efaf42eb93c407b89619dd'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
-        logger.debug(data)
-        account_sid: str = data["AccountSid"][0] or ""
+        account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
 
+        logger.debug(data)
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
             # cases where user is calling the bot
             bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
+                account_sid=account_sid, twilio_phone_number=bot_number
             )
         except BotIntegration.DoesNotExist:
             #  cases where bot is calling the user
             user_number, bot_number = bot_number, user_number
             bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
+                account_sid=account_sid, twilio_phone_number=bot_number
             )
 
         convo = Conversation.objects.get_or_create(

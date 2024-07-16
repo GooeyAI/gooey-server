@@ -643,25 +643,32 @@ class BotIntegration(models.Model):
         help_text="Extra configuration for the bot's web integration",
     )
 
-    twilio_account_sid = models.TextField(
-        blank=True,
-        default="",
-        help_text="Twilio account sid as found on twilio.com/console (If not provided we'll use Gooey's Twilio Account)",
-    )
-    twilio_auth_token = models.TextField(
-        blank=True,
-        default="",
-        help_text="Twilio auth token as found on twilio.com/console (If not provided we'll use Gooey's Twilio Account)",
-    )
     twilio_phone_number = PhoneNumberField(
         blank=True,
-        default="",
-        help_text="Twilio unformatted phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
+        null=True,
+        default=None,
+        unique=True,
+        help_text="Twilio phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
     )
     twilio_phone_number_sid = models.TextField(
         blank=True,
         default="",
         help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming",
+    )
+    twilio_account_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Account SID, required if using api_key to authenticate",
+    )
+    twilio_username = models.TextField(
+        blank=True,
+        default="",
+        help_text="Username to authenticate with, either account_sid or api_key",
+    )
+    twilio_password = models.TextField(
+        blank=True,
+        default="",
+        help_text="Password to authenticate with, auth_token (if using account_sid) or api_secret (if using api_key)",
     )
     twilio_use_missed_call = models.BooleanField(
         default=False,
@@ -712,11 +719,11 @@ class BotIntegration(models.Model):
         ordering = ["-updated_at"]
         unique_together = [
             ("slack_channel_id", "slack_team_id"),
+            ("twilio_phone_number", "twilio_account_sid"),
         ]
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
-            models.Index(fields=["twilio_account_sid", "twilio_phone_number"]),
         ]
 
     def __str__(self):
@@ -796,8 +803,9 @@ class BotIntegration(models.Model):
         import twilio.rest
 
         return twilio.rest.Client(
-            self.twilio_account_sid or settings.TWILIO_ACCOUNT_SID,
-            self.twilio_auth_token or settings.TWILIO_AUTH_TOKEN,
+            account_sid=self.twilio_account_sid or settings.TWILIO_ACCOUNT_SID,
+            username=self.twilio_username or settings.TWILIO_API_KEY_SID,
+            password=self.twilio_password or settings.TWILIO_API_KEY_SECRET,
         )
 
 
