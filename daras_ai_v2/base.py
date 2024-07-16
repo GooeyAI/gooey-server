@@ -89,6 +89,7 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
+from daras_ai.image_input import truncate_text_words
 
 DEFAULT_META_IMG = (
     # Small
@@ -989,14 +990,12 @@ class BasePage:
                 st.markdown(
                     f"###### {root_run.title or page.title}",
                 )
-            with st.link(
-                to=page.app_url(), className="text-decoration-none cursor-pointer"
-            ):
+            with st.link(to=page.app_url(), className="text-decoration-none"):
                 st.caption(
-                    root_run.notes or page.preview_description(state),
-                    className="text-decoration-none",
-                    line_clamp=7,
-                    line_clamp_expand=False,
+                    truncate_text_words(
+                        root_run.notes or page.preview_description(state),
+                        maxlen=210,
+                    ),
                 )
 
         grid_layout(4, page_clses, _render)

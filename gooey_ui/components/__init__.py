@@ -99,7 +99,6 @@ def markdown(
     body: str | None,
     *,
     line_clamp: int = None,
-    line_clamp_expand: bool = True,
     unsafe_allow_html=False,
     **props,
 ):
@@ -114,7 +113,6 @@ def markdown(
         "markdown",
         body=dedent(body).strip(),
         lineClamp=line_clamp,
-        lineClampExpand=line_clamp_expand,
         **props,
     )
 
