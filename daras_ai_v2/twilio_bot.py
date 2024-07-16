@@ -109,7 +109,7 @@ class TwilioVoice(BotInterface):
             )
 
         convo = Conversation.objects.get_or_create(
-            bot_integration=bi, twilio_phone_number=data["From"][0]
+            bot_integration=bi, twilio_phone_number=user_number
         )[0]
         return cls(
             convo,
