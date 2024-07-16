@@ -50,28 +50,23 @@ def twilio_voice_call(
     bot = TwilioVoice.from_data(data)
     bi = bot.bi
 
-    text = bi.twilio_initial_text.strip()
-    audio_url = bi.twilio_initial_audio_url.strip()
-    if not text and not audio_url:
-        text = DEFAULT_INITIAL_TEXT.format(bot_name=bi.name)
+    initial_text = bi.twilio_initial_text.strip()
+    initial_audio_url = bi.twilio_initial_audio_url.strip()
+    if not initial_text and not initial_audio_url:
+        initial_text = DEFAULT_INITIAL_TEXT.format(bot_name=bi.name)
 
     resp = create_voice_call_response(
-        bot, text=text, audio_url=audio_url, should_translate=True
+        bot, text=initial_text, audio_url=initial_audio_url, should_translate=True
     )
 
     if bi.twilio_use_missed_call:
         # if not data.get("StirVerstat"):
-        background_tasks.add_task(start_voice_call_session, bot=bot, resp=resp)
+        background_tasks.add_task(bot.start_voice_call_session, resp)
         sleep(1)
         resp = VoiceResponse()
         resp.reject()
 
     return twiml_response(resp)
-
-
-def start_voice_call_session(*, bot: TwilioVoice, resp: VoiceResponse):
-    client = bot.bi.get_twilio_client()
-    return client.calls.create(twiml=str(resp), from_=bot.bot_id, to=bot.user_id)
 
 
 @router.post("/__/twilio/voice/response/")

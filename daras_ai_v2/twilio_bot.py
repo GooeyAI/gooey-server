@@ -3,6 +3,7 @@ from functools import cached_property
 
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
+from twilio.twiml import TwiML
 from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models import BotIntegration, Platform, Conversation
@@ -193,6 +194,10 @@ class TwilioVoice(BotInterface):
     def mark_read(self):
         pass  # handled in the webhook
 
+    def start_voice_call_session(self, resp: TwiML):
+        client = self.bi.get_twilio_client()
+        return client.calls.create(twiml=str(resp), from_=self.bot_id, to=self.user_id)
+
 
 def send_single_voice_call(
     convo: Conversation, text: str | None, audio_url: str | None
@@ -204,18 +209,12 @@ def send_single_voice_call(
         convo.twilio_phone_number
     ), "This is not a Twilio conversation, it has no phone number."
 
-    bi: BotIntegration = convo.bot_integration
-    client = bi.get_twilio_client()
+    bot = TwilioVoice(convo)
 
     resp = VoiceResponse()
     if audio_url:
         resp.play(audio_url)
     elif text:
-        bot = TwilioVoice(convo)
         resp_say_or_tts_play(bot, resp, text)
 
-    return client.calls.create(
-        twiml=str(resp),
-        to=convo.twilio_phone_number.as_e164,
-        from_=bi.twilio_phone_number.as_e164,
-    )
+    return bot.start_voice_call_session(resp)
