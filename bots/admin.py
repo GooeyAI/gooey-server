@@ -71,10 +71,11 @@ slack_fields = [
 ]
 web_fields = ["web_allowed_origins", "web_config_extras"]
 twilio_fields = [
-    "twilio_account_sid",
-    "twilio_auth_token",
     "twilio_phone_number",
     "twilio_phone_number_sid",
+    "twilio_account_sid",
+    "twilio_username",
+    "twilio_password",
     "twilio_use_missed_call",
     "twilio_tts_voice",
     "twilio_asr_language",
