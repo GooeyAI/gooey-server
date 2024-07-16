@@ -49,6 +49,7 @@ from routers import (
     stripe,
     broadcast_api,
     bots_api,
+    twilio_api,
 )
 import url_shortener.routers as url_shortener
 
@@ -66,6 +67,7 @@ app.include_router(root.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)
 app.include_router(stripe.router, include_in_schema=False)
+app.include_router(twilio_api.router, include_in_schema=False)
 
 app.add_middleware(
     CORSMiddleware,

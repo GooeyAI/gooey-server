@@ -13,7 +13,7 @@ from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.billing import billing_page
-from daras_ai_v2.fastapi_tricks import get_route_path, get_route_url
+from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -68,7 +68,7 @@ def payment_processing_route(
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
-        redirectUrl=(get_route_url(account_route)),
+        redirectUrl=get_app_route_url(account_route),
     )
 
     return dict(

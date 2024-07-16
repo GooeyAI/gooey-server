@@ -23,6 +23,7 @@ from daras_ai_v2.slack_bot import (
     create_personal_channel,
     SlackBot,
 )
+from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton, messages_as_prompt
@@ -177,6 +178,7 @@ def send_broadcast_msg(
     documents: list[str] = None,
     bi_id: int,
     convo_ids: list[int],
+    medium: str = "Voice Call",
 ):
     bi = BotIntegration.objects.get(id=bi_id)
     convos = Conversation.objects.filter(id__in=convo_ids)
@@ -205,6 +207,11 @@ def send_broadcast_msg(
                     username=bi.name,
                     token=bi.slack_access_token,
                 )[0]
+            case Platform.TWILIO:
+                if medium == "Voice Call":
+                    send_single_voice_call(convo, text, audio)
+                else:
+                    send_sms_message(convo, text, media_url=audio)
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"

@@ -12,7 +12,7 @@ from decouple import config
 from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.settings import templates
 from gooey_ui import UploadedFile
 
@@ -56,7 +56,7 @@ def send_low_balance_email(
     recipeints = "support@gooey.ai, devs@gooey.ai"
     html_body = templates.get_template("low_balance_email.html").render(
         user=user,
-        url=get_route_url(account_route),
+        url=get_app_route_url(account_route),
         total_credits_consumed=total_credits_consumed,
         settings=settings,
     )

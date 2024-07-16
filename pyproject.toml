@@ -85,6 +85,7 @@ emoji = "^2.10.1"
 pyvespa = "^0.39.0"
 anthropic = "^0.25.5"
 azure-cognitiveservices-speech = "^1.37.0"
+twilio = "^9.2.3"
 sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
 
 [tool.poetry.group.dev.dependencies]

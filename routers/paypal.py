@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from app_users.models import PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
+from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_app_route_url
 from payments.models import PricingPlan
 from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
 from routers.account import payment_processing_route, account_route
@@ -139,8 +139,8 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
-            "return_url": get_route_url(payment_processing_route),
-            "cancel_url": get_route_url(account_route),
+            "return_url": get_app_route_url(payment_processing_route),
+            "cancel_url": get_app_route_url(account_route),
         },
     )
     return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)

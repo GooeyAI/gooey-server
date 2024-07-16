@@ -7,7 +7,7 @@ import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import icons, settings, paypal
 from daras_ai_v2.base import RedirectException
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
@@ -55,7 +55,7 @@ def render_payments_setup():
     st.html(
         templates.get_template("payment_setup.html").render(
             settings=settings,
-            payment_processing_url=get_route_url(payment_processing_route),
+            payment_processing_url=get_app_route_url(payment_processing_route),
         )
     )
 
@@ -319,13 +319,13 @@ def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
     current_plan = PricingPlan.from_sub(user.subscription)
 
     if new_plan == current_plan:
-        raise RedirectException(get_route_url(account_route), status_code=303)
+        raise RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
         user.subscription.cancel()
         user.subscription.delete()
         raise RedirectException(
-            get_route_url(payment_processing_route), status_code=303
+            get_app_route_url(payment_processing_route), status_code=303
         )
 
     match user.subscription.payment_provider:
@@ -347,7 +347,7 @@ def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
                 proration_behavior="none",
             )
             raise RedirectException(
-                get_route_url(payment_processing_route), status_code=303
+                get_app_route_url(payment_processing_route), status_code=303
             )
 
         case PaymentProvider.PAYPAL:
@@ -469,8 +469,8 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode="payment",
-        success_url=get_route_url(payment_processing_route),
-        cancel_url=get_route_url(account_route),
+        success_url=get_app_route_url(payment_processing_route),
+        cancel_url=get_app_route_url(account_route),
         customer=user.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
@@ -512,8 +512,8 @@ def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
     checkout_session = stripe.checkout.Session.create(
         line_items=[(plan.get_stripe_line_item())],
         mode="subscription",
-        success_url=get_route_url(payment_processing_route),
-        cancel_url=get_route_url(account_route),
+        success_url=get_app_route_url(payment_processing_route),
+        cancel_url=get_app_route_url(account_route),
         customer=user.get_or_create_stripe_customer(),
         metadata=metadata,
         subscription_data={"metadata": metadata},
@@ -598,8 +598,8 @@ def change_payment_method(user: AppUser):
                 setup_intent_data={
                     "metadata": {"subscription_id": user.subscription.external_id},
                 },
-                success_url=get_route_url(payment_processing_route),
-                cancel_url=get_route_url(account_route),
+                success_url=get_app_route_url(payment_processing_route),
+                cancel_url=get_app_route_url(account_route),
             )
             raise RedirectException(session.url, status_code=303)
         case _:

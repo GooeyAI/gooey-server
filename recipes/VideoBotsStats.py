@@ -42,6 +42,8 @@ ID_COLUMNS = [
     "conversation__ig_account_id",
     "conversation__wa_phone_number",
     "conversation__slack_user_id",
+    "conversation__twilio_phone_number",
+    "conversation__web_user_id",
 ]
 
 
