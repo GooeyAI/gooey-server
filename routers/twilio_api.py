@@ -36,6 +36,8 @@ SILENCE_RESPONSE = (
     "Sorry, I didn't get that. Please call again in a more quiet environment."
 )
 
+WEBHOOK_ERROR_MSG = "Sorry. This number has been incorrectly configured. Contact the bot integration owner or try again later."
+
 router = APIRouter()
 
 
@@ -241,10 +243,7 @@ def twilio_voice_call_error():
     """If an unhandled error occurs in the voice call webhook, return a generic error message."""
 
     resp = VoiceResponse()
-    resp.say(
-        "Sorry. This number has been incorrectly configured. Contact the bot integration owner or try again later."
-    )
-
+    resp.say(WEBHOOK_ERROR_MSG)
     return twiml_response(resp)
 
 
@@ -276,10 +275,7 @@ def twilio_sms_error():
     """If an unhandled error occurs in the SMS webhook, return a generic error message."""
 
     resp = MessagingResponse()
-    resp.message(
-        "Sorry. This number has been incorrectly configured. Contact the bot integration owner or try again later."
-    )
-
+    resp.message(WEBHOOK_ERROR_MSG)
     return twiml_response(resp)
 
 

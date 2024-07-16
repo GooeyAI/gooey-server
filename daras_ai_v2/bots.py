@@ -1,5 +1,4 @@
 import mimetypes
-import traceback
 import typing
 from datetime import datetime
 
@@ -8,7 +7,6 @@ from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
-from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -47,9 +45,9 @@ INVALID_INPUT_FORMAT = (
 )
 
 ERROR_MSG = """
-`{}`
+⚠️ Sorry, I ran into an error while processing your request. Please try again, or send "Reset" to start over.
 
-⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
+`{}`
 """.strip()
 
 FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
@@ -251,8 +249,9 @@ def _mock_api_output(input_text):
 def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
-    except Exception:
-        bot.send_msg(text="Sorry, an error occurred. Please try again later.")
+    except Exception as e:
+        # send error msg as repsonse
+        bot.send_msg(text=ERROR_MSG.format(e))
         raise
 
 
@@ -336,13 +335,7 @@ def _msg_handler(bot: BotInterface):
 
 
 def _handle_feedback_msg(bot: BotInterface, input_text):
-    try:
-        last_feedback = Feedback.objects.filter(
-            message__conversation=bot.convo
-        ).latest()
-    except Feedback.DoesNotExist as e:
-        bot.send_msg(text=ERROR_MSG.format(e))
-        return
+    last_feedback = Feedback.objects.filter(message__conversation=bot.convo).latest()
     # save the feedback
     last_feedback.text = input_text
     # translate feedback to english
@@ -543,24 +536,13 @@ def _save_msgs(
 
 
 def _handle_interactive_msg(bot: BotInterface):
-    try:
-        button = bot.get_interactive_msg_info()
-    except NotImplementedError as e:
-        bot.send_msg(text=ERROR_MSG.format(e))
-        return
+    button = bot.get_interactive_msg_info()
     match button.button_id:
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
-            try:
-                context_msg = Message.objects.get(
-                    platform_msg_id=button.context_msg_id, conversation=bot.convo
-                )
-            except Message.DoesNotExist as e:
-                traceback.print_exc()
-                capture_exception(e)
-                # send error msg as repsonse
-                bot.send_msg(text=ERROR_MSG.format(e))
-                return
+            context_msg = Message.objects.get(
+                platform_msg_id=button.context_msg_id, conversation=bot.convo
+            )
             if button.button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
                 # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
