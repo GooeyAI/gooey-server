@@ -1,6 +1,7 @@
 import uuid
 from functools import cached_property
 
+import aifail
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
@@ -90,11 +91,10 @@ class TwilioVoice(BotInterface):
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['ringing'], 'CallToken': ['XXXX'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'StirVerstat': ['XXXX'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Confidence': ['0.9128386'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'Language': ['en-US'], 'SpeechResult': ['Hello.'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'RecordingDuration': ['XXXX'], 'RecordingSid': ['XXXX'], 'RecordingUrl': ['https://api.twilio.com/2010-04-01/Accounts/AC5bac377df5bf25292fe863b9ddb2db2e/Recordings/RE0a6ed1afa9efaf42eb93c407b89619dd'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
+        logger.debug(data)
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
-        account_sid
-        logger.debug(data)
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
             # cases where user is calling the bot
@@ -166,7 +166,6 @@ class TwilioVoice(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        from routers.twilio_api import twilio_voice_call_response
 
         assert documents is None, "Twilio does not support sending documents via Voice"
         assert video is None, "Twilio does not support sending videos via Voice"
@@ -174,19 +173,12 @@ class TwilioVoice(BotInterface):
         assert update_msg_id is None, "Twilio does not support un-saying things"
 
         try:
-            self.twilio_queue.members("Front").update(
-                url=get_api_route_url(
-                    twilio_voice_call_response,
-                    query_params=dict(
-                        convo_id=self.convo.id, text=text, audio_url=audio
-                    ),
-                ),
+            return send_msg_to_queue(
+                self.twilio_queue, convo_id=self.convo.id, text=text, audio=audio
             )
-        except TwilioRestException as e:
-            if e.code == 20404:
-                logger.error(
-                    f"Call not found, probably already ended {self.call_sid=} {self.convo=}"
-                )
+        except Exception as e:
+            if is_queue_not_found(e):
+                logger.error(f"Call queue not found, probably already ended. {e=}")
             else:
                 raise
 
@@ -202,6 +194,22 @@ class TwilioVoice(BotInterface):
     def start_voice_call_session(self, resp: TwiML):
         client = self.bi.get_twilio_client()
         return client.calls.create(twiml=str(resp), from_=self.bot_id, to=self.user_id)
+
+
+def is_queue_not_found(exc: Exception):
+    return isinstance(exc, TwilioRestException) and exc.code == 20404
+
+
+@aifail.retry_if(is_queue_not_found, max_retry_delay=1, max_retries=5)
+def send_msg_to_queue(queue, *, convo_id: int, text: str | None, audio: str | None):
+    from routers.twilio_api import twilio_voice_call_response
+
+    return queue.members("Front").update(
+        url=get_api_route_url(
+            twilio_voice_call_response,
+            query_params=dict(convo_id=convo_id, text=text, audio_url=audio),
+        ),
+    )
 
 
 def send_single_voice_call(
