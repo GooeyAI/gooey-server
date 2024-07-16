@@ -20,7 +20,7 @@ class TwilioSMS(BotInterface):
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
         bi = BotIntegration.objects.get(
-            account_sid=account_sid, twilio_phone_number=data["To"][0]
+            twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
         )
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi, twilio_phone_number=data["From"][0]
@@ -93,19 +93,19 @@ class TwilioVoice(BotInterface):
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
-
+        account_sid
         logger.debug(data)
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
             # cases where user is calling the bot
             bi = BotIntegration.objects.get(
-                account_sid=account_sid, twilio_phone_number=bot_number
+                twilio_account_sid=account_sid, twilio_phone_number=bot_number
             )
         except BotIntegration.DoesNotExist:
             #  cases where bot is calling the user
             user_number, bot_number = bot_number, user_number
             bi = BotIntegration.objects.get(
-                account_sid=account_sid, twilio_phone_number=bot_number
+                twilio_account_sid=account_sid, twilio_phone_number=bot_number
             )
 
         convo = Conversation.objects.get_or_create(
