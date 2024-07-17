@@ -1,3 +1,5 @@
+import re
+
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -7,6 +9,19 @@ from app_users.models import AppUser
 from daras_ai_v2.crypto import get_random_doc_id
 
 
+ORG_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]+$")
+
+
+def validate_org_domain_name(value):
+    from handles.models import COMMON_EMAIL_DOMAINS
+
+    if not ORG_DOMAIN_NAME_RE.fullmatch(value):
+        raise ValidationError("Invalid domain name")
+
+    if value in COMMON_EMAIL_DOMAINS:
+        raise ValidationError("This domain name is reserved")
+
+
 class OrgRole(models.IntegerChoices):
     OWNER = 1
     ADMIN = 2
@@ -14,10 +29,19 @@ class OrgRole(models.IntegerChoices):
 
 
 class OrgQuerySet(models.QuerySet):
+    pass
+
+
+class OrgManager(models.Manager):
+    def get_queryset(self):
+        return OrgQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
+
     def create_org(self, *, created_by: "AppUser", org_id: str | None = None, **kwargs):
-        org = self.create(
+        org = self.model(
             org_id=org_id or get_random_doc_id(), created_by=created_by, **kwargs
         )
+        org.full_clean()
+        org.save()
         org.members.add(
             created_by,
             through_defaults={
@@ -25,11 +49,6 @@ class OrgQuerySet(models.QuerySet):
             },
         )
         return org
-
-
-class OrgManager(models.Manager):
-    def get_queryset(self):
-        return OrgQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
 
 
 class Org(models.Model):
@@ -47,14 +66,29 @@ class Org(models.Model):
     )
 
     logo = models.URLField(null=True, blank=True)
+    domain_name = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True,
+        unique=True,
+        validators=[
+            validate_org_domain_name,
+        ],
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True, default=None)
 
-    objects = OrgManager()
+    objects = OrgManager()  # only active orgs
+    all_objects = OrgQuerySet.as_manager()  # for internal & admin use
+
+    class Meta:
+        default_manager_name = "all_objects"
 
     def __str__(self):
+        if self.is_deleted():
+            return f"[Deleted] {self.name}"
         return self.name
 
     def get_slug(self):
@@ -155,8 +189,8 @@ class OrgMembership(models.Model):
     def can_kick(self, other: "OrgMembership"):
         return self.has_higher_role_than(other)
 
-    def can_transfer_ownership(self, other: "OrgMembership"):
-        return self.role == OrgRole.OWNER and other.role == OrgRole.ADMIN
+    def can_transfer_ownership(self):
+        return self.role == OrgRole.OWNER
 
 
 class OrgInvitation(models.Model):
