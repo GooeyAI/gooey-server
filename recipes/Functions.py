@@ -75,8 +75,12 @@ class FunctionsPage(BasePage):
         response.error = data.get("error")
 
     def render_form_v2(self):
-        st.caption("##### " + field_title_desc(self.RequestModel, "code"))
-        st.code_editor(key="code", language="javascript", height=300)
+        st.code_editor(
+            label="##### " + field_title_desc(self.RequestModel, "code"),
+            key="code",
+            language="javascript",
+            height=300,
+        )
 
     def render_variables(self):
         variables_input(template_keys=["code"], allow_add=True)

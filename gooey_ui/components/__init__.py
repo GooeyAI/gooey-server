@@ -379,17 +379,23 @@ def text_area(
 def code_editor(
     value: str = "",
     key: str = None,
+    label: str = None,
+    label_visibility: LabelVisibility = "visible",
     **props,
 ) -> typing.Any:
     value = str(state.session_state.setdefault(key, value) or "")
-    return state.RenderTreeNode(
+    if label_visibility != "visible":
+        label = None
+    state.RenderTreeNode(
         name="code-editor",
         props=dict(
             name=key,
             defaultValue=value,
+            label=dedent(label),
             **props,
         ),
     ).mount()
+    return value or ""
 
 
 def nrows_for_text(
