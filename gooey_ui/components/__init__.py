@@ -367,6 +367,22 @@ def text_area(
     return value or ""
 
 
+def code_editor(
+    value: str = "",
+    key: str = None,
+    **props,
+) -> typing.Any:
+    value = str(state.session_state.setdefault(key, value) or "")
+    return state.RenderTreeNode(
+        name="code-editor",
+        props=dict(
+            name=key,
+            defaultValue=value,
+            **props,
+        ),
+    ).mount()
+
+
 def nrows_for_text(
     text: str,
     max_height_px: int,
