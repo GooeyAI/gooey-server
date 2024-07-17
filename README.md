@@ -88,13 +88,28 @@ export MAGICK_HOME=/opt/homebrew
 
 Clone [gooey-gui](https://github.com/GooeyAI/gooey-gui) repo, in the same directory as `gooey-server` and follow the setup steps.
 
-## Running Tests
+### Run Tests
 
 ``` 
+ulimit -n unlimited  # Increase the number of open files allowed
 ./scripts/run-tests.sh
 ```
 
-(If you run into issues with the number of open files, you can remove the limit with `ulimit -n unlimited`)
+### Initialize databse
+
+
+```bash
+# reset the database
+./manage.py reset_db -c
+# create the database
+./manage.py sqlcreate | psql postgres
+# run migrations
+./manage.py migrate
+# load the fixture (donwloaded by ./scripts/run-tests.sh)
+./manage.py loaddata fixture.json
+# create a superuser to access admin
+./manage.py createsuperuser
+```
 
 ## Run
 
