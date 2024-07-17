@@ -68,6 +68,7 @@ class Modal:
             background: white;
             z-index: 3000;
             max-height: 80vh;
+            border-radius: 0.5rem;
         }}
         </style>
         """
