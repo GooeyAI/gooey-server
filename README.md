@@ -54,10 +54,7 @@ Provide a simpler workaround for localhost auth.
 Provide an open source alternative to Google auth for use in VPC. 
 Provide a way to do storage locally. 
 
-## 💻
-laptop
-Unicode: U+1F4BB, UTF-8: F0 9F 92 BB
-Setup (Mac)
+## 💻 Setup (Mac)
 
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
