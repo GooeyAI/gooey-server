@@ -164,9 +164,23 @@ class LargeLanguageModels(Enum):
         context_window=8192,
         price=1,
     )
+    llama_3_groq_70b_tool_use = LLMSpec(
+        label="Llama 3 Groq 70b Tool Use",
+        model_id="llama3-groq-70b-8192-tool-use-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+    )
     llama3_8b = LLMSpec(
         label="Llama 3 8b (Meta AI)",
         model_id="llama3-8b-8192",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+    )
+    llama_3_groq_8b_tool_use = LLMSpec(
+        label="Llama 3 Groq 8b Tool Use",
+        model_id="llama3-groq-8b-8192-tool-use-preview",
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
@@ -184,6 +198,13 @@ class LargeLanguageModels(Enum):
         model_id="mixtral-8x7b-32768",
         llm_api=LLMApis.groq,
         context_window=32_768,
+        price=1,
+    )
+    gemma_2_9b_it = LLMSpec(
+        label="Gemma 2 9B (Google)",
+        model_id="gemma2-9b-it",
+        llm_api=LLMApis.groq,
+        context_window=8_192,
         price=1,
     )
     gemma_7b_it = LLMSpec(
