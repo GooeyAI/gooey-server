@@ -23,7 +23,6 @@ class OrgInvitationInline(admin.TabularInline):
     fields = [
         "invitee_email",
         "inviter",
-        "role",
         "status",
         "auto_accepted",
         "created_at",
