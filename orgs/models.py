@@ -2,8 +2,9 @@ import re
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 from django.utils.text import slugify
+from safedelete.managers import SafeDeleteManager
+from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
 from app_users.models import AppUser
 from daras_ai_v2.crypto import get_random_doc_id
@@ -28,14 +29,7 @@ class OrgRole(models.IntegerChoices):
     MEMBER = 3
 
 
-class OrgQuerySet(models.QuerySet):
-    pass
-
-
-class OrgManager(models.Manager):
-    def get_queryset(self):
-        return OrgQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
-
+class OrgManager(SafeDeleteManager):
     def create_org(self, *, created_by: "AppUser", org_id: str | None = None, **kwargs):
         org = self.model(
             org_id=org_id or get_random_doc_id(), created_by=created_by, **kwargs
@@ -51,7 +45,9 @@ class OrgManager(models.Manager):
         return org
 
 
-class Org(models.Model):
+class Org(SafeDeleteModel):
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
     org_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
 
     name = models.CharField(max_length=100)
@@ -70,7 +66,6 @@ class Org(models.Model):
         max_length=30,
         blank=True,
         null=True,
-        unique=True,
         validators=[
             validate_org_domain_name,
         ],
@@ -78,31 +73,20 @@ class Org(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(null=True, blank=True, default=None)
 
-    objects = OrgManager()  # only active orgs
-    all_objects = OrgQuerySet.as_manager()  # for internal & admin use
+    objects = OrgManager()
 
     class Meta:
-        default_manager_name = "all_objects"
+        unique_together = ("domain_name", "deleted")
 
     def __str__(self):
-        if self.is_deleted():
+        if self.deleted:
             return f"[Deleted] {self.name}"
-        return self.name
+        else:
+            return self.name
 
     def get_slug(self):
         return slugify(self.name)
-
-    def is_deleted(self):
-        return self.deleted_at is not None
-
-    def soft_delete(self):
-        with transaction.atomic():
-            for m in self.memberships.all():
-                m.delete()
-            self.deleted_at = timezone.now()
-            self.save()
 
     def invite_user(
         self,
@@ -117,11 +101,13 @@ class Org(models.Model):
         """
         for member in self.members.all():
             if member.email == invitee_email:
-                raise ValidationError(f"{member} is already a member of this org")
+                raise ValidationError(f"{member} is already a member of this team")
 
         for invitation in self.invitations.filter(status=OrgInvitation.Status.PENDING):
             if invitation.invitee_email == invitee_email:
-                raise ValidationError(f"{invitee_email} was already invited")
+                raise ValidationError(
+                    f"{invitee_email} was already invited to this team"
+                )
 
         invitation = OrgInvitation(
             org=self,
@@ -139,7 +125,7 @@ class Org(models.Model):
                 pass
 
 
-class OrgMembership(models.Model):
+class OrgMembership(SafeDeleteModel):
     org = models.ForeignKey(Org, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(
         "app_users.AppUser", on_delete=models.CASCADE, related_name="org_memberships"
@@ -159,7 +145,7 @@ class OrgMembership(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ("org", "user")
+        unique_together = ("org", "user", "deleted")
 
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.org})"
@@ -193,7 +179,7 @@ class OrgMembership(models.Model):
         return self.role == OrgRole.OWNER
 
 
-class OrgInvitation(models.Model):
+class OrgInvitation(SafeDeleteModel):
     class Status(models.IntegerChoices):
         PENDING = 1
         ACCEPTED = 2
@@ -207,10 +193,6 @@ class OrgInvitation(models.Model):
     status = models.IntegerField(choices=Status.choices, default=Status.PENDING)
     auto_accepted = models.BooleanField(default=False)
     role = models.IntegerField(choices=OrgRole.choices, default=OrgRole.MEMBER)
-
-    # TODO: don't spam invitees!
-    # invitation_email_count = models.IntegerField(default=0)
-    # last_invitation_sent_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

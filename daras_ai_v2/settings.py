@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "safedelete",
     "app_users",
     "files",
     "url_shortener",
