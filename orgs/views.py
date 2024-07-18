@@ -1,6 +1,5 @@
 import html as html_lib
 from django.core.exceptions import ValidationError
-from django.db import transaction
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -80,20 +79,37 @@ def render_org_by_membership(membership: OrgMembership):
         render_pending_invitations_list(org=org, current_user=current_user)
 
     with st.div(className="mt-4"):
-        if membership.role != OrgRole.OWNER:
-            # Owners can't leave! They can only delete
-            org_leave_modal = Modal("Leave Org", key="leave-org-modal")
-            if org_leave_modal.is_open():
-                with org_leave_modal.container():
-                    render_org_leave_view_by_membership(
-                        membership, modal=org_leave_modal
-                    )
+        org_leave_modal = Modal("Leave Org", key="leave-org-modal")
+        if org_leave_modal.is_open():
+            with org_leave_modal.container():
+                render_org_leave_view_by_membership(membership, modal=org_leave_modal)
 
-            if st.button(
-                "Leave Org",
+        with st.div(className="text-end"):
+            leave_org = st.button(
+                "Leave",
                 className="btn btn-theme bg-danger border-danger text-white",
-            ):
-                org_leave_modal.open()
+            )
+        if leave_org:
+            org_leave_modal.open()
+
+
+#     if membership.can_transfer_ownership():
+#         transfer_ownership_modal = Modal("Transfer Ownership", key="transfer-ownership")
+#         if transfer_ownership_modal.is_open():
+#             with transfer_ownership_modal.container():
+#                 render_transfer_ownership_view_by_membership(
+#                     membership, modal=transfer_ownership_modal
+#                 )
+#
+#         with st.div(className="d-flex justify-content-between align-items-center"):
+#             st.write("Transfer Ownership")
+#             if st.button(
+#                 f"{icons.transfer} Transfer",
+#                 className="btn btn-theme py-2 bg-danger border-danger text-light",
+#                 unsafe_allow_html=True,
+#             ):
+#                 transfer_ownership_modal.open()
+#
 
 
 def render_org_creation_view(user: AppUser):
@@ -162,21 +178,6 @@ def render_danger_zone_by_membership(membership: OrgMembership):
             ):
                 org_deletion_modal.open()
 
-    if membership.can_transfer_ownership():
-        with st.div(className="d-flex justify-content-between align-items-center"):
-            st.write("Transfer Ownership")
-            if st.button(
-                f"{icons.transfer} Transfer",
-                className="btn btn-theme py-2 bg-danger border-danger text-light",
-                unsafe_allow_html=True,
-            ):
-                m.role = OrgRole.OWNER
-                membership.role = OrgRole.ADMIN
-                with transaction.atomic():
-                    m.save()
-                    membership.save()
-                st.experimental_rerun()
-
 
 def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: Modal):
     st.write(
@@ -194,17 +195,54 @@ def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: 
         ):
             membership.org.soft_delete()
             modal.close()
+            st.experimental_rerun()
 
 
-def render_org_leave_view_by_membership(membership: OrgMembership, *, modal: Modal):
+def render_org_leave_view_by_membership(
+    current_membership: OrgMembership, *, modal: Modal
+):
+    org = current_membership.org
+
     st.write("Are you sure you want to leave this organization?")
 
-    if st.button("Cancel", type="secondary", className="border-danger text-danger"):
-        modal.close()
+    new_owner = None
+    if current_membership.role == OrgRole.OWNER and org.memberships.count() == 1:
+        st.caption(
+            "You are the only member. You will lose access to this team if you leave."
+        )
+    elif (
+        current_membership.role == OrgRole.OWNER
+        and org.memberships.filter(role=OrgRole.OWNER).count() == 1
+    ):
+        members_by_uid = {
+            m.user.uid: m
+            for m in org.memberships.all().select_related("user")
+            if m != current_membership
+        }
+        new_owner_uid = st.selectbox(
+            "New Owner",
+            options=list(members_by_uid),
+            format_func=lambda uid: format_user_name(members_by_uid[uid].user),
+        )
+        new_owner = members_by_uid[new_owner_uid]
+        st.caption(
+            "You are the only owner of this organization. Please choose another member to promote to owner."
+        )
 
-    if st.button("Leave", className="btn btn-theme bg-danger border-danger text-light"):
-        membership.org.members.remove(membership.user)
-        modal.close()
+    with st.div(className="d-flex"):
+        if st.button(
+            "Cancel", type="secondary", className="border-danger text-danger w-50"
+        ):
+            modal.close()
+
+        if st.button(
+            "Leave", className="btn btn-theme bg-danger border-danger text-light w-50"
+        ):
+            if new_owner:
+                new_owner.role = OrgRole.OWNER
+                new_owner.save()
+            org.members.remove(current_membership.user)
+            modal.close()
 
 
 def render_members_list(org: Org, current_membership: OrgMembership):
