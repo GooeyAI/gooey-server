@@ -193,9 +193,8 @@ def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: 
         if st.button(
             "Delete", className="btn btn-theme bg-danger border-danger text-light w-50"
         ):
-            membership.org.soft_delete()
+            membership.org.delete()
             modal.close()
-            st.experimental_rerun()
 
 
 def render_org_leave_view_by_membership(
