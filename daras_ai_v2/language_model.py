@@ -68,12 +68,22 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
         model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o"),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=10,
+        is_vision_model=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-4o-mini
+    gpt_4_o_mini = LLMSpec(
+        label="GPT-4o-mini (openai)",
+        model_id="gpt-4o-mini",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=1,
         is_vision_model=True,
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4

@@ -5,6 +5,18 @@ category = ModelCategory.LLM
 
 
 def run():
+    # GPT-4o-mini
+
+    llm_pricing_create(
+        model_id="gpt-4o-mini",
+        model_name=LargeLanguageModels.gpt_4_o_mini.name,
+        unit_cost_input=0.150,
+        unit_cost_output=0.600,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+
     # GPT-4o
 
     llm_pricing_create(
