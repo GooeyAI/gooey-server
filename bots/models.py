@@ -1229,11 +1229,7 @@ class MessageQuerySet(models.QuerySet):
                         metadata__mime_type__startswith="image/"
                     ).values_list("url", flat=True)
                 ),
-                "Audio Input": ", ".join(
-                    message.attachments.filter(
-                        metadata__mime_type__startswith="audio/"
-                    ).values_list("url", flat=True)
-                ),
+                "Audio Input": message.saved_run.state.get("input_audio", ""),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
