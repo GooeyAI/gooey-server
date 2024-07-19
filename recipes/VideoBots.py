@@ -33,6 +33,7 @@ from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
+    twilio_specific_settings,
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
@@ -1260,6 +1261,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                if bi.twilio_phone_number:
+                    copy_to_clipboard_button(
+                        f'<i class="fa-regular fa-link"></i> Copy Phone Number',
+                        value=bi.twilio_phone_number.as_e164,
+                        type="secondary",
+                    )
 
             col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
@@ -1279,6 +1286,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                elif bi.platform == Platform.TWILIO and test_link:
+                    pass
                 elif test_link:
                     st.anchor(
                         f"{icon} Message {bi.get_display_name()}",
@@ -1288,6 +1297,24 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                 else:
                     st.write("Message quicklink not available.")
+
+                if bi.twilio_phone_number:
+                    st.anchor(
+                        '<i class="fa-regular fa-phone"></i> Start Voice Call',
+                        f"tel:{bi.twilio_phone_number.as_e164}",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                    st.anchor(
+                        '<i class="fa-regular fa-sms"></i> Send SMS',
+                        f"sms:{bi.twilio_phone_number.as_e164}",
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                elif bi.platform == Platform.TWILIO:
+                    st.write(
+                        "Phone number incorrectly configured. Please re-add the integration and double check spelling. [Contact Us](support@gooey.ai) if you need help."
+                    )
 
                 if bi.platform == Platform.WEB:
                     embed_code = get_web_widget_embed_code(bi)
@@ -1317,6 +1344,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ),
                     new_tab=True,
                 )
+                if bi.platform == Platform.TWILIO and test_link:
+                    st.anchor(
+                        f"{icon} View Calls/Messages",
+                        test_link,
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
                 col1, col2 = st.columns(2, style={"alignItems": "center"})
@@ -1351,9 +1385,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
                     slack_specific_settings(bi, run_title)
+                if bi.platform == Platform.TWILIO:
+                    twilio_specific_settings(bi)
                 general_integration_settings(bi, self.request.user)
 
-                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
                     st.newline()
                     broadcast_input(bi)
                     st.write("---")
