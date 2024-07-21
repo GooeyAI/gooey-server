@@ -377,6 +377,7 @@ def _process_and_send_msg(
         input_images=input_images,
         input_documents=input_documents,
         messages=saved_msgs,
+        variables=build_run_vars(bot.convo, bot.user_msg_id),
     )
     if bot.user_language:
         body["user_language"] = bot.user_language
@@ -489,6 +490,49 @@ def _process_and_send_msg(
         saved_run=sr,
         received_time=recieved_time,
     )
+
+
+def build_run_vars(convo: Conversation, user_msg_id: str):
+    from routers.bots_api import MSG_ID_PREFIX
+
+    bi = convo.bot_integration
+    if bi.platform == Platform.WEB:
+        user_msg_id = user_msg_id.lstrip(MSG_ID_PREFIX)
+    variables = dict(
+        platform=Platform(bi.platform).name,
+        integration_id=bi.api_integration_id(),
+        integration_name=bi.name,
+        conversation_id=convo.api_integration_id(),
+        user_message_id=user_msg_id,
+    )
+    match bi.platform:
+        case Platform.FACEBOOK:
+            variables["user_fb_page_name"] = convo.fb_page_name
+            variables["bot_fb_page_name"] = bi.fb_page_name
+        case Platform.INSTAGRAM:
+            variables["user_ig_username"] = convo.ig_username
+            variables["bot_ig_username "] = bi.ig_username
+        case Platform.WHATSAPP:
+            variables["user_wa_phone_number"] = (
+                convo.wa_phone_number and convo.wa_phone_number.as_international
+            )
+            variables["bot_wa_phone_number"] = (
+                bi.wa_phone_number and bi.wa_phone_number.as_international
+            )
+        case Platform.SLACK:
+            variables["slack_user_name"] = convo.slack_user_name
+            variables["slack_channel_name"] = convo.slack_channel_name
+            variables["slack_team_name"] = bi.slack_team_name
+        case Platform.WEB:
+            variables["web_user_id"] = convo.web_user_id
+        case Platform.TWILIO:
+            variables["user_twilio_phone_number"] = (
+                convo.twilio_phone_number and convo.twilio_phone_number.as_international
+            )
+            variables["bot_twilio_phone_number"] = (
+                bi.twilio_phone_number and bi.twilio_phone_number.as_international
+            )
+    return variables
 
 
 def _save_msgs(

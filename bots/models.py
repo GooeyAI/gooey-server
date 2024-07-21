@@ -1159,6 +1159,11 @@ class Conversation(models.Model):
     def msgs_for_llm_context(self):
         return self.messages.all().as_llm_context(reset_at=self.reset_at)
 
+    def api_integration_id(self) -> str:
+        from routers.bots_api import api_hashids
+
+        return api_hashids.encode(self.id)
+
 
 class MessageQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":

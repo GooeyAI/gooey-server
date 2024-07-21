@@ -36,6 +36,11 @@ def call_recipe_functions(
     if not functions:
         return
     variables = state.setdefault("variables", {})
+    fn_vars = dict(
+        web_url=saved_run.get_app_url(),
+        request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
+        response={k: v for k, v in state.items() if k in response_model.__fields__},
+    )
 
     yield f"Running {trigger.name} hooks..."
 
@@ -46,16 +51,7 @@ def call_recipe_functions(
             current_user=current_user,
             parent_pr=pr,
             request_body=dict(
-                variables=sr.state.get("variables", {})
-                | variables
-                | dict(
-                    request=json.loads(
-                        request.json(exclude_unset=True, exclude={"variables"})
-                    ),
-                    response={
-                        k: v for k, v in state.items() if k in response_model.__fields__
-                    },
-                ),
+                variables=sr.state.get("variables", {}) | variables | fn_vars,
             ),
         )
 
