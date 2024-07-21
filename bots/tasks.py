@@ -67,8 +67,10 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
     analysis_sr = anal.get_active_saved_run()
     variables = analysis_sr.state.get("variables", {})
 
-    # add the state variables requested by the script
     if msg.saved_run:
+        # add the variables from the parent run
+        variables |= msg.saved_run.state.get("variables") or {}
+        # add the state variables requested by the script
         fill_req_vars_from_state(msg.saved_run.state, variables)
     if "messages" in variables:
         variables["messages"] = messages_as_prompt(
