@@ -86,12 +86,6 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         assistant_msg=msg.content,
         assistant_msg_local=msg.display_content,
     )
-    if msg.saved_run:
-        for requested_variable in analysis_sr.state.get("variables", {}).keys():
-            if requested_variable in msg.saved_run.state:
-                variables[requested_variable] = msg.saved_run.state.get(
-                    requested_variable
-                )
 
     # make the api call
     result, sr = analysis_sr.submit_api_call(
