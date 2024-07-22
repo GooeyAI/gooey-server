@@ -14,7 +14,10 @@ from daras_ai_v2.language_model import (
     SUPERSCRIPT,
     ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars
 
@@ -39,22 +42,14 @@ class CompareLLMPage(BasePage):
         "sampling_temperature": 0.7,
     }
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
         )
 
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
-
-        response_format_type: ResponseFormatType = Field(
-            None,
-            title="Response Format",
-        )
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: dict[
@@ -95,7 +90,7 @@ class CompareLLMPage(BasePage):
         youtube_video("dhexRRDAuY8")
 
     def render_settings(self):
-        language_model_settings(show_selector=False)
+        language_model_settings()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)

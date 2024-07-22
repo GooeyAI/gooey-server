@@ -10,7 +10,6 @@ from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
-from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
@@ -171,8 +170,10 @@ The maximum number of document search citations.
     st.number_input(
         label="""
 ###### Max Snippet Words
-
-After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300
+After a document search, relevant snippets of your documents are returned as results.
+This setting adjusts the maximum number of words in each snippet (tokens = words * 2).
+A high snippet size allows the LLM to access more information from your document results, \
+at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond).
 """,
         key="max_context_words",
         min_value=10,
@@ -181,9 +182,10 @@ After a document search, relevant snippets of your documents are returned as res
 
     st.number_input(
         label="""
-###### Overlapping Snippet Lines
-Your knowledge base documents are split into overlapping snippets. This settings adjusts how much those snippets overlap. In general you shouldn't need to adjust this. Default: 5
-
+###### Snippet Overlap Ratio
+Your knowledge base documents are split into overlapping snippets.
+This settings adjusts how much those snippets overlap (overlap tokens = snippet tokens / overlap ratio).
+In general you shouldn't need to adjust this.
 """,
         key="scroll_jump",
         min_value=1,
@@ -194,7 +196,7 @@ Your knowledge base documents are split into overlapping snippets. This settings
 def embeddings_model_selector(key: str):
     return enum_selector(
         EmbeddingModels,
-        label="##### Embeddings Model",
+        label="##### ✏ Embeddings Model",
         key=key,
         use_selectbox=True,
     )

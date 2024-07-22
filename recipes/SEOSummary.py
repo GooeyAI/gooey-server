@@ -20,7 +20,11 @@ from daras_ai_v2.language_model import (
     calc_gpt_tokens,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.serp_search import get_links_from_serp_api
@@ -86,7 +90,7 @@ class SEOSummaryPage(BasePage):
         # enable_blog_mode=False,
     )
 
-    class RequestModel(GoogleSearchMixin, BaseModel):
+    class RequestModelBase(BaseModel):
         search_query: str
         keywords: str
         title: str
@@ -99,11 +103,6 @@ class SEOSummaryPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        sampling_temperature: float | None
-        max_tokens: int | None
-        num_outputs: int | None
-        quality: float | None
-        avoid_repetition: bool | None
 
         max_search_urls: int | None
 
@@ -112,6 +111,9 @@ class SEOSummaryPage(BasePage):
         # enable_blog_mode: bool | None
 
         seed: int | None
+
+    class RequestModel(GoogleSearchMixin, LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_content: list[str]
@@ -181,7 +183,8 @@ SearchSEO > Page Parsing > GPT3
         st.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
         st.checkbox("Enable HTML Formatting", key="enable_html")
 
-        language_model_settings(show_response_format=False)
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
         st.write("---")
 
@@ -346,6 +349,7 @@ def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str
         max_tokens=request.max_tokens,
         stop=[STOP_SEQ],
         avoid_repetition=request.avoid_repetition,
+        response_format_type=request.response_format_type,
     )
 
 
