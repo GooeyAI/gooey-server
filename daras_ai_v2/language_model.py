@@ -91,6 +91,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         price=1,
         is_vision_model=True,
+        supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
@@ -172,6 +173,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
     )
     llama_3_groq_70b_tool_use = LLMSpec(
         label="Llama 3 Groq 70b Tool Use",
@@ -179,6 +181,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
     )
     llama3_8b = LLMSpec(
         label="Llama 3 8b (Meta AI)",
@@ -186,6 +189,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
     )
     llama_3_groq_8b_tool_use = LLMSpec(
         label="Llama 3 Groq 8b Tool Use",
@@ -193,6 +197,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
     )
     llama2_70b_chat = LLMSpec(
         label="Llama 2 70b Chat [Deprecated] (Meta AI)",
@@ -208,6 +213,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=32_768,
         price=1,
+        supports_json=True,
     )
     gemma_2_9b_it = LLMSpec(
         label="Gemma 2 9B (Google)",
@@ -215,6 +221,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8_192,
         price=1,
+        supports_json=True,
     )
     gemma_7b_it = LLMSpec(
         label="Gemma 7B (Google)",
@@ -222,6 +229,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8_192,
         price=1,
+        supports_json=True,
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
