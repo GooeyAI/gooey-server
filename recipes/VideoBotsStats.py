@@ -476,9 +476,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(Convos=Count("conversation_id", distinct=True))
         .annotate(
             Senders=Count(
-                Concat(
-                    *Message.CONVO_ID_COLUMNS(),
-                ),
+                Concat(*Message.CONVO_ID_COLUMNS),
                 distinct=True,
             )
         )

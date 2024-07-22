@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
-from django.db.models import Q, IntegerChoices
+from django.db.models import Q, IntegerChoices, QuerySet
 from django.utils import timezone
 from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -877,7 +877,7 @@ class ConvoState(models.IntegerChoices):
 class ConversationQuerySet(models.QuerySet):
     def get_unique_users(self) -> models.QuerySet["Conversation"]:
         """Get unique conversations"""
-        return self.distinct(*Conversation.ID_COLUMNS())
+        return self.distinct(*Conversation.ID_COLUMNS)
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
@@ -1088,6 +1088,15 @@ class Conversation(models.Model):
 
     objects = ConversationQuerySet.as_manager()
 
+    ID_COLUMNS = [
+        "fb_page_id",
+        "ig_account_id",
+        "slack_user_id",
+        "web_user_id",
+        "wa_phone_number",
+        "twilio_phone_number",
+    ]
+
     class Meta:
         unique_together = [
             ("slack_channel_id", "slack_user_id", "slack_team_id"),
@@ -1110,20 +1119,9 @@ class Conversation(models.Model):
     def __str__(self):
         return f"{self.get_display_name()} <> {self.bot_integration}"
 
-    @classmethod
-    def ID_COLUMNS(cls):
-        return [
-            "fb_page_id",
-            "ig_account_id",
-            "slack_user_id",
-            "web_user_id",
-            "wa_phone_number",
-            "twilio_phone_number",
-        ]
-
     def get_id(self):
         self_id = None
-        for col in self.ID_COLUMNS():
+        for col in self.ID_COLUMNS:
             if getattr(self, col):
                 self_id = getattr(self, col)
                 break
@@ -1176,9 +1174,9 @@ class Conversation(models.Model):
 
 
 class MessageQuerySet(models.QuerySet):
-    def get_unique_users(self) -> "MessageQuerySet":
+    def get_unique_users(self) -> QuerySet["Message"]:
         """Get unique users"""
-        return self.distinct(*Message.CONVO_ID_COLUMNS())
+        return self.distinct(*Message.CONVO_ID_COLUMNS)
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
@@ -1395,6 +1393,8 @@ class Message(models.Model):
 
     objects = MessageQuerySet.as_manager()
 
+    CONVO_ID_COLUMNS = [f"conversation__{col}" for col in Conversation.ID_COLUMNS]
+
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
@@ -1411,10 +1411,6 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
-
-    @classmethod
-    def CONVO_ID_COLUMNS(cls):
-        return [f"conversation__{col}" for col in Conversation.ID_COLUMNS()]
 
 
 class MessageAttachment(models.Model):
