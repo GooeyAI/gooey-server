@@ -402,7 +402,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         bot_integration=bi
     ).order_by()  # type: ignore
     # due to things like personal convos for slack, each user can have multiple conversations
-    users = conversations.get_unique_users().order_by()
+    users = conversations.distinct_by_user_id().order_by()
     messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
     user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
     bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
@@ -411,7 +411,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=7),
         )
-        .get_unique_users()
+        .distinct_by_user_id()
         .count()
     )
     num_active_users_last_30_days = (
@@ -419,7 +419,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=30),
         )
-        .get_unique_users()
+        .distinct_by_user_id()
         .count()
     )
     positive_feedbacks = Feedback.objects.filter(
@@ -431,11 +431,10 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         rating=Feedback.Rating.RATING_THUMBS_DOWN,
     ).count()
     run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
-    connection_detail = (
-        f"- Connected to: {bi.get_display_name()}"
-        if bi.get_display_name() != bi.name
-        else ""
-    )
+    if bi.get_display_name() != bi.name:
+        connection_detail = f"- Connected to: {bi.get_display_name()}"
+    else:
+        connection_detail = ""
     st.markdown(
         f"""
             - Platform: {Platform(bi.platform).name.capitalize()}
@@ -476,7 +475,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(Convos=Count("conversation_id", distinct=True))
         .annotate(
             Senders=Count(
-                Concat(*Message.CONVO_ID_COLUMNS),
+                Concat(*Message.convo_user_id_fields),
                 distinct=True,
             )
         )
