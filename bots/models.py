@@ -875,9 +875,9 @@ class ConvoState(models.IntegerChoices):
 
 
 class ConversationQuerySet(models.QuerySet):
-    def get_unique_users(self) -> models.QuerySet["Conversation"]:
+    def distinct_by_user_id(self) -> QuerySet["Conversation"]:
         """Get unique conversations"""
-        return self.distinct(*Conversation.ID_COLUMNS)
+        return self.distinct(*Conversation.user_id_fields)
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
@@ -1088,7 +1088,7 @@ class Conversation(models.Model):
 
     objects = ConversationQuerySet.as_manager()
 
-    ID_COLUMNS = [
+    user_id_fields = [
         "fb_page_id",
         "ig_account_id",
         "slack_user_id",
@@ -1119,14 +1119,6 @@ class Conversation(models.Model):
     def __str__(self):
         return f"{self.get_display_name()} <> {self.bot_integration}"
 
-    def get_id(self):
-        self_id = None
-        for col in self.ID_COLUMNS:
-            if getattr(self, col):
-                self_id = getattr(self, col)
-                break
-        return self_id
-
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
@@ -1136,8 +1128,13 @@ class Conversation(models.Model):
             or " in #".join(
                 filter(None, [self.slack_user_name, self.slack_channel_name])
             )
-            or self.get_id()
+            or self.unique_user_id()
         )
+
+    def unique_user_id(self) -> str | None:
+        for col in self.user_id_fields:
+            if value := getattr(self, col, None):
+                return value
 
     get_display_name.short_description = "User"
 
@@ -1174,9 +1171,9 @@ class Conversation(models.Model):
 
 
 class MessageQuerySet(models.QuerySet):
-    def get_unique_users(self) -> QuerySet["Message"]:
+    def distinct_by_user_id(self) -> QuerySet["Message"]:
         """Get unique users"""
-        return self.distinct(*Message.CONVO_ID_COLUMNS)
+        return self.distinct(*Message.convo_user_id_fields)
 
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
@@ -1393,7 +1390,9 @@ class Message(models.Model):
 
     objects = MessageQuerySet.as_manager()
 
-    CONVO_ID_COLUMNS = [f"conversation__{col}" for col in Conversation.ID_COLUMNS]
+    convo_user_id_fields = [
+        f"conversation__{col}" for col in Conversation.user_id_fields
+    ]
 
     class Meta:
         ordering = ("-created_at",)
