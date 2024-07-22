@@ -80,6 +80,7 @@ class CompareLLMPage(BasePage):
             LargeLanguageModels,
             label="#### 🤗 Compare Language Models",
             key="selected_models",
+            checkboxes=False,
         )
 
     def validate_form_v2(self):
