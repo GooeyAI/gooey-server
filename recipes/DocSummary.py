@@ -18,7 +18,11 @@ from daras_ai_v2.language_model import (
     calc_gpt_tokens,
     ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.pt import PromptTree
 from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.vector_search import (
@@ -58,7 +62,7 @@ class DocSummaryPage(BasePage):
         "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
         task_instructions: str | None
@@ -67,21 +71,14 @@ class DocSummaryPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
-
-        response_format_type: ResponseFormatType = Field(
-            None,
-            title="Response Format",
-        )
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         google_translate_target: str | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -117,7 +114,8 @@ Prompt for merging several outputs together
         #         )
         st.write("---")
 
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
     def preview_description(self, state: dict) -> str:
         return "Upload any collection of PDFs, docs and/or audio files and we'll transcribe them. Then give any GPT based instruction and we'll do a map-reduce and return the result. Great for summarizing large data sets to create structured data. Check out the examples for more."
