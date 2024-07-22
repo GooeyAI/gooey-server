@@ -694,16 +694,6 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="The audio url to play to the user while waiting for a response if using voice",
     )
-    twilio_tts_voice = models.TextField(
-        default="",
-        blank=True,
-        help_text="The voice to use for Twilio TTS ('man', 'woman', or Amazon Polly/Google Voices: https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages)",
-    )
-    twilio_asr_language = models.TextField(
-        default="",
-        blank=True,
-        help_text="The language to use for Twilio ASR (https://www.twilio.com/docs/voice/twiml/gather#languagetags)",
-    )
 
     streaming_enabled = models.BooleanField(
         default=False,

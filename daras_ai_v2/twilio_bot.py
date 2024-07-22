@@ -126,6 +126,8 @@ class TwilioVoice(BotInterface):
         text: str = None,
         audio_url: str = None,
     ):
+        from recipes.TextToSpeech import TextToSpeechProviders
+
         self.convo = convo
 
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
@@ -148,7 +150,10 @@ class TwilioVoice(BotInterface):
         super().__init__()
 
         self.use_gooey_asr = self.saved_run.state.get("asr_model")
-        self.use_gooey_tts = self.saved_run.state.get("tts_provider")
+        tts_provider = self.saved_run.state.get("tts_provider")
+        self.use_gooey_tts = (
+            tts_provider and tts_provider != TextToSpeechProviders.GOOGLE_TTS.name
+        )
 
     def get_input_text(self) -> str | None:
         return self._text

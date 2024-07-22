@@ -408,8 +408,6 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
-    import langcodes
-
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
@@ -421,16 +419,7 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_val = st.session_state.get(key)
-    if old_val and old_val not in options:
-        old_val_lang = langcodes.Language.get(old_val).language
-        for opt in options:
-            try:
-                if opt and langcodes.Language.get(opt).language == old_val_lang:
-                    st.session_state[key] = opt
-                    break
-            except langcodes.LanguageTagError:
-                pass
+    st.session_state[key] = get_language_match(st.session_state.get(key), options)
 
     return st.selectbox(
         label=label,
@@ -438,6 +427,30 @@ def asr_language_selector(
         format_func=lang_format_func,
         options=options,
     )
+
+
+def get_language_match(lang: str | None, languages: list[str]) -> str | None:
+    import langcodes
+
+    if not lang:
+        return None
+
+    if lang in languages:
+        return lang
+
+    try:
+        lan = langcodes.Language.get(lang).language
+    except langcodes.LanguageTagError:
+        return None
+
+    for language in languages:
+        try:
+            if language and langcodes.Language.get(language).language == lan:
+                return language
+        except langcodes.LanguageTagError:
+            pass
+
+    return None
 
 
 def lang_format_func(l):
