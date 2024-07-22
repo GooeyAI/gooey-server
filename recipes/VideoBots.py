@@ -127,6 +127,8 @@ class VideoBotsPage(BasePage):
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
+    functions_in_settings = False
+
     sane_defaults = {
         "messages": [],
         # tts

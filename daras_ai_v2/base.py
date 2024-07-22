@@ -1478,12 +1478,20 @@ class BasePage:
         ref.save(update_fields=["is_flagged"])
         st.session_state["is_flagged"] = is_flagged
 
+    # Functions in every recipe feels like overkill for now, hide it in settings
+    functions_in_settings = True
+
     def _render_input_col(self):
         self.render_form_v2()
-        self.render_variables()
+        placeholder = st.div()
 
         with st.expander("⚙️ Settings"):
+            if self.functions_in_settings:
+                functions_input(self.request.user)
             self.render_settings()
+
+        with placeholder:
+            self.render_variables()
 
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
@@ -1494,8 +1502,9 @@ class BasePage:
         return submitted
 
     def render_variables(self):
-        st.write("---")
-        functions_input(self.request.user)
+        if not self.functions_in_settings:
+            st.write("---")
+            functions_input(self.request.user)
         variables_input(
             template_keys=self.template_keys, allow_add=is_functions_enabled()
         )

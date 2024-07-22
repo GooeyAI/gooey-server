@@ -30,6 +30,8 @@ class CompareLLMPage(BasePage):
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
+    functions_in_settings = False
+
     sane_defaults = {
         "avoid_repetition": False,
         "num_outputs": 1,
