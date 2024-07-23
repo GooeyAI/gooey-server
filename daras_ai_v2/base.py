@@ -1699,6 +1699,7 @@ class BasePage:
                 run_id=sr.run_id,
                 uid=sr.uid,
                 channel=self.realtime_channel_name(sr.run_id, sr.uid),
+                extra_state=self._get_extra_state(),
             )
             | post_runner_tasks.s()
         )
@@ -1782,7 +1783,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             state.setdefault(k, v)
         return state
 
-    def fields_to_save(self) -> [str]:
+    def fields_to_save(self) -> list[str]:
         # only save the fields in request/response
         return [
             field_name
@@ -1793,6 +1794,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             StateKeys.run_status,
             StateKeys.run_time,
         ]
+
+    def _get_extra_state(self) -> dict[str, typing.Any]:
+        result = {}
+        for field in self.get_extra_state_fields():
+            if val := st.session_state.get(field):
+                result[field] = val
+
+        return result
+
+    def get_extra_state_fields(self) -> list[str]:
+        return []
 
     def _examples_tab(self):
         allow_hide = self.is_current_user_admin()

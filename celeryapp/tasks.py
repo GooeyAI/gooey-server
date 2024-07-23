@@ -41,6 +41,7 @@ def runner_task(
     run_id: str,
     uid: str,
     channel: str,
+    extra_state: dict[str, typing.Any],
 ) -> int:
     start_time = time()
     error_msg = None
@@ -84,7 +85,7 @@ def runner_task(
     page = page_cls(request=SimpleNamespace(user=user))
     page.setup_sentry()
     sr = page.run_doc_sr(run_id, uid)
-    st.set_session_state(sr.to_dict())
+    st.set_session_state(sr.to_dict() | extra_state)
     set_query_params(dict(run_id=run_id, uid=uid))
 
     try:

@@ -97,6 +97,9 @@ class TextToSpeechPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["tts_provider"]
 
+    def get_extra_state_fields(self):
+        return ["elevenlabs_api_key"]
+
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
