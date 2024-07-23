@@ -8,6 +8,7 @@ from fastapi.requests import Request
 from furl import furl
 from loguru import logger
 from requests.models import HTTPError
+from starlette.responses import Response
 
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
@@ -17,9 +18,11 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+
+from orgs.models import OrgInvitation
 from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
-from orgs.views import orgs_page
+from orgs.views import invitation_page, orgs_page
 
 from routers.custom_api_router import CustomAPIRouter
 
@@ -153,6 +156,33 @@ def orgs_route(request: Request):
             canonical_url=url,
             title="Teams • Gooey.AI",
             description="Your teams.",
+            robots="noindex,nofollow",
+        )
+    )
+
+
+@app.post("/invitation/{org_slug}/{invite_id}/")
+@st.route
+def invitation_route(request: Request, org_slug: str, invite_id: str):
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        next_url = request.url.path
+        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
+        raise RedirectException(redirect_url)
+
+    try:
+        invitation = OrgInvitation.objects.get(invite_id=invite_id)
+    except OrgInvitation.DoesNotExist:
+        return Response(status_code=404)
+
+    with page_wrapper(request):
+        invitation_page(user=request.user, invitation=invitation)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title=f"Join {invitation.org.name} • Gooey.AI",
+            description=f"Invitation to join {invitation.org.name}",
             robots="noindex,nofollow",
         )
     )
