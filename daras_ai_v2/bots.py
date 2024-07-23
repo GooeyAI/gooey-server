@@ -1,5 +1,4 @@
 import mimetypes
-import traceback
 import typing
 from datetime import datetime
 
@@ -8,7 +7,6 @@ from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
-from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -20,6 +18,7 @@ from bots.models import (
     ConvoState,
     Workflow,
     MessageAttachment,
+    BotIntegration,
 )
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
@@ -46,9 +45,9 @@ INVALID_INPUT_FORMAT = (
 )
 
 ERROR_MSG = """
-`{}`
+⚠️ Sorry, I ran into an error while processing your request. Please try again, or send "Reset" to start over.
 
-⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
+`{}`
 """.strip()
 
 FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
@@ -76,15 +75,17 @@ class BotInterface:
     bot_id: str
     user_id: str
     convo: Conversation
+    bi: BotIntegration
+    saved_run: SavedRun
     input_type: typing.Literal[
         "text", "audio", "video", "image", "document", "interactive"
     ]
     user_msg_id: str = None
     can_update_message: bool = False
 
-    page_cls: typing.Type[BasePage] | None
+    page_cls: typing.Type[BasePage] = None
     query_params: dict
-    language: str
+    user_language: str = None
     billing_account_uid: str
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
@@ -96,6 +97,43 @@ class BotInterface:
 
     request_overrides: dict = None
 
+    def __init__(self):
+        assert self.convo, "A conversation must be set"
+
+        self.bi = self.convo.bot_integration
+        if self.bi.published_run:
+            self.saved_run = self.bi.published_run.saved_run
+            self.page_cls = Workflow(self.bi.published_run.workflow).page_cls
+            self.query_params = dict(
+                example_id=self.bi.published_run.published_run_id,
+            )
+        elif self.bi.saved_run:
+            self.saved_run = self.bi.saved_run
+            self.page_cls = Workflow(self.saved_run.workflow).page_cls
+            self.query_params = self.page_cls.clean_query_params(
+                example_id=self.saved_run.example_id,
+                run_id=self.saved_run.run_id,
+                uid=self.saved_run.uid,
+            )
+        else:
+            raise AssertionError(f"No saved run found for {self.bi=}")
+
+        if self.saved_run:
+            self.input_glossary = self.saved_run.state.get("input_glossary_document")
+            self.output_glossary = self.saved_run.state.get("output_glossary_document")
+            user_language = self.saved_run.state.get("user_language")
+        else:
+            user_language = None
+
+        if should_translate_lang(self.bi.user_language):
+            self.user_language = self.bi.user_language
+        elif should_translate_lang(user_language):
+            self.user_language = user_language
+
+        self.billing_account_uid = self.bi.billing_account_uid
+        self.show_feedback_buttons = self.bi.show_feedback_buttons
+        self.streaming_enabled = self.bi.streaming_enabled
+
     def send_msg(
         self,
         *,
@@ -104,7 +142,41 @@ class BotInterface:
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
+        update_msg_id: str = None,
         should_translate: bool = False,
+    ) -> str | None:
+        """
+        Send a message response to the user using the bot's platform API
+
+        :param text: The text to send
+        :param audio: The audio URL to send
+        :param video: The video URL to send
+        :param buttons: The interactive reply buttons to send
+        :param documents: The document URLs to send
+        :param update_msg_id: The message ID of the message to update in-place
+        :param should_translate: The messages from the saved run itself should automatically be translated,
+            so we don't need to translate them again. This flag is for when we need to translate hardcoded text
+        :return: The message ID of the sent message
+        """
+        if should_translate:
+            text = self.translate_response(text)
+        return self._send_msg(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            documents=documents,
+            update_msg_id=update_msg_id,
+        )
+
+    def _send_msg(
+        self,
+        *,
+        text: str | None = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
         update_msg_id: str = None,
     ) -> str | None:
         raise NotImplementedError
@@ -139,38 +211,13 @@ class BotInterface:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform.name}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
-    def _unpack_bot_integration(self):
-        bi = self.convo.bot_integration
-        if bi.published_run:
-            self.page_cls = Workflow(bi.published_run.workflow).page_cls
-            self.query_params = self.page_cls.clean_query_params(
-                example_id=bi.published_run.published_run_id,
-                run_id="",
-                uid="",
-            )
-            saved_run = bi.published_run.saved_run
-            self.input_glossary = saved_run.state.get("input_glossary_document")
-            self.output_glossary = saved_run.state.get("output_glossary_document")
-            self.language = saved_run.state.get("user_language")
-        elif bi.saved_run:
-            self.page_cls = Workflow(bi.saved_run.workflow).page_cls
-            self.query_params = self.page_cls.clean_query_params(
-                example_id=bi.saved_run.example_id,
-                run_id=bi.saved_run.run_id,
-                uid=bi.saved_run.uid,
-            )
-            self.input_glossary = bi.saved_run.state.get("input_glossary_document")
-            self.output_glossary = bi.saved_run.state.get("output_glossary_document")
-            self.language = bi.saved_run.state.get("user_language")
+    def translate_response(self, text: str | None) -> str:
+        if text and self.user_language:
+            return run_google_translate(
+                [text], self.user_language, glossary_url=self.output_glossary
+            )[0]
         else:
-            self.page_cls = None
-            self.query_params = {}
-
-        self.billing_account_uid = bi.billing_account_uid
-        if should_translate_lang(bi.user_language):
-            self.language = bi.user_language
-        self.show_feedback_buttons = bi.show_feedback_buttons
-        self.streaming_enabled = bi.streaming_enabled
+            return text or ""
 
 
 def _echo(bot, input_text):
@@ -199,8 +246,17 @@ def _mock_api_output(input_text):
     }
 
 
-@db_middleware
 def msg_handler(bot: BotInterface):
+    try:
+        _msg_handler(bot)
+    except Exception as e:
+        # send error msg as repsonse
+        bot.send_msg(text=ERROR_MSG.format(e))
+        raise
+
+
+@db_middleware
+def _msg_handler(bot: BotInterface):
     recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
@@ -279,13 +335,7 @@ def msg_handler(bot: BotInterface):
 
 
 def _handle_feedback_msg(bot: BotInterface, input_text):
-    try:
-        last_feedback = Feedback.objects.filter(
-            message__conversation=bot.convo
-        ).latest()
-    except Feedback.DoesNotExist as e:
-        bot.send_msg(text=ERROR_MSG.format(e))
-        return
+    last_feedback = Feedback.objects.filter(message__conversation=bot.convo).latest()
     # save the feedback
     last_feedback.text = input_text
     # translate feedback to english
@@ -295,7 +345,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
     last_feedback.save()
     # send back a confimation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
-    bot_name = str(bot.convo.bot_integration.name)
+    bot_name = str(bot.bi.name)
     # reset convo state
     bot.convo.state = ConvoState.INITIAL
     bot.convo.save()
@@ -327,9 +377,10 @@ def _process_and_send_msg(
         input_images=input_images,
         input_documents=input_documents,
         messages=saved_msgs,
+        variables=build_run_vars(bot.convo, bot.user_msg_id),
     )
-    if should_translate_lang(bot.language):
-        body["user_language"] = bot.language
+    if bot.user_language:
+        body["user_language"] = bot.user_language
     if bot.request_overrides:
         body = bot.request_overrides | body
     page, result, run_id, uid = submit_api_call(
@@ -441,6 +492,49 @@ def _process_and_send_msg(
     )
 
 
+def build_run_vars(convo: Conversation, user_msg_id: str):
+    from routers.bots_api import MSG_ID_PREFIX
+
+    bi = convo.bot_integration
+    if bi.platform == Platform.WEB:
+        user_msg_id = user_msg_id.lstrip(MSG_ID_PREFIX)
+    variables = dict(
+        platform=Platform(bi.platform).name,
+        integration_id=bi.api_integration_id(),
+        integration_name=bi.name,
+        conversation_id=convo.api_integration_id(),
+        user_message_id=user_msg_id,
+    )
+    match bi.platform:
+        case Platform.FACEBOOK:
+            variables["user_fb_page_name"] = convo.fb_page_name
+            variables["bot_fb_page_name"] = bi.fb_page_name
+        case Platform.INSTAGRAM:
+            variables["user_ig_username"] = convo.ig_username
+            variables["bot_ig_username "] = bi.ig_username
+        case Platform.WHATSAPP:
+            variables["user_wa_phone_number"] = (
+                convo.wa_phone_number and convo.wa_phone_number.as_international
+            )
+            variables["bot_wa_phone_number"] = (
+                bi.wa_phone_number and bi.wa_phone_number.as_international
+            )
+        case Platform.SLACK:
+            variables["slack_user_name"] = convo.slack_user_name
+            variables["slack_channel_name"] = convo.slack_channel_name
+            variables["slack_team_name"] = bi.slack_team_name
+        case Platform.WEB:
+            variables["web_user_id"] = convo.web_user_id
+        case Platform.TWILIO:
+            variables["user_twilio_phone_number"] = (
+                convo.twilio_phone_number and convo.twilio_phone_number.as_international
+            )
+            variables["bot_twilio_phone_number"] = (
+                bi.twilio_phone_number and bi.twilio_phone_number.as_international
+            )
+    return variables
+
+
 def _save_msgs(
     bot: BotInterface,
     input_images: list[str] | None,
@@ -486,24 +580,13 @@ def _save_msgs(
 
 
 def _handle_interactive_msg(bot: BotInterface):
-    try:
-        button = bot.get_interactive_msg_info()
-    except NotImplementedError as e:
-        bot.send_msg(text=ERROR_MSG.format(e))
-        return
+    button = bot.get_interactive_msg_info()
     match button.button_id:
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
-            try:
-                context_msg = Message.objects.get(
-                    platform_msg_id=button.context_msg_id, conversation=bot.convo
-                )
-            except Message.DoesNotExist as e:
-                traceback.print_exc()
-                capture_exception(e)
-                # send error msg as repsonse
-                bot.send_msg(text=ERROR_MSG.format(e))
-                return
+            context_msg = Message.objects.get(
+                platform_msg_id=button.context_msg_id, conversation=bot.convo
+            )
             if button.button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
                 # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
@@ -512,9 +595,7 @@ def _handle_interactive_msg(bot: BotInterface):
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
                 # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
                 # response_text = FEEDBACK_THUMBS_DOWN_MSG
-            response_text = FEEDBACK_CONFIRMED_MSG.format(
-                bot_name=str(bot.convo.bot_integration.name)
-            )
+            response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
             bot.convo.save()
             # save the feedback
             Feedback.objects.create(message=context_msg, rating=rating)
@@ -535,7 +616,7 @@ def _handle_interactive_msg(bot: BotInterface):
 
         # not sure what button was pressed, ignore
         case _:
-            bot_name = str(bot.convo.bot_integration.name)
+            bot_name = str(bot.bi.name)
             bot.send_msg(
                 text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
                 should_translate=True,

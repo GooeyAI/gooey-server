@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -289,7 +289,7 @@ class Subscription(models.Model):
             case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
                     customer=self.stripe_get_customer_id(),
-                    return_url=get_route_url(account_route),
+                    return_url=get_app_route_url(account_route),
                 )
                 return portal.url
             case PaymentProvider.PAYPAL:

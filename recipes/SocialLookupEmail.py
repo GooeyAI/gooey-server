@@ -15,7 +15,11 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     SUPERSCRIPT,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
@@ -38,7 +42,7 @@ class SocialLookupEmailPage(BasePage):
         "sampling_temperature": 0.5,
     }
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         email_address: str
 
         input_prompt: str | None
@@ -50,15 +54,12 @@ class SocialLookupEmailPage(BasePage):
         # domain: str | None
         # key_words: str | None
 
-        # llm settings
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        num_outputs: int | None
-        avoid_repetition: bool | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         person_data: dict
@@ -126,7 +127,8 @@ class SocialLookupEmailPage(BasePage):
         )
 
     def render_settings(self):
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
         # st.text_input("URL 1", key="url1")
         # st.text_input("URL 2", key="url2")
@@ -174,6 +176,7 @@ class SocialLookupEmailPage(BasePage):
             max_tokens=request.max_tokens,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
             stream=True,
         )
         for i, entries in enumerate(chunks):

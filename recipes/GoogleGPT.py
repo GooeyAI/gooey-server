@@ -1,7 +1,7 @@
 import typing
 
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -14,10 +14,15 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
+    ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars, variables_input
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -73,7 +78,7 @@ class GoogleGPTPage(BasePage):
         dense_weight=1.0,
     )
 
-    class RequestModel(GoogleSearchMixin, BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         search_query: str
         site_filter: str
 
@@ -83,11 +88,6 @@ class GoogleGPTPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         max_search_urls: int | None
 
@@ -99,6 +99,9 @@ class GoogleGPTPage(BasePage):
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
+
+    class RequestModel(GoogleSearchMixin, LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -140,12 +143,14 @@ class GoogleGPTPage(BasePage):
             height=300,
         )
         st.write("---")
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
         st.write("---")
         serp_search_settings()
         st.write("---")
         st.write("##### 🔎 Document Search Settings")
         query_instructions_widget()
+        st.write("---")
         doc_search_advanced_settings()
 
     def related_workflows(self) -> list:
@@ -279,4 +284,5 @@ class GoogleGPTPage(BasePage):
             prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )

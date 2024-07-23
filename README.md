@@ -1,20 +1,57 @@
-## Setup
+<h3 align="center">
+  <img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cdc58fe0-2da1-11ef-84df-02420a0001f4/githubbanner.png"
+  />
+</h3>
+<p align="center">
+  <a href="https://gooey.ai">🏠 Homepage</a> ·
+  <a href="https://gooey.ai/explore">👾 Explore Workflows</a> ·
+  <a href="https://gooey.ai/docs">📚 Docs</a> ·
+  <a href="https://gooey.ai/api">🤖 API</a> ·
+  <a href="https://gooey.ai/discord">🛟 Discord</a> ·
+  <a href="https://gooey.ai/account">💃🏾 Start Building</a>
+</p>
 
-* Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
-* Install [poetry](https://python-poetry.org/docs/)
-* Clone the github repo to gooey-server (and make sure that's the folder name)
-* Create & activate a virtualenv (e.g. `poetry shell`)
-* Run `poetry install --with dev`
-* Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
-* Enable background services for `redis`, `rabbitmq`, and `postgresql` (e.g. with `brew services start redis` and similar for `rabbitmq` and `postgresql`)
-* Use `sqlcreate` helper to create a user and database for gooey:
-  * `./manage.py sqlcreate | psql postgres`
-  * make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
-* Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
-* Run `./manage.py migrate`
-* Install the zbar library (`brew install zbar`)
+<div>
+  <p align="center">
+    <a
+    href="https://x.com/GooeyAI">
+        <img src="https://img.shields.io/badge/X/Twitter-000000?style=for-the-badge&logo=x&logoColor=white" />
+    </a>
+    <a href="https://in.linkedin.com/company/gooeyai">
+        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
+    </a>
+    <a href="https://gooey.ai/discord">
+        <img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" />
+    </a>
+    <a href="https://www.youtube.com/@gooeyai">
+        <img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />
+    </a>
+ </p>
+</div>
 
-### Create a google cloud / firebase account
+[Gooey.AI](http://gooey.ai/) is the low-code orchestration platform with **discoverable workflows** & **unified billing to all of GenAI universe.** 
+
+
+
+# 🤖🍲 What is Gooey Server?
+Gooey.AI is a low-code AI recipe platform and Gooey Server is our core repo.   
+It allows users to discover, customize, and deploy AI "recipes" using the best of private and open-source AI,
+all using a single API with a single auth token.   
+Recipes are workflows that incorporate various models to accomplish a task; they are designed to be highly customizable and shareable. 
+
+## 🧑‍💻 Who is this for and why would I want to use it?
+For most developers, we DO NOT recommend running or forking Gooey Server; use our [APIs](https://gooey.ai/api/) or [client SDK](https://github.com/GooeyAI/python-sdk) instead.     
+The repo is intended only for developers who want to run and deploy their own server cluster or run Gooey locally for development purposes. 
+
+Specifically, this repo may be for you if:
+- You want to create a new recipe (instead of changing the parameters on an existing one)
+- You want to add an AI model that we currently don’t support. 
+- You are an enterprise with specific requirements regarding data practices, such as using specific cloud providers.
+- You want to add some other functionality that we don’t support.
+
+## 📋 Setup
+
+### ☁️ Create a google cloud / firebase account
 
 1. Create a [google cloud](https://console.cloud.google.com/) project
 2. Create a [firebase project](https://console.firebase.google.com/) (using the same google cloud project) 
@@ -35,19 +72,85 @@
 5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
 6. Add your project & bucket name to `.env`
 
-* Run tests to see if everything is working fine:
-  ``` 
-  ./scripts/run-tests.sh
-  ```
-  (If you run into issues with the number of open files, you can remove the limit with `ulimit -n unlimited`)
 
-## Run
+### 💻 Setup (Mac)
 
-You can start all required processes in one command with Honcho:
-
-```shell
-$ poetry run honcho start
+* Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
+* Install [poetry](https://python-poetry.org/docs/)
+* Clone the github repo to `gooey-server` (and make sure that's the folder name)
+* Create & activate a virtualenv (e.g. `poetry shell`)
+* Run `poetry install --with dev`
+* Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
+* Enable background services for `redis`, `rabbitmq`, and `postgresql` (e.g. with `brew services start redis` and similar for `rabbitmq` and `postgresql`)
+* Use `sqlcreate` helper to create a user and database for gooey:
+  * `./manage.py sqlcreate | psql postgres`
+  * make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
+* Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
+* Run `./manage.py migrate`
+* Install the zbar library (`brew install zbar`)
+* (optional) Install imagemagick - Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
 ```
+brew install freetype imagemagick
+export MAGICK_HOME=/opt/homebrew
+```
+
+### 🐧 Setup (Linux)
+* Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile) (currently Python 3.10)
+  - `curl https://pyenv.run | bash`
+* Install [poetry](https://python-poetry.org/docs/)
+  - This is likely available in your distro's package repos. 
+* Clone this repository:
+* Create and activate a virtualenv using `poetry shell`
+* Install dependencies using `poetry install --with dev`
+  - Note: you may have to remove `package-mode=false` on line 7 of `pyproject.toml`
+* Install redis, rabbitmq-server, and postgresql 15 using your distro's package manager. 
+* Enable these services as background services using `sudo systemctl enable --now redis rabbitmq-server postgresql`
+* Configure Postgres to ensure that password authentication is enabled for the gooey user
+    - open the pg_hba.conf file in a text editor. On Linux, by default, it is usually located either at ```/etc/postgresql/<version>/main/``` or ```/var/lib/pgsql/<version>/data/```
+    - add/edit the file so that there are lines at the bottom that looks like this:
+    ```
+    local    all        gooey                    md5
+    host     all        gooey                    md5
+    ```
+    - restart postgresql using ```sudo systemctl restart postgresql```
+* Use the manage.py script to set up the Postgres database:
+  - To create the user and database for gooey: `./manage.py sqlcreate | sudo -u postgres psql postgres `
+  - Test your setup to ensure that `gooey-server` can access the database by running `psql -W -U gooey gooey` and supplying "gooey" as the password
+* Create a .env file from `.env.example`
+* Install the zbar library using your distro's package manager. 
+
+### 🌍 Frontend 
+
+Clone [gooey-gui](https://github.com/GooeyAI/gooey-gui) repo, in the same directory as `gooey-server` and follow the setup steps.
+
+### 🧪 Run Tests
+
+``` 
+ulimit -n unlimited  # Increase the number of open files allowed
+./scripts/run-tests.sh
+```
+
+### 🗄 Initialize databse
+
+
+```bash
+# reset the database
+./manage.py reset_db -c
+# create the database
+./manage.py sqlcreate | psql postgres
+# run migrations
+./manage.py migrate
+# load the fixture (donwloaded by ./scripts/run-tests.sh)
+./manage.py loaddata fixture.json
+# create a superuser to access admin
+./manage.py createsuperuser
+```
+
+## 🏃 Run
+
+_Note: The `gooey-server` project is not currently set up to be run without support from Gooey. This software requires access to a Google Cloud instance as well as business data loaded in the database. If you are interested in running this software totally independently, reach out to support@gooey.ai to communicate with our enterprise team._ 
+
+### Services
 
 The processes that it starts are defined in [`Procfile`](Procfile).
 Currently they are these:
@@ -61,16 +164,26 @@ Currently they are these:
 | UI               | `3000`  |
 | Vespa            | `8085`  |
 
+### Honcho
+
+You can start all required processes in one command with Honcho:
+
+```shell
+poetry run honcho start
+```
+This will spin up the API server at `http://localhost:8080`. To view the autogenerated API documentation, navigate to `http://localhost:8080/docs`
+
 This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
-as background services on ports 6379, 5672, and 5432 respectively. 
-It also assumes that the gooey-ui repo can be found at `../gooey-ui/` (adjacent to where the
-gooey-server repo sits). You can open the Procfile and comment this out if you don't need
+as background services on ports `6379`, `5672`, and `5432` respectively.
+
+The gooey-gui repo should be cloned at `../gooey-gui/`
+(adjacent to where the`gooey-server` repo sits). You can open the Procfile and comment this out if you don't need
 to run it.
 
 **Note:** the Celery worker must be manually restarted on code changes. You
 can do this by stopping and starting Honcho.
 
-## To run vespa (used for vector search)
+### Vespa (used for vector search)
 
 You need to install OrbStack or Docker Desktop for this to work.
 
@@ -91,135 +204,7 @@ docker run \
 ./manage.py runscript setup_vespa_db
 ```
 
-## To connect to our GPU cluster 
 
-* Connect to k8s cluster -
-```bash
-gcloud container clusters get-credentials cluster-5 --zone us-central1-a
-```
-
-* Port-forward the rabbitmq and redis services -
-```bash
-kubectl port-forward rabbitmq-1-rabbitmq-0 15674:15672 5674:5672 & kubectl port-forward redis-ha-1-server-0 6374:6379
-```
-
-* Add the following to `.env` file -
-```
-GPU_CELERY_BROKER_URL="amqp://rabbit:<password>@localhost:5674"
-GPU_CELERY_RESULT_BACKEND="redis://:<password>@localhost:6374"
-```
-
-### Install imagemagick
-
-Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
-
-```
-brew install freetype imagemagick
-export MAGICK_HOME=/opt/homebrew
-```
-
-### Code Formatting
+### 📐 Code Formatting
 
 Use black - https://pypi.org/project/black
-
-**Recommended**: Black IDE integration Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
-
-
-## Running test Whatsapp bot
-
-We use the following facebook app for testing - 
-```
-gooey.ai (dev)
-App ID: 228027632918921
-```
-
-Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & send admin your **facebook ID** to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
-
-1. start ngrok
-
-```
-ngrok http 8080
-```
-
-2. set env var `FB_WEBHOOK_TOKEN = asdf1234`
-
-
-3. Open [WhatsApp Configuration](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-settings/?business_id=549319917267066), set the Callback URL and Verify Token
-<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/95bb3a87-ae4f-4f6b-a04e-583ee51b85de">
-
-4. Open [WhatsApp API Setup](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-dev-console/?business_id=549319917267066), send yourself a message from the test number.
-<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/f9417723-77c0-4be5-9814-778662215d9c">
-
-5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
-
-
-**(Optional) Use the test script to send yourself messages** 
-
-```bash
-python manage.py runscript test_wa_msg_send --script-args 104696745926402 +918764022384
-```
-Replace `+918764022384` with your number and `104696745926402` with the test number ID
-
-## Dangerous postgres commands
-
-### backup & restore postgres db
-
-**on server**
-```bash
-# select a running container
-cid=$(docker ps | grep gooey-api-prod | cut -d " " -f 1 | head -1)
-# give it a nice name 
-fname=gooey_db_$(date +"%Y-%m-%d_%I-%M-%S_%p").dump
-# exec the script to create the fixture
-docker exec -it $cid pg_dump --dbname $PGDATABASE --format c -f "$fname"
-# copy the fixture outside container
-docker cp $cid:/app/$fname .
-# print the absolute path
-echo $PWD/$fname
-```
-
-**on local**
-```bash
-# reset the database
-./manage.py reset_db -c
-# create the database with an empty template
-createdb -T template0 $PGDATABASE
-# restore the database
-pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
-```
-
-### create & load fixtures
-
-**on server**
-```bash
-# select a running container
-cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
-# exec the script to create the fixture
-docker exec -it $cid poetry run ./manage.py runscript create_fixture
-# upload the fixture
-docker exec -it $cid poetry run ./manage.py runscript upload_fixture
-```
-
-To load the fixture on local db -
-
-```bash
-# reset the database
-./manage.py reset_db -c
-# create the database
-./manage.py sqlcreate | psql postgres
-# run migrations
-./manage.py migrate
-# load the fixture
-./manage.py loaddata fixture.json
-# create a superuser to access admin
-./manage.py createsuperuser
-```
-
-### copy one postgres db to another
-
-**on server**
-```bash
-./manage.py reset_db
-createdb -T template0 $PGDATABASE
-pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
-```

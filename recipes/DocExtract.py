@@ -38,8 +38,15 @@ from daras_ai_v2.functional import (
     flatapply_parallel,
 )
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+)
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import (
@@ -76,7 +83,7 @@ class DocExtractPage(BasePage):
     ]
     price = 500
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
         sheet_url: FieldHttpUrl | None
@@ -95,11 +102,9 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         pass
@@ -134,11 +139,12 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 
     def render_settings(self):
         st.text_area(
-            "### 👩‍🏫 Task Instructions",
+            "##### 👩‍🏫 Task Instructions",
             key="task_instructions",
             height=300,
         )
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
@@ -464,6 +470,7 @@ def process_source(
                     prompt=prompt,
                     max_tokens=request.max_tokens,
                     avoid_repetition=request.avoid_repetition,
+                    response_format_type=request.response_format_type,
                 )
             )
             update_cell(spreadsheet_id, row, Columns.summary.value, summary)

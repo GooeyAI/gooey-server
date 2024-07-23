@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from recipes.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -14,8 +13,13 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_ASSISTANT,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.pt import PromptTree
+from recipes.GoogleGPT import render_output_with_refs
 
 DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3d71b434-9457-11ee-8edd-02420a0001c7/Smart%20GPT.jpg.png"
 
@@ -27,7 +31,7 @@ class SmartGPTPage(BasePage):
     slug_versions = ["SmartGPT"]
     price = 20
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str
 
         cot_prompt: str | None
@@ -37,11 +41,9 @@ class SmartGPTPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -80,7 +82,8 @@ class SmartGPTPage(BasePage):
                 """,
             key="dera_prompt",
         )
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
     def related_workflows(self):
         from recipes.CompareLLM import CompareLLMPage
@@ -118,6 +121,7 @@ class SmartGPTPage(BasePage):
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
         state["prompt_tree"] = prompt_tree = [
             {
@@ -139,6 +143,7 @@ class SmartGPTPage(BasePage):
                 quality=request.quality,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
+                response_format_type=request.response_format_type,
             )[0],
             prompt_tree,
         )
@@ -171,6 +176,7 @@ class SmartGPTPage(BasePage):
             quality=request.quality,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
         state["output_text"] = dera_outputs
 

@@ -37,13 +37,6 @@ from daras_ai_v2.language_model import (
 from gooey_ui import RedirectException
 from recipes.VideoBots import VideoBotsPage
 
-ID_COLUMNS = [
-    "conversation__fb_page_id",
-    "conversation__ig_account_id",
-    "conversation__wa_phone_number",
-    "conversation__slack_user_id",
-]
-
 
 class VideoBotsStatsPage(BasePage):
     title = "Copilot Analytics"  # "Create Interactive Video Bots"
@@ -123,11 +116,6 @@ class VideoBotsStatsPage(BasePage):
 
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
-            return
-        if not self.request.user.is_paying and not self.is_current_user_admin():
-            st.write(
-                "**Please upgrade to a paid plan to view stats for your bot integrations**"
-            )
             return
         if self.is_current_user_admin():
             bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
@@ -409,7 +397,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         bot_integration=bi
     ).order_by()  # type: ignore
     # due to things like personal convos for slack, each user can have multiple conversations
-    users = conversations.get_unique_users().order_by()
+    users = conversations.distinct_by_user_id().order_by()
     messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
     user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
     bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
@@ -418,9 +406,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=7),
         )
-        .distinct(
-            *ID_COLUMNS,
-        )
+        .distinct_by_user_id()
         .count()
     )
     num_active_users_last_30_days = (
@@ -428,9 +414,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             conversation__in=users,
             created_at__gte=timezone.now() - timedelta(days=30),
         )
-        .distinct(
-            *ID_COLUMNS,
-        )
+        .distinct_by_user_id()
         .count()
     )
     positive_feedbacks = Feedback.objects.filter(
@@ -442,14 +426,17 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         rating=Feedback.Rating.RATING_THUMBS_DOWN,
     ).count()
     run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
-    connection_detail = bi.get_display_name()
+    if bi.get_display_name() != bi.name:
+        connection_detail = f"- Connected to: {bi.get_display_name()}"
+    else:
+        connection_detail = ""
     st.markdown(
         f"""
             - Platform: {Platform(bi.platform).name.capitalize()}
             - Created on: {bi.created_at.strftime("%b %d, %Y")}
             - Last Updated: {bi.updated_at.strftime("%b %d, %Y")}
             - {run_link}
-            - Connected to: {connection_detail}
+            {connection_detail}
             * {users.count()} Users
             * {num_active_users_last_7_days} Active Users (Last 7 Days)
             * {num_active_users_last_30_days} Active Users (Last 30 Days)
@@ -483,9 +470,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(Convos=Count("conversation_id", distinct=True))
         .annotate(
             Senders=Count(
-                Concat(
-                    *ID_COLUMNS,
-                ),
+                Concat(*Message.convo_user_id_fields),
                 distinct=True,
             )
         )

@@ -20,9 +20,13 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -63,20 +67,18 @@ class DocSearchPage(BasePage):
         "dense_weight": 1.0,
     }
 
-    class RequestModel(DocSearchRequest, BasePage.RequestModel):
+    class RequestModelBase(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -124,18 +126,19 @@ class DocSearchPage(BasePage):
 
     def render_settings(self):
         st.text_area(
-            "### 👩‍🏫 Task Instructions",
+            "##### 👩‍🏫 Task Instructions",
             key="task_instructions",
             height=300,
         )
         st.write("---")
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
         st.write("---")
         st.write("##### 🔎 Document Search Settings")
         citation_style_selector()
         doc_extract_selector(self.request and self.request.user)
-        st.write("---")
         query_instructions_widget()
+        st.write("---")
         doc_search_advanced_settings()
 
     def preview_image(self, state: dict) -> str | None:
@@ -202,6 +205,7 @@ class DocSearchPage(BasePage):
             prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
 
         citation_style = (

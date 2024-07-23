@@ -33,6 +33,10 @@ from daras_ai_v2.text_splitter import (
 from functions.recipe_functions import LLMTools
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
+DEFAULT_JSON_PROMPT = (
+    "Please respond directly in JSON format. "
+    "Don't output markdown or HTML, instead print the JSON object directly without formatting."
+)
 
 CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISTANT = "assistant"
@@ -65,9 +69,11 @@ class LLMSpec(typing.NamedTuple):
     is_chat_model: bool = True
     is_vision_model: bool = False
     is_deprecated: bool = False
+    supports_json: bool = False
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
         model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o"),
@@ -75,6 +81,17 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         price=10,
         is_vision_model=True,
+        supports_json=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-4o-mini
+    gpt_4_o_mini = LLMSpec(
+        label="GPT-4o-mini (openai)",
+        model_id="gpt-4o-mini",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=1,
+        is_vision_model=True,
+        supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
@@ -87,6 +104,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         price=6,
         is_vision_model=True,
+        supports_json=True,
     )
     gpt_4_vision = LLMSpec(
         label="GPT-4 Vision (openai) 🔻",
@@ -104,6 +122,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=5,
+        supports_json=True,
     )
 
     # https://platform.openai.com/docs/models/gpt-4
@@ -129,6 +148,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.openai,
         context_window=4096,
         price=1,
+        supports_json=True,
     )
     gpt_3_5_turbo_16k = LLMSpec(
         label="ChatGPT 16k (openai)",
@@ -153,6 +173,15 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
+    )
+    llama_3_groq_70b_tool_use = LLMSpec(
+        label="Llama 3 Groq 70b Tool Use",
+        model_id="llama3-groq-70b-8192-tool-use-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
     )
     llama3_8b = LLMSpec(
         label="Llama 3 8b (Meta AI)",
@@ -160,6 +189,15 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
+        supports_json=True,
+    )
+    llama_3_groq_8b_tool_use = LLMSpec(
+        label="Llama 3 Groq 8b Tool Use",
+        model_id="llama3-groq-8b-8192-tool-use-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
     )
     llama2_70b_chat = LLMSpec(
         label="Llama 2 70b Chat [Deprecated] (Meta AI)",
@@ -175,6 +213,15 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=32_768,
         price=1,
+        supports_json=True,
+    )
+    gemma_2_9b_it = LLMSpec(
+        label="Gemma 2 9B (Google)",
+        model_id="gemma2-9b-it",
+        llm_api=LLMApis.groq,
+        context_window=8_192,
+        price=1,
+        supports_json=True,
     )
     gemma_7b_it = LLMSpec(
         label="Gemma 7B (Google)",
@@ -182,6 +229,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.groq,
         context_window=8_192,
         price=1,
+        supports_json=True,
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -327,6 +375,7 @@ class LargeLanguageModels(Enum):
         self.is_deprecated = spec.is_deprecated
         self.is_chat_model = spec.is_chat_model
         self.is_vision_model = spec.is_vision_model
+        self.supports_json = spec.supports_json
 
     @property
     def value(self):
@@ -400,11 +449,11 @@ def run_language_model(
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     if model.is_chat_model:
-        if not messages:
+        if prompt and not messages:
             # convert text prompt to chat messages
             messages = [
-                {"role": "system", "content": DEFAULT_SYSTEM_MSG},
-                {"role": "user", "content": prompt},
+                format_chat_entry(role=CHATML_ROLE_SYSTEM, content=DEFAULT_SYSTEM_MSG),
+                format_chat_entry(role=CHATML_ROLE_USER, content=prompt),
             ]
         if not model.is_vision_model:
             # remove images from the messages
@@ -412,6 +461,22 @@ def run_language_model(
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
+        if (
+            messages
+            and response_format_type == "json_object"
+            and "JSON" not in str(messages).upper()
+        ):
+            if messages[0]["role"] != CHATML_ROLE_SYSTEM:
+                messages.insert(
+                    0,
+                    format_chat_entry(
+                        role=CHATML_ROLE_SYSTEM, content=DEFAULT_JSON_PROMPT
+                    ),
+                )
+            else:
+                messages[0]["content"] = "\n\n".join(
+                    [get_entry_text(messages[0]), DEFAULT_JSON_PROMPT]
+                )
         entries = _run_chat_model(
             api=model.llm_api,
             model=model.model_id,
@@ -597,6 +662,7 @@ def _run_chat_model(
                 max_tokens=max_tokens,
                 temperature=temperature,
                 avoid_repetition=avoid_repetition,
+                response_format_type=response_format_type,
                 stop=stop,
             )
         case LLMApis.anthropic:
@@ -994,6 +1060,7 @@ def _run_groq_chat(
     temperature: float,
     avoid_repetition: bool,
     stop: list[str] | None,
+    response_format_type: ResponseFormatType | None,
 ):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
@@ -1009,6 +1076,8 @@ def _run_groq_chat(
         data["presence_penalty"] = 0.25
     if stop:
         data["stop"] = stop
+    if response_format_type:
+        data["response_format"] = {"type": response_format_type}
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         json=data,

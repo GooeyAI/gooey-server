@@ -22,6 +22,7 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
 )
+from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
@@ -46,15 +47,6 @@ AggFunctionsList = [
     "nunique",
     "rank",
 ]
-
-
-class LLMSettingsMixin(BaseModel):
-    selected_model: typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-    avoid_repetition: bool | None
-    num_outputs: int | None
-    quality: float | None
-    max_tokens: int | None
-    sampling_temperature: float | None
 
 
 class EvalPrompt(typing.TypedDict):
@@ -168,7 +160,7 @@ Summarize and score every row of any CSV, google sheet or excel with GPT4 (or an
 
         return [BulkRunnerPage, VideoBotsPage, AsrPage, DocSearchPage]
 
-    class RequestModel(LLMSettingsMixin, BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[str] = Field(
             title="Input Data Spreadsheet",
             description="""
@@ -192,6 +184,13 @@ _The `columns` dictionary can be used to reference the spreadsheet columns._
 Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats).
             """,
         )
+
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_documents: list[str]

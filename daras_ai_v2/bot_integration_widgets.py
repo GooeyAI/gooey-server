@@ -11,7 +11,7 @@ from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
@@ -247,24 +247,21 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
     elif bi.fb_page_name:
         return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
     elif bi.platform == Platform.WEB:
-        return str(
-            furl(settings.APP_BASE_URL)
-            / get_route_path(
-                chat_route,
-                dict(
-                    integration_id=bi.api_integration_id(),
-                    integration_name=slugify(bi.name) or "untitled",
-                ),
-            )
+        return get_app_route_url(
+            chat_route,
+            path_params=dict(
+                integration_id=bi.api_integration_id(),
+                integration_name=slugify(bi.name) or "untitled",
+            ),
         )
     else:
         return None
 
 
 def get_web_widget_embed_code(bi: BotIntegration) -> str:
-    lib_src = furl(settings.APP_BASE_URL) / get_route_path(
+    lib_src = get_app_route_url(
         chat_lib_route,
-        dict(
+        path_params=dict(
             integration_id=bi.api_integration_id(),
             integration_name=slugify(bi.name) or "untitled",
         ),

@@ -5,6 +5,18 @@ category = ModelCategory.LLM
 
 
 def run():
+    # GPT-4o-mini
+
+    llm_pricing_create(
+        model_id="gpt-4o-mini",
+        model_name=LargeLanguageModels.gpt_4_o_mini.name,
+        unit_cost_input=0.150,
+        unit_cost_output=0.600,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+
     # GPT-4o
 
     llm_pricing_create(
@@ -521,8 +533,26 @@ def run():
         pricing_url="https://wow.groq.com/",
     )
     llm_pricing_create(
+        model_id="llama3-groq-70b-8192-tool-use-preview",
+        model_name=LargeLanguageModels.llama_3_groq_70b_tool_use.name,
+        unit_cost_input=0.59,
+        unit_cost_output=0.79,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
         model_id="llama3-8b-8192",
         model_name=LargeLanguageModels.llama3_8b.name,
+        unit_cost_input=0.05,
+        unit_cost_output=0.1,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="llama3-groq-8b-8192-tool-use-preview",
+        model_name=LargeLanguageModels.llama_3_groq_8b_tool_use.name,
         unit_cost_input=0.05,
         unit_cost_output=0.1,
         unit_quantity=10**6,
@@ -543,6 +573,15 @@ def run():
         model_name=LargeLanguageModels.mixtral_8x7b_instruct_0_1.name,
         unit_cost_input=0.27,
         unit_cost_output=0.27,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="gemma2-9b-it",
+        model_name=LargeLanguageModels.gemma_2_9b_it.name,
+        unit_cost_input=0.20,
+        unit_cost_output=0.20,
         unit_quantity=10**6,
         provider=ModelProvider.groq,
         pricing_url="https://wow.groq.com/",

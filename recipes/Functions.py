@@ -71,10 +71,8 @@ class FunctionsPage(BasePage):
         raise_for_status(r)
         data = r.json()
         response.logs = data.get("logs")
-        if r.ok:
-            response.return_value = data.get("retval")
-        else:
-            response.error = data.get("error")
+        response.return_value = data.get("retval")
+        response.error = data.get("error")
 
     def render_form_v2(self):
         st.text_area(

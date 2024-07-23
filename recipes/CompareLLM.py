@@ -7,17 +7,19 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect, BLANK_OPTION
-from daras_ai_v2.field_render import field_title
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     SUPERSCRIPT,
     ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import variables_input, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 
@@ -30,6 +32,8 @@ class CompareLLMPage(BasePage):
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
+    functions_in_settings = False
+
     sane_defaults = {
         "avoid_repetition": False,
         "num_outputs": 1,
@@ -38,22 +42,14 @@ class CompareLLMPage(BasePage):
         "sampling_temperature": 0.7,
     }
 
-    class RequestModel(BasePage.RequestModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
         )
 
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
-
-        response_format_type: ResponseFormatType = Field(
-            None,
-            title="Response Format",
-        )
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: dict[
@@ -84,6 +80,7 @@ class CompareLLMPage(BasePage):
             LargeLanguageModels,
             label="#### 🤗 Compare Language Models",
             key="selected_models",
+            checkboxes=False,
         )
 
     def validate_form_v2(self):
@@ -94,16 +91,7 @@ class CompareLLMPage(BasePage):
         youtube_video("dhexRRDAuY8")
 
     def render_settings(self):
-        language_model_settings(show_selector=False)
-        st.selectbox(
-            f"###### {field_title(self.RequestModel, 'response_format_type')}",
-            options=[None, "json_object"],
-            key="response_format_type",
-            format_func={
-                None: BLANK_OPTION,
-                "json_object": "JSON Object",
-            }.__getitem__,
-        )
+        language_model_settings()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)

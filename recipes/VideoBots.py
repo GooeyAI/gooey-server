@@ -66,7 +66,11 @@ from daras_ai_v2.language_model import (
     format_chat_entry,
     SUPERSCRIPT,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -127,6 +131,8 @@ class VideoBotsPage(BasePage):
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
+    functions_in_settings = False
+
     sane_defaults = {
         "messages": [],
         # tts
@@ -181,7 +187,7 @@ class VideoBotsPage(BasePage):
 
         bot_script: str | None
 
-        # llm settings
+        # llm model
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
@@ -190,11 +196,6 @@ class VideoBotsPage(BasePage):
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
             "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         # doc search
         task_instructions: str | None
@@ -252,7 +253,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
         )
 
-    class RequestModel(LipsyncSettings, TextToSpeechSettings, RequestModelBase):
+    class RequestModel(
+        LipsyncSettings, TextToSpeechSettings, LanguageModelSettings, RequestModelBase
+    ):
         pass
 
     class ResponseModel(BaseModel):
@@ -330,12 +333,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             height=300,
         )
 
-        enum_selector(
-            LargeLanguageModels,
-            label="#### 🧠 Language Model",
-            key="selected_model",
-            use_selectbox=True,
-        )
+        language_model_selector(label="#### 🧠 Language Model")
 
         bulk_documents_uploader(
             """
@@ -532,10 +530,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if documents:
             query_instructions_widget()
             keyword_instructions_widget()
+            st.write("---")
             doc_search_advanced_settings()
             st.write("---")
 
-        language_model_settings(show_selector=False)
+        st.write("##### 🔠 Language Model Settings")
+        language_model_settings(st.session_state.get("selected_model"))
 
         st.write("---")
 
@@ -932,6 +932,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
             tools=request.tools,
             stream=True,
         )

@@ -1,21 +1,27 @@
 import json
 
-import pytest
 from furl import furl
 from starlette.testclient import TestClient
 
-from bots.models import BotIntegration
+from bots.models import BotIntegration, Workflow, Platform, SavedRun
 from server import app
 
 client = TestClient(app)
 
 
-@pytest.mark.django_db
-def test_send_msg_streaming(mock_celery_tasks, force_authentication):
+def test_send_msg_streaming(transactional_db, mock_celery_tasks, force_authentication):
+    bi = BotIntegration.objects.create(
+        platform=Platform.WEB,
+        billing_account_uid=force_authentication.uid,
+        saved_run=SavedRun.objects.create(
+            workflow=Workflow.VIDEO_BOTS,
+            uid=force_authentication.uid,
+        ),
+    )
     r = client.post(
         "/v3/integrations/stream/",
         json={
-            "integration_id": BotIntegration.objects.first().api_integration_id(),
+            "integration_id": bi.api_integration_id(),
             "input_text": "hello, world",
         },
         allow_redirects=False,

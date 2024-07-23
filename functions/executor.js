@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     status = 200;
     response = { retval };
   } catch (e) {
-    status = 500;
+    status = 207;
     response = { error: toString(e), errorType: typeof e };
   }
 

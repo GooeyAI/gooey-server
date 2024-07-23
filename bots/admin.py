@@ -31,8 +31,7 @@ from bots.models import (
     Workflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from celeryapp.tasks import runner_task
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -71,6 +70,20 @@ slack_fields = [
     "slack_create_personal_channels",
 ]
 web_fields = ["web_allowed_origins", "web_config_extras"]
+twilio_fields = [
+    "twilio_phone_number",
+    "twilio_phone_number_sid",
+    "twilio_account_sid",
+    "twilio_username",
+    "twilio_password",
+    "twilio_use_missed_call",
+    "twilio_tts_voice",
+    "twilio_asr_language",
+    "twilio_initial_text",
+    "twilio_initial_audio_url",
+    "twilio_waiting_text",
+    "twilio_waiting_audio_url",
+]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -133,12 +146,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "slack_channel_name",
         "slack_channel_hook_url",
         "slack_access_token",
+        "twilio_phone_number",
     ]
     list_display = [
         "name",
         "get_display_name",
         "platform",
         "wa_phone_number",
+        "twilio_phone_number",
         "created_at",
         "updated_at",
         "billing_account_uid",
@@ -193,6 +208,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *wa_fields,
                     *slack_fields,
                     *web_fields,
+                    *twilio_fields,
                 ]
             },
         ),
@@ -256,12 +272,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     @admin.display(description="Integration Stats")
     def api_integration_stats_url(self, bi: BotIntegration):
+        if not bi.id:
+            raise bi.DoesNotExist
 
         integration_id = bi.api_integration_id()
         return open_in_new_tab(
-            url=get_route_url(
+            url=get_app_route_url(
                 integrations_stats_route,
-                params=dict(
+                path_params=dict(
                     page_slug=VideoBotsPage.slug_versions[-1],
                     integration_id=integration_id,
                 ),
@@ -489,6 +507,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "slack_user_name",
         "slack_channel_id",
         "slack_channel_name",
+        "twilio_phone_number",
     ] + [f"bot_integration__{field}" for field in BotIntegrationAdmin.search_fields]
     actions = [export_to_csv, export_to_excel]
 

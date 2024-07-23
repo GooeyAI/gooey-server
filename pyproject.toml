@@ -48,7 +48,6 @@ tiktoken = "^0.7.0"
 google-cloud-translate = "^3.12.0"
 google-cloud-speech = "^2.21.0"
 yt-dlp = "^2024.7.2"
-nltk = "^3.8.1"
 Jinja2 = "^3.1.2"
 Django = "^4.2"
 django-phonenumber-field = { extras = ["phonenumberslite"], version = "^7.0.2" }
@@ -85,6 +84,7 @@ emoji = "^2.10.1"
 pyvespa = "^0.39.0"
 anthropic = "^0.25.5"
 azure-cognitiveservices-speech = "^1.37.0"
+twilio = "^9.2.3"
 sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
 django-safedelete = "^1.4.0"
 
