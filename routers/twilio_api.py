@@ -59,22 +59,30 @@ def get_twilio_tts_voice(bi: BotIntegration) -> str:
 
 
 def get_twilio_asr_language(bi: BotIntegration) -> str:
-    from daras_ai_v2.asr import get_language_match
+    from daras_ai_v2.asr import normalised_lang_in_collection
 
     run = bi.get_active_saved_run()
     state: dict = run.state
 
-    asr_language = get_language_match(
-        state.get("asr_language"), TWILIO_ASR_SUPPORTED_LANGUAGES
-    )
+    asr_language = state.get("asr_language")
     if asr_language:
-        return asr_language
+        try:
+            asr_language = normalised_lang_in_collection(
+                asr_language, TWILIO_ASR_SUPPORTED_LANGUAGES
+            )
+            return asr_language
+        except:
+            pass
 
-    user_language = get_language_match(
-        state.get("user_language"), TWILIO_ASR_SUPPORTED_LANGUAGES
-    )
+    user_language = state.get("user_language")
     if user_language:
-        return user_language
+        try:
+            user_language = normalised_lang_in_collection(
+                user_language, TWILIO_ASR_SUPPORTED_LANGUAGES
+            )
+            return user_language
+        except:
+            pass
 
     return DEFAULT_ASR_LANGUAGE
 
