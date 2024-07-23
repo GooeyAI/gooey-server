@@ -1,0 +1,19 @@
+<p>
+  Hi {{ user.first_name() }},
+</p>
+
+<p>
+  You have been added to the team <strong>{{ org.name }}</strong> on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
+  Visit the <a href="{{ orgs_url }}">teams page</a> to see your team.
+</p>
+
+<p>
+  Your invite was automatically accepted because your email domain matches the organization's configured email domain.
+  If you think this shouldn't have happened, you can leave this organization from the
+  <a href="{{ orgs_url }}">teams page</a>.
+</p>
+
+<p>
+  Cheers,<br/>
+  Gooey.AI team
+</p>
