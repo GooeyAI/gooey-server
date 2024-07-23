@@ -419,7 +419,12 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    st.session_state[key] = get_language_match(st.session_state.get(key), options)
+    old_lang = st.session_state.get(key)
+    if old_lang:
+        try:
+            st.session_state[key] = normalised_lang_in_collection(old_lang, options)
+        except UserError:
+            st.session_state[key] = None
 
     return st.selectbox(
         label=label,
@@ -427,30 +432,6 @@ def asr_language_selector(
         format_func=lang_format_func,
         options=options,
     )
-
-
-def get_language_match(lang: str | None, languages: list[str]) -> str | None:
-    import langcodes
-
-    if not lang:
-        return None
-
-    if lang in languages:
-        return lang
-
-    try:
-        lan = langcodes.Language.get(lang).language
-    except langcodes.LanguageTagError:
-        return None
-
-    for language in languages:
-        try:
-            if language and langcodes.Language.get(language).language == lan:
-                return language
-        except langcodes.LanguageTagError:
-            pass
-
-    return None
 
 
 def lang_format_func(l):
@@ -597,13 +578,26 @@ def run_google_translate(
 def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
     import langcodes
 
-    for candidate in collection:
-        if langcodes.get(candidate).language == langcodes.get(target).language:
-            return candidate
-
-    raise UserError(
+    ERROR = UserError(
         f"Unsupported language: {target!r} | must be one of {set(collection)}"
     )
+
+    if target in collection:
+        return target
+
+    try:
+        target_lan = langcodes.Language.get(target).language
+    except langcodes.LanguageTagError:
+        raise ERROR
+
+    for candidate in collection:
+        try:
+            if candidate and langcodes.Language.get(candidate).language == target_lan:
+                return candidate
+        except langcodes.LanguageTagError:
+            pass
+
+    raise ERROR
 
 
 def _translate_text(

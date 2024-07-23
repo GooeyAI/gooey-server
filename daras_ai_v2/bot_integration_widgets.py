@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
-import langcodes
 
 import gooey_ui as st
 from app_users.models import AppUser
