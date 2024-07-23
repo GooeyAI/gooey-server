@@ -149,7 +149,9 @@ class TwilioVoice(BotInterface):
 
         super().__init__()
 
-        self.use_gooey_asr = not get_twilio_asr_language(self.bi)
+        self.use_gooey_asr = self.saved_run.state.get(
+            "asr_model"
+        ) or not get_twilio_asr_language(self.bi)
         self.use_gooey_tts = not get_twilio_tts_voice(self.bi)
 
     def get_input_text(self) -> str | None:
