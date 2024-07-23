@@ -170,7 +170,13 @@ class OrgMembership(SafeDeleteModel):
     objects = SafeDeleteManager()
 
     class Meta:
-        unique_together = ("org", "user", "deleted")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "user"],
+                condition=Q(deleted__isnull=True),
+                name="unique_org_user",
+            )
+        ]
 
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.org})"
