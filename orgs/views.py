@@ -9,9 +9,54 @@ from app_users.models import AppUser
 from gooey_ui.components.modal import Modal
 from orgs.models import Org, OrgInvitation, OrgMembership, OrgRole
 from daras_ai_v2 import icons
+from daras_ai_v2.fastapi_tricks import get_route_path
 
 
-DEFAULT_ORG_LOGO = "https://seccdn.libravatar.org/avatar/40f8d096a3777232204cb3f796c577b7?s=80&forcedefault=y&default=monsterid"
+DEFAULT_ORG_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+
+
+def invitation_page(user: AppUser, invitation: OrgInvitation):
+    from routers.account import orgs_route
+
+    orgs_page_path = get_route_path(orgs_route)
+
+    with st.div(className="text-center my-5"):
+        st.write(
+            f"# Invitation to join {invitation.org.name}", className="d-block mb-5"
+        )
+
+        if invitation.org.memberships.filter(user=user).exists():
+            # redirect to org page
+            raise st.RedirectException(orgs_page_path)
+
+        if invitation.status != OrgInvitation.Status.PENDING:
+            st.write(f"This invitation has been {invitation.get_status_display()}.")
+            return
+
+        st.write(
+            f"**{format_user_name(invitation.inviter)}** has invited you to join **{invitation.org.name}**."
+        )
+
+        if other_m := user.org_memberships.first():
+            st.caption(
+                f"You are currently a member of [{other_m.org.name}]({orgs_page_path}). You will be removed from that team if you accept this invitation."
+            )
+            accept_label = "Leave and Accept"
+        else:
+            accept_label = "Accept"
+
+        with st.div(
+            className="d-flex justify-content-center align-items-center mx-auto",
+            style={"max-width": "600px"},
+        ):
+            accept_button = st.button(accept_label, type="primary", className="w-50")
+            reject_button = st.button("Decline", type="secondary", className="w-50")
+
+        if accept_button:
+            invitation.accept(user=user)
+            raise st.RedirectException(orgs_page_path)
+        if reject_button:
+            invitation.reject(user=user)
 
 
 def orgs_page(user: AppUser):
@@ -53,13 +98,15 @@ def render_org_by_membership(membership: OrgMembership):
         with st.div(className="d-flex align-items-center"):
             st.image(
                 org.logo or DEFAULT_ORG_LOGO,
-                className="my-0 me-2",
+                className="my-0 me-4 rounded",
                 style={"width": "128px", "height": "128px", "object-fit": "contain"},
             )
             with st.div(className="d-flex flex-column justify-content-center"):
                 st.write(f"# {org.name}")
                 if org.domain_name:
-                    st.write(f"Domain: `@{org.domain_name}`", className="text-muted")
+                    st.write(
+                        f"Org Domain: `@{org.domain_name}`", className="text-muted"
+                    )
 
     with st.div(className="mt-4"):
         with st.div(className="d-flex justify-content-between align-items-center"):
@@ -67,7 +114,7 @@ def render_org_by_membership(membership: OrgMembership):
 
             if membership.can_invite():
                 invite_modal = Modal("Invite Member", key="invite-member-modal")
-                if st.button(f"{icons.add_user} Invite Member", type="primary"):
+                if st.button(f"{icons.add_user} Invite"):
                     invite_modal.open()
 
                 if invite_modal.is_open():
@@ -76,10 +123,10 @@ def render_org_by_membership(membership: OrgMembership):
                             org=org, inviter=current_user, modal=invite_modal
                         )
 
-        render_members_list(org=org, current_membership=membership)
+        render_members_list(org=org, current_member=membership)
 
     with st.div(className="mt-4"):
-        render_pending_invitations_list(org=org, current_user=current_user)
+        render_pending_invitations_list(org=org, current_member=membership)
 
     with st.div(className="mt-4"):
         org_leave_modal = Modal("Leave Org", key="leave-org-modal")
@@ -169,26 +216,24 @@ def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: 
             modal.close()
 
 
-def render_org_leave_view_by_membership(
-    current_membership: OrgMembership, *, modal: Modal
-):
-    org = current_membership.org
+def render_org_leave_view_by_membership(current_member: OrgMembership, *, modal: Modal):
+    org = current_member.org
 
     st.write("Are you sure you want to leave this organization?")
 
     new_owner = None
-    if current_membership.role == OrgRole.OWNER and org.memberships.count() == 1:
+    if current_member.role == OrgRole.OWNER and org.memberships.count() == 1:
         st.caption(
             "You are the only member. You will lose access to this team if you leave."
         )
     elif (
-        current_membership.role == OrgRole.OWNER
+        current_member.role == OrgRole.OWNER
         and org.memberships.filter(role=OrgRole.OWNER).count() == 1
     ):
         members_by_uid = {
             m.user.uid: m
             for m in org.memberships.all().select_related("user")
-            if m != current_membership
+            if m != current_member
         }
 
         st.caption(
@@ -213,11 +258,11 @@ def render_org_leave_view_by_membership(
             if new_owner:
                 new_owner.role = OrgRole.OWNER
                 new_owner.save()
-            org.members.remove(current_membership.user)
+            current_member.delete()
             modal.close()
 
 
-def render_members_list(org: Org, current_membership: OrgMembership):
+def render_members_list(org: Org, current_member: OrgMembership):
     with st.tag("table", className="table table-responsive"):
         with st.tag("thead"), st.tag("tr"):
             with st.tag("th", scope="col"):
@@ -234,7 +279,7 @@ def render_members_list(org: Org, current_membership: OrgMembership):
                 with st.tag("tr"):
                     with st.tag("td"):
                         name = format_user_name(
-                            m.user, current_user=current_membership.user
+                            m.user, current_user=current_member.user
                         )
                         if m.user.handle_id:
                             with st.link(to=m.user.handle.get_app_url()):
@@ -246,47 +291,92 @@ def render_members_list(org: Org, current_membership: OrgMembership):
                     with st.tag("td"):
                         st.html(m.created_at.strftime("%b %d, %Y"))
                     with st.tag("td", className="text-end"):
-                        render_membership_actions(
-                            m, current_membership=current_membership
-                        )
+                        render_membership_actions(m, current_member=current_member)
 
 
-def render_membership_actions(m: OrgMembership, current_membership: OrgMembership):
-    if current_membership.can_kick(m):
-        member_deletion_modal = Modal(
-            "Remove Member", key=f"remove-member-{m.pk}-modal"
-        )
-        if member_deletion_modal.is_open():
-            with member_deletion_modal.container():
-                render_member_deletion_view(m, modal=member_deletion_modal)
+def render_membership_actions(m: OrgMembership, current_member: OrgMembership):
+    if current_member.can_change_role(m):
+        if m.role == OrgRole.MEMBER:
+            modal, confirmed = button_with_confirmation_modal(
+                f"{icons.admin} Make Admin",
+                key=f"promote-member-{m.pk}",
+                unsafe_allow_html=True,
+                confirmation_text=f"Are you sure you want to promote **{format_user_name(m.user)}** to an admin?",
+                modal_title="Make Admin",
+                modal_key=f"promote-member-{m.pk}-modal",
+            )
+            if confirmed:
+                m.role = OrgRole.ADMIN
+                m.save()
+                modal.close()
+        elif m.role == OrgRole.ADMIN:
+            modal, confirmed = button_with_confirmation_modal(
+                f"{icons.remove_user} Revoke Admin",
+                key=f"demote-member-{m.pk}",
+                unsafe_allow_html=True,
+                confirmation_text=f"Are you sure you want to revoke admin privileges from **{format_user_name(m.user)}**?",
+                modal_title="Revoke Admin",
+                modal_key=f"demote-member-{m.pk}-modal",
+            )
+            if confirmed:
+                m.role = OrgRole.MEMBER
+                m.save()
+                modal.close()
 
-        if st.button(
+    if current_member.can_kick(m):
+        modal, confirmed = button_with_confirmation_modal(
             f"{icons.remove_user} Remove",
-            className="btn btn-theme btn-sm my-0 py-0 bg-danger border-danger text-light",
+            key=f"remove-member-{m.pk}",
             unsafe_allow_html=True,
-        ):
-            member_deletion_modal.open()
-
-
-def render_member_deletion_view(membership: OrgMembership, modal: Modal):
-    st.write(
-        f"Are you sure you want to remove **{format_user_name(membership.user)}** from **{membership.org.name}**?"
-    )
-
-    with st.div(className="d-flex"):
-        if st.button(
-            "Cancel", type="secondary", className="border-danger text-danger w-50"
-        ):
-            modal.close()
-
-        if st.button(
-            "Remove", className="btn btn-theme bg-danger border-danger text-light w-50"
-        ):
-            membership.delete()
+            confirmation_text=f"Are you sure you want to remove **{format_user_name(m.user)}** from **{m.org.name}**?",
+            modal_title="Remove Member",
+            modal_key=f"remove-member-{m.pk}-modal",
+            className="bg-danger border-danger text-light",
+        )
+        if confirmed:
+            m.delete()
             modal.close()
 
 
-def render_pending_invitations_list(org: Org, current_user: AppUser):
+def button_with_confirmation_modal(
+    btn_label: str,
+    confirmation_text: str,
+    modal_title: str | None = None,
+    modal_key: str | None = None,
+    modal_className: str = "",
+    **btn_props,
+) -> tuple[Modal, bool]:
+    """
+    Returns boolean for whether user confirmed the action or not.
+    """
+
+    modal = Modal(modal_title or btn_label, key=modal_key)
+
+    btn_classes = "btn btn-theme btn-sm my-0 py-0 " + btn_props.pop("className", "")
+    if st.button(btn_label, className=btn_classes, **btn_props):
+        modal.open()
+
+    if modal.is_open():
+        with modal.container(className=modal_className):
+            st.write(confirmation_text)
+            with st.div(className="d-flex"):
+                if st.button(
+                    "Cancel",
+                    type="secondary",
+                    className="border-danger text-danger w-50",
+                ):
+                    modal.close()
+
+                confirmed = st.button(
+                    "Confirm",
+                    className="btn btn-theme bg-danger border-danger text-light w-50",
+                )
+                return modal, confirmed
+
+    return modal, False
+
+
+def render_pending_invitations_list(org: Org, *, current_member: OrgMembership):
     pending_invitations = org.invitations.filter(status=OrgInvitation.Status.PENDING)
     if not pending_invitations:
         return
@@ -299,7 +389,9 @@ def render_pending_invitations_list(org: Org, current_user: AppUser):
             with st.tag("th", scope="col"):
                 st.html("Invited By")
             with st.tag("th", scope="col"):
-                st.html(f"{icons.time} Invited on")
+                st.html(f"{icons.time} Last invited on")
+            with st.tag("th", scope="col"):
+                pass
 
         with st.tag("tbody"):
             for invite in pending_invitations:
@@ -310,20 +402,66 @@ def render_pending_invitations_list(org: Org, current_user: AppUser):
                         st.html(
                             html_lib.escape(
                                 format_user_name(
-                                    invite.inviter, current_user=current_user
+                                    invite.inviter, current_user=current_member.user
                                 )
                             )
                         )
                     with st.tag("td"):
-                        st.html(invite.created_at.strftime("%b %d, %Y"))
+                        last_invited_at = invite.last_email_sent_at or invite.created_at
+                        st.html(last_invited_at.strftime("%b %d, %Y"))
+                    with st.tag("td", className="text-end"):
+                        render_invitation_actions(invite, current_member=current_member)
+
+
+def render_invitation_actions(invitation: OrgInvitation, current_member: OrgMembership):
+    if current_member.can_invite() and invitation.can_resend_email():
+        modal, confirmed = button_with_confirmation_modal(
+            f"{icons.email} Resend",
+            className="btn btn-theme btn-sm my-0 py-0",
+            key=f"resend-invitation-{invitation.pk}",
+            unsafe_allow_html=True,
+            confirmation_text=f"Resend invitation to **{invitation.invitee_email}**?",
+            modal_title="Resend Invitation",
+            modal_key=f"resend-invitation-{invitation.pk}-modal",
+        )
+        if confirmed:
+            try:
+                invitation.send_email()
+            except ValidationError as e:
+                pass
+            finally:
+                modal.close()
+
+    if current_member.can_invite():
+        modal, confirmed = button_with_confirmation_modal(
+            f"{icons.delete} Cancel",
+            key=f"cancel-invitation-{invitation.pk}",
+            unsafe_allow_html=True,
+            confirmation_text=f"Are you sure you want to cancel the invitation to **{invitation.invitee_email}**?",
+            modal_title="Cancel Invitation",
+            modal_key=f"cancel-invitation-{invitation.pk}-modal",
+            className="bg-danger border-danger text-light",
+        )
+        if confirmed:
+            invitation.cancel(user=current_member.user)
+            modal.close()
 
 
 def render_invite_creation_view(org: Org, inviter: AppUser, modal: Modal):
     email = st.text_input("Email")
+    if org.domain_name:
+        st.caption(
+            f"Users with `@{org.domain_name}` email will be added automatically."
+        )
 
     if st.button(f"{icons.add_user} Invite", type="primary", unsafe_allow_html=True):
         try:
-            org.invite_user(invitee_email=email, inviter=inviter, role=OrgRole.MEMBER)
+            org.invite_user(
+                invitee_email=email,
+                inviter=inviter,
+                role=OrgRole.MEMBER,
+                auto_accept=org.domain_name.lower() == email.split("@")[1].lower(),
+            )
         except ValidationError as e:
             st.write(", ".join(e.messages), className="text-danger")
         else:
