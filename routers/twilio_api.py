@@ -43,7 +43,7 @@ WEBHOOK_ERROR_MSG = "Sorry. This number has been incorrectly configured. Contact
 router = APIRouter()
 
 
-def get_twilio_tts_voice(bi: BotIntegration) -> str:
+def get_twilio_tts_voice(bi: BotIntegration) -> str | None:
     from recipes.TextToSpeech import TextToSpeechProviders
 
     run = bi.get_active_saved_run()
@@ -53,13 +53,14 @@ def get_twilio_tts_voice(bi: BotIntegration) -> str:
         voice = "Google." + state.get("google_voice_name", "en-US-Wavenet-F")
         if voice not in TWILIO_SUPPORTED_VOICES:
             logger.warning(f"Unsupported voice {voice=} for {bi=}")
-            return DEFAULT_VOICE_NAME
+            return None
         return voice
-    return DEFAULT_VOICE_NAME
+    return None
 
 
-def get_twilio_asr_language(bi: BotIntegration) -> str:
+def get_twilio_asr_language(bi: BotIntegration) -> str | None:
     from daras_ai_v2.asr import normalised_lang_in_collection
+    from daras_ai_v2.exceptions import UserError
 
     run = bi.get_active_saved_run()
     state: dict = run.state
@@ -71,7 +72,7 @@ def get_twilio_asr_language(bi: BotIntegration) -> str:
                 asr_language, TWILIO_ASR_SUPPORTED_LANGUAGES
             )
             return asr_language
-        except:
+        except UserError:
             pass
 
     user_language = state.get("user_language")
@@ -81,10 +82,10 @@ def get_twilio_asr_language(bi: BotIntegration) -> str:
                 user_language, TWILIO_ASR_SUPPORTED_LANGUAGES
             )
             return user_language
-        except:
+        except UserError:
             pass
 
-    return DEFAULT_ASR_LANGUAGE
+    return None
 
 
 @router.post("/__/twilio/voice/")
@@ -181,7 +182,7 @@ def create_voice_call_response(
             action=action,
             method="POST",
             finish_on_key="0",  # user can press 0 to end the input
-            language=get_twilio_asr_language(bot.bi),
+            language=get_twilio_asr_language(bot.bi) or DEFAULT_ASR_LANGUAGE,
             speech_model="phone_call",  # optimized for phone call audio
             enhanced=True,  # only phone_call model supports enhanced
         )
@@ -286,7 +287,7 @@ def resp_say_or_tts_play(
         else:
             return
 
-    resp.say(text, voice=get_twilio_tts_voice(bot.bi))
+    resp.say(text, voice=get_twilio_tts_voice(bot.bi) or DEFAULT_VOICE_NAME)
 
 
 @router.post("/__/twilio/voice/error/")
