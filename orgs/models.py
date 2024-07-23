@@ -12,7 +12,7 @@ from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
-from daras_ai_v2.fastapi_tricks import get_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.crypto import get_random_doc_id
 from orgs.tasks import send_auto_accepted_email, send_invitation_email
 
@@ -272,9 +272,9 @@ class OrgInvitation(SafeDeleteModel):
     def get_url(self):
         from routers.account import invitation_route
 
-        return get_route_url(
+        return get_app_route_url(
             invitation_route,
-            params={"invite_id": self.invite_id, "org_slug": self.org.get_slug()},
+            path_params={"invite_id": self.invite_id, "org_slug": self.org.get_slug()},
         )
 
     def send_email(self):
