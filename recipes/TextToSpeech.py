@@ -97,8 +97,16 @@ class TextToSpeechPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["tts_provider"]
 
-    def get_extra_state_fields(self):
+    def fields_not_to_save(self):
         return ["elevenlabs_api_key"]
+
+    def fields_to_save(self):
+        fields = super().fields_to_save()
+        try:
+            fields.remove("elevenlabs_api_key")
+        except ValueError:
+            pass
+        return fields
 
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
@@ -125,12 +133,6 @@ class TextToSpeechPage(BasePage):
             key="text_prompt",
         )
         text_to_speech_provider_selector(self)
-
-    def fields_to_save(self):
-        fields = super().fields_to_save()
-        if "elevenlabs_api_key" in fields:
-            fields.remove("elevenlabs_api_key")
-        return fields
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Text input cannot be empty"

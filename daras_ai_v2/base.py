@@ -1699,7 +1699,7 @@ class BasePage:
                 run_id=sr.run_id,
                 uid=sr.uid,
                 channel=self.realtime_channel_name(sr.run_id, sr.uid),
-                extra_state=self._get_extra_state(),
+                unsaved_state=self._unsaved_state(),
             )
             | post_runner_tasks.s()
         )
@@ -1795,15 +1795,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             StateKeys.run_time,
         ]
 
-    def _get_extra_state(self) -> dict[str, typing.Any]:
+    def _unsaved_state(self) -> dict[str, typing.Any]:
         result = {}
-        for field in self.get_extra_state_fields():
-            if val := st.session_state.get(field):
-                result[field] = val
-
+        for field in self.fields_not_to_save():
+            try:
+                result[field] = st.session_state[field]
+            except KeyError:
+                pass
         return result
 
-    def get_extra_state_fields(self) -> list[str]:
+    def fields_not_to_save(self) -> list[str]:
         return []
 
     def _examples_tab(self):
