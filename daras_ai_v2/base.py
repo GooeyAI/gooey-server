@@ -2072,7 +2072,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         api_example_generator(
             api_url=api_url,
-            request_body=request_body,
+            request_body=request_body | self._unsaved_state(),
             as_form_data=as_form_data,
             as_async=as_async,
         )

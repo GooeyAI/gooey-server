@@ -24,6 +24,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
     OLD_ELEVEN_LABS_VOICES,
+    elevenlabs_init_state,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -107,6 +108,10 @@ class TextToSpeechPage(BasePage):
         except ValueError:
             pass
         return fields
+
+    def run_as_api_tab(self):
+        elevenlabs_init_state(self)
+        super().run_as_api_tab()
 
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."

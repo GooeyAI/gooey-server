@@ -90,6 +90,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
+    elevenlabs_init_state,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from functions.recipe_functions import LLMTools
@@ -555,6 +556,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         except ValueError:
             pass
         return fields
+
+    def run_as_api_tab(self):
+        elevenlabs_init_state(self)
+        super().run_as_api_tab()
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
