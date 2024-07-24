@@ -1,16 +1,19 @@
-from enum import Enum
 import typing
+from enum import Enum
 
 import requests
 from furl import furl
-from daras_ai_v2.azure_asr import azure_auth_header
 
 import gooey_ui as st
 from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
 
 SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
 
@@ -329,20 +332,8 @@ def uberduck_settings():
     )
 
 
-def elevenlabs_selector(page):
-    if not st.session_state.get("elevenlabs_api_key"):
-        st.session_state["elevenlabs_api_key"] = page.request.session.get(
-            SESSION_ELEVENLABS_API_KEY
-        )
-
-    # for backwards compat
-    if old_voice_name := st.session_state.pop("elevenlabs_voice_name", None):
-        try:
-            st.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
-                old_voice_name
-            ]
-        except KeyError:
-            pass
+def elevenlabs_selector(page: "BasePage"):
+    elevenlabs_init_state(page)
 
     elevenlabs_use_custom_key = st.checkbox(
         "Use custom API key + Voice ID",
@@ -404,6 +395,21 @@ def elevenlabs_selector(page):
         format_func=ELEVEN_LABS_MODELS.__getitem__,
         options=ELEVEN_LABS_MODELS.keys(),
     )
+
+
+def elevenlabs_init_state(page: "BasePage"):
+    if not st.session_state.get("elevenlabs_api_key"):
+        st.session_state["elevenlabs_api_key"] = page.request.session.get(
+            SESSION_ELEVENLABS_API_KEY
+        )
+    # for backwards compat
+    if old_voice_name := st.session_state.pop("elevenlabs_voice_name", None):
+        try:
+            st.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
+                old_voice_name
+            ]
+        except KeyError:
+            pass
 
 
 def elevenlabs_settings():
