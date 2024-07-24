@@ -545,10 +545,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             key="tools",
         )
 
+    def fields_not_to_save(self):
+        return ["elevenlabs_api_key"]
+
     def fields_to_save(self) -> [str]:
-        fields = super().fields_to_save() + ["landbot_url"]
-        if "elevenlabs_api_key" in fields:
+        fields = super().fields_to_save()
+        try:
             fields.remove("elevenlabs_api_key")
+        except ValueError:
+            pass
         return fields
 
     def render_example(self, state: dict):
