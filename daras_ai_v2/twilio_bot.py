@@ -126,7 +126,6 @@ class TwilioVoice(BotInterface):
         text: str = None,
         audio_url: str = None,
     ):
-        from routers.twilio_api import get_twilio_tts_voice, get_twilio_asr_language
 
         self.convo = convo
 
@@ -148,11 +147,6 @@ class TwilioVoice(BotInterface):
             self.input_type = "interactive"
 
         super().__init__()
-
-        self.use_gooey_asr = self.saved_run.state.get(
-            "asr_model"
-        ) or not get_twilio_asr_language(self.bi)
-        self.use_gooey_tts = not get_twilio_tts_voice(self.bi)
 
     def get_input_text(self) -> str | None:
         return self._text
