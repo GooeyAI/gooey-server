@@ -1246,25 +1246,33 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                if test_link:
+                if not test_link:
+                    st.write("Message quicklink not available.")
+                elif bi.platform == Platform.TWILIO:
+                    copy_to_clipboard_button(
+                        '<i class="fa-regular fa-link"></i> Copy Phone Number',
+                        value=bi.twilio_phone_number.as_e164,
+                        type="secondary",
+                    )
+                else:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                         value=test_link,
                         type="secondary",
                     )
-                else:
-                    st.write("Message quicklink not available.")
+
                 if bi.platform == Platform.FACEBOOK:
                     st.anchor(
                         '<i class="fa-regular fa-inbox"></i> Open Inbox',
-                        f"https://www.facebook.com/latest/inbox",
+                        "https://www.facebook.com/latest/inbox",
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                if bi.twilio_phone_number:
+                elif bi.platform == Platform.WEB:
+                    embed_code = get_web_widget_embed_code(bi)
                     copy_to_clipboard_button(
-                        f'<i class="fa-regular fa-link"></i> Copy Phone Number',
-                        value=bi.twilio_phone_number.as_e164,
+                        f"{icons.code} Copy Embed Code",
+                        value=embed_code,
                         type="secondary",
                     )
 
@@ -1273,7 +1281,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Test")
                 st.caption(f"Send a test message via {Platform(bi.platform).label}.")
             with col2:
-                if bi.platform == Platform.FACEBOOK and test_link:
+                if not test_link:
+                    st.write("Message quicklink not available.")
+                elif bi.platform == Platform.FACEBOOK:
                     st.anchor(
                         f"{icon} Open Profile",
                         test_link,
@@ -1281,47 +1291,30 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         new_tab=True,
                     )
                     st.anchor(
-                        '<img src="https://upload.wikimedia.org/wikipedia/commons/b/be/Facebook_Messenger_logo_2020.svg" width="20" height="20" /> Open Messenger',
-                        f"https://www.messenger.com/t/{bi.fb_page_id}",
+                        f'<i class="fa-brands facebook-messenger"></i> Open Messenger',
+                        str(furl("https://www.messenger.com/t/") / bi.fb_page_id),
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                elif bi.platform == Platform.TWILIO and test_link:
-                    pass
-                elif test_link:
-                    st.anchor(
-                        f"{icon} Message {bi.get_display_name()}",
-                        test_link,
-                        unsafe_allow_html=True,
-                        new_tab=True,
-                    )
-                else:
-                    st.write("Message quicklink not available.")
-
-                if bi.twilio_phone_number:
+                elif bi.platform == Platform.TWILIO:
                     st.anchor(
                         '<i class="fa-regular fa-phone"></i> Start Voice Call',
-                        f"tel:{bi.twilio_phone_number.as_e164}",
+                        test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
                     st.anchor(
                         '<i class="fa-regular fa-sms"></i> Send SMS',
-                        f"sms:{bi.twilio_phone_number.as_e164}",
+                        str(furl("sms:") / bi.twilio_phone_number.as_e164),
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                elif bi.platform == Platform.TWILIO:
-                    st.write(
-                        "Phone number incorrectly configured. Please re-add the integration and double check spelling. [Contact Us](support@gooey.ai) if you need help."
-                    )
-
-                if bi.platform == Platform.WEB:
-                    embed_code = get_web_widget_embed_code(bi)
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=embed_code,
-                        type="secondary",
+                else:
+                    st.anchor(
+                        f"{icon} Message {bi.get_display_name()}",
+                        test_link,
+                        unsafe_allow_html=True,
+                        new_tab=True,
                     )
 
             col1, col2 = st.columns(2, style={"alignItems": "center"})
@@ -1344,10 +1337,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ),
                     new_tab=True,
                 )
-                if bi.platform == Platform.TWILIO and test_link:
+                if bi.platform == Platform.TWILIO and bi.twilio_phone_number_sid:
                     st.anchor(
-                        f"{icon} View Calls/Messages",
-                        test_link,
+                        f"{icon} Open Twilio Console",
+                        str(
+                            furl(
+                                "https://console.twilio.com/us1/develop/phone-numbers/manage/incoming/"
+                            )
+                            / bi.twilio_phone_number_sid
+                            / "calls"
+                        ),
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
@@ -1362,12 +1361,22 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with col2:
                     st.anchor(
                         "Business Settings",
-                        f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                        str(
+                            furl(
+                                "https://business.facebook.com/settings/whatsapp-business-accounts/"
+                            )
+                            / bi.wa_business_waba_id
+                        ),
                         new_tab=True,
                     )
                     st.anchor(
                         "WhatsApp Manager",
-                        f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                        str(
+                            furl(
+                                "https://business.facebook.com/wa/manage/home/",
+                                query_params=dict(waba_id=bi.wa_business_waba_id),
+                            )
+                        ),
                         new_tab=True,
                     )
 
