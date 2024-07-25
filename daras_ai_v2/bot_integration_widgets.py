@@ -305,8 +305,8 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
                 integration_name=slugify(bi.name) or "untitled",
             ),
         )
-    elif bi.twilio_phone_number_sid:
-        return f"https://console.twilio.com/us1/develop/phone-numbers/manage/incoming/{bi.twilio_phone_number_sid}/calls"
+    elif bi.twilio_phone_number:
+        return str(furl("tel:") / bi.twilio_phone_number.as_e164)
     else:
         return None
 
