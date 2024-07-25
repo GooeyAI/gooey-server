@@ -254,7 +254,7 @@ class GoogleGPTPage(BasePage):
                 },
             ),
             is_user_url=False,
-            current_user=self.request.user,
+            current_user=self.request and self.request.user,
         )
         # add pretty titles to references
         for ref in response.references:

@@ -175,7 +175,7 @@ class DocSearchPage(BasePage):
                     "search_query": response.final_search_query,
                 },
             ),
-            current_user=self.request.user,
+            current_user=self.request and self.request.user,
         )
 
         # empty search result, abort!
