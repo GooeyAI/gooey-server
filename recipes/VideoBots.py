@@ -882,6 +882,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         "keyword_query": response.final_keyword_query,
                     },
                 ),
+                current_user=self.request.user,
             )
             if request.use_url_shortener:
                 for reference in response.references:
