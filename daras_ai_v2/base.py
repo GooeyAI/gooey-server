@@ -980,22 +980,19 @@ class BasePage:
             state = root_run.saved_run.to_dict()
             preview_image = page.get_explore_image()
 
-            with st.link(to=page.app_url()):
+            with st.link(to=page.app_url(), className="text-decoration-none"):
                 st.html(
                     # language=html
                     f"""
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                     """
                 )
-                st.markdown(
-                    f"###### {root_run.title or page.title}",
-                )
-            with st.link(to=page.app_url(), className="text-decoration-none"):
+                st.markdown(f"###### {root_run.title or page.title}")
                 st.caption(
                     truncate_text_words(
                         root_run.notes or page.preview_description(state),
                         maxlen=210,
-                    ),
+                    )
                 )
 
         grid_layout(4, page_clses, _render)
