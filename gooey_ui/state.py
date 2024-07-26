@@ -6,9 +6,10 @@ import urllib.parse
 from functools import wraps, partial
 
 from fastapi import Depends
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from starlette.requests import Request
-from starlette.responses import Response, RedirectResponse
+from starlette.responses import Response, RedirectResponse, JSONResponse
 
 from gooey_ui.pubsub import (
     get_subscriptions,
@@ -148,11 +149,16 @@ def runner(
                 return RedirectResponse(e.url, status_code=e.status_code)
             if isinstance(ret, Response):
                 return ret
-            return dict(
-                children=root.children,
-                state=get_session_state(),
-                channels=get_subscriptions(),
-                **(ret or {}),
+            return JSONResponse(
+                jsonable_encoder(
+                    dict(
+                        children=root.children,
+                        state=get_session_state(),
+                        channels=get_subscriptions(),
+                        **(ret or {}),
+                    )
+                ),
+                headers={"X-GOOEY-GUI-ROUTE": "1"},
             )
         except RerunException:
             continue
