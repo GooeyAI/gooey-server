@@ -129,7 +129,47 @@ class QueryParamsRedirectException(RedirectException):
         super().__init__(url, status_code)
 
 
-def runner(
+def route(app, *paths, **kwargs):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(request: Request, json_data: dict | None, **kwargs):
+            if "request" in fn_sig.parameters:
+                kwargs["request"] = request
+            if "json_data" in fn_sig.parameters:
+                kwargs["json_data"] = json_data
+            return renderer(
+                partial(fn, **kwargs),
+                query_params=dict(request.query_params),
+                state=json_data and json_data.get("state"),
+            )
+
+        fn_sig = inspect.signature(fn)
+        mod_params = dict(fn_sig.parameters) | dict(
+            request=inspect.Parameter(
+                "request",
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Request,
+            ),
+            json_data=inspect.Parameter(
+                "json_data",
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=Depends(_request_json),
+                annotation=typing.Optional[dict],
+            ),
+        )
+        mod_sig = fn_sig.replace(parameters=list(mod_params.values()))
+        wrapper.__signature__ = mod_sig
+
+        for path in reversed(paths):
+            wrapper = app.get(path)(wrapper)
+            wrapper = app.post(path)(wrapper)
+
+        return wrapper
+
+    return decorator
+
+
+def renderer(
     fn: typing.Callable,
     state: dict[str, typing.Any] = None,
     query_params: dict[str, str] = None,
@@ -162,39 +202,6 @@ def runner(
             )
         except RerunException:
             continue
-
-
-def route(fn):
-    @wraps(fn)
-    def wrapper(request: Request, json_data: dict | None, **kwargs):
-        if "request" in fn_sig.parameters:
-            kwargs["request"] = request
-        if "json_data" in fn_sig.parameters:
-            kwargs["json_data"] = json_data
-        return runner(
-            partial(fn, **kwargs),
-            query_params=dict(request.query_params),
-            state=json_data and json_data.get("state"),
-        )
-
-    fn_sig = inspect.signature(fn)
-    mod_params = dict(fn_sig.parameters) | dict(
-        request=inspect.Parameter(
-            "request",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Request,
-        ),
-        json_data=inspect.Parameter(
-            "json_data",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=Depends(_request_json),
-            annotation=typing.Optional[dict],
-        ),
-    )
-    mod_sig = fn_sig.replace(parameters=list(mod_params.values()))
-    wrapper.__signature__ = mod_sig
-
-    return wrapper
 
 
 async def _request_json(request: Request) -> dict | None:

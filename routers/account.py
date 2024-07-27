@@ -25,8 +25,7 @@ from routers.root import page_wrapper, get_og_url_path
 app = APIRouter()
 
 
-@app.post("/payment-processing/")
-@st.route
+@st.route(app, "/payment-processing/")
 def payment_processing_route(
     request: Request, provider: str | None = None, subscription_id: str | None = None
 ):
@@ -76,8 +75,7 @@ def payment_processing_route(
     )
 
 
-@app.post("/account/")
-@st.route
+@st.route(app, "/account/")
 def account_route(request: Request):
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
@@ -93,8 +91,7 @@ def account_route(request: Request):
     )
 
 
-@app.post("/account/profile/")
-@st.route
+@st.route(app, "/account/profile/")
 def profile_route(request: Request):
     with account_page_wrapper(request, AccountTabs.profile):
         profile_tab(request)
@@ -110,8 +107,7 @@ def profile_route(request: Request):
     )
 
 
-@app.post("/saved/")
-@st.route
+@st.route(app, "/saved/")
 def saved_route(request: Request):
     with account_page_wrapper(request, AccountTabs.saved):
         all_saved_runs_tab(request)
@@ -127,8 +123,7 @@ def saved_route(request: Request):
     )
 
 
-@app.post("/account/api-keys/")
-@st.route
+@st.route(app, "/account/api-keys/")
 def api_keys_route(request: Request):
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)

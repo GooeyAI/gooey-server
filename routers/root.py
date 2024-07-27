@@ -84,19 +84,6 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-@app.post("/handleError/")
-@st.route
-def handle_error(request: Request, json_data: dict):
-    context = {"request": request, "settings": settings}
-    match json_data["status"]:
-        case 404:
-            template = "errors/404.html"
-        case _:
-            template = "errors/unknown.html"
-    with page_wrapper(request):
-        st.html(templates.get_template(template).render(**context))
-
-
 @app.get("/login/")
 def login(request: Request):
     if request.user and not request.user.is_anonymous:
@@ -208,8 +195,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
-@app.post("/GuiComponents/")
-@st.route
+@st.route(app, "/GuiComponents/")
 def component_page(request: Request):
     import components_doc
 
@@ -225,8 +211,7 @@ def component_page(request: Request):
     }
 
 
-@app.post("/explore/")
-@st.route
+@st.route(app, "/explore/")
 def explore_page(request: Request):
     import explore
 
@@ -242,8 +227,7 @@ def explore_page(request: Request):
     }
 
 
-@app.post("/api/")
-@st.route
+@st.route(app, "/api/")
 def api_docs_page(request: Request):
     with page_wrapper(request):
         _api_docs_page(request)
@@ -347,50 +331,60 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@app.post("/{page_slug}/examples/")
-@app.post("/{page_slug}/{run_slug}/examples/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/examples/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/examples/",
+    "/{page_slug}/{run_slug}/examples/",
+    "/{page_slug}/{run_slug}-{example_id}/examples/",
+)
 def examples_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
     return render_page(request, page_slug, RecipeTabs.examples, example_id)
 
 
-@app.post("/{page_slug}/api/")
-@app.post("/{page_slug}/{run_slug}/api/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/api/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/api/",
+    "/{page_slug}/{run_slug}/api/",
+    "/{page_slug}/{run_slug}-{example_id}/api/",
+)
 def api_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
     return render_page(request, page_slug, RecipeTabs.run_as_api, example_id)
 
 
-@app.post("/{page_slug}/history/")
-@app.post("/{page_slug}/{run_slug}/history/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/history/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/history/",
+    "/{page_slug}/{run_slug}/history/",
+    "/{page_slug}/{run_slug}-{example_id}/history/",
+)
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
     return render_page(request, page_slug, RecipeTabs.history, example_id)
 
 
-@app.post("/{page_slug}/saved/")
-@app.post("/{page_slug}/{run_slug}/saved/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/saved/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/saved/",
+    "/{page_slug}/{run_slug}/saved/",
+    "/{page_slug}/{run_slug}-{example_id}/saved/",
+)
 def save_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
     return render_page(request, page_slug, RecipeTabs.saved, example_id)
 
 
-@app.post("/{page_slug}/integrations/add/")
-@app.post("/{page_slug}/{run_slug}/integrations/add/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/add/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/integrations/add/",
+    "/{page_slug}/{run_slug}/integrations/add/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/add/",
+)
 def add_integrations_route(
     request: Request,
     page_slug: str,
@@ -401,10 +395,12 @@ def add_integrations_route(
     return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
-@app.post("/{page_slug}/integrations/{integration_id}/stats/")
-@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/stats/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/integrations/{integration_id}/stats/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/stats/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/",
+)
 def integrations_stats_route(
     request: Request,
     page_slug: str,
@@ -421,12 +417,12 @@ def integrations_stats_route(
     return render_page(request, "stats", RecipeTabs.integrations, example_id)
 
 
-@app.post("/{page_slug}/integrations/{integration_id}/analysis/")
-@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/")
-@app.post(
-    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/"
+@st.route(
+    app,
+    "/{page_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/",
 )
-@st.route
 def integrations_analysis_route(
     request: Request,
     page_slug: str,
@@ -457,14 +453,16 @@ def integrations_analysis_route(
     )
 
 
-@app.post("/{page_slug}/integrations/")
-@app.post("/{page_slug}/{run_slug}/integrations/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/")
-###
-@app.post("/{page_slug}/integrations/{integration_id}/")
-@app.post("/{page_slug}/{run_slug}/integrations/{integration_id}/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/integrations/",
+    "/{page_slug}/{run_slug}/integrations/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/",
+    ###
+    "/{page_slug}/integrations/{integration_id}/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/",
+)
 def integrations_route(
     request: Request,
     page_slug: str,
@@ -482,9 +480,11 @@ def integrations_route(
     return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
-@app.post("/chat/")
-@app.post("/chats/")
-@st.route
+@st.route(
+    app,
+    "/chat/",
+    "/chats/",
+)
 def chat_explore_route(request: Request):
     from daras_ai_v2 import chat_explore
 
@@ -572,10 +572,12 @@ let script = document.createElement("script");
     )
 
 
-@app.post("/{page_slug}/")
-@app.post("/{page_slug}/{run_slug}/")
-@app.post("/{page_slug}/{run_slug}-{example_id}/")
-@st.route
+@st.route(
+    app,
+    "/{page_slug}/",
+    "/{page_slug}/{run_slug}/",
+    "/{page_slug}/{run_slug}-{example_id}/",
+)
 def recipe_page_or_handle(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
