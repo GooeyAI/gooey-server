@@ -43,6 +43,26 @@ def call_celery_task_outfile(
     filename: str,
     num_outputs: int = 1,
 ):
+    links, _ = call_celery_task_outfile_with_ret(
+        task_name,
+        pipeline=pipeline,
+        inputs=inputs,
+        content_type=content_type,
+        filename=filename,
+        num_outputs=num_outputs,
+    )
+    return links
+
+
+def call_celery_task_outfile_with_ret(
+    task_name: str,
+    *,
+    pipeline: dict,
+    inputs: dict,
+    content_type: str | None,
+    filename: str,
+    num_outputs: int = 1,
+):
     blobs = [storage_blob_for(filename) for i in range(num_outputs)]
     pipeline["upload_urls"] = [
         blob.generate_signed_url(
@@ -55,8 +75,8 @@ def call_celery_task_outfile(
         )
         for blob in blobs
     ]
-    call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
-    return [blob.public_url for blob in blobs]
+    ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
+    return [blob.public_url for blob in blobs], ret
 
 
 _app = None
