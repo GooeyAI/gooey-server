@@ -4,7 +4,7 @@ import typing
 
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -67,7 +67,7 @@ class CompareLLMPage(BasePage):
         return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             """,
@@ -84,8 +84,8 @@ class CompareLLMPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state["input_prompt"], "Please enter a Prompt"
-        assert st.session_state["selected_models"], "Please select at least one model"
+        assert gui.session_state["input_prompt"], "Please enter a Prompt"
+        assert gui.session_state["selected_models"], "Please select at least one model"
 
     def render_usage_guide(self):
         youtube_video("dhexRRDAuY8")
@@ -118,15 +118,15 @@ class CompareLLMPage(BasePage):
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        _render_outputs(st.session_state, 450)
+        _render_outputs(gui.session_state, 450)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.write("**Prompt**")
-            st.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
+            gui.write("**Prompt**")
+            gui.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
             for key, value in state.get("variables", {}).items():
-                st.text_area(f"`{key}`", value=str(value), disabled=True)
+                gui.text_area(f"`{key}`", value=str(value), disabled=True)
         with col2:
             _render_outputs(state, 300)
 
@@ -163,7 +163,7 @@ def _render_outputs(state, height):
     for key in selected_models:
         output_text: dict = state.get("output_text", {}).get(key, [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**{LargeLanguageModels[key].value}**",
                 help=f"output {key} {idx} {random.random()}",
                 disabled=True,

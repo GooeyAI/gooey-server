@@ -2,6 +2,7 @@ import mimetypes
 import typing
 from datetime import datetime
 
+import gooey_gui as gui
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -24,7 +25,6 @@ from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
-from gooey_ui.pubsub import realtime_subscribe
 from gooeysite.bg_db_conn import db_middleware, get_celery_result_db_safe
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
@@ -402,7 +402,7 @@ def _process_and_send_msg(
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
         channel = page.realtime_channel_name(run_id, uid)
-        with realtime_subscribe(channel) as realtime_gen:
+        with gui.realtime_subscribe(channel) as realtime_gen:
             for state in realtime_gen:
                 bot.recipe_run_state = page.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""

@@ -21,7 +21,7 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
 
-import gooey_ui as gui
+import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai.image_input import (
     upload_file_from_bytes,

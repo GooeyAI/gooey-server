@@ -21,7 +21,7 @@ from starlette.responses import (
     FileResponse,
 )
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import Workflow, BotIntegration
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
@@ -42,7 +42,6 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
-from gooey_ui.components.url_button import url_button
 from handles.models import Handle
 
 app = APIRouter()
@@ -195,7 +194,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
-@st.route(app, "/GuiComponents/")
+@gui.route(app, "/GuiComponents/")
 def component_page(request: Request):
     import components_doc
 
@@ -211,7 +210,7 @@ def component_page(request: Request):
     }
 
 
-@st.route(app, "/explore/")
+@gui.route(app, "/explore/")
 def explore_page(request: Request):
     import explore
 
@@ -227,7 +226,7 @@ def explore_page(request: Request):
     }
 
 
-@st.route(app, "/api/")
+@gui.route(app, "/api/")
 def api_docs_page(request: Request):
     with page_wrapper(request):
         _api_docs_page(request)
@@ -248,7 +247,7 @@ def _api_docs_page(request):
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
 
-    st.markdown(
+    gui.markdown(
         f"""
 # Gooey.AI API Platform
 
@@ -271,34 +270,34 @@ Authorization: Bearer GOOEY_API_KEY
         unsafe_allow_html=True,
     )
 
-    st.write("---")
+    gui.write("---")
     options = {
         page_cls.workflow.value: page_cls().get_recipe_title()
         for page_cls in all_api_pages
     }
 
-    st.write(
+    gui.write(
         "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API"
     )
 
-    col1, col2 = st.columns([11, 1], responsive=False)
+    col1, col2 = gui.columns([11, 1], responsive=False)
     with col1:
-        with st.div(className="pt-1"):
+        with gui.div(className="pt-1"):
             workflow = Workflow(
-                st.selectbox(
+                gui.selectbox(
                     "",
                     options=options,
                     format_func=lambda x: options[x],
                 )
             )
     with col2:
-        url_button(workflow.page_cls.app_url())
+        gui.url_button(workflow.page_cls.app_url())
 
-    st.write("###### 📤 Example Request")
+    gui.write("###### 📤 Example Request")
 
-    include_all = st.checkbox("Show all fields")
-    as_async = st.checkbox("Run Async")
-    as_form_data = st.checkbox("Upload Files via Form Data")
+    include_all = gui.checkbox("Show all fields")
+    as_async = gui.checkbox("Run Async")
+    as_form_data = gui.checkbox("Upload Files via Form Data")
 
     page = workflow.page_cls(request=request)
     state = page.get_root_published_run().saved_run.to_dict()
@@ -313,17 +312,17 @@ Authorization: Bearer GOOEY_API_KEY
         as_form_data=as_form_data,
         as_async=as_async,
     )
-    st.write("")
+    gui.write("")
 
-    st.write("###### 🎁 Example Response")
-    st.json(response_body, expanded=True)
+    gui.write("###### 🎁 Example Response")
+    gui.json(response_body, expanded=True)
 
-    st.write("---")
-    with st.tag("a", id="api-keys"):
-        st.write("##### 🔐 API keys")
+    gui.write("---")
+    with gui.tag("a", id="api-keys"):
+        gui.write("##### 🔐 API keys")
 
     if not page.request.user or page.request.user.is_anonymous:
-        st.write(
+        gui.write(
             "**Please [Login](/login/?next=/api/) to generate the `$GOOEY_API_KEY`**"
         )
         return
@@ -331,7 +330,7 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/examples/",
     "/{page_slug}/{run_slug}/examples/",
@@ -343,7 +342,7 @@ def examples_route(
     return render_page(request, page_slug, RecipeTabs.examples, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/api/",
     "/{page_slug}/{run_slug}/api/",
@@ -355,7 +354,7 @@ def api_route(
     return render_page(request, page_slug, RecipeTabs.run_as_api, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/history/",
     "/{page_slug}/{run_slug}/history/",
@@ -367,7 +366,7 @@ def history_route(
     return render_page(request, page_slug, RecipeTabs.history, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/saved/",
     "/{page_slug}/{run_slug}/saved/",
@@ -379,7 +378,7 @@ def save_route(
     return render_page(request, page_slug, RecipeTabs.saved, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/integrations/add/",
     "/{page_slug}/{run_slug}/integrations/add/",
@@ -391,11 +390,11 @@ def add_integrations_route(
     run_slug: str = None,
     example_id: str = None,
 ):
-    st.session_state["--add-integration"] = True
+    gui.session_state["--add-integration"] = True
     return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/integrations/{integration_id}/stats/",
     "/{page_slug}/{run_slug}/integrations/{integration_id}/stats/",
@@ -411,13 +410,13 @@ def integrations_stats_route(
     from routers.bots_api import api_hashids
 
     try:
-        st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
+        gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
     return render_page(request, "stats", RecipeTabs.integrations, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/integrations/{integration_id}/analysis/",
     "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
@@ -453,7 +452,7 @@ def integrations_analysis_route(
     )
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/integrations/",
     "/{page_slug}/{run_slug}/integrations/",
@@ -474,13 +473,13 @@ def integrations_route(
 
     if integration_id:
         try:
-            st.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
+            gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
         except IndexError:
             raise HTTPException(status_code=404)
     return render_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
-@st.route(
+@gui.route(
     app,
     "/chat/",
     "/chats/",
@@ -572,7 +571,7 @@ let script = document.createElement("script");
     )
 
 
-@st.route(
+@gui.route(
     app,
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
@@ -632,13 +631,13 @@ def render_page(
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
     # this is because the code still expects example_id to be in the query params
-    st.set_query_params(dict(request.query_params) | dict(example_id=example_id))
+    gui.set_query_params(dict(request.query_params) | dict(example_id=example_id))
     _, run_id, uid = extract_query_params(request.query_params)
 
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
-    if not st.session_state:
+    if not gui.session_state:
         sr = page.get_sr_from_query_params(example_id, run_id, uid)
-        st.session_state.update(page.load_state_from_sr(sr))
+        gui.session_state.update(page.load_state_from_sr(sr))
 
     with page_wrapper(request):
         page.render()
@@ -647,7 +646,7 @@ def render_page(
         meta=build_meta_tags(
             url=get_og_url_path(request),
             page=page,
-            state=st.session_state,
+            state=gui.session_state,
             run_id=run_id,
             uid=uid,
             example_id=example_id,
@@ -684,16 +683,16 @@ def page_wrapper(request: Request, className=""):
             request.user.uid
         ).decode()
 
-    with st.div(className="d-flex flex-column min-vh-100"):
-        st.html(templates.get_template("gtag.html").render(**context))
-        st.html(templates.get_template("header.html").render(**context))
-        st.html(copy_to_clipboard_scripts)
+    with gui.div(className="d-flex flex-column min-vh-100"):
+        gui.html(templates.get_template("gtag.html").render(**context))
+        gui.html(templates.get_template("header.html").render(**context))
+        gui.html(copy_to_clipboard_scripts)
 
-        with st.div(id="main-content", className="container " + className):
+        with gui.div(id="main-content", className="container " + className):
             yield
 
-        st.html(templates.get_template("footer.html").render(**context))
-        st.html(templates.get_template("login_scripts.html").render(**context))
+        gui.html(templates.get_template("footer.html").render(**context))
+        gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"

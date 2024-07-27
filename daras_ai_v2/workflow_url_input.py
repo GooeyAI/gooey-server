@@ -1,9 +1,9 @@
 import typing
 
+import gooey_gui as gui
 from django.db.models import Q
 from furl import furl
 
-import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, SavedRun, Workflow
 from daras_ai_v2.base import BasePage
@@ -11,7 +11,6 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.fastapi_tricks import resolve_url
 from daras_ai_v2.query_params_util import extract_query_params
-from gooey_ui.components.url_button import url_button
 
 
 def workflow_url_input(
@@ -25,10 +24,10 @@ def workflow_url_input(
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 
-    col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
+    col1, col2, col3, col4 = gui.columns([9, 1, 1, 1], responsive=False)
     if not internal_state.get("workflow") and internal_state.get("url"):
         with col1:
-            url = st.text_input(
+            url = gui.text_input(
                 "",
                 key=key,
                 value=internal_state.get("url"),
@@ -41,8 +40,8 @@ def workflow_url_input(
         with col1:
             options = get_published_run_options(page_cls, current_user=current_user)
             options.update(internal_state.get("--added_workflows", {}))
-            with st.div(className="pt-1"):
-                url = st.selectbox(
+            with gui.div(className="pt-1"):
+                url = gui.selectbox(
                     "",
                     key=key,
                     options=options,
@@ -55,7 +54,7 @@ def workflow_url_input(
         with col2:
             edit_button(key)
     with col3:
-        url_button(url)
+        gui.url_button(url)
     with col4:
         if del_key:
             del_button(del_key)
@@ -64,13 +63,13 @@ def workflow_url_input(
         ret = url_to_runs(url)
     except Exception as e:
         ret = None
-        st.error(repr(e))
+        gui.error(repr(e))
     internal_state["url"] = url
     return ret
 
 
 def edit_done_button(key: str):
-    st.button(
+    gui.button(
         '<i class="fa-regular fa-square-check text-success"></i>',
         key=key + ":edit-done",
         type="tertiary",
@@ -78,7 +77,7 @@ def edit_done_button(key: str):
 
 
 def edit_button(key: str):
-    st.button(
+    gui.button(
         '<i class="fa-regular fa-pencil text-warning"></i>',
         key=key + ":edit-mode",
         type="tertiary",
@@ -86,7 +85,7 @@ def edit_button(key: str):
 
 
 def del_button(key: str):
-    st.button(
+    gui.button(
         '<i class="fa-regular fa-trash text-danger"></i>',
         key=key,
         type="tertiary",
@@ -97,12 +96,12 @@ def init_workflow_selector(
     internal_state: dict,
     key: str,
 ) -> dict:
-    if st.session_state.get(key + ":edit-done"):
-        st.session_state.pop(key + ":edit-mode", None)
-        st.session_state.pop(key + ":edit-done", None)
-        st.session_state.pop(key, None)
+    if gui.session_state.get(key + ":edit-done"):
+        gui.session_state.pop(key + ":edit-mode", None)
+        gui.session_state.pop(key + ":edit-done", None)
+        gui.session_state.pop(key, None)
 
-    if st.session_state.get(key + ":edit-mode"):
+    if gui.session_state.get(key + ":edit-mode"):
         internal_state.pop("workflow", None)
 
     elif not internal_state.get("workflow") and internal_state.get("url"):
@@ -140,7 +139,7 @@ def url_to_runs(
     return page_cls, sr, pr
 
 
-@st.cache_in_session_state
+@gui.cache_in_session_state
 def get_published_run_options(
     page_cls: typing.Type[BasePage],
     current_user: AppUser | None = None,

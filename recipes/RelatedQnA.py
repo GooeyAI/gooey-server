@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import apply_parallel
@@ -60,32 +60,32 @@ class RelatedQnAPage(BasePage):
         GoogleGPTPage.validate_form_v2(self)
 
     def render_steps(self):
-        serp_results = st.session_state.get(
-            "serp_results", st.session_state.get("scaleserp_results")
+        serp_results = gui.session_state.get(
+            "serp_results", gui.session_state.get("scaleserp_results")
         )
         if serp_results:
-            st.write("**Web Search Results**")
-            st.json(serp_results)
+            gui.write("**Web Search Results**")
+            gui.json(serp_results)
 
-        output_queries = st.session_state.get("output_queries", [])
+        output_queries = gui.session_state.get("output_queries", [])
         for i, result in enumerate(output_queries):
-            st.write("---")
-            st.write(f"##### {i+1}. _{result.get('search_query')}_")
+            gui.write("---")
+            gui.write(f"##### {i+1}. _{result.get('search_query')}_")
             serp_results = result.get("serp_results", result.get("scaleserp_results"))
             if serp_results:
-                st.write("**Web Search Results**")
-                st.json(serp_results)
+                gui.write("**Web Search Results**")
+                gui.json(serp_results)
             render_doc_search_step(result)
 
     def render_output(self):
-        render_qna_outputs(st.session_state, 300)
+        render_qna_outputs(gui.session_state, 300)
 
     def render_example(self, state: dict):
-        st.write("**Search Query**")
-        st.write("```properties\n" + state.get("search_query", "") + "\n```")
+        gui.write("**Search Query**")
+        gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         site_filter = state.get("site_filter")
         if site_filter:
-            st.write(f"**Site** \\\n{site_filter}")
+            gui.write(f"**Site** \\\n{site_filter}")
         render_qna_outputs(state, 200, show_count=1)
 
     def render_settings(self):

@@ -1,8 +1,7 @@
+import gooey_gui as gui
 from pydantic import BaseModel
 
-import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2 import settings
 from daras_ai_v2.base import (
     BasePage,
 )
@@ -32,7 +31,7 @@ class ChyronPlantPage(BasePage):
         chyron_output: str
 
     def render_form_v2(self):
-        st.text_input(
+        gui.text_input(
             """
             ### Input Midi notes
             """,
@@ -40,25 +39,25 @@ class ChyronPlantPage(BasePage):
         )
 
     def render_output(self):
-        st.text_area(
+        gui.text_area(
             """
             **MIDI translation**
             """,
-            value=st.session_state.get("midi_translation", ""),
+            value=gui.session_state.get("midi_translation", ""),
             disabled=True,
         )
 
-        st.text_area(
+        gui.text_area(
             """
             ### Chyron Output
             """,
             disabled=True,
-            value=st.session_state.get("chyron_output", ""),
+            value=gui.session_state.get("chyron_output", ""),
             height=300,
         )
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             """
             ### Midi Notes -> English GPT script
             """,
@@ -66,7 +65,7 @@ class ChyronPlantPage(BasePage):
             height=500,
         )
 
-        st.text_area(
+        gui.text_area(
             """
             ### Chyron Plant Radbot script
             """,
@@ -128,8 +127,8 @@ class ChyronPlantPage(BasePage):
         return ""
 
     def render_example(self, state):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.write(state.get("midi_translation", ""))
+            gui.write(state.get("midi_translation", ""))
         with col2:
-            st.write(state.get("chyron_output", ""))
+            gui.write(state.get("chyron_output", ""))

@@ -5,7 +5,7 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.image_input import (
@@ -88,7 +88,7 @@ class FaceInpaintingPage(BasePage):
         return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
-        st.write(
+        gui.write(
             """    
     This recipe takes a photo with a face and then uses the text prompt to paint a background.
     
@@ -104,7 +104,7 @@ class FaceInpaintingPage(BasePage):
         )
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Describe the character that you'd like to generate. 
@@ -113,7 +113,7 @@ class FaceInpaintingPage(BasePage):
             placeholder="Iron man",
         )
 
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Face Photo
             Give us a photo of yourself, or anyone else
@@ -123,16 +123,16 @@ class FaceInpaintingPage(BasePage):
         )
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("text_prompt")
-        input_image = st.session_state.get("input_image")
+        text_prompt = gui.session_state.get("text_prompt")
+        input_image = gui.session_state.get("input_image")
         assert text_prompt and input_image, "Please provide a Prompt and a Face Photo"
 
     def render_settings(self):
         img_model_settings(InpaintingModels)
 
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.slider(
+            gui.slider(
                 "##### Upscaling",
                 min_value=1.0,
                 max_value=4.0,
@@ -140,35 +140,35 @@ class FaceInpaintingPage(BasePage):
                 key="upscale_factor",
             )
 
-        st.write("---")
+        gui.write("---")
 
-        st.write(
+        gui.write(
             """
             #### Face Repositioning Settings
             """
         )
 
-        st.write("How _big_ should the face look?")
-        col1, _ = st.columns(2)
+        gui.write("How _big_ should the face look?")
+        col1, _ = gui.columns(2)
         with col1:
-            face_scale = st.slider(
+            face_scale = gui.slider(
                 "Scale",
                 min_value=0.1,
                 max_value=1.0,
                 key="face_scale",
             )
 
-        st.write("_Where_ would you like to place the face in the scene?")
-        col1, col2 = st.columns(2)
+        gui.write("_Where_ would you like to place the face in the scene?")
+        col1, col2 = gui.columns(2)
         with col1:
-            pos_x = st.slider(
+            pos_x = gui.slider(
                 "Position X",
                 min_value=0.0,
                 max_value=1.0,
                 key="face_pos_x",
             )
         with col2:
-            pos_y = st.slider(
+            pos_y = gui.slider(
                 "Position Y",
                 min_value=0.0,
                 max_value=1.0,
@@ -183,8 +183,8 @@ class FaceInpaintingPage(BasePage):
         img, _ = extract_and_reposition_face_cv2(
             img_cv2,
             out_size=(
-                st.session_state["output_width"],
-                st.session_state["output_height"],
+                gui.session_state["output_width"],
+                gui.session_state["output_height"],
             ),
             out_face_scale=face_scale,
             out_pos_x=pos_x,
@@ -193,57 +193,57 @@ class FaceInpaintingPage(BasePage):
         repositioning_preview_img(img)
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
-        output_images = st.session_state.get("output_images")
+        text_prompt = gui.session_state.get("text_prompt", "")
+        output_images = gui.session_state.get("output_images")
 
         if output_images:
-            st.write("#### Output Image")
+            gui.write("#### Output Image")
             for url in output_images:
-                st.image(url, show_download_button=True)
+                gui.image(url, show_download_button=True)
         else:
-            st.div()
+            gui.div()
 
     def render_steps(self):
-        input_file = st.session_state.get("input_file")
-        input_image = st.session_state.get("input_image")
+        input_file = gui.session_state.get("input_file")
+        input_image = gui.session_state.get("input_image")
         input_image_or_file = input_image or input_file
-        output_images = st.session_state.get("output_images")
+        output_images = gui.session_state.get("output_images")
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = gui.columns(4)
 
         with col1:
             if input_image_or_file:
-                st.image(input_image_or_file, caption="Input Image")
+                gui.image(input_image_or_file, caption="Input Image")
             else:
-                st.div()
+                gui.div()
 
         with col2:
-            resized_image = st.session_state.get("resized_image")
+            resized_image = gui.session_state.get("resized_image")
             if resized_image:
-                st.image(resized_image, caption="Repositioned Face")
+                gui.image(resized_image, caption="Repositioned Face")
             else:
-                st.div()
+                gui.div()
 
-            face_mask = st.session_state.get("face_mask")
+            face_mask = gui.session_state.get("face_mask")
             if face_mask:
-                st.image(face_mask, caption="Face Mask")
+                gui.image(face_mask, caption="Face Mask")
             else:
-                st.div()
+                gui.div()
 
         with col3:
-            diffusion_images = st.session_state.get("diffusion_images")
+            diffusion_images = gui.session_state.get("diffusion_images")
             if diffusion_images:
                 for url in diffusion_images:
-                    st.image(url, caption="Generated Image")
+                    gui.image(url, caption="Generated Image")
             else:
-                st.div()
+                gui.div()
 
         with col4:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption="gfpgan - Face Restoration")
+                    gui.image(url, caption="gfpgan - Face Restoration")
             else:
-                st.div()
+                gui.div()
 
     def render_usage_guide(self):
         youtube_video("To4Oc_d4Nus")
@@ -321,17 +321,17 @@ class FaceInpaintingPage(BasePage):
         ]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col2:
             output_images = state.get("output_images")
             if output_images:
                 for img in output_images:
-                    st.image(img, caption="Generated Image")
+                    gui.image(img, caption="Generated Image")
         with col1:
             input_image = state.get("input_image")
-            st.image(input_image, caption="Input Image")
-            st.write("**Prompt**")
-            st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
+            gui.image(input_image, caption="Input Image")
+            gui.write("**Prompt**")
+            gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")

@@ -11,7 +11,7 @@ from furl import furl
 from pydantic import BaseModel
 from pyzbar import pyzbar
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -152,7 +152,7 @@ class QRCodeGeneratorPage(BasePage):
             return ["qr_code_data"]
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             Describe the subject/scene of the QR Code.
@@ -163,12 +163,12 @@ class QRCodeGeneratorPage(BasePage):
         )
 
         qr_code_source_key = "__qr_code_source"
-        if qr_code_source_key not in st.session_state:
+        if qr_code_source_key not in gui.session_state:
             for key in QrSources._member_names_:
-                if st.session_state.get(key):
-                    st.session_state[qr_code_source_key] = key
+                if gui.session_state.get(key):
+                    gui.session_state[qr_code_source_key] = key
                     break
-        source = st.horizontal_radio(
+        source = gui.horizontal_radio(
             "",
             options=QrSources._member_names_,
             key=qr_code_source_key,
@@ -178,7 +178,7 @@ class QRCodeGeneratorPage(BasePage):
         _set_selected_qr_input_field(source)
         match source:
             case QrSources.qr_code_data.name:
-                st.text_area(
+                gui.text_area(
                     """
                     Enter your URL/Text below.
                     """,
@@ -187,7 +187,7 @@ class QRCodeGeneratorPage(BasePage):
                 )
 
             case QrSources.qr_code_input_image.name:
-                st.file_uploader(
+                gui.file_uploader(
                     """
                     It will be reformatted and cleaned
                     """,
@@ -196,27 +196,27 @@ class QRCodeGeneratorPage(BasePage):
                 )
 
             case QrSources.qr_code_vcard.name:
-                st.caption(
+                gui.caption(
                     "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
                 )
                 vcard_form(key=QrSources.qr_code_vcard.name)
 
             case QrSources.qr_code_file.name:
-                st.file_uploader(
+                gui.file_uploader(
                     "Upload any file. Contact cards and PDFs work great.",
                     key=QrSources.qr_code_file.name,
                 )
 
         if source != QrSources.qr_code_vcard:
-            st.checkbox(
+            gui.checkbox(
                 "🔗 Shorten URL",
                 key="use_url_shortener",
             )
-            st.caption(
+            gui.caption(
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
 
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### 🏞️ Reference Image *[optional]*
             This image will be used as inspiration to blend with the QR Code.
@@ -226,13 +226,13 @@ class QRCodeGeneratorPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state.get("text_prompt"), "Please provide a prompt"
+        assert gui.session_state.get("text_prompt"), "Please provide a prompt"
         assert any(
-            st.session_state.get(k) for k in QrSources._member_names_
+            gui.session_state.get(k) for k in QrSources._member_names_
         ), "Please provide QR Code URL, text content, contact info, or upload an image"
 
     def render_description(self):
-        st.markdown(
+        gui.markdown(
             """
             Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier! 
             Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR codes tailored to your style. 
@@ -242,30 +242,30 @@ class QRCodeGeneratorPage(BasePage):
         prompting101()
 
     def render_steps(self):
-        email_import = st.session_state.get("__email_imported")
+        email_import = gui.session_state.get("__email_imported")
         if email_import:
-            st.markdown("#### Import contact info from email")
-            st.json(email_import)
-        shortened_url = st.session_state.get("shortened_url")
+            gui.markdown("#### Import contact info from email")
+            gui.json(email_import)
+        shortened_url = gui.session_state.get("shortened_url")
         if shortened_url:
-            st.markdown(
+            gui.markdown(
                 f"""
                 #### Shorten the URL
                 For more aesthetic and reliable QR codes with fewer black squares, we automatically shorten the URL: {shortened_url}
                 """
             )
-        img = st.session_state.get("cleaned_qr_code")
+        img = gui.session_state.get("cleaned_qr_code")
         if img:
-            st.image(
+            gui.image(
                 img,
                 caption="""
                 #### Generate clean QR code
                 Having consistent padding, formatting, and using high error correction in the QR Code encoding makes the QR code more readable and robust to damage and thus yields more reliable results with the model.
                 """,
             )
-        raw_images = st.session_state.get("raw_images", [])
+        raw_images = gui.session_state.get("raw_images", [])
         if raw_images:
-            st.markdown(
+            gui.markdown(
                 """
 #### Generate the QR Codes
 We use the model and controlnet constraints to generate QR codes that blend the prompt with the cleaned QR Code. We generate them one at a time and check if they work. If they don't work, we try again. If they work, we stop.
@@ -274,10 +274,10 @@ Here are the attempts:
                 """
             )
         for img in raw_images:
-            st.image(img)
-        output_images = st.session_state.get("output_images", [])
+            gui.image(img)
+        output_images = gui.session_state.get("output_images", [])
         if output_images:
-            st.markdown(
+            gui.markdown(
                 """
 #### Run quality control
 We programatically scan the QR Codes to make sure they are readable. Once a working one is found, it becomes the output.
@@ -286,10 +286,10 @@ Here is the final output:
                 """
             )
         for img in output_images:
-            st.image(img)
+            gui.image(img)
 
     def render_settings(self):
-        st.write(
+        gui.write(
             """
             Customize the QR Code output for your text prompt with these Settings. 
             """
@@ -307,29 +307,29 @@ Here is the final output:
             low_explanation="At {low} the prompted visual will be intact and the QR code will be more artistic but less readable",
             high_explanation="At {high} the control settings that blend the QR code will be applied tightly, possibly overriding the image prompt, but the QR code will be more readable",
         )
-        st.write("---")
+        gui.write("---")
 
         output_resolution_setting()
 
-        st.write(
+        gui.write(
             """
             ##### ⌖ QR Positioning
             Use this to control where the QR code is placed in the image, and how big it should be.
             """,
             className="gui-input",
         )
-        col1, _ = st.columns(2)
+        col1, _ = gui.columns(2)
         with col1:
-            obj_scale = st.slider(
+            obj_scale = gui.slider(
                 "Scale",
                 min_value=0.1,
                 max_value=1.0,
                 step=0.05,
                 key="obj_scale",
             )
-        col1, col2 = st.columns(2, responsive=False)
+        col1, col2 = gui.columns(2, responsive=False)
         with col1:
-            pos_x = st.slider(
+            pos_x = gui.slider(
                 "Position X",
                 min_value=0.0,
                 max_value=1.0,
@@ -337,7 +337,7 @@ Here is the final output:
                 key="obj_pos_x",
             )
         with col2:
-            pos_y = st.slider(
+            pos_y = gui.slider(
                 "Position Y",
                 min_value=0.0,
                 max_value=1.0,
@@ -355,22 +355,22 @@ Here is the final output:
             pos_x=pos_x,
             pos_y=pos_y,
             out_size=(
-                st.session_state["output_width"],
-                st.session_state["output_height"],
+                gui.session_state["output_width"],
+                gui.session_state["output_height"],
             ),
             color=255,
         )
 
-        if st.session_state.get("image_prompt"):
-            st.write("---")
-            st.write(
+        if gui.session_state.get("image_prompt"):
+            gui.write("---")
+            gui.write(
                 """
                 ##### 🎨 Inspiration
                 Use this to control how the image prompt should influence the output.
                 """,
                 className="gui-input",
             )
-            st.slider(
+            gui.slider(
                 "Inspiration Strength",
                 min_value=0.0,
                 max_value=1.0,
@@ -384,25 +384,25 @@ Here is the final output:
                 checkboxes=False,
                 allow_none=False,
             )
-            st.write(
+            gui.write(
                 """
                 ##### ⌖ Reference Image Positioning
                 Use this to control where the reference image is placed, and how big it should be.
                 """,
                 className="gui-input",
             )
-            col1, _ = st.columns(2)
+            col1, _ = gui.columns(2)
             with col1:
-                image_prompt_scale = st.slider(
+                image_prompt_scale = gui.slider(
                     "Scale",
                     min_value=0.1,
                     max_value=1.0,
                     step=0.05,
                     key="image_prompt_scale",
                 )
-            col1, col2 = st.columns(2, responsive=False)
+            col1, col2 = gui.columns(2, responsive=False)
             with col1:
-                image_prompt_pos_x = st.slider(
+                image_prompt_pos_x = gui.slider(
                     "Position X",
                     min_value=0.0,
                     max_value=1.0,
@@ -410,7 +410,7 @@ Here is the final output:
                     key="image_prompt_pos_x",
                 )
             with col2:
-                image_prompt_pos_y = st.slider(
+                image_prompt_pos_y = gui.slider(
                     "Position Y",
                     min_value=0.0,
                     max_value=1.0,
@@ -419,7 +419,7 @@ Here is the final output:
                 )
 
             img_cv2 = mask_cv2 = bytes_to_cv2_img(
-                requests.get(st.session_state["image_prompt"]).content,
+                requests.get(gui.session_state["image_prompt"]).content,
             )
             repositioning_preview_widget(
                 img_cv2=img_cv2,
@@ -428,14 +428,14 @@ Here is the final output:
                 pos_x=image_prompt_pos_x,
                 pos_y=image_prompt_pos_y,
                 out_size=(
-                    st.session_state["output_width"],
-                    st.session_state["output_height"],
+                    gui.session_state["output_width"],
+                    gui.session_state["output_height"],
                 ),
                 color=255,
             )
 
     def render_output(self):
-        state = st.session_state
+        state = gui.session_state
         self._render_outputs(state)
 
     def render_example(self, state: dict):
@@ -446,7 +446,7 @@ Here is the final output:
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            st.image(img, show_download_button=True)
+            gui.image(img, show_download_button=True)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)
@@ -457,7 +457,7 @@ Here is the final output:
                 continue
             shortened_url = state.get("shortened_url")
             if not shortened_url:
-                st.caption(qr_code_data)
+                gui.caption(qr_code_data)
                 continue
             hashid = furl(shortened_url.strip("/")).path.segments[-1]
             try:
@@ -465,9 +465,9 @@ Here is the final output:
             except ShortenedURL.DoesNotExist:
                 clicks = None
             if clicks is not None:
-                st.caption(f"{shortened_url} → {qr_code_data} (Views: {clicks})")
+                gui.caption(f"{shortened_url} → {qr_code_data} (Views: {clicks})")
             else:
-                st.caption(f"{shortened_url} → {qr_code_data}")
+                gui.caption(f"{shortened_url} → {qr_code_data}")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -557,44 +557,44 @@ Here is the final output:
 
 
 def vcard_form(*, key: str) -> VCARD:
-    vcard_data = st.session_state.get(key, {})
+    vcard_data = gui.session_state.get(key, {})
     # populate inputs
     for k in VCARD.__fields__.keys():
-        st.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
+        gui.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
     vcard = VCARD.construct()
 
-    vcard.email = st.text_input(
+    vcard.email = gui.text_input(
         "Email", key="__vcard_data__email", placeholder="dev@gooey.ai"
     )
 
-    if vcard.email and st.button(
+    if vcard.email and gui.button(
         "Import other contact info from my email - magic!",
         type="link",
     ):
         imported_vcard = get_vcard_from_email(vcard.email)
         if not imported_vcard or not imported_vcard.format_name:
-            st.error("No contact info found for that email")
+            gui.error("No contact info found for that email")
         else:
             vcard = imported_vcard
             # update inputs
             for k, v in vcard.dict().items():
-                st.session_state[f"__vcard_data__{k}"] = v
+                gui.session_state[f"__vcard_data__{k}"] = v
 
-    vcard.format_name = st.text_input(
+    vcard.format_name = gui.text_input(
         "Name*",
         key="__vcard_data__format_name",
         placeholder="Supreme Overlord Alex Metzger, PhD",
     )
-    vcard.tel = st.text_input(
+    vcard.tel = gui.text_input(
         "Phone Number",
         key="__vcard_data__tel",
         placeholder="+1 (420) 669-6969",
     )
-    vcard.role = st.text_input("Role", key="__vcard_data__role", placeholder="Intern")
+    vcard.role = gui.text_input("Role", key="__vcard_data__role", placeholder="Intern")
 
-    st.session_state.setdefault("__vcard_data__urls_text", "\n".join(vcard.urls or []))
+    gui.session_state.setdefault("__vcard_data__urls_text", "\n".join(vcard.urls or []))
     vcard.urls = (
-        st.text_area(
+        gui.text_area(
             """
             Website Links  
             *([calend.ly](https://calend.ly) works great!)*
@@ -606,28 +606,28 @@ def vcard_form(*, key: str) -> VCARD:
         .splitlines()
     )
 
-    vcard.photo_url = st.text_input(
+    vcard.photo_url = gui.text_input(
         "Photo URL",
         key="__vcard_data__photo_url",
         placeholder="https://www.gooey.ai/static/images/logo.png",
     )
 
-    with st.expander("More Contact Fields"):
-        vcard.gender = st.text_input(
+    with gui.expander("More Contact Fields"):
+        vcard.gender = gui.text_input(
             "Gender", key="__vcard_data__gender", placeholder="F"
         )
-        vcard.note = st.text_area(
+        vcard.note = gui.text_area(
             "Notes",
             key="__vcard_data__note",
             placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
         )
-        vcard.address = st.text_area(
+        vcard.address = gui.text_area(
             "Address",
             key="__vcard_data__address",
-            placeholder="123 Main St, San Francisco, CA 94105",
+            placeholder="123 Main gui, San Francisco, CA 94105",
         )
 
-    st.session_state[key] = vcard.dict()
+    gui.session_state[key] = vcard.dict()
     return vcard
 
 
@@ -645,7 +645,7 @@ def _set_selected_qr_input_field(
     - caching any previous form data from other fields with hidden keys
     - restoring previously saved data for this field
     """
-    state = st.session_state
+    state = gui.session_state
 
     all_fields = QrSources._member_names_
     if selected not in all_fields:

@@ -10,7 +10,7 @@ import typing_extensions
 from django.db.models import F
 from furl import furl
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
@@ -297,7 +297,7 @@ def translation_language_selector(
     **kwargs,
 ) -> str | None:
     if not model:
-        st.session_state[key] = None
+        gui.session_state[key] = None
         return
 
     if model == TranslationModels.google:
@@ -308,7 +308,7 @@ def translation_language_selector(
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -351,7 +351,7 @@ def google_translate_language_selector(
     """
     languages = google_translate_target_languages()
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
@@ -411,7 +411,7 @@ def asr_language_selector(
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
-        st.session_state[key] = forced_lang
+        gui.session_state[key] = forced_lang
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
@@ -419,14 +419,14 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_lang = st.session_state.get(key)
+    old_lang = gui.session_state.get(key)
     if old_lang:
         try:
-            st.session_state[key] = normalised_lang_in_collection(old_lang, options)
+            gui.session_state[key] = normalised_lang_in_collection(old_lang, options)
         except UserError:
-            st.session_state[key] = None
+            gui.session_state[key] = None
 
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,

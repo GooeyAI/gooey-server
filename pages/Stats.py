@@ -5,7 +5,7 @@ assert wsgi
 import datetime
 
 import pandas as pd
-import streamlit as st
+import streamlit as gui
 from django.db.models import Count
 
 from bots.models import (
@@ -16,10 +16,10 @@ from bots.models import (
     Conversation,
 )
 
-st.set_page_config(layout="wide")
+gui.set_page_config(layout="wide")
 
 
-@st.cache_data
+@gui.cache_data
 def convert_df(df):
     return df.to_csv(index=True).encode("utf-8")
 
@@ -29,7 +29,7 @@ DEFAULT_BOT_ID = 8  # Telugu bot id is 8
 
 
 def main():
-    st.markdown(
+    gui.markdown(
         """
         # Gooey.AI Bot Stats
         """
@@ -40,18 +40,18 @@ def main():
         if bot.id == DEFAULT_BOT_ID:
             default_bot_index = index
 
-    col1, col2 = st.columns([25, 75])
+    col1, col2 = gui.columns([25, 75])
     with col1:
-        bot = st.selectbox(
+        bot = gui.selectbox(
             "Select Bot",
             index=default_bot_index,
             options=[b for b in bots],
             # format_func=lambda b: f"{b}",
         )
-        view = st.radio("View", ["Daily", "Weekly"], index=0)
-        start_date = st.date_input("Start date", START_DATE)
+        view = gui.radio("View", ["Daily", "Weekly"], index=0)
+        start_date = gui.date_input("Start date", START_DATE)
     if bot and start_date:
-        with st.spinner("Loading stats..."):
+        with gui.spinner("Loading stats..."):
             date = start_date
             data = []
             convo_by_msg_exchanged = (
@@ -137,19 +137,19 @@ def main():
         df = pd.DataFrame(data)
 
         csv = convert_df(df)
-        st.write("### Stats")
-        st.download_button(
+        gui.write("### Stats")
+        gui.download_button(
             "Download as csv", csv, "file.csv", "text/csv", key="download-csv"
         )
         with col2:
-            st.line_chart(
+            gui.line_chart(
                 df,
                 x="date",
                 y=[
                     "Messages_Sent",
                 ],
             )
-            st.line_chart(
+            gui.line_chart(
                 df,
                 x="date",
                 y=[
@@ -161,16 +161,16 @@ def main():
                 ],
             )
 
-        st.dataframe(df, use_container_width=True)
-        col1, col2 = st.columns(2)
+        gui.dataframe(df, use_container_width=True)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.write("### Top 5 users")
-            st.caption(f"{start_date} - {datetime.date.today()}")
-            st.dataframe(top_5_conv_by_message)
+            gui.write("### Top 5 users")
+            gui.caption(f"{start_date} - {datetime.date.today()}")
+            gui.dataframe(top_5_conv_by_message)
         with col2:
-            st.write("### Bottom 5 users")
-            st.caption(f"{start_date} - {datetime.date.today()}")
-            st.dataframe(bottom_5_conv_by_message)
+            gui.write("### Bottom 5 users")
+            gui.caption(f"{start_date} - {datetime.date.today()}")
+            gui.dataframe(bottom_5_conv_by_message)
 
 
 main()

@@ -6,7 +6,7 @@ from django.db.models import TextChoices
 from pydantic import BaseModel
 from typing_extensions import TypedDict
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -68,19 +68,19 @@ def animation_prompts_editor(
     input_prompt_key: str = "input_prompt",
 ):
     st_list_key = f"{animation_prompts_key}/st_list"
-    if st_list_key in st.session_state:
-        prompt_st_list = st.session_state[st_list_key]
+    if st_list_key in gui.session_state:
+        prompt_st_list = gui.session_state[st_list_key]
     else:
-        animation_prompts = st.session_state.get(
+        animation_prompts = gui.session_state.get(
             animation_prompts_key
         ) or input_prompt_to_animation_prompts(
-            st.session_state.get(input_prompt_key, "0:")
+            gui.session_state.get(input_prompt_key, "0:")
         )
         prompt_st_list = animation_prompts_to_st_list(animation_prompts)
-        st.session_state[st_list_key] = prompt_st_list
+        gui.session_state[st_list_key] = prompt_st_list
 
-    st.write("#### 👩‍💻 Animation Prompts")
-    st.caption(
+    gui.write("#### 👩‍💻 Animation Prompts")
+    gui.caption(
         """
         Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next.
         View the ‘Details’ drop down menu to get started.
@@ -91,33 +91,33 @@ def animation_prompts_editor(
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
-        if frame_key not in st.session_state:
-            st.session_state[frame_key] = fp["frame"]
-        if prompt_key not in st.session_state:
-            st.session_state[prompt_key] = fp["prompt"]
+        if frame_key not in gui.session_state:
+            gui.session_state[frame_key] = fp["frame"]
+        if prompt_key not in gui.session_state:
+            gui.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns([8, 3], responsive=False)
+        col1, col2 = gui.columns([8, 3], responsive=False)
         with col1:
-            st.text_area(
+            gui.text_area(
                 label="*Prompt*",
                 key=prompt_key,
                 height=100,
             )
         with col2:
-            st.number_input(
+            gui.number_input(
                 label="*Frame*",
                 key=frame_key,
                 min_value=0,
                 step=1,
             )
-            if st.button("🗑️", help=f"Remove Frame {idx + 1}"):
+            if gui.button("🗑️", help=f"Remove Frame {idx + 1}"):
                 prompt_st_list.pop(idx)
-                st.experimental_rerun()
+                gui.rerun()
 
         updated_st_list.append(
             {
-                "frame": st.session_state.get(frame_key),
-                "prompt": st.session_state.get(prompt_key),
+                "frame": gui.session_state.get(frame_key),
+                "prompt": gui.session_state.get(prompt_key),
                 "key": fp_key,
             }
         )
@@ -125,15 +125,15 @@ def animation_prompts_editor(
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
 
-    if st.button("➕ Add a Prompt"):
-        max_frames = st.session_state.get("max_frames", 100)
+    if gui.button("➕ Add a Prompt"):
+        max_frames = gui.session_state.get("max_frames", 100)
         if prompt_st_list:
             next_frame = get_last_frame(prompt_st_list)
             next_frame += max(min(max_frames - next_frame, 10), 1)
         else:
             next_frame = 0
         if next_frame > max_frames:
-            st.error("Please increase Frame Count")
+            gui.error("Please increase Frame Count")
         else:
             prompt_st_list.append(
                 {
@@ -142,12 +142,12 @@ def animation_prompts_editor(
                     "key": str(uuid.uuid1()),
                 }
             )
-            st.experimental_rerun()
+            gui.rerun()
 
-    st.session_state[animation_prompts_key] = st_list_to_animation_prompt(
+    gui.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
     )
-    st.caption(
+    gui.caption(
         """
         Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation.
         """
@@ -220,9 +220,9 @@ class DeforumSDPage(BasePage):
     def render_form_v2(self):
         animation_prompts_editor()
 
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.slider(
+            gui.slider(
                 """
                 #### Frame Count
                 Choose the number of frames in your animation.
@@ -232,7 +232,7 @@ class DeforumSDPage(BasePage):
                 step=10,
                 key="max_frames",
             )
-            st.caption(
+            gui.caption(
                 """
 Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames.
             """
@@ -249,10 +249,10 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         return max_frames * CREDITS_PER_FRAME
 
     def validate_form_v2(self):
-        prompt_list = st.session_state.get("animation_prompts")
+        prompt_list = gui.session_state.get("animation_prompts")
         assert prompt_list, "Please provide animation prompts"
 
-        max_frames = st.session_state["max_frames"]
+        max_frames = gui.session_state["max_frames"]
         assert (
             get_last_frame(prompt_list) <= max_frames
         ), "Please make sure that Frame Count matches the Animation Prompts"
@@ -261,7 +261,7 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         youtube_video("sUvica6UuQU")
 
     def render_settings(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             enum_selector(
                 AnimationModels,
@@ -272,11 +272,11 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
                 use_selectbox=True,
             )
 
-            animation_mode = st.selectbox(
+            animation_mode = gui.selectbox(
                 "Animation Mode", key="animation_mode", options=["2D", "3D"]
             )
 
-        st.text_input(
+        gui.text_input(
             """
 ###### Zoom
 How should the camera zoom in or out? This setting scales the canvas size, multiplicatively.
@@ -284,19 +284,19 @@ How should the camera zoom in or out? This setting scales the canvas size, multi
             """,
             key="zoom",
         )
-        st.caption(
+        gui.caption(
             """
             With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end.
             """
         )
-        st.text_input(
+        gui.text_input(
             """
 ###### Horizontal Pan
 How should the camera pan horizontally? This parameter uses positive values to move right and negative values to move left.
             """,
             key="translation_x",
         )
-        st.text_input(
+        gui.text_input(
             """
 ###### Vertical Pan
 How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down.
@@ -304,28 +304,28 @@ How should the camera pan vertically? This parameter uses positive values to mov
             key="translation_y",
         )
         if animation_mode == "3D":
-            st.text_input(
+            gui.text_input(
                 """
 ###### Roll Clockwise/Counterclockwise
 Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise. E.g. use `0:(-1), 20:(0)` to roll the camera 1 degree clockwise for the first 20 frames.
                 """,
                 key="rotation_3d_z",
             )
-            st.text_input(
+            gui.text_input(
                 """
 ###### Pan Left/Right
 Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.
                 """,
                 key="rotation_3d_y",
             )
-            st.text_input(
+            gui.text_input(
                 """
 ###### Tilt Up/Down
 Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.
                 """,
                 key="rotation_3d_x",
             )
-        st.slider(
+        gui.slider(
             """
 ###### FPS (Frames per second)
 Choose fps for the video.
@@ -336,7 +336,7 @@ Choose fps for the video.
             key="fps",
         )
 
-    #         st.selectbox(
+    #         gui.selectbox(
     #             """
     # ###### Sampler
     # What Stable Diffusion sampler should be used.
@@ -365,7 +365,7 @@ Choose fps for the video.
         return "Create AI-generated Animation without relying on complex CoLab notebooks. Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum. For more help on how to use the tool visit https://www.help.gooey.ai/learn-animation"
 
     def render_description(self):
-        st.markdown(
+        gui.markdown(
             f"""
             - Every Submit will require approximately 3-5 minutes to render.
 
@@ -377,7 +377,7 @@ Choose fps for the video.
 
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             #### Resources:
 
@@ -391,8 +391,8 @@ Choose fps for the video.
 
             """
         )
-        st.write("---")
-        st.markdown(
+        gui.write("---")
+        gui.markdown(
             """
             Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count.
 
@@ -407,7 +407,7 @@ Choose fps for the video.
             Use the Camera Settings to generate animations with depth and other 3D parameters.
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             Prompt Construction Tip:
 
@@ -421,20 +421,20 @@ Choose fps for the video.
         )
 
     def render_output(self):
-        output_video = st.session_state.get("output_video")
+        output_video = gui.session_state.get("output_video")
         if output_video:
-            st.write("#### Output Video")
-            st.video(output_video, autoplay=True, show_download_button=True)
+            gui.write("#### Output Video")
+            gui.video(output_video, autoplay=True, show_download_button=True)
 
     def estimate_run_duration(self):
         # in seconds
-        return st.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
+        return gui.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
 
     def render_example(self, state: dict):
         display = self.preview_input(state)
-        st.markdown("```lua\n" + display + "\n```")
+        gui.markdown("```lua\n" + display + "\n```")
 
-        st.video(state.get("output_video"), autoplay=True)
+        gui.video(state.get("output_video"), autoplay=True)
 
     @classmethod
     def preview_input(cls, state: dict) -> str:

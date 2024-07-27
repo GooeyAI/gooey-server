@@ -4,7 +4,7 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
@@ -93,7 +93,7 @@ class Img2ImgPage(BasePage):
         ]
 
     def render_form_v2(self):
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Input Image
             """,
@@ -101,7 +101,7 @@ class Img2ImgPage(BasePage):
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
         )
 
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Describe your edits 
@@ -111,11 +111,11 @@ class Img2ImgPage(BasePage):
         )
 
     def validate_form_v2(self):
-        input_image = st.session_state.get("input_image")
+        input_image = gui.session_state.get("input_image")
         assert input_image, "Please provide an Input Image"
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             This recipe takes an image and a prompt and then attempts to alter the image, based on the text.
 
@@ -130,24 +130,24 @@ class Img2ImgPage(BasePage):
         youtube_video("narcZNyuNAg")
 
     def render_output(self):
-        output_images = st.session_state.get("output_images", [])
+        output_images = gui.session_state.get("output_images", [])
         if not output_images:
             return
-        st.write("#### Output Image")
+        gui.write("#### Output Image")
         for img in output_images:
-            st.image(img, show_download_button=True)
+            gui.image(img, show_download_button=True)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col2:
             output_images = state.get("output_images", [])
             for img in output_images:
-                st.image(img, caption="Generated Image")
+                gui.image(img, caption="Generated Image")
         with col1:
             input_image = state.get("input_image")
-            st.image(input_image, caption="Input Image")
-            st.write("**Prompt**")
-            st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
+            gui.image(input_image, caption="Input Image")
+            gui.write("**Prompt**")
+            gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
