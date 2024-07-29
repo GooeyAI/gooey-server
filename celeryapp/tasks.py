@@ -11,6 +11,7 @@ import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
+from loguru import logger
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
@@ -95,6 +96,7 @@ def runner_task(
     except Exception as e:
         if isinstance(e, UserError):
             sentry_level = e.sentry_level
+            logger.warning(e)
         else:
             sentry_level = "error"
             traceback.print_exc()

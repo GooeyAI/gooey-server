@@ -6,7 +6,7 @@ from time import time
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import GPUError
+from daras_ai_v2.exceptions import GPUError, UserError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
 
@@ -94,7 +94,10 @@ def call_celery_task(
     try:
         result.maybe_throw()
     except Exception as e:
-        raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
+        if type(e).__name__ == "UserError" and e.args and isinstance(e.args[0], dict):
+            raise UserError(**e.args[0])
+        else:
+            raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
     record_cost_auto(
         model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
     )
