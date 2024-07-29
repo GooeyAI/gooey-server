@@ -87,6 +87,7 @@ azure-cognitiveservices-speech = "^1.37.0"
 twilio = "^9.2.3"
 sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
 gooey-gui = "^0.1.0"
+django-storages = "^1.14.4"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

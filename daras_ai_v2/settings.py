@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "handles",
     "payments",
     "functions",
+    "static_pages",
 ]
 
 MIDDLEWARE = [
@@ -182,6 +183,7 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
+    "default": {},
 }
 
 # Default primary key field type
@@ -233,6 +235,25 @@ GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
+
+
+# django-storages settings for google-cloud
+from google.oauth2 import service_account
+
+GCS_CONFIG = config("GCS_CONFIG", default="")
+GCS_PRIVATE_KEY = config("GCS_PRIVATE_KEY", default="")
+GCS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+    info={**json.loads(GCS_CONFIG), "private_key": GCS_PRIVATE_KEY}
+)
+
+STORAGES["default"] = {
+    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    "OPTIONS": {
+        "project_id": GCP_PROJECT,
+        "bucket_name": GS_BUCKET_NAME,
+        "credentials": GCS_CREDENTIALS,
+    },
+}
 
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
