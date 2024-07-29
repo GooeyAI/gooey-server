@@ -6,7 +6,7 @@ from textwrap import indent
 from furl import furl
 
 import gooey_ui as st
-from auth.token_authentication import auth_keyword
+from auth.token_authentication import auth_scheme
 from daras_ai_v2 import settings
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
@@ -48,12 +48,12 @@ def api_example_generator(
         if as_form_data:
             curl_code = r"""
 curl %(api_url)s \
-  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
+  -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY" \
   %(files)s \
   -F json=%(json)s
                 """ % dict(
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 files=" \\\n  ".join(
                     f"-F {key}=@{shlex.quote(filename)}" for key, filename in filenames
                 ),
@@ -62,12 +62,12 @@ curl %(api_url)s \
         else:
             curl_code = r"""
 curl %(api_url)s \
-  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
+  -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY" \
   -H 'Content-Type: application/json' \
   -d %(json)s
             """ % dict(
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
         if as_async:
@@ -77,7 +77,7 @@ status_url=$(
 )
 
 while true; do
-    result=$(curl $status_url -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY")
+    result=$(curl $status_url -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY")
     status=$(echo $result | jq -r '.status')
     if [ "$status" = "completed" ]; then
         echo $result
@@ -91,7 +91,7 @@ done
             """ % dict(
                 curl_code=indent(curl_code.strip(), " " * 2),
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
 
@@ -128,7 +128,7 @@ payload = %(json)s
 response = requests.post(
     "%(api_url)s",
     headers={
-        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"],
     },
     files=files,
     data={"json": json.dumps(payload)},
@@ -140,7 +140,7 @@ assert response.ok, response.content
                 ),
                 json=repr(request_body),
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             py_code = r"""
@@ -152,14 +152,14 @@ payload = %(json)s
 response = requests.post(
     "%(api_url)s",
     headers={
-        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"],
     },
     json=payload,
 )
 assert response.ok, response.content
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=repr(request_body),
             )
         if as_async:
@@ -168,7 +168,7 @@ from time import sleep
 
 status_url = response.headers["Location"]
 while True:
-    response = requests.get(status_url, headers={"Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"]})
+    response = requests.get(status_url, headers={"Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"]})
     assert response.ok, response.content
     result = response.json()
     if result["status"] == "completed":
@@ -181,7 +181,7 @@ while True:
         sleep(3)
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             py_code += r"""
@@ -229,7 +229,7 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
     },
     body: formData,
   });
@@ -243,7 +243,7 @@ async function gooeyAPI() {
                     " " * 2,
                 ),
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
 
         else:
@@ -256,14 +256,14 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=json.dumps(request_body, indent=2),
             )
 
@@ -280,7 +280,7 @@ async function gooeyAPI() {
     const response = await fetch(status_url, {
         method: "GET",
         headers: {
-          "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+          "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
         },
     });
     if (!response.ok) {
@@ -299,7 +299,7 @@ async function gooeyAPI() {
     }
   }""" % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             js_code += """
