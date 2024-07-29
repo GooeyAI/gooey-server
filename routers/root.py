@@ -19,6 +19,7 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
+    HTMLResponse,
 )
 
 import gooey_gui as gui
@@ -43,6 +44,8 @@ from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from handles.models import Handle
+from daras_ai_v2.functional import R
+from static_pages.models import StaticPage
 
 app = APIRouter()
 
@@ -576,14 +579,30 @@ let script = document.createElement("script");
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
     "/{page_slug}/{run_slug}-{example_id}/",
+    "/{page_slug}/{path:path}",
 )
 def recipe_page_or_handle(
-    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+    request: Request,
+    page_slug: str,
+    run_slug: str = None,
+    example_id: str = None,
+    path: str = None,
 ):
     try:
         handle = Handle.objects.get_by_name(page_slug)
     except Handle.DoesNotExist:
-        return render_page(request, page_slug, RecipeTabs.run, example_id)
+        try:
+            import daras_ai_v2.static_pages as static_pages
+
+            html, file_path = static_pages.serve(page_slug=page_slug, file_path=path)
+
+            if file_path:
+                return RedirectResponse(file_path)
+            elif html:
+                return HTMLResponse(html)
+        except StaticPage.DoesNotExist:
+            return render_page(request, page_slug, RecipeTabs.run, example_id)
+
     else:
         return render_page_for_handle(request, handle)
 
