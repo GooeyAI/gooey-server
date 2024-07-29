@@ -19,8 +19,8 @@ from daras_ai_v2.redis_cache import get_redis_cache
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import (
     AsyncApiResponseModelV3,
-    build_api_response,
     AsyncStatusResponseModelV3,
+    build_async_api_response,
 )
 
 app = APIRouter()
@@ -337,11 +337,7 @@ class ApiInterface(BotInterface):
         self.run_id = run_id
         self.uid = uid
         self.queue.put(
-            RunStart(
-                **build_api_response(
-                    page=page, result=result, run_async=True, run_id=run_id, uid=uid
-                ),
-            )
+            RunStart(**build_async_api_response(page=page, run_id=run_id, uid=uid))
         )
 
     def send_run_status(self, update_msg_id: str | None) -> str | None:

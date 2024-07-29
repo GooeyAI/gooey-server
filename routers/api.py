@@ -5,6 +5,7 @@ import os.path
 import typing
 from types import SimpleNamespace
 
+import gooey_gui as gui
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Form
@@ -20,6 +21,7 @@ from pydantic.generics import GenericModel
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.status import (
     HTTP_402_PAYMENT_REQUIRED,
     HTTP_429_TOO_MANY_REQUESTS,
@@ -27,7 +29,6 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import RetentionPolicy
@@ -163,13 +164,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request: request_model,
         user: AppUser = Depends(api_auth_header),
     ):
-        return _run_api(
+        page, result, run_id, uid = submit_api_call(
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
-            run_settings=page_request.settings,
+            retention_policy=RetentionPolicy[page_request.settings.retention_policy],
+            enable_rate_limits=True,
         )
+        return build_sync_api_response(page=page, result=result, run_id=run_id, uid=uid)
 
     @app.post(
         os.path.join(endpoint, "form/"),
@@ -227,14 +230,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request: request_model,
         user: AppUser = Depends(api_auth_header),
     ):
-        ret = _run_api(
+        page, _, run_id, uid = submit_api_call(
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
-            run_async=True,
-            run_settings=page_request.settings,
+            retention_policy=RetentionPolicy[page_request.settings.retention_policy],
+            enable_rate_limits=True,
         )
+        ret = build_async_api_response(page=page, run_id=run_id, uid=uid)
         response.headers["Location"] = ret["status_url"]
         response.headers["Access-Control-Expose-Headers"] = "Location"
         return ret
@@ -304,7 +308,9 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             "run_time_sec": sr.run_time.total_seconds(),
         }
         if sr.error_code:
-            raise HTTPException(sr.error_code, detail=ret | {"error": sr.error_msg})
+            return JSONResponse(
+                dict(detail=ret | dict(error=sr.error_msg)), status_code=sr.error_code
+            )
         elif sr.error_msg:
             ret |= {"status": "failed", "detail": sr.error_msg}
         else:
@@ -358,33 +364,6 @@ def _parse_form_data(
     return page_request
 
 
-def _run_api(
-    *,
-    page_cls: typing.Type[BasePage],
-    user: AppUser,
-    request_body: dict,
-    query_params,
-    run_async: bool = False,
-    run_settings: RunSettings,
-) -> dict:
-    page, result, run_id, uid = submit_api_call(
-        page_cls=page_cls,
-        request_body=request_body,
-        user=user,
-        query_params=query_params,
-        retention_policy=RetentionPolicy[run_settings.retention_policy],
-        enable_rate_limits=True,
-    )
-    response = build_api_response(
-        page=page,
-        result=result,
-        run_id=run_id,
-        uid=uid,
-        run_async=run_async,
-    )
-    return response
-
-
 def submit_api_call(
     *,
     page_cls: typing.Type[BasePage],
@@ -422,55 +401,59 @@ def submit_api_call(
     return self, result, sr.run_id, sr.uid
 
 
-def build_api_response(
+def build_async_api_response(*, page: BasePage, run_id: str, uid: str) -> dict:
+    web_url = page.app_url(run_id=run_id, uid=uid)
+    status_url = str(
+        furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
+        / page.endpoint.replace("v2", "v3")
+        / "status/"
+    )
+    sr = page.run_doc_sr(run_id, uid)
+    return dict(
+        run_id=run_id,
+        web_url=web_url,
+        created_at=sr.created_at.isoformat(),
+        status_url=status_url,
+    )
+
+
+def build_sync_api_response(
     *,
     page: BasePage,
     result: "celery.result.AsyncResult",
     run_id: str,
     uid: str,
-    run_async: bool,
-):
+) -> JSONResponse:
     web_url = page.app_url(run_id=run_id, uid=uid)
-    if run_async:
-        status_url = str(
-            furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
-            / page.endpoint.replace("v2", "v3")
-            / "status/"
+    # wait for the result
+    get_celery_result_db_safe(result)
+    sr = page.run_doc_sr(run_id, uid)
+    if sr.retention_policy == RetentionPolicy.delete:
+        sr.state = {}
+        sr.save(update_fields=["state"])
+    # check for errors
+    if sr.error_msg:
+        return JSONResponse(
+            dict(
+                detail=dict(
+                    id=run_id,
+                    url=web_url,
+                    created_at=sr.created_at.isoformat(),
+                    error=sr.error_msg,
+                )
+            ),
+            status_code=sr.error_code or HTTP_500_INTERNAL_SERVER_ERROR,
         )
-        sr = page.run_doc_sr(run_id, uid)
-        # return the url to check status
-        return {
-            "run_id": run_id,
-            "web_url": web_url,
-            "created_at": sr.created_at.isoformat(),
-            "status_url": status_url,
-        }
     else:
-        # wait for the result
-        get_celery_result_db_safe(result)
-        sr = page.run_doc_sr(run_id, uid)
-        if sr.retention_policy == RetentionPolicy.delete:
-            sr.state = {}
-            sr.save(update_fields=["state"])
-        # check for errors
-        if sr.error_msg:
-            raise HTTPException(
-                status_code=sr.error_code or HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={
-                    "id": run_id,
-                    "url": web_url,
-                    "created_at": sr.created_at.isoformat(),
-                    "error": sr.error_msg,
-                },
-            )
-        else:
-            # return updated state
-            return {
-                "id": run_id,
-                "url": web_url,
-                "created_at": sr.created_at.isoformat(),
-                "output": sr.api_output(),
-            }
+        # return updated state
+        return JSONResponse(
+            dict(
+                id=run_id,
+                url=web_url,
+                created_at=sr.created_at.isoformat(),
+                output=sr.api_output(),
+            ),
+        )
 
 
 def setup_pages():
