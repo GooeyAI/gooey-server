@@ -1076,7 +1076,15 @@ def iterate_subtitles(
         yield segment_start, segment_end, segment_text
 
 
-def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker: str):
+INFINITY_SECONDS = 99 * 3600 + 59 * 60 + 59  # 99:59:59 in seconds
+
+
+def format_timestamp(
+    seconds: float | None, always_include_hours: bool, decimal_marker: str
+):
+    if seconds is None:
+        # treat None as end of time
+        seconds = INFINITY_SECONDS
     assert seconds >= 0, "non-negative timestamp expected"
     milliseconds = round(seconds * 1000.0)
 

@@ -21,7 +21,7 @@ def enum_multiselect(
     except AttributeError:
         deprecated = set()
     enums = []
-    value = gui.session_state.get(key, [])
+    value = gui.session_state.get(key) or []
     for e in enum_cls:
         if e in deprecated and e.name not in value:
             continue
