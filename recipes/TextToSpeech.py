@@ -5,7 +5,7 @@ import typing
 import requests
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -117,7 +117,7 @@ class TextToSpeechPage(BasePage):
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             *Convert text into audio in the voice of your choice*
 
@@ -130,7 +130,7 @@ class TextToSpeechPage(BasePage):
         )
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Enter text you want to convert to speech
@@ -140,11 +140,11 @@ class TextToSpeechPage(BasePage):
         text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
-        assert st.session_state.get("text_prompt"), "Text input cannot be empty"
-        assert st.session_state.get("tts_provider"), "Please select a TTS provider"
+        assert gui.session_state.get("text_prompt"), "Text input cannot be empty"
+        assert gui.session_state.get("tts_provider"), "Please select a TTS provider"
 
     def render_settings(self):
-        text_to_speech_settings(self, st.session_state.get("tts_provider"))
+        text_to_speech_settings(self, gui.session_state.get("tts_provider"))
 
     def get_raw_price(self, state: dict):
         tts_provider = self._get_tts_provider(state)
@@ -159,8 +159,8 @@ class TextToSpeechPage(BasePage):
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
-        audio_url = st.session_state.get("audio_url")
-        st.audio(audio_url, show_download_button=True)
+        audio_url = gui.session_state.get("audio_url")
+        gui.audio(audio_url, show_download_button=True)
 
     def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)
@@ -177,9 +177,9 @@ class TextToSpeechPage(BasePage):
         return TextToSpeechProviders[tts_provider]
 
     def get_cost_note(self):
-        tts_provider = st.session_state.get("tts_provider")
+        tts_provider = gui.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
-            _, is_user_provided_key = self._get_elevenlabs_api_key(st.session_state)
+            _, is_user_provided_key = self._get_elevenlabs_api_key(gui.session_state)
             if is_user_provided_key:
                 return "*No additional credit charge given we'll use your API key*"
             else:
@@ -382,12 +382,12 @@ class TextToSpeechPage(BasePage):
                 client = OpenAI()
 
                 model = OpenAI_TTS_Models[
-                    st.session_state.get(
+                    gui.session_state.get(
                         "openai_tts_model", OpenAI_TTS_Models.tts_1.name
                     )
                 ].value
                 voice = OpenAI_TTS_Voices[
-                    st.session_state.get(
+                    gui.session_state.get(
                         "openai_voice_name", OpenAI_TTS_Voices.alloy.name
                     )
                 ].value
@@ -442,12 +442,12 @@ class TextToSpeechPage(BasePage):
         ]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             text = state.get("text_prompt")
             if text:
-                st.write(text)
+                gui.write(text)
         with col2:
             audio_url = state.get("audio_url")
             if audio_url:
-                st.audio(audio_url)
+                gui.audio(audio_url)

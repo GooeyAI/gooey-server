@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.billing import stripe_subscription_checkout_redirect
-from gooey_ui import RedirectException
+from gooey_gui import RedirectException
 from payments.plans import PricingPlan
 from server import app
 

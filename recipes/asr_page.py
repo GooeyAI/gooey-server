@@ -3,7 +3,7 @@ import typing
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai_v2.asr import (
     AsrModels,
@@ -89,12 +89,12 @@ class AsrPage(BasePage):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."
 
     def render_description(self):
-        st.markdown(
+        gui.markdown(
             """
             This workflow let's you compare the latest and finest speech recognition models from [OpenAI](https://openai.com/research/whisper), [AI4Bharat](https://ai4bharat.org) and [Bhashini](https://bhashini.gov.in) and Google's USM coming soon.
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             Just upload an audio file (mp3, wav, ogg or aac file) setting its language and then choose a speech recognition engine. You can also translate the output to any language too (using Google's Translation APIs).
             """
@@ -119,7 +119,7 @@ class AsrPage(BasePage):
             "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
-        col1, col2 = st.columns(2, responsive=False)
+        col1, col2 = gui.columns(2, responsive=False)
         with col1:
             selected_model = enum_selector(
                 AsrModels,
@@ -131,7 +131,7 @@ class AsrPage(BasePage):
             asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             translation_model = translation_model_selector()
         with col2:
@@ -141,13 +141,13 @@ class AsrPage(BasePage):
                 key="translation_target",
             )
         if translation_model and translation_model.supports_glossary:
-            st.file_uploader(
+            gui.file_uploader(
                 label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
                 key="glossary_document",
                 accept=SUPPORTED_SPREADSHEET_TYPES,
             )
-        st.write("---")
-        selected_model = st.session_state.get("selected_model")
+        gui.write("---")
+        selected_model = gui.session_state.get("selected_model")
         if selected_model:
             translation_language_selector(
                 model=translation_model,
@@ -155,16 +155,18 @@ class AsrPage(BasePage):
                 key="translation_source",
                 allow_none=True,
             )
-            st.caption(
+            gui.caption(
                 "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
             )
-            st.write("---")
+            gui.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
         )
 
     def validate_form_v2(self):
-        assert st.session_state.get("documents"), "Please provide at least 1 Audio File"
+        assert gui.session_state.get(
+            "documents"
+        ), "Please provide at least 1 Audio File"
 
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)
@@ -174,8 +176,8 @@ class AsrPage(BasePage):
         text_outputs("**Transcription**", value=state.get("output_text"))
 
     def render_steps(self):
-        if st.session_state.get("translation_model"):
-            col1, col2 = st.columns(2)
+        if gui.session_state.get("translation_model"):
+            col1, col2 = gui.columns(2)
             with col1:
                 text_outputs("**Transcription**", key="raw_output_text")
             with col2:

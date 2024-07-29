@@ -3,7 +3,7 @@ import typing
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
@@ -52,7 +52,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         ]
 
     def render_form_v2(self):
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Input Face
             Upload a video/image that contains faces to use
@@ -60,7 +60,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="input_face",
         )
-        st.text_area(
+        gui.text_area(
             """
             #### Input Text
             This generates audio for your video
@@ -78,10 +78,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
-        assert st.session_state.get(
+        assert gui.session_state.get(
             "text_prompt", ""
         ).strip(), "Text input cannot be empty"
-        assert st.session_state.get("input_face"), "Please provide an Input Face"
+        assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_TTS_META_IMG
@@ -90,7 +90,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
                 This recipe takes any text and a video of a person (plus the voice defined in Settings) to create a lipsync'd video of that person speaking your text.
 
@@ -104,8 +104,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
     def render_steps(self):
-        audio_url = st.session_state.get("audio_url")
-        st.audio(audio_url, caption="Output Audio", show_download_button=True)
+        audio_url = gui.session_state.get("audio_url")
+        gui.audio(audio_url, caption="Output Audio", show_download_button=True)
 
     def render_settings(self):
         LipsyncPage.render_settings(self)
@@ -125,17 +125,17 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def render_example(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
-            st.video(
+            gui.video(
                 output_video,
                 caption="#### Output Video",
                 autoplay=True,
                 show_download_button=True,
             )
         else:
-            st.div()
+            gui.div()
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self.render_example(gui.session_state)
 
     def get_raw_price(self, state: dict):
         # _get_tts_provider comes from TextToSpeechPage

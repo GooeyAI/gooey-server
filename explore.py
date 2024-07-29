@@ -1,6 +1,6 @@
 import typing
 
-import gooey_ui as gui
+import gooey_gui as gui
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout

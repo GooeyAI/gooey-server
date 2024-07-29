@@ -8,7 +8,7 @@ from itertools import zip_longest
 import typing_extensions
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
@@ -82,7 +82,7 @@ def _render_results(results: list[AggFunctionResult]):
     from plotly.colors import sample_colorscale
 
     for k, g in itertools.groupby(results, key=lambda d: d["function"]):
-        st.write("---\n###### **Aggregate**: " + k.capitalize())
+        gui.write("---\n###### **Aggregate**: " + k.capitalize())
 
         g = list(g)
 
@@ -95,7 +95,7 @@ def _render_results(results: list[AggFunctionResult]):
         colors = sample_colorscale("RdYlGn", norm_values, colortype="tuple")
         colors = [f"rgba{(r * 255, g * 255, b * 255, 0.5)}" for r, g, b in colors]
 
-        st.data_table(
+        gui.data_table(
             [
                 ["Metric", k.capitalize(), "Count"],
             ]
@@ -132,7 +132,7 @@ def _render_results(results: list[AggFunctionResult]):
                 margin=dict(l=0, r=0, t=24, b=0),
             ),
         )
-        st.plotly_chart(fig)
+        gui.plotly_chart(fig)
 
 
 class BulkEvalPage(BasePage):
@@ -146,7 +146,7 @@ class BulkEvalPage(BasePage):
         return "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9631fb74-9a97-11ee-971f-02420a0001c4/evaluator.png.png"
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
 Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
             """
@@ -202,31 +202,31 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             f"##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
-        st.session_state[NROWS_CACHE_KEY] = get_nrows(files)
+        gui.session_state[NROWS_CACHE_KEY] = get_nrows(files)
         if not files:
             return
 
-        st.write(
+        gui.write(
             """
 ##### Input Data Preview
 Here's what you uploaded:          
             """
         )
         for file in files:
-            st.data_table(file)
-        st.write("---")
+            gui.data_table(file)
+        gui.write("---")
 
         def render_inputs(key: str, del_key: str, d: EvalPrompt):
-            col1, col2 = st.columns([8, 1], responsive=False)
+            col1, col2 = gui.columns([8, 1], responsive=False)
             with col1:
-                d["name"] = st.text_input(
+                d["name"] = gui.text_input(
                     label="",
                     label_visibility="collapsed",
                     placeholder="Metric Name",
                     key=key + ":name",
                     value=d.get("name"),
                 ).strip()
-                d["prompt"] = st.text_area(
+                d["prompt"] = gui.text_area(
                     label="",
                     label_visibility="collapsed",
                     placeholder="Prompt",
@@ -237,7 +237,7 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
-        st.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
+        gui.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
         list_view_editor(
             add_btn_label="➕ Add a Prompt",
             key="eval_prompts",
@@ -245,10 +245,10 @@ Here's what you uploaded:
         )
 
         def render_agg_inputs(key: str, del_key: str, d: AggFunction):
-            col1, col3 = st.columns([8, 1], responsive=False)
+            col1, col3 = gui.columns([8, 1], responsive=False)
             with col1:
-                with st.div(className="pt-1"):
-                    d["function"] = st.selectbox(
+                with gui.div(className="pt-1"):
+                    d["function"] = gui.selectbox(
                         "",
                         label_visibility="collapsed",
                         key=key + ":func",
@@ -258,8 +258,8 @@ Here's what you uploaded:
             with col3:
                 del_button(del_key)
 
-        st.html("<br>")
-        st.write("##### " + field_title_desc(self.RequestModel, "agg_functions"))
+        gui.html("<br>")
+        gui.write("##### " + field_title_desc(self.RequestModel, "agg_functions"))
         list_view_editor(
             add_btn_label="➕ Add an Aggregation",
             key="agg_functions",
@@ -273,12 +273,12 @@ Here's what you uploaded:
         render_documents(state)
 
     def render_output(self):
-        files = st.session_state.get("output_documents", [])
-        aggregations = st.session_state.get("aggregations", [])
+        files = gui.session_state.get("output_documents", [])
+        aggregations = gui.session_state.get("aggregations", [])
 
         for file, results in zip_longest(files, aggregations):
-            st.write(file)
-            st.data_table(file)
+            gui.write(file)
+            gui.data_table(file)
 
             if not results:
                 continue
@@ -313,14 +313,14 @@ Here's what you uploaded:
         return price * nprompts * nrows
 
     def render_steps(self):
-        documents = st.session_state.get("documents") or []
-        final_prompts = st.session_state.get("final_prompts") or []
+        documents = gui.session_state.get("documents") or []
+        final_prompts = gui.session_state.get("final_prompts") or []
         for doc, prompts in zip_longest(documents, final_prompts):
             if not prompts:
                 continue
-            st.write(f"###### {doc}")
+            gui.write(f"###### {doc}")
             for i, prompt in enumerate(prompts):
-                st.text_area("", value=prompt, key=f"--final-prompt-{i}")
+                gui.text_area("", value=prompt, key=f"--final-prompt-{i}")
 
 
 class TaskResult(typing.NamedTuple):
@@ -348,7 +348,7 @@ def submit(
             for ep_ix, ep in enumerate(request.eval_prompts):
                 prompt = render_prompt_vars(
                     ep["prompt"],
-                    st.session_state | {"columns": current_rec},
+                    gui.session_state | {"columns": current_rec},
                 )
                 response.final_prompts[doc_ix].append(prompt)
                 futs.append(
@@ -429,7 +429,7 @@ def iterate(
         response.aggregations[result.doc_ix] = aggs
 
 
-@st.cache_in_session_state
+@gui.cache_in_session_state
 def get_nrows(files: list[str]) -> int:
     try:
         dfs = map_parallel(read_df_any, files)

@@ -3,7 +3,7 @@ import typing
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
@@ -100,7 +100,7 @@ class CompareText2ImgPage(BasePage):
         ]
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             Describe the scene that you'd like to generate.
@@ -108,16 +108,16 @@ class CompareText2ImgPage(BasePage):
             key="text_prompt",
             placeholder="Iron man",
         )
-        st.caption(
+        gui.caption(
             """
             Refer to the saved examples or our basic prompt guide in the ‘Details’ dropdown menu.
         """
         )
-        st.write("#### 🧨 Compare Image Models")
-        st.caption(
+        gui.write("#### 🧨 Compare Image Models")
+        gui.caption(
             "Each selected model costs 2 credits to run except for Dall-E which is 15 credits per rendered image."
         )
-        st.caption(
+        gui.caption(
             """
         Confused about what each model looks like?
         [Check out our prompt guide](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit#slide=id.g210b1678eba_0_26).
@@ -129,14 +129,14 @@ class CompareText2ImgPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Please provide a prompt"
-        assert st.session_state["selected_models"], "Please select at least one model"
+        assert gui.session_state["text_prompt"], "Please provide a prompt"
+        assert gui.session_state["selected_models"], "Please select at least one model"
 
     def render_usage_guide(self):
         youtube_video("TxT-mTYP0II")
 
     def render_description(self):
-        st.markdown(
+        gui.markdown(
             """
             This recipe takes any text and renders an image using multiple Text2Image engines.
             Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt.
@@ -145,42 +145,42 @@ class CompareText2ImgPage(BasePage):
         prompting101()
 
     def render_settings(self):
-        st.write(
+        gui.write(
             """
             Customize the image output for your text prompt with these Settings. 
             """
         )
-        st.caption(
+        gui.caption(
             """
             You can also enable ‘Edit Instructions’ to use InstructPix2Pix that allows you to change your generated image output with a follow-up written instruction.
             """
         )
-        if st.checkbox("📝 Edit Instructions"):
-            st.text_area(
+        if gui.checkbox("📝 Edit Instructions"):
+            gui.text_area(
                 """
                 Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
                 """,
                 key="__edit_instruction",
                 placeholder="Give it sunglasses and a mustache",
             )
-        st.session_state["edit_instruction"] = st.session_state.get(
+        gui.session_state["edit_instruction"] = gui.session_state.get(
             "__edit_instruction"
         )
 
         negative_prompt_setting()
         output_resolution_setting()
-        num_outputs_setting(st.session_state.get("selected_models", []))
+        num_outputs_setting(gui.session_state.get("selected_models", []))
         sd_2_upscaling_setting()
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             guidance_scale_setting()
             scheduler_setting()
         with col2:
-            if st.session_state.get("edit_instruction"):
+            if gui.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()
 
     def render_output(self):
-        self._render_outputs(st.session_state)
+        self._render_outputs(gui.session_state)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -241,9 +241,9 @@ class CompareText2ImgPage(BasePage):
                 ]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
+            gui.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
         with col2:
             self._render_outputs(state)
 
@@ -252,7 +252,7 @@ class CompareText2ImgPage(BasePage):
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
-                st.image(
+                gui.image(
                     img, caption=Text2ImgModels[key].value, show_download_button=True
                 )
 

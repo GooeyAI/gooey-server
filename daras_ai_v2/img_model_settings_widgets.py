@@ -1,4 +1,4 @@
-import gooey_ui as st
+import gooey_gui as gui
 
 from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
 from daras_ai_v2.stable_diffusion import (
@@ -21,7 +21,7 @@ def img_model_settings(
     low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
-    st.write("#### Image Generation Settings")
+    gui.write("#### Image Generation Settings")
     if render_model_selector:
         selected_model = model_selector(
             models_enum,
@@ -32,7 +32,7 @@ def img_model_settings(
             high_explanation=high_explanation,
         )
     else:
-        selected_model = st.session_state.get("selected_model")
+        selected_model = gui.session_state.get("selected_model")
 
     negative_prompt_setting(selected_model)
 
@@ -43,13 +43,13 @@ def img_model_settings(
     if models_enum is Text2ImgModels:
         sd_2_upscaling_setting()
 
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
 
     with col1:
         guidance_scale_setting(selected_model)
 
     with col2:
-        if models_enum is Img2ImgModels and not st.session_state.get(
+        if models_enum is Img2ImgModels and not gui.session_state.get(
             "selected_controlnet_model"
         ):
             prompt_strength_setting(selected_model)
@@ -57,7 +57,7 @@ def img_model_settings(
             instruct_pix2pix_settings()
 
     if show_scheduler:
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             scheduler_setting(selected_model)
 
@@ -78,7 +78,7 @@ def model_selector(
         Img2ImgModels.jack_qiao.name,
         Img2ImgModels.sd_2.name,
     ]
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
         selected_model = enum_selector(
             models_enum,
@@ -89,7 +89,7 @@ def model_selector(
             use_selectbox=True,
             exclude=controlnet_unsupported_models if require_controlnet else [],
         )
-        st.caption(
+        gui.caption(
             """
             Search for our available models [here](https://huggingface.co/models?pipeline_tag=text-to-image) to learn more about them.
             Please use our default settings for optimal results if you're a beginner.   
@@ -97,10 +97,10 @@ def model_selector(
         )
         if (
             models_enum is Img2ImgModels
-            and st.session_state.get("selected_model") in controlnet_unsupported_models
+            and gui.session_state.get("selected_model") in controlnet_unsupported_models
         ):
-            if "selected_controlnet_model" in st.session_state:
-                st.session_state["selected_controlnet_model"] = None
+            if "selected_controlnet_model" in gui.session_state:
+                gui.session_state["selected_controlnet_model"] = None
         elif models_enum is Img2ImgModels:
             enum_multiselect(
                 ControlNetModels,
@@ -126,7 +126,7 @@ def controlnet_settings(
     low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
-    models = st.session_state.get("selected_controlnet_model", [])
+    models = gui.session_state.get("selected_controlnet_model", [])
     if not models:
         return
 
@@ -134,15 +134,15 @@ def controlnet_settings(
         extra_explanations = {}
     explanations = controlnet_model_explanations | extra_explanations
 
-    state_values = st.session_state.get("controlnet_conditioning_scale", [])
+    state_values = gui.session_state.get("controlnet_conditioning_scale", [])
     new_values = []
-    st.write(
+    gui.write(
         """
         ##### ⚖️ Conditioning Scales
         """,
         className="gui-input",
     )
-    st.caption(
+    gui.caption(
         f"""
         `{low_explanation.format(low=int(CONTROLNET_CONDITIONING_SCALE_RANGE[0]))}`.
         
@@ -152,7 +152,7 @@ def controlnet_settings(
     for i, model in enumerate(sorted(models)):
         key = f"controlnet_conditioning_scale_{model}"
         try:
-            st.session_state.setdefault(key, state_values[i])
+            gui.session_state.setdefault(key, state_values[i])
         except IndexError:
             pass
         new_values.append(
@@ -160,7 +160,7 @@ def controlnet_settings(
                 selected_controlnet_model=model, explanations=explanations, key=key
             ),
         )
-    st.session_state["controlnet_conditioning_scale"] = new_values
+    gui.session_state["controlnet_conditioning_scale"] = new_values
 
 
 def controlnet_weight_setting(
@@ -170,7 +170,7 @@ def controlnet_weight_setting(
     key: str = "controlnet_conditioning_scale",
 ):
     model = ControlNetModels[selected_controlnet_model]
-    return st.slider(
+    return gui.slider(
         label=f"""
         {explanations[model]}.
         """,
@@ -182,9 +182,9 @@ def controlnet_weight_setting(
 
 
 def num_outputs_setting(selected_models: str | list[str] = None):
-    col1, col2 = st.columns(2, gap="medium")
+    col1, col2 = gui.columns(2, gap="medium")
     with col1:
-        st.slider(
+        gui.slider(
             label="""
             ##### Number of Outputs
             Change the number of outputs for a single run here:
@@ -194,7 +194,7 @@ def num_outputs_setting(selected_models: str | list[str] = None):
             max_value=4,
             step=1,
         )
-        st.caption(
+        gui.caption(
             """
             By default, each run produces one output per Model.
             """
@@ -219,7 +219,7 @@ def quality_setting(selected_models=None):
             for selected_model in selected_models
         ]
     ):
-        st.selectbox(
+        gui.selectbox(
             """##### Dalle 3 Quality""",
             options=[
                 "standard",
@@ -227,7 +227,7 @@ def quality_setting(selected_models=None):
             ],
             key="dall_e_3_quality",
         )
-        st.selectbox(
+        gui.selectbox(
             """##### Dalle 3 Style""",
             options=[
                 "natural",
@@ -235,7 +235,7 @@ def quality_setting(selected_models=None):
             ],
             key="dall_e_3_style",
         )
-    st.slider(
+    gui.slider(
         label="""
         ##### Quality
         How precise, or focused do you want your output to be? 
@@ -245,7 +245,7 @@ def quality_setting(selected_models=None):
         max_value=200,
         step=10,
     )
-    st.caption(
+    gui.caption(
         """
         An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
         """
@@ -287,12 +287,12 @@ PORTRAIT = "Portrait"
 
 
 def output_resolution_setting():
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = gui.columns(3)
 
-    if "__pixels" not in st.session_state:
+    if "__pixels" not in gui.session_state:
         saved = (
-            st.session_state.get("output_width"),
-            st.session_state.get("output_height"),
+            gui.session_state.get("output_width"),
+            gui.session_state.get("output_height"),
         )
         if not saved[0]:
             saved = (768, 768)
@@ -305,13 +305,15 @@ def output_resolution_setting():
             for res in spec.keys():
                 if res != f"{int(saved[0])}, {int(saved[1])}":
                     continue
-                st.session_state["__pixels"] = pixels
-                st.session_state["__res"] = res
-                st.session_state["__orientation"] = orientation
+                gui.session_state["__pixels"] = pixels
+                gui.session_state["__res"] = res
+                gui.session_state["__orientation"] = orientation
                 break
 
     selected_models = (
-        st.session_state.get("selected_model", st.session_state.get("selected_models"))
+        gui.session_state.get(
+            "selected_model", gui.session_state.get("selected_models")
+        )
         or ""
     )
     if not isinstance(selected_models, list):
@@ -332,7 +334,7 @@ def output_resolution_setting():
         pixel_options = [512, 768]
 
     with col1:
-        pixels = st.selectbox(
+        pixels = gui.selectbox(
             "##### Size",
             key="__pixels",
             format_func=lambda x: f"{x}p",
@@ -344,7 +346,7 @@ def output_resolution_setting():
             for res, shape in RESOLUTIONS[pixels or pixel_options[0]].items()
             if not allowed_shapes or shape in allowed_shapes
         ]
-        res = st.selectbox(
+        res = gui.selectbox(
             "##### Resolution",
             key="__res",
             format_func=lambda r: f"{r.split(', ')[0]} x {r.split(', ')[1]} ({RESOLUTIONS[pixels][r]})",
@@ -354,7 +356,7 @@ def output_resolution_setting():
 
     if res[0] != res[1]:
         with col3:
-            orientation = st.selectbox(
+            orientation = gui.selectbox(
                 "##### Orientation",
                 key="__orientation",
                 options=[LANDSCAPE, PORTRAIT],
@@ -362,13 +364,13 @@ def output_resolution_setting():
         if orientation == PORTRAIT:
             res = res[::-1]
 
-    st.session_state["output_width"] = res[0]
-    st.session_state["output_height"] = res[1]
+    gui.session_state["output_width"] = res[0]
+    gui.session_state["output_height"] = res[1]
 
 
 def sd_2_upscaling_setting():
-    st.checkbox("**4x Upscaling**", key="sd_2_upscaling")
-    st.caption("Note: Currently, only square images can be upscaled")
+    gui.checkbox("**4x Upscaling**", key="sd_2_upscaling")
+    gui.caption("Note: Currently, only square images can be upscaled")
 
 
 def scheduler_setting(selected_model: str = None):
@@ -397,7 +399,7 @@ def guidance_scale_setting(selected_model: str = None):
         Text2ImgModels.jack_qiao,
     ]:
         return
-    st.slider(
+    gui.slider(
         label="""
             ##### 🎨️ Artistic Pressure
             ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
@@ -409,7 +411,7 @@ def guidance_scale_setting(selected_model: str = None):
         max_value=25.0,
         step=0.5,
     )
-    st.caption(
+    gui.caption(
         """
             At lower values the image will effectively be random. The standard value is between 6-8. Values that are too high can also distort the image.
             """
@@ -417,7 +419,7 @@ def guidance_scale_setting(selected_model: str = None):
 
 
 def instruct_pix2pix_settings():
-    st.slider(
+    gui.slider(
         label="""
 ##### 🌠️ Image Strength
 ([*Image Guidance Scale*](https://github.com/timothybrooks/instruct-pix2pix#tips)) \\
@@ -438,7 +440,7 @@ def prompt_strength_setting(selected_model: str = None):
     ]:
         return
 
-    st.slider(
+    gui.slider(
         label="""
         ##### Extent of Modification 
         (*Prompt Strength*)
@@ -459,7 +461,7 @@ def negative_prompt_setting(selected_model: str = None):
     if selected_model in [Text2ImgModels.dall_e.name]:
         return
 
-    st.text_area(
+    gui.text_area(
         """
         ##### 🧽 Negative Prompt
         This allows you to specify what you DON'T want to see in your output.
@@ -468,7 +470,7 @@ def negative_prompt_setting(selected_model: str = None):
         key="negative_prompt",
         placeholder="ugly, disfigured, low quality, blurry, nsfw",
     )
-    st.caption(
+    gui.caption(
         """
         Image generation engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
         """

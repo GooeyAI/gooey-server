@@ -27,7 +27,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import RetentionPolicy
@@ -405,8 +405,8 @@ def submit_api_call(
     state.update(request_body)
 
     # set streamlit session state
-    st.set_session_state(state)
-    st.set_query_params(query_params)
+    gui.set_session_state(state)
+    gui.set_query_params(query_params)
 
     # create a new run
     try:
@@ -416,7 +416,7 @@ def submit_api_call(
             retention_policy=retention_policy or RetentionPolicy.keep,
         )
     except ValidationError as e:
-        raise RequestValidationError(e.raw_errors, body=st.session_state) from e
+        raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
     # submit the task
     result = self.call_runner_task(sr)
     return self, result, sr.run_id, sr.uid

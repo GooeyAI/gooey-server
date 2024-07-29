@@ -1,7 +1,7 @@
 import inspect
 from functools import wraps
 
-import gooey_ui as gui
+import gooey_gui as gui
 
 META_TITLE = "Gooey Components"
 META_DESCRIPTION = "Explore the Gooey Component Library"

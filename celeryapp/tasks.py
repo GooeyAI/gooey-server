@@ -5,13 +5,13 @@ import typing
 from time import time
 from types import SimpleNamespace
 
+import gooey_gui as gui
 import requests
 import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
 
-import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
 from bots.models import SavedRun, Platform, Workflow
@@ -22,8 +22,6 @@ from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
-from gooey_ui.pubsub import realtime_push
-from gooey_ui.state import set_query_params
 from gooeysite.bg_db_conn import db_middleware
 from payments.auto_recharge import (
     should_attempt_auto_recharge,
@@ -69,7 +67,7 @@ def runner_task(
             # extract outputs from local state
             | {
                 k: v
-                for k, v in st.session_state.items()
+                for k, v in gui.session_state.items()
                 if k in page.ResponseModel.__fields__
             }
             # add extra outputs from the run
@@ -77,20 +75,20 @@ def runner_task(
         )
 
         # send outputs to ui
-        realtime_push(channel, output)
+        gui.realtime_push(channel, output)
         # save to db
-        page.dump_state_to_sr(st.session_state | output, sr)
+        page.dump_state_to_sr(gui.session_state | output, sr)
 
     user = AppUser.objects.get(id=user_id)
     page = page_cls(request=SimpleNamespace(user=user))
     page.setup_sentry()
     sr = page.run_doc_sr(run_id, uid)
-    st.set_session_state(sr.to_dict() | (unsaved_state or {}))
-    set_query_params(dict(run_id=run_id, uid=uid))
+    gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
+    gui.set_query_params(dict(run_id=run_id, uid=uid))
 
     try:
         save_on_step()
-        for val in page.main(sr, st.session_state):
+        for val in page.main(sr, gui.session_state):
             save_on_step(val)
 
     # render errors nicely
@@ -107,7 +105,7 @@ def runner_task(
 
     # run completed successfully, deduct credits
     else:
-        sr.transaction, sr.price = page.deduct_credits(st.session_state)
+        sr.transaction, sr.price = page.deduct_credits(gui.session_state)
 
     # save everything, mark run as completed
     finally:

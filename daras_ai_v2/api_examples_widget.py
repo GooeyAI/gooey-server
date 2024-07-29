@@ -5,7 +5,7 @@ from textwrap import indent
 
 from furl import furl
 
-import gooey_ui as st
+import gooey_gui as gui
 from auth.token_authentication import auth_scheme
 from daras_ai_v2 import settings
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
@@ -30,7 +30,7 @@ black_import_lock = threading.Lock()
 def api_example_generator(
     *, api_url: furl, request_body: dict, as_form_data: bool, as_async: bool
 ):
-    js, python, curl = st.tabs(["`node.js`", "`python`", "`curl`"])
+    js, python, curl = gui.tabs(["`node.js`", "`python`", "`curl`"])
 
     filenames = []
     if as_async:
@@ -95,7 +95,7 @@ done
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
 
-        st.write(
+        gui.write(
             """
 1. Generate an api key [below👇](#api-keys)
 
@@ -193,7 +193,7 @@ print(response.status_code, result)
             from black.mode import Mode
 
         py_code = format_str(py_code, mode=Mode())
-        st.write(
+        gui.write(
             rf"""
 1. Generate an api key [below👇](#api-keys)
 
@@ -308,7 +308,7 @@ async function gooeyAPI() {
 
         js_code += "\n}\n\ngooeyAPI();"
 
-        st.write(
+        gui.write(
             r"""
 1. Generate an api key [below👇](#api-keys)
 
@@ -385,7 +385,7 @@ evtSource.onerror = (event) => {
         integration_id=integration_id,
     )
 
-    st.write(
+    gui.write(
         f"""
 Your Integration ID: `{integration_id}`
 
@@ -407,14 +407,14 @@ Note that you do not need the API key for this endpoint and can use it directly 
         )
         / "docs"
     )
-    st.markdown(
+    gui.markdown(
         f"""
 Read our <a href="{api_docs_url}" target="_blank">complete API</a> for features like conversation history, input media files, and more.
         """,
         unsafe_allow_html=True,
     )
 
-    st.js(
+    gui.js(
         """
 document.startStreaming = async function() {
     document.getElementById('stream-output').style.display = 'flex';
@@ -426,7 +426,7 @@ document.startStreaming = async function() {
         ).strip()
     )
 
-    st.html(
+    gui.html(
         f"""
 <br>
 <button class="btn btn-theme btn-secondary" onclick="document.startStreaming()">🏃‍♀️ Preview Streaming</button>

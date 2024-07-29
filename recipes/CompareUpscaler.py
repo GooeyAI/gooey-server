@@ -3,7 +3,7 @@ import typing
 
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -46,11 +46,11 @@ class CompareUpscalerPage(BasePage):
         ] = Field({}, description="Output Videos")
 
     def validate_form_v2(self):
-        assert st.session_state.get(
+        assert gui.session_state.get(
             "selected_models"
         ), "Please select at least one model"
 
-        assert st.session_state.get("input_image") or st.session_state.get(
+        assert gui.session_state.get("input_image") or gui.session_state.get(
             "input_video"
         ), "Please provide an Input Image or Video"
 
@@ -83,22 +83,22 @@ class CompareUpscalerPage(BasePage):
                 )
 
     def render_form_v2(self):
-        selected_input_type = st.horizontal_radio(
+        selected_input_type = gui.horizontal_radio(
             "",
             options=["Image", "Video"],
-            value="Video" if st.session_state.get("input_video") else "Image",
+            value="Video" if gui.session_state.get("input_video") else "Image",
         )
         if selected_input_type == "Video":
-            st.session_state.pop("input_image", None)
-            st.file_uploader(
+            gui.session_state.pop("input_image", None)
+            gui.file_uploader(
                 """
                 #### Input Video
                 """,
                 key="input_video",
             )
         else:
-            st.session_state.pop("input_video", None)
-            st.file_uploader(
+            gui.session_state.pop("input_video", None)
+            gui.file_uploader(
                 """
                 #### Input Image
                 """,
@@ -107,20 +107,20 @@ class CompareUpscalerPage(BasePage):
             )
 
         if selected_input_type == "Video":
-            col1, col2 = st.columns(2)
+            col1, col2 = gui.columns(2)
             with col1:
-                st.multiselect(
+                gui.multiselect(
                     label="##### Upscaler Models",
                     options=[e.name for e in UpscalerModels if e.supports_video],
                     format_func=lambda x: UpscalerModels[x].label,
                     key="selected_models",
                 )
             with col2:
-                st.selectbox(
+                gui.selectbox(
                     label="##### Background Upscaler",
                     options=[e.name for e in UpscalerModels if e.is_bg_model],
                     format_func=lambda x: (
-                        UpscalerModels[x].label if x else st.BLANK_OPTION
+                        UpscalerModels[x].label if x else gui.BLANK_OPTION
                     ),
                     allow_none=True,
                     key="selected_bg_model",
@@ -132,7 +132,7 @@ class CompareUpscalerPage(BasePage):
                 key="selected_models",
             )
 
-        st.slider(
+        gui.slider(
             """
             ### Scale
             Factor to scale image by
@@ -147,19 +147,19 @@ class CompareUpscalerPage(BasePage):
         return DEFAULT_COMPARE_UPSCALER_META_IMG
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             Have an old photo or just a funky AI picture? Run this workflow to compare the top image upscalers.
             """
         )
 
     def render_output(self):
-        _render_outputs(st.session_state)
+        _render_outputs(gui.session_state)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.image(state.get("input_image"), caption="Input Image")
+            gui.image(state.get("input_image"), caption="Input Image")
         with col2:
             _render_outputs(state)
 
@@ -185,8 +185,8 @@ def _render_outputs(state):
     for key in state.get("selected_models") or []:
         img = (state.get("output_images") or {}).get(key)
         if img:
-            st.image(img, caption=UpscalerModels[key].label, show_download_button=True)
+            gui.image(img, caption=UpscalerModels[key].label, show_download_button=True)
 
         vid = (state.get("output_videos") or {}).get(key)
         if vid:
-            st.video(vid, caption=UpscalerModels[key].label, show_download_button=True)
+            gui.video(vid, caption=UpscalerModels[key].label, show_download_button=True)

@@ -3,7 +3,7 @@ import typing
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -114,43 +114,43 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        st.text_area("#### Google Search Query", key="search_query")
-        st.text_input("Search on a specific site *(optional)*", key="site_filter")
+        gui.text_area("#### Google Search Query", key="search_query")
+        gui.text_input("Search on a specific site *(optional)*", key="site_filter")
 
     def validate_form_v2(self):
-        assert st.session_state.get(
+        assert gui.session_state.get(
             "search_query", ""
         ).strip(), "Please enter a search query"
 
     def render_output(self):
-        render_output_with_refs(st.session_state)
+        render_output_with_refs(gui.session_state)
 
-        refs = st.session_state.get("references", [])
+        refs = gui.session_state.get("references", [])
         render_sources_widget(refs)
 
     def render_example(self, state: dict):
-        st.write("**Search Query**")
-        st.write("```properties\n" + state.get("search_query", "") + "\n```")
+        gui.write("**Search Query**")
+        gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         site_filter = state.get("site_filter")
         if site_filter:
-            st.write(f"**Site** \\\n{site_filter}")
+            gui.write(f"**Site** \\\n{site_filter}")
         render_output_with_refs(state, 200)
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             "### Task Instructions",
             key="task_instructions",
             height=300,
         )
-        st.write("---")
+        gui.write("---")
         selected_model = language_model_selector()
         language_model_settings(selected_model)
-        st.write("---")
+        gui.write("---")
         serp_search_settings()
-        st.write("---")
-        st.write("##### 🔎 Document Search Settings")
+        gui.write("---")
+        gui.write("##### 🔎 Document Search Settings")
         query_instructions_widget()
-        st.write("---")
+        gui.write("---")
         doc_search_advanced_settings()
 
     def related_workflows(self) -> list:
@@ -176,41 +176,41 @@ class GoogleGPTPage(BasePage):
         youtube_video("mcscNaUIosA")
 
     def render_steps(self):
-        final_search_query = st.session_state.get("final_search_query")
+        final_search_query = gui.session_state.get("final_search_query")
         if final_search_query:
-            st.text_area(
+            gui.text_area(
                 "**Final Search Query**", value=final_search_query, disabled=True
             )
 
-        serp_results = st.session_state.get(
-            "serp_results", st.session_state.get("scaleserp_results")
+        serp_results = gui.session_state.get(
+            "serp_results", gui.session_state.get("scaleserp_results")
         )
         if serp_results:
-            st.write("**Web Search Results**")
-            st.json(serp_results)
+            gui.write("**Web Search Results**")
+            gui.json(serp_results)
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area(
+            gui.text_area(
                 "**Final Prompt**",
                 value=final_prompt,
                 height=400,
                 disabled=True,
             )
 
-        output_text: list = st.session_state.get("output_text", [])
+        output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**Output Text**",
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
             )
 
-        references = st.session_state.get("references", [])
+        references = gui.session_state.get("references", [])
         if references:
-            st.write("**References**")
-            st.json(references)
+            gui.write("**References**")
+            gui.json(references)
 
     def run_v2(
         self,

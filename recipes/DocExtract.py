@@ -10,7 +10,7 @@ from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -117,28 +117,28 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             "#### 🤖 Youtube/PDF/Drive URLs",
             accept=("audio/*", "application/pdf", "video/*"),
         )
-        st.text_input(
+        gui.text_input(
             "#### 📊 Google Sheets URL",
             key="sheet_url",
         )
 
     def validate_form_v2(self):
-        assert st.session_state.get("documents"), "Please enter Youtube/PDF/Drive URLs"
-        assert st.session_state.get("sheet_url"), "Please enter a Google Sheet URL"
+        assert gui.session_state.get("documents"), "Please enter Youtube/PDF/Drive URLs"
+        assert gui.session_state.get("sheet_url"), "Please enter a Google Sheet URL"
 
     def preview_description(self, state: dict) -> str:
         return "Transcribe YouTube videos in any language with Whisper, Google Chirp & more, run your own GPT4 prompt on each transcript and save it all to a Google Sheet. Perfect for making a YouTube-based dataset to create your own chatbot or enterprise copilot (ie. just add the finished Google sheet url to the doc section in https://gooey.ai/copilot)."
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.write("**Google Sheets URL**")
-        st.write(state.get("sheet_url"))
+        gui.write("**Google Sheets URL**")
+        gui.write(state.get("sheet_url"))
 
     def render_usage_guide(self):
         youtube_video("p7ZLb-loR_4")
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             "##### 👩‍🏫 Task Instructions",
             key="task_instructions",
             height=300,
@@ -147,15 +147,15 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         language_model_settings(selected_model)
 
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
-        st.write("---")
+        gui.write("---")
 
         google_translate_language_selector()
-        st.file_uploader(
+        gui.file_uploader(
             label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
             key="glossary_document",
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
-        st.write("---")
+        gui.write("---")
 
     def related_workflows(self) -> list:
         from recipes.asr_page import AsrPage

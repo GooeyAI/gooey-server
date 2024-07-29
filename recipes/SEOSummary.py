@@ -9,7 +9,7 @@ from html_sanitizer import Sanitizer
 from loguru import logger
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
@@ -140,7 +140,7 @@ class SEOSummaryPage(BasePage):
         youtube_video("8VDYTYWhOaw")
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
         This workflow is designed to make it incredibly easy to create a webpage that Google's search engine will rank well. 
 
@@ -160,45 +160,45 @@ SearchSEO > Page Parsing > GPT3
         )
 
     def render_form_v2(self):
-        st.write("#### Inputs")
-        st.text_input("Google Search Query", key="search_query")
-        st.text_input("Website Name", key="title")
-        st.text_input("Website URL", key="company_url")
-        st.text_area("Focus Keywords *(optional)*", key="keywords")
+        gui.write("#### Inputs")
+        gui.text_input("Google Search Query", key="search_query")
+        gui.text_input("Website Name", key="title")
+        gui.text_input("Website URL", key="company_url")
+        gui.text_area("Focus Keywords *(optional)*", key="keywords")
 
     def validate_form_v2(self):
-        assert st.session_state["search_query"], "Please provide Google Search Query"
-        assert st.session_state["title"], "Please provide Website Name"
-        assert st.session_state["company_url"], "Please provide Website URL"
-        # assert st.session_state["keywords"], "Please provide Focus Keywords"
+        assert gui.session_state["search_query"], "Please provide Google Search Query"
+        assert gui.session_state["title"], "Please provide Website Name"
+        assert gui.session_state["company_url"], "Please provide Website URL"
+        # assert gui.session_state["keywords"], "Please provide Focus Keywords"
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             "### Task Instructions",
             key="task_instructions",
             height=300,
         )
 
-        # st.checkbox("Blog Generator Mode", key="enable_blog_mode")
-        st.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
-        st.checkbox("Enable HTML Formatting", key="enable_html")
+        # gui.checkbox("Blog Generator Mode", key="enable_blog_mode")
+        gui.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
+        gui.checkbox("Enable HTML Formatting", key="enable_html")
 
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
-        st.write("---")
+        gui.write("---")
 
         serp_search_settings()
 
     def render_output(self):
-        output_content = st.session_state.get("output_content")
+        output_content = gui.session_state.get("output_content")
         if output_content:
-            st.write("#### Generated Content")
+            gui.write("#### Generated Content")
             for idx, text in enumerate(output_content):
-                if st.session_state.get("enable_html"):
+                if gui.session_state.get("enable_html"):
                     scrollable_html(text)
                 else:
-                    st.text_area(
+                    gui.text_area(
                         f"output {idx}",
                         label_visibility="collapsed",
                         value=text,
@@ -207,47 +207,47 @@ SearchSEO > Page Parsing > GPT3
                     )
 
         else:
-            st.div()
+            gui.div()
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
 
         with col1:
-            serp_results = st.session_state.get(
-                "serp_results", st.session_state.get("scaleserp_results")
+            serp_results = gui.session_state.get(
+                "serp_results", gui.session_state.get("scaleserp_results")
             )
             if serp_results:
-                st.write("**Web Search Results**")
-                st.json(serp_results)
+                gui.write("**Web Search Results**")
+                gui.json(serp_results)
 
         with col2:
-            search_urls = st.session_state.get("search_urls")
+            search_urls = gui.session_state.get("search_urls")
             if search_urls:
-                st.write("**Search URLs**")
-                st.json(search_urls, expanded=False)
+                gui.write("**Search URLs**")
+                gui.json(search_urls, expanded=False)
             else:
-                st.div()
+                gui.div()
 
-        summarized_urls = st.session_state.get("summarized_urls")
+        summarized_urls = gui.session_state.get("summarized_urls")
         if summarized_urls:
-            st.write("**Summarized URLs**")
-            st.json(summarized_urls, expanded=False)
+            gui.write("**Summarized URLs**")
+            gui.json(summarized_urls, expanded=False)
         else:
-            st.div()
+            gui.div()
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area(
+            gui.text_area(
                 "Final Prompt",
                 value=final_prompt,
                 height=400,
                 disabled=True,
             )
         else:
-            st.div()
+            gui.div()
 
     def render_example(self, state: dict):
-        st.write(
+        gui.write(
             f"""
             Search Query `{state.get('search_query', '')}` \\
             Company Name `{state.get('title', '')}` \\
@@ -261,7 +261,7 @@ SearchSEO > Page Parsing > GPT3
             if state.get("enable_html"):
                 scrollable_html(output_content[0], height=300)
             else:
-                st.text_area(
+                gui.text_area(
                     "Generated Content",
                     value=output_content[0],
                     height=200,

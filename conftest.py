@@ -55,7 +55,7 @@ def mock_celery_tasks():
     with (
         patch("celeryapp.tasks.runner_task", _mock_runner_task),
         patch("celeryapp.tasks.post_runner_tasks", _mock_post_runner_tasks),
-        patch("daras_ai_v2.bots.realtime_subscribe", _mock_realtime_subscribe),
+        patch("gooey_gui.realtime_subscribe", _mock_realtime_subscribe),
     ):
         yield
 

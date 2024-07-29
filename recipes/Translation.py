@@ -2,7 +2,7 @@ import typing
 
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.asr import (
     TranslationModels,
@@ -88,7 +88,7 @@ class TranslationPage(BasePage):
         ]
 
     def render_form_v2(self):
-        st.write("###### Source Texts")
+        gui.write("###### Source Texts")
         list_view_editor(
             add_btn_label="➕ Add Text",
             key="texts",
@@ -100,7 +100,7 @@ class TranslationPage(BasePage):
             key="selected_model",
             allow_none=False,
         )
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             translation_language_selector(
                 model=translation_model,
@@ -118,21 +118,23 @@ class TranslationPage(BasePage):
     def render_settings(self):
         try:
             translation_model = TranslationModels[
-                st.session_state.get("selected_model")
+                gui.session_state.get("selected_model")
             ]
         except KeyError:
             translation_model = None
         if translation_model and translation_model.supports_glossary:
-            st.file_uploader(
+            gui.file_uploader(
                 label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
                 key="glossary_document",
                 accept=SUPPORTED_SPREADSHEET_TYPES,
             )
         else:
-            st.session_state["glossary_document"] = None
+            gui.session_state["glossary_document"] = None
 
     def validate_form_v2(self):
-        non_empty_text_inputs = [text for text in st.session_state.get("texts") if text]
+        non_empty_text_inputs = [
+            text for text in gui.session_state.get("texts") if text
+        ]
         assert non_empty_text_inputs, "Please provide at least 1 non-empty text input"
 
     def render_output(self):
@@ -142,22 +144,22 @@ class TranslationPage(BasePage):
         text_outputs("**Translations**", value=state.get("output_texts", []))
 
     def render_steps(self):
-        st.markdown(
+        gui.markdown(
             """
             1. Apply Transliteration as necessary.
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             2. Detect the source language if not provided.
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             3. Translate with the selected API (for Auto, we look up the optimal API based on the detected language and script).
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             4. Apply romanization if requested and applicable.
             """
@@ -173,10 +175,10 @@ class TranslationPage(BasePage):
 
 
 def render_text_input(key: str, del_key: str, d: dict):
-    col1, col2 = st.columns([8, 1], responsive=False)
+    col1, col2 = gui.columns([8, 1], responsive=False)
     with col1:
-        with st.div(className="pt-1"):
-            d["text"] = st.text_area(
+        with gui.div(className="pt-1"):
+            d["text"] = gui.text_area(
                 "",
                 label_visibility="collapsed",
                 key=key + ":text",

@@ -122,21 +122,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(HTTP_404_NOT_FOUND)
 @app.exception_handler(HTTP_405_METHOD_NOT_ALLOWED)
 async def not_found_exception_handler(request: Request, exc: HTTPException):
-    if not request.headers.get("accept", "").startswith("text/html"):
-        return await http_exception_handler(request, exc)
-    return templates.TemplateResponse(
-        "errors/404.html",
-        {"request": request, "settings": settings},
-        status_code=exc.status_code,
-    )
+    return await _exc_handler(request, exc, "errors/404.html")
 
 
 @app.exception_handler(HTTPException)
 async def server_error_exception_handler(request: Request, exc: HTTPException):
-    if not request.headers.get("accept", "").startswith("text/html"):
+    return await _exc_handler(request, exc, "errors/unknown.html")
+
+
+async def _exc_handler(request: Request, exc: HTTPException, template_name: str):
+    if request.headers.get("accept", "").startswith("text/html"):
+        return templates.TemplateResponse(
+            template_name,
+            context=dict(request=request, settings=settings),
+            status_code=exc.status_code,
+        )
+    else:
         return await http_exception_handler(request, exc)
-    return templates.TemplateResponse(
-        "errors/unknown.html",
-        {"request": request, "settings": settings},
-        status_code=exc.status_code,
-    )

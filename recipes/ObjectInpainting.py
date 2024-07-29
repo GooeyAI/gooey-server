@@ -4,7 +4,7 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -94,7 +94,7 @@ class ObjectInpaintingPage(BasePage):
         ]
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Describe the scene that you'd like to generate. 
@@ -103,7 +103,7 @@ class ObjectInpaintingPage(BasePage):
             placeholder="Iron man",
         )
 
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Object Photo
             Give us a photo of anything
@@ -112,12 +112,12 @@ class ObjectInpaintingPage(BasePage):
         )
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("text_prompt", "").strip()
-        input_image = st.session_state.get("input_image")
+        text_prompt = gui.session_state.get("text_prompt", "").strip()
+        input_image = gui.session_state.get("input_image")
         assert text_prompt and input_image, "Please provide a Prompt and a Object Photo"
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             This recipe an image of an object, masks it and then renders the background around the object according to the prompt. 
             
@@ -133,35 +133,35 @@ class ObjectInpaintingPage(BasePage):
     def render_settings(self):
         img_model_settings(InpaintingModels)
 
-        st.write("---")
+        gui.write("---")
 
-        st.write(
+        gui.write(
             """
             #### Object Repositioning Settings
             """
         )
 
-        st.write("How _big_ should the object look?")
-        col1, _ = st.columns(2)
+        gui.write("How _big_ should the object look?")
+        col1, _ = gui.columns(2)
         with col1:
-            obj_scale = st.slider(
+            obj_scale = gui.slider(
                 "Scale",
                 min_value=0.1,
                 max_value=1.0,
                 key="obj_scale",
             )
 
-        st.write("_Where_ would you like to place the object in the scene?")
-        col1, col2 = st.columns(2)
+        gui.write("_Where_ would you like to place the object in the scene?")
+        col1, col2 = gui.columns(2)
         with col1:
-            pos_x = st.slider(
+            pos_x = gui.slider(
                 "Position X",
                 min_value=0.0,
                 max_value=1.0,
                 key="obj_pos_x",
             )
         with col2:
-            pos_y = st.slider(
+            pos_y = gui.slider(
                 "Position Y",
                 min_value=0.0,
                 max_value=1.0,
@@ -181,12 +181,12 @@ class ObjectInpaintingPage(BasePage):
             pos_x=pos_x,
             pos_y=pos_y,
             out_size=(
-                st.session_state["output_width"],
-                st.session_state["output_height"],
+                gui.session_state["output_width"],
+                gui.session_state["output_height"],
             ),
         )
 
-        st.slider(
+        gui.slider(
             """
             ##### Edge Threshold
             Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
@@ -197,47 +197,47 @@ class ObjectInpaintingPage(BasePage):
         )
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
-        output_images = st.session_state.get("output_images")
+        text_prompt = gui.session_state.get("text_prompt", "")
+        output_images = gui.session_state.get("output_images")
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}", show_download_button=True)
+                gui.image(url, caption=f"{text_prompt}", show_download_button=True)
         else:
-            st.div()
+            gui.div()
 
     def render_steps(self):
-        input_file = st.session_state.get("input_file")
-        input_image = st.session_state.get("input_image")
+        input_file = gui.session_state.get("input_file")
+        input_image = gui.session_state.get("input_image")
         input_image_or_file = input_image or input_file
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = gui.columns(3)
 
         with col1:
             if input_image_or_file:
-                st.image(input_image_or_file, caption="Input Image")
+                gui.image(input_image_or_file, caption="Input Image")
             else:
-                st.div()
+                gui.div()
 
         with col2:
-            resized_image = st.session_state.get("resized_image")
+            resized_image = gui.session_state.get("resized_image")
             if resized_image:
-                st.image(resized_image, caption="Repositioned Object")
+                gui.image(resized_image, caption="Repositioned Object")
             else:
-                st.div()
+                gui.div()
 
-            obj_mask = st.session_state.get("obj_mask")
+            obj_mask = gui.session_state.get("obj_mask")
             if obj_mask:
-                st.image(obj_mask, caption="Object Mask")
+                gui.image(obj_mask, caption="Object Mask")
             else:
-                st.div()
+                gui.div()
 
         with col3:
-            diffusion_images = st.session_state.get("output_images")
+            diffusion_images = gui.session_state.get("output_images")
             if diffusion_images:
                 for url in diffusion_images:
-                    st.image(url, caption=f"Generated Image")
+                    gui.image(url, caption=f"Generated Image")
             else:
-                st.div()
+                gui.div()
 
     def run(self, state: dict):
         request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -293,17 +293,17 @@ class ObjectInpaintingPage(BasePage):
         state["output_images"] = diffusion_images
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col2:
             output_images = state.get("output_images")
             if output_images:
                 for img in output_images:
-                    st.image(img, caption="Generated Image")
+                    gui.image(img, caption="Generated Image")
         with col1:
             input_image = state.get("input_image")
-            st.image(input_image, caption="Input Image")
-            st.write("**Prompt**")
-            st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
+            gui.image(input_image, caption="Input Image")
+            gui.write("**Prompt**")
+            gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def preview_description(self, state: dict) -> str:
         return "Upload your product photo and describe the background. Then use Stable Diffusion's Inpainting AI to create professional background scenery without the photoshoot."

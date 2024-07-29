@@ -3,7 +3,7 @@ import typing
 import jinja2.sandbox
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
@@ -54,7 +54,7 @@ class SmartGPTPage(BasePage):
         return DEFAULT_SMARTGPT_META_IMG
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             """,
@@ -64,19 +64,19 @@ class SmartGPTPage(BasePage):
         )
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 1: CoT Prompt
                 """,
             key="cot_prompt",
         )
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 2: Reflexion Prompt
                 """,
             key="reflexion_prompt",
         )
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 3: DERA Prompt 
                 """,
@@ -181,22 +181,22 @@ class SmartGPTPage(BasePage):
         state["output_text"] = dera_outputs
 
     def render_output(self):
-        render_output_with_refs(st.session_state)
+        render_output_with_refs(gui.session_state)
 
     def render_example(self, state: dict):
-        st.write("**Prompt**")
-        st.write("```properties\n" + state.get("input_prompt", "") + "\n```")
+        gui.write("**Prompt**")
+        gui.write("```properties\n" + state.get("input_prompt", "") + "\n```")
         render_output_with_refs(state, 200)
 
     def render_steps(self):
-        prompt_tree = st.session_state.get("prompt_tree", {})
+        prompt_tree = gui.session_state.get("prompt_tree", {})
         if prompt_tree:
-            st.write("**Prompt Tree**")
-            st.json(prompt_tree, expanded=True)
+            gui.write("**Prompt Tree**")
+            gui.json(prompt_tree, expanded=True)
 
-        output_text: list = st.session_state.get("output_text", [])
+        output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**Output Text**",
                 help=f"output {idx}",
                 disabled=True,

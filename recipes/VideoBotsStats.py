@@ -1,6 +1,7 @@
 import base64
 from datetime import datetime, timedelta
 
+import gooey_gui as gui
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, Avg, Q
 from django.db.models.functions import (
@@ -15,7 +16,6 @@ from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel
 
-import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import (
     Workflow,
@@ -34,7 +34,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
 )
-from gooey_ui import RedirectException
 from recipes.VideoBots import VideoBotsPage
 
 
@@ -67,23 +66,23 @@ class VideoBotsStatsPage(BasePage):
     def show_title_breadcrumb_share(
         self, bi: BotIntegration, run_title: str, run_url: str
     ):
-        with st.div(className="d-flex justify-content-between mt-4"):
-            with st.div(className="d-lg-flex d-block align-items-center"):
-                with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                    with st.breadcrumbs():
+        with gui.div(className="d-flex justify-content-between mt-4"):
+            with gui.div(className="d-lg-flex d-block align-items-center"):
+                with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                    with gui.breadcrumbs():
                         metadata = VideoBotsPage.workflow.get_or_create_metadata()
-                        st.breadcrumb_item(
+                        gui.breadcrumb_item(
                             metadata.short_title,
                             link_to=VideoBotsPage.app_url(),
                             className="text-muted",
                         )
                         if not (bi.published_run_id and bi.published_run.is_root()):
-                            st.breadcrumb_item(
+                            gui.breadcrumb_item(
                                 run_title,
                                 link_to=run_url,
                                 className="text-muted",
                             )
-                        st.breadcrumb_item(
+                        gui.breadcrumb_item(
                             "Integrations",
                             link_to=VideoBotsPage.current_app_url(
                                 RecipeTabs.integrations,
@@ -102,11 +101,11 @@ class VideoBotsStatsPage(BasePage):
                     show_as_link=self.is_current_user_admin(),
                 )
 
-            with st.div(className="d-flex align-items-center"):
-                with st.div(className="d-flex align-items-start right-action-icons"):
+            with gui.div(className="d-flex align-items-center"):
+                with gui.div(className="d-flex align-items-start right-action-icons"):
                     self._render_social_buttons(show_button_text=True)
 
-        st.markdown("# " + self.get_dynamic_meta_title())
+        gui.markdown("# " + self.get_dynamic_meta_title())
 
     def get_dynamic_meta_title(self):
         return f"📊 {self.bi.name} Analytics" if self.bi else self.title
@@ -115,7 +114,7 @@ class VideoBotsStatsPage(BasePage):
         self.setup_sentry()
 
         if not self.request.user or self.request.user.is_anonymous:
-            st.write("**Please Login to view stats for your bot integrations**")
+            gui.write("**Please Login to view stats for your bot integrations**")
             return
         if self.is_current_user_admin():
             bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
@@ -125,12 +124,12 @@ class VideoBotsStatsPage(BasePage):
             ).order_by("platform", "-created_at")
 
         if not bi_qs.exists():
-            st.write(
+            gui.write(
                 "**Please connect a bot to a platform to view stats for your bot integrations or login to an account with connected bot integrations**"
             )
             return
 
-        bi_id = self.request.query_params.get("bi_id") or st.session_state.get("bi_id")
+        bi_id = self.request.query_params.get("bi_id") or gui.session_state.get("bi_id")
         try:
             self.bi = bi = bi_qs.get(id=bi_id)
         except BotIntegration.DoesNotExist:
@@ -138,7 +137,7 @@ class VideoBotsStatsPage(BasePage):
 
         # for backwards compatibility with old urls
         if self.request.query_params.get("bi_id"):
-            raise RedirectException(
+            raise gui.RedirectException(
                 str(
                     furl(
                         VideoBotsPage.app_url(
@@ -160,7 +159,7 @@ class VideoBotsStatsPage(BasePage):
             run_title = bi.saved_run.page_title  # this is mostly for backwards compat
         self.show_title_breadcrumb_share(bi, run_title, run_url)
 
-        col1, col2 = st.columns([1, 2])
+        col1, col2 = gui.columns([1, 2])
 
         with col1:
             conversations, messages = calculate_overall_stats(
@@ -184,22 +183,24 @@ class VideoBotsStatsPage(BasePage):
         )
 
         if df.empty or "date" not in df.columns:
-            st.write("No data to show yet.")
+            gui.write("No data to show yet.")
             self.update_url(
                 view,
-                st.session_state.get("details"),
+                gui.session_state.get("details"),
                 start_date,
                 end_date,
-                st.session_state.get("sort_by"),
+                gui.session_state.get("sort_by"),
             )
             return
 
         with col2:
             plot_graphs(view, df)
 
-        st.write("---")
-        st.session_state.setdefault("details", self.request.query_params.get("details"))
-        details = st.horizontal_radio(
+        gui.write("---")
+        gui.session_state.setdefault(
+            "details", self.request.query_params.get("details")
+        )
+        details = gui.horizontal_radio(
             "### Details",
             options=(
                 [
@@ -256,15 +257,15 @@ class VideoBotsStatsPage(BasePage):
         sort_by = None
         if options:
             query_sort_by = self.request.query_params.get("sort_by")
-            st.session_state.setdefault(
+            gui.session_state.setdefault(
                 "sort_by", query_sort_by if query_sort_by in options else options[0]
             )
-            st.selectbox(
+            gui.selectbox(
                 "Sort by",
                 options=options,
                 key="sort_by",
             )
-            sort_by = st.session_state["sort_by"]
+            sort_by = gui.session_state["sort_by"]
 
         df = get_tabular_data(
             bi=bi,
@@ -279,7 +280,7 @@ class VideoBotsStatsPage(BasePage):
 
         if not df.empty:
             columns = df.columns.tolist()
-            st.data_table(
+            gui.data_table(
                 [columns]
                 + [
                     [
@@ -294,8 +295,8 @@ class VideoBotsStatsPage(BasePage):
                 ]
             )
             # download as csv button
-            st.html("<br/>")
-            if st.checkbox("Export"):
+            gui.html("<br/>")
+            if gui.checkbox("Export"):
                 df = get_tabular_data(
                     bi=bi,
                     conversations=conversations,
@@ -307,12 +308,12 @@ class VideoBotsStatsPage(BasePage):
                 )
                 csv = df.to_csv()
                 b64 = base64.b64encode(csv.encode()).decode()
-                st.html(
+                gui.html(
                     f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv" class="btn btn-theme btn-secondary">Download CSV File</a>'
                 )
-                st.caption("Includes full data (UI only shows first 500 rows)")
+                gui.caption("Includes full data (UI only shows first 500 rows)")
         else:
-            st.write("No data to show yet.")
+            gui.write("No data to show yet.")
 
         self.update_url(view, details, start_date, end_date, sort_by)
 
@@ -330,25 +331,25 @@ class VideoBotsStatsPage(BasePage):
         }
         if f.query.params == new_query_params:
             return
-        raise RedirectException(str(f.set(query_params=new_query_params)))
+        raise gui.RedirectException(str(f.set(query_params=new_query_params)))
 
     def render_date_view_inputs(self, bi):
-        if st.checkbox("Show All"):
+        if gui.checkbox("Show All"):
             start_date = bi.created_at
             end_date = timezone.now() + timedelta(days=1)
         else:
             fifteen_days_ago = timezone.now() - timedelta(days=15)
             fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
-            st.session_state.setdefault(
+            gui.session_state.setdefault(
                 "start_date",
                 self.request.query_params.get(
                     "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
                 ),
             )
             start_date: datetime = (
-                st.date_input("Start date", key="start_date") or fifteen_days_ago
+                gui.date_input("Start date", key="start_date") or fifteen_days_ago
             )
-            st.session_state.setdefault(
+            gui.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
                     "end_date",
@@ -356,13 +357,13 @@ class VideoBotsStatsPage(BasePage):
                 ),
             )
             end_date: datetime = (
-                st.date_input("End date", key="end_date") or timezone.now()
+                gui.date_input("End date", key="end_date") or timezone.now()
             )
-            st.session_state.setdefault(
+            gui.session_state.setdefault(
                 "view", self.request.query_params.get("view", "Daily")
             )
-        st.write("---")
-        view = st.horizontal_radio(
+        gui.write("---")
+        view = gui.horizontal_radio(
             "### View",
             options=["Daily", "Weekly", "Monthly"],
             key="view",
@@ -373,7 +374,7 @@ class VideoBotsStatsPage(BasePage):
             trunc_fn = TruncWeek
         elif view == "Daily":
             if end_date - start_date > timedelta(days=31):
-                st.write(
+                gui.write(
                     "**Note: Date ranges greater than 31 days show weekly averages in daily view**"
                 )
                 factor = 1.0 / 7.0
@@ -383,10 +384,10 @@ class VideoBotsStatsPage(BasePage):
         elif view == "Monthly":
             trunc_fn = TruncMonth
             start_date = start_date.replace(day=1)
-            st.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
+            gui.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
             if end_date.day != 1:
                 end_date = end_date.replace(day=1) + relativedelta(months=1)
-                st.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
+                gui.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
         else:
             trunc_fn = TruncYear
         return start_date, end_date, view, factor, trunc_fn
@@ -430,7 +431,7 @@ def calculate_overall_stats(*, bi, run_title, run_url):
         connection_detail = f"- Connected to: {bi.get_display_name()}"
     else:
         connection_detail = ""
-    st.markdown(
+    gui.markdown(
         f"""
             - Platform: {Platform(bi.platform).name.capitalize()}
             - Created on: {bi.created_at.strftime("%b %d, %Y")}
@@ -629,8 +630,8 @@ def plot_graphs(view, df):
             template="plotly_white",
         ),
     )
-    st.plotly_chart(fig)
-    st.write("---")
+    gui.plotly_chart(fig)
+    gui.write("---")
     fig = go.Figure(
         data=[
             go.Scatter(
@@ -734,8 +735,8 @@ def plot_graphs(view, df):
                 )
             ],
         )
-    st.plotly_chart(fig)
-    st.write("---")
+    gui.plotly_chart(fig)
+    gui.write("---")
     fig = go.Figure(
         data=[
             go.Scatter(
@@ -760,8 +761,8 @@ def plot_graphs(view, df):
             template="plotly_white",
         ),
     )
-    st.plotly_chart(fig)
-    st.write("---")
+    gui.plotly_chart(fig)
+    gui.write("---")
     fig = go.Figure(
         data=[
             go.Scatter(
@@ -810,7 +811,7 @@ def plot_graphs(view, df):
             template="plotly_white",
         ),
     )
-    st.plotly_chart(fig)
+    gui.plotly_chart(fig)
 
 
 def get_tabular_data(
