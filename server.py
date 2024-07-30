@@ -63,11 +63,11 @@ app.include_router(broadcast_api.app)
 app.include_router(account.app, include_in_schema=False)
 app.include_router(facebook_api.app, include_in_schema=False)
 app.include_router(slack_api.router, include_in_schema=False)
-app.include_router(root.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)
 app.include_router(stripe.router, include_in_schema=False)
 app.include_router(twilio_api.router, include_in_schema=False)
+app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(
     CORSMiddleware,
