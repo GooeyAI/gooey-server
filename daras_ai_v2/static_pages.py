@@ -1,5 +1,4 @@
 import io
-import gooey_ui as st
 from static_pages.models import StaticPage
 from google.cloud import storage
 
@@ -7,11 +6,13 @@ from bs4 import BeautifulSoup
 from daras_ai_v2.settings import GCP_PROJECT, GCS_CREDENTIALS, GS_BUCKET_NAME
 
 
-client = storage.Client(
-    GCP_PROJECT,
-    GCS_CREDENTIALS,
-)
-bucket = client.get_bucket(GS_BUCKET_NAME)
+def gcs_bucket() -> "storage.storage.Bucket":
+    client = storage.Client(
+        GCP_PROJECT,
+        GCS_CREDENTIALS,
+    )
+    bucket = client.get_bucket(GS_BUCKET_NAME)
+    return bucket
 
 
 def populate_imported_css(html: str, uid: str):
@@ -41,7 +42,7 @@ def get_all_styles(links: list, uid: str):
     for link in links:
         if not link.endswith(".css"):  # ignore for css files
             continue
-        blob = bucket.get_blob(f"{uid}/{link}")
+        blob = gcs_bucket().get_blob(f"{uid}/{link}")
         blob = blob.download_as_string()
         blob = blob.decode("utf-8")
         blob = io.StringIO(blob).read()
@@ -57,6 +58,7 @@ def serve(page_slug: str, file_path: str = None):
         return None
 
     uid = static_page.uid
+    bucket = gcs_bucket()
 
     def render_page():
         if file_path:

@@ -240,11 +240,18 @@ FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
 # django-storages settings for google-cloud
 from google.oauth2 import service_account
 
-GCS_CONFIG = config("GCS_CONFIG", default="")
 GCS_PRIVATE_KEY = config("GCS_PRIVATE_KEY", default="")
-GCS_CREDENTIALS = service_account.Credentials.from_service_account_info(
-    info={**json.loads(GCS_CONFIG), "private_key": GCS_PRIVATE_KEY}
-)
+
+GCS_CREDENTIALS = ""
+# create credentials from env vars
+try:
+    GCS_CONFIG = config("GCS_CONFIG")
+except UndefinedValueError:
+    pass
+else:
+    GCS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+        info={**json.loads(GCS_CONFIG), "private_key": GCS_PRIVATE_KEY}
+    )
 
 STORAGES["default"] = {
     "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
