@@ -578,15 +578,15 @@ let script = document.createElement("script");
     app,
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
+    "/{page_slug}/{run_slug}/{path}",
     "/{page_slug}/{run_slug}-{example_id}/",
-    "/{page_slug}/{path:path}",
 )
 def recipe_page_or_handle(
     request: Request,
     page_slug: str,
     run_slug: str = None,
-    example_id: str = None,
     path: str = None,
+    example_id: str = None,
 ):
     try:
         handle = Handle.objects.get_by_name(page_slug)
@@ -594,7 +594,10 @@ def recipe_page_or_handle(
         try:
             import daras_ai_v2.static_pages as static_pages
 
-            html, file_path = static_pages.serve(page_slug=page_slug, file_path=path)
+            html, file_path = static_pages.serve(
+                request=request,
+                page_slug=page_slug,
+            )
 
             if file_path:
                 return RedirectResponse(file_path)

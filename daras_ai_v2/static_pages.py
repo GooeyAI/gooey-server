@@ -1,4 +1,5 @@
 import io
+from starlette.responses import Response
 from static_pages.models import StaticPage
 from google.cloud import storage
 
@@ -51,11 +52,16 @@ def get_all_styles(links: list, uid: str):
     return f"<style>{styles}</style>"
 
 
-def serve(page_slug: str, file_path: str = None):
+def serve(request: Response, page_slug: str):
     static_page = StaticPage.objects.get(path=page_slug)
-
     if not static_page:
         return None
+
+    file_path = request.url.path
+    if not file_path == f"/{page_slug}/":
+        file_path = file_path[len(f"/{page_slug}/") :]
+    else:
+        file_path = None
 
     uid = static_page.uid
     bucket = gcs_bucket()
