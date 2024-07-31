@@ -1,9 +1,9 @@
 import gooey_gui as gui
 from daras_ai_v2 import settings
 import io
+import mimetypes
 from starlette.requests import Request
 from fastapi import HTTPException
-import typing
 from zipfile import ZipFile, is_zipfile
 import urllib.request
 from daras_ai_v2.base import BasePage
@@ -19,10 +19,6 @@ WEBSITE_FOLDER_PATH = "gooey-website"
 
 
 def serve(page_slug: str, file_path: str):
-    from daras_ai_v2.all_pages import normalize_slug
-
-    if page_slug == "pricing":
-        page_slug = "index"
 
     bucket = gcs_bucket()
 
@@ -33,7 +29,7 @@ def serve(page_slug: str, file_path: str):
     elif file_path:
         blob_path = f"{WEBSITE_FOLDER_PATH}/{file_path}"
 
-    if not (blob_path.endswith(".html") or blob_path.endswith(".css")):
+    if not (blob_path.endswith(".html")):
         return dict(
             redirectUrl=f"https://storage.googleapis.com/{settings.GS_BUCKET_NAME}/{WEBSITE_FOLDER_PATH}/{file_path}"
         )
@@ -74,7 +70,10 @@ class StaticPageUpload(BasePage):
                         file_name = file_info.filename  # Maintain directory structure
                         blob_path = f"{WEBSITE_FOLDER_PATH}/{file_name}"
                         blob = bucket.blob(blob_path)
-                        blob.upload_from_string(file_data)
+                        content_type = (
+                            mimetypes.guess_type(file_name)[0] or "text/plain"
+                        )
+                        blob.upload_from_string(file_data, content_type=content_type)
                         self.extracted_files.append(blob.public_url)
 
     def render_file_upload(self) -> None:
@@ -93,14 +92,13 @@ class StaticPageUpload(BasePage):
                 "Extract ZIP File",
                 key="zip_file",
                 type="primary",
-                disabled=not self.zip_file or self.is_uploading,
+                disabled=not self.zip_file,
             )
             gui.caption(
                 "After successful upload, extracted files will be displayed below.",
                 className="my-4 text-muted",
             )
             if pressed_save:
-                self.is_uploading = True
                 self.extract_zip_to_gcloud()
 
             # render extracted files if any
