@@ -17,6 +17,7 @@ excluded_endpoints = [
     slack_connect_redirect_shortcuts.__name__,
     "get_run_status",  # needs query params
     "get_balance",  # needs authentication
+    "internal/file-upload",  # needs admin authentication
 ]
 
 route_paths = [
