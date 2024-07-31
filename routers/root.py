@@ -194,6 +194,24 @@ def file_upload(form_data: FormData = fastapi_request_form):
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
+@gui.route(app, "/internal/file-upload/")
+def zip_file_upload(request: Request):
+    from static_pages import StaticPageUpload
+
+    uploader = StaticPageUpload(request=request)
+
+    with page_wrapper(request):
+        uploader.render_file_upload()
+
+    return {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title="Upload ZIP File",
+            description="Internal Page: Upload a ZIP file to extract its contents, to google cloud",
+        ),
+    }
+
+
 @gui.route(app, "/GuiComponents/")
 def component_page(request: Request):
     import components_doc
@@ -575,15 +593,34 @@ let script = document.createElement("script");
     app,
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
+    "/{page_slug}/{path:path}",
     "/{page_slug}/{run_slug}-{example_id}/",
 )
 def recipe_page_or_handle(
-    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+    request: Request,
+    page_slug: str,
+    run_slug: str = None,
+    path: str = None,
+    example_id: str = None,
 ):
     try:
         handle = Handle.objects.get_by_name(page_slug)
     except Handle.DoesNotExist:
-        return render_page(request, page_slug, RecipeTabs.run, example_id)
+        import static_pages
+
+        static_content = static_pages.serve(page_slug, path)
+        if not static_content:
+            # render recipe page
+            return render_page(request, page_slug, RecipeTabs.run, example_id)
+
+        if static_content.get("redirectUrl"):
+            return RedirectResponse(static_content.get("redirectUrl"))
+
+        if static_content.get("content"):
+            return Response(
+                content=static_content["content"],
+            )
+
     else:
         return render_page_for_handle(request, handle)
 
