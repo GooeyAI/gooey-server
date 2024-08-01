@@ -92,7 +92,7 @@ async def startup():
     limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
 
 
-@app.get("/", tags=["Misc"])
+@app.get("/", tags=["Misc"], openapi_extra={"x-fern-ignore": True})
 async def health():
     return "OK"
 
