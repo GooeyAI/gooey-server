@@ -23,7 +23,7 @@ PlanActionLabel = Literal["Upgrade", "Downgrade", "Contact Us", "Your Plan"]
 def billing_page(user: AppUser):
     render_payments_setup()
 
-    if user.subscription:
+    if user.subscription and user.subscription.plan != PricingPlan.STARTER.db_value:
         render_current_plan(user)
 
     with gui.div(className="my-5"):
@@ -35,7 +35,7 @@ def billing_page(user: AppUser):
     with gui.div(className="my-5"):
         render_addon_section(user, selected_payment_provider)
 
-    if user.subscription and user.subscription.payment_provider:
+    if user.subscription:
         if user.subscription.payment_provider == PaymentProvider.STRIPE:
             with gui.div(className="my-5"):
                 render_auto_recharge_section(user)
@@ -131,7 +131,7 @@ def render_all_plans(user: AppUser) -> PaymentProvider:
     plans_div = gui.div(className="mb-1")
 
     if user.subscription and user.subscription.payment_provider:
-        selected_payment_provider = None
+        selected_payment_provider = user.subscription.payment_provider
     else:
         with gui.div():
             selected_payment_provider = PaymentProvider[
@@ -149,7 +149,10 @@ def render_all_plans(user: AppUser) -> PaymentProvider:
             ):
                 _render_plan_details(plan)
                 _render_plan_action_button(
-                    user, plan, current_plan, selected_payment_provider
+                    user=user,
+                    plan=plan,
+                    current_plan=current_plan,
+                    payment_provider=selected_payment_provider,
                 )
 
     with plans_div:
@@ -198,7 +201,9 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             gui.html("Contact Us")
-    elif user.subscription and not user.subscription.payment_provider:
+    elif (
+        user.subscription and user.subscription.plan == PricingPlan.ENTERPRISE.db_value
+    ):
         # don't show upgrade/downgrade buttons for enterprise customers
         # assumption: anyone without a payment provider attached is admin/enterprise
         return
@@ -208,7 +213,7 @@ def _render_plan_action_button(
         else:
             label, btn_type = ("Downgrade", "secondary")
 
-        if user.subscription and user.subscription.payment_provider:
+        if user.subscription and user.subscription.external_id:
             # subscription exists, show upgrade/downgrade button
             _render_update_subscription_button(
                 label,
@@ -322,7 +327,6 @@ def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
 
     if new_plan == PricingPlan.STARTER:
         user.subscription.cancel()
-        user.subscription.delete()
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303
         )
@@ -383,7 +387,7 @@ def render_addon_section(user: AppUser, selected_payment_provider: PaymentProvid
         gui.write("# Purchase Credits")
     gui.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    if user.subscription:
+    if user.subscription and user.subscription.payment_provider:
         provider = PaymentProvider(user.subscription.payment_provider)
     else:
         provider = selected_payment_provider
@@ -423,7 +427,7 @@ def render_stripe_addon_button(dollat_amt: int, user: AppUser):
         "Confirm Purchase", key=f"confirm-purchase-{dollat_amt}"
     )
     if gui.button(f"${dollat_amt:,}", type="primary"):
-        if user.subscription:
+        if user.subscription and user.subscription.payment_provider:
             confirm_purchase_modal.open()
         else:
             stripe_addon_checkout_redirect(user, dollat_amt)
@@ -503,7 +507,7 @@ def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    if user.subscription:
+    if user.subscription and user.subscription.plan == plan.db_value:
         # already subscribed to some plan
         return
 
@@ -544,24 +548,28 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(user: AppUser):
-    assert user.subscription
-
-    gui.write("## Payment Information", id="payment-information", className="d-block")
-    col1, col2, col3 = gui.columns(3, responsive=False)
-    with col1:
-        gui.write("**Pay via**")
-    with col2:
-        provider = PaymentProvider(user.subscription.payment_provider)
-        gui.write(provider.label)
-    with col3:
-        if gui.button(f"{icons.edit} Edit", type="link", key="manage-payment-provider"):
-            raise gui.RedirectException(user.subscription.get_external_management_url())
+    if not user.subscription:
+        return
 
     pm_summary = gui.run_in_thread(
         user.subscription.get_payment_method_summary, cache=True
     )
     if not pm_summary:
         return
+
+    gui.write("## Payment Information", id="payment-information", className="d-block")
+    col1, col2, col3 = gui.columns(3, responsive=False)
+    with col1:
+        gui.write("**Pay via**")
+    with col2:
+        provider = PaymentProvider(
+            user.subscription.payment_provider or PaymentProvider.STRIPE
+        )
+        gui.write(provider.label)
+    with col3:
+        if gui.button(f"{icons.edit} Edit", type="link", key="manage-payment-provider"):
+            raise gui.RedirectException(user.subscription.get_external_management_url())
+
     pm_summary = PaymentMethodSummary(*pm_summary)
     if pm_summary.card_brand and pm_summary.card_last4:
         col1, col2, col3 = gui.columns(3, responsive=False)

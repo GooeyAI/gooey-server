@@ -59,7 +59,7 @@ class PaypalWebhookHandler:
             )
             return
 
-        _set_user_subscription(
+        set_user_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             uid=pp_sub.custom_id,
@@ -109,20 +109,25 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_checkout_session_completed(cls, uid: str, session_data):
-        if setup_intent_id := session_data.get("setup_intent") is None:
+        setup_intent_id = session_data.get("setup_intent")
+        if not setup_intent_id:
             # not a setup mode checkout -- do nothing
             return
+
         setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
-
-        # subscription_id was passed to metadata when creating the session
-        sub_id = setup_intent.metadata["subscription_id"]
-        assert (
-            sub_id
-        ), f"subscription_id is missing in setup_intent metadata {setup_intent}"
-
-        stripe.Subscription.modify(
-            sub_id, default_payment_method=setup_intent.payment_method
-        )
+        if sub_id := setup_intent.metadata.get("subscription_id"):
+            # subscription_id was passed to metadata when creating the session
+            stripe.Subscription.modify(
+                sub_id, default_payment_method=setup_intent.payment_method
+            )
+        elif customer_id := session_data.get("customer"):
+            # no subscription_id, so update the customer's default payment method instead
+            stripe.Customer.modify(
+                customer_id,
+                invoice_settings={
+                    "default_payment_method": setup_intent.payment_method
+                },
+            )
 
     @classmethod
     def handle_subscription_updated(cls, uid: str, stripe_sub: stripe.Subscription):
@@ -146,7 +151,7 @@ class StripeWebhookHandler:
             )
             return
 
-        _set_user_subscription(
+        set_user_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             uid=uid,
@@ -190,21 +195,36 @@ def add_balance_for_payment(
         send_monthly_spending_notification_email.delay(user.id)
 
 
-def _set_user_subscription(
-    *, provider: PaymentProvider, plan: PricingPlan, uid: str, external_id: str
+def set_user_subscription(
+    *,
+    provider: PaymentProvider,
+    plan: PricingPlan,
+    uid: str,
+    external_id: str | None,
 ):
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    existing = user.subscription
+    if existing:
+        defaults = {
+            "auto_recharge_enabled": user.subscription.auto_recharge_enabled,
+            "auto_recharge_topup_amount": user.subscription.auto_recharge_topup_amount,
+            "auto_recharge_balance_threshold": user.subscription.auto_recharge_balance_threshold,
+            "monthly_spending_budget": user.subscription.monthly_spending_budget,
+            "monthly_spending_notification_threshold": user.subscription.monthly_spending_notification_threshold,
+        }
+    else:
+        defaults = {}
+
     with transaction.atomic():
         subscription, created = Subscription.objects.get_or_create(
             payment_provider=provider,
             external_id=external_id,
-            defaults=dict(plan=plan.db_value),
+            defaults=dict(plan=plan.db_value, **defaults),
         )
+
         subscription.plan = plan.db_value
         subscription.full_clean()
         subscription.save()
-
-        user = AppUser.objects.get_or_create_from_uid(uid)[0]
-        existing = user.subscription
 
         user.subscription = subscription
         user.save(update_fields=["subscription"])
@@ -224,10 +244,13 @@ def _set_user_subscription(
 def _remove_subscription_for_user(
     *, uid: str, provider: PaymentProvider, external_id: str
 ):
-    AppUser.objects.filter(
-        uid=uid,
-        subscription__payment_provider=provider,
-        subscription__external_id=external_id,
-    ).update(
-        subscription=None,
-    )
+    try:
+        user = AppUser.objects.get(uid=uid)
+    except AppUser.DoesNotExist:
+        logger.warning(f"User {uid} not found")
+        return
+
+    user.subscription.plan = PricingPlan.STARTER.db_value
+    user.subscription.payment_provider = None
+    user.subscription.external_id = None
+    user.subscription.save(update_fields=["plan", "payment_provider", "external_id"])
