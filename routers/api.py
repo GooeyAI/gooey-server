@@ -283,6 +283,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
+        openapi_extra={"x-fern-sdk-return-value": "output"},
     )
     @app.get(
         os.path.join(endpoint, "status"),
