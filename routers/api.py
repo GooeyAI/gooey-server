@@ -162,6 +162,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     def run_api_json(
         request: Request,
         page_request: request_model,
+        example_id: str | None = None,
         user: AppUser = Depends(api_auth_header),
     ):
         return _run_api(
@@ -226,6 +227,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request: Request,
         response: Response,
         page_request: request_model,
+        example_id: str | None = None,
         user: AppUser = Depends(api_auth_header),
     ):
         ret = _run_api(
