@@ -148,6 +148,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id=page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
+        openapi_extra={"x-fern-ignore": True},
     )
     @app.post(
         endpoint,
