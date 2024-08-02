@@ -158,7 +158,7 @@ GITHUB_REPO = "https://github.com/GooeyAI/gooey-server/"
 
 def github_url_for_exc(exc: Exception) -> str | None:
     base_dir = str(settings.BASE_DIR)
-    ref = os.environ.get("CAPROVER_GIT_COMMIT_SHA") or "master"
+    ref = (os.environ.get("CAPROVER_GIT_COMMIT_SHA") or "master").strip()
     for frame in reversed(traceback.extract_tb(exc.__traceback__)):
         if not frame.filename.startswith(base_dir):
             continue
