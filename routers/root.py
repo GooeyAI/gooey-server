@@ -6,10 +6,10 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
+import gooey_gui as gui
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
-from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
 from loguru import logger
@@ -21,7 +21,6 @@ from starlette.responses import (
     FileResponse,
 )
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import Workflow, BotIntegration
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
@@ -43,8 +42,10 @@ from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from handles.models import Handle
+from routers.custom_api_router import CustomAPIRouter
+from routers.static_pages import serve_static_file
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
@@ -76,9 +77,7 @@ async def get_sitemap():
 
 
 @app.get("/favicon")
-@app.get("/favicon/")
 @app.get("/favicon.ico")
-@app.get("/favicon.ico/")
 async def favicon():
     return FileResponse("static/favicon.ico")
 
@@ -188,28 +187,10 @@ def file_upload(form_data: FormData = fastapi_request_form):
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"
-            img.transform(resize=form_data.get("resize", f"{1024**2}@>"))
+            img.transform(resize=form_data.get("resize", f"{1024 ** 2}@>"))
             data = img.make_blob()
 
     return {"url": upload_file_from_bytes(filename, data, content_type)}
-
-
-@gui.route(app, "/internal/file-upload/")
-def zip_file_upload(request: Request):
-    from static_pages import StaticPageUpload
-
-    uploader = StaticPageUpload(request=request)
-
-    with page_wrapper(request):
-        uploader.render_file_upload()
-
-    return {
-        "meta": raw_build_meta_tags(
-            url=get_og_url_path(request),
-            title="Upload ZIP File",
-            description="Internal Page: Upload a ZIP file to extract its contents, to google cloud",
-        ),
-    }
 
 
 @gui.route(app, "/GuiComponents/")
@@ -357,7 +338,7 @@ Authorization: Bearer GOOEY_API_KEY
 def examples_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.examples, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.examples, example_id)
 
 
 @gui.route(
@@ -369,7 +350,7 @@ def examples_route(
 def api_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.run_as_api, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.run_as_api, example_id)
 
 
 @gui.route(
@@ -381,7 +362,7 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.history, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
 
 
 @gui.route(
@@ -393,7 +374,7 @@ def history_route(
 def save_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.saved, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.saved, example_id)
 
 
 @gui.route(
@@ -409,7 +390,7 @@ def add_integrations_route(
     example_id: str = None,
 ):
     gui.session_state["--add-integration"] = True
-    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -431,7 +412,7 @@ def integrations_stats_route(
         gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
-    return render_page(request, "stats", RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, "stats", RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -494,7 +475,7 @@ def integrations_route(
             gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
         except IndexError:
             raise HTTPException(status_code=404)
-    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -544,7 +525,6 @@ def chat_route(
 
 
 @app.get("/chat/{integration_name}-{integration_id}/lib.js")
-@app.get("/chat/{integration_name}-{integration_id}/lib.js/")
 def chat_lib_route(request: Request, integration_id: str, integration_name: str = None):
     from routers.bots_api import api_hashids
 
@@ -591,41 +571,36 @@ let script = document.createElement("script");
 
 @gui.route(
     app,
+    "/{path:path}",
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
-    "/{page_slug}/{path:path}",
     "/{page_slug}/{run_slug}-{example_id}/",
 )
-def recipe_page_or_handle(
-    request: Request,
-    page_slug: str,
-    run_slug: str = None,
-    path: str = None,
-    example_id: str = None,
+def recipe_or_handle_or_static(
+    request: Request, page_slug=None, run_slug=None, example_id=None, path=None
 ):
-    try:
-        handle = Handle.objects.get_by_name(page_slug)
-    except Handle.DoesNotExist:
-        import static_pages
+    path = furl(request.url).pathstr.lstrip("/")
 
-        static_content = static_pages.serve(page_slug, path)
-        if not static_content:
-            # render recipe page
-            return render_page(request, page_slug, RecipeTabs.run, example_id)
+    parts = path.strip("/").split("/")
+    if len(parts) in {1, 2}:
+        try:
+            example_id = parts[1].split("-")[-1] or None
+        except IndexError:
+            example_id = None
+        try:
+            return render_recipe_page(request, parts[0], RecipeTabs.run, example_id)
+        except RecipePageNotFound:
+            pass
+        try:
+            return render_handle_page(request, parts[0])
+        except Handle.DoesNotExist:
+            pass
 
-        if static_content.get("redirectUrl"):
-            return RedirectResponse(static_content.get("redirectUrl"))
-
-        if static_content.get("content"):
-            return Response(
-                content=static_content["content"],
-            )
-
-    else:
-        return render_page_for_handle(request, handle)
+    return serve_static_file(request, path)
 
 
-def render_page_for_handle(request: Request, handle: Handle):
+def render_handle_page(request: Request, name: str):
+    handle = Handle.objects.get_by_name(name)
     if handle.has_user:
         with page_wrapper(request):
             user_profile_page(request, handle.user)
@@ -639,7 +614,11 @@ def render_page_for_handle(request: Request, handle: Handle):
         raise HTTPException(status_code=404)
 
 
-def render_page(
+class RecipePageNotFound(Exception):
+    pass
+
+
+def render_recipe_page(
     request: Request, page_slug: str, tab: "RecipeTabs", example_id: str | None
 ):
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
@@ -648,7 +627,7 @@ def render_page(
     try:
         page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
-        raise HTTPException(status_code=404)
+        raise RecipePageNotFound
 
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
@@ -745,7 +724,7 @@ class RecipeTabs(TabData, Enum):
     run = TabData(
         title=f"{icons.run} Run",
         label="",
-        route=recipe_page_or_handle,
+        route=recipe_or_handle_or_static,
     )
     examples = TabData(
         title=f"{icons.example} Examples",

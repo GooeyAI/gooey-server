@@ -161,7 +161,7 @@ class BasePage:
     @classmethod
     @property
     def endpoint(cls) -> str:
-        return f"/v2/{cls.slug_versions[0]}/"
+        return f"/v2/{cls.slug_versions[0]}"
 
     @classmethod
     def current_app_url(

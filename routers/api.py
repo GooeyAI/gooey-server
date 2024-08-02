@@ -43,7 +43,9 @@ from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
-app = APIRouter()
+from routers.custom_api_router import CustomAPIRouter
+
+app = CustomAPIRouter()
 
 
 O = typing.TypeVar("O")
@@ -140,7 +142,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     }
 
     @app.post(
-        os.path.join(endpoint, ""),
+        endpoint,
         response_model=response_model,
         responses={
             HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
@@ -149,15 +151,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id=page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
-    )
-    @app.post(
-        endpoint,
-        response_model=response_model,
-        responses={
-            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
-            **common_errs,
-        },
-        include_in_schema=False,
     )
     def run_api_json(
         request: Request,
@@ -174,16 +167,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         )
         return build_sync_api_response(page=page, result=result, run_id=run_id, uid=uid)
 
-    @app.post(
-        os.path.join(endpoint, "form/"),
-        response_model=response_model,
-        responses={
-            HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
-            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
-            **common_errs,
-        },
-        include_in_schema=False,
-    )
     @app.post(
         os.path.join(endpoint, "form"),
         response_model=response_model,
@@ -209,19 +192,12 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     response_model = AsyncApiResponseModelV3
 
     @app.post(
-        os.path.join(endpoint, "async/"),
+        os.path.join(endpoint, "async"),
         response_model=response_model,
         responses=common_errs,
         operation_id="async__" + page_cls.slug_versions[0],
         name=page_cls.title + " (v3 async)",
         tags=[page_cls.title],
-        status_code=202,
-    )
-    @app.post(
-        os.path.join(endpoint, "async"),
-        response_model=response_model,
-        responses=common_errs,
-        include_in_schema=False,
         status_code=202,
     )
     def run_api_json_async(
@@ -243,15 +219,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response.headers["Access-Control-Expose-Headers"] = "Location"
         return ret
 
-    @app.post(
-        os.path.join(endpoint, "async/form/"),
-        response_model=response_model,
-        responses={
-            HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
-            **common_errs,
-        },
-        include_in_schema=False,
-    )
     @app.post(
         os.path.join(endpoint, "async/form"),
         response_model=response_model,
@@ -281,18 +248,12 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
 
     @app.get(
-        os.path.join(endpoint, "status/"),
+        os.path.join(endpoint, "status"),
         response_model=response_model,
         responses=common_errs,
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
-    )
-    @app.get(
-        os.path.join(endpoint, "status"),
-        response_model=response_model,
-        responses=common_errs,
-        include_in_schema=False,
     )
     def get_run_status(
         run_id: str,
@@ -471,3 +432,8 @@ class BalanceResponse(BaseModel):
 @app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
 def get_balance(user: AppUser = Depends(api_auth_header)):
     return BalanceResponse(balance=user.balance)
+
+
+@app.get("/status")
+async def health():
+    return "OK"

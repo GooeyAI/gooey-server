@@ -318,7 +318,7 @@ def get_web_widget_embed_code(bi: BotIntegration) -> str:
             integration_id=bi.api_integration_id(),
             integration_name=slugify(bi.name) or "untitled",
         ),
-    )
+    ).rstrip("/")
     return dedent(
         f"""
         <div id="gooey-embed"></div>

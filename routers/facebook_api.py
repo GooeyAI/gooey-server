@@ -1,5 +1,4 @@
 import requests
-from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 from furl import furl
 from starlette.background import BackgroundTasks
@@ -13,8 +12,9 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
+from routers.custom_api_router import CustomAPIRouter
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 
 @app.get("/__/fb/connect_whatsapp/")

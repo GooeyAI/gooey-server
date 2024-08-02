@@ -497,7 +497,7 @@ def build_run_vars(convo: Conversation, user_msg_id: str):
 
     bi = convo.bot_integration
     if bi.platform == Platform.WEB:
-        user_msg_id = user_msg_id.lstrip(MSG_ID_PREFIX)
+        user_msg_id = user_msg_id.removeprefix(MSG_ID_PREFIX)
     variables = dict(
         platform=Platform(bi.platform).name,
         integration_id=bi.api_integration_id(),
