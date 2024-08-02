@@ -303,6 +303,13 @@ class BasePage:
             }
         return event
 
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {
+            "x-fern-sdk-group-name": cls.slug_versions[-1].title().replace("-", ""),
+            "x-fern-sdk-method-name": "status",
+        }
+
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gui.get_query_params())
         channel = self.realtime_channel_name(run_id, uid)

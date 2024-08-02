@@ -5,7 +5,7 @@ import os.path
 import typing
 from types import SimpleNamespace
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
@@ -215,6 +215,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         name=page_cls.title + " (v3 async)",
         tags=[page_cls.title],
         status_code=202,
+        openapi_extra=page_cls.get_openapi_extra(),
     )
     @app.post(
         os.path.join(endpoint, "async"),
@@ -227,7 +228,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request: Request,
         response: Response,
         page_request: request_model,
-        example_id: str | None = None,
+        example_id: str | None = Query(default=None),
         user: AppUser = Depends(api_auth_header),
     ):
         ret = _run_api(
@@ -286,7 +287,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
-        openapi_extra={"x-fern-sdk-return-value": "output"},
+        openapi_extra={
+            "x-fern-sdk-return-value": "output",
+            **page_cls.get_openapi_extra(),
+        },
     )
     @app.get(
         os.path.join(endpoint, "status"),
