@@ -1,6 +1,6 @@
 {% if request.user and not request.user.is_anonymous %}
     <a class="pe-2" href="/account">
-        Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number }}
+        Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number or "Anon" }}
     </a>
 {% else %}
     {% if block_incognito %}

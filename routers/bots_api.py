@@ -5,7 +5,7 @@ from threading import Thread
 from typing import Any
 
 import hashids
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse, Response
@@ -22,8 +22,9 @@ from routers.api import (
     AsyncStatusResponseModelV3,
     build_async_api_response,
 )
+from routers.custom_api_router import CustomAPIRouter
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT)
 MSG_ID_PREFIX = "web-"
@@ -78,18 +79,12 @@ class CreateStreamResponse(BaseModel):
 
 
 @app.post(
-    "/v3/integrations/stream/",
+    "/v3/integrations/stream",
     response_model=CreateStreamResponse,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
     tags=["Copilot Integrations"],
     name="Copilot Integrations Create Stream",
-)
-@app.post(
-    "/v3/integrations/stream/",
-    response_model=CreateStreamResponse,
-    responses={402: {}},
-    include_in_schema=False,
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
@@ -172,18 +167,12 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
 
 
 @app.get(
-    "/v3/integrations/stream/{request_id}/",
+    "/v3/integrations/stream/{request_id}",
     response_model=StreamEvent,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream",
     tags=["Copilot Integrations"],
     name="Copilot integrations Stream Response",
-)
-@app.get(
-    "/v3/integrations/stream/{request_id}",
-    response_model=StreamEvent,
-    responses={402: {}},
-    include_in_schema=False,
 )
 def stream_response(request_id: str):
     r = get_redis_cache().getdel(f"gooey/stream-init/v1/{request_id}")

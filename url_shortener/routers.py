@@ -1,12 +1,12 @@
 from django.db.models import F
-from fastapi import APIRouter, Request
+from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.responses import Response
 
+from routers.custom_api_router import CustomAPIRouter
 from url_shortener.models import ShortenedURL
-from url_shortener.tasks import save_click_info
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 
 @app.api_route("/2/{hashid}", methods=["GET", "POST"])
