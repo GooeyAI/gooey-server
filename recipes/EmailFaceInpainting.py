@@ -201,56 +201,56 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_usage_guide(self):
         youtube_video("3C23HwQPITg")
 
-    def render_settings(self):
-        super().render_settings()
-        gui.write(
-            """
-            ### Email settings
-            """
-        )
-
-        gui.checkbox(
-            "Send email",
-            key="should_send_email",
-        )
-        gui.text_input(
-            label="From",
-            key="email_from",
-        )
-        gui.text_input(
-            label="Cc (You can enter multiple emails separated by comma)",
-            key="email_cc",
-            placeholder="john@gmail.com, cathy@gmail.com",
-        )
-        gui.text_input(
-            label="Bcc (You can enter multiple emails separated by comma)",
-            key="email_bcc",
-            placeholder="john@gmail.com, cathy@gmail.com",
-        )
-        gui.text_input(
-            label="Subject",
-            key="email_subject",
-        )
-        gui.checkbox(
-            label="Enable HTML Body",
-            key="email_body_enable_html",
-        )
-        gui.text_area(
-            label="Body (use {{output_images}} to insert the images into the email)",
-            key="email_body",
-        )
-        gui.text_area(
-            label="Fallback Body (in case of failure)",
-            key="fallback_email_body",
-        )
-
-    def render_output(self):
-        super().render_output()
-
-        if gui.session_state.get("email_sent"):
-            gui.write(f"✅ Email sent to {gui.session_state.get('email_address')}")
-        else:
-            gui.div()
+    # def render_settings(self):
+    #     super().render_settings()
+    #     gui.write(
+    #         """
+    #         ### Email settings
+    #         """
+    #     )
+    #
+    #     gui.checkbox(
+    #         "Send email",
+    #         key="should_send_email",
+    #     )
+    #     gui.text_input(
+    #         label="From",
+    #         key="email_from",
+    #     )
+    #     gui.text_input(
+    #         label="Cc (You can enter multiple emails separated by comma)",
+    #         key="email_cc",
+    #         placeholder="john@gmail.com, cathy@gmail.com",
+    #     )
+    #     gui.text_input(
+    #         label="Bcc (You can enter multiple emails separated by comma)",
+    #         key="email_bcc",
+    #         placeholder="john@gmail.com, cathy@gmail.com",
+    #     )
+    #     gui.text_input(
+    #         label="Subject",
+    #         key="email_subject",
+    #     )
+    #     gui.checkbox(
+    #         label="Enable HTML Body",
+    #         key="email_body_enable_html",
+    #     )
+    #     gui.text_area(
+    #         label="Body (use {{output_images}} to insert the images into the email)",
+    #         key="email_body",
+    #     )
+    #     gui.text_area(
+    #         label="Fallback Body (in case of failure)",
+    #         key="fallback_email_body",
+    #     )
+    #
+    # def render_output(self):
+    #     super().render_output()
+    #
+    #     if gui.session_state.get("email_sent"):
+    #         gui.write(f"✅ Email sent to {gui.session_state.get('email_address')}")
+    #     else:
+    #         gui.div()
 
     def run(self, state: dict):
         request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
@@ -263,21 +263,21 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             state["input_image"] = photo_url
             yield from super().run(state)
 
-        output_images = state.get("output_images")
-
-        if request.should_send_email and (output_images or request.fallback_email_body):
-            yield "Sending Email..."
-
-            send_email_via_postmark(
-                from_address=request.email_from,
-                to_address=request.email_address,
-                cc=request.email_cc,
-                bcc=request.email_bcc,
-                subject=request.email_subject,
-                html_body=self._get_email_body(request, output_images),
-                message_stream="gooey-ai-workflows",
-            )
-            state["email_sent"] = True
+        # output_images = state.get("output_images")
+        #
+        # if request.should_send_email and (output_images or request.fallback_email_body):
+        #     yield "Sending Email..."
+        #
+        #     send_email_via_postmark(
+        #         from_address=request.email_from,
+        #         to_address=request.email_address,
+        #         cc=request.email_cc,
+        #         bcc=request.email_bcc,
+        #         subject=request.email_subject,
+        #         html_body=self._get_email_body(request, output_images),
+        #         message_stream="gooey-ai-workflows",
+        #     )
+        #     state["email_sent"] = True
 
         if not photo_url:
             raise ImageNotFound(
