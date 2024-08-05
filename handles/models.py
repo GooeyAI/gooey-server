@@ -28,6 +28,10 @@ BASE_HANDLE_BLACKLIST = [
     "about",
     "blog",
     "sales",
+    "js",
+    "css",
+    "assets",
+    "favicon.ico",
 ]
 COMMON_EMAIL_DOMAINS = [
     "gmail.com",
