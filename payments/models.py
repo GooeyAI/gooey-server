@@ -5,6 +5,7 @@ import typing
 
 import stripe
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from app_users.models import PaymentProvider
@@ -72,10 +73,14 @@ class Subscription(models.Model):
     objects = SubscriptionQuerySet.as_manager()
 
     class Meta:
-        unique_together = ("payment_provider", "external_id")
-        indexes = [
-            models.Index(fields=["plan"]),
+        constraints = [
+            models.UniqueConstraint(
+                fields=["payment_provider", "external_id"],
+                condition=Q(plan__ne=PricingPlan.STARTER.db_value),
+                name="unique_provider_and_subscription_id",
+            )
         ]
+        indexes = [models.Index(fields=["plan"])]
 
     def __str__(self):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
@@ -126,6 +131,9 @@ class Subscription(models.Model):
             return True
 
     def cancel(self):
+        if not self.external_id:
+            return
+
         match self.payment_provider:
             case PaymentProvider.STRIPE:
                 stripe.Subscription.cancel(self.external_id)
@@ -156,16 +164,6 @@ class Subscription(models.Model):
 
     def get_payment_method_summary(self) -> PaymentMethodSummary | None:
         match self.payment_provider:
-            case PaymentProvider.STRIPE:
-                pm = self.stripe_get_default_payment_method()
-                if not pm:
-                    return None
-                return PaymentMethodSummary(
-                    payment_method_type=pm.type,
-                    card_brand=pm.card and pm.card.brand,
-                    card_last4=pm.card and pm.card.last4,
-                    billing_email=(pm.billing_details and pm.billing_details.email),
-                )
             case PaymentProvider.PAYPAL:
                 subscription = paypal.Subscription.retrieve(self.external_id)
                 subscriber = subscription.subscriber
@@ -178,17 +176,32 @@ class Subscription(models.Model):
                     card_last4=source.get("card", {}).get("last_digits"),
                     billing_email=subscriber.email_address,
                 )
+            case PaymentProvider.STRIPE | None:
+                # None is for the case when user doesn't have a subscription, but has their payment
+                # method on Stripe. we can use this to autopay for their addons or in autorecharge
+                pm = self.stripe_get_default_payment_method()
+                if not pm:
+                    return None
+                return PaymentMethodSummary(
+                    payment_method_type=pm.type,
+                    card_brand=pm.card and pm.card.brand,
+                    card_last4=pm.card and pm.card.last4,
+                    billing_email=(pm.billing_details and pm.billing_details.email),
+                )
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
-        if self.payment_provider != PaymentProvider.STRIPE:
-            raise ValueError("Invalid Payment Provider")
+        if self.payment_provider == PaymentProvider.STRIPE and self.external_id:
+            subscription = stripe.Subscription.retrieve(self.external_id)
+            if subscription.default_payment_method:
+                return stripe.PaymentMethod.retrieve(
+                    subscription.default_payment_method
+                )
 
-        subscription = stripe.Subscription.retrieve(self.external_id)
-        if subscription.default_payment_method:
-            return stripe.PaymentMethod.retrieve(subscription.default_payment_method)
-
-        customer = stripe.Customer.retrieve(subscription.customer)
-        if customer.invoice_settings.default_payment_method:
+        customer = self.stripe_get_customer()
+        if (
+            customer.invoice_settings
+            and customer.invoice_settings.default_payment_method
+        ):
             return stripe.PaymentMethod.retrieve(
                 customer.invoice_settings.default_payment_method
             )
@@ -208,12 +221,16 @@ class Subscription(models.Model):
         - Fetch a `metadata_key` invoice that was recently paid
         - Create an invoice with amount=`amount_in_dollars` and `metadata_key` set to true
         """
-        customer_id = self.stripe_get_customer_id()
+        customer = self.stripe_get_customer()
         invoices = stripe.Invoice.list(
-            customer=customer_id,
+            customer=customer.id,
             collection_method="charge_automatically",
         )
-        invoices = [inv for inv in invoices.data if metadata_key in inv.metadata]
+        invoices = [
+            inv
+            for inv in invoices.data
+            if inv.metadata and metadata_key in inv.metadata
+        ]
 
         open_invoice = next((inv for inv in invoices if inv.status == "open"), None)
         if open_invoice:
@@ -232,16 +249,16 @@ class Subscription(models.Model):
         )
 
     def stripe_create_auto_invoice(self, *, amount_in_dollars: int, metadata_key: str):
-        customer_id = self.stripe_get_customer_id()
+        customer = self.stripe_get_customer()
         invoice = stripe.Invoice.create(
-            customer=customer_id,
+            customer=customer.id,
             collection_method="charge_automatically",
             metadata={metadata_key: True},
             auto_advance=False,
             pending_invoice_items_behavior="exclude",
         )
         stripe.InvoiceItem.create(
-            customer=customer_id,
+            customer=customer.id,
             invoice=invoice,
             price_data={
                 "currency": "usd",
@@ -257,11 +274,15 @@ class Subscription(models.Model):
         invoice.finalize_invoice(auto_advance=True)
         return invoice
 
-    def stripe_get_customer_id(self) -> str:
-        if self.payment_provider == PaymentProvider.STRIPE:
-            subscription = stripe.Subscription.retrieve(self.external_id)
+    def stripe_get_customer(self) -> stripe.Customer:
+        if self.payment_provider == PaymentProvider.STRIPE and self.external_id:
+            subscription = stripe.Subscription.retrieve(
+                self.external_id, expand=["customer"]
+            )
             return subscription.customer
-        raise ValueError("Invalid Payment Provider")
+
+        assert self.has_user
+        return self.user.get_or_create_stripe_customer()
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
         from payments.webhooks import StripeWebhookHandler
@@ -286,12 +307,6 @@ class Subscription(models.Model):
         from routers.account import account_route
 
         match self.payment_provider:
-            case PaymentProvider.STRIPE:
-                portal = stripe.billing_portal.Session.create(
-                    customer=self.stripe_get_customer_id(),
-                    return_url=get_app_route_url(account_route),
-                )
-                return portal.url
             case PaymentProvider.PAYPAL:
                 return str(
                     settings.PAYPAL_WEB_BASE_URL
@@ -300,6 +315,12 @@ class Subscription(models.Model):
                     / "connect"
                     / self.external_id
                 )
+            case PaymentProvider.STRIPE | None:
+                portal = stripe.billing_portal.Session.create(
+                    customer=self.stripe_get_customer().id,
+                    return_url=get_app_route_url(account_route),
+                )
+                return portal.url
             case _:
                 raise NotImplementedError(
                     f"Can't get management URL for subscription with provider {self.payment_provider}"
@@ -329,5 +350,9 @@ class Subscription(models.Model):
 
 
 def nearest_choice(choices: list[int], value: int) -> int:
-    # nearest value in choices that is less than or equal to value
-    return min(filter(lambda x: x <= value, choices), key=lambda x: abs(x - value))
+    # nearest choice that is less than or equal to the value (or the minimum choice if value is the least)
+    le_choices = [choice for choice in choices if choice <= value]
+    if not le_choices:
+        return min(choices)
+    else:
+        return min(le_choices, key=lambda x: abs(value - x))
