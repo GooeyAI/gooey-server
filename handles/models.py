@@ -28,6 +28,7 @@ BASE_HANDLE_BLACKLIST = [
     "about",
     "blog",
     "sales",
+    "js",
 ]
 COMMON_EMAIL_DOMAINS = [
     "gmail.com",
