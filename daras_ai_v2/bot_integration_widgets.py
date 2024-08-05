@@ -375,7 +375,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 mode="inline",
                 showSources=True,
                 enablePhotoUpload=False,
-                enableLipsyncVideo=False,
+                autoPlayResponses=True,
                 enableAudioMessage=True,
                 branding=(
                     dict(showPoweredByGooey=True)
@@ -397,8 +397,8 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             config["enableAudioMessage"] = gui.checkbox(
                 "Enable Audio Message", value=config["enableAudioMessage"]
             )
-            config["enableLipsyncVideo"] = gui.checkbox(
-                "Enable Lipsync Video", value=config["enableLipsyncVideo"]
+            config["autoPlayResponses"] = gui.checkbox(
+                "Auto-play responses", value=config["autoPlayResponses"]
             )
             # config["branding"]["showPoweredByGooey"] = gui.checkbox(
             #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
