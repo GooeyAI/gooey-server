@@ -11,6 +11,9 @@ META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Goo
 TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
+# test secret
+leak = "sk-b53e818ad76d62bf81153702dff99dc406dfc36bc0cf5d272b331df6f2e09665"
+
 
 def render():
     heading(title=TITLE, description=DESCRIPTION)
