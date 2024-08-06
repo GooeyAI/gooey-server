@@ -4,9 +4,9 @@ from zipfile import ZipFile, is_zipfile, ZipInfo
 
 import gooey_gui as gui
 import requests
+from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import (
-    Response,
     RedirectResponse,
     HTMLResponse,
     PlainTextResponse,
@@ -38,8 +38,11 @@ def serve_static_file(request: Request, path: str):
 
     # if the path has no extension, try to serve a .html file
     if not os.path.splitext(gcs_path)[1]:
-        html_url = bucket.blob(gcs_path + ".html").public_url
-        r = requests.get(html_url)
+        html_blob = bucket.blob(gcs_path + ".html")
+        if not html_blob.exists():
+            raise HTTPException(status_code=404)
+
+        r = requests.get(html_blob.public_url)
         if r.ok:
             html = r.content.decode()
             # replace sign in button with user's name if logged in
@@ -51,12 +54,13 @@ def serve_static_file(request: Request, path: str):
                 )
             return HTMLResponse(html, status_code=r.status_code)
 
-    url = bucket.blob(gcs_path).public_url
-    r = requests.head(url)
-    if r.ok:
-        return RedirectResponse(url, status_code=HTTP_308_PERMANENT_REDIRECT)
+    blob = bucket.blob(gcs_path)
+    if blob.exists():
+        return RedirectResponse(
+            blob.public_url, status_code=HTTP_308_PERMANENT_REDIRECT
+        )
 
-    return Response(status_code=r.status_code)
+    raise HTTPException(status_code=404)
 
 
 @gui.route(app, "/internal/webflow-upload/")
