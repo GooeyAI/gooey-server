@@ -12,7 +12,28 @@ TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 # test secret
-leak = "sk-b53e818ad76d62bf81153702dff99dc406dfc36bc0cf5d272b331df6f2e09665"
+gooey_like = "sk-b53e818ad76d62bf81153702dff99dc406dfc36bc0cf5d27"
+access_key_id_like = "AKIAIOSFODNN7EXAMPLE"
+secret_key_like = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+api_key_like = "AIzaSyA9w6cC6-BQJdFgWexAEXAMPLEAPIKEY"
+service_account_like = {
+    "type": "service_account",
+    "project_id": "my-project",
+    "private_key_id": "abcd1234abcd1234abcd1234abcd1234abcd1234",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCUabcdEFGHIJKLMNOPQRSTUV123456\n-----END PRIVATE KEY-----\n",
+    "client_email": "my-service-account@my-project.iam.gserviceaccount.com",
+    "client_id": "12345678901234567890",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-service-account%40my-project.iam.gserviceaccount.com",
+}
+subscription_id_like = "12345678-1234-1234-1234-123456789012"
+client_id_like = "abcd1234-abcd-1234-abcd-1234567890ab"
+client_secret_like = "eK7M4sQ~8X9LAbCDExAMPLETK_tKyrQ6Rp_H"
+tenant_id_like = "abcd1234-abcd-1234-abcd-1234567890ab"
+server_api_token_like = "f31c243b-8e2a-40e8-94d4-8c17aa7EXAMPLETOKEN"
+account_api_token_like = "b9b5b6d1-9f7c-4a5a-b87d-2e9ea0EXAMPLETOKEN"
 
 
 def render():
