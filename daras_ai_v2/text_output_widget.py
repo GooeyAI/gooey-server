@@ -1,6 +1,6 @@
 import random
 
-import gooey_ui as st
+import gooey_gui as gui
 
 
 def text_outputs(
@@ -10,12 +10,12 @@ def text_outputs(
     value: str | list = None,
     height: int = 200,
 ):
-    value = value or st.session_state.get(key)
+    value = value or gui.session_state.get(key)
     match value:
         case str():
             text_output(label, height=height, value=value)
         case list():
-            st.write(label)
+            gui.write(label)
             for idx, text in enumerate(value):
                 text_output(
                     label,
@@ -25,11 +25,11 @@ def text_outputs(
                     value=str(text),
                 )
         case _:
-            st.div()
+            gui.div()
 
 
 def text_output(label: str, *, value: str, height: int = 200, idx: int = 0, **kwargs):
-    st.text_area(
+    gui.text_area(
         label,
         help=f"output text {idx + 1} #{random.random()}",
         disabled=True,

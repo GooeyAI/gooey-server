@@ -15,11 +15,14 @@ from time import time
 import numpy as np
 import requests
 from django.db import transaction
+from django.db.models import F
+from django.utils import timezone
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
 
-import gooey_ui as gui
+import gooey_gui as gui
+from app_users.models import AppUser
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -112,8 +115,7 @@ Snippet: """
 
 
 def get_top_k_references(
-    request: DocSearchRequest,
-    is_user_url: bool = True,
+    request: DocSearchRequest, is_user_url: bool = True, current_user: AppUser = None
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
@@ -121,6 +123,7 @@ def get_top_k_references(
     Args:
         request: the document search request
         is_user_url: whether the url is user-uploaded
+        current_user: the current user
 
     Returns:
         the top k documents
@@ -148,8 +151,8 @@ def get_top_k_references(
             EmbeddedFile._meta.get_field("embedding_model").default
         ),
     )
-    embedding_refs: list[EmbeddedFile] = map_parallel(
-        lambda f_url, file_meta: get_or_create_embeddings(
+    embedded_files: list[EmbeddedFile] = map_parallel(
+        lambda f_url, file_meta: get_or_create_embedded_file(
             f_url=f_url,
             file_meta=file_meta,
             max_context_words=request.max_context_words,
@@ -158,20 +161,26 @@ def get_top_k_references(
             selected_asr_model=selected_asr_model,
             embedding_model=embedding_model,
             is_user_url=is_user_url,
+            current_user=current_user,
         ),
         file_urls,
         file_metas,
         max_workers=4,
     )
-    if not embedding_refs:
+    if not embedded_files:
         yield "No embeddings found - skipping search"
         return []
 
-    vespa_file_ids = [ref.vespa_file_id for ref in embedding_refs]
+    yield "Searching knowledge base..."
+
+    vespa_file_ids = [ref.vespa_file_id for ref in embedded_files]
+    EmbeddedFile.objects.filter(id__in=[ref.id for ref in embedded_files]).update(
+        query_count=F("query_count") + 1,
+        last_query_at=timezone.now(),
+    )
     # chunk_count = sum(len(ref.document_ids) for ref in embedding_refs)
     # logger.debug(f"Knowledge base has {len(file_ids)} documents ({chunk_count} chunks)")
 
-    yield "Searching knowledge base..."
     s = time()
     search_result = query_vespa(
         request.search_query,
@@ -361,16 +370,17 @@ def yt_dlp_extract_info(url: str) -> dict:
         return data
 
 
-def get_or_create_embeddings(
+def get_or_create_embedded_file(
+    *,
     f_url: str,
     file_meta: FileMetadata,
-    *,
     max_context_words: int,
     scroll_jump: int,
     google_translate_target: str | None,
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     is_user_url: bool,
+    current_user: AppUser,
 ) -> EmbeddedFile:
     """
     Return Vespa document ids and document tags
@@ -408,7 +418,11 @@ def get_or_create_embeddings(
                 file_meta.save()
                 embedded_file = EmbeddedFile.objects.get_or_create(
                     **lookup,
-                    defaults=dict(metadata=file_meta, vespa_file_id=file_id),
+                    defaults=dict(
+                        metadata=file_meta,
+                        vespa_file_id=file_id,
+                        created_by=current_user,
+                    ),
                 )[0]
                 for ref in refs:
                     ref.embedded_file = embedded_file

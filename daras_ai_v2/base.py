@@ -12,6 +12,7 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
+import gooey_gui as gui
 import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
@@ -25,7 +26,6 @@ from sentry_sdk.tracing import (
 )
 from starlette.requests import Request
 
-import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     SavedRun,
@@ -35,6 +35,7 @@ from bots.models import (
     Workflow,
     RetentionPolicy,
 )
+from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -55,9 +56,6 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.prompt_vars import variables_input
-from daras_ai_v2.query_params import (
-    gooey_get_query_params,
-)
 from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
@@ -76,13 +74,6 @@ from functions.recipe_functions import (
     is_functions_enabled,
     render_called_functions,
 )
-from gooey_ui import (
-    realtime_clear_subs,
-    RedirectException,
-)
-from gooey_ui.components.modal import Modal
-from gooey_ui.components.pills import pill
-from gooey_ui.pubsub import realtime_pull
 from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
@@ -170,7 +161,7 @@ class BasePage:
     @classmethod
     @property
     def endpoint(cls) -> str:
-        return f"/v2/{cls.slug_versions[0]}/"
+        return f"/v2/{cls.slug_versions[0]}"
 
     @classmethod
     def current_app_url(
@@ -182,7 +173,7 @@ class BasePage:
     ) -> str:
         if query_params is None:
             query_params = {}
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gui.get_query_params())
         return cls.app_url(
             tab=tab,
             example_id=example_id,
@@ -276,7 +267,7 @@ class BasePage:
     def sentry_event_set_request(self, event, hint):
         request = event.setdefault("request", {})
         request.setdefault("method", "POST")
-        request["data"] = st.session_state
+        request["data"] = gui.session_state
         if url := request.get("url"):
             f = furl(url)
             request["url"] = str(
@@ -284,7 +275,7 @@ class BasePage:
             )
         else:
             request["url"] = self.app_url(
-                tab=self.tab, query_params=st.get_query_params()
+                tab=self.tab, query_params=gui.get_query_params()
             )
         return event
 
@@ -313,36 +304,36 @@ class BasePage:
         return event
 
     def refresh_state(self):
-        _, run_id, uid = extract_query_params(gooey_get_query_params())
+        _, run_id, uid = extract_query_params(gui.get_query_params())
         channel = self.realtime_channel_name(run_id, uid)
-        output = realtime_pull([channel])[0]
+        output = gui.realtime_pull([channel])[0]
         if output:
-            st.session_state.update(output)
+            gui.session_state.update(output)
 
     def render(self):
         self.setup_sentry()
 
-        if self.get_run_state(st.session_state) == RecipeRunState.running:
+        if self.get_run_state(gui.session_state) == RecipeRunState.running:
             self.refresh_state()
         else:
-            realtime_clear_subs()
+            gui.realtime_clear_subs()
 
         self._user_disabled_check()
         self._check_if_flagged()
 
-        if st.session_state.get("show_report_workflow"):
+        if gui.session_state.get("show_report_workflow"):
             self.render_report_form()
             return
 
         self._render_header()
-        st.newline()
+        gui.newline()
 
-        with st.nav_tabs():
+        with gui.nav_tabs():
             for tab in self.get_tabs():
                 url = self.current_app_url(tab)
-                with st.nav_item(url, active=tab == self.tab):
-                    st.html(tab.title)
-        with st.nav_tab_content():
+                with gui.nav_item(url, active=tab == self.tab):
+                    gui.html(tab.title)
+        with gui.nav_tab_content():
             self.render_selected_tab()
 
     def _render_header(self):
@@ -354,13 +345,13 @@ class BasePage:
             self, current_run, published_run, tab=self.tab
         )
 
-        with st.div(className="d-flex justify-content-between mt-4"):
-            with st.div(className="d-lg-flex d-block align-items-center"):
+        with gui.div(className="d-flex justify-content-between mt-4"):
+            with gui.div(className="d-lg-flex d-block align-items-center"):
                 if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
                     self._render_title(tbreadcrumbs.h1_title)
 
                 if tbreadcrumbs:
-                    with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                    with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                         render_breadcrumbs(
                             tbreadcrumbs,
                             is_api_call=(
@@ -376,7 +367,7 @@ class BasePage:
                 if not is_root_example:
                     self.render_author(author)
 
-            with st.div(className="d-flex align-items-center"):
+            with gui.div(className="d-flex align-items-center"):
                 can_user_edit_run = self.can_user_edit_run(current_run, published_run)
                 has_unpublished_changes = (
                     published_run
@@ -389,8 +380,8 @@ class BasePage:
                 if can_user_edit_run and has_unpublished_changes:
                     self._render_unpublished_changes_indicator()
 
-                with st.div(className="d-flex align-items-start right-action-icons"):
-                    st.html(
+                with gui.div(className="d-flex align-items-start right-action-icons"):
+                    gui.html(
                         """
                     <style>
                     .right-action-icons .btn {
@@ -415,9 +406,9 @@ class BasePage:
         if self.tab != RecipeTabs.run:
             return
         if published_run and published_run.notes:
-            st.write(published_run.notes, line_clamp=2)
+            gui.write(published_run.notes, line_clamp=2)
         elif is_root_example and self.tab != RecipeTabs.integrations:
-            st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
+            gui.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
     def can_user_edit_run(
         self,
@@ -450,14 +441,14 @@ class BasePage:
         )
 
     def _render_title(self, title: str):
-        st.write(f"# {title}")
+        gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
-        with st.div(
+        with gui.div(
             className="d-none d-lg-flex h-100 align-items-center text-muted ms-2"
         ):
-            with st.tag("span", className="d-inline-block"):
-                st.html("Unpublished changes")
+            with gui.tag("span", className="d-inline-block"):
+                gui.html("Unpublished changes")
 
     def _render_social_buttons(self, show_button_text: bool = False):
         button_text = (
@@ -485,8 +476,8 @@ class BasePage:
             or published_run.created_by == self.request.user
         )
 
-        with st.div(className="d-flex justify-content-end"):
-            st.html(
+        with gui.div(className="d-flex justify-content-end"):
+            gui.html(
                 """
                 <style>
                     .save-button-menu .gui-input label p { color: black; }
@@ -500,12 +491,12 @@ class BasePage:
                 """
             )
 
-            pressed_options = is_update_mode and st.button(
+            pressed_options = is_update_mode and gui.button(
                 '<i class="fa-regular fa-ellipsis"></i>',
                 className="mb-0 ms-lg-2",
                 type="tertiary",
             )
-            options_modal = Modal("Options", key="published-run-options-modal")
+            options_modal = gui.Modal("Options", key="published-run-options-modal")
             if pressed_options:
                 options_modal.open()
             if options_modal.is_open():
@@ -521,12 +512,12 @@ class BasePage:
                 save_text = "Update"
             else:
                 save_text = "Save"
-            pressed_save = st.button(
+            pressed_save = gui.button(
                 f'{save_icon} <span class="d-none d-lg-inline">{save_text}</span>',
                 className="mb-0 ms-lg-2 px-lg-4",
                 type="primary",
             )
-            publish_modal = Modal("Publish to", key="publish-modal")
+            publish_modal = gui.Modal("Publish to", key="publish-modal")
             if pressed_save:
                 publish_modal.open()
             if publish_modal.is_open():
@@ -544,21 +535,21 @@ class BasePage:
         *,
         current_run: SavedRun,
         published_run: PublishedRun,
-        modal: Modal,
+        modal: gui.Modal,
         is_update_mode: bool = False,
         redirect_to: str | None = None,
     ):
         if published_run.is_root() and self.is_current_user_admin():
-            with st.div(className="text-danger"):
-                st.write(
+            with gui.div(className="text-danger"):
+                gui.write(
                     "###### You're about to update the root workflow as an admin. "
                 )
-            st.html(
+            gui.html(
                 'If you want to create a new example, press <i class="fa-regular fa-ellipsis"></i> and "Duplicate" instead.'
             )
             published_run_visibility = PublishedRunVisibility.PUBLIC
         else:
-            with st.div(className="visibility-radio"):
+            with gui.div(className="visibility-radio"):
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
@@ -576,7 +567,7 @@ class BasePage:
 
                 published_run_visibility = PublishedRunVisibility(
                     int(
-                        st.radio(
+                        gui.radio(
                             "",
                             options=options,
                             format_func=options.__getitem__,
@@ -584,7 +575,7 @@ class BasePage:
                         )
                     )
                 )
-                st.radio(
+                gui.radio(
                     "",
                     options=[
                         '<span class="text-muted">Anyone at my org (coming soon)</span>'
@@ -593,7 +584,7 @@ class BasePage:
                     checked_by_default=False,
                 )
 
-        with st.div(className="mt-4"):
+        with gui.div(className="mt-4"):
             if is_update_mode:
                 title = published_run.title or self.title
             else:
@@ -605,23 +596,23 @@ class BasePage:
                 else:
                     username = "My"
                 title = f"{username} {recipe_title}"
-            published_run_title = st.text_input(
+            published_run_title = gui.text_input(
                 "##### Title",
                 key="published_run_title",
                 value=title,
             )
-            published_run_notes = st.text_area(
+            published_run_notes = gui.text_area(
                 "##### Notes",
                 key="published_run_notes",
                 value=(
                     published_run.notes
-                    or self.preview_description(st.session_state)
+                    or self.preview_description(gui.session_state)
                     or ""
                 ),
             )
 
-        with st.div(className="mt-4 d-flex justify-content-center"):
-            pressed_save = st.button(
+        with gui.div(className="mt-4 d-flex justify-content-center"):
+            pressed_save = gui.button(
                 f'<i class="fa-regular fa-floppy-disk"></i> Save',
                 className="px-4",
                 type="primary",
@@ -637,7 +628,7 @@ class BasePage:
             try:
                 self._validate_published_run_title(published_run_title)
             except TitleValidationError as e:
-                st.error(str(e))
+                gui.error(str(e))
                 return
 
         if is_update_mode:
@@ -650,7 +641,7 @@ class BasePage:
             if not self._has_published_run_changed(
                 published_run=published_run, **updates
             ):
-                st.error("No changes to publish", icon="⚠️")
+                gui.error("No changes to publish", icon="⚠️")
                 return
             published_run.add_version(user=self.request.user, **updates)
         else:
@@ -662,7 +653,7 @@ class BasePage:
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        raise RedirectException(redirect_to or published_run.get_app_url())
+        raise gui.RedirectException(redirect_to or published_run.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -697,23 +688,23 @@ class BasePage:
         *,
         current_run: SavedRun,
         published_run: PublishedRun,
-        modal: Modal,
+        modal: gui.Modal,
     ):
         is_latest_version = published_run.saved_run == current_run
 
-        with st.div(className="mt-4"):
+        with gui.div(className="mt-4"):
             duplicate_button = None
             save_as_new_button = None
             duplicate_icon = save_as_new_icon = '<i class="fa-regular fa-copy"></i>'
             if is_latest_version:
-                duplicate_button = st.button(
+                duplicate_button = gui.button(
                     f"{duplicate_icon} Duplicate", className="w-100"
                 )
             else:
-                save_as_new_button = st.button(
+                save_as_new_button = gui.button(
                     f"{save_as_new_icon} Save as New", className="w-100"
                 )
-            delete_button = not published_run.is_root() and st.button(
+            delete_button = not published_run.is_root() and gui.button(
                 f'<i class="fa-regular fa-trash"></i> Delete',
                 className="w-100 text-danger",
             )
@@ -725,7 +716,7 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise RedirectException(
+            raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
             )
 
@@ -738,13 +729,15 @@ class BasePage:
                 notes=published_run.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
-            raise RedirectException(self.app_url(example_id=new_pr.published_run_id))
+            raise gui.RedirectException(
+                self.app_url(example_id=new_pr.published_run_id)
+            )
 
-        with st.div(className="mt-4"):
-            st.write("#### Version History", className="mb-4")
+        with gui.div(className="mt-4"):
+            gui.write("#### Version History", className="mb-4")
             self._render_version_history()
 
-        confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
+        confirm_delete_modal = gui.Modal("Confirm Delete", key="confirm-delete-modal")
         if delete_button:
             confirm_delete_modal.open()
         if confirm_delete_modal.is_open():
@@ -759,20 +752,20 @@ class BasePage:
         self,
         *,
         published_run: PublishedRun,
-        modal: Modal,
+        modal: gui.Modal,
     ):
-        st.write(
+        gui.write(
             "Are you sure you want to delete this published run? "
             f"_({published_run.title})_"
         )
-        st.caption("This will also delete all the associated versions.")
-        with st.div(className="d-flex"):
-            confirm_button = st.button(
+        gui.caption("This will also delete all the associated versions.")
+        with gui.div(className="d-flex"):
+            confirm_button = gui.button(
                 '<span class="text-danger">Confirm</span>',
                 type="secondary",
                 className="w-100",
             )
-            cancel_button = st.button(
+            cancel_button = gui.button(
                 "Cancel",
                 type="secondary",
                 className="w-100",
@@ -780,7 +773,7 @@ class BasePage:
 
         if confirm_button:
             published_run.delete()
-            raise RedirectException(self.app_url())
+            raise gui.RedirectException(self.app_url())
 
         if cancel_button:
             modal.close()
@@ -793,12 +786,12 @@ class BasePage:
         ):
             return
 
-        with st.expander("🛠️ Admin Options"):
-            st.write(
+        with gui.expander("🛠️ Admin Options"):
+            gui.write(
                 f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
                 f"(Given that you have set public visibility above)"
             )
-            if st.session_state.get("--toggle-approve-example"):
+            if gui.session_state.get("--toggle-approve-example"):
                 published_run.is_approved_example = (
                     not published_run.is_approved_example
                 )
@@ -807,30 +800,30 @@ class BasePage:
                 btn_text = "🙈 Hide from Examples"
             else:
                 btn_text = "✅ Approve as Example"
-            st.button(btn_text, key="--toggle-approve-example")
+            gui.button(btn_text, key="--toggle-approve-example")
 
             if published_run.is_approved_example:
-                example_priority = st.number_input(
+                example_priority = gui.number_input(
                     "Example Priority (Between 1 to 100 - Default is 1)",
                     min_value=1,
                     max_value=100,
                     value=published_run.example_priority,
                 )
                 if example_priority != published_run.example_priority:
-                    if st.button("Save Priority"):
+                    if gui.button("Save Priority"):
                         published_run.example_priority = example_priority
                         published_run.save(update_fields=["example_priority"])
-                        st.experimental_rerun()
+                        gui.rerun()
 
-            st.write("---")
+            gui.write("---")
 
-            if st.checkbox("⭐️ Save as Root Workflow"):
-                st.write(
+            if gui.checkbox("⭐️ Save as Root Workflow"):
+                gui.write(
                     f"Are you Sure?  \n"
                     f"This will overwrite the contents of {self.app_url()}",
                     className="text-danger",
                 )
-                if st.button("👌 Yes, Update the Root Workflow"):
+                if gui.button("👌 Yes, Update the Root Workflow"):
                     root_run = self.get_root_published_run()
                     root_run.add_version(
                         user=self.request.user,
@@ -839,7 +832,7 @@ class BasePage:
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
                     )
-                    raise RedirectException(self.app_url())
+                    raise gui.RedirectException(self.app_url())
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -857,8 +850,8 @@ class BasePage:
                 "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
                 "Contact us at support@gooey.ai if you think this is a mistake."
             )
-            st.error(msg, icon="😵")
-            st.stop()
+            gui.error(msg, icon="😵")
+            gui.stop()
 
     def get_tabs(self):
         tabs = [RecipeTabs.run, RecipeTabs.examples, RecipeTabs.run_as_api]
@@ -875,7 +868,7 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                input_col, output_col = st.columns([3, 2], gap="medium")
+                input_col, output_col = gui.columns([3, 2], gap="medium")
                 with input_col:
                     submitted = self._render_input_col()
                 with output_col:
@@ -883,7 +876,7 @@ class BasePage:
 
                 self._render_step_row()
 
-                col1, col2 = st.columns(2)
+                col1, col2 = gui.columns(2)
                 with col1:
                     self._render_help()
 
@@ -917,7 +910,7 @@ class BasePage:
         version: PublishedRunVersion,
         older_version: PublishedRunVersion | None,
     ):
-        st.html(
+        gui.html(
             """
             <style>
             .disable-p-margin p {
@@ -931,21 +924,21 @@ class BasePage:
             run_id=version.saved_run.run_id,
             uid=version.saved_run.uid,
         )
-        with st.link(to=url, className="text-decoration-none"):
-            with st.div(
+        with gui.link(to=url, className="text-decoration-none"):
+            with gui.div(
                 className="d-flex mb-4 disable-p-margin",
                 style={"minWidth": "min(100vw, 500px)"},
             ):
-                col1 = st.div(className="me-4")
-                col2 = st.div()
+                col1 = gui.div(className="me-4")
+                col2 = gui.div()
         with col1:
-            with st.div(className="fs-5 mt-1"):
-                st.html('<i class="fa-regular fa-clock"></i>')
+            with gui.div(className="fs-5 mt-1"):
+                gui.html('<i class="fa-regular fa-clock"></i>')
         with col2:
             is_first_version = not older_version
-            with st.div(className="fs-5 d-flex align-items-center"):
-                with st.tag("span"):
-                    st.html(
+            with gui.div(className="fs-5 d-flex align-items-center"):
+                with gui.tag("span"):
+                    gui.html(
                         "Loading...",
                         **render_local_dt_attrs(
                             version.created_at,
@@ -953,14 +946,14 @@ class BasePage:
                         ),
                     )
                 if is_first_version:
-                    with st.tag("span", className="badge bg-secondary px-3 ms-2"):
-                        st.write("FIRST VERSION")
-            with st.div(className="text-muted"):
+                    with gui.tag("span", className="badge bg-secondary px-3 ms-2"):
+                        gui.write("FIRST VERSION")
+            with gui.div(className="text-muted"):
                 if older_version and older_version.title != version.title:
-                    st.write(f"Renamed: {version.title}")
+                    gui.write(f"Renamed: {version.title}")
                 elif not older_version:
-                    st.write(version.title)
-            with st.div(className="mt-1", style={"fontSize": "0.85rem"}):
+                    gui.write(version.title)
+            with gui.div(className="mt-1", style={"fontSize": "0.85rem"}):
                 self.render_author(
                     version.changed_by, image_size="18px", responsive=False
                 )
@@ -970,8 +963,8 @@ class BasePage:
         if not page_clses:
             return
 
-        with st.link(to="/explore/"):
-            st.html("<h2>Related Workflows</h2>")
+        with gui.link(to="/explore/"):
+            gui.html("<h2>Related Workflows</h2>")
 
         def _render(page_cls: typing.Type[BasePage]):
             page = page_cls()
@@ -979,15 +972,20 @@ class BasePage:
             state = root_run.saved_run.to_dict()
             preview_image = page.get_explore_image()
 
-            with st.link(to=page.app_url()):
-                st.html(
+            with gui.link(to=page.app_url(), className="text-decoration-none"):
+                gui.html(
                     # language=html
                     f"""
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                     """
                 )
-                st.markdown(f"###### {root_run.title or page.title}")
-            st.caption(root_run.notes or page.preview_description(state))
+                gui.markdown(f"###### {root_run.title or page.title}")
+                gui.caption(
+                    truncate_text_words(
+                        root_run.notes or page.preview_description(state),
+                        maxlen=210,
+                    )
+                )
 
         grid_layout(4, page_clses, _render)
 
@@ -995,8 +993,8 @@ class BasePage:
         return []
 
     def render_report_form(self):
-        with st.form("report_form"):
-            st.write(
+        with gui.form("report_form"):
+            gui.write(
                 """
                 ## Report a Workflow
                 Generative AI is powerful, but these technologies are also unmoderated. Sometimes the output of workflows can be inappropriate or incorrect. It might be broken or buggy. It might cause copyright issues. It might be inappropriate content.
@@ -1005,49 +1003,49 @@ class BasePage:
                 """
             )
 
-            st.write("#### Your Report")
+            gui.write("#### Your Report")
 
-            st.text_input(
+            gui.text_input(
                 "Workflow",
                 disabled=True,
                 value=self.title,
             )
 
             current_url = self.current_app_url()
-            st.text_input(
+            gui.text_input(
                 "Run URL",
                 disabled=True,
                 value=current_url,
             )
 
-            st.write("Output")
+            gui.write("Output")
             self.render_output()
 
             inappropriate_radio_text = "Inappropriate content"
-            report_type = st.radio(
+            report_type = gui.radio(
                 "Report Type", ("Buggy Output", inappropriate_radio_text, "Other")
             )
-            reason_for_report = st.text_area(
+            reason_for_report = gui.text_area(
                 "Reason for report",
                 placeholder="Tell us why you are reporting this workflow e.g. an error, inappropriate content, very poor output, etc. Please let know what you expected as well. ",
             )
 
-            col1, col2 = st.columns(2)
+            col1, col2 = gui.columns(2)
             with col1:
-                submitted = st.form_submit_button("✅ Submit Report")
+                submitted = gui.form_submit_button("✅ Submit Report")
             with col2:
-                cancelled = st.form_submit_button("❌ Cancel")
+                cancelled = gui.form_submit_button("❌ Cancel")
 
         if cancelled:
-            st.session_state["show_report_workflow"] = False
-            st.experimental_rerun()
+            gui.session_state["show_report_workflow"] = False
+            gui.rerun()
 
         if submitted:
             if not reason_for_report:
-                st.error("Reason for report cannot be empty")
+                gui.error("Reason for report cannot be empty")
                 return
 
-            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+            example_id, run_id, uid = extract_query_params(gui.get_query_params())
 
             send_reported_run_email(
                 user=self.request.user,
@@ -1056,39 +1054,39 @@ class BasePage:
                 recipe_name=self.title,
                 report_type=report_type,
                 reason_for_report=reason_for_report,
-                error_msg=st.session_state.get(StateKeys.error_msg),
+                error_msg=gui.session_state.get(StateKeys.error_msg),
             )
 
             if report_type == inappropriate_radio_text:
                 self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
 
-            # st.success("Reported.")
-            st.session_state["show_report_workflow"] = False
-            st.experimental_rerun()
+            # gui.success("Reported.")
+            gui.session_state["show_report_workflow"] = False
+            gui.rerun()
 
     def _check_if_flagged(self):
-        if not st.session_state.get("is_flagged"):
+        if not gui.session_state.get("is_flagged"):
             return
 
-        st.error("### This Content has been Flagged")
+        gui.error("### This Content has been Flagged")
 
         if self.is_current_user_admin():
-            unflag_pressed = st.button("UnFlag")
+            unflag_pressed = gui.button("UnFlag")
             if not unflag_pressed:
                 return
-            with st.spinner("Removing flag..."):
-                example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+            with gui.spinner("Removing flag..."):
+                example_id, run_id, uid = extract_query_params(gui.get_query_params())
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
-            st.success("Removed flag.", icon="✅")
+            gui.success("Removed flag.", icon="✅")
             sleep(2)
-            st.experimental_rerun()
+            gui.rerun()
         else:
-            st.write(
+            gui.write(
                 "Our support team is reviewing this run. Please come back after some time."
             )
             # Return and Don't render the run any further
-            st.stop()
+            gui.stop()
 
     @classmethod
     def get_runs_from_query_params(
@@ -1104,7 +1102,7 @@ class BasePage:
 
     @classmethod
     def get_current_published_run(cls) -> PublishedRun | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gui.get_query_params())
         return cls.get_pr_from_query_params(example_id, run_id, uid)
 
     @classmethod
@@ -1128,7 +1126,7 @@ class BasePage:
 
     @classmethod
     def get_current_sr(cls) -> SavedRun:
-        return cls.get_sr_from_query_params_dict(gooey_get_query_params())
+        return cls.get_sr_from_query_params_dict(gui.get_query_params())
 
     @classmethod
     def get_sr_from_query_params_dict(cls, query_params) -> SavedRun:
@@ -1239,7 +1237,7 @@ class BasePage:
         pass
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self.render_example(gui.session_state)
 
     def render_form_v2(self):
         pass
@@ -1269,13 +1267,13 @@ class BasePage:
             class_name += "-responsive"
 
         if show_as_link and user and user.handle:
-            linkto = st.link(to=user.handle.get_app_url())
+            linkto = gui.link(to=user.handle.get_app_url())
         else:
-            linkto = st.dummy()
+            linkto = gui.dummy()
 
-        with linkto, st.div(className="d-flex align-items-center"):
+        with linkto, gui.div(className="d-flex align-items-center"):
             if user.photo_url:
-                st.html(
+                gui.html(
                     f"""
                     <style>
                     .{class_name} {{
@@ -1296,12 +1294,12 @@ class BasePage:
                     </style>
                 """
                 )
-                st.image(user.photo_url, className=class_name)
+                gui.image(user.photo_url, className=class_name)
 
             if user.display_name:
                 name_style = {"fontSize": text_size} if text_size else {}
-                with st.tag("span", style=name_style):
-                    st.html(html.escape(user.display_name))
+                with gui.tag("span", style=name_style):
+                    gui.html(html.escape(user.display_name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1315,9 +1313,9 @@ class BasePage:
         )
 
     def render_submit_button(self, key="--submit-1"):
-        with st.div(**self.get_submit_container_props()):
-            st.write("---")
-            col1, col2 = st.columns([2, 1], responsive=False)
+        with gui.div(**self.get_submit_container_props()):
+            gui.write("---")
+            col1, col2 = gui.columns([2, 1], responsive=False)
             col2.node.props[
                 "className"
             ] += " d-flex justify-content-end align-items-center"
@@ -1325,25 +1323,25 @@ class BasePage:
             with col1:
                 self.render_run_cost()
             with col2:
-                submitted = st.button(
+                submitted = gui.button(
                     "🏃 Submit",
                     key=key,
                     type="primary",
-                    # disabled=bool(st.session_state.get(StateKeys.run_status)),
+                    # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
             if not submitted:
                 return False
             try:
                 self.validate_form_v2()
             except AssertionError as e:
-                st.error(str(e))
+                gui.error(str(e))
                 return False
             else:
                 return True
 
     def render_run_cost(self):
         url = self.get_credits_click_url()
-        run_cost = self.get_price_roundoff(st.session_state)
+        run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
 
         cost_note = self.get_cost_note()
@@ -1354,18 +1352,18 @@ class BasePage:
         if additional_notes:
             ret += f" \n{additional_notes}"
 
-        st.caption(ret, line_clamp=1, unsafe_allow_html=True)
+        gui.caption(ret, line_clamp=1, unsafe_allow_html=True)
 
     def _render_step_row(self):
         key = "details-expander"
-        with st.expander("**ℹ️ Details**", key=key):
-            if not st.session_state.get(key):
+        with gui.expander("**ℹ️ Details**", key=key):
+            if not gui.session_state.get(key):
                 return
-            col1, col2 = st.columns([1, 2])
+            col1, col2 = gui.columns([1, 2])
             with col1:
                 self.render_description()
             with col2:
-                placeholder = st.div()
+                placeholder = gui.div()
                 render_called_functions(
                     saved_run=self.get_current_sr(), trigger=FunctionTrigger.pre
                 )
@@ -1375,33 +1373,33 @@ class BasePage:
                     pass
                 else:
                     with placeholder:
-                        st.write("##### 👣 Steps")
+                        gui.write("##### 👣 Steps")
                 render_called_functions(
                     saved_run=self.get_current_sr(), trigger=FunctionTrigger.post
                 )
 
     def _render_help(self):
-        placeholder = st.div()
+        placeholder = gui.div()
         try:
             self.render_usage_guide()
         except NotImplementedError:
             pass
         else:
             with placeholder:
-                st.write(
+                gui.write(
                     """
                     ## How to Use This Recipe
                     """
                 )
 
         key = "discord-expander"
-        with st.expander(
+        with gui.expander(
             f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
             key=key,
         ):
-            if not st.session_state.get(key):
+            if not gui.session_state.get(key):
                 return
-            st.markdown(
+            gui.markdown(
                 """
                 <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
                 <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
@@ -1458,34 +1456,34 @@ class BasePage:
         raise NotImplementedError
 
     def _render_report_button(self):
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gui.get_query_params())
         # only logged in users can report a run (but not examples/default runs)
         if not (self.request.user and run_id and uid):
             return
 
-        reported = st.button(
+        reported = gui.button(
             '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
         )
         if not reported:
             return
 
-        st.session_state["show_report_workflow"] = reported
-        st.experimental_rerun()
+        gui.session_state["show_report_workflow"] = reported
+        gui.rerun()
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_sr(uid=uid, run_id=run_id)
         ref.is_flagged = is_flagged
         ref.save(update_fields=["is_flagged"])
-        st.session_state["is_flagged"] = is_flagged
+        gui.session_state["is_flagged"] = is_flagged
 
     # Functions in every recipe feels like overkill for now, hide it in settings
     functions_in_settings = True
 
     def _render_input_col(self):
         self.render_form_v2()
-        placeholder = st.div()
+        placeholder = gui.div()
 
-        with st.expander("⚙️ Settings"):
+        with gui.expander("⚙️ Settings"):
             if self.functions_in_settings:
                 functions_input(self.request.user)
             self.render_settings()
@@ -1494,8 +1492,8 @@ class BasePage:
             self.render_variables()
 
         submitted = self.render_submit_button()
-        with st.div(style={"textAlign": "right"}):
-            st.caption(
+        with gui.div(style={"textAlign": "right"}):
+            gui.caption(
                 "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
                 "[privacy policy](https://gooey.ai/privacy)._"
             )
@@ -1503,7 +1501,7 @@ class BasePage:
 
     def render_variables(self):
         if not self.functions_in_settings:
-            st.write("---")
+            gui.write("---")
             functions_input(self.request.user)
         variables_input(
             template_keys=self.template_keys, allow_add=is_functions_enabled()
@@ -1522,30 +1520,30 @@ class BasePage:
             return RecipeRunState.starting
 
     def render_deleted_output(self):
-        col1, *_ = st.columns(2)
+        col1, *_ = gui.columns(2)
         with col1:
-            st.error(
+            gui.error(
                 "This data has been deleted as per the retention policy.",
                 icon="🗑️",
                 color="rgba(255, 200, 100, 0.5)",
             )
-            st.newline()
+            gui.newline()
             self._render_output_col(is_deleted=True)
-            st.newline()
+            gui.newline()
             self.render_run_cost()
 
     def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
-        if st.session_state.get(StateKeys.pressed_randomize):
-            st.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
-            st.session_state.pop(StateKeys.pressed_randomize, None)
+        if gui.session_state.get(StateKeys.pressed_randomize):
+            gui.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
+            gui.session_state.pop(StateKeys.pressed_randomize, None)
             submitted = True
 
         if submitted or self.should_submit_after_login():
             self.on_submit()
 
-        run_state = self.get_run_state(st.session_state)
+        run_state = self.get_run_state(gui.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1569,16 +1567,16 @@ class BasePage:
         pass
 
     def _render_failed_output(self):
-        err_msg = st.session_state.get(StateKeys.error_msg)
-        st.error(err_msg, unsafe_allow_html=True)
+        err_msg = gui.session_state.get(StateKeys.error_msg)
+        gui.error(err_msg, unsafe_allow_html=True)
 
     def _render_running_output(self):
-        run_status = st.session_state.get(StateKeys.run_status)
+        run_status = gui.session_state.get(StateKeys.run_status)
         html_spinner(run_status)
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
-        created_at = st.session_state.get("created_at")
+        created_at = gui.session_state.get("created_at")
         if not created_at:
             return
 
@@ -1589,15 +1587,15 @@ class BasePage:
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
-        with st.countdown_timer(
+        with gui.countdown_timer(
             end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
             delay_text="Sorry for the wait. Your run is taking longer than we expected.",
         ):
             if self.is_current_user_owner() and self.request.user.email:
-                st.write(
+                gui.write(
                     f"""We'll email **{self.request.user.email}** when your workflow is done."""
                 )
-            st.write(
+            gui.write(
                 f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
                   for inspiration."""
             )
@@ -1609,21 +1607,21 @@ class BasePage:
         try:
             sr = self.create_new_run(enable_rate_limits=True)
         except ValidationError as e:
-            st.session_state[StateKeys.run_status] = None
-            st.session_state[StateKeys.error_msg] = str(e)
+            gui.session_state[StateKeys.run_status] = None
+            gui.session_state[StateKeys.error_msg] = str(e)
             return
         except RateLimitExceeded as e:
-            st.session_state[StateKeys.run_status] = None
-            st.session_state[StateKeys.error_msg] = e.detail.get("error", "")
+            gui.session_state[StateKeys.run_status] = None
+            gui.session_state[StateKeys.error_msg] = e.detail.get("error", "")
             return
 
         self.call_runner_task(sr)
 
-        raise RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def should_submit_after_login(self) -> bool:
         return (
-            st.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
+            gui.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
             and self.request
             and self.request.user
             and not self.request.user.is_anonymous
@@ -1632,9 +1630,9 @@ class BasePage:
     def create_new_run(
         self, *, enable_rate_limits: bool = False, **defaults
     ) -> SavedRun:
-        st.session_state[StateKeys.run_status] = "Starting..."
-        st.session_state.pop(StateKeys.error_msg, None)
-        st.session_state.pop(StateKeys.run_time, None)
+        gui.session_state[StateKeys.run_status] = "Starting..."
+        gui.session_state.pop(StateKeys.error_msg, None)
+        gui.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
         self.clear_outputs()
 
@@ -1654,7 +1652,7 @@ class BasePage:
         run_id = get_random_doc_id()
 
         parent_example_id, parent_run_id, parent_uid = extract_query_params(
-            gooey_get_query_params()
+            gui.get_query_params()
         )
         parent = self.get_sr_from_query_params(
             parent_example_id, parent_run_id, parent_uid
@@ -1673,8 +1671,8 @@ class BasePage:
         )
 
         # ensure the request is validated
-        state = st.session_state | json.loads(
-            self.RequestModel.parse_obj(st.session_state).json(exclude_unset=True)
+        state = gui.session_state | json.loads(
+            self.RequestModel.parse_obj(gui.session_state).json(exclude_unset=True)
         )
         self.dump_state_to_sr(state, sr)
 
@@ -1699,6 +1697,7 @@ class BasePage:
                 run_id=sr.run_id,
                 uid=sr.uid,
                 channel=self.realtime_channel_name(sr.run_id, sr.uid),
+                unsaved_state=self._unsaved_state(),
             )
             | post_runner_tasks.s()
         )
@@ -1741,28 +1740,28 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return error_msg
 
     def _setup_rng_seed(self):
-        seed = st.session_state.get("seed")
+        seed = gui.session_state.get("seed")
         if not seed:
             return
         gooey_rng.seed(seed)
 
     def clear_outputs(self):
         # clear error msg
-        st.session_state.pop(StateKeys.error_msg, None)
+        gui.session_state.pop(StateKeys.error_msg, None)
         # clear outputs
         for field_name in self.ResponseModel.__fields__:
-            st.session_state.pop(field_name, None)
+            gui.session_state.pop(field_name, None)
 
     def _render_after_output(self):
         self._render_report_button()
 
         if "seed" in self.RequestModel.schema_json():
-            randomize = st.button(
+            randomize = gui.button(
                 '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
             )
             if randomize:
-                st.session_state[StateKeys.pressed_randomize] = True
-                st.experimental_rerun()
+                gui.session_state[StateKeys.pressed_randomize] = True
+                gui.rerun()
 
     @classmethod
     def load_state_from_sr(cls, sr: SavedRun) -> dict:
@@ -1782,7 +1781,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             state.setdefault(k, v)
         return state
 
-    def fields_to_save(self) -> [str]:
+    def fields_to_save(self) -> list[str]:
         # only save the fields in request/response
         return [
             field_name
@@ -1793,6 +1792,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             StateKeys.run_status,
             StateKeys.run_time,
         ]
+
+    def _unsaved_state(self) -> dict[str, typing.Any]:
+        result = {}
+        for field in self.fields_not_to_save():
+            try:
+                result[field] = gui.session_state[field]
+            except KeyError:
+                pass
+        return result
+
+    def fields_not_to_save(self) -> list[str]:
+        return []
 
     def _examples_tab(self):
         allow_hide = self.is_current_user_admin()
@@ -1823,12 +1834,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             created_by=self.request.user,
         )[:50]
         if not published_runs:
-            st.write("No published runs yet")
+            gui.write("No published runs yet")
             return
 
         def _render(pr: PublishedRun):
-            with st.div(className="mb-2", style={"font-size": "0.9rem"}):
-                pill(
+            with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
+                gui.pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
                     className="border border-dark",
@@ -1845,7 +1856,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
 
-        before = gooey_get_query_params().get("updated_at__lt", None)
+        before = gui.get_query_params().get("updated_at__lt", None)
         if before:
             before = datetime.datetime.fromisoformat(before)
         else:
@@ -1858,7 +1869,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )[:25]
         )
         if not run_history:
-            st.write("No history yet")
+            gui.write("No history yet")
             return
 
         grid_layout(3, run_history, self._render_run_preview)
@@ -1867,15 +1878,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             RecipeTabs.history,
             query_params={"updated_at__lt": run_history[-1].to_dict()["updated_at"]},
         )
-        with st.link(to=str(next_url)):
-            st.html(
+        with gui.link(to=str(next_url)):
+            gui.html(
                 # language=HTML
                 f"""<button type="button" class="btn btn-theme">Load More</button>"""
             )
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
-            raise RedirectException(self.get_auth_url(next_url))
+            raise gui.RedirectException(self.get_auth_url(next_url))
 
     def get_auth_url(self, next_url: str | None = None) -> str:
         from routers.root import login
@@ -1890,10 +1901,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         is_latest_version = published_run and published_run.saved_run == saved_run
         tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
-        with st.link(to=saved_run.get_app_url()):
-            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
+        with gui.link(to=saved_run.get_app_url()):
+            with gui.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
-                    pill(
+                    gui.pill(
                         PublishedRunVisibility(
                             published_run.visibility
                         ).get_badge_html(),
@@ -1901,7 +1912,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                         className="border border-dark",
                     )
 
-            st.write(f"#### {tb.h1_title}")
+            gui.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if (
@@ -1909,34 +1920,34 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             and isinstance(updated_at, datetime.datetime)
             and not saved_run.run_status
         ):
-            st.caption("Loading...", **render_local_dt_attrs(updated_at))
+            gui.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
             started_at_text(saved_run.created_at)
             html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
-            st.error(saved_run.error_msg, unsafe_allow_html=True)
+            gui.error(saved_run.error_msg, unsafe_allow_html=True)
 
         return self.render_example(saved_run.to_dict())
 
     def render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-        with st.link(to=published_run.get_app_url()):
-            st.write(f"#### {tb.h1_title}")
+        with gui.link(to=published_run.get_app_url()):
+            gui.write(f"#### {tb.h1_title}")
 
-        with st.div(className="d-flex align-items-center justify-content-between"):
-            with st.div():
+        with gui.div(className="d-flex align-items-center justify-content-between"):
+            with gui.div():
                 updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
-                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
+                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
 
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
                 run_icon = '<i class="fa-regular fa-person-running"></i>'
                 run_count = format_number_with_suffix(published_run.get_run_count())
-                st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+                gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if published_run.notes:
-            st.caption(published_run.notes, line_clamp=2)
+            gui.caption(published_run.notes, line_clamp=2)
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
@@ -1950,28 +1961,28 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
         if published_run.created_by:
-            with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
+            with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
                     published_run.created_by,
                     image_size="20px",
                     text_size="0.9rem",
                 )
 
-        with st.link(to=published_run.get_app_url()):
-            st.write(f"#### {tb.h1_title}")
+        with gui.link(to=published_run.get_app_url()):
+            gui.write(f"#### {tb.h1_title}")
 
-        with st.div(className="d-flex align-items-center justify-content-between"):
-            with st.div():
+        with gui.div(className="d-flex align-items-center justify-content-between"):
+            with gui.div():
                 updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
-                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
+                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
 
             run_icon = '<i class="fa-regular fa-person-running"></i>'
             run_count = format_number_with_suffix(published_run.get_run_count())
-            st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+            gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if published_run.notes:
-            st.caption(published_run.notes, line_clamp=2)
+            gui.caption(published_run.notes, line_clamp=2)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
@@ -1980,7 +1991,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         self.render_example(doc)
 
     def _example_hide_button(self, published_run: PublishedRun):
-        pressed_delete = st.button(
+        pressed_delete = gui.button(
             "🙈️ Hide",
             key=f"delete_example_{published_run.published_run_id}",
             style={"color": "red"},
@@ -1990,11 +2001,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         self.set_hidden(published_run=published_run, hidden=True)
 
     def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
-        with st.spinner("Hiding..."):
+        with gui.spinner("Hiding..."):
             published_run.is_approved_example = not hidden
             published_run.save()
 
-        st.experimental_rerun()
+        gui.rerun()
 
     def render_example(self, state: dict):
         pass
@@ -2036,45 +2047,45 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             / "docs"
         )
 
-        st.markdown(
+        gui.markdown(
             f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>',
             unsafe_allow_html=True,
         )
 
-        st.write("#### 📤 Example Request")
+        gui.write("#### 📤 Example Request")
 
-        include_all = st.checkbox("##### Show all fields")
-        as_async = st.checkbox("##### Run Async")
-        as_form_data = st.checkbox("##### Upload Files via Form Data")
+        include_all = gui.checkbox("##### Show all fields")
+        as_async = gui.checkbox("##### Run Async")
+        as_form_data = gui.checkbox("##### Upload Files via Form Data")
 
         pr = self.get_current_published_run()
         api_url, request_body = self.get_example_request(
-            st.session_state,
+            gui.session_state,
             include_all=include_all,
             pr=pr,
         )
         response_body = self.get_example_response_body(
-            st.session_state, as_async=as_async, include_all=include_all
+            gui.session_state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
             api_url=api_url,
-            request_body=request_body,
+            request_body=request_body | self._unsaved_state(),
             as_form_data=as_form_data,
             as_async=as_async,
         )
-        st.write("")
+        gui.write("")
 
-        st.write("#### 🎁 Example Response")
-        st.json(response_body, expanded=True)
+        gui.write("#### 🎁 Example Response")
+        gui.json(response_body, expanded=True)
 
         if not self.request.user or self.request.user.is_anonymous:
-            st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
+            gui.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
-        st.write("---")
-        with st.tag("a", id="api-keys"):
-            st.write("### 🔐 API keys")
+        gui.write("---")
+        with gui.tag("a", id="api-keys"):
+            gui.write("### 🔐 API keys")
 
         manage_api_keys(self.request.user)
 
@@ -2168,7 +2179,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         include_all: bool = False,
     ) -> dict:
         run_id = get_random_doc_id()
-        created_at = st.session_state.get(
+        created_at = gui.session_state.get(
             StateKeys.created_at, datetime.datetime.utcnow().isoformat()
         )
         web_url = self.app_url(
@@ -2182,7 +2193,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 run_id=run_id,
                 web_url=web_url,
                 created_at=created_at,
-                run_time_sec=st.session_state.get(StateKeys.run_time, 0),
+                run_time_sec=gui.session_state.get(StateKeys.run_time, 0),
                 status="completed",
                 output=output,
             )
@@ -2220,12 +2231,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
 
 def started_at_text(dt: datetime.datetime):
-    with st.div(className="d-flex"):
+    with gui.div(className="d-flex"):
         text = "Started"
-        if seed := st.session_state.get("seed"):
+        if seed := gui.session_state.get("seed"):
             text += f' with seed <span style="color: black;">{seed}</span>'
-        st.caption(text + " on&nbsp;", unsafe_allow_html=True)
-        st.caption(
+        gui.caption(text + " on&nbsp;", unsafe_allow_html=True)
+        gui.caption(
             "...",
             className="text-black",
             **render_local_dt_attrs(dt),
@@ -2235,23 +2246,23 @@ def started_at_text(dt: datetime.datetime):
 def render_output_caption():
     caption = ""
 
-    run_time = st.session_state.get(StateKeys.run_time, 0)
+    run_time = gui.session_state.get(StateKeys.run_time, 0)
     if run_time:
         caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
 
-    if seed := st.session_state.get("seed"):
+    if seed := gui.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '
 
-    updated_at = st.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+    updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
     if updated_at:
         if isinstance(updated_at, str):
             updated_at = datetime.datetime.fromisoformat(updated_at)
         caption += " on&nbsp;"
 
-    with st.div(className="d-flex"):
-        st.caption(caption, unsafe_allow_html=True)
+    with gui.div(className="d-flex"):
+        gui.caption(caption, unsafe_allow_html=True)
         if updated_at:
-            st.caption(
+            gui.caption(
                 "...",
                 className="text-black",
                 **render_local_dt_attrs(

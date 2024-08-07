@@ -2,7 +2,7 @@ import typing
 
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import embeddings_model_selector
@@ -27,32 +27,32 @@ class EmbeddingsPage(BasePage):
         embeddings: list[list[float]]
 
     def render_form_v2(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             embeddings_model_selector(key="selected_model")
 
-        texts = st.session_state.setdefault("texts", [""])
+        texts = gui.session_state.setdefault("texts", [""])
         for i, text in enumerate(texts):
-            col1, col2 = st.columns([8, 3], responsive=False)
+            col1, col2 = gui.columns([8, 3], responsive=False)
             with col1:
-                texts[i] = st.text_area(f"##### `texts[{i}]`", value=text)
+                texts[i] = gui.text_area(f"##### `texts[{i}]`", value=text)
             with col2:
-                if st.button("🗑️", className="mt-5"):
+                if gui.button("🗑️", className="mt-5"):
                     texts.pop(i)
-                    st.experimental_rerun()
-        if st.button("➕ Add"):
+                    gui.rerun()
+        if gui.button("➕ Add"):
             texts.append("")
-            st.experimental_rerun()
+            gui.rerun()
 
     def render_output(self):
-        for i, embedding in enumerate(st.session_state.get("embeddings", [])):
-            st.write(f"##### `embeddings[{i}]`")
-            st.json(embedding, depth=0)
+        for i, embedding in enumerate(gui.session_state.get("embeddings", [])):
+            gui.write(f"##### `embeddings[{i}]`")
+            gui.json(embedding, depth=0)
 
     def render_example(self, state: dict):
-        texts = st.session_state.setdefault("texts", [""])
+        texts = gui.session_state.setdefault("texts", [""])
         for i, text in enumerate(texts):
-            texts[i] = st.text_area(f"`texts[{i}]`", value=text, disabled=True)
+            texts[i] = gui.text_area(f"`texts[{i}]`", value=text, disabled=True)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: EmbeddingsPage.RequestModel = self.RequestModel.parse_obj(state)

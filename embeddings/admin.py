@@ -15,7 +15,9 @@ class EmbeddedFileAdmin(admin.ModelAdmin):
         "google_translate_target",
         "selected_asr_model",
         "vespa_file_id",
+        "query_count",
         "created_at",
+        "last_query_at",
     ]
     search_fields = [
         "url",
@@ -31,6 +33,7 @@ class EmbeddedFileAdmin(admin.ModelAdmin):
         "selected_asr_model",
         "created_at",
         "updated_at",
+        "last_query_at",
     ]
     readonly_fields = [
         "metadata",
@@ -38,7 +41,10 @@ class EmbeddedFileAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "view_embeds",
+        "query_count",
+        "last_query_at",
     ]
+    autocomplete_fields = ["created_by"]
     ordering = ["-created_at"]
 
     @admin.display(description="View Embeds")

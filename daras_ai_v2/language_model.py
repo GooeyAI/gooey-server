@@ -867,6 +867,8 @@ def _run_openai_chat(
     )
     if stream:
         return _stream_openai_chunked(completion, used_model, messages)
+    if not completion or not completion.choices:
+        return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content="")]
     else:
         ret = [choice.message.dict() for choice in completion.choices]
         record_openai_llm_usage(used_model, completion, messages, ret)

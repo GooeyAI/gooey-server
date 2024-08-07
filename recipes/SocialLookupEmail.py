@@ -4,7 +4,7 @@ import typing
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
@@ -87,7 +87,7 @@ class SocialLookupEmailPage(BasePage):
         return DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             
     This recipe takes an email address and a sample email body. It attempts to pull the social profile of the email address and then personlize the email using AI.
@@ -107,7 +107,7 @@ class SocialLookupEmailPage(BasePage):
         youtube_video("lVWQbS_rFaM")
 
     def render_form_v2(self):
-        st.text_input(
+        gui.text_input(
             """
             #### Email Address
             Give us an email address and we'll try to get determine the profile data associated with it
@@ -115,11 +115,11 @@ class SocialLookupEmailPage(BasePage):
             key="email_address",
             placeholder="john@appleseed.com",
         )
-        st.caption(
+        gui.caption(
             "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
         )
 
-        st.text_area(
+        gui.text_area(
             """
             #### Email Prompt
             """,
@@ -130,15 +130,15 @@ class SocialLookupEmailPage(BasePage):
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
-        # st.text_input("URL 1", key="url1")
-        # st.text_input("URL 2", key="url2")
-        # st.text_input("Company", key="company")
-        # st.text_input("Article Title", key="article_title")
-        # st.text_input("Domain", key="domain")
-        # st.text_input("Key Words", key="key_words")
+        # gui.text_input("URL 1", key="url1")
+        # gui.text_input("URL 2", key="url2")
+        # gui.text_input("Company", key="company")
+        # gui.text_input("Article Title", key="article_title")
+        # gui.text_input("Domain", key="domain")
+        # gui.text_input("Key Words", key="key_words")
 
     def validate_form_v2(self):
-        email_address = st.session_state.get("email_address")
+        email_address = gui.session_state.get("email_address")
 
         assert email_address, "Please provide a Prompt and an Email Address"
 
@@ -186,16 +186,16 @@ class SocialLookupEmailPage(BasePage):
             yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        output_text = st.session_state.get("output_text", "")
+        output_text = gui.session_state.get("output_text", "")
         if not output_text:
             return
-        st.write(
+        gui.write(
             """
                 #### Email Body Output 
                 """
         )
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 "",
                 disabled=True,
                 value=text,
@@ -204,24 +204,24 @@ class SocialLookupEmailPage(BasePage):
             )
 
     def render_steps(self):
-        person_data = st.session_state.get("person_data")
+        person_data = gui.session_state.get("person_data")
         if person_data:
-            st.write("**Input Variables**")
-            st.json(_input_variables(st.session_state))
+            gui.write("**Input Variables**")
+            gui.json(_input_variables(gui.session_state))
         else:
-            st.div()
+            gui.div()
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area("Final Prompt", disabled=True, value=final_prompt)
+            gui.text_area("Final Prompt", disabled=True, value=final_prompt)
         else:
-            st.div()
+            gui.div()
 
     def render_example(self, state: dict):
-        st.write("**Email Address**")
-        st.write(state.get("email_address", ""))
-        st.write("**Email Body Output**")
-        st.write(state.get("output_email_body", ""))
+        gui.write("**Email Address**")
+        gui.write(state.get("email_address", ""))
+        gui.write("**Email Body Output**")
+        gui.write(state.get("output_email_body", ""))
 
 
 def _input_variables(state: dict):

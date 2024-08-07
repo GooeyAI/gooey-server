@@ -4,7 +4,7 @@ import typing
 from furl import furl
 from sentry_sdk import capture_exception
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
@@ -37,15 +37,15 @@ def bulk_documents_uploader(
     key: str = "documents",
     accept: typing.Iterable[str] = None,
 ) -> list[str]:
-    st.write(label, className="gui-input")
-    documents = st.session_state.get(key) or []
+    gui.write(label, className="gui-input")
+    documents = gui.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
     custom_key = "__custom_" + key
-    if st.session_state.get(f"__custom_checkbox_{key}"):
-        if not custom_key in st.session_state:
-            st.session_state[custom_key] = "\n".join(documents)
-        widget = st.text_area
+    if gui.session_state.get(f"__custom_checkbox_{key}"):
+        if not custom_key in gui.session_state:
+            gui.session_state[custom_key] = "\n".join(documents)
+        widget = gui.text_area
         kwargs = dict(height=150)
         text_value = widget(
             label,
@@ -60,25 +60,25 @@ def bulk_documents_uploader(
             },
             **kwargs,
         )
-        st.session_state[key] = filter(None, text_value.strip().splitlines())
+        gui.session_state[key] = filter(None, text_value.strip().splitlines())
     else:
-        st.session_state.pop(custom_key, None)
-        st.file_uploader(
+        gui.session_state.pop(custom_key, None)
+        gui.file_uploader(
             label,
             label_visibility="collapsed",
             key=key,
             accept=accept,
             accept_multiple_files=True,
         )
-    st.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
-    documents = st.session_state.setdefault(key, [])
+    gui.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
+    documents = gui.session_state.setdefault(key, [])
     try:
         documents = list(_expand_gdrive_folders(documents))
-        st.session_state[key] = documents
+        gui.session_state[key] = documents
     except Exception as e:
         capture_exception(e)
-        st.error(f"Error expanding gdrive folders: {e}")
-    st.session_state[custom_key] = "\n".join(documents)
+        gui.error(f"Error expanding gdrive folders: {e}")
+    gui.session_state[custom_key] = "\n".join(documents)
     return documents
 
 
@@ -101,7 +101,7 @@ def citation_style_selector():
 
 
 def query_instructions_widget():
-    st.text_area(
+    gui.text_area(
         """
 ###### 👁‍🗨 Conversation Summarization
 These instructions run before the knowledge base is search and should reduce the conversation into a search query most relevant to the user's last message.
@@ -112,7 +112,7 @@ These instructions run before the knowledge base is search and should reduce the
 
 
 def keyword_instructions_widget():
-    st.text_area(
+    gui.text_area(
         """
         ###### 🔑 Keyword Extraction 
         Instructions to create a query for keyword/hybrid BM25 search. Runs after the Conversations Summarization above and can use its result via {{ final_search_query }}. 
@@ -126,8 +126,8 @@ def doc_extract_selector(current_user: AppUser | None):
     from recipes.DocExtract import DocExtractPage
     from daras_ai_v2.workflow_url_input import workflow_url_input
 
-    st.write("###### Create Synthetic Data")
-    st.caption(
+    gui.write("###### Create Synthetic Data")
+    gui.caption(
         f"""
         To improve answer quality, pick a [synthetic data maker workflow]({DocExtractPage.get_root_published_run().get_app_url()}) to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
         """
@@ -135,9 +135,9 @@ def doc_extract_selector(current_user: AppUser | None):
     workflow_url_input(
         page_cls=DocExtractPage,
         key="doc_extract_url",
-        internal_state=st.session_state.setdefault(
+        internal_state=gui.session_state.setdefault(
             "--doc_extract_url:state",
-            {"url": st.session_state.get("doc_extract_url")},
+            {"url": gui.session_state.get("doc_extract_url")},
         ),
         current_user=current_user,
         allow_none=True,
@@ -150,14 +150,14 @@ def doc_search_advanced_settings():
     embeddings_model_selector(key="embedding_model")
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
-    st.slider(
+    gui.slider(
         label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
         key=dense_weight_.name,
         min_value=dense_weight_.field_info.ge,
         max_value=dense_weight_.field_info.le,
     )
 
-    st.number_input(
+    gui.number_input(
         label="""
 ###### Max Citations
 The maximum number of document search citations.
@@ -167,7 +167,7 @@ The maximum number of document search citations.
         max_value=20,
     )
 
-    st.number_input(
+    gui.number_input(
         label="""
 ###### Max Snippet Words
 After a document search, relevant snippets of your documents are returned as results.
@@ -180,7 +180,7 @@ at the cost of being verbose and potentially exhausting input tokens (which can 
         max_value=500,
     )
 
-    st.number_input(
+    gui.number_input(
         label="""
 ###### Snippet Overlap Ratio
 Your knowledge base documents are split into overlapping snippets.

@@ -1,5 +1,5 @@
 import uuid
-import gooey_ui as st
+import gooey_gui as gui
 from google.cloud import texttospeech
 from enum import Enum
 
@@ -25,23 +25,23 @@ gender_dict = {
 
 
 def main():
-    st.write("# GOOGLE Text To Speach")
+    gui.write("# GOOGLE Text To Speach")
 
-    with st.form(key="send_email", clear_on_submit=False):
-        voice_name = st.text_input(label="Voice name", value="en-US-Neural2-F")
-        st.write(
+    with gui.form(key="send_email", clear_on_submit=False):
+        voice_name = gui.text_input(label="Voice name", value="en-US-Neural2-F")
+        gui.write(
             "Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)"
         )
-        text = st.text_area(label="Text input", value="This is a test.")
-        pitch = st.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0)
-        speaking_rate = st.slider(
+        text = gui.text_area(label="Text input", value="This is a test.")
+        pitch = gui.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0)
+        speaking_rate = gui.slider(
             "Speaking rate (1.0 is the normal native speed)",
             min_value=0.25,
             max_value=4.0,
             value=1.0,
         )
-        # voice_gender = st.selectbox("Voice", (voice.name for voice in VoiceGender))
-        submitted = st.form_submit_button("Generate")
+        # voice_gender = gui.selectbox("Voice", (voice.name for voice in VoiceGender))
+        submitted = gui.form_submit_button("Generate")
         if submitted:
             client = texttospeech.TextToSpeechClient(credentials=credentials)
 
@@ -58,23 +58,23 @@ def main():
 
             # Perform the text-to-speech request on the text input with the selected
             # voice parameters and audio file type
-            with st.spinner("Generating audio..."):
+            with gui.spinner("Generating audio..."):
                 response = client.synthesize_speech(
                     input=synthesis_input, voice=voice, audio_config=audio_config
                 )
             if not response:
-                st.error("Error: Audio generation failed")
+                gui.error("Error: Audio generation failed")
                 return
 
-            with st.spinner("Uploading file..."):
+            with gui.spinner("Uploading file..."):
                 audio_url = upload_file_from_bytes(
                     f"google_tts_{uuid.uuid4()}.mp3", response.audio_content
                 )
 
             if not audio_url:
-                st.error("Error: Uploading failed")
+                gui.error("Error: Uploading failed")
                 return
-            st.audio(audio_url)
+            gui.audio(audio_url)
 
 
 main()

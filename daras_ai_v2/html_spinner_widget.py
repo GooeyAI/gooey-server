@@ -1,8 +1,8 @@
-import gooey_ui as st
+import gooey_gui as gui
 
 
 def html_spinner(text: str, scroll_into_view=True):
-    st.html(
+    gui.html(
         # language=HTML
         f"""
 <div class="gooey-spinner-top" style="padding-top: 8px; padding-bottom: 8px;">
@@ -13,7 +13,7 @@ def html_spinner(text: str, scroll_into_view=True):
     )
 
     if scroll_into_view:
-        st.js(
+        gui.js(
             # language=JavaScript
             """document.querySelector(".gooey-spinner-top").scrollIntoView()"""
         )

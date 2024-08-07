@@ -3,7 +3,7 @@ import typing
 import requests
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
@@ -56,7 +56,7 @@ class FunctionsPage(BasePage):
         request: "FunctionsPage.RequestModel",
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
-        query_params = st.get_query_params()
+        query_params = gui.get_query_params()
         run_id = query_params.get("run_id")
         uid = query_params.get("uid")
         tag = f"run_id={run_id}&uid={uid}"
@@ -75,30 +75,32 @@ class FunctionsPage(BasePage):
         response.error = data.get("error")
 
     def render_form_v2(self):
-        st.text_area(
-            "##### " + field_title_desc(self.RequestModel, "code"),
+        gui.code_editor(
+            label="##### " + field_title_desc(self.RequestModel, "code"),
             key="code",
+            language="javascript",
+            height=300,
         )
 
     def render_variables(self):
         variables_input(template_keys=["code"], allow_add=True)
 
     def render_output(self):
-        if error := st.session_state.get("error"):
-            with st.tag("pre", className="bg-danger bg-opacity-25"):
-                st.html(error)
+        if error := gui.session_state.get("error"):
+            with gui.tag("pre", className="bg-danger bg-opacity-25"):
+                gui.html(error)
 
-        if return_value := st.session_state.get("return_value"):
-            st.write("**Return value**")
-            st.json(return_value)
+        if return_value := gui.session_state.get("return_value"):
+            gui.write("**Return value**")
+            gui.json(return_value)
 
-        logs = st.session_state.get("logs")
+        logs = gui.session_state.get("logs")
         if not logs:
             return
 
-        st.write("---")
-        st.write("**Logs**")
-        with st.tag(
+        gui.write("---")
+        gui.write("**Logs**")
+        with gui.tag(
             "pre", style=dict(maxHeight=500, overflowY="auto"), className="bg-light p-2"
         ):
             for i, log in enumerate(logs):
@@ -110,7 +112,7 @@ class FunctionsPage(BasePage):
                     borderClass = "border-top"
                 else:
                     borderClass = ""
-                st.html(
+                gui.html(
                     log.get("message"),
                     className=f"d-block py-1 {borderClass} {textClass}",
                 )

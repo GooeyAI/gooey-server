@@ -232,6 +232,8 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
+
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")

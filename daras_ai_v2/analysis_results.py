@@ -4,14 +4,14 @@ from functools import partial
 
 from django.db.models import IntegerChoices
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import BotIntegration, Message
 from daras_ai_v2.base import RecipeTabs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
-from gooey_ui import QueryParamsRedirectException
+from gooey_gui import QueryParamsRedirectException
 from gooeysite.custom_filters import related_json_field_summary
 from recipes.BulkRunner import list_view_editor
 from recipes.VideoBots import VideoBotsPage
@@ -41,7 +41,7 @@ def render_analysis_results_page(
     render_title_breadcrumb_share(bi, current_url, current_user)
 
     if title:
-        st.write(title)
+        gui.write(title)
 
     if graphs_json:
         graphs = json.loads(graphs_json)
@@ -55,40 +55,40 @@ def render_analysis_results_page(
     except Message.DoesNotExist:
         results = None
     if not results:
-        with st.center():
-            st.error("No analysis results found")
+        with gui.center():
+            gui.error("No analysis results found")
         return
 
-    with st.div(className="pb-5 pt-3"):
+    with gui.div(className="pb-5 pt-3"):
         grid_layout(2, graphs, partial(render_graph_data, bi, results), separator=False)
 
-    st.checkbox("🔄 Refresh every 10s", key="autorefresh")
+    gui.checkbox("🔄 Refresh every 10s", key="autorefresh")
 
-    with st.expander("✏️ Edit"):
-        title = st.text_area("##### Title", value=title)
+    with gui.expander("✏️ Edit"):
+        title = gui.text_area("##### Title", value=title)
 
-        st.session_state.setdefault("selected_graphs", graphs)
+        gui.session_state.setdefault("selected_graphs", graphs)
         selected_graphs = list_view_editor(
             add_btn_label="➕ Add a Graph",
             key="selected_graphs",
             render_inputs=partial(render_inputs, results),
         )
 
-        with st.center():
-            if st.button("✅ Update"):
+        with gui.center():
+            if gui.button("✅ Update"):
                 _on_press_update(title, selected_graphs)
 
 
 def render_inputs(results: dict, key: str, del_key: str, d: dict):
-    ocol1, ocol2 = st.columns([11, 1], responsive=False)
+    ocol1, ocol2 = gui.columns([11, 1], responsive=False)
     with ocol1:
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = gui.columns(3)
     with ocol2:
         ocol2.node.props["style"] = dict(paddingTop="2rem")
         del_button(del_key)
 
     with col1:
-        d["key"] = st.selectbox(
+        d["key"] = gui.selectbox(
             label="##### Key",
             options=results.keys(),
             key=f"{key}_key",
@@ -96,7 +96,7 @@ def render_inputs(results: dict, key: str, del_key: str, d: dict):
         )
     with col2:
         col2.node.props["style"] = dict(paddingTop="0.45rem")
-        d["graph_type"] = st.selectbox(
+        d["graph_type"] = gui.selectbox(
             label="###### Graph Type",
             options=[g.value for g in GraphType],
             format_func=lambda x: GraphType(x).label,
@@ -105,7 +105,7 @@ def render_inputs(results: dict, key: str, del_key: str, d: dict):
         )
     with col3:
         col3.node.props["style"] = dict(paddingTop="0.45rem")
-        d["data_selection"] = st.selectbox(
+        d["data_selection"] = gui.selectbox(
             label="###### Data Selection",
             options=[d.value for d in DataSelection],
             format_func=lambda x: DataSelection(x).label,
@@ -115,10 +115,10 @@ def render_inputs(results: dict, key: str, del_key: str, d: dict):
 
 
 def _autorefresh_script():
-    if not st.session_state.get("autorefresh"):
+    if not gui.session_state.get("autorefresh"):
         return
-    st.session_state.pop("__cache__", None)
-    st.js(
+    gui.session_state.pop("__cache__", None)
+    gui.js(
         # language=JavaScript
         """
             setTimeout(() => {
@@ -139,23 +139,23 @@ def render_title_breadcrumb_share(
     else:
         run_title = bi.saved_run.page_title  # this is mostly for backwards compat
         query_params = dict(run_id=bi.saved_run.run_id, uid=bi.saved_run.uid)
-    with st.div(className="d-flex justify-content-between mt-4"):
-        with st.div(className="d-lg-flex d-block align-items-center"):
-            with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                with st.breadcrumbs():
+    with gui.div(className="d-flex justify-content-between mt-4"):
+        with gui.div(className="d-lg-flex d-block align-items-center"):
+            with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                with gui.breadcrumbs():
                     metadata = VideoBotsPage.workflow.get_or_create_metadata()
-                    st.breadcrumb_item(
+                    gui.breadcrumb_item(
                         metadata.short_title,
                         link_to=VideoBotsPage.app_url(),
                         className="text-muted",
                     )
                     if not (bi.published_run_id and bi.published_run.is_root()):
-                        st.breadcrumb_item(
+                        gui.breadcrumb_item(
                             run_title,
                             link_to=VideoBotsPage.app_url(**query_params),
                             className="text-muted",
                         )
-                    st.breadcrumb_item(
+                    gui.breadcrumb_item(
                         "Integrations",
                         link_to=VideoBotsPage.app_url(
                             **query_params,
@@ -170,8 +170,8 @@ def render_title_breadcrumb_share(
                 show_as_link=current_user and VideoBotsPage.is_user_admin(current_user),
             )
 
-        with st.div(className="d-flex align-items-center"):
-            with st.div(className="d-flex align-items-start right-action-icons"):
+        with gui.div(className="d-flex align-items-center"):
+            with gui.div(className="d-flex align-items-start right-action-icons"):
                 copy_to_clipboard_button(
                     f'<i class="fa-regular fa-link"></i> <span class="d-none d-lg-inline"> Copy Link</span>',
                     value=current_url,
@@ -197,7 +197,7 @@ def _on_press_update(title: str, selected_graphs: list[dict]):
     raise QueryParamsRedirectException(dict(title=title, graphs=graphs_json))
 
 
-@st.cache_in_session_state
+@gui.cache_in_session_state
 def fetch_analysis_results(bi: BotIntegration) -> dict:
     msgs = Message.objects.filter(
         conversation__bot_integration=bi,
@@ -217,7 +217,7 @@ def fetch_analysis_results(bi: BotIntegration) -> dict:
 
 def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
     key = graph_data["key"]
-    st.write(f"##### {key}")
+    gui.write(f"##### {key}")
     obj_key = f"analysis_result__{key}"
 
     if graph_data["data_selection"] == DataSelection.last.value:
@@ -227,7 +227,7 @@ def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
             .latest()
         )
         if not latest_msg:
-            st.write("No analysis results found")
+            gui.write("No analysis results found")
             return
         values = [[latest_msg.analysis_result.get(key), 1]]
     elif graph_data["data_selection"] == DataSelection.convo_last.value:
@@ -249,7 +249,7 @@ def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
             for val in values:
                 if not val:
                     continue
-                st.write(val[0])
+                gui.write(val[0])
         case GraphType.table_count.value:
             render_table_count(values)
         case GraphType.bar_count.value:
@@ -261,8 +261,8 @@ def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
 
 
 def render_table_count(values):
-    st.div(className="p-1")
-    st.data_table(
+    gui.div(className="p-1")
+    gui.data_table(
         [["Value", "Count"]] + [[result[0], result[1]] for result in values],
     )
 
@@ -318,4 +318,4 @@ def render_data_in_plotly(*data):
             dragmode="pan",
         ),
     )
-    st.plotly_chart(fig)
+    gui.plotly_chart(fig)

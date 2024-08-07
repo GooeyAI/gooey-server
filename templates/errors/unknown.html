@@ -1,8 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Doh!{% endblock title %}
+
 {% block content %}
-<div style="text-align: center; margin: 2rem 0;">
-    <h1>
-        Uh oh... Something went wrong
-    </h1>
-    <img src="https://media.tenor.com/1Wlr9trTPLwAAAAd/robotically-robot.gif" height="404" alt="404">
-</div>
+    <div style="text-align: center; margin: 2rem 0;">
+        <h1>
+            Uh oh... Something went wrong
+        </h1>
+        {% if error %}
+            <details class="p-4">
+                <summary>Stats For Nerds</summary>
+                <div class="container border p-2">
+                    {% if github_url %}
+                        You look smart! Help us fix this issue on
+                        <a href="{{ github_url }}">
+                            <img class="mb-1" width="20px" height="20px" src="https://github.com/favicon.ico">
+                            GitHub
+                        </a>.
+                    {% endif %}
+                    <pre class="text-danger">{{ error }}</pre>
+                    <pre class="text-start m-4 bg-light">{{ traceback }}</pre>
+                </div>
+            </details>
+        {% endif %}
+        <img src="https://media.tenor.com/1Wlr9trTPLwAAAAd/robotically-robot.gif" height="404" alt="404">
+    </div>
 {% endblock %}

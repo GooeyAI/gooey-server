@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Any
 
 import stripe
+from furl import furl
 
 from daras_ai_v2 import paypal, settings
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
@@ -192,7 +193,7 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
-        contact_us_link=f"mailto:{settings.SALES_EMAIL}",
+        contact_us_link=str(furl("mailto:") / settings.SALES_EMAIL),
         title_override="Let's talk",
         caption_override="",
     )

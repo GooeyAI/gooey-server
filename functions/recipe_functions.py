@@ -5,7 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -98,15 +98,15 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
             called_fn.function_run.parent_published_run(),
         )
         title = (tb.published_title and tb.published_title.title) or tb.h1_title
-        st.write(f"###### 🧩 Called [{title}]({called_fn.function_run.get_app_url()})")
+        gui.write(f"###### 🧩 Called [{title}]({called_fn.function_run.get_app_url()})")
         return_value = called_fn.function_run.state.get("return_value")
         if return_value is not None:
-            st.json(return_value)
-            st.newline()
+            gui.json(return_value)
+            gui.newline()
 
 
 def is_functions_enabled(key="functions") -> bool:
-    return bool(st.session_state.get(f"--enable-{key}"))
+    return bool(gui.session_state.get(f"--enable-{key}"))
 
 
 def functions_input(current_user: AppUser, key="functions"):
@@ -117,7 +117,7 @@ def functions_input(current_user: AppUser, key="functions"):
         from daras_ai_v2.workflow_url_input import workflow_url_input
         from recipes.Functions import FunctionsPage
 
-        col1, col2 = st.columns([2, 10], responsive=False)
+        col1, col2 = gui.columns([2, 10], responsive=False)
         with col1:
             col1.node.props["className"] += " pt-1"
             d["trigger"] = enum_selector(
@@ -135,20 +135,20 @@ def functions_input(current_user: AppUser, key="functions"):
                 current_user=current_user,
             )
 
-    if st.checkbox(
+    if gui.checkbox(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
         key=f"--enable-{key}",
-        value=key in st.session_state,
+        value=key in gui.session_state,
     ):
-        st.session_state.setdefault(key, [{}])
+        gui.session_state.setdefault(key, [{}])
         list_view_editor(
             add_btn_label="➕ Add Function",
             key=key,
             render_inputs=render_function_input,
         )
-        st.write("---")
+        gui.write("---")
     else:
-        st.session_state.pop(key, None)
+        gui.session_state.pop(key, None)
 
 
 def json_to_pdf(filename: str, data: str) -> str:

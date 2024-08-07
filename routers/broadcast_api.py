@@ -1,7 +1,6 @@
 import typing
 
 from django.db.models import Q
-from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
@@ -11,8 +10,9 @@ from auth.token_authentication import api_auth_header
 from bots.models import BotIntegration
 from bots.tasks import send_broadcast_msgs_chunked
 from recipes.VideoBots import ReplyButton, VideoBotsPage
+from routers.custom_api_router import CustomAPIRouter
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 
 class BotBroadcastFilters(BaseModel):

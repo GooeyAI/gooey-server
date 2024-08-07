@@ -4,7 +4,7 @@ from enum import Enum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -64,7 +64,7 @@ class Text2AudioPage(BasePage):
         return DEFAULT_TEXT2AUDIO_META_IMG
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             Describe the audio that you'd like to generate.
@@ -73,18 +73,18 @@ class Text2AudioPage(BasePage):
             placeholder="Iron man",
         )
 
-        st.write("#### 🧨 Audio Model")
+        gui.write("#### 🧨 Audio Model")
         enum_multiselect(
             Text2AudioModels,
             key="selected_models",
         )
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Please provide a prompt"
-        assert st.session_state["selected_models"], "Please select at least one model"
+        assert gui.session_state["text_prompt"], "Please provide a prompt"
+        assert gui.session_state["selected_models"], "Please select at least one model"
 
     def render_settings(self):
-        st.slider(
+        gui.slider(
             label="""
             ##### ⏱️ Audio Duration (sec)
             """,
@@ -130,12 +130,12 @@ class Text2AudioPage(BasePage):
             )
 
     def render_output(self):
-        _render_output(st.session_state)
+        _render_output(gui.session_state)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
+            gui.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
         with col2:
             _render_output(state)
 
@@ -148,6 +148,6 @@ def _render_output(state):
     for key in selected_models:
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
-            st.audio(
+            gui.audio(
                 audio, caption=Text2AudioModels[key].value, show_download_button=True
             )

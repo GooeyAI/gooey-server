@@ -126,6 +126,7 @@ class TwilioVoice(BotInterface):
         text: str = None,
         audio_url: str = None,
     ):
+
         self.convo = convo
 
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
@@ -146,9 +147,6 @@ class TwilioVoice(BotInterface):
             self.input_type = "interactive"
 
         super().__init__()
-
-        self.use_gooey_asr = self.saved_run.state.get("asr_model")
-        self.use_gooey_tts = self.saved_run.state.get("tts_provider")
 
     def get_input_text(self) -> str | None:
         return self._text

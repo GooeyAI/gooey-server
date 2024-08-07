@@ -10,7 +10,7 @@ import typing_extensions
 from django.db.models import F
 from furl import furl
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
@@ -297,7 +297,7 @@ def translation_language_selector(
     **kwargs,
 ) -> str | None:
     if not model:
-        st.session_state[key] = None
+        gui.session_state[key] = None
         return
 
     if model == TranslationModels.google:
@@ -308,7 +308,7 @@ def translation_language_selector(
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -351,7 +351,7 @@ def google_translate_language_selector(
     """
     languages = google_translate_target_languages()
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
@@ -408,12 +408,10 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
-    import langcodes
-
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
-        st.session_state[key] = forced_lang
+        gui.session_state[key] = forced_lang
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
@@ -421,18 +419,14 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_val = st.session_state.get(key)
-    if old_val and old_val not in options:
-        old_val_lang = langcodes.Language.get(old_val).language
-        for opt in options:
-            try:
-                if opt and langcodes.Language.get(opt).language == old_val_lang:
-                    st.session_state[key] = opt
-                    break
-            except langcodes.LanguageTagError:
-                pass
+    old_lang = gui.session_state.get(key)
+    if old_lang:
+        try:
+            gui.session_state[key] = normalised_lang_in_collection(old_lang, options)
+        except UserError:
+            gui.session_state[key] = None
 
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -584,13 +578,26 @@ def run_google_translate(
 def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
     import langcodes
 
-    for candidate in collection:
-        if langcodes.get(candidate).language == langcodes.get(target).language:
-            return candidate
-
-    raise UserError(
+    ERROR = UserError(
         f"Unsupported language: {target!r} | must be one of {set(collection)}"
     )
+
+    if target in collection:
+        return target
+
+    try:
+        target_lan = langcodes.Language.get(target).language
+    except langcodes.LanguageTagError:
+        raise ERROR
+
+    for candidate in collection:
+        try:
+            if candidate and langcodes.Language.get(candidate).language == target_lan:
+                return candidate
+        except langcodes.LanguageTagError:
+            pass
+
+    raise ERROR
 
 
 def _translate_text(
@@ -1069,7 +1076,15 @@ def iterate_subtitles(
         yield segment_start, segment_end, segment_text
 
 
-def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker: str):
+INFINITY_SECONDS = 99 * 3600 + 59 * 60 + 59  # 99:59:59 in seconds
+
+
+def format_timestamp(
+    seconds: float | None, always_include_hours: bool, decimal_marker: str
+):
+    if seconds is None:
+        # treat None as end of time
+        seconds = INFINITY_SECONDS
     assert seconds >= 0, "non-negative timestamp expected"
     milliseconds = round(seconds * 1000.0)
 

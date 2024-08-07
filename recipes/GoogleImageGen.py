@@ -3,7 +3,7 @@ import typing
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -93,7 +93,7 @@ class GoogleImageGenPage(BasePage):
         ]
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
         This workflow creates unique, relevant images to help your site rank well for a given search query.
 
@@ -178,7 +178,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             )
 
     def render_form_v2(self):
-        st.text_input(
+        gui.text_input(
             """
             #### 🔎 Google Image Search
             Type a query you'd use in [Google image search](https://images.google.com/?gws_rd=ssl)
@@ -186,13 +186,13 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             key="search_query",
         )
         model_selector(Img2ImgModels)
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             Describe how you want to edit the photo in words
             """,
             key="text_prompt",
-            disabled=st.session_state.get("selected_model") is None,
+            disabled=gui.session_state.get("selected_model") is None,
         )
 
     def render_usage_guide(self):
@@ -203,29 +203,31 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         serp_search_location_selectbox()
 
     def render_output(self):
-        out_imgs = st.session_state.get("output_images")
+        out_imgs = gui.session_state.get("output_images")
         if out_imgs:
             for img in out_imgs:
-                st.image(img, caption="#### Generated Image", show_download_button=True)
+                gui.image(
+                    img, caption="#### Generated Image", show_download_button=True
+                )
         else:
-            st.div()
+            gui.div()
 
     def render_steps(self):
-        image_urls = st.session_state.get("image_urls")
+        image_urls = gui.session_state.get("image_urls")
         if image_urls:
-            st.write("**Image URLs**")
-            st.json(image_urls, expanded=False)
+            gui.write("**Image URLs**")
+            gui.json(image_urls, expanded=False)
         else:
-            st.div()
+            gui.div()
 
-        selected_image = st.session_state.get("selected_image")
+        selected_image = gui.session_state.get("selected_image")
         if selected_image:
-            st.image(selected_image, caption="Selected Image")
+            gui.image(selected_image, caption="Selected Image")
         else:
-            st.div()
+            gui.div()
 
     def render_example(self, state: dict):
-        st.write(
+        gui.write(
             f"""
             **Google Search Query** `{state.get("search_query", '')}` \\
             **Prompt** `{state.get("text_prompt", '')}`
@@ -234,7 +236,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         out_imgs = state.get("output_images")
         if out_imgs:
-            st.image(out_imgs[0], caption="Generated Image")
+            gui.image(out_imgs[0], caption="Generated Image")
 
     def preview_description(self, state: dict) -> str:
         return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."

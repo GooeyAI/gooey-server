@@ -1,6 +1,6 @@
 import typing
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import (
     SavedRun,
     PublishedRun,
@@ -32,7 +32,7 @@ class TitleBreadCrumbs(typing.NamedTuple):
 
 
 def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = False):
-    st.html(
+    gui.html(
         """
         <style>
         @media (min-width: 1024px) {
@@ -55,21 +55,21 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
         # avoid empty space when breadcrumbs are not rendered
         return
 
-    with st.breadcrumbs():
+    with gui.breadcrumbs():
         if breadcrumbs.root_title:
-            st.breadcrumb_item(
+            gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
                 link_to=breadcrumbs.root_title.url,
                 className="text-muted",
             )
         if breadcrumbs.published_title:
-            st.breadcrumb_item(
+            gui.breadcrumb_item(
                 breadcrumbs.published_title.title,
                 link_to=breadcrumbs.published_title.url,
             )
 
         if is_api_call:
-            st.caption("(API)")
+            gui.caption("(API)")
 
 
 def get_title_breadcrumbs(

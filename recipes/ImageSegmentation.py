@@ -5,7 +5,7 @@ import PIL
 import numpy as np
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
-import gooey_ui as st
+import gooey_gui as gui
 from pydantic import BaseModel
 
 from bots.models import Workflow
@@ -85,7 +85,7 @@ class ImageSegmentationPage(BasePage):
         ]
 
     def render_form_v2(self):
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Input Photo
             Give us a photo of anything
@@ -95,7 +95,7 @@ class ImageSegmentationPage(BasePage):
         )
 
     def validate_form_v2(self):
-        input_image = st.session_state.get("input_image")
+        input_image = gui.session_state.get("input_image")
         assert input_image, "Please provide an Input Photo"
 
     def render_settings(self):
@@ -105,7 +105,7 @@ class ImageSegmentationPage(BasePage):
             key="selected_model",
         )
 
-        st.slider(
+        gui.slider(
             """
             #### Edge Threshold
             Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
@@ -115,63 +115,63 @@ class ImageSegmentationPage(BasePage):
             key="mask_threshold",
         )
 
-        st.write(
+        gui.write(
             """
             #### Fix Skewed Perspective
             
             Automatically transform the perspective of the image to make objects look like a perfect rectangle  
             """
         )
-        st.checkbox(
+        gui.checkbox(
             "Fix Skewed Perspective",
             key="rect_persepective_transform",
         )
 
-        st.write(
+        gui.write(
             """
             #### Add reflections
             """
         )
-        col1, _ = st.columns(2)
+        col1, _ = gui.columns(2)
         with col1:
-            st.slider("Reflection Opacity", key="reflection_opacity")
+            gui.slider("Reflection Opacity", key="reflection_opacity")
 
-        # st.write(
+        # gui.write(
         #     """
         #     ##### Add Drop shadow
         #     """
         # )
-        # col1, _ = st.columns(2)
+        # col1, _ = gui.columns(2)
         # with col1:
-        #     st.slider("Shadow ", key="reflection_opacity")
+        #     gui.slider("Shadow ", key="reflection_opacity")
 
-        st.write(
+        gui.write(
             """
             #### Object Repositioning Settings
             """
         )
 
-        st.write("How _big_ should the object look?")
-        col1, _ = st.columns(2)
+        gui.write("How _big_ should the object look?")
+        col1, _ = gui.columns(2)
         with col1:
-            obj_scale = st.slider(
+            obj_scale = gui.slider(
                 "Scale",
                 min_value=0.1,
                 max_value=1.0,
                 key="obj_scale",
             )
 
-        st.write("_Where_ would you like to place the object in the scene?")
-        col1, col2 = st.columns(2)
+        gui.write("_Where_ would you like to place the object in the scene?")
+        col1, col2 = gui.columns(2)
         with col1:
-            pos_x = st.slider(
+            pos_x = gui.slider(
                 "Position X",
                 min_value=0.0,
                 max_value=1.0,
                 key="obj_pos_x",
             )
         with col2:
-            pos_y = st.slider(
+            pos_y = gui.slider(
                 "Position Y",
                 min_value=0.0,
                 max_value=1.0,
@@ -298,61 +298,61 @@ class ImageSegmentationPage(BasePage):
         yield
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self.render_example(gui.session_state)
 
     def render_steps(self):
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = gui.columns(4)
 
         with col1:
-            input_image = st.session_state.get("input_image")
+            input_image = gui.session_state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo")
+                gui.image(input_image, caption="Input Photo")
             else:
-                st.div()
+                gui.div()
 
         with col2:
-            output_image = st.session_state.get("output_image")
+            output_image = gui.session_state.get("output_image")
             if output_image:
-                st.image(output_image, caption=f"Segmentation Mask")
+                gui.image(output_image, caption=f"Segmentation Mask")
             else:
-                st.div()
+                gui.div()
 
         with col3:
-            resized_image = st.session_state.get("resized_image")
+            resized_image = gui.session_state.get("resized_image")
             if resized_image:
-                st.image(resized_image, caption=f"Resized Image")
+                gui.image(resized_image, caption=f"Resized Image")
             else:
-                st.div()
+                gui.div()
 
-            resized_mask = st.session_state.get("resized_mask")
+            resized_mask = gui.session_state.get("resized_mask")
             if resized_mask:
-                st.image(resized_mask, caption=f"Resized Mask")
+                gui.image(resized_mask, caption=f"Resized Mask")
             else:
-                st.div()
+                gui.div()
 
         with col4:
-            cutout_image = st.session_state.get("cutout_image")
+            cutout_image = gui.session_state.get("cutout_image")
             if cutout_image:
-                st.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption=f"Cutout Image")
             else:
-                st.div()
+                gui.div()
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
 
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo", show_download_button=True)
+                gui.image(input_image, caption="Input Photo", show_download_button=True)
             else:
-                st.div()
+                gui.div()
 
         with col2:
             cutout_image = state.get("cutout_image")
             if cutout_image:
-                st.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption=f"Cutout Image")
             else:
-                st.div()
+                gui.div()
 
     def preview_description(self, state: dict) -> str:
         return "Use Dichotomous Image Segmentation to remove unwanted backgrounds from your images and correct perspective. Awesome when used with other Gooey.AI steps."

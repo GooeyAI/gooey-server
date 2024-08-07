@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.language_model import LargeLanguageModels, ResponseFormatType, LLMApis
@@ -38,12 +38,12 @@ def language_model_settings(selected_model: str = None):
     except KeyError:
         llm = None
 
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
-        st.checkbox("Avoid Repetition", key="avoid_repetition")
+        gui.checkbox("Avoid Repetition", key="avoid_repetition")
     if not llm or llm.supports_json:
         with col2:
-            st.selectbox(
+            gui.selectbox(
                 f"###### {field_title_desc(LanguageModelSettings, 'response_format_type')}",
                 options=[None, "json_object"],
                 key="response_format_type",
@@ -53,9 +53,9 @@ def language_model_settings(selected_model: str = None):
                 }.__getitem__,
             )
 
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
-        st.number_input(
+        gui.number_input(
             label="""
             ###### Max Output Tokens
             The maximum number of tokens to generate in the completion. Increase to generate longer responses.
@@ -65,7 +65,7 @@ def language_model_settings(selected_model: str = None):
             step=10,
         )
     with col2:
-        st.slider(
+        gui.slider(
             label="""
             ###### Creativity (aka Sampling Temperature)
     
@@ -76,9 +76,9 @@ def language_model_settings(selected_model: str = None):
             max_value=2.0,
         )
 
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
-        st.slider(
+        gui.slider(
             label="""
 ###### Answer Outputs
 How many answers should the copilot generate? Additional answer outputs increase the cost of each run.
@@ -89,7 +89,7 @@ How many answers should the copilot generate? Additional answer outputs increase
         )
     if llm and not llm.is_chat_model and llm.llm_api == LLMApis.openai:
         with col2:
-            st.slider(
+            gui.slider(
                 label="""
 ###### Attempts
 Generate multiple responses and choose the best one

@@ -1,16 +1,19 @@
-from enum import Enum
 import typing
+from enum import Enum
 
 import requests
 from furl import furl
-from daras_ai_v2.azure_asr import azure_auth_header
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
 
 SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
 
@@ -127,7 +130,7 @@ BARK_ALLOWED_PROMPTS = {
 
 
 def text_to_speech_provider_selector(page):
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
         tts_provider = enum_selector(
             TextToSpeechProviders,
@@ -184,7 +187,7 @@ def openai_tts_settings():
         key="openai_tts_model",
         use_selectbox=True,
     )
-    st.caption(
+    gui.caption(
         "The HD version has less static noise in most situations at the cost of higher latency. Read more about the OpenAI voices and models [here](https://platform.openai.com/docs/guides/text-to-speech)."
     )
 
@@ -194,7 +197,7 @@ def azure_tts_selector():
         voices = azure_tts_voices()
     else:
         voices = {}
-    st.selectbox(
+    gui.selectbox(
         label="""
         ###### Azure TTS Voice name
         """,
@@ -205,14 +208,14 @@ def azure_tts_selector():
 
 
 def azure_tts_settings():
-    voice_name = st.session_state.get("azure_voice_name")
+    voice_name = gui.session_state.get("azure_voice_name")
     if not voice_name or not settings.AZURE_SPEECH_KEY:
         return
     try:
         voice = azure_tts_voices()[voice_name]
     except KeyError:
         return
-    st.markdown(
+    gui.markdown(
         f"""
         ###### {voice.get('Name')}:
         * Name: {voice.get('LocalName')} {'(' + str(voice.get('DisplayName')) + ')' if voice.get('LocalName') != voice.get('DisplayName') else ''}
@@ -252,7 +255,7 @@ def azure_tts_voices() -> dict[str, dict[str, str]]:
 
 
 def bark_selector():
-    st.selectbox(
+    gui.selectbox(
         label="""
         ###### Bark History Prompt
         """,
@@ -264,7 +267,7 @@ def bark_selector():
 
 def google_tts_selector():
     voices = google_tts_voices()
-    st.selectbox(
+    gui.selectbox(
         label="""
         ###### Voice name (Google TTS)
         """,
@@ -272,16 +275,16 @@ def google_tts_selector():
         format_func=voices.__getitem__,
         options=voices.keys(),
     )
-    st.caption(
+    gui.caption(
         "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
     )
 
 
 def google_tts_settings():
-    st.write(f"##### 🗣️ {TextToSpeechProviders.GOOGLE_TTS.value} Settings")
-    col1, col2 = st.columns(2)
+    gui.write(f"##### 🗣️ {TextToSpeechProviders.GOOGLE_TTS.value} Settings")
+    col1, col2 = gui.columns(2)
     with col1:
-        st.slider(
+        gui.slider(
             """
             ###### Speaking rate
             *`1.0` is the normal native speed of the speaker*
@@ -292,7 +295,7 @@ def google_tts_settings():
             key="google_speaking_rate",
         )
     with col2:
-        st.slider(
+        gui.slider(
             """
             ###### Pitch
             *Increase/Decrease semitones from the original pitch*
@@ -305,7 +308,7 @@ def google_tts_settings():
 
 
 def uberduck_selector():
-    st.selectbox(
+    gui.selectbox(
         label="""
         ###### Voice name (Uberduck)
         """,
@@ -316,8 +319,8 @@ def uberduck_selector():
 
 
 def uberduck_settings():
-    st.write(f"##### 🗣️ {TextToSpeechProviders.UBERDUCK.value} Settings")
-    st.slider(
+    gui.write(f"##### 🗣️ {TextToSpeechProviders.UBERDUCK.value} Settings")
+    gui.slider(
         """
         ###### Speaking rate
         *`1.0` is the normal native speed of the speaker*
@@ -329,27 +332,15 @@ def uberduck_settings():
     )
 
 
-def elevenlabs_selector(page):
-    if not st.session_state.get("elevenlabs_api_key"):
-        st.session_state["elevenlabs_api_key"] = page.request.session.get(
-            SESSION_ELEVENLABS_API_KEY
-        )
+def elevenlabs_selector(page: "BasePage"):
+    elevenlabs_init_state(page)
 
-    # for backwards compat
-    if old_voice_name := st.session_state.pop("elevenlabs_voice_name", None):
-        try:
-            st.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
-                old_voice_name
-            ]
-        except KeyError:
-            pass
-
-    elevenlabs_use_custom_key = st.checkbox(
+    elevenlabs_use_custom_key = gui.checkbox(
         "Use custom API key + Voice ID",
-        value=bool(st.session_state.get("elevenlabs_api_key")),
+        value=bool(gui.session_state.get("elevenlabs_api_key")),
     )
     if elevenlabs_use_custom_key:
-        elevenlabs_api_key = st.text_input(
+        elevenlabs_api_key = gui.text_input(
             """
             ###### Your ElevenLabs API key
             *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
@@ -362,19 +353,19 @@ def elevenlabs_selector(page):
             try:
                 voices = fetch_elevenlabs_voices(elevenlabs_api_key)
             except requests.exceptions.HTTPError as e:
-                st.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
+                gui.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
                 return
-            selected_voice_id = st.session_state.get("elevenlabs_voice_id")
+            selected_voice_id = gui.session_state.get("elevenlabs_voice_id")
             if selected_voice_id and selected_voice_id not in voices:
                 voices[selected_voice_id] = selected_voice_id
         else:
             voices = {}
     else:
-        st.session_state["elevenlabs_api_key"] = None
+        gui.session_state["elevenlabs_api_key"] = None
         if not (
             page and (page.is_current_user_paying() or page.is_current_user_admin())
         ):
-            st.caption(
+            gui.caption(
                 """
                 Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
                 Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
@@ -385,10 +376,10 @@ def elevenlabs_selector(page):
         else:
             voices = {}
 
-    page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
+    page.request.session[SESSION_ELEVENLABS_API_KEY] = gui.session_state.get(
         "elevenlabs_api_key"
     )
-    st.selectbox(
+    gui.selectbox(
         """
         ###### Voice
         """,
@@ -396,7 +387,7 @@ def elevenlabs_selector(page):
         options=voices.keys(),
         format_func=voices.__getitem__,
     )
-    st.selectbox(
+    gui.selectbox(
         """
         ###### Model
         """,
@@ -406,10 +397,25 @@ def elevenlabs_selector(page):
     )
 
 
+def elevenlabs_init_state(page: "BasePage"):
+    if not gui.session_state.get("elevenlabs_api_key"):
+        gui.session_state["elevenlabs_api_key"] = page.request.session.get(
+            SESSION_ELEVENLABS_API_KEY
+        )
+    # for backwards compat
+    if old_voice_name := gui.session_state.pop("elevenlabs_voice_name", None):
+        try:
+            gui.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
+                old_voice_name
+            ]
+        except KeyError:
+            pass
+
+
 def elevenlabs_settings():
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
-        st.slider(
+        gui.slider(
             """
             ###### Stability
             *A lower stability provides a broader emotional range.
@@ -422,7 +428,7 @@ def elevenlabs_settings():
             key="elevenlabs_stability",
         )
     with col2:
-        st.slider(
+        gui.slider(
             """
             ###### Similarity Boost
             *Dictates how hard the model should try to replicate the original voice.
@@ -434,10 +440,10 @@ def elevenlabs_settings():
             key="elevenlabs_similarity_boost",
         )
 
-    if st.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
-        col1, col2 = st.columns(2)
+    if gui.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
+        col1, col2 = gui.columns(2)
         with col1:
-            st.slider(
+            gui.slider(
                 """
                 ###### Style Exaggeration
                 """,
@@ -447,18 +453,20 @@ def elevenlabs_settings():
                 key="elevenlabs_style",
             )
         with col2:
-            st.checkbox(
+            gui.checkbox(
                 "Speaker Boost",
                 key="elevenlabs_speaker_boost",
                 value=True,
             )
 
-    with st.expander(
+    with gui.expander(
         "Eleven Labs Supported Languages",
         style={"fontSize": "0.9rem", "textDecoration": "underline"},
     ):
-        st.caption("With Multilingual V2 voice model", style={"fontSize": "0.8rem"})
-        st.caption(", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"})
+        gui.caption("With Multilingual V2 voice model", style={"fontSize": "0.8rem"})
+        gui.caption(
+            ", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"}
+        )
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -501,7 +509,7 @@ _elevenlabs_category_order = {
 }
 
 
-@st.cache_in_session_state
+@gui.cache_in_session_state
 def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
     r = requests.get(
         "https://api.elevenlabs.io/v1/voices",

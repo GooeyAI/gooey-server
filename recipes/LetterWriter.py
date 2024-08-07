@@ -4,7 +4,7 @@ import typing
 import requests
 from pydantic.main import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
@@ -47,7 +47,7 @@ class LetterWriterPage(BasePage):
         final_prompt: str
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             *ID > Call Custom API > Build Training Data > GPT3*
             
@@ -61,21 +61,21 @@ class LetterWriterPage(BasePage):
         )
 
     def render_form_v2(self):
-        st.text_input(
+        gui.text_input(
             "### Action ID",
             key="action_id",
         )
 
-        col1, col2 = st.columns(2, gap="medium")
+        col1, col2 = gui.columns(2, gap="medium")
         with col1:
-            st.slider(
+            gui.slider(
                 label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
             )
         with col2:
-            st.slider(
+            gui.slider(
                 label="Quality",
                 key="quality",
                 min_value=1.0,
@@ -84,14 +84,14 @@ class LetterWriterPage(BasePage):
             )
 
     def render_settings(self):
-        st.write("### Model Settings")
+        gui.write("### Model Settings")
 
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
 
         with col1:
             # select text api
             api_provider_options = ["openai", "goose.ai"]
-            api_provider = st.selectbox(
+            api_provider = gui.selectbox(
                 label="Language Model Provider",
                 options=api_provider_options,
                 key="lm_selected_api",
@@ -131,13 +131,13 @@ class LetterWriterPage(BasePage):
                 raise ValueError()
 
         with col2:
-            st.selectbox(
+            gui.selectbox(
                 label="Engine",
                 options=engine_choices,
                 key="lm_selected_engine",
             )
 
-        st.slider(
+        gui.slider(
             """
             ##### Model Risk Factor 
 
@@ -152,9 +152,9 @@ class LetterWriterPage(BasePage):
             max_value=1.0,
         )
 
-        st.write("---")
+        gui.write("---")
 
-        st.text_area(
+        gui.text_area(
             """
             ### Task description
             Briefly describe the task for the language model
@@ -162,11 +162,11 @@ class LetterWriterPage(BasePage):
             key="prompt_header",
         )
 
-        st.write("---")
+        gui.write("---")
 
-        st.write("### Example letters")
+        gui.write("### Example letters")
 
-        st.write(
+        gui.write(
             """
             A set of example letters for the model to learn your writing style
             """
@@ -174,11 +174,11 @@ class LetterWriterPage(BasePage):
 
         text_training_data("Talking points", "Letter", key="example_letters")
 
-        st.write("---")
+        gui.write("---")
 
-        st.write("### Custom API settings")
+        gui.write("### Custom API settings")
 
-        st.write(
+        gui.write(
             """
         Call any external API to get the talking points from an input Action ID
          
@@ -186,29 +186,29 @@ class LetterWriterPage(BasePage):
         """
         )
 
-        col1, col2 = st.columns([1, 4])
+        col1, col2 = gui.columns([1, 4])
         with col1:
-            st.text_input(
+            gui.text_input(
                 "HTTP Method",
                 key="api_http_method",
             )
         with col2:
-            st.text_input(
+            gui.text_input(
                 "URL",
                 key="api_url",
             )
-        st.text_area(
+        gui.text_area(
             "Headers as JSON (optional)",
             key="api_headers",
         )
-        st.text_area(
+        gui.text_area(
             "JSON Body (optional)",
             key="api_json_body",
         )
 
-        st.write("---")
+        gui.write("---")
 
-        st.text_area(
+        gui.text_area(
             """
             ##### Input Talking Points (Prompt)
     
@@ -219,7 +219,7 @@ class LetterWriterPage(BasePage):
             """,
             key="input_prompt",
         )
-        st.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
+        gui.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         yield "Calling API.."
@@ -304,14 +304,14 @@ class LetterWriterPage(BasePage):
         )
 
     def render_output(self):
-        st.write("### Generated Letters")
-        output_letters = st.session_state.get(
+        gui.write("### Generated Letters")
+        output_letters = gui.session_state.get(
             "output_letters",
             # this default value makes a nicer output while running :)
-            [""] * st.session_state["num_outputs"],
+            [""] * gui.session_state["num_outputs"],
         )
         for idx, out in enumerate(output_letters):
-            st.text_area(
+            gui.text_area(
                 f"output {idx}",
                 label_visibility="collapsed",
                 value=out,
@@ -320,22 +320,22 @@ class LetterWriterPage(BasePage):
             )
 
     def render_steps(self):
-        response_json = st.session_state.get("response_json", {})
-        st.write("**API Response**")
-        st.json(
+        response_json = gui.session_state.get("response_json", {})
+        gui.write("**API Response**")
+        gui.json(
             response_json,
             expanded=False,
         )
 
-        input_prompt = st.session_state.get("generated_input_prompt", "")
-        st.text_area(
+        input_prompt = gui.session_state.get("generated_input_prompt", "")
+        gui.text_area(
             "**Input Talking Points (Prompt)**",
             value=input_prompt,
             disabled=True,
         )
 
-        final_prompt = st.session_state.get("final_prompt", "")
-        st.text_area(
+        final_prompt = gui.session_state.get("final_prompt", "")
+        gui.text_area(
             "**Final Language Model Prompt**",
             value=final_prompt,
             disabled=True,
