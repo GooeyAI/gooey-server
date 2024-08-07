@@ -579,9 +579,9 @@ let script = document.createElement("script");
 def recipe_or_handle_or_static(
     request: Request, page_slug=None, run_slug=None, example_id=None, path=None
 ):
-    path = furl(request.url).pathstr.lstrip("/")
+    parts = request.url.path.strip("/").split("/")
 
-    parts = path.strip("/").split("/")
+    # try to render a recipe page
     if len(parts) in {1, 2}:
         try:
             example_id = parts[1].split("-")[-1] or None
@@ -591,12 +591,16 @@ def recipe_or_handle_or_static(
             return render_recipe_page(request, parts[0], RecipeTabs.run, example_id)
         except RecipePageNotFound:
             pass
+
+    # try to render a handle page
+    if len(parts) == 1:
         try:
             return render_handle_page(request, parts[0])
         except Handle.DoesNotExist:
             pass
 
-    return serve_static_file(request, path)
+    # try to serve a static file
+    return serve_static_file(request)
 
 
 def render_handle_page(request: Request, name: str):
@@ -614,8 +618,9 @@ def render_handle_page(request: Request, name: str):
         raise HTTPException(status_code=404)
 
 
-class RecipePageNotFound(Exception):
-    pass
+class RecipePageNotFound(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(status_code=404)
 
 
 def render_recipe_page(

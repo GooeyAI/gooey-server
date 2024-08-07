@@ -4,12 +4,13 @@ from zipfile import ZipFile, is_zipfile, ZipInfo
 
 import gooey_gui as gui
 import requests
+from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import (
-    Response,
     RedirectResponse,
     HTMLResponse,
     PlainTextResponse,
+    Response,
 )
 from starlette.status import HTTP_308_PERMANENT_REDIRECT, HTTP_401_UNAUTHORIZED
 
@@ -24,20 +25,20 @@ from routers.custom_api_router import CustomAPIRouter
 app = CustomAPIRouter()
 
 
-def serve_static_file(request: Request, path: str):
+def serve_static_file(request: Request) -> Response | None:
     bucket = gcs_bucket()
 
-    if path.endswith("/"):
-        # relative css/js paths dont work with trailing slashes
-        return RedirectResponse(
-            os.path.join("/", path.strip("/")), status_code=HTTP_308_PERMANENT_REDIRECT
-        )
-
-    path = path or "index"
-    gcs_path = os.path.join(settings.GS_STATIC_PATH, path)
+    relpath = request.url.path.strip("/") or "index"
+    gcs_path = os.path.join(settings.GS_STATIC_PATH, relpath)
 
     # if the path has no extension, try to serve a .html file
-    if not os.path.splitext(gcs_path)[1]:
+    if not os.path.splitext(relpath)[1]:
+        # relative css/js paths in html won't work if a trailing slash is present in the url
+        if request.url.path.lstrip("/").endswith("/"):
+            return RedirectResponse(
+                os.path.join("/", relpath),
+                status_code=HTTP_308_PERMANENT_REDIRECT,
+            )
         html_url = bucket.blob(gcs_path + ".html").public_url
         r = requests.get(html_url)
         if r.ok:
@@ -51,12 +52,13 @@ def serve_static_file(request: Request, path: str):
                 )
             return HTMLResponse(html, status_code=r.status_code)
 
-    url = bucket.blob(gcs_path).public_url
-    r = requests.head(url)
-    if r.ok:
-        return RedirectResponse(url, status_code=HTTP_308_PERMANENT_REDIRECT)
+    blob = bucket.blob(gcs_path)
+    if blob.exists():
+        return RedirectResponse(
+            blob.public_url, status_code=HTTP_308_PERMANENT_REDIRECT
+        )
 
-    return Response(status_code=r.status_code)
+    raise HTTPException(status_code=404)
 
 
 @gui.route(app, "/internal/webflow-upload/")
