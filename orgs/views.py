@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import html as html_lib
 
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
 
-import gooey_ui as st
 from app_users.models import AppUser
-from gooey_ui.components.modal import Modal
 from orgs.models import Org, OrgInvitation, OrgMembership, OrgRole
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
@@ -85,7 +84,7 @@ def render_org_by_membership(membership: OrgMembership):
     ):
         with st.div(className="d-flex justify-content-center align-items-center"):
             if membership.can_edit_org_metadata():
-                org_edit_modal = Modal("Edit Org", key="edit-org-modal")
+                org_edit_modal = gui.Modal("Edit Org", key="edit-org-modal")
                 if org_edit_modal.is_open():
                     with org_edit_modal.container():
                         render_org_edit_view_by_membership(
@@ -113,7 +112,7 @@ def render_org_by_membership(membership: OrgMembership):
             st.write("## Members")
 
             if membership.can_invite():
-                invite_modal = Modal("Invite Member", key="invite-member-modal")
+                invite_modal = gui.Modal("Invite Member", key="invite-member-modal")
                 if st.button(f"{icons.add_user} Invite"):
                     invite_modal.open()
 
@@ -129,7 +128,7 @@ def render_org_by_membership(membership: OrgMembership):
         render_pending_invitations_list(org=org, current_member=membership)
 
     with st.div(className="mt-4"):
-        org_leave_modal = Modal("Leave Org", key="leave-org-modal")
+        org_leave_modal = gui.Modal("Leave Org", key="leave-org-modal")
         if org_leave_modal.is_open():
             with org_leave_modal.container():
                 render_org_leave_view_by_membership(membership, modal=org_leave_modal)
@@ -159,7 +158,7 @@ def render_org_creation_view(user: AppUser):
             st.experimental_rerun()
 
 
-def render_org_edit_view_by_membership(membership: OrgMembership, *, modal: Modal):
+def render_org_edit_view_by_membership(membership: OrgMembership, *, modal: gui.Modal):
     org = membership.org
     render_org_create_or_edit_form(org=org)
 
@@ -182,7 +181,7 @@ def render_danger_zone_by_membership(membership: OrgMembership):
     st.write("### Danger Zone", className="d-block my-2")
 
     if membership.can_delete_org():
-        org_deletion_modal = Modal("Delete Organization", key="delete-org-modal")
+        org_deletion_modal = gui.Modal("Delete Organization", key="delete-org-modal")
         if org_deletion_modal.is_open():
             with org_deletion_modal.container():
                 render_org_deletion_view_by_membership(
@@ -198,7 +197,9 @@ def render_danger_zone_by_membership(membership: OrgMembership):
                 org_deletion_modal.open()
 
 
-def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: Modal):
+def render_org_deletion_view_by_membership(
+    membership: OrgMembership, *, modal: gui.Modal
+):
     st.write(
         f"Are you sure you want to delete **{membership.org.name}**? This action is irreversible."
     )
@@ -216,7 +217,9 @@ def render_org_deletion_view_by_membership(membership: OrgMembership, *, modal: 
             modal.close()
 
 
-def render_org_leave_view_by_membership(current_member: OrgMembership, *, modal: Modal):
+def render_org_leave_view_by_membership(
+    current_member: OrgMembership, *, modal: gui.Modal
+):
     org = current_member.org
 
     st.write("Are you sure you want to leave this organization?")
@@ -345,12 +348,12 @@ def button_with_confirmation_modal(
     modal_key: str | None = None,
     modal_className: str = "",
     **btn_props,
-) -> tuple[Modal, bool]:
+) -> tuple[gui.Modal, bool]:
     """
     Returns boolean for whether user confirmed the action or not.
     """
 
-    modal = Modal(modal_title or btn_label, key=modal_key)
+    modal = gui.Modal(modal_title or btn_label, key=modal_key)
 
     btn_classes = "btn btn-theme btn-sm my-0 py-0 " + btn_props.pop("className", "")
     if st.button(btn_label, className=btn_classes, **btn_props):
@@ -447,7 +450,7 @@ def render_invitation_actions(invitation: OrgInvitation, current_member: OrgMemb
             modal.close()
 
 
-def render_invite_creation_view(org: Org, inviter: AppUser, modal: Modal):
+def render_invite_creation_view(org: Org, inviter: AppUser, modal: gui.Modal):
     email = st.text_input("Email")
     if org.domain_name:
         st.caption(
