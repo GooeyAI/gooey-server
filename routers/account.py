@@ -8,6 +8,7 @@ from fastapi.requests import Request
 from furl import furl
 from loguru import logger
 from requests.models import HTTPError
+from starlette.responses import Response
 
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
@@ -17,6 +18,8 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from orgs.models import OrgInvitation
+from orgs.views import invitation_page, orgs_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
 
@@ -139,6 +142,51 @@ def api_keys_route(request: Request):
     )
 
 
+@app.post("/orgs/")
+@gui.route
+def orgs_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.orgs):
+        orgs_tab(request)
+
+    url = get_og_url_path(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title="Teams • Gooey.AI",
+            description="Your teams.",
+            robots="noindex,nofollow",
+        )
+    )
+
+
+@app.post("/invitation/{org_slug}/{invite_id}/")
+@gui.route
+def invitation_route(request: Request, org_slug: str, invite_id: str):
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        next_url = request.url.path
+        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
+        raise RedirectException(redirect_url)
+
+    try:
+        invitation = OrgInvitation.objects.get(invite_id=invite_id)
+    except OrgInvitation.DoesNotExist:
+        return Response(status_code=404)
+
+    with page_wrapper(request):
+        invitation_page(user=request.user, invitation=invitation)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title=f"Join {invitation.org.name} • Gooey.AI",
+            description=f"Invitation to join {invitation.org.name}",
+            robots="noindex,nofollow",
+        )
+    )
+
+
 class TabData(typing.NamedTuple):
     title: str
     route: typing.Callable
@@ -149,6 +197,7 @@ class AccountTabs(TabData, Enum):
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
+    orgs = TabData(title=f"{icons.company} Teams", route=orgs_route)
 
     @property
     def url_path(self) -> str:
@@ -206,6 +255,10 @@ def all_saved_runs_tab(request: Request):
 def api_keys_tab(request: Request):
     gui.write("# 🔐 API Keys")
     manage_api_keys(request.user)
+
+
+def orgs_tab(request: Request):
+    orgs_page(request.user)
 
 
 @contextmanager

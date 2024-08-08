@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "safedelete",
     "app_users",
     "files",
     "url_shortener",
@@ -63,6 +64,7 @@ INSTALLED_APPS = [
     "handles",
     "payments",
     "functions",
+    "orgs",
 ]
 
 MIDDLEWARE = [
@@ -392,6 +394,11 @@ MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
 
 DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
 DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
+
+ORG_INVITATION_EXPIRY_DAYS = config("ORG_INVITATIONS_EXPIRY_IN_DAYS", 10, cast=int)
+ORG_INVITATION_EMAIL_COOLDOWN_INTERVAL = config(
+    "ORG_INVITATION_EMAIL_COOLDOWN_INTERVAL", 60 * 60 * 24, cast=int  # 24 hours
+)
 
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
 TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
