@@ -144,7 +144,7 @@ def api_keys_route(request: Request):
 
 
 @app.post("/orgs/")
-@st.route
+@gui.route
 def orgs_route(request: Request):
     with account_page_wrapper(request, AccountTabs.orgs):
         orgs_tab(request)
@@ -162,7 +162,7 @@ def orgs_route(request: Request):
 
 
 @app.post("/invitation/{org_slug}/{invite_id}/")
-@st.route
+@gui.route
 def invitation_route(request: Request, org_slug: str, invite_id: str):
     from routers.root import login
 
