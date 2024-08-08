@@ -208,3 +208,7 @@ docker run \
 ### 📐 Code Formatting
 
 Use black - https://pypi.org/project/black
+
+### 💣 Secret Scanning
+
+Gitleaks will automatically run pre-commit (see `pre-commit-config.yaml` for details) to prevent commits with secrets in the first place. To test this without committing, run `pre-commit` from the terminal. To skip this check for false positives, use `SKIP=gitleaks git commit -m "message"` to commit changes.
