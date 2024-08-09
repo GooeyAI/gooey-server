@@ -1096,7 +1096,6 @@ class Conversation(models.Model):
         "web_user_id",
         "wa_phone_number",
         "twilio_phone_number",
-        "id",
     ]
 
     class Meta:
@@ -1135,10 +1134,9 @@ class Conversation(models.Model):
 
     def unique_user_id(self) -> str | None:
         for col in self.user_id_fields:
-            if col == "id":
-                return self.api_integration_id()
             if value := getattr(self, col, None):
                 return value
+        return self.api_integration_id()
 
     get_display_name.short_description = "User"
 
