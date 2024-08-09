@@ -694,6 +694,10 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="The audio url to play to the user while waiting for a response if using voice",
     )
+    twilio_fresh_conversation_per_call = models.BooleanField(
+        default=False,
+        help_text="If set, the bot will start a new conversation for each call",
+    )
 
     streaming_enabled = models.BooleanField(
         default=False,
@@ -1063,6 +1067,11 @@ class Conversation(models.Model):
         blank=True,
         default="",
         help_text="User's Twilio phone number (mandatory)",
+    )
+    twilio_call_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio call sid (only used if each call is a new conversation)",
     )
 
     web_user_id = models.CharField(

@@ -126,7 +126,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
 
 
 def twilio_specific_settings(bi: BotIntegration):
-    SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url"]  # fmt:skip
+    SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url", "twilio_fresh_conversation_per_call"]  # fmt:skip
     if gui.session_state.get(f"_bi_reset_{bi.id}"):
         for field in SETTINGS_FIELDS:
             gui.session_state[f"_bi_{field}_{bi.id}"] = BotIntegration._meta.get_field(
@@ -165,6 +165,11 @@ def twilio_specific_settings(bi: BotIntegration):
     )
     gui.caption(
         "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
+    )
+    bi.twilio_fresh_conversation_per_call = gui.checkbox(
+        "🔄 Fresh Conversation History for Each Call",
+        value=bi.twilio_fresh_conversation_per_call,
+        key=f"_bi_twilio_fresh_conversation_per_call_{bi.id}",
     )
 
 

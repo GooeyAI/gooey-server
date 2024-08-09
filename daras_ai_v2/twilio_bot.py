@@ -95,6 +95,8 @@ class TwilioVoice(BotInterface):
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
+        call_sid = data["CallSid"][0]
+        caller_number = data["Caller"][0]
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
             # cases where user is calling the bot
@@ -108,14 +110,25 @@ class TwilioVoice(BotInterface):
                 twilio_account_sid=account_sid, twilio_phone_number=bot_number
             )
 
-        convo = Conversation.objects.get_or_create(
-            bot_integration=bi, twilio_phone_number=user_number
-        )[0]
+        will_be_missed = caller_number == user_number and bi.twilio_use_missed_call
+        if will_be_missed:
+            # for call_sids that we will reject and re-call, the convo is not used, so we don't want to create a new one
+            convo = None
+        if bi.twilio_fresh_conversation_per_call and not will_be_missed:
+            convo = Conversation.objects.get_or_create(
+                bot_integration=bi,
+                twilio_phone_number=user_number,
+                twilio_call_sid=call_sid,
+            )[0]
+        else:
+            convo = Conversation.objects.get_or_create(
+                bot_integration=bi, twilio_phone_number=user_number
+            )[0]
         return cls(
             convo,
             text=data.get("SpeechResult", [None])[0],
             audio_url=data.get("RecordingUrl", [None])[0],
-            call_sid=data["CallSid"][0],
+            call_sid=call_sid,
         )
 
     def __init__(
