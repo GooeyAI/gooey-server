@@ -3,9 +3,9 @@ from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
-from fastapi import APIRouter
 from fastapi.requests import Request
 from furl import furl
+from gooey_gui.core import RedirectException
 from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
@@ -142,8 +142,7 @@ def api_keys_route(request: Request):
     )
 
 
-@app.post("/orgs/")
-@gui.route
+@gui.route(app, "/orgs/")
 def orgs_route(request: Request):
     with account_page_wrapper(request, AccountTabs.orgs):
         orgs_tab(request)
@@ -160,8 +159,7 @@ def orgs_route(request: Request):
     )
 
 
-@app.post("/invitation/{org_slug}/{invite_id}/")
-@gui.route
+@gui.route(app, "/invitation/{org_slug}/{invite_id}/")
 def invitation_route(request: Request, org_slug: str, invite_id: str):
     from routers.root import login
 
