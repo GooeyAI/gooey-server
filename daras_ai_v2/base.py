@@ -1308,9 +1308,7 @@ class BasePage:
             return "/account/"
 
     def get_submit_container_props(self):
-        return dict(
-            className="position-sticky bottom-0 bg-white", style=dict(zIndex=100)
-        )
+        return dict(className="position-sticky bottom-0 bg-white")
 
     def render_submit_button(self, key="--submit-1"):
         with gui.div(**self.get_submit_container_props()):
