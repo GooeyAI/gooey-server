@@ -619,7 +619,7 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
 
 def list_view_editor(
     *,
-    add_btn_label: str,
+    add_btn_label: str = None,
     key: str,
     render_labels: typing.Callable = None,
     render_inputs: typing.Callable[[str, str, dict], None],
@@ -658,5 +658,6 @@ def list_view_editor(
         with label_placeholder:
             render_labels()
     gui.session_state[key] = new_lst
-    gui.button(add_btn_label, key=add_key)
+    if add_btn_label:
+        gui.button(add_btn_label, key=add_key)
     return new_lst

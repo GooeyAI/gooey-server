@@ -19,6 +19,13 @@ def variables_input(
 ):
     from daras_ai_v2.workflow_url_input import del_button
 
+    def render_title_desc():
+        gui.write(label)
+        gui.caption(
+            "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with {{ }} eg. {{ my_variable }}. <a href='/variables-help' target='_blank'>Learn more.</a>",
+            unsafe_allow_html=True,
+        )
+
     # find all variables in the prompts
     env = jinja2.sandbox.SandboxedEnvironment()
     template_var_names = set()
@@ -56,7 +63,7 @@ def variables_input(
             continue
 
         if not title_shown:
-            gui.write(label)
+            render_title_desc()
             title_shown = True
 
         col1, col2 = gui.columns([11, 1], responsive=False)
@@ -93,7 +100,7 @@ def variables_input(
 
     if allow_add:
         if not title_shown:
-            gui.write(label)
+            render_title_desc()
         gui.newline()
         col1, col2, _ = gui.columns([6, 2, 4], responsive=False)
         with col1:
