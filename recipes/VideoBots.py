@@ -1475,7 +1475,7 @@ def infer_asr_model_and_language(
     elif "bho" in user_lang:
         asr_model = AsrModels.vakyansh_bhojpuri
     elif "sw" in user_lang:
-        asr_model = AsrModels.seamless_m4t
+        asr_model = AsrModels.seamless_m4t_v2
         asr_lang = "swh"
     else:
         asr_model = default
