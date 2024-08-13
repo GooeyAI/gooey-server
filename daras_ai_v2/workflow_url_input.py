@@ -166,13 +166,19 @@ def get_published_run_options(
             pr.updated_at,  # newer first
         ),
     )
-
-    options = {
-        # root recipe
-        page_cls.get_root_published_run().get_app_url(): "Default",
-    } | {
+    options_dict = {
         pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
         for pr in saved_runs_and_examples
     }
+
+    options = (
+        options_dict
+        if page_cls.workflow == Workflow.FUNCTIONS
+        else {
+            # root recipe
+            page_cls.get_root_published_run().get_app_url(): "Default",
+        }
+        | options_dict
+    )
 
     return options
