@@ -647,6 +647,26 @@ def run():
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
     )
 
+    llm_pricing_create(
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
+        model_name=LargeLanguageModels.llama3_8b_cpt_sea_lion_v2_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
+    llm_pricing_create(
+        model_id="sarvamai/sarvam-2b-v0.5",
+        model_name=LargeLanguageModels.sarvam_2b.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
 
 def llm_pricing_create(
     model_id: str,
