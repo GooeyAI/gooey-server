@@ -86,9 +86,6 @@ class FunctionsPage(BasePage):
     def render_variables(self):
         variables_input(template_keys=["code"], allow_add=True)
 
-    def render_settings(self):
-        raise NotImplementedError
-
     def render_output(self):
         if error := gui.session_state.get("error"):
             with gui.tag("pre", className="bg-danger bg-opacity-25"):
