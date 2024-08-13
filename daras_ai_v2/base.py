@@ -1478,16 +1478,17 @@ class BasePage:
 
     # Functions in every recipe feels like overkill for now, hide it in settings
     functions_in_settings = True
+    show_settings = True
 
     def _render_input_col(self):
         self.render_form_v2()
         placeholder = gui.div()
 
-        gui.write("---")
-        with gui.expander("⚙️ Settings"):
-            self.render_settings()
-            if self.functions_in_settings:
-                functions_input(self.request.user, is_in_settings=True)
+        if self.show_settings:
+            with gui.expander("⚙️ Settings"):
+                self.render_settings()
+                if self.functions_in_settings:
+                    functions_input(self.request.user, is_in_settings=True)
 
         with placeholder:
             self.render_variables()

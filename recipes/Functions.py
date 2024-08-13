@@ -21,6 +21,7 @@ class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    show_settings = False
 
     class RequestModel(BaseModel):
         code: str = Field(
@@ -84,6 +85,9 @@ class FunctionsPage(BasePage):
 
     def render_variables(self):
         variables_input(template_keys=["code"], allow_add=True)
+
+    def render_settings(self):
+        raise NotImplementedError
 
     def render_output(self):
         if error := gui.session_state.get("error"):
