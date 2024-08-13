@@ -158,6 +158,7 @@ class Img2ImgPage(BasePage):
         yield "Generating Image..."
 
         if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
             safety_checker(text=request.text_prompt, image=request.input_image)
 
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
