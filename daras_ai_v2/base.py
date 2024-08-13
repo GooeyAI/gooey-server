@@ -1487,7 +1487,7 @@ class BasePage:
         with gui.expander("⚙️ Settings"):
             self.render_settings()
             if self.functions_in_settings:
-                functions_input(self.request.user)
+                functions_input(self.request.user, is_in_settings=True)
 
         with placeholder:
             self.render_variables()
