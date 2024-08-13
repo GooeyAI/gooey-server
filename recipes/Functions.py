@@ -21,6 +21,7 @@ class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    price = 1
 
     class RequestModel(BaseModel):
         code: str = Field(
