@@ -23,6 +23,7 @@ class FunctionsPage(BasePage):
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
     show_settings = False
+    price = 1
 
     class RequestModel(BaseModel):
         code: str = Field(
