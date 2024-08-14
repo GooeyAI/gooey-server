@@ -130,8 +130,11 @@ class Subscription(models.Model):
         else:
             return True
 
+    def is_paid(self) -> bool:
+        return self.plan != PricingPlan.STARTER.db_value
+
     def cancel(self):
-        if not self.external_id:
+        if not self.is_paid():
             return
 
         match self.payment_provider:
@@ -176,9 +179,7 @@ class Subscription(models.Model):
                     card_last4=source.get("card", {}).get("last_digits"),
                     billing_email=subscriber.email_address,
                 )
-            case PaymentProvider.STRIPE | None:
-                # None is for the case when user doesn't have a subscription, but has their payment
-                # method on Stripe. we can use this to autopay for their addons or in autorecharge
+            case PaymentProvider.STRIPE:
                 pm = self.stripe_get_default_payment_method()
                 if not pm:
                     return None
@@ -190,7 +191,7 @@ class Subscription(models.Model):
                 )
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
-        if self.payment_provider == PaymentProvider.STRIPE and self.external_id:
+        if self.payment_provider == PaymentProvider.STRIPE and self.is_paid():
             subscription = stripe.Subscription.retrieve(self.external_id)
             if subscription.default_payment_method:
                 return stripe.PaymentMethod.retrieve(
@@ -275,7 +276,7 @@ class Subscription(models.Model):
         return invoice
 
     def stripe_get_customer(self) -> stripe.Customer:
-        if self.payment_provider == PaymentProvider.STRIPE and self.external_id:
+        if self.payment_provider == PaymentProvider.STRIPE and self.is_paid():
             subscription = stripe.Subscription.retrieve(
                 self.external_id, expand=["customer"]
             )
@@ -315,7 +316,7 @@ class Subscription(models.Model):
                     / "connect"
                     / self.external_id
                 )
-            case PaymentProvider.STRIPE | None:
+            case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
                     customer=self.stripe_get_customer().id,
                     return_url=get_app_route_url(account_route),
