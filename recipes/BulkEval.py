@@ -239,7 +239,7 @@ Here's what you uploaded:
 
         gui.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
         list_view_editor(
-            add_btn_label="➕ Add a Prompt",
+            add_btn_label="Add a Prompt",
             key="eval_prompts",
             render_inputs=render_inputs,
         )
@@ -261,7 +261,7 @@ Here's what you uploaded:
         gui.html("<br>")
         gui.write("##### " + field_title_desc(self.RequestModel, "agg_functions"))
         list_view_editor(
-            add_btn_label="➕ Add an Aggregation",
+            add_btn_label="Add an Aggregation",
             key="agg_functions",
             render_inputs=render_agg_inputs,
         )

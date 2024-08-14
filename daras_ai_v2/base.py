@@ -136,7 +136,7 @@ class BasePage:
 
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
-            title="🧩 Functions",
+            title="🧩 Developer Tools and Functions",
         )
         variables: dict[str, typing.Any] = Field(
             None,
@@ -1476,15 +1476,17 @@ class BasePage:
 
     # Functions in every recipe feels like overkill for now, hide it in settings
     functions_in_settings = True
+    show_settings = True
 
     def _render_input_col(self):
         self.render_form_v2()
         placeholder = gui.div()
 
-        with gui.expander("⚙️ Settings"):
-            if self.functions_in_settings:
-                functions_input(self.request.user)
-            self.render_settings()
+        if self.show_settings:
+            with gui.expander("⚙️ Settings"):
+                self.render_settings()
+                if self.functions_in_settings:
+                    functions_input(self.request.user)
 
         with placeholder:
             self.render_variables()
@@ -1499,7 +1501,6 @@ class BasePage:
 
     def render_variables(self):
         if not self.functions_in_settings:
-            gui.write("---")
             functions_input(self.request.user)
         variables_input(
             template_keys=self.template_keys, allow_add=is_functions_enabled()

@@ -14,6 +14,7 @@ link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
 copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
+add = '<i class="fa-regular fa-add"></i>'
 
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'

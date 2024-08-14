@@ -2,9 +2,9 @@ import math
 import random
 import typing
 
-from pydantic import BaseModel, Field
-
 import gooey_gui as gui
+from pydantic import BaseModel
+
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -12,7 +12,6 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     SUPERSCRIPT,
-    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -78,10 +77,13 @@ class CompareLLMPage(BasePage):
 
         enum_multiselect(
             LargeLanguageModels,
-            label="#### 🤗 Compare Language Models",
+            label="#### 🧠 Language Models",
             key="selected_models",
             checkboxes=False,
         )
+
+        gui.markdown("#### 💪 Capabilities")
+        # -- functions will render here in parent --
 
     def validate_form_v2(self):
         assert gui.session_state["input_prompt"], "Please enter a Prompt"

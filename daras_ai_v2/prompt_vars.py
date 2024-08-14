@@ -3,21 +3,30 @@ import typing
 from datetime import datetime
 from types import SimpleNamespace
 
+import gooey_gui as gui
 import jinja2
 import jinja2.meta
 import jinja2.sandbox
 
-import gooey_gui as gui
+from daras_ai_v2 import icons
 
 
 def variables_input(
     *,
     template_keys: typing.Iterable[str],
     label: str = "###### ⌥ Variables",
+    description: str = "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with <a href='https://jinja.palletsprojects.com/en/3.1.x/templates/' target='_blank'>Jinja</a>, e.g. `{{ my_variable }}`\n  ",
     key: str = "variables",
     allow_add: bool = False,
 ):
     from daras_ai_v2.workflow_url_input import del_button
+
+    def render_title_desc():
+        gui.write(label)
+        gui.caption(
+            f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
+            unsafe_allow_html=True,
+        )
 
     # find all variables in the prompts
     env = jinja2.sandbox.SandboxedEnvironment()
@@ -56,7 +65,7 @@ def variables_input(
             continue
 
         if not title_shown:
-            gui.write(label)
+            render_title_desc()
             title_shown = True
 
         col1, col2 = gui.columns([11, 1], responsive=False)
@@ -93,7 +102,7 @@ def variables_input(
 
     if allow_add:
         if not title_shown:
-            gui.write(label)
+            render_title_desc()
         gui.newline()
         col1, col2, _ = gui.columns([6, 2, 4], responsive=False)
         with col1:
@@ -105,7 +114,7 @@ def variables_input(
                 )
         with col2:
             gui.button(
-                '<i class="fa-regular fa-add"></i> Add',
+                f"{icons.add} Add",
                 key=var_add_key,
                 type="tertiary",
             )
