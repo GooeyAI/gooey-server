@@ -23,7 +23,7 @@ PlanActionLabel = Literal["Upgrade", "Downgrade", "Contact Us", "Your Plan"]
 def billing_page(user: AppUser):
     render_payments_setup()
 
-    if user.subscription and user.subscription.plan != PricingPlan.STARTER.db_value:
+    if user.subscription and user.subscription.is_paid():
         render_current_plan(user)
 
     with gui.div(className="my-5"):
@@ -36,9 +36,10 @@ def billing_page(user: AppUser):
         render_addon_section(user, selected_payment_provider)
 
     if user.subscription:
-        if user.subscription.payment_provider == PaymentProvider.STRIPE:
+        if user.subscription.payment_provider != PaymentProvider.PAYPAL:
             with gui.div(className="my-5"):
                 render_auto_recharge_section(user)
+
         with gui.div(className="my-5"):
             render_payment_information(user)
 
@@ -213,7 +214,7 @@ def _render_plan_action_button(
         else:
             label, btn_type = ("Downgrade", "secondary")
 
-        if user.subscription and user.subscription.external_id:
+        if user.subscription and user.subscription.is_paid():
             # subscription exists, show upgrade/downgrade button
             _render_update_subscription_button(
                 label,
@@ -644,10 +645,7 @@ def render_billing_history(user: AppUser, limit: int = 50):
 
 
 def render_auto_recharge_section(user: AppUser):
-    assert (
-        user.subscription
-        and user.subscription.payment_provider == PaymentProvider.STRIPE
-    )
+    assert user.subscription
     subscription = user.subscription
 
     gui.write("## Auto Recharge & Limits")
