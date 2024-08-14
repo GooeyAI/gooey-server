@@ -19,4 +19,6 @@ d5866242d107743ab5eebeb284e7e5ee2426d941:pages/SocialLookupEmail.py:generic-api-
 73bef8c3be7682fed0b99ceb6770f599eabbbd08:daras_ai_v2/send_email.py:generic-api-key:25
 fa3f7982fa1527838c2073d2542c83887cc6ebbd:pages/EmailFaceInpainting.py:generic-api-key:189
 e1c218882d288ca1df0225654aae8dd10027e9d0:political_example.py:jwt:30
-ede582d5a859726ff04fe371e9066f9dffb393f7:explore.py
+ede582d5a859726ff04fe371e9066f9dffb393f7:explore.py:aws-access-token:16
+ede582d5a859726ff04fe371e9066f9dffb393f7:explore.py:private-key:23
+ede582d5a859726ff04fe371e9066f9dffb393f7:explore.py:generic-api-key:32
