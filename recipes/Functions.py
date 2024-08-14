@@ -10,6 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.prompt_vars import variables_input
+from functions.models import CalledFunction
 
 
 class ConsoleLogs(BaseModel):
@@ -82,6 +83,14 @@ class FunctionsPage(BasePage):
             language="javascript",
             height=300,
         )
+
+    def get_price_roundoff(self, state: dict) -> float:
+        try:
+            # called from another workflow don't charge any credits
+            CalledFunction.objects.get(function_run=self.get_current_sr())
+            return 0
+        except CalledFunction.DoesNotExist:
+            return self.price
 
     def render_variables(self):
         variables_input(
