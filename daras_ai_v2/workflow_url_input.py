@@ -21,6 +21,7 @@ def workflow_url_input(
     del_key: str = None,
     current_user: AppUser | None = None,
     allow_none: bool = False,
+    include_root: bool = True
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 
@@ -38,7 +39,9 @@ def workflow_url_input(
     else:
         internal_state["workflow"] = page_cls.workflow
         with col1:
-            options = get_published_run_options(page_cls, current_user=current_user)
+            options = get_published_run_options(
+                page_cls, current_user=current_user, include_root=include_root
+            )
             options.update(internal_state.get("--added_workflows", {}))
             with gui.div(className="pt-1"):
                 url = gui.selectbox(
@@ -143,6 +146,7 @@ def url_to_runs(
 def get_published_run_options(
     page_cls: typing.Type[BasePage],
     current_user: AppUser | None = None,
+    include_root: bool = True,
 ) -> dict[str, str]:
     # approved examples
     pr_query = Q(is_approved_example=True, visibility=PublishedRunVisibility.PUBLIC)
@@ -171,14 +175,10 @@ def get_published_run_options(
         for pr in saved_runs_and_examples
     }
 
-    options = (
-        options_dict
-        if page_cls.workflow == Workflow.FUNCTIONS
-        else {
-            # root recipe
+    if include_root:
+        # include root recipe if requested
+        options_dict = {
             page_cls.get_root_published_run().get_app_url(): "Default",
-        }
-        | options_dict
-    )
+        } | options_dict
 
-    return options
+    return options_dict

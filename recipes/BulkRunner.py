@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2 import icons
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -97,7 +98,7 @@ List of URLs to the evaluation runs that you requested.
     def render_form_v2(self):
         gui.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
         run_urls = list_view_editor(
-            add_btn_label="➕ Add a Workflow",
+            add_btn_label="Add a Workflow",
             key="run_urls",
             render_inputs=self.render_run_url_inputs,
             flatten_dict_key="url",
@@ -246,7 +247,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         gui.write("---")
         gui.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")
         list_view_editor(
-            add_btn_label="➕ Add an Eval",
+            add_btn_label="Add an Eval",
             key="eval_urls",
             render_inputs=self.render_eval_url_inputs,
             flatten_dict_key="url",
@@ -620,6 +621,7 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
 def list_view_editor(
     *,
     add_btn_label: str = None,
+    add_btn_type: str = "secondary",
     key: str,
     render_labels: typing.Callable = None,
     render_inputs: typing.Callable[[str, str, dict], None],
@@ -659,5 +661,6 @@ def list_view_editor(
             render_labels()
     gui.session_state[key] = new_lst
     if add_btn_label:
-        gui.button(add_btn_label, key=add_key)
+        with gui.center():
+            gui.button(f"{icons.add} {add_btn_label}", key=add_key, type=add_btn_type)
     return new_lst

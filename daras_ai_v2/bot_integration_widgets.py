@@ -94,7 +94,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
                 input_analysis_runs.append(dict(saved_run=sr, published_run=None))
 
     list_view_editor(
-        add_btn_label="➕ Add",
+        add_btn_label="Add",
         key="analysis_urls",
         render_inputs=render_workflow_url_input,
         flatten_dict_key="url",

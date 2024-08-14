@@ -3,17 +3,19 @@ import typing
 from datetime import datetime
 from types import SimpleNamespace
 
+import gooey_gui as gui
 import jinja2
 import jinja2.meta
 import jinja2.sandbox
 
-import gooey_gui as gui
+from daras_ai_v2 import icons
 
 
 def variables_input(
     *,
     template_keys: typing.Iterable[str],
     label: str = "###### ⌥ Variables",
+    description: str = "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with <a href='https://jinja.palletsprojects.com/en/3.1.x/templates/' target='_blank'>Jinja</a>, e.g. `{{ my_variable }}`\n  ",
     key: str = "variables",
     allow_add: bool = False,
 ):
@@ -22,7 +24,7 @@ def variables_input(
     def render_title_desc():
         gui.write(label)
         gui.caption(
-            "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with {{ }} eg. {{ my_variable }}. <a href='/variables-help' target='_blank'>Learn more.</a>",
+            f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
             unsafe_allow_html=True,
         )
 
@@ -112,7 +114,7 @@ def variables_input(
                 )
         with col2:
             gui.button(
-                '<i class="fa-regular fa-add"></i> Add',
+                f"{icons.add} Add",
                 key=var_add_key,
                 type="tertiary",
             )

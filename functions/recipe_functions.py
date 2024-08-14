@@ -109,9 +109,7 @@ def is_functions_enabled(key="functions") -> bool:
     return bool(gui.session_state.get(f"--enable-{key}"))
 
 
-def functions_input(
-    current_user: AppUser, key="functions", is_in_settings: bool = False
-):
+def functions_input(current_user: AppUser, key="functions"):
     from recipes.BulkRunner import list_view_editor
     from daras_ai_v2.base import BasePage
 
@@ -135,6 +133,7 @@ def functions_input(
                 internal_state=d,
                 del_key=del_key,
                 current_user=current_user,
+                include_root=False,
             )
         col2.node.children[0].props["className"] += " col-12"
 
@@ -151,14 +150,11 @@ def functions_input(
             unsafe_allow_html=True,
         )
         list_view_editor(
-            add_btn_label=None,
+            add_btn_label="Add Function",
+            add_btn_type="tertiary",
             key=key,
             render_inputs=render_function_input,
         )
-        gui.button("➕ Add Function", key=f"--{key}:add", type="tertiary")
-
-        if not is_in_settings:
-            gui.write("---")
     else:
         gui.session_state.pop(key, None)
 
