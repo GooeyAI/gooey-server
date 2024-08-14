@@ -69,9 +69,7 @@ class PaypalWebhookHandler:
     @classmethod
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
-        _remove_subscription_for_user(
-            provider=cls.PROVIDER, uid=pp_sub.custom_id, external_id=pp_sub.id
-        )
+        set_free_subscription_for_user(uid=pp_sub.custom_id)
 
 
 class StripeWebhookHandler:
@@ -161,9 +159,7 @@ class StripeWebhookHandler:
     @classmethod
     def handle_subscription_cancelled(cls, uid: str, stripe_sub):
         logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
-        _remove_subscription_for_user(
-            provider=cls.PROVIDER, uid=uid, external_id=stripe_sub.id
-        )
+        set_free_subscription_for_user(uid=uid)
 
 
 def add_balance_for_payment(
@@ -197,29 +193,30 @@ def add_balance_for_payment(
 
 def set_user_subscription(
     *,
-    provider: PaymentProvider,
-    plan: PricingPlan,
     uid: str,
+    plan: PricingPlan,
+    provider: PaymentProvider,
     external_id: str | None,
-):
+) -> Subscription:
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
     existing = user.subscription
+
+    defaults = {"plan": plan.db_value}
     if existing:
-        defaults = {
+        # transfer old auto recharge settings - whatever they are
+        defaults |= {
             "auto_recharge_enabled": user.subscription.auto_recharge_enabled,
             "auto_recharge_topup_amount": user.subscription.auto_recharge_topup_amount,
             "auto_recharge_balance_threshold": user.subscription.auto_recharge_balance_threshold,
             "monthly_spending_budget": user.subscription.monthly_spending_budget,
             "monthly_spending_notification_threshold": user.subscription.monthly_spending_notification_threshold,
         }
-    else:
-        defaults = {}
 
     with transaction.atomic():
         subscription, created = Subscription.objects.get_or_create(
             payment_provider=provider,
             external_id=external_id,
-            defaults=dict(plan=plan.db_value, **defaults),
+            defaults=defaults,
         )
 
         subscription.plan = plan.db_value
@@ -229,28 +226,22 @@ def set_user_subscription(
         user.subscription = subscription
         user.save(update_fields=["subscription"])
 
-    if not existing:
-        return
+    if existing:
+        # cancel existing subscription if it's not the same as the new one
+        if existing.external_id != external_id:
+            existing.cancel()
 
-    # cancel existing subscription if it's not the same as the new one
-    if existing.external_id != external_id:
-        existing.cancel()
+        # delete old db record if it exists
+        if existing.id != subscription.pk:
+            existing.delete()
 
-    # delete old db record if it exists
-    if existing.id != subscription.id:
-        existing.delete()
+    return subscription
 
 
-def _remove_subscription_for_user(
-    *, uid: str, provider: PaymentProvider, external_id: str
-):
-    try:
-        user = AppUser.objects.get(uid=uid)
-    except AppUser.DoesNotExist:
-        logger.warning(f"User {uid} not found")
-        return
-
-    user.subscription.plan = PricingPlan.STARTER.db_value
-    user.subscription.payment_provider = None
-    user.subscription.external_id = None
-    user.subscription.save(update_fields=["plan", "payment_provider", "external_id"])
+def set_free_subscription_for_user(*, uid: str) -> Subscription:
+    return set_user_subscription(
+        uid=uid,
+        plan=PricingPlan.STARTER,
+        provider=PaymentProvider.STRIPE,
+        external_id=None,
+    )
