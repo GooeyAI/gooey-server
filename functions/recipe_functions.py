@@ -53,6 +53,7 @@ def call_recipe_functions(
             request_body=dict(
                 variables=sr.state.get("variables", {}) | variables | fn_vars,
             ),
+            deduct_credits=False,
         )
 
         CalledFunction.objects.create(

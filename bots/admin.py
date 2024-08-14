@@ -438,7 +438,7 @@ class SavedRunAdmin(admin.ModelAdmin):
             page = Workflow(sr.workflow).page_cls(
                 request=SimpleNamespace(user=AppUser.objects.get(uid=sr.uid))
             )
-            page.call_runner_task(sr)
+            page.call_runner_task(sr, deduct_credits=False)
         self.message_user(
             request,
             f"Started re-running {queryset.count()} tasks in the background.",

@@ -332,6 +332,7 @@ def submit_api_call(
     query_params: dict,
     retention_policy: RetentionPolicy = None,
     enable_rate_limits: bool = False,
+    deduct_credits: bool = True,
 ) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
     # init a new page for every request
     self = page_cls(request=SimpleNamespace(user=user))
@@ -357,7 +358,7 @@ def submit_api_call(
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
     # submit the task
-    result = self.call_runner_task(sr)
+    result = self.call_runner_task(sr, deduct_credits=deduct_credits)
     return self, result, sr.run_id, sr.uid
 
 

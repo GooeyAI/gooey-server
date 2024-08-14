@@ -1686,7 +1686,7 @@ class BasePage:
             }
         )
 
-    def call_runner_task(self, sr: SavedRun):
+    def call_runner_task(self, sr: SavedRun, deduct_credits: bool = True):
         from celeryapp.tasks import runner_task, post_runner_tasks
 
         chain = (
@@ -1697,6 +1697,7 @@ class BasePage:
                 uid=sr.uid,
                 channel=self.realtime_channel_name(sr.run_id, sr.uid),
                 unsaved_state=self._unsaved_state(),
+                deduct_credits=deduct_credits,
             )
             | post_runner_tasks.s()
         )

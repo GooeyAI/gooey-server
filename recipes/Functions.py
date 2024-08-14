@@ -86,12 +86,12 @@ class FunctionsPage(BasePage):
         )
 
     def get_price_roundoff(self, state: dict) -> float:
-        try:
-            # called from another workflow don't charge any credits
-            CalledFunction.objects.get(function_run=self.get_current_sr())
+        if CalledFunction.objects.filter(function_run=self.get_current_sr()).exists():
             return 0
-        except CalledFunction.DoesNotExist:
-            return self.price
+        return super().get_price_roundoff(state)
+
+    def additional_notes(self):
+        return "\nFunctions are free if called from another workflow."
 
     def render_variables(self):
         variables_input(
