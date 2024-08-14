@@ -363,6 +363,7 @@ class SavedRun(models.Model):
         request_body: dict,
         enable_rate_limits: bool = False,
         parent_pr: "PublishedRun" = None,
+        deduct_credits: bool = True,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -384,6 +385,7 @@ class SavedRun(models.Model):
                     user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
+                    deduct_credits=deduct_credits,
                 ),
             )
 
@@ -1818,12 +1820,14 @@ class PublishedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        deduct_credits: bool = True,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         return self.saved_run.submit_api_call(
             current_user=current_user,
             request_body=request_body,
             enable_rate_limits=enable_rate_limits,
             parent_pr=self,
+            deduct_credits=deduct_credits,
         )
 
 

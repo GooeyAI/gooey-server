@@ -10,6 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.prompt_vars import variables_input
+from functions.models import CalledFunction
 
 
 class ConsoleLogs(BaseModel):
@@ -22,6 +23,7 @@ class FunctionsPage(BasePage):
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
     show_settings = False
+    price = 1
 
     class RequestModel(BaseModel):
         code: str = Field(
@@ -82,6 +84,14 @@ class FunctionsPage(BasePage):
             language="javascript",
             height=300,
         )
+
+    def get_price_roundoff(self, state: dict) -> float:
+        if CalledFunction.objects.filter(function_run=self.get_current_sr()).exists():
+            return 0
+        return super().get_price_roundoff(state)
+
+    def additional_notes(self):
+        return "\nFunctions are free if called from another workflow."
 
     def render_variables(self):
         variables_input(
