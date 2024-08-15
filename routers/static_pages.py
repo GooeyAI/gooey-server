@@ -40,7 +40,7 @@ def serve_static_file(request: Request) -> Response | None:
                 status_code=HTTP_308_PERMANENT_REDIRECT,
             )
         html_url = bucket.blob(gcs_path + ".html").public_url
-        r = requests.get(html_url)
+        r = requests.get(html_url, headers={"Cache-Control": "no-cache"})
         if r.ok:
             html = r.content.decode()
             # replace sign in button with user's name if logged in
