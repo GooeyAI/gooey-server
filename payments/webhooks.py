@@ -1,8 +1,14 @@
+from copy import copy
+
 import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import AppUser, PaymentProvider, TransactionReason
+from app_users.models import (
+    AppUser,
+    PaymentProvider,
+    TransactionReason,
+)
 from daras_ai_v2 import paypal
 from .models import Subscription
 from .plans import PricingPlan
@@ -69,7 +75,12 @@ class PaypalWebhookHandler:
     @classmethod
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
-        set_free_subscription_for_user(uid=pp_sub.custom_id)
+        set_user_subscription(
+            uid=pp_sub.custom_id,
+            plan=PricingPlan.STARTER,
+            provider=None,
+            external_id=None,
+        )
 
 
 class StripeWebhookHandler:
@@ -77,6 +88,8 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_invoice_paid(cls, uid: str, invoice: stripe.Invoice):
+        from app_users.tasks import save_stripe_default_payment_method
+
         kwargs = {}
         if invoice.subscription:
             kwargs["plan"] = PricingPlan.get_by_key(
@@ -95,14 +108,25 @@ class StripeWebhookHandler:
             reason = TransactionReason.AUTO_RECHARGE
         else:
             reason = TransactionReason.ADDON
+
+        amount = invoice.lines.data[0].quantity
+        charged_amount = invoice.lines.data[0].amount
         add_balance_for_payment(
             uid=uid,
-            amount=invoice.lines.data[0].quantity,
+            amount=amount,
             invoice_id=invoice.id,
             payment_provider=cls.PROVIDER,
-            charged_amount=invoice.lines.data[0].amount,
+            charged_amount=charged_amount,
             reason=reason,
             **kwargs,
+        )
+
+        save_stripe_default_payment_method.delay(
+            payment_intent_id=invoice.payment_intent,
+            uid=uid,
+            amount=amount,
+            charged_amount=charged_amount,
+            reason=reason,
         )
 
     @classmethod
@@ -122,9 +146,9 @@ class StripeWebhookHandler:
             # no subscription_id, so update the customer's default payment method instead
             stripe.Customer.modify(
                 customer_id,
-                invoice_settings={
-                    "default_payment_method": setup_intent.payment_method
-                },
+                invoice_settings=dict(
+                    default_payment_method=setup_intent.payment_method
+                ),
             )
 
     @classmethod
@@ -157,9 +181,13 @@ class StripeWebhookHandler:
         )
 
     @classmethod
-    def handle_subscription_cancelled(cls, uid: str, stripe_sub):
-        logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
-        set_free_subscription_for_user(uid=uid)
+    def handle_subscription_cancelled(cls, uid: str):
+        set_user_subscription(
+            uid=uid,
+            plan=PricingPlan.STARTER,
+            provider=PaymentProvider.STRIPE,
+            external_id=None,
+        )
 
 
 def add_balance_for_payment(
@@ -195,53 +223,33 @@ def set_user_subscription(
     *,
     uid: str,
     plan: PricingPlan,
-    provider: PaymentProvider,
+    provider: PaymentProvider | None,
     external_id: str | None,
+    amount: int = None,
+    charged_amount: int = None,
 ) -> Subscription:
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    existing = user.subscription
-
-    defaults = {"plan": plan.db_value}
-    if existing:
-        # transfer old auto recharge settings - whatever they are
-        defaults |= {
-            "auto_recharge_enabled": user.subscription.auto_recharge_enabled,
-            "auto_recharge_topup_amount": user.subscription.auto_recharge_topup_amount,
-            "auto_recharge_balance_threshold": user.subscription.auto_recharge_balance_threshold,
-            "monthly_spending_budget": user.subscription.monthly_spending_budget,
-            "monthly_spending_notification_threshold": user.subscription.monthly_spending_notification_threshold,
-        }
-
     with transaction.atomic():
-        subscription, created = Subscription.objects.get_or_create(
-            payment_provider=provider,
-            external_id=external_id,
-            defaults=defaults,
-        )
+        user = AppUser.objects.get_or_create_from_uid(uid)[0]
 
-        subscription.plan = plan.db_value
-        subscription.full_clean()
-        subscription.save()
+        old_sub = user.subscription
+        if old_sub:
+            new_sub = copy(old_sub)
+        else:
+            old_sub = None
+            new_sub = Subscription()
 
-        user.subscription = subscription
-        user.save(update_fields=["subscription"])
+        new_sub.plan = plan.db_value
+        new_sub.payment_provider = provider
+        new_sub.external_id = external_id
+        new_sub.full_clean(amount=amount, charged_amount=charged_amount)
+        new_sub.save()
 
-    if existing:
-        # cancel existing subscription if it's not the same as the new one
-        if existing.external_id != external_id:
-            existing.cancel()
+        if not old_sub:
+            user.subscription = new_sub
+            user.save(update_fields=["subscription"])
 
-        # delete old db record if it exists
-        if existing.id != subscription.pk:
-            existing.delete()
+    # cancel previous subscription if it's not the same as the new one
+    if old_sub and old_sub.external_id != external_id:
+        old_sub.cancel()
 
-    return subscription
-
-
-def set_free_subscription_for_user(*, uid: str) -> Subscription:
-    return set_user_subscription(
-        uid=uid,
-        plan=PricingPlan.STARTER,
-        provider=PaymentProvider.STRIPE,
-        external_id=None,
-    )
+    return new_sub

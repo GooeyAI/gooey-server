@@ -1,62 +1,54 @@
 import stripe
 from loguru import logger
 
-from app_users.models import AppUserTransaction
+from app_users.models import PaymentProvider, TransactionReason
 from celeryapp.celeryconfig import app
-from payments.webhooks import set_free_subscription_for_user
+from payments.models import Subscription
+from payments.plans import PricingPlan
+from payments.webhooks import set_user_subscription
 
 
 @app.task
-def after_stripe_addon(txn_id: int):
-    txn = AppUserTransaction.objects.get(id=txn_id)
+def save_stripe_default_payment_method(
+    *,
+    payment_intent_id: str,
+    uid: str,
+    amount: int,
+    charged_amount: int,
+    reason: TransactionReason,
+):
+    pi = stripe.PaymentIntent.retrieve(payment_intent_id, expand=["payment_method"])
+    pm = pi.payment_method
+    if not (pm and pm.customer):
+        logger.error(
+            f"Failed to retrieve payment method for payment intent {payment_intent_id}"
+        )
+        return
 
-    default_pm = stripe_set_default_payment_method(txn)
-    if default_pm and not txn.user.subscription:
-        # user is not on an existing subscription... add one so that user can configure auto recharge
-        subscription = set_free_subscription_for_user(uid=txn.user.uid)
-        if (
-            subscription.auto_recharge_enabled
-            and not subscription.monthly_spending_budget
-        ):
-            subscription.monthly_spending_budget = int(3 * txn.charged_amount / 100)
-            subscription.monthly_spending_notification_threshold = int(
-                0.8 * subscription.monthly_spending_budget
-            )
-            subscription.save(
-                update_fields=[
-                    "monthly_spending_budget",
-                    "monthly_spending_notification_threshold",
-                ]
-            )
-
-
-def stripe_set_default_payment_method(
-    instance: AppUserTransaction,
-) -> stripe.PaymentMethod | None:
     # update customer's defualt payment method
-    # note... that if a customer has an active subscription, the payment method attached there will be preferred
+    # note: if a customer has an active subscription, the payment method attached there will be preferred
     # see `stripe_get_default_payment_method` in payments/models.py module
-    invoice = stripe.Invoice.retrieve(
-        instance.invoice_id, expand=["payment_intent", "payment_intent.payment_method"]
+    logger.info(
+        f"Updating default payment method for customer {pm.customer} to {pm.id}"
     )
-    if (
-        invoice.payment_intent
-        and invoice.payment_intent.status == "succeeded"
-        and invoice.payment_intent.payment_method
-    ):
-        if not invoice.payment_intent.payment_method.customer:
-            logger.info(
-                "Can't save payment method because it's not attached to a customer"
-            )
-            return
+    stripe.Customer.modify(
+        pm.customer,
+        invoice_settings=dict(default_payment_method=pm),
+    )
 
-        logger.info(
-            f"Updating default payment method for customer {invoice.customer} to {invoice.payment_intent.payment_method}"
+    # if user doesn't already have a active billing/autorecharge info, so we don't need to do anything
+    # set user's subscription to the free plan
+    if (
+        reason == TransactionReason.ADDON
+        and not Subscription.objects.filter(
+            user__uid=uid, payment_provider__isnull=False
+        ).exists()
+    ):
+        set_user_subscription(
+            uid=uid,
+            plan=PricingPlan.STARTER,
+            provider=PaymentProvider.STRIPE,
+            external_id=None,
+            amount=amount,
+            charged_amount=charged_amount,
         )
-        stripe.Customer.modify(
-            invoice.customer,
-            invoice_settings={
-                "default_payment_method": invoice.payment_intent.payment_method
-            },
-        )
-        return invoice.payment_intent.payment_method

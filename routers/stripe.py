@@ -46,6 +46,6 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
         case "customer.subscription.created" | "customer.subscription.updated":
             StripeWebhookHandler.handle_subscription_updated(uid, data)
         case "customer.subscription.deleted":
-            StripeWebhookHandler.handle_subscription_cancelled(uid, data)
+            StripeWebhookHandler.handle_subscription_cancelled(uid)
 
     return JSONResponse({"status": "success"})

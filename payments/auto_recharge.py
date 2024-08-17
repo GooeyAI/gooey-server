@@ -107,6 +107,9 @@ def _auto_recharge_user(user: AppUser):
     # get default payment method and attempt payment
     assert invoice.status == "open"  # sanity check
     pm = user.subscription.stripe_get_default_payment_method()
+    if not pm:
+        logger.warning(f"{user} has no default payment method, cannot auto-recharge")
+        return
 
     try:
         invoice_data = invoice.pay(payment_method=pm)

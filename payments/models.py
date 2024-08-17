@@ -76,11 +76,13 @@ class Subscription(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["payment_provider", "external_id"],
-                condition=Q(plan__ne=PricingPlan.STARTER.db_value),
+                condition=Q(plan__monthly_charge__gt=0),
                 name="unique_provider_and_subscription_id",
             )
         ]
-        indexes = [models.Index(fields=["plan"])]
+        indexes = [
+            models.Index(fields=["plan"]),
+        ]
 
     def __str__(self):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
@@ -90,36 +92,38 @@ class Subscription(models.Model):
             ret = f"Auto | {ret}"
         return ret
 
-    def full_clean(self, *args, **kwargs):
+    def full_clean(
+        self, amount: int = None, charged_amount: int = None, *args, **kwargs
+    ):
+        if self.auto_recharge_enabled:
+            if amount is None:
+                amount = PricingPlan.from_sub(self).credits
+            if charged_amount is None:
+                charged_amount = PricingPlan.from_sub(self).monthly_charge * 100
+            self.ensure_default_auto_recharge_params(
+                amount=amount, charged_amount=charged_amount
+            )
+        return super().full_clean(*args, **kwargs)
+
+    def ensure_default_auto_recharge_params(self, *, amount: int, charged_amount: int):
+        if amount <= 0 or charged_amount <= 0:
+            return
+
         if not self.auto_recharge_balance_threshold:
-            self.auto_recharge_balance_threshold = (
-                self._get_default_auto_recharge_balance_threshold()
+            # 25% of the credits
+            self.auto_recharge_balance_threshold = nearest_choice(
+                settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES, 0.25 * amount
             )
 
         if not self.monthly_spending_budget:
-            self.monthly_spending_budget = self._get_default_monthly_spending_budget()
+            # 3x the charged amount
+            self.monthly_spending_budget = 3 * charged_amount / 100  # in dollars
 
         if not self.monthly_spending_notification_threshold:
-            self.monthly_spending_notification_threshold = (
-                self._get_default_monthly_spending_notification_threshold()
+            # 80% of the monthly budget
+            self.monthly_spending_notification_threshold = int(
+                0.8 * self.monthly_spending_budget
             )
-
-        return super().full_clean(*args, **kwargs)
-
-    def _get_default_auto_recharge_balance_threshold(self):
-        # 25% of the monthly credit subscription
-        threshold = int(PricingPlan.from_sub(self).credits * 0.25)
-        return nearest_choice(
-            settings.AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES, threshold
-        )
-
-    def _get_default_monthly_spending_budget(self):
-        # 3x the monthly subscription charge
-        return 3 * PricingPlan.from_sub(self).monthly_charge
-
-    def _get_default_monthly_spending_notification_threshold(self):
-        # 80% of the monthly budget
-        return int(0.8 * self._get_default_monthly_spending_budget())
 
     @property
     def has_user(self) -> bool:
@@ -131,15 +135,25 @@ class Subscription(models.Model):
             return True
 
     def is_paid(self) -> bool:
-        return self.plan != PricingPlan.STARTER.db_value
+        return PricingPlan.from_sub(self).monthly_charge > 0
 
     def cancel(self):
+        from payments.webhooks import StripeWebhookHandler
+
         if not self.is_paid():
             return
 
         match self.payment_provider:
             case PaymentProvider.STRIPE:
-                stripe.Subscription.cancel(self.external_id)
+                try:
+                    stripe.Subscription.cancel(self.external_id)
+                except stripe.error.InvalidRequestError as e:
+                    if e.code == "resource_missing":
+                        StripeWebhookHandler.handle_subscription_cancelled(
+                            self.user.uid
+                        )
+                    else:
+                        raise
             case PaymentProvider.PAYPAL:
                 paypal.Subscription.retrieve(self.external_id).cancel()
             case _:
@@ -191,21 +205,25 @@ class Subscription(models.Model):
                 )
 
     def stripe_get_default_payment_method(self) -> stripe.PaymentMethod | None:
-        if self.payment_provider == PaymentProvider.STRIPE and self.is_paid():
-            subscription = stripe.Subscription.retrieve(self.external_id)
-            if subscription.default_payment_method:
-                return stripe.PaymentMethod.retrieve(
-                    subscription.default_payment_method
-                )
+        if self.payment_provider != PaymentProvider.STRIPE:
+            return None
 
-        customer = self.stripe_get_customer()
+        if self.external_id:
+            subscription = stripe.Subscription.retrieve(
+                self.external_id, expand=["default_payment_method"]
+            )
+            if subscription.default_payment_method:
+                return subscription.default_payment_method
+
+        customer_id = self.stripe_get_customer_id()
+        customer = stripe.Customer.retrieve(
+            customer_id, expand=["invoice_settings.default_payment_method"]
+        )
         if (
             customer.invoice_settings
             and customer.invoice_settings.default_payment_method
         ):
-            return stripe.PaymentMethod.retrieve(
-                customer.invoice_settings.default_payment_method
-            )
+            return customer.invoice_settings.default_payment_method
 
         return None
 
@@ -222,9 +240,9 @@ class Subscription(models.Model):
         - Fetch a `metadata_key` invoice that was recently paid
         - Create an invoice with amount=`amount_in_dollars` and `metadata_key` set to true
         """
-        customer = self.stripe_get_customer()
+        customer_id = self.stripe_get_customer_id()
         invoices = stripe.Invoice.list(
-            customer=customer.id,
+            customer=customer_id,
             collection_method="charge_automatically",
         )
         invoices = [
@@ -250,16 +268,16 @@ class Subscription(models.Model):
         )
 
     def stripe_create_auto_invoice(self, *, amount_in_dollars: int, metadata_key: str):
-        customer = self.stripe_get_customer()
+        customer_id = self.stripe_get_customer_id()
         invoice = stripe.Invoice.create(
-            customer=customer.id,
+            customer=customer_id,
             collection_method="charge_automatically",
             metadata={metadata_key: True},
             auto_advance=False,
             pending_invoice_items_behavior="exclude",
         )
         stripe.InvoiceItem.create(
-            customer=customer.id,
+            customer=customer_id,
             invoice=invoice,
             price_data={
                 "currency": "usd",
@@ -275,15 +293,12 @@ class Subscription(models.Model):
         invoice.finalize_invoice(auto_advance=True)
         return invoice
 
-    def stripe_get_customer(self) -> stripe.Customer:
-        if self.payment_provider == PaymentProvider.STRIPE and self.is_paid():
-            subscription = stripe.Subscription.retrieve(
-                self.external_id, expand=["customer"]
-            )
+    def stripe_get_customer_id(self) -> str:
+        if self.payment_provider == PaymentProvider.STRIPE and self.external_id:
+            subscription = stripe.Subscription.retrieve(self.external_id)
             return subscription.customer
-
-        assert self.has_user
-        return self.user.get_or_create_stripe_customer()
+        else:
+            return self.user.get_or_create_stripe_customer().id
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
         from payments.webhooks import StripeWebhookHandler
@@ -295,6 +310,8 @@ class Subscription(models.Model):
         if invoice.status != "open":
             return False
         pm = self.stripe_get_default_payment_method()
+        if not pm:
+            return False
         invoice = invoice.pay(payment_method=pm)
         if not invoice.paid:
             return False
@@ -318,7 +335,7 @@ class Subscription(models.Model):
                 )
             case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
-                    customer=self.stripe_get_customer().id,
+                    customer=self.stripe_get_customer_id(),
                     return_url=get_app_route_url(account_route),
                 )
                 return portal.url
@@ -350,10 +367,10 @@ class Subscription(models.Model):
         )
 
 
-def nearest_choice(choices: list[int], value: int) -> int:
+def nearest_choice(choices: list[int], value: float) -> int:
     # nearest choice that is less than or equal to the value (or the minimum choice if value is the least)
-    le_choices = [choice for choice in choices if choice <= value]
-    if not le_choices:
-        return min(choices)
-    else:
-        return min(le_choices, key=lambda x: abs(value - x))
+    return min(
+        filter(lambda x: x <= value, choices),
+        key=lambda x: abs(x - value),
+        default=min(choices),
+    )

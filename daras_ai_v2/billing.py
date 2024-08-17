@@ -36,7 +36,7 @@ def billing_page(user: AppUser):
         render_addon_section(user, selected_payment_provider)
 
     if user.subscription:
-        if user.subscription.payment_provider != PaymentProvider.PAYPAL:
+        if user.subscription.payment_provider == PaymentProvider.STRIPE:
             with gui.div(className="my-5"):
                 render_auto_recharge_section(user)
 
@@ -60,11 +60,10 @@ def render_payments_setup():
 
 def render_current_plan(user: AppUser):
     plan = PricingPlan.from_sub(user.subscription)
-    provider = (
-        PaymentProvider(user.subscription.payment_provider)
-        if user.subscription.payment_provider
-        else None
-    )
+    if user.subscription.payment_provider:
+        provider = PaymentProvider(user.subscription.payment_provider)
+    else:
+        provider = None
 
     with gui.div(className=f"{rounded_border} border-dark"):
         # ROW 1: Plan title and next invoice date
@@ -102,7 +101,10 @@ def render_current_plan(user: AppUser):
         with left:
             gui.write(f"# {plan.pricing_title()}", className="no-margin")
             if plan.monthly_charge:
-                provider_text = f" **via {provider.label}**" if provider else ""
+                if provider:
+                    provider_text = f" **via {provider.label}**"
+                else:
+                    provider_text = ""
                 gui.caption("per month" + provider_text)
 
         with right, gui.div(className="text-end"):
@@ -206,7 +208,6 @@ def _render_plan_action_button(
         user.subscription and user.subscription.plan == PricingPlan.ENTERPRISE.db_value
     ):
         # don't show upgrade/downgrade buttons for enterprise customers
-        # assumption: anyone without a payment provider attached is admin/enterprise
         return
     else:
         if plan.credits > current_plan.credits:
@@ -428,7 +429,7 @@ def render_stripe_addon_button(dollat_amt: int, user: AppUser):
         "Confirm Purchase", key=f"confirm-purchase-{dollat_amt}"
     )
     if gui.button(f"${dollat_amt:,}", type="primary"):
-        if user.subscription and user.subscription.payment_provider:
+        if user.subscription and user.subscription.stripe_get_default_payment_method():
             confirm_purchase_modal.open()
         else:
             stripe_addon_checkout_redirect(user, dollat_amt)
@@ -478,9 +479,8 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
         customer=user.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
+        saved_payment_method_options={"payment_method_save": "enabled"},
+        payment_intent_data={"setup_future_usage": "off_session"},
     )
     raise gui.RedirectException(checkout_session.url, status_code=303)
 
@@ -512,21 +512,35 @@ def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
         # already subscribed to some plan
         return
 
+    pm = user.subscription and user.subscription.stripe_get_default_payment_method()
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[(plan.get_stripe_line_item())],
-        mode="subscription",
-        success_url=get_app_route_url(payment_processing_route),
-        cancel_url=get_app_route_url(account_route),
-        customer=user.get_or_create_stripe_customer(),
-        metadata=metadata,
-        subscription_data={"metadata": metadata},
-        allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
-    )
-    raise gui.RedirectException(checkout_session.url, status_code=303)
+    line_items = [plan.get_stripe_line_item()]
+    if pm:
+        # directly create the subscription without checkout
+        stripe.Subscription.create(
+            customer=pm.customer,
+            items=line_items,
+            metadata=metadata,
+            default_payment_method=pm.id,
+            proration_behavior="none",
+        )
+        raise gui.RedirectException(
+            get_app_route_url(payment_processing_route), status_code=303
+        )
+    else:
+        checkout_session = stripe.checkout.Session.create(
+            mode="subscription",
+            success_url=get_app_route_url(payment_processing_route),
+            cancel_url=get_app_route_url(account_route),
+            allow_promotion_codes=True,
+            customer=user.get_or_create_stripe_customer(),
+            line_items=line_items,
+            metadata=metadata,
+            subscription_data={"metadata": metadata},
+            saved_payment_method_options={"payment_method_save": "enabled"},
+            payment_intent_data={"setup_future_usage": "off_session"},
+        )
+        raise gui.RedirectException(checkout_session.url, status_code=303)
 
 
 def render_paypal_subscription_button(
