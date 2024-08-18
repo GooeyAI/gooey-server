@@ -17,6 +17,8 @@ class TwilioSMS(BotInterface):
     platform = Platform.TWILIO
 
     def __init__(self, data: dict):
+        # {'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'SmsMessageSid': ['XXXX'], 'NumMedia': ['XXXX'], 'ToCity': ['XXXX'], 'SmsSid': ['XXXX'], 'FromState': ['XXXX'], 'SmsStatus': ['XXXX'], 'Body': ['XXXX'], 'FromCountry': ['XXXX'], 'To': ['XXXX'], 'ToZip': ['XXXX'], 'NumSegments': ['1'], 'MessageSid': ['XXXX'], 'AccountSid': ['XXXX'], 'From': ['XXXX'], 'ApiVersion': ['2010-04-01']}
+        # {'ToCountry': ['XXXX'], 'MediaContentType0': ['audio/mp4'], 'ToState': ['XXXX'], 'SmsMessageSid': ['XXXX'], 'NumMedia': ['1'], 'ToCity': ['XXXX'], 'SmsSid': ['XXXX'], 'FromState': ['XXXX'], 'SmsStatus': ['received'], 'FromCountry': ['XXXX'], 'To': ['XXXX'], 'ToZip': ['XXXX'], 'NumSegments': ['1'], 'MessageSid': ['XXXX'], 'AccountSid': ['XXXX'], 'From': ['XXXX'], 'MediaUrl0': ['XXXX'], 'ApiVersion': ['2010-04-01']}
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
@@ -30,8 +32,44 @@ class TwilioSMS(BotInterface):
         self.bot_id = bi.twilio_phone_number.as_e164
         self.user_id = self.convo.twilio_phone_number.as_e164
 
-        self._text = data["Body"][0]
+        self._text = data["Body"][0] if "Body" in data else None
         self.input_type = "text"
+
+        # Parse media attachments
+        num_media = int(data["NumMedia"][0] or 0)
+        if num_media > 0:
+            # temporary URLs, can be made permanent with twilio's MMSMedia api (or uploaded to cloud bucket) if needed
+            media_urls = [data[f"MediaUrl{i}"][0] for i in range(num_media)]
+            content_types = [data[f"MediaContentType{i}"][0] for i in range(num_media)]
+
+            # find the first audio or video
+            audio_index = (
+                [i for i, ct in enumerate(content_types) if ct.startswith("audio/")]
+                + [None]
+            )[0]
+            if audio_index is None:
+                audio_index = (
+                    [i for i, ct in enumerate(content_types) if ct.startswith("video/")]
+                    + [None]
+                )[0]
+            self._audio_url = None
+            if audio_index is not None:
+                self.input_type = "audio"
+                self._audio_url = media_urls[audio_index]
+
+            # find the images
+            self._image_urls = []
+            for media_url in media_urls:
+                if media_url.startswith("image/"):
+                    self.input_type = "image"
+                    self._image_urls.append(media_url)
+
+            # count everything as a document
+            self._document_urls = media_urls
+
+            # if we have both audio and images, or only non image/audio files, treat them as documents
+            if bool(self._audio_url) == bool(self._image_urls):
+                self.input_type = "document"
 
         self.user_msg_id = data["MessageSid"][0]
 
@@ -39,6 +77,15 @@ class TwilioSMS(BotInterface):
 
     def get_input_text(self) -> str | None:
         return self._text
+
+    def get_input_audio(self) -> str | None:
+        return self._audio_url
+
+    def get_input_images(self) -> list[str] | None:
+        return self._image_urls
+
+    def get_input_documents(self) -> list[str] | None:
+        return self._document_urls
 
     def _send_msg(
         self,
