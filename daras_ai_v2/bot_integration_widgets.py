@@ -1,12 +1,13 @@
+import json
 from itertools import zip_longest
 from textwrap import dedent
 
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
@@ -311,7 +312,7 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
         return None
 
 
-def get_web_widget_embed_code(bi: BotIntegration) -> str:
+def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str:
     lib_src = get_app_route_url(
         chat_lib_route,
         path_params=dict(
@@ -319,11 +320,19 @@ def get_web_widget_embed_code(bi: BotIntegration) -> str:
             integration_name=slugify(bi.name) or "untitled",
         ),
     ).rstrip("/")
+    if config is None:
+        config = {}
     return dedent(
-        f"""
-        <div id="gooey-embed"></div>
-        <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
         """
+        <div id="gooey-embed"></div>
+        <script>
+            function onLoadGooeyEmbed() {
+                GooeyEmbed.mount(%(config_json)s);
+            }
+        </script>
+        <script async defer onload="onLoadGooeyEmbed()" src="%(lib_src)s"></script>
+        """
+        % dict(config_json=json.dumps(config), lib_src=lib_src)
     ).strip()
 
 

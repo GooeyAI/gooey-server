@@ -503,6 +503,7 @@ def chat_route(
     request: Request, integration_id: str = None, integration_name: str = None
 ):
     from routers.bots_api import api_hashids
+    from daras_ai_v2.bot_integration_widgets import get_web_widget_embed_code
 
     try:
         bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
@@ -514,6 +515,7 @@ def chat_route(
         {
             "request": request,
             "bi": bi,
+            "embed_code": get_web_widget_embed_code(bi, config=dict(mode="fullscreen")),
             "meta": raw_build_meta_tags(
                 url=get_og_url_path(request),
                 title=f"Chat with {bi.name}",
