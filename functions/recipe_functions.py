@@ -53,6 +53,7 @@ def call_recipe_functions(
             request_body=dict(
                 variables=sr.state.get("variables", {}) | variables | fn_vars,
             ),
+            deduct_credits=False,
         )
 
         CalledFunction.objects.create(
@@ -117,7 +118,7 @@ def functions_input(current_user: AppUser, key="functions"):
         from daras_ai_v2.workflow_url_input import workflow_url_input
         from recipes.Functions import FunctionsPage
 
-        col1, col2 = gui.columns([2, 10], responsive=False)
+        col1, col2 = gui.columns([3, 9], responsive=True)
         with col1:
             col1.node.props["className"] += " pt-1"
             d["trigger"] = enum_selector(
@@ -133,7 +134,9 @@ def functions_input(current_user: AppUser, key="functions"):
                 internal_state=d,
                 del_key=del_key,
                 current_user=current_user,
+                include_root=False,
             )
+        col2.node.children[0].props["className"] += " col-12"
 
     if gui.checkbox(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
@@ -141,12 +144,18 @@ def functions_input(current_user: AppUser, key="functions"):
         value=key in gui.session_state,
     ):
         gui.session_state.setdefault(key, [{}])
+        with gui.div(className="d-flex align-items-center"):
+            gui.write("###### Functions")
+        gui.caption(
+            "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
+            unsafe_allow_html=True,
+        )
         list_view_editor(
-            add_btn_label="➕ Add Function",
+            add_btn_label="Add Function",
+            add_btn_type="tertiary",
             key=key,
             render_inputs=render_function_input,
         )
-        gui.write("---")
     else:
         gui.session_state.pop(key, None)
 

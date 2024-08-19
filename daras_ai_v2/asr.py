@@ -75,16 +75,15 @@ WHISPER_SUPPORTED = {
     "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
 }  # fmt: skip
 
-# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
+# https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
 # For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
-SEAMLESS_SUPPORTED = {
-    "afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb",
-    "cmn", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "gaz", "gle", "glg", "guj", "heb", "hin",
-    "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kam", "kan", "kat", "kaz", "kea", "khk", "khm",
-    "kir", "kor", "lao", "lit", "ltz", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld",
-    "nno", "nob", "npi", "nya", "oci", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna",
-    "snd", "som", "spa", "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie",
-    "xho", "yor", "yue", "zlm", "zul"
+SEAMLESS_v2_ASR_SUPPORTED = {
+    "afr", "amh", "arb", "ary", "arz", "asm", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb", "cmn",
+    "cmn-Hant", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "fuv", "gaz", "gle", "glg", "guj", "heb",
+    "hin", "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kan", "kat", "kaz", "khk", "khm", "kir",
+    "kor", "lao", "lit", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld", "nno", "nob",
+    "npi", "nya", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna", "snd", "som", "spa",
+    "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "yor", "yue", "zul",
 }  # fmt: skip
 
 AZURE_SUPPORTED = {
@@ -199,7 +198,8 @@ MMS_SUPPORTED = {
 }  # fmt: skip
 
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
-GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
+                       'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
 
 
@@ -215,11 +215,22 @@ class AsrModels(Enum):
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
-    seamless_m4t = "Seamless M4T (Facebook Research)"
+    seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
+    seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
+
     def supports_auto_detect(self) -> bool:
-        return self not in {self.azure, self.gcp_v1, self.mms_1b_all}
+        return self not in {
+            self.azure,
+            self.gcp_v1,
+            self.mms_1b_all,
+            self.seamless_m4t_v2,
+        }
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.seamless_m4t}
 
 
 asr_model_ids = {
@@ -230,7 +241,7 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
-    AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
+    AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
 }
 
@@ -248,7 +259,7 @@ asr_supported_languages = {
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
-    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
+    AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
 }
@@ -783,15 +794,14 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-    elif selected_model == AsrModels.seamless_m4t:
+    elif selected_model == AsrModels.seamless_m4t_v2:
         data = call_celery_task(
-            "seamless",
+            "seamless.asr",
             pipeline=dict(
-                model_id=asr_model_ids[AsrModels.seamless_m4t],
+                model_id=asr_model_ids[AsrModels.seamless_m4t_v2],
             ),
             inputs=dict(
                 audio=audio_url,
-                task="ASR",
                 src_lang=language,
             ),
         )

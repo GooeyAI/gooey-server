@@ -17,6 +17,7 @@ copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
 time = '<i class="fa-regular fa-clock"></i>'
 email = '<i class="fa-solid fa-envelope"></i>'
+add = '<i class="fa-regular fa-add"></i>'
 
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'

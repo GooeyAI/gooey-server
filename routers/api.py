@@ -6,11 +6,11 @@ import typing
 from types import SimpleNamespace
 
 import gooey_gui as gui
-from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
 from fastapi import Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from furl import furl
 from pydantic import BaseModel, Field
@@ -42,7 +42,6 @@ from daras_ai_v2.base import (
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-
 from routers.custom_api_router import CustomAPIRouter
 
 app = CustomAPIRouter()
@@ -333,6 +332,7 @@ def submit_api_call(
     query_params: dict,
     retention_policy: RetentionPolicy = None,
     enable_rate_limits: bool = False,
+    deduct_credits: bool = True,
 ) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
     # init a new page for every request
     self = page_cls(request=SimpleNamespace(user=user))
@@ -358,7 +358,7 @@ def submit_api_call(
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
     # submit the task
-    result = self.call_runner_task(sr)
+    result = self.call_runner_task(sr, deduct_credits=deduct_credits)
     return self, result, sr.run_id, sr.uid
 
 
@@ -408,11 +408,13 @@ def build_sync_api_response(
     else:
         # return updated state
         return JSONResponse(
-            dict(
-                id=run_id,
-                url=web_url,
-                created_at=sr.created_at.isoformat(),
-                output=sr.api_output(),
+            jsonable_encoder(
+                dict(
+                    id=run_id,
+                    url=web_url,
+                    created_at=sr.created_at.isoformat(),
+                    output=sr.api_output(),
+                ),
             ),
         )
 

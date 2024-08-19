@@ -343,7 +343,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
-        gui.markdown("#### Capabilities")
+        gui.markdown("#### 💪 Capabilities")
         if gui.checkbox(
             "##### 🗣️ Text to Speech & Lipsync",
             value=bool(gui.session_state.get("tts_provider")),
@@ -425,9 +425,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if gui.checkbox(
             "##### 🩻 Photo & Document Intelligence",
-            value=bool(
-                gui.session_state.get("document_model"),
-            ),
+            value=bool(gui.session_state.get("document_model")),
         ):
             if settings.AZURE_FORM_RECOGNIZER_KEY:
                 doc_model_descriptions = azure_form_recognizer_models()
@@ -439,6 +437,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 options=doc_model_descriptions,
                 format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
             )
+            gui.write("---")
         else:
             gui.session_state["document_model"] = None
 
@@ -1475,7 +1474,7 @@ def infer_asr_model_and_language(
     elif "bho" in user_lang:
         asr_model = AsrModels.vakyansh_bhojpuri
     elif "sw" in user_lang:
-        asr_model = AsrModels.seamless_m4t
+        asr_model = AsrModels.seamless_m4t_v2
         asr_lang = "swh"
     else:
         asr_model = default

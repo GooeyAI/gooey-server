@@ -1,12 +1,13 @@
+import json
 from itertools import zip_longest
 from textwrap import dedent
 
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
@@ -94,7 +95,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
                 input_analysis_runs.append(dict(saved_run=sr, published_run=None))
 
     list_view_editor(
-        add_btn_label="➕ Add",
+        add_btn_label="Add",
         key="analysis_urls",
         render_inputs=render_workflow_url_input,
         flatten_dict_key="url",
@@ -311,7 +312,7 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
         return None
 
 
-def get_web_widget_embed_code(bi: BotIntegration) -> str:
+def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str:
     lib_src = get_app_route_url(
         chat_lib_route,
         path_params=dict(
@@ -319,11 +320,19 @@ def get_web_widget_embed_code(bi: BotIntegration) -> str:
             integration_name=slugify(bi.name) or "untitled",
         ),
     ).rstrip("/")
+    if config is None:
+        config = {}
     return dedent(
-        f"""
-        <div id="gooey-embed"></div>
-        <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
         """
+        <div id="gooey-embed"></div>
+        <script>
+            function onLoadGooeyEmbed() {
+                GooeyEmbed.mount(%(config_json)s);
+            }
+        </script>
+        <script async defer onload="onLoadGooeyEmbed()" src="%(lib_src)s"></script>
+        """
+        % dict(config_json=json.dumps(config), lib_src=lib_src)
     ).strip()
 
 
@@ -375,7 +384,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 mode="inline",
                 showSources=True,
                 enablePhotoUpload=False,
-                enableLipsyncVideo=False,
+                autoPlayResponses=True,
                 enableAudioMessage=True,
                 branding=(
                     dict(showPoweredByGooey=True)
@@ -397,8 +406,8 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             config["enableAudioMessage"] = gui.checkbox(
                 "Enable Audio Message", value=config["enableAudioMessage"]
             )
-            config["enableLipsyncVideo"] = gui.checkbox(
-                "Enable Lipsync Video", value=config["enableLipsyncVideo"]
+            config["autoPlayResponses"] = gui.checkbox(
+                "Auto-play responses", value=config["autoPlayResponses"]
             )
             # config["branding"]["showPoweredByGooey"] = gui.checkbox(
             #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]

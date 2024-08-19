@@ -41,6 +41,7 @@ def runner_task(
     uid: str,
     channel: str,
     unsaved_state: dict[str, typing.Any] = None,
+    deduct_credits: bool = True,
 ) -> int:
     start_time = time()
     error_msg = None
@@ -107,7 +108,8 @@ def runner_task(
 
     # run completed successfully, deduct credits
     else:
-        sr.transaction, sr.price = page.deduct_credits(gui.session_state)
+        if deduct_credits:
+            sr.transaction, sr.price = page.deduct_credits(gui.session_state)
 
     # save everything, mark run as completed
     finally:

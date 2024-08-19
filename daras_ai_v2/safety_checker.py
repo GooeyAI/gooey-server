@@ -33,6 +33,7 @@ def safety_checker_text(text_input: str):
         .submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),
+            deduct_credits=False,
         )
     )
 

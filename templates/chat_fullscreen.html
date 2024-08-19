@@ -12,10 +12,6 @@
     {% endfor %}
 </head>
 <body>
-<div id="gooey-embed"></div>
-<script src="lib.js"></script>
-<script>
-    GooeyEmbed.mount({ mode: "fullscreen"});
-</script>
+{{ embed_code | safe }}
 </body>
 </html>

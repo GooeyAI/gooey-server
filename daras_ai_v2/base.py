@@ -136,7 +136,7 @@ class BasePage:
 
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
-            title="🧩 Functions",
+            title="🧩 Developer Tools and Functions",
         )
         variables: dict[str, typing.Any] = Field(
             None,
@@ -1308,9 +1308,7 @@ class BasePage:
             return "/account/"
 
     def get_submit_container_props(self):
-        return dict(
-            className="position-sticky bottom-0 bg-white", style=dict(zIndex=100)
-        )
+        return dict(className="position-sticky bottom-0 bg-white")
 
     def render_submit_button(self, key="--submit-1"):
         with gui.div(**self.get_submit_container_props()):
@@ -1478,15 +1476,17 @@ class BasePage:
 
     # Functions in every recipe feels like overkill for now, hide it in settings
     functions_in_settings = True
+    show_settings = True
 
     def _render_input_col(self):
         self.render_form_v2()
         placeholder = gui.div()
 
-        with gui.expander("⚙️ Settings"):
-            if self.functions_in_settings:
-                functions_input(self.request.user)
-            self.render_settings()
+        if self.show_settings:
+            with gui.expander("⚙️ Settings"):
+                self.render_settings()
+                if self.functions_in_settings:
+                    functions_input(self.request.user)
 
         with placeholder:
             self.render_variables()
@@ -1501,7 +1501,6 @@ class BasePage:
 
     def render_variables(self):
         if not self.functions_in_settings:
-            gui.write("---")
             functions_input(self.request.user)
         variables_input(
             template_keys=self.template_keys, allow_add=is_functions_enabled()
@@ -1687,7 +1686,7 @@ class BasePage:
             }
         )
 
-    def call_runner_task(self, sr: SavedRun):
+    def call_runner_task(self, sr: SavedRun, deduct_credits: bool = True):
         from celeryapp.tasks import runner_task, post_runner_tasks
 
         chain = (
@@ -1698,6 +1697,7 @@ class BasePage:
                 uid=sr.uid,
                 channel=self.realtime_channel_name(sr.run_id, sr.uid),
                 unsaved_state=self._unsaved_state(),
+                deduct_credits=deduct_credits,
             )
             | post_runner_tasks.s()
         )

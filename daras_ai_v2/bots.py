@@ -234,18 +234,6 @@ def _echo(bot, input_text):
     return msgs_to_save, response_audio, response_text, response_video
 
 
-def _mock_api_output(input_text):
-    return {
-        "url": "https://gooey.ai?example_id=mock-api-example",
-        "output": {
-            "input_text": input_text,
-            "raw_input_text": input_text,
-            "raw_output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-        },
-    }
-
-
 def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
@@ -369,20 +357,25 @@ def _process_and_send_msg(
     # get latest messages for context
     saved_msgs = bot.convo.msgs_for_llm_context()
 
-    # # mock testing
-    # result = _mock_api_output(input_text)
+    variables = (bot.saved_run.state.get("variables") or {}) | build_run_vars(
+        bot.convo, bot.user_msg_id
+    )
     body = dict(
         input_prompt=input_text,
         input_audio=input_audio,
         input_images=input_images,
         input_documents=input_documents,
         messages=saved_msgs,
-        variables=build_run_vars(bot.convo, bot.user_msg_id),
+        variables=variables,
     )
     if bot.user_language:
         body["user_language"] = bot.user_language
     if bot.request_overrides:
         body = bot.request_overrides | body
+        try:
+            variables.update(bot.request_overrides["variables"])
+        except KeyError:
+            pass
     page, result, run_id, uid = submit_api_call(
         page_cls=bot.page_cls,
         user=billing_account_user,

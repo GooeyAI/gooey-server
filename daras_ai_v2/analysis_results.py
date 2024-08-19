@@ -69,7 +69,7 @@ def render_analysis_results_page(
 
         gui.session_state.setdefault("selected_graphs", graphs)
         selected_graphs = list_view_editor(
-            add_btn_label="➕ Add a Graph",
+            add_btn_label="Add a Graph",
             key="selected_graphs",
             render_inputs=partial(render_inputs, results),
         )
