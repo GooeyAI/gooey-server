@@ -421,7 +421,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
-    def reset_fb_pages_for_user(
+    def add_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
@@ -454,13 +454,13 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.name = bi.fb_page_name
             bi.save()
             saved.append(bi)
-        # delete pages that are no longer connected for this user
-        self.filter(
-            Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-            billing_account_uid=uid,
-        ).exclude(
-            id__in=[bi.id for bi in saved],
-        ).delete()
+        # # delete pages that are no longer connected for this user
+        # self.filter(
+        #     Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
+        #     billing_account_uid=uid,
+        # ).exclude(
+        #     id__in=[bi.id for bi in saved],
+        # ).delete()
         return saved
 
 
