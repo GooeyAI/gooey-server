@@ -19,6 +19,41 @@ from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
 
 
+def integrations_welcome_screen(title: str):
+    with gui.center():
+        gui.markdown(f"#### {title}")
+
+    col1, col2, col3 = gui.columns(
+        3,
+        column_props=dict(
+            style=dict(
+                display="flex",
+                flexDirection="column",
+                alignItems="center",
+                textAlign="center",
+                maxWidth="300px",
+            ),
+        ),
+        style={"justifyContent": "center"},
+    )
+    with col1:
+        gui.html("🏃‍♀️", style={"fontSize": "4rem"})
+        gui.markdown(
+            """
+            1. Fork & Save your Run
+            """
+        )
+        gui.caption("Make changes, Submit & Save your perfect workflow")
+    with col2:
+        gui.image(icons.integrations_img, alt="Integrations", style={"height": "5rem"})
+        gui.markdown("2. Connect to Slack, Whatsapp or your App")
+        gui.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
+    with col3:
+        gui.html("📈", style={"fontSize": "4rem"})
+        gui.markdown("3. Test, Analyze & Iterate")
+        gui.caption("Analyze your usage. Update your Saved Run to test changes.")
+
+
 def general_integration_settings(bi: BotIntegration, current_user: AppUser):
     if gui.session_state.get(f"_bi_reset_{bi.id}"):
         gui.session_state[f"_bi_streaming_enabled_{bi.id}"] = (

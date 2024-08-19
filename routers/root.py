@@ -718,9 +718,6 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
-INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
-
-
 class TabData(typing.NamedTuple):
     title: str
     label: str
@@ -749,7 +746,7 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{INTEGRATION_IMG}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
+        title=f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
         label="Integrations",
         route=integrations_route,
     )

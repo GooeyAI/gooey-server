@@ -15,11 +15,13 @@ from bots.models import (
     Platform,
     Conversation,
     Message,
-    SavedRun,
-    PublishedRun,
 )
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
+from daras_ai_v2.bot_integration_connect import (
+    connect_bot_to_published_run,
+    load_published_run_from_state,
+)
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import (
@@ -34,12 +36,11 @@ from daras_ai_v2.slack_bot import (
     fetch_user_info,
     parse_slack_response,
 )
-from recipes.VideoBots import connect
 
 router = APIRouter()
 
 
-def slack_connect_url(current_run_id: str | None, published_run_id: str | None):
+def slack_connect_url(pr_id: int):
     return furl(
         "https://slack.com/oauth/v2/authorize",
         query_params=dict(
@@ -72,9 +73,7 @@ def slack_connect_url(current_run_id: str | None, published_run_id: str | None):
                     "groups:write.invites",
                 ]
             ),
-            state=json.dumps(
-                dict(current_run_id=current_run_id, published_run_id=published_run_id)
-            ),
+            state=json.dumps(dict(pr_id=pr_id)),
         ),
     )
 
@@ -85,16 +84,8 @@ def slack_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    connection_state = json.loads(request.query_params.get("state", "{}"))
-    current_run_id = connection_state.get("current_run_id", None)
-    published_run_id = connection_state.get("published_run_id", None)
-    retry_button = (
-        f'<a href="{slack_connect_url(current_run_id, published_run_id)}">Retry</a>'
-    )
-    current_run = SavedRun.objects.get(run_id=current_run_id)
-    published_run = PublishedRun.objects.filter(
-        published_run_id=published_run_id
-    ).first()
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{slack_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -157,12 +148,11 @@ def slack_connect_redirect(request: Request):
             BotIntegration.objects.filter(pk=bi.pk).update(**config)
             bi.refresh_from_db()
 
-    redirect = connect(bi, current_run, published_run)
-
     if bi.slack_create_personal_channels:
         create_personal_channels_for_all_members.delay(bi.id)
 
-    return RedirectResponse(url=redirect.url, status_code=redirect.status_code)
+    redirect_url = connect_bot_to_published_run(bi, pr)
+    return RedirectResponse(redirect_url)
 
 
 @router.post("/__/slack/interaction/")

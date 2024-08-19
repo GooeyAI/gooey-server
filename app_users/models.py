@@ -145,6 +145,20 @@ class AppUser(models.Model):
             return str(self.phone_number)
         return "Anon"
 
+    def first_name_possesive(self) -> str:
+        if self.display_name:
+            name = self.display_name.split(" ")[0]
+        elif self.email:
+            name = self.email.split("@")[0]
+        elif self.phone_number:
+            name = str(self.phone_number)
+        else:
+            return "My"
+        if name.endswith("s"):
+            return name + "'"
+        else:
+            return name + "'s"
+
     @db_middleware
     @transaction.atomic
     def add_balance(
