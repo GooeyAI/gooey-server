@@ -1277,12 +1277,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                    gui.anchor(
-                        f'<i class="fa-brands facebook-messenger"></i> Open Messenger',
-                        str(furl("https://www.messenger.com/t/") / bi.fb_page_id),
-                        unsafe_allow_html=True,
-                        new_tab=True,
-                    )
                 elif bi.platform == Platform.TWILIO:
                     gui.anchor(
                         '<i class="fa-regular fa-phone"></i> Start Voice Call',
