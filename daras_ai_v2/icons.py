@@ -31,3 +31,5 @@ card_icons = {
     "jcb": '<i class="fa-brands fa-cc-jcb"></i>',
     "diners": '<i class="fa-brands fa-cc-diners-club"></i>',
 }
+
+integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"

@@ -374,7 +374,6 @@ class BasePage:
                     and published_run.saved_run != current_run
                     and self.request
                     and self.request.user
-                    and published_run.created_by == self.request.user
                 )
 
                 if can_user_edit_run and has_unpublished_changes:
@@ -589,13 +588,7 @@ class BasePage:
                 title = published_run.title or self.title
             else:
                 recipe_title = self.get_root_published_run().title or self.title
-                if self.request.user.display_name:
-                    username = self.request.user.display_name + "'s"
-                elif self.request.user.email:
-                    username = self.request.user.email.split("@")[0] + "'s"
-                else:
-                    username = "My"
-                title = f"{username} {recipe_title}"
+                title = f"{self.request.user.first_name_possesive()} {recipe_title}"
             published_run_title = gui.text_input(
                 "##### Title",
                 key="published_run_title",

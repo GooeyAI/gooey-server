@@ -1,19 +1,23 @@
+import json
+
 import requests
 from fastapi.responses import RedirectResponse
 from furl import furl
-import json
 from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
-from bots.models import BotIntegration, Platform, SavedRun, PublishedRun
+from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings, db
+from daras_ai_v2.bot_integration_connect import (
+    connect_bot_to_published_run,
+    load_published_run_from_state,
+)
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
-from recipes.VideoBots import connect
 from routers.custom_api_router import CustomAPIRouter
 
 app = CustomAPIRouter()
@@ -25,16 +29,8 @@ def fb_connect_whatsapp_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    connection_state = json.loads(request.query_params.get("state", "{}"))
-    current_run_id = connection_state.get("current_run_id", None)
-    published_run_id = connection_state.get("published_run_id", None)
-    retry_button = (
-        f'<a href="{wa_connect_url(current_run_id, published_run_id)}">Retry</a>'
-    )
-    current_run = SavedRun.objects.get(run_id=current_run_id)
-    published_run = PublishedRun.objects.filter(
-        published_run_id=published_run_id
-    ).first()
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{wa_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -74,7 +70,7 @@ def fb_connect_whatsapp_redirect(request: Request):
     # {'data': [{'verified_name': 'XXXX', 'code_verification_status': 'VERIFIED', 'display_phone_number': 'XXXX', 'quality_rating': 'UNKNOWN', 'platform_type': 'NOT_APPLICABLE', 'throughput': {'level': 'NOT_APPLICABLE'}, 'last_onboarded_time': '2024-02-22T20:42:16+0000', 'id': 'XXXX'}], 'paging': {'cursors': {'before': 'XXXX', 'after': 'XXXX'}}}
     phone_numbers = r.json()["data"]
 
-    redirect = None
+    redirect_url = None
     for phone_number in phone_numbers:
         business_name = phone_number["verified_name"]
         display_phone_number = phone_number["display_phone_number"]
@@ -120,13 +116,12 @@ def fb_connect_whatsapp_redirect(request: Request):
         )
         r.raise_for_status()
 
-        redirect = connect(bi, current_run, published_run)
+        redirect_url = connect_bot_to_published_run(bi, pr)
 
-    return (
-        RedirectResponse(url=redirect.url, status_code=redirect.status_code)
-        if redirect
-        else HTMLResponse("No phone numbers found!" + retry_button)
-    )
+    if redirect_url:
+        return RedirectResponse(redirect_url)
+    else:
+        return HTMLResponse("No phone numbers found! " + retry_button, status_code=404)
 
 
 @app.get("/__/fb/connect/")
@@ -135,21 +130,8 @@ def fb_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    connection_state = json.loads(request.query_params.get("state", "{}"))
-    current_run_id: str | None = connection_state.get("current_run_id", None)
-    published_run_id: str | None = connection_state.get("published_run_id", None)
-    retry_button = (
-        f'<a href="{fb_connect_url(current_run_id, published_run_id)}">Retry</a>'
-    )
-    if not current_run_id or not published_run_id:
-        return HTMLResponse(
-            f"<p>Oh No! Something went wrong here. Please go back to the integration page and try again or contact support. </p>",
-            status_code=400,
-        )
-    current_run = SavedRun.objects.get(run_id=current_run_id)
-    published_run = PublishedRun.objects.filter(
-        published_run_id=published_run_id
-    ).first()
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{fb_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -188,15 +170,14 @@ def fb_connect_redirect(request: Request):
         request.user.uid, fb_pages
     )
 
-    redirect = None
-    for integration in integrations:
-        redirect = connect(integration, current_run, published_run)
+    redirect_url = None
+    for bi in integrations:
+        redirect_url = connect_bot_to_published_run(bi, pr)
 
-    return (
-        RedirectResponse(url=redirect.url, status_code=redirect.status_code)
-        if redirect
-        else HTMLResponse("No pages found!" + retry_button)
-    )
+    if redirect_url:
+        return RedirectResponse(redirect_url)
+    else:
+        return HTMLResponse("No pages found! " + retry_button, status_code=404)
 
 
 def get_currently_connected_fb_pages(user_access_token):
@@ -271,7 +252,7 @@ wa_connect_redirect_url = (
 ).tostr()
 
 
-def wa_connect_url(current_run_id: str | None, published_run_id: str | None) -> str:
+def wa_connect_url(pr_id: int) -> str:
     return furl(
         "https://www.facebook.com/v18.0/dialog/oauth",
         query_params={
@@ -280,9 +261,7 @@ def wa_connect_url(current_run_id: str | None, published_run_id: str | None) -> 
             "redirect_uri": wa_connect_redirect_url,
             "response_type": "code",
             "config_id": settings.FB_WHATSAPP_CONFIG_ID,
-            "state": json.dumps(
-                dict(current_run_id=current_run_id, published_run_id=published_run_id)
-            ),
+            "state": json.dumps(dict(pr_id=pr_id)),
         },
     ).tostr()
 
@@ -295,7 +274,7 @@ fb_connect_redirect_url = (
 ).tostr()
 
 
-def fb_connect_url(current_run_id: str | None, published_run_id: str | None) -> str:
+def fb_connect_url(pr_id: int) -> str:
     return furl(
         "https://www.facebook.com/dialog/oauth",
         query_params={
@@ -310,9 +289,7 @@ def fb_connect_url(current_run_id: str | None, published_run_id: str | None) -> 
                     "pages_show_list",
                 ]
             ),
-            "state": json.dumps(
-                dict(current_run_id=current_run_id, published_run_id=published_run_id)
-            ),
+            "state": json.dumps(dict(pr_id=pr_id)),
         },
     ).tostr()
 
