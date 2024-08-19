@@ -153,18 +153,6 @@ def fb_connect_redirect(request: Request):
             status_code=400,
         )
 
-    # only connect to pages that are not already connected
-    fb_pages = [
-        fb_page
-        for fb_page in fb_pages
-        if BotIntegration.objects.filter(
-            fb_page_id=fb_page["id"]
-        )  # this will need to change if we ever add instagram
-        .exclude(saved_run__isnull=True)
-        .count()
-        == 0
-    ]
-
     map_parallel(_subscribe_to_page, fb_pages)
     integrations = BotIntegration.objects.reset_fb_pages_for_user(
         request.user.uid, fb_pages
