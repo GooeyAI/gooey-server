@@ -135,7 +135,7 @@ async def server_error_exception_handler(request: Request, exc: Exception):
 async def _exc_handler(request: Request, exc: Exception, template_name: str):
     from celeryapp.tasks import err_msg_for_exc
 
-    if request.headers.get("accept", "").startswith("text/html"):
+    if request.headers.get("X-GOOEY-GUI-ROUTE"):
         return templates.TemplateResponse(
             template_name,
             context=dict(
@@ -150,7 +150,14 @@ async def _exc_handler(request: Request, exc: Exception, template_name: str):
     elif isinstance(exc, HTTPException):
         return await http_exception_handler(request, exc)
     else:
-        return JSONResponse(dict(detail=err_msg_for_exc(exc)), status_code=500)
+        return JSONResponse(
+            dict(
+                detail=err_msg_for_exc(exc),
+                github_url=github_url_for_exc(exc),
+                traceback=traceback.format_exc(),
+            ),
+            status_code=500,
+        )
 
 
 GITHUB_REPO = "https://github.com/GooeyAI/gooey-server/"
