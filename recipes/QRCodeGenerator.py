@@ -762,13 +762,12 @@ def get_vcard_from_email(
     person = get_profile_for_email(email)
     if not person:
         return None
-    photo_url = get_photo_for_email(email)
     return VCARD(
         email=email,
         format_name=person.get("name") or "",
         tel=person.get("phone"),
         role=person.get("title"),
-        photo_url=photo_url,
+        # photo_url=photo_url,
         urls=list(set(filter(None, [person.get(field, "") for field in url_fields]))),
         note=person.get("headline"),
         organization=person.get("organization", {}).get("name"),
