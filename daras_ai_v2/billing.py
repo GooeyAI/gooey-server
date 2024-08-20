@@ -274,26 +274,13 @@ def _render_update_subscription_button(
 
             if downgrade_modal.is_open():
                 with downgrade_modal.container():
-                    gui.write(
-                        f"""
-    Are you sure you want to change from:  
-    **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
-                     """,
-                        className="d-block py-4",
+                    _render_plan_downgrade_modal(
+                        key=key,
+                        user=user,
+                        current_plan=current_plan,
+                        plan=plan,
+                        modal=downgrade_modal,
                     )
-                    with gui.div(className="d-flex w-100"):
-                        if gui.button(
-                            "Downgrade",
-                            className="btn btn-theme bg-danger border-danger text-white",
-                            key=f"{key}-confirm",
-                        ):
-                            change_subscription(user, plan)
-                        if gui.button(
-                            "Cancel",
-                            className="border border-danger text-danger",
-                            key=f"{key}-cancel",
-                        ):
-                            downgrade_modal.close()
         case _:
             if gui.button(label, className=className, key=key):
                 change_subscription(
@@ -302,6 +289,36 @@ def _render_update_subscription_button(
                     # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
                     billing_cycle_anchor="now",
                 )
+
+
+def _render_plan_downgrade_modal(
+    *,
+    user: AppUser,
+    key: str,
+    current_plan: PricingPlan,
+    plan: PricingPlan,
+    modal: gui.Modal,
+):
+    gui.write(
+        f"""
+Are you sure you want to change from:  
+**{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
+     """,
+        className="d-block py-4",
+    )
+    with gui.div(className="d-flex w-100"):
+        if gui.button(
+            "Downgrade",
+            className="btn btn-theme bg-danger border-danger text-white",
+            key=f"{key}-confirm",
+        ):
+            change_subscription(user, plan)
+        if gui.button(
+            "Cancel",
+            className="border border-danger text-danger",
+            key=f"{key}-cancel",
+        ):
+            modal.close()
 
 
 def fmt_price(plan: PricingPlan) -> str:
@@ -560,28 +577,48 @@ def render_payment_information(user: AppUser):
     pm_summary = gui.run_in_thread(
         user.subscription.get_payment_method_summary, cache=True
     )
-    if not pm_summary:
-        return
-    pm_summary = PaymentMethodSummary(*pm_summary)
-    if pm_summary.card_brand and pm_summary.card_last4:
-        col1, col2, col3 = gui.columns(3, responsive=False)
-        with col1:
-            gui.write("**Payment Method**")
-        with col2:
-            gui.write(
-                f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
-                unsafe_allow_html=True,
-            )
-        with col3:
-            if gui.button(f"{icons.edit} Edit", type="link", key="edit-payment-method"):
-                change_payment_method(user)
+    if pm_summary:
+        pm_summary = PaymentMethodSummary(*pm_summary)
+        if pm_summary.card_brand and pm_summary.card_last4:
+            col1, col2, col3 = gui.columns(3, responsive=False)
+            with col1:
+                gui.write("**Payment Method**")
+            with col2:
+                gui.write(
+                    f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
+                    unsafe_allow_html=True,
+                )
+            with col3:
+                if gui.button(
+                    f"{icons.edit} Edit", type="link", key="edit-payment-method"
+                ):
+                    change_payment_method(user)
 
-    if pm_summary.billing_email:
-        col1, col2, _ = gui.columns(3, responsive=False)
-        with col1:
-            gui.write("**Billing Email**")
-        with col2:
-            gui.html(pm_summary.billing_email)
+        if pm_summary.billing_email:
+            col1, col2, _ = gui.columns(3, responsive=False)
+            with col1:
+                gui.write("**Billing Email**")
+            with col2:
+                gui.html(pm_summary.billing_email)
+
+    if user.subscription and user.subscription.plan != PricingPlan.STARTER.db_value:
+        cancel_subscription_modal = gui.Modal(
+            "Cancel Subscription", key="cancel-subscription"
+        )
+        if gui.button(
+            "Cancel", type="secondary", className="text-danger border-danger"
+        ):
+            cancel_subscription_modal.open()
+
+        if cancel_subscription_modal.is_open():
+            with cancel_subscription_modal.container():
+                _render_plan_downgrade_modal(
+                    key="cancel-subscription",
+                    user=user,
+                    current_plan=PricingPlan.from_db_value(user.subscription.plan),
+                    plan=PricingPlan.STARTER,  # downgrade to STARTER
+                    modal=cancel_subscription_modal,
+                )
 
 
 def change_payment_method(user: AppUser):
