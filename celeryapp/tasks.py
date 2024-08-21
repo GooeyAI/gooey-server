@@ -42,7 +42,7 @@ def runner_task(
     channel: str,
     unsaved_state: dict[str, typing.Any] = None,
     deduct_credits: bool = True,
-) -> int:
+):
     start_time = time()
     error_msg = None
 
@@ -115,7 +115,7 @@ def runner_task(
     finally:
         save_on_step(done=True)
 
-    return sr.id
+    post_runner_tasks.delay(sr.id)
 
 
 @app.task

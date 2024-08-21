@@ -1680,21 +1680,17 @@ class BasePage:
         )
 
     def call_runner_task(self, sr: SavedRun, deduct_credits: bool = True):
-        from celeryapp.tasks import runner_task, post_runner_tasks
+        from celeryapp.tasks import runner_task
 
-        chain = (
-            runner_task.s(
-                page_cls=self.__class__,
-                user_id=self.request.user.id,
-                run_id=sr.run_id,
-                uid=sr.uid,
-                channel=self.realtime_channel_name(sr.run_id, sr.uid),
-                unsaved_state=self._unsaved_state(),
-                deduct_credits=deduct_credits,
-            )
-            | post_runner_tasks.s()
+        return runner_task.delay(
+            page_cls=self.__class__,
+            user_id=self.request.user.id,
+            run_id=sr.run_id,
+            uid=sr.uid,
+            channel=self.realtime_channel_name(sr.run_id, sr.uid),
+            unsaved_state=self._unsaved_state(),
+            deduct_credits=deduct_credits,
         )
-        return chain.apply_async()
 
     @classmethod
     def realtime_channel_name(cls, run_id, uid):
