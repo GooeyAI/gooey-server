@@ -16,8 +16,8 @@ def safety_checker(*, text: str | None = None, image: str | None = None):
 
     if text:
         safety_checker_text(text)
-    if image:
-        safety_checker_image(image)
+    # if image:
+    #     safety_checker_image(image)
 
 
 def safety_checker_text(text_input: str):
