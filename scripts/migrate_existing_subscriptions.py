@@ -29,7 +29,7 @@ available_subscriptions = {
             # "quantity": 1000,  # number of credits (set by html)
             "adjustable_quantity": {
                 "enabled": True,
-                "maximum": 50_000,
+                "maximum": 100_000,
                 "minimum": 1_000,
             },
         },

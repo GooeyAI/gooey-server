@@ -5,4 +5,14 @@ from .models import Subscription
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    search_fields = ["plan", "payment_provider", "external_id"]
+    search_fields = [
+        "plan",
+        "payment_provider",
+        "external_id",
+    ]
+    readonly_fields = [
+        "user",
+        "created_at",
+        "updated_at",
+        "get_payment_method_summary",
+    ]

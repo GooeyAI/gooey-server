@@ -126,7 +126,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if plan.deprecated:
         return JSONResponse({"error": "Deprecated plan"}, status_code=400)
 
-    if request.user.subscription:
+    if request.user.subscription and request.user.subscription.is_paid():
         return JSONResponse(
             {"error": "User already has an active subscription"}, status_code=400
         )
