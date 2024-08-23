@@ -1,5 +1,3 @@
-from typing import Literal
-
 import gooey_gui as gui
 import stripe
 from django.core.exceptions import ValidationError
@@ -8,16 +6,15 @@ from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import icons, settings, paypal
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
+from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
+from payments.webhooks import StripeWebhookHandler
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
-
-
-PlanActionLabel = Literal["Upgrade", "Downgrade", "Contact Us", "Your Plan"]
 
 
 def billing_page(user: AppUser):
@@ -210,25 +207,53 @@ def _render_plan_action_button(
         # don't show upgrade/downgrade buttons for enterprise customers
         return
     else:
-        if plan.credits > current_plan.credits:
-            label, btn_type = ("Upgrade", "primary")
-        else:
-            label, btn_type = ("Downgrade", "secondary")
-
         if user.subscription and user.subscription.is_paid():
             # subscription exists, show upgrade/downgrade button
-            _render_update_subscription_button(
-                label,
-                user=user,
-                current_plan=current_plan,
-                plan=plan,
-                className=f"{btn_classes} btn btn-theme btn-{btn_type}",
-            )
+            if plan.credits > current_plan.credits:
+                modal, confirmed = confirm_modal(
+                    title="Upgrade Plan",
+                    key=f"--modal-{plan.key}",
+                    text=f"""
+Are you sure you want to upgrade from: **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
+
+This will charge you the full amount today, and every month thereafter.  
+ 
+**{current_plan.credits:,} credits** will be added to your account.
+                    """,
+                    button_label="Buy",
+                )
+                if gui.button(
+                    "Upgrade", className="primary", key=f"--change-sub-{plan.key}"
+                ):
+                    modal.open()
+                if confirmed:
+                    change_subscription(
+                        user,
+                        plan,
+                        # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                        billing_cycle_anchor="now",
+                    )
+            else:
+                modal, confirmed = confirm_modal(
+                    title="Downgrade Plan",
+                    key=f"--modal-{plan.key}",
+                    text=f"""
+Are you sure you want to downgrade from: **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
+
+This will take effect from the next billing cycle.
+                    """,
+                    button_label="Downgrade",
+                    button_class="border-danger bg-danger text-white",
+                )
+                if gui.button(
+                    "Downgrade", className="secondary", key=f"--change-sub-{plan.key}"
+                ):
+                    modal.open()
+                if confirmed:
+                    change_subscription(user, plan)
         else:
             assert payment_provider is not None  # for sanity
             _render_create_subscription_button(
-                label,
-                btn_type=btn_type,
                 user=user,
                 plan=plan,
                 payment_provider=payment_provider,
@@ -236,79 +261,16 @@ def _render_plan_action_button(
 
 
 def _render_create_subscription_button(
-    label: PlanActionLabel,
     *,
-    btn_type: str,
     user: AppUser,
     plan: PricingPlan,
     payment_provider: PaymentProvider,
 ):
     match payment_provider:
         case PaymentProvider.STRIPE:
-            key = f"stripe-sub-{plan.key}"
-            render_stripe_subscription_button(
-                user=user,
-                label=label,
-                plan=plan,
-                btn_type=btn_type,
-                key=key,
-            )
+            render_stripe_subscription_button(user=user, plan=plan)
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
-
-
-def _render_update_subscription_button(
-    label: PlanActionLabel,
-    *,
-    user: AppUser,
-    current_plan: PricingPlan,
-    plan: PricingPlan,
-    className: str = "",
-):
-    key = f"change-sub-{plan.key}"
-    match label:
-        case "Downgrade":
-            downgrade_modal = gui.Modal(
-                "Confirm downgrade",
-                key=f"downgrade-plan-modal-{plan.key}",
-            )
-            if gui.button(
-                label,
-                className=className,
-                key=key,
-            ):
-                downgrade_modal.open()
-
-            if downgrade_modal.is_open():
-                with downgrade_modal.container():
-                    gui.write(
-                        f"""
-    Are you sure you want to change from:  
-    **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
-                     """,
-                        className="d-block py-4",
-                    )
-                    with gui.div(className="d-flex w-100"):
-                        if gui.button(
-                            "Downgrade",
-                            className="btn btn-theme bg-danger border-danger text-white",
-                            key=f"{key}-confirm",
-                        ):
-                            change_subscription(user, plan)
-                        if gui.button(
-                            "Cancel",
-                            className="border border-danger text-danger",
-                            key=f"{key}-cancel",
-                        ):
-                            downgrade_modal.close()
-        case _:
-            if gui.button(label, className=className, key=key):
-                change_subscription(
-                    user,
-                    plan,
-                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                    billing_cycle_anchor="now",
-                )
 
 
 def fmt_price(plan: PricingPlan) -> str:
@@ -420,57 +382,66 @@ def render_paypal_addon_buttons():
 
 
 def render_stripe_addon_buttons(user: AppUser):
+    if not (user.subscription and user.subscription.payment_provider):
+        save_pm = gui.checkbox(
+            "Save payment method for future purchases & auto-recharge", value=True
+        )
+    else:
+        save_pm = True
+
     for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
-        render_stripe_addon_button(dollat_amt, user)
+        render_stripe_addon_button(dollat_amt, user, save_pm)
+
+    error = gui.session_state.pop("--addon-purchase-error", None)
+    if error:
+        gui.error(error)
 
 
-def render_stripe_addon_button(dollat_amt: int, user: AppUser):
-    confirm_purchase_modal = gui.Modal(
-        "Confirm Purchase", key=f"confirm-purchase-{dollat_amt}"
+def render_stripe_addon_button(dollat_amt: int, user: AppUser, save_pm: bool):
+    modal, confirmed = confirm_modal(
+        title="Purchase Credits",
+        key=f"--addon-modal-{dollat_amt}",
+        text=f"""
+Please confirm your purchase: **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollat_amt}**.
+
+This is a one-time purchase. Your account will be credited immediately.
+        """,
+        button_label="Buy",
+        text_on_confirm="Processing Payment...",
     )
+
     if gui.button(f"${dollat_amt:,}", type="primary"):
         if user.subscription and user.subscription.stripe_get_default_payment_method():
-            confirm_purchase_modal.open()
+            modal.open()
         else:
-            stripe_addon_checkout_redirect(user, dollat_amt)
+            stripe_addon_checkout_redirect(user, dollat_amt, save_pm)
 
-    if not confirm_purchase_modal.is_open():
-        return
-    with confirm_purchase_modal.container():
-        gui.write(
-            f"""
-                Please confirm your purchase:  
-                 **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollat_amt}**.
-                 """,
-            className="py-4 d-block text-center",
+    if confirmed:
+        success = gui.run_in_thread(
+            user.subscription.stripe_attempt_addon_purchase,
+            args=[dollat_amt],
+            placeholder="",
         )
-        with gui.div(className="d-flex w-100 justify-content-end"):
-            if gui.session_state.get("--confirm-purchase"):
-                success = gui.run_in_thread(
-                    user.subscription.stripe_attempt_addon_purchase,
-                    args=[dollat_amt],
-                    placeholder="Processing payment...",
-                )
-                if success is None:
-                    return
-                gui.session_state.pop("--confirm-purchase")
-                if success:
-                    confirm_purchase_modal.close()
-                else:
-                    gui.error("Payment failed... Please try again.")
-                return
-
-            if gui.button("Cancel", className="border border-danger text-danger me-2"):
-                confirm_purchase_modal.close()
-            gui.button("Buy", type="primary", key="--confirm-purchase")
+        if success is None:
+            return
+        if not success:
+            gui.session_state["--addon-purchase-error"] = (
+                "Payment failed... Please try again or contact us at support@gooey.ai"
+            )
+        modal.close()
 
 
-def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
+def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int, save_pm: bool):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
     line_item = available_subscriptions["addon"]["stripe"].copy()
     line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
+    kwargs = {}
+    if save_pm:
+        kwargs["payment_intent_data"] = {"setup_future_usage": "on_session"}
+    else:
+        kwargs["saved_payment_method_options"] = {"payment_method_save": "enabled"}
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode="payment",
@@ -479,32 +450,51 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int):
         customer=user.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
-        saved_payment_method_options={"payment_method_save": "enabled"},
-        payment_intent_data={"setup_future_usage": "off_session"},
+        **kwargs,
     )
     raise gui.RedirectException(checkout_session.url, status_code=303)
 
 
 def render_stripe_subscription_button(
     *,
-    label: str,
     user: AppUser,
     plan: PricingPlan,
-    btn_type: str,
-    key: str,
 ):
     if not plan.supports_stripe():
         gui.write("Stripe subscription not available")
         return
 
+    modal, confirmed = confirm_modal(
+        title="Upgrade Plan",
+        key=f"--modal-{plan.key}",
+        text=f"""
+Are you sure you want to subscribe to **{plan.title} ({fmt_price(plan)})**?
+
+This will charge you the full amount today, and every month thereafter.
+   
+**{plan.credits:,} credits** will be added to your account.
+        """,
+        button_label="Buy",
+    )
+
     # IMPORTANT: key=... is needed here to maintain uniqueness
     # of buttons with the same label. otherwise, all buttons
     # will be the same to the server
-    if gui.button(label, key=key, type=btn_type):
-        stripe_subscription_checkout_redirect(user=user, plan=plan)
+    if gui.button(
+        "Upgrade",
+        key=f"--change-sub-{plan.key}",
+        type="primary",
+    ):
+        if user.subscription and user.subscription.stripe_get_default_payment_method():
+            modal.open()
+        else:
+            stripe_subscription_create(user=user, plan=plan)
+
+    if confirmed:
+        stripe_subscription_create(user=user, plan=plan)
 
 
-def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
+def stripe_subscription_create(user: AppUser, plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -528,17 +518,28 @@ def stripe_subscription_checkout_redirect(user: AppUser, plan: PricingPlan):
             get_app_route_url(payment_processing_route), status_code=303
         )
     else:
+        # check for existing subscriptions
+        customer = user.get_or_create_stripe_customer()
+        for sub in stripe.Subscription.list(
+            customer=customer, status="active", limit=1
+        ).data:
+            StripeWebhookHandler.handle_subscription_updated(
+                uid=user.uid, stripe_sub=sub
+            )
+            raise gui.RedirectException(
+                get_app_route_url(payment_processing_route), status_code=303
+            )
+
         checkout_session = stripe.checkout.Session.create(
             mode="subscription",
             success_url=get_app_route_url(payment_processing_route),
             cancel_url=get_app_route_url(account_route),
             allow_promotion_codes=True,
-            customer=user.get_or_create_stripe_customer(),
+            customer=customer,
             line_items=line_items,
             metadata=metadata,
             subscription_data={"metadata": metadata},
             saved_payment_method_options={"payment_method_save": "enabled"},
-            payment_intent_data={"setup_future_usage": "off_session"},
         )
         raise gui.RedirectException(checkout_session.url, status_code=303)
 
@@ -586,15 +587,18 @@ def render_payment_information(user: AppUser):
             raise gui.RedirectException(user.subscription.get_external_management_url())
 
     pm_summary = PaymentMethodSummary(*pm_summary)
-    if pm_summary.card_brand and pm_summary.card_last4:
+    if pm_summary.card_brand:
         col1, col2, col3 = gui.columns(3, responsive=False)
         with col1:
             gui.write("**Payment Method**")
         with col2:
-            gui.write(
-                f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
-                unsafe_allow_html=True,
-            )
+            if pm_summary.card_last4:
+                gui.write(
+                    f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
+                    unsafe_allow_html=True,
+                )
+            else:
+                gui.write(pm_summary.card_brand)
         with col3:
             if gui.button(f"{icons.edit} Edit", type="link", key="edit-payment-method"):
                 change_payment_method(user)

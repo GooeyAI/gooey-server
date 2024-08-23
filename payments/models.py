@@ -135,7 +135,7 @@ class Subscription(models.Model):
             return True
 
     def is_paid(self) -> bool:
-        return PricingPlan.from_sub(self).monthly_charge > 0
+        return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
 
     def cancel(self):
         from payments.webhooks import StripeWebhookHandler
@@ -196,11 +196,17 @@ class Subscription(models.Model):
             case PaymentProvider.STRIPE:
                 pm = self.stripe_get_default_payment_method()
                 if not pm:
+                    # clear the payment provider if the default payment method is missing
+                    if self.payment_provider and not self.is_paid():
+                        self.payment_provider = None
+                        self.save(update_fields=["payment_provider"])
                     return None
                 return PaymentMethodSummary(
                     payment_method_type=pm.type,
-                    card_brand=pm.card and pm.card.brand,
-                    card_last4=pm.card and pm.card.last4,
+                    card_brand=(
+                        (pm.type == "card" and pm.card and pm.card.brand) or pm.type
+                    ),
+                    card_last4=(pm.type == "card" and pm.card and pm.card.last4) or "",
                     billing_email=(pm.billing_details and pm.billing_details.email),
                 )
 

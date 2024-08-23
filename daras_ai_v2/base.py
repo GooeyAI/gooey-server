@@ -52,6 +52,7 @@ from daras_ai_v2.db import (
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
+from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -697,10 +698,29 @@ class BasePage:
                 save_as_new_button = gui.button(
                     f"{save_as_new_icon} Save as New", className="w-100"
                 )
-            delete_button = not published_run.is_root() and gui.button(
-                f'<i class="fa-regular fa-trash"></i> Delete',
-                className="w-100 text-danger",
-            )
+
+            if not published_run.is_root():
+                confirm_delete_modal, confirmed = confirm_modal(
+                    title="Are you sure?",
+                    key="--delete-run-modal",
+                    text=f"""
+Are you sure you want to delete this published run? 
+
+**{published_run.title}**
+
+This will also delete all the associated versions.          
+                        """,
+                    button_label="Delete",
+                    button_class="border-danger bg-danger text-white",
+                )
+                if gui.button(
+                    f'<i class="fa-regular fa-trash"></i> Delete',
+                    className="w-100 text-danger",
+                ):
+                    confirm_delete_modal.open()
+                if confirmed:
+                    published_run.delete()
+                    raise gui.RedirectException(self.app_url())
 
         if duplicate_button:
             duplicate_pr = self.duplicate_published_run(
@@ -729,47 +749,6 @@ class BasePage:
         with gui.div(className="mt-4"):
             gui.write("#### Version History", className="mb-4")
             self._render_version_history()
-
-        confirm_delete_modal = gui.Modal("Confirm Delete", key="confirm-delete-modal")
-        if delete_button:
-            confirm_delete_modal.open()
-        if confirm_delete_modal.is_open():
-            modal.empty()
-            with confirm_delete_modal.container():
-                self._render_confirm_delete_modal(
-                    published_run=published_run,
-                    modal=confirm_delete_modal,
-                )
-
-    def _render_confirm_delete_modal(
-        self,
-        *,
-        published_run: PublishedRun,
-        modal: gui.Modal,
-    ):
-        gui.write(
-            "Are you sure you want to delete this published run? "
-            f"_({published_run.title})_"
-        )
-        gui.caption("This will also delete all the associated versions.")
-        with gui.div(className="d-flex"):
-            confirm_button = gui.button(
-                '<span class="text-danger">Confirm</span>',
-                type="secondary",
-                className="w-100",
-            )
-            cancel_button = gui.button(
-                "Cancel",
-                type="secondary",
-                className="w-100",
-            )
-
-        if confirm_button:
-            published_run.delete()
-            raise gui.RedirectException(self.app_url())
-
-        if cancel_button:
-            modal.close()
 
     def _render_admin_options(self, current_run: SavedRun, published_run: PublishedRun):
         if (

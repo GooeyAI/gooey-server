@@ -11,6 +11,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "external_id",
     ]
     readonly_fields = [
+        "user",
         "created_at",
         "updated_at",
         "get_payment_method_summary",
