@@ -11,7 +11,7 @@ from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
-from payments.webhooks import StripeWebhookHandler
+from payments.webhooks import StripeWebhookHandler, set_user_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
@@ -574,41 +574,80 @@ def render_payment_information(user: AppUser):
         return
 
     gui.write("## Payment Information", id="payment-information", className="d-block")
-    col1, col2, col3 = gui.columns(3, responsive=False)
-    with col1:
-        gui.write("**Pay via**")
-    with col2:
-        provider = PaymentProvider(
-            user.subscription.payment_provider or PaymentProvider.STRIPE
-        )
-        gui.write(provider.label)
-    with col3:
-        if gui.button(f"{icons.edit} Edit", type="link", key="manage-payment-provider"):
-            raise gui.RedirectException(user.subscription.get_external_management_url())
-
-    pm_summary = PaymentMethodSummary(*pm_summary)
-    if pm_summary.card_brand:
+    with gui.div(className="ps-1"):
         col1, col2, col3 = gui.columns(3, responsive=False)
         with col1:
-            gui.write("**Payment Method**")
+            gui.write("**Pay via**")
         with col2:
-            if pm_summary.card_last4:
-                gui.write(
-                    f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
-                    unsafe_allow_html=True,
-                )
-            else:
-                gui.write(pm_summary.card_brand)
+            provider = PaymentProvider(
+                user.subscription.payment_provider or PaymentProvider.STRIPE
+            )
+            gui.write(provider.label)
         with col3:
-            if gui.button(f"{icons.edit} Edit", type="link", key="edit-payment-method"):
-                change_payment_method(user)
+            if gui.button(
+                f"{icons.edit} Edit", type="link", key="manage-payment-provider"
+            ):
+                raise gui.RedirectException(
+                    user.subscription.get_external_management_url()
+                )
 
-    if pm_summary.billing_email:
-        col1, col2, _ = gui.columns(3, responsive=False)
-        with col1:
-            gui.write("**Billing Email**")
-        with col2:
-            gui.html(pm_summary.billing_email)
+        pm_summary = PaymentMethodSummary(*pm_summary)
+        if pm_summary.card_brand:
+            col1, col2, col3 = gui.columns(3, responsive=False)
+            with col1:
+                gui.write("**Payment Method**")
+            with col2:
+                if pm_summary.card_last4:
+                    gui.write(
+                        f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    gui.write(pm_summary.card_brand)
+            with col3:
+                if gui.button(
+                    f"{icons.edit} Edit", type="link", key="edit-payment-method"
+                ):
+                    change_payment_method(user)
+
+        if pm_summary.billing_email:
+            col1, col2, _ = gui.columns(3, responsive=False)
+            with col1:
+                gui.write("**Billing Email**")
+            with col2:
+                gui.html(pm_summary.billing_email)
+
+    from routers.account import payment_processing_route
+
+    modal, confirmed = confirm_modal(
+        title="Delete Payment Information",
+        key="--delete-payment-method",
+        text="""
+Are you sure you want to delete your payment information?
+
+This will cancel your subscription and remove your saved payment method.
+        """,
+        button_label="Delete",
+        button_class="border-danger bg-danger text-white",
+    )
+    if gui.button(
+        "Delete & Cancel Subscription",
+        className="border-danger text-danger",
+    ):
+        modal.open()
+    if confirmed:
+        set_user_subscription(
+            uid=user.uid,
+            plan=PricingPlan.STARTER,
+            provider=None,
+            external_id=None,
+        )
+        pm = user.subscription and user.subscription.stripe_get_default_payment_method()
+        if pm:
+            pm.detach()
+        raise gui.RedirectException(
+            get_app_route_url(payment_processing_route), status_code=303
+        )
 
 
 def change_payment_method(user: AppUser):
