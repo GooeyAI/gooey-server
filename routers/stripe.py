@@ -1,13 +1,14 @@
 import stripe
-from fastapi import APIRouter, Request
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import fastapi_request_body
 from payments.webhooks import StripeWebhookHandler
+from routers.custom_api_router import CustomAPIRouter
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 @router.post("/__/stripe/webhook")

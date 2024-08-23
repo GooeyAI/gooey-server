@@ -4,7 +4,6 @@ from typing import Literal
 
 import pydantic
 import requests
-from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
@@ -12,15 +11,16 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel
 
-from app_users.models import PaymentProvider, TransactionReason
+from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_app_route_url
 from payments.models import PricingPlan
 from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
 from routers.account import payment_processing_route, account_route
+from routers.custom_api_router import CustomAPIRouter
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 class SubscriptionPayload(BaseModel):

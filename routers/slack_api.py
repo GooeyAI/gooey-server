@@ -2,7 +2,7 @@ import json
 
 import requests
 from django.db import transaction
-from fastapi import APIRouter, HTTPException, Depends, Request, Response, Header
+from fastapi import HTTPException, Depends, Request, Response, Header
 from furl import furl
 from requests import HTTPError
 from requests.auth import HTTPBasicAuth
@@ -36,8 +36,9 @@ from daras_ai_v2.slack_bot import (
     fetch_user_info,
     parse_slack_response,
 )
+from routers.custom_api_router import CustomAPIRouter
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 def slack_connect_url(pr_id: int):
