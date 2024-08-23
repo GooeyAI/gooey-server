@@ -73,13 +73,7 @@ class Subscription(models.Model):
     objects = SubscriptionQuerySet.as_manager()
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["payment_provider", "external_id"],
-                condition=Q(plan__monthly_charge__gt=0),
-                name="unique_provider_and_subscription_id",
-            )
-        ]
+        unique_together = ["payment_provider", "external_id"]
         indexes = [
             models.Index(fields=["plan"]),
         ]
