@@ -392,10 +392,6 @@ def render_stripe_addon_buttons(user: AppUser):
     for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
         render_stripe_addon_button(dollat_amt, user, save_pm)
 
-    error = gui.session_state.pop("--addon-purchase-error", None)
-    if error:
-        gui.error(error)
-
 
 def render_stripe_addon_button(dollat_amt: int, user: AppUser, save_pm: bool):
     modal, confirmed = confirm_modal(
@@ -423,12 +419,13 @@ This is a one-time purchase. Your account will be credited immediately.
             placeholder="",
         )
         if success is None:
+            # thread is still running
             return
-        if not success:
-            gui.session_state["--addon-purchase-error"] = (
-                "Payment failed... Please try again or contact us at support@gooey.ai"
-            )
-        modal.close()
+        if success:
+            modal.close()
+        else:
+            # fallback to stripe checkout flow if the auto payment failed
+            stripe_addon_checkout_redirect(user, dollat_amt, save_pm)
 
 
 def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int, save_pm: bool):
@@ -499,49 +496,50 @@ def stripe_subscription_create(user: AppUser, plan: PricingPlan):
     from routers.account import payment_processing_route
 
     if user.subscription and user.subscription.plan == plan.db_value:
-        # already subscribed to some plan
+        # sanity check: already subscribed to some plan
         return
 
+    # check for existing subscriptions on stripe
+    customer = user.get_or_create_stripe_customer()
+    for sub in stripe.Subscription.list(
+        customer=customer, status="active", limit=1
+    ).data:
+        StripeWebhookHandler.handle_subscription_updated(uid=user.uid, stripe_sub=sub)
+        raise gui.RedirectException(
+            get_app_route_url(payment_processing_route), status_code=303
+        )
+
+    # try to directly create the subscription without checkout
     pm = user.subscription and user.subscription.stripe_get_default_payment_method()
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
     line_items = [plan.get_stripe_line_item()]
     if pm:
-        # directly create the subscription without checkout
-        stripe.Subscription.create(
+        sub = stripe.Subscription.create(
             customer=pm.customer,
             items=line_items,
             metadata=metadata,
             default_payment_method=pm.id,
             proration_behavior="none",
         )
-        raise gui.RedirectException(
-            get_app_route_url(payment_processing_route), status_code=303
-        )
-    else:
-        # check for existing subscriptions
-        customer = user.get_or_create_stripe_customer()
-        for sub in stripe.Subscription.list(
-            customer=customer, status="active", limit=1
-        ).data:
-            StripeWebhookHandler.handle_subscription_updated(
-                uid=user.uid, stripe_sub=sub
-            )
+        if sub.status != "incomplete":
+            # if the call succeeded redirect, otherwise use the checkout flow
             raise gui.RedirectException(
                 get_app_route_url(payment_processing_route), status_code=303
             )
 
-        checkout_session = stripe.checkout.Session.create(
-            mode="subscription",
-            success_url=get_app_route_url(payment_processing_route),
-            cancel_url=get_app_route_url(account_route),
-            allow_promotion_codes=True,
-            customer=customer,
-            line_items=line_items,
-            metadata=metadata,
-            subscription_data={"metadata": metadata},
-            saved_payment_method_options={"payment_method_save": "enabled"},
-        )
-        raise gui.RedirectException(checkout_session.url, status_code=303)
+    # redirect to stripe checkout flow
+    checkout_session = stripe.checkout.Session.create(
+        mode="subscription",
+        success_url=get_app_route_url(payment_processing_route),
+        cancel_url=get_app_route_url(account_route),
+        allow_promotion_codes=True,
+        customer=customer,
+        line_items=line_items,
+        metadata=metadata,
+        subscription_data={"metadata": metadata},
+        saved_payment_method_options={"payment_method_save": "enabled"},
+    )
+    raise gui.RedirectException(checkout_session.url, status_code=303)
 
 
 def render_paypal_subscription_button(
@@ -758,9 +756,9 @@ def render_auto_recharge_section(user: AppUser):
         gui.write("###### Email Notification Threshold")
         gui.caption(
             """
-                If your account purchases exceed this threshold in a given
-                calendar month, you will receive an email notification.
-                """
+            If your account purchases exceed this threshold in a given
+            calendar month, you will receive an email notification.
+            """
         )
         with gui.div(className="d-flex align-items-center"):
             user.subscription.monthly_spending_notification_threshold = (

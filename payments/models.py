@@ -5,8 +5,8 @@ import typing
 
 import stripe
 from django.db import models
-from django.db.models import Q
 from django.utils import timezone
+from loguru import logger
 
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
@@ -312,7 +312,11 @@ class Subscription(models.Model):
         pm = self.stripe_get_default_payment_method()
         if not pm:
             return False
-        invoice = invoice.pay(payment_method=pm)
+        try:
+            invoice = invoice.pay(payment_method=pm)
+        except stripe.CardError as e:
+            logger.warning(f"Card error while purchasing addon {e=}")
+            return False
         if not invoice.paid:
             return False
         StripeWebhookHandler.handle_invoice_paid(self.user.uid, invoice)
