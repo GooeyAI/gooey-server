@@ -633,6 +633,11 @@ class BasePage:
                 gui.error(str(e))
                 return
 
+        if self._has_current_run_changed(current_run):
+            sr = self._on_submit()
+            if sr:
+                current_run = sr
+
         if is_update_mode:
             updates = dict(
                 saved_run=current_run,
