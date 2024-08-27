@@ -70,7 +70,7 @@ def twilio_voice_call(
     """Handle incoming Twilio voice call."""
 
     try:
-        bot = TwilioVoice.from_data(data)
+        bot = TwilioVoice.from_webhook_data(data)
     except BotIntegration.DoesNotExist as e:
         logger.debug(f"could not find bot integration for {data=} {e=}")
         resp = VoiceResponse()
@@ -199,7 +199,7 @@ def twilio_voice_call_asked(
 ):
     """After the initial call, the user has asked a question via Twilio/Gooey ASR. Handle their question."""
 
-    bot = TwilioVoice.from_data(data)
+    bot = TwilioVoice.from_webhook_data(data)
     resolve_twilio_tts_voice(bot)
     background_tasks.add_task(msg_handler, bot)
 

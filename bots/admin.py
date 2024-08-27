@@ -77,6 +77,7 @@ twilio_fields = [
     "twilio_username",
     "twilio_password",
     "twilio_use_missed_call",
+    "twilio_fresh_conversation_per_call",
     "twilio_initial_text",
     "twilio_initial_audio_url",
     "twilio_waiting_text",

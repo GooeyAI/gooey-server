@@ -24,7 +24,9 @@ class TwilioSMS(BotInterface):
             twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
         )
         self.convo = Conversation.objects.get_or_create(
-            bot_integration=bi, twilio_phone_number=data["From"][0]
+            bot_integration=bi,
+            twilio_phone_number=data["From"][0],
+            twilio_call_sid="",
         )[0]
 
         self.bot_id = bi.twilio_phone_number.as_e164
@@ -86,7 +88,7 @@ class TwilioVoice(BotInterface):
     platform = Platform.TWILIO
 
     @classmethod
-    def from_data(cls, data: dict):
+    def from_webhook_data(cls, data: dict):
         ## data samples:
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['ringing'], 'CallToken': ['XXXX'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'StirVerstat': ['XXXX'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Confidence': ['0.9128386'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'Language': ['en-US'], 'SpeechResult': ['Hello.'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
@@ -96,25 +98,29 @@ class TwilioVoice(BotInterface):
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
         call_sid = data["CallSid"][0]
-        caller_number = data["Caller"][0]
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
             # cases where user is calling the bot
             bi = BotIntegration.objects.get(
                 twilio_account_sid=account_sid, twilio_phone_number=bot_number
             )
+            will_be_missed = bi.twilio_use_missed_call
         except BotIntegration.DoesNotExist:
             #  cases where bot is calling the user
             user_number, bot_number = bot_number, user_number
             bi = BotIntegration.objects.get(
                 twilio_account_sid=account_sid, twilio_phone_number=bot_number
             )
+            will_be_missed = False
 
-        will_be_missed = caller_number == user_number and bi.twilio_use_missed_call
         if will_be_missed:
-            # for call_sids that we will reject and re-call, the convo is not used, so we don't want to create a new one
-            convo = None
-        if bi.twilio_fresh_conversation_per_call and not will_be_missed:
+            # for calls that we will reject and callback, the convo is not used so we don't want to create one
+            convo = Conversation(
+                bot_integration=bi,
+                twilio_phone_number=user_number,
+                twilio_call_sid=call_sid,
+            )
+        elif bi.twilio_fresh_conversation_per_call:
             convo = Conversation.objects.get_or_create(
                 bot_integration=bi,
                 twilio_phone_number=user_number,
@@ -122,8 +128,11 @@ class TwilioVoice(BotInterface):
             )[0]
         else:
             convo = Conversation.objects.get_or_create(
-                bot_integration=bi, twilio_phone_number=user_number
+                bot_integration=bi,
+                twilio_phone_number=user_number,
+                twilio_call_sid="",
             )[0]
+
         return cls(
             convo,
             text=data.get("SpeechResult", [None])[0],
