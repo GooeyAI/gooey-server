@@ -1,4 +1,5 @@
 import gooey_gui as gui
+import sentry_sdk
 import stripe
 from django.core.exceptions import ValidationError
 
@@ -227,12 +228,22 @@ This will charge you the full amount today, and every month thereafter.
                 ):
                     modal.open()
                 if confirmed:
-                    change_subscription(
-                        user,
-                        plan,
-                        # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                        billing_cycle_anchor="now",
-                    )
+                    try:
+                        change_subscription(
+                            user,
+                            plan,
+                            # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                            billing_cycle_anchor="now",
+                            payment_behavior="error_if_incomplete",
+                        )
+                    except (stripe.CardError, stripe.InvalidRequestError) as e:
+                        if isinstance(e, stripe.InvalidRequestError):
+                            sentry_sdk.capture_exception(e)
+
+                        # only handle error if it's related to mandates
+                        # cancel current subscription & redirect user to new subscription page
+                        user.subscription.cancel()
+                        stripe_subscription_create(user=user, plan=plan)
             else:
                 modal, confirmed = confirm_modal(
                     title="Downgrade Plan",
