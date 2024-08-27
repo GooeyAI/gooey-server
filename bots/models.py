@@ -1111,7 +1111,9 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
-            models.Index(fields=["bot_integration", "twilio_phone_number"]),
+            models.Index(
+                fields=["bot_integration", "twilio_phone_number", "twilio_call_sid"]
+            ),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
@@ -1121,7 +1123,18 @@ class Conversation(models.Model):
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
-            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or " | ".join(
+                filter(
+                    None,
+                    [
+                        (
+                            self.twilio_phone_number
+                            and self.twilio_phone_number.as_international
+                        ),
+                        self.twilio_call_sid,
+                    ],
+                )
+            )
             or self.ig_username
             or self.fb_page_name
             or " in #".join(
