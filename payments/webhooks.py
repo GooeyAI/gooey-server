@@ -207,7 +207,7 @@ class StripeWebhookHandler:
                 uid=uid,
                 invoice_url=data["hosted_invoice_url"],
                 dollar_amt=data["amount_due"] / 100,
-                kind="auto recharge",
+                subject="Payment failure on your Gooey.AI auto-recharge",
             )
         elif data.get("subscription_details", {}):
             print("subscription failed")
@@ -215,7 +215,7 @@ class StripeWebhookHandler:
                 uid=uid,
                 invoice_url=data["hosted_invoice_url"],
                 dollar_amt=data["amount_due"] / 100,
-                kind="subscription",
+                subject="Payment failure on your Gooey.AI subscription",
             )
         else:
             print("not auto recharge or subscription")

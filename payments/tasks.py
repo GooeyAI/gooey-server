@@ -1,6 +1,3 @@
-from typing import Literal
-
-import stripe
 from django.utils import timezone
 from loguru import logger
 
@@ -47,7 +44,7 @@ def send_payment_failed_email_with_invoice(
     uid: str,
     invoice_url: str,
     dollar_amt: float,
-    kind: Literal["subscription", "auto recharge"],
+    subject: str,
 ):
     from routers.account import account_route
 
@@ -59,7 +56,7 @@ def send_payment_failed_email_with_invoice(
     send_email_via_postmark(
         from_address=settings.PAYMENT_EMAIL,
         to_address=user.email,
-        subject=f"Payment failure on your Gooey.AI {kind}",
+        subject=subject,
         html_body=templates.get_template(
             "off_session_payment_failed_email.html"
         ).render(
