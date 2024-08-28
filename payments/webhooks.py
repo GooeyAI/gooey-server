@@ -181,7 +181,6 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_subscription_cancelled(cls, org_id: str):
-        logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
         set_org_subscription(
             org_id=org_id,
             plan=PricingPlan.STARTER,

@@ -42,11 +42,27 @@ class OrgRole(models.IntegerChoices):
 
 class OrgManager(SafeDeleteManager):
     def create_org(
-        self, *, created_by: "AppUser", org_id: str | None = None, **kwargs
+        self,
+        *,
+        created_by: "AppUser",
+        org_id: str | None = None,
+        balance: int | None = None,
+        **kwargs,
     ) -> Org:
         org = self.model(
-            org_id=org_id or get_random_doc_id(), created_by=created_by, **kwargs
+            org_id=org_id or get_random_doc_id(),
+            created_by=created_by,
+            balance=balance,
+            **kwargs,
         )
+        if (
+            balance is None
+            and Org.all_objects.filter(created_by=created_by).count() <= 1
+        ):
+            # set some balance for first team created by user
+            # Org.all_objects is important to include deleted orgs
+            org.balance = settings.FIRST_ORG_FREE_CREDITS
+
         org.full_clean()
         org.save()
         org.add_member(

@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-import json
 from pathlib import Path
 
 import sentry_sdk
@@ -289,8 +288,8 @@ CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
+FIRST_ORG_FREE_CREDITS = config("ORG_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
-
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
