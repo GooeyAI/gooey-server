@@ -9,7 +9,6 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from orgs.models import Org
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
 from payments.webhooks import StripeWebhookHandler, set_org_subscription
