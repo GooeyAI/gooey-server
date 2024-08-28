@@ -80,8 +80,10 @@ class Subscription(models.Model):
 
     def __str__(self):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
-        if self.has_user:
-            ret = f"{ret} | {self.user}"
+        # if self.has_user:
+        #     ret = f"{ret} | {self.user}"
+        if self.has_org:
+            ret = f"{ret} | {self.org}"
         if self.auto_recharge_enabled:
             ret = f"Auto | {ret}"
         return ret
@@ -130,6 +132,15 @@ class Subscription(models.Model):
 
     def is_paid(self) -> bool:
         return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
+
+    @property
+    def has_org(self) -> bool:
+        try:
+            self.org
+        except Subscription.org.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
 
     def cancel(self):
         from payments.webhooks import StripeWebhookHandler
@@ -361,12 +372,12 @@ class Subscription(models.Model):
         )
 
     def should_send_monthly_spending_notification(self) -> bool:
-        assert self.has_user
+        assert self.has_org
 
         return bool(
             self.monthly_spending_notification_threshold
             and not self.has_sent_monthly_spending_notification_this_month()
-            and self.user.get_dollars_spent_this_month()
+            and self.org.get_dollars_spent_this_month()
             >= self.monthly_spending_notification_threshold
         )
 

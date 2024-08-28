@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import re
 from datetime import timedelta
 
+from django.db.models.aggregates import Sum
+import stripe
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.db.backends.base.schema import logger
@@ -10,10 +14,10 @@ from django.utils.text import slugify
 from safedelete.managers import SafeDeleteManager
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
-from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.crypto import get_random_doc_id
+from gooeysite.bg_db_conn import db_middleware
 from orgs.tasks import send_auto_accepted_email, send_invitation_email
 
 
@@ -37,7 +41,9 @@ class OrgRole(models.IntegerChoices):
 
 
 class OrgManager(SafeDeleteManager):
-    def create_org(self, *, created_by: "AppUser", org_id: str | None = None, **kwargs):
+    def create_org(
+        self, *, created_by: "AppUser", org_id: str | None = None, **kwargs
+    ) -> Org:
         org = self.model(
             org_id=org_id or get_random_doc_id(), created_by=created_by, **kwargs
         )
@@ -48,6 +54,28 @@ class OrgManager(SafeDeleteManager):
             role=OrgRole.OWNER,
         )
         return org
+
+    def get_or_create_from_org_id(self, org_id: str) -> tuple[Org, bool]:
+        from app_users.models import AppUser
+
+        try:
+            return self.get(org_id=org_id), False
+        except self.model.DoesNotExist:
+            user = AppUser.objects.get_or_create_from_uid(org_id)[0]
+            return self.migrate_from_appuser(user), True
+
+    def migrate_from_appuser(self, user: "AppUser") -> Org:
+        return self.create_org(
+            name=f"{user.first_name()}'s Personal Workspace",
+            org_id=user.uid or get_random_doc_id(),
+            created_by=user,
+            is_personal=True,
+            balance=user.balance,
+            stripe_customer_id=user.stripe_customer_id,
+            subscription=user.subscription,
+            low_balance_email_sent_at=user.low_balance_email_sent_at,
+            is_paying=user.is_paying,
+        )
 
 
 class Org(SafeDeleteModel):
@@ -71,6 +99,21 @@ class Org(SafeDeleteModel):
         ],
     )
 
+    # billing
+    balance = models.IntegerField("bal", default=0)
+    is_paying = models.BooleanField("paid", default=False)
+    stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
+    subscription = models.OneToOneField(
+        "payments.Subscription",
+        on_delete=models.SET_NULL,
+        related_name="org",
+        null=True,
+        blank=True,
+    )
+    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+
+    is_personal = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,7 +126,12 @@ class Org(SafeDeleteModel):
                 condition=Q(deleted__isnull=True),
                 name="unique_domain_name_when_not_deleted",
                 violation_error_message=f"This domain name is already in use by another team. Contact {settings.SUPPORT_EMAIL} if you think this is a mistake.",
-            )
+            ),
+            models.UniqueConstraint(
+                "created_by",
+                condition=Q(deleted__isnull=True, is_personal=True),
+                name="unique_personal_org_per_user",
+            ),
         ]
 
     def __str__(self):
@@ -146,6 +194,90 @@ class Org(SafeDeleteModel):
             invitation.send_email()
 
         return invitation
+
+    def get_owners(self) -> list[OrgMembership]:
+        return self.memberships.filter(role=OrgRole.OWNER)
+
+    @db_middleware
+    @transaction.atomic
+    def add_balance(
+        self, amount: int, invoice_id: str, **kwargs
+    ) -> "AppUserTransaction":
+        """
+        Used to add/deduct credits when they are bought or consumed.
+
+        When credits are bought with stripe -- invoice_id is the stripe
+        invoice ID.
+        When credits are deducted due to a run -- invoice_id is of the
+        form "gooey_in_{uuid}"
+        """
+        from app_users.models import AppUserTransaction
+
+        # if an invoice entry exists
+        try:
+            # avoid updating twice for same invoice
+            return AppUserTransaction.objects.get(invoice_id=invoice_id)
+        except AppUserTransaction.DoesNotExist:
+            pass
+
+        # select_for_update() is very important here
+        # transaction.atomic alone is not enough!
+        # It won't lock this row for reads, and multiple threads can update the same row leading incorrect balance
+        #
+        # Also we're not using .update() here because it won't give back the updated end balance
+        org: Org = Org.objects.select_for_update().get(pk=self.pk)
+        org.balance += amount
+        org.save(update_fields=["balance"])
+        kwargs.setdefault("plan", org.subscription and org.subscription.plan)
+        return AppUserTransaction.objects.create(
+            org=org,
+            invoice_id=invoice_id,
+            amount=amount,
+            end_balance=org.balance,
+            **kwargs,
+        )
+
+    def get_or_create_stripe_customer(self) -> stripe.Customer:
+        customer = self.search_stripe_customer()
+        if not customer:
+            customer = stripe.Customer.create(
+                name=self.created_by.display_name,
+                email=self.created_by.email,
+                phone=self.created_by.phone,
+                metadata={"uid": self.org_id, "org_id": self.org_id, "id": self.pk},
+            )
+            self.stripe_customer_id = customer.id
+            self.save()
+        return customer
+
+    def search_stripe_customer(self) -> stripe.Customer | None:
+        if not self.org_id:
+            return None
+        if self.stripe_customer_id:
+            try:
+                return stripe.Customer.retrieve(self.stripe_customer_id)
+            except stripe.error.InvalidRequestError as e:
+                if e.http_status != 404:
+                    raise
+        try:
+            customer = stripe.Customer.search(
+                query=f'metadata["uid"]:"{self.org_id}"'
+            ).data[0]
+        except IndexError:
+            return None
+        else:
+            self.stripe_customer_id = customer.id
+            self.save()
+            return customer
+
+    def get_dollars_spent_this_month(self) -> float:
+        today = timezone.now()
+        cents_spent = self.transactions.filter(
+            created_at__month=today.month,
+            created_at__year=today.year,
+            amount__gt=0,
+        ).aggregate(total=Sum("charged_amount"))["total"]
+        return (cents_spent or 0) / 100
 
 
 class OrgMembership(SafeDeleteModel):
@@ -260,6 +392,8 @@ class OrgInvitation(SafeDeleteModel):
 
         Raises: ValidationError
         """
+        from app_users.models import AppUser
+
         assert self.status == self.Status.PENDING
 
         invitee = AppUser.objects.get(email=self.invitee_email)
@@ -287,7 +421,7 @@ class OrgInvitation(SafeDeleteModel):
 
         send_invitation_email.delay(invitation_pk=self.pk)
 
-    def accept(self, user: AppUser, *, auto_accepted: bool = False):
+    def accept(self, user: "AppUser", *, auto_accepted: bool = False):
         """
         Raises: ValidationError
         """
@@ -323,13 +457,13 @@ class OrgInvitation(SafeDeleteModel):
             )
             self.save()
 
-    def reject(self, user: AppUser):
+    def reject(self, user: "AppUser"):
         self.status = self.Status.REJECTED
         self.status_changed_at = timezone.now()
         self.status_changed_by = user
         self.save()
 
-    def cancel(self, user: AppUser):
+    def cancel(self, user: "AppUser"):
         self.status = self.Status.CANCELED
         self.status_changed_at = timezone.now()
         self.status_changed_by = user

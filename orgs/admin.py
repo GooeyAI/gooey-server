@@ -43,9 +43,16 @@ class OrgAdmin(SafeDeleteAdmin):
         "updated_at",
     ] + list(SafeDeleteAdmin.list_display)
     list_filter = [SafeDeleteAdminFilter] + list(SafeDeleteAdmin.list_filter)
-    fields = ["name", "domain_name", "created_by", "created_at", "updated_at"]
+    fields = [
+        "name",
+        "domain_name",
+        "created_by",
+        "is_personal",
+        "created_at",
+        "updated_at",
+    ]
     search_fields = ["name", "domain_name"]
-    readonly_fields = ["created_at", "updated_at"]
+    readonly_fields = ["is_personal", "created_at", "updated_at"]
     inlines = [OrgMembershipInline, OrgInvitationInline]
     ordering = ["-created_at"]
 
