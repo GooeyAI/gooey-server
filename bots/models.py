@@ -212,6 +212,13 @@ class SavedRun(models.Model):
     )
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
+    billed_org = models.ForeignKey(
+        "orgs.Org",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="billed_runs",
+    )
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 

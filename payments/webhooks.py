@@ -10,6 +10,7 @@ from app_users.models import (
     TransactionReason,
 )
 from daras_ai_v2 import paypal
+from orgs.models import Org
 from .models import Subscription
 from .plans import PricingPlan
 from .tasks import send_monthly_spending_notification_email
@@ -25,7 +26,7 @@ class PaypalWebhookHandler:
             return
 
         pp_sub = paypal.Subscription.retrieve(sale.billing_agreement_id)
-        assert pp_sub.custom_id, "pp_sub is missing uid"
+        assert pp_sub.custom_id, "pp_sub is missing org_id"
         assert pp_sub.plan_id, "pp_sub is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
@@ -38,9 +39,9 @@ class PaypalWebhookHandler:
                 f"paypal: charged amount ${charged_dollars} does not match plan's monthly charge ${plan.monthly_charge}"
             )
 
-        uid = pp_sub.custom_id
+        org_id = pp_sub.custom_id
         add_balance_for_payment(
-            uid=uid,
+            org_id=org_id,
             amount=plan.credits,
             invoice_id=sale.id,
             payment_provider=cls.PROVIDER,
@@ -53,7 +54,7 @@ class PaypalWebhookHandler:
     def handle_subscription_updated(cls, pp_sub: paypal.Subscription):
         logger.info(f"Paypal subscription updated {pp_sub.id}")
 
-        assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
+        assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing org_id"
         assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
@@ -65,17 +66,17 @@ class PaypalWebhookHandler:
             )
             return
 
-        set_user_subscription(
+        set_org_subscription(
             provider=cls.PROVIDER,
             plan=plan,
-            uid=pp_sub.custom_id,
+            org_id=pp_sub.custom_id,
             external_id=pp_sub.id,
         )
 
     @classmethod
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
-        set_user_subscription(
+        set_org_subscription(
             uid=pp_sub.custom_id,
             plan=PricingPlan.STARTER,
             provider=None,
@@ -87,11 +88,9 @@ class StripeWebhookHandler:
     PROVIDER = PaymentProvider.STRIPE
 
     @classmethod
-    def handle_invoice_paid(cls, uid: str, invoice: stripe.Invoice):
-        from app_users.tasks import save_stripe_default_payment_method
-
+    def handle_invoice_paid(cls, org_id: str, invoice: stripe.Invoice):
         kwargs = {}
-        if invoice.subscription:
+        if invoice.subscription and invoice.subscription_details:
             kwargs["plan"] = PricingPlan.get_by_key(
                 invoice.subscription_details.metadata.get("subscription_key")
             ).db_value
@@ -112,7 +111,7 @@ class StripeWebhookHandler:
         amount = invoice.lines.data[0].quantity
         charged_amount = invoice.lines.data[0].amount
         add_balance_for_payment(
-            uid=uid,
+            org_id=org_id,
             amount=amount,
             invoice_id=invoice.id,
             payment_provider=cls.PROVIDER,
@@ -130,7 +129,7 @@ class StripeWebhookHandler:
         )
 
     @classmethod
-    def handle_checkout_session_completed(cls, uid: str, session_data):
+    def handle_checkout_session_completed(cls, org_id: str, session_data):
         setup_intent_id = session_data.get("setup_intent")
         if not setup_intent_id:
             # not a setup mode checkout -- do nothing
@@ -152,7 +151,7 @@ class StripeWebhookHandler:
             )
 
     @classmethod
-    def handle_subscription_updated(cls, uid: str, stripe_sub: stripe.Subscription):
+    def handle_subscription_updated(cls, org_id: str, stripe_sub: stripe.Subscription):
         logger.info(f"Stripe subscription updated: {stripe_sub.id}")
 
         assert stripe_sub.plan, f"Stripe subscription {stripe_sub.id} is missing plan"
@@ -173,17 +172,18 @@ class StripeWebhookHandler:
             )
             return
 
-        set_user_subscription(
+        set_org_subscription(
             provider=cls.PROVIDER,
             plan=plan,
-            uid=uid,
+            org_id=org_id,
             external_id=stripe_sub.id,
         )
 
     @classmethod
-    def handle_subscription_cancelled(cls, uid: str):
-        set_user_subscription(
-            uid=uid,
+    def handle_subscription_cancelled(cls, org_id: str):
+        logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
+        set_org_subscription(
+            org_id=org_id,
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,
@@ -192,15 +192,15 @@ class StripeWebhookHandler:
 
 def add_balance_for_payment(
     *,
-    uid: str,
+    org_id: str,
     amount: int,
     invoice_id: str,
     payment_provider: PaymentProvider,
     charged_amount: int,
     **kwargs,
 ):
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(
+    org = Org.objects.get_or_create_from_org_id(org_id)[0]
+    org.add_balance(
         amount=amount,
         invoice_id=invoice_id,
         charged_amount=charged_amount,
@@ -208,20 +208,20 @@ def add_balance_for_payment(
         **kwargs,
     )
 
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])
+    if not org.is_paying:
+        org.is_paying = True
+        org.save(update_fields=["is_paying"])
 
     if (
-        user.subscription
-        and user.subscription.should_send_monthly_spending_notification()
+        org.subscription
+        and org.subscription.should_send_monthly_spending_notification()
     ):
-        send_monthly_spending_notification_email.delay(user.id)
+        send_monthly_spending_notification_email.delay(org.id)
 
 
-def set_user_subscription(
+def set_org_subscription(
     *,
-    uid: str,
+    org_id: str,
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
@@ -229,9 +229,9 @@ def set_user_subscription(
     charged_amount: int = None,
 ) -> Subscription:
     with transaction.atomic():
-        user = AppUser.objects.get_or_create_from_uid(uid)[0]
+        org = Org.objects.get_or_create_from_org_id(org_id)[0]
 
-        old_sub = user.subscription
+        old_sub = org.subscription
         if old_sub:
             new_sub = copy(old_sub)
         else:
@@ -245,8 +245,8 @@ def set_user_subscription(
         new_sub.save()
 
         if not old_sub:
-            user.subscription = new_sub
-            user.save(update_fields=["subscription"])
+            org.subscription = new_sub
+            org.save(update_fields=["subscription"])
 
     # cancel previous subscription if it's not the same as the new one
     if old_sub and old_sub.external_id != external_id:

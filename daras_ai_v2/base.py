@@ -2106,7 +2106,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ), "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
-        txn = self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        org, _ = self.request.user.get_or_create_personal_org()
+        txn = org.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
         return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:

@@ -9,9 +9,10 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
+from orgs.models import Org
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
-from payments.webhooks import StripeWebhookHandler, set_user_subscription
+from payments.webhooks import StripeWebhookHandler, set_org_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
@@ -635,8 +636,8 @@ This will cancel your subscription and remove your saved payment method.
     ):
         modal.open()
     if confirmed:
-        set_user_subscription(
-            uid=user.uid,
+        set_org_subscription(
+            org_id=user.get_personal_org().org_id,
             plan=PricingPlan.STARTER,
             provider=None,
             external_id=None,

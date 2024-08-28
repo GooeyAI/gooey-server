@@ -90,22 +90,9 @@ class AppUser(models.Model):
     display_name = models.TextField("name", blank=True)
     email = models.EmailField(null=True, blank=True)
     phone_number = PhoneNumberField(null=True, blank=True)
-    balance = models.IntegerField("bal")
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
     photo_url = CustomURLField(default="", blank=True)
-
-    stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
-    is_paying = models.BooleanField("paid", default=False)
-
-    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
-    subscription = models.OneToOneField(
-        "payments.Subscription",
-        on_delete=models.SET_NULL,
-        related_name="user",
-        null=True,
-        blank=True,
-    )
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
@@ -128,6 +115,18 @@ class AppUser(models.Model):
     company = models.CharField(max_length=255, blank=True, default="")
     github_username = models.CharField(max_length=255, blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
+
+    balance = models.IntegerField("bal")
+    is_paying = models.BooleanField("paid", default=False)
+    stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
+    subscription = models.OneToOneField(
+        "payments.Subscription",
+        on_delete=models.SET_NULL,
+        related_name="user",
+        null=True,
+        blank=True,
+    )
+    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     disable_rate_limits = models.BooleanField(default=False)
 
@@ -158,6 +157,9 @@ class AppUser(models.Model):
             return name + "'"
         else:
             return name + "'s"
+
+    def get_personal_org(self) -> "Org | None":
+        return self.orgs.filter(is_personal=True).first()
 
     @db_middleware
     @transaction.atomic
@@ -246,6 +248,17 @@ class AppUser(models.Model):
 
         return self
 
+    def get_or_create_personal_org(self) -> tuple["Org", bool]:
+        from orgs.models import Org
+
+        org_membership = self.org_memberships.filter(
+            org__is_personal=True, org__created_by=self
+        ).first()
+        if org_membership:
+            return org_membership, False
+        else:
+            return Org.objects.migrate_from_appuser(self), True
+
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = self.search_stripe_customer()
         if not customer:
@@ -303,7 +316,16 @@ class TransactionReason(models.IntegerChoices):
 
 class AppUserTransaction(models.Model):
     user = models.ForeignKey(
-        "AppUser", on_delete=models.CASCADE, related_name="transactions"
+        "AppUser",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        null=True,
+    )
+    org = models.ForeignKey(
+        "orgs.Org",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        null=True,
     )
     invoice_id = models.CharField(
         max_length=255,

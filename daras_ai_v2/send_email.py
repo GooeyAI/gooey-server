@@ -3,16 +3,19 @@ import typing
 
 import requests
 
-from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.settings import templates
 
 
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+
+
 def send_reported_run_email(
     *,
-    user: AppUser,
+    user: "AppUser",
     run_uid: str,
     url: str,
     recipe_name: str,
@@ -41,7 +44,7 @@ def send_reported_run_email(
 
 def send_low_balance_email(
     *,
-    user: AppUser,
+    user: "AppUser",
     total_credits_consumed: int,
 ):
     from routers.account import account_route
@@ -70,8 +73,8 @@ def send_email_via_postmark(
     *,
     from_address: str,
     to_address: str,
-    cc: str = None,
-    bcc: str = None,
+    cc: str | None = None,
+    bcc: str | None = None,
     subject: str = "",
     html_body: str = "",
     text_body: str = "",
@@ -79,7 +82,7 @@ def send_email_via_postmark(
         "outbound", "gooey-ai-workflows", "announcements"
     ] = "outbound",
 ):
-    if is_running_pytest:
+    if is_running_pytest or not settings.POSTMARK_API_TOKEN:
         pytest_outbox.append(
             dict(
                 from_address=from_address,

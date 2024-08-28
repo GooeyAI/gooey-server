@@ -5,14 +5,14 @@ from app_users.models import PaymentProvider, TransactionReason
 from celeryapp.celeryconfig import app
 from payments.models import Subscription
 from payments.plans import PricingPlan
-from payments.webhooks import set_user_subscription
+from payments.webhooks import set_org_subscription
 
 
 @app.task
 def save_stripe_default_payment_method(
     *,
     payment_intent_id: str,
-    uid: str,
+    org_id: str,
     amount: int,
     charged_amount: int,
     reason: TransactionReason,
@@ -41,11 +41,11 @@ def save_stripe_default_payment_method(
     if (
         reason == TransactionReason.ADDON
         and not Subscription.objects.filter(
-            user__uid=uid, payment_provider__isnull=False
+            org__org_id=org_id, payment_provider__isnull=False
         ).exists()
     ):
-        set_user_subscription(
-            uid=uid,
+        set_org_subscription(
+            org_id=org_id,
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,
