@@ -1,0 +1,25 @@
+{% extends 'base_email.html' %}
+
+{% block title %}Payment failed{% endblock title %}
+
+{% block content %}
+<p>Hi {{ user.first_name() }},</p>
+
+<p>We attempted to process your payment for ${{ dollar_amt }} but your payment method was declined.</p>
+
+<p>
+  Please <a href="{{ invoice_url }}">make a payment</a> on Gooey.AI for continued service or update
+  your payment method on <a href="{{ account_url }}">your account</a>.
+</p>
+
+<p>
+  <a href="{{ invoice_url }}">
+    <button class="btn btn-dark text-light">Make Payment</button>
+  </a>
+</p>
+
+<p>
+  Cheers,<br />
+  The Gooey.AI team
+</p>
+{% endblock content %}

@@ -12,7 +12,10 @@ from app_users.models import (
 from daras_ai_v2 import paypal
 from .models import Subscription
 from .plans import PricingPlan
-from .tasks import send_monthly_spending_notification_email
+from .tasks import (
+    send_monthly_spending_notification_email,
+    send_payment_failed_email_with_invoice,
+)
 
 
 class PaypalWebhookHandler:
@@ -188,6 +191,36 @@ class StripeWebhookHandler:
             provider=PaymentProvider.STRIPE,
             external_id=None,
         )
+
+    @classmethod
+    def handle_invoice_failed(cls, uid: str, data: dict):
+        logger.info(f"Invoice failed: {data}")
+
+        if stripe.Charge.list(payment_intent=data["payment_intent"], limit=1).has_more:
+            # we must have already sent an invoice for this to the user. so we should just ignore this event
+            logger.info("Charge already exists for this payment intent")
+            return
+
+        if data.get("metadata", {}).get("auto_recharge"):
+            logger.info("auto recharge failed... sending invoice email")
+            send_payment_failed_email_with_invoice.delay(
+                uid=uid,
+                invoice_url=data["hosted_invoice_url"],
+                dollar_amt=data["amount_due"] / 100,
+                kind="auto recharge",
+            )
+        elif data.get("subscription_details", {}):
+            print("subscription failed")
+            send_payment_failed_email_with_invoice.delay(
+                uid=uid,
+                invoice_url=data["hosted_invoice_url"],
+                dollar_amt=data["amount_due"] / 100,
+                kind="subscription",
+            )
+        else:
+            print("not auto recharge or subscription")
+            print(f"{data.get('metadata')=}")
+            return
 
 
 def add_balance_for_payment(

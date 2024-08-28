@@ -1,3 +1,6 @@
+from typing import Literal
+
+import stripe
 from django.utils import timezone
 from loguru import logger
 
@@ -37,6 +40,36 @@ def send_monthly_spending_notification_email(user_id: int):
     # subscription during the same time
     user.subscription.monthly_spending_notification_sent_at = timezone.now()
     user.subscription.save(update_fields=["monthly_spending_notification_sent_at"])
+
+
+@app.task
+def send_payment_failed_email_with_invoice(
+    uid: str,
+    invoice_url: str,
+    dollar_amt: float,
+    kind: Literal["subscription", "auto recharge"],
+):
+    from routers.account import account_route
+
+    user = AppUser.objects.get(uid=uid)
+    if not user.email:
+        logger.error(f"User doesn't have an email: {user=}")
+        return
+
+    send_email_via_postmark(
+        from_address=settings.PAYMENT_EMAIL,
+        to_address=user.email,
+        subject=f"Payment failure on your Gooey.AI {kind}",
+        html_body=templates.get_template(
+            "off_session_payment_failed_email.html"
+        ).render(
+            user=user,
+            dollar_amt=f"{dollar_amt:.2f}",
+            invoice_url=invoice_url,
+            account_url=get_app_route_url(account_route),
+        ),
+        message_stream="billing",
+    )
 
 
 def send_monthly_budget_reached_email(user: AppUser):
