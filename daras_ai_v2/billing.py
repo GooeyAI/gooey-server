@@ -214,13 +214,14 @@ def _render_plan_action_button(
                     title="Upgrade Plan",
                     key=f"--modal-{plan.key}",
                     text=f"""
-Are you sure you want to upgrade from: **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
+Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
 
-This will charge you the full amount today, and every month thereafter.  
- 
-**{current_plan.credits:,} credits** will be added to your account.
+Your payment method will be charged ${plan.monthly_charge:,} today and again every month until you cancel.
+
+**{plan.credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
+will be refreshed to {plan.credits:,} Credits.
                     """,
-                    button_label="Buy",
+                    button_label="Upgrade",
                 )
                 if gui.button(
                     "Upgrade", className="primary", key=f"--change-sub-{plan.key}"
@@ -238,7 +239,7 @@ This will charge you the full amount today, and every month thereafter.
                     title="Downgrade Plan",
                     key=f"--modal-{plan.key}",
                     text=f"""
-Are you sure you want to downgrade from: **{current_plan.title} ({fmt_price(current_plan)})** to **{plan.title} ({fmt_price(plan)})**?
+Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
 
 This will take effect from the next billing cycle.
                     """,
@@ -398,9 +399,9 @@ def render_stripe_addon_button(dollat_amt: int, user: AppUser, save_pm: bool):
         title="Purchase Credits",
         key=f"--addon-modal-{dollat_amt}",
         text=f"""
-Please confirm your purchase: **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollat_amt}**.
+Please confirm your purchase of **{dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} Credits for ${dollat_amt}**.
 
-This is a one-time purchase. Your account will be credited immediately.
+This is a one-time purchase and your account will be credited once the payment is made.
         """,
         button_label="Buy",
         text_on_confirm="Processing Payment...",
