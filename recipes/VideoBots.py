@@ -662,7 +662,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.session_state["input_images"] = new_input_images or None
         gui.session_state["input_documents"] = new_input_documents or None
 
-        self.on_submit()
+        self.submit_and_redirect()
 
     def render_steps(self):
         if gui.session_state.get("tts_provider"):

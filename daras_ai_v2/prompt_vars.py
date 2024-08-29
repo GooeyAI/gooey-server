@@ -55,7 +55,9 @@ def variables_input(
         - set(gui.session_state.keys())  # dont show other session state variables
     )
 
-    gui.session_state[key] = new_vars = {}
+    new_vars = {}
+    if all_var_names:
+        gui.session_state[key] = new_vars
     title_shown = False
     for name in sorted(all_var_names):
         var_key = f"--{key}:{name}"
