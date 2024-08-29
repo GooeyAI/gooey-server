@@ -136,7 +136,7 @@ def url_to_runs(
     assert match, "Not a valid Gooey.AI URL"
     page_cls = page_slug_map[normalize_slug(match.matched_params["page_slug"])]
     example_id, run_id, uid = extract_query_params(furl(url).query.params)
-    sr, pr = page_cls.get_runs_from_query_params(
+    sr, pr = page_cls.get_sr_pr_from_query_params(
         example_id or match.matched_params.get("example_id"), run_id, uid
     )
     return page_cls, sr, pr
@@ -177,7 +177,7 @@ def get_published_run_options(
     if include_root:
         # include root recipe if requested
         options_dict = {
-            page_cls.get_root_published_run().get_app_url(): "Default",
+            page_cls.get_root_pr().get_app_url(): "Default",
         } | options_dict
 
     return options_dict

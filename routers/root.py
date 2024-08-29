@@ -39,7 +39,6 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -314,7 +313,7 @@ Authorization: Bearer GOOEY_API_KEY
     as_form_data = gui.checkbox("Upload Files via Form Data")
 
     page = workflow.page_cls(request=request)
-    state = page.get_root_published_run().saved_run.to_dict()
+    state = page.get_root_pr().saved_run.to_dict()
     api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
@@ -669,12 +668,13 @@ def render_recipe_page(
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
     # this is because the code still expects example_id to be in the query params
-    gui.set_query_params(dict(request.query_params) | dict(example_id=example_id))
-    _, run_id, uid = extract_query_params(request.query_params)
+    request._query_params = dict(request.query_params) | dict(example_id=example_id)
 
-    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
+    page = page_cls(tab=tab, request=request)
+    sr = page.current_sr
+    page.run_user = get_run_user(request, sr.uid)
+
     if not gui.session_state:
-        sr = page.get_sr_from_query_params(example_id, run_id, uid)
         gui.session_state.update(page.load_state_from_sr(sr))
 
     with page_wrapper(request):
@@ -682,12 +682,7 @@ def render_recipe_page(
 
     return dict(
         meta=build_meta_tags(
-            url=get_og_url_path(request),
-            page=page,
-            state=gui.session_state,
-            run_id=run_id,
-            uid=uid,
-            example_id=example_id,
+            url=get_og_url_path(request), page=page, state=gui.session_state
         ),
     )
 
@@ -698,7 +693,7 @@ def get_og_url_path(request) -> str:
     )
 
 
-def get_run_user(request, uid) -> AppUser | None:
+def get_run_user(request: Request, uid: str) -> AppUser | None:
     if not uid:
         return
     if request.user and request.user.uid == uid:
