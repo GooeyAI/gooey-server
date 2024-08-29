@@ -302,7 +302,7 @@ class ApiInterface(BotInterface):
             msg_handler(self)
             # raise ValueError("Stream ended")
             if self.run_id and self.uid:
-                sr = self.page_cls.run_doc_sr(run_id=self.run_id, uid=self.uid)
+                sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
                 self.queue.put(
                     FinalResponse(

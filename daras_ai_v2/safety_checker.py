@@ -29,7 +29,7 @@ def safety_checker_text(text_input: str):
     # run in a thread to avoid messing up threadlocals
     result, sr = (
         CompareLLMPage()
-        .get_published_run(published_run_id=settings.SAFETY_CHECKER_EXAMPLE_ID)
+        .get_pr_from_example_id(example_id=settings.SAFETY_CHECKER_EXAMPLE_ID)
         .submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),

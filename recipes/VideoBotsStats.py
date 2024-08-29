@@ -84,8 +84,9 @@ class VideoBotsStatsPage(BasePage):
                             )
                         gui.breadcrumb_item(
                             "Integrations",
-                            link_to=VideoBotsPage.current_app_url(
-                                RecipeTabs.integrations,
+                            link_to=VideoBotsPage.app_url(
+                                tab=RecipeTabs.integrations,
+                                query_params=dict(self.request.query_params),
                                 path_params=dict(
                                     integration_id=bi.api_integration_id()
                                 ),
@@ -152,7 +153,7 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
-        run_url = VideoBotsPage.current_app_url()
+        run_url = VideoBotsPage.app_url(query_params=dict(self.request.query_params))
         if bi.published_run_id:
             run_title = bi.published_run.title
         else:

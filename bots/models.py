@@ -127,16 +127,12 @@ class Workflow(models.IntegerChoices):
             workflow=self,
             create=lambda **kwargs: WorkflowMetadata.objects.create(
                 **kwargs,
-                short_title=(
-                    self.page_cls.get_root_published_run().title or self.page_cls.title
-                ),
+                short_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 default_image=self.page_cls.explore_image or "",
-                meta_title=(
-                    self.page_cls.get_root_published_run().title or self.page_cls.title
-                ),
+                meta_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 meta_description=(
                     self.page_cls().preview_description(state={})
-                    or self.page_cls.get_root_published_run().notes
+                    or self.page_cls.get_root_pr().notes
                 ),
                 meta_image=self.page_cls.explore_image or "",
             ),
@@ -389,7 +385,7 @@ class SavedRun(models.Model):
                 ),
             )
 
-        return result, page.run_doc_sr(run_id, uid)
+        return result, page.current_sr
 
     def get_creator(self) -> AppUser | None:
         if self.uid:

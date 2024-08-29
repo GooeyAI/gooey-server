@@ -258,8 +258,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         run_id: str,
         user: AppUser = Depends(api_auth_header),
     ):
-        self = page_cls()
-        sr = self.get_sr_from_query_params(example_id=None, run_id=run_id, uid=user.uid)
+        # init a new page for every request
+        self = page_cls(
+            request=SimpleNamespace(
+                user=user, query_params=dict(run_id=run_id, uid=user.uid)
+            )
+        )
+        sr = self.current_sr
         web_url = str(furl(self.app_url(run_id=run_id, uid=user.uid)))
         ret = {
             "run_id": run_id,
@@ -335,18 +340,17 @@ def submit_api_call(
     deduct_credits: bool = True,
 ) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
     # init a new page for every request
-    self = page_cls(request=SimpleNamespace(user=user))
+    query_params.setdefault("uid", user.uid)
+    self = page_cls(request=SimpleNamespace(user=user, query_params=query_params))
 
     # get saved state from db
-    query_params.setdefault("uid", user.uid)
-    sr = self.get_sr_from_query_params_dict(query_params)
+    sr = self.current_sr
     state = self.load_state_from_sr(sr)
     # load request data
     state.update(request_body)
 
     # set streamlit session state
     gui.set_session_state(state)
-    gui.set_query_params(query_params)
 
     # create a new run
     try:
@@ -369,7 +373,7 @@ def build_async_api_response(*, page: BasePage, run_id: str, uid: str) -> dict:
         / page.endpoint.replace("v2", "v3")
         / "status/"
     )
-    sr = page.run_doc_sr(run_id, uid)
+    sr = page.current_sr
     return dict(
         run_id=run_id,
         web_url=web_url,
@@ -388,7 +392,8 @@ def build_sync_api_response(
     web_url = page.app_url(run_id=run_id, uid=uid)
     # wait for the result
     get_celery_result_db_safe(result)
-    sr = page.run_doc_sr(run_id, uid)
+    sr = page.current_sr
+    sr.refresh_from_db()
     if sr.retention_policy == RetentionPolicy.delete:
         sr.state = {}
         sr.save(update_fields=["state"])

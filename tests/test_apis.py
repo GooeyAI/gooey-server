@@ -21,7 +21,7 @@ def test_apis_sync(mock_celery_tasks, force_authentication, threadpool_subtest):
 
 
 def _test_api_sync(page_cls: typing.Type[BasePage]):
-    state = page_cls.recipe_doc_sr().state
+    state = page_cls.get_root_pr().saved_run.state
     r = client.post(
         f"/v2/{page_cls.slug_versions[0]}/",
         json=page_cls.get_example_request(state)[1],
@@ -38,7 +38,7 @@ def test_apis_async(mock_celery_tasks, force_authentication, threadpool_subtest)
 
 
 def _test_api_async(page_cls: typing.Type[BasePage]):
-    state = page_cls.recipe_doc_sr().state
+    state = page_cls.get_root_pr().saved_run.state
 
     r = client.post(
         f"/v3/{page_cls.slug_versions[0]}/async/",

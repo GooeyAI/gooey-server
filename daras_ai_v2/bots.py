@@ -440,7 +440,7 @@ def _process_and_send_msg(
     # wait for the celery task to finish
     get_celery_result_db_safe(result)
     # get the final state from db
-    sr = page.run_doc_sr(run_id, uid)
+    sr = page.current_sr
     state = sr.to_dict()
     bot.recipe_run_state = page.get_run_state(state)
     bot.run_status = state.get(StateKeys.run_status) or ""

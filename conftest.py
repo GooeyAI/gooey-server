@@ -64,10 +64,10 @@ def mock_celery_tasks():
 def _mock_runner_task(
     *, page_cls: typing.Type[BasePage], run_id: str, uid: str, **kwargs
 ):
-    sr = page_cls.run_doc_sr(run_id, uid)
+    sr = page_cls.get_sr_from_ids(run_id, uid)
     sr.set(sr.parent.to_dict())
     sr.save()
-    channel = page_cls().realtime_channel_name(run_id, uid)
+    channel = page_cls.realtime_channel_name(run_id, uid)
     _mock_realtime_push(channel, sr.to_dict())
 
 
