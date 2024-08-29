@@ -473,6 +473,9 @@ Here is the final output:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        yield "Running safety checker..."
+        safety_checker(text=request.text_prompt, image=request.image_prompt)
+
         yield "Generating QR Code..."
         image, qr_code_data, did_shorten = generate_and_upload_qr_code(
             request, self.request.user
@@ -482,10 +485,6 @@ Here is the final output:
         state["cleaned_qr_code"] = image
 
         state["raw_images"] = raw_images = []
-
-        if request.text_prompt:
-            yield "Running safety checker..."
-            safety_checker(text=request.text_prompt)
 
         yield f"Running {Text2ImgModels[request.selected_model].value}..."
         if isinstance(request.selected_controlnet_model, str):
