@@ -348,7 +348,7 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(
             self, current_run, published_run, tab=self.tab
         )
-        can_edit = self.can_user_edit_run(current_run, published_run)
+        can_save = self.can_user_save_run(current_run, published_run)
         request_changed = self._has_request_changed()
 
         with gui.div(className="d-flex justify-content-between mt-4"):
@@ -373,7 +373,7 @@ class BasePage:
                     self.render_author(author)
 
             with gui.div(className="d-flex align-items-center"):
-                if request_changed or (can_edit and not is_example):
+                if request_changed or (can_save and not is_example):
                     self._render_unpublished_changes_indicator()
 
                 with gui.div(className="d-flex align-items-start right-action-icons"):
@@ -387,7 +387,7 @@ class BasePage:
                         """
                     )
 
-                    show_save_buttons = request_changed or can_edit
+                    show_save_buttons = request_changed or can_save
                     if show_save_buttons:
                         self._render_published_run_save_buttons(
                             current_run=current_run,
@@ -406,7 +406,7 @@ class BasePage:
         elif is_root_example and self.tab != RecipeTabs.integrations:
             gui.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
-    def can_user_edit_run(
+    def can_user_save_run(
         self,
         current_run: SavedRun,
         published_run: PublishedRun | None,
@@ -433,7 +433,8 @@ class BasePage:
             published_run
             and self.request
             and self.request.user
-            and published_run.created_by == self.request.user
+            and published_run.created_by_id
+            and published_run.created_by_id == self.request.user.id
         )
 
     def _render_title(self, title: str):
@@ -465,10 +466,7 @@ class BasePage:
         current_run: SavedRun,
         published_run: PublishedRun,
     ):
-        is_update_mode = (
-            self.is_current_user_admin()
-            or published_run.created_by == self.request.user
-        )
+        can_edit = self.can_user_edit_published_run(published_run)
 
         with gui.div(className="d-flex justify-content-end"):
             gui.html(
@@ -485,11 +483,12 @@ class BasePage:
                 """
             )
 
-            pressed_options = is_update_mode and gui.button(
-                '<i class="fa-regular fa-ellipsis"></i>',
-                className="mb-0 ms-lg-2",
-                type="tertiary",
-            )
+            if can_edit:
+                pressed_options = gui.button(
+                    '<i class="fa-regular fa-ellipsis"></i>',
+                    className="mb-0 ms-lg-2",
+                    type="tertiary",
+                )
             options_modal = gui.Modal("Options", key="published-run-options-modal")
             if pressed_options:
                 options_modal.open()
@@ -502,7 +501,7 @@ class BasePage:
                     )
 
             save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
-            if is_update_mode:
+            if can_edit:
                 save_text = "Update"
             else:
                 save_text = "Save"
@@ -520,7 +519,7 @@ class BasePage:
                         current_run=current_run,
                         published_run=published_run,
                         modal=publish_modal,
-                        is_update_mode=is_update_mode,
+                        is_update_mode=can_edit,
                     )
 
     def _render_publish_modal(
