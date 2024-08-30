@@ -671,11 +671,10 @@ def render_recipe_page(
     request._query_params = dict(request.query_params) | dict(example_id=example_id)
 
     page = page_cls(tab=tab, request=request)
-    sr = page.current_sr
-    page.run_user = get_run_user(request, sr.uid)
+    page.run_user = get_run_user(request, page.current_sr.uid)
 
     if not gui.session_state:
-        gui.session_state.update(page.load_state_from_sr(sr))
+        gui.session_state.update(page.current_sr_to_session_state())
 
     with page_wrapper(request):
         page.render()

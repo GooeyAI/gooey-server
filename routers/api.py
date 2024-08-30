@@ -344,8 +344,7 @@ def submit_api_call(
     self = page_cls(request=SimpleNamespace(user=user, query_params=query_params))
 
     # get saved state from db
-    sr = self.current_sr
-    state = self.load_state_from_sr(sr)
+    state = self.current_sr_to_session_state()
     # load request data
     state.update(request_body)
 

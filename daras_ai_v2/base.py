@@ -1683,12 +1683,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 gui.session_state[StateKeys.pressed_randomize] = True
                 gui.rerun()
 
-    @classmethod
-    def load_state_from_sr(cls, sr: SavedRun) -> dict:
-        state = sr.to_dict()
+    def current_sr_to_session_state(self) -> dict:
+        state = self.current_sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
-        return cls.load_state_defaults(state)
+        return self.load_state_defaults(state)
 
     @classmethod
     def load_state_defaults(cls, state: dict):
