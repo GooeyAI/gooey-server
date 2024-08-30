@@ -291,12 +291,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 class PublishedRunVersionAdmin(admin.ModelAdmin):
     search_fields = ["id", "version_id", "published_run__published_run_id"]
     autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+    readonly_fields = ["created_at"]
 
 
 class PublishedRunVersionInline(admin.TabularInline):
     model = PublishedRunVersion
     extra = 0
     autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
+    readonly_fields = PublishedRunVersionAdmin.readonly_fields
 
 
 @admin.register(PublishedRun)
