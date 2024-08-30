@@ -489,6 +489,8 @@ class BasePage:
                     className="mb-0 ms-lg-2",
                     type="tertiary",
                 )
+            else:
+                pressed_options = False
             options_modal = gui.Modal("Options", key="published-run-options-modal")
             if pressed_options:
                 options_modal.open()

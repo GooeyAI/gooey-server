@@ -1807,9 +1807,6 @@ class PublishedRun(models.Model):
             version.save()
             self.update_fields_to_latest_version()
 
-    def is_editor(self, user: AppUser):
-        return self.created_by == user
-
     def is_root(self):
         return not self.published_run_id
 

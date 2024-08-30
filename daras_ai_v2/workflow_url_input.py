@@ -163,9 +163,8 @@ def get_published_run_options(
         saved_runs_and_examples,
         reverse=True,
         key=lambda pr: (
-            int(
-                current_user and pr.created_by == current_user or False
-            ),  # user's saved first
+            # user's saved first
+            int(current_user and pr.created_by_id == current_user.id),
             pr.example_priority,  # higher priority first
             pr.updated_at,  # newer first
         ),
