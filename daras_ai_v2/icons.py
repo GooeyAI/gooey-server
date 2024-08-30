@@ -24,7 +24,6 @@ chat = '<i class="fa-regular fa-messages"></i>'
 admin = '<i class="fa-solid fa-shield-halved"></i>'
 remove_user = '<i class="fa-solid fa-user-minus"></i>'
 add_user = '<i class="fa-solid fa-user-plus"></i>'
-transfer = '<i class="fa-solid fa-right-left"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
