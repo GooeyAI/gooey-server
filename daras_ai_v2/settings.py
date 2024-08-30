@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "handles",
     "payments",
     "functions",
+    "orgs",
 ]
 
 MIDDLEWARE = [
