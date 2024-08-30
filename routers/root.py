@@ -22,7 +22,7 @@ from starlette.responses import (
 )
 
 from app_users.models import AppUser
-from bots.models import Workflow, BotIntegration
+from bots.models import Workflow, BotIntegration, PublishedRun
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -52,24 +52,39 @@ DEFAULT_LOGOUT_REDIRECT = "/"
 
 
 @app.get("/sitemap.xml/")
-async def get_sitemap():
-    from daras_ai_v2.all_pages import all_api_pages
-
+def get_sitemap():
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
-                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
 
-    all_paths = ["/", "/faq", "/pricing", "/privacy", "/terms", "/team/"] + [
-        page.slug_versions[-1] for page in all_api_pages
+    all_urls = [
+        furl(settings.APP_BASE_URL) / path
+        for path in [
+            "/",
+            "/faq",
+            "/pricing",
+            "/privacy",
+            "/terms",
+            "/team",
+            "/jobs",
+            "/farmerchat",
+            "/contact",
+            "/impact",
+            "/explore",
+            "/api",
+        ]
+    ] + [
+        pr.get_app_url()
+        for pr in (
+            PublishedRun.objects.filter(is_approved_example=True).order_by("workflow")
+        )
     ]
-
-    for path in all_paths:
-        url = furl(settings.APP_BASE_URL) / path
+    for url in all_urls:
         my_sitemap += f"""<url>
-              <loc>{url}</loc>
-              <lastmod>2022-12-26</lastmod>
-              <changefreq>daily</changefreq>
-              <priority>1.0</priority>
-          </url>"""
+          <loc>{url}</loc>
+          <lastmod>{datetime.datetime.today().strftime("%Y-%m-%d")}</lastmod>
+          <changefreq>daily</changefreq>
+          <priority>1.0</priority>
+        </url>"""
 
     my_sitemap += """</urlset>"""
 
