@@ -256,7 +256,28 @@ def api_keys_tab(request: Request):
 
 
 def orgs_tab(request: Request):
+    """only accessible to admins"""
+    from daras_ai_v2.base import BasePage
+
+    if not BasePage.is_user_admin(request.user):
+        raise RedirectException(get_route_path(account_route))
+
     orgs_page(request.user)
+
+
+def get_tabs(request: Request) -> list[AccountTabs]:
+    from daras_ai_v2.base import BasePage
+
+    tab_list = [
+        AccountTabs.billing,
+        AccountTabs.profile,
+        AccountTabs.saved,
+        AccountTabs.api_keys,
+    ]
+    if BasePage.is_user_admin(request.user):
+        tab_list.append(AccountTabs.orgs)
+
+    return tab_list
 
 
 @contextmanager
@@ -269,7 +290,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
     with page_wrapper(request):
         gui.div(className="mt-5")
         with gui.nav_tabs():
-            for tab in AccountTabs:
+            for tab in get_tabs(request):
                 with gui.nav_item(tab.url_path, active=tab == current_tab):
                     gui.html(tab.title)
 
