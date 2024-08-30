@@ -23,13 +23,13 @@ def safety_checker(*, text: str | None = None, image: str | None = None):
 def safety_checker_text(text_input: str):
     # ge the billing account for the checker
     billing_account = AppUser.objects.get_or_create_from_email(
-        settings.SAFTY_CHECKER_BILLING_EMAIL
+        settings.SAFETY_CHECKER_BILLING_EMAIL
     )[0]
 
     # run in a thread to avoid messing up threadlocals
     result, sr = (
         CompareLLMPage()
-        .get_published_run(published_run_id=settings.SAFTY_CHECKER_EXAMPLE_ID)
+        .get_published_run(published_run_id=settings.SAFETY_CHECKER_EXAMPLE_ID)
         .submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),

@@ -1,13 +1,14 @@
 import stripe
-from fastapi import APIRouter, Request
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import fastapi_request_body
 from payments.webhooks import StripeWebhookHandler
+from routers.custom_api_router import CustomAPIRouter
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 @router.post("/__/stripe/webhook")
@@ -46,6 +47,6 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
         case "customer.subscription.created" | "customer.subscription.updated":
             StripeWebhookHandler.handle_subscription_updated(uid, data)
         case "customer.subscription.deleted":
-            StripeWebhookHandler.handle_subscription_cancelled(uid, data)
+            StripeWebhookHandler.handle_subscription_cancelled(uid)
 
     return JSONResponse({"status": "success"})

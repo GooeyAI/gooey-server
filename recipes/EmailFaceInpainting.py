@@ -360,38 +360,11 @@ class TwitterError(Exception):
 
 
 def get_photo_for_email(email_address):
-    import glom
-
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()
     photo_url = doc.get("photo_url")
     if photo_url:
-        return photo_url
-
-    r = requests.get(
-        f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
-        headers={"X-API-KEY": settings.SEON_API_KEY},
-    )
-    raise_for_status(r)
-
-    account_details = glom.glom(r.json(), "data.account_details", default={})
-    for spec in [
-        "linkedin.photo",
-        "facebook.photo",
-        "google.photo",
-        "skype.photo",
-        "foursquare.photo",
-    ]:
-        photo = glom.glom(account_details, spec, default=None)
-        if not photo:
-            continue
-
-        photo_url = upload_file_from_bytes(
-            "face_photo.png", requests.get(photo).content
-        )
-        doc_ref.set({"photo_url": photo_url})
-
         return photo_url
 
 

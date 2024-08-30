@@ -155,11 +155,11 @@ class Img2ImgPage(BasePage):
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content
 
-        yield "Generating Image..."
-
         if not self.request.user.disable_safety_checker:
             yield "Running safety checker..."
             safety_checker(text=request.text_prompt, image=request.input_image)
+
+        yield "Generating Image..."
 
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(

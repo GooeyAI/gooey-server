@@ -421,7 +421,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
-    def reset_fb_pages_for_user(
+    def add_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
@@ -454,13 +454,13 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.name = bi.fb_page_name
             bi.save()
             saved.append(bi)
-        # delete pages that are no longer connected for this user
-        self.filter(
-            Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-            billing_account_uid=uid,
-        ).exclude(
-            id__in=[bi.id for bi in saved],
-        ).delete()
+        # # delete pages that are no longer connected for this user
+        # self.filter(
+        #     Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
+        #     billing_account_uid=uid,
+        # ).exclude(
+        #     id__in=[bi.id for bi in saved],
+        # ).delete()
         return saved
 
 
@@ -696,10 +696,14 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="The audio url to play to the user while waiting for a response if using voice",
     )
+    twilio_fresh_conversation_per_call = models.BooleanField(
+        default=False,
+        help_text="If set, the bot will start a new conversation for each call",
+    )
 
     streaming_enabled = models.BooleanField(
-        default=False,
-        help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
+        default=True,
+        help_text="If set, the bot will stream messages to the frontend",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1066,6 +1070,11 @@ class Conversation(models.Model):
         default="",
         help_text="User's Twilio phone number (mandatory)",
     )
+    twilio_call_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio call sid (only used if each call is a new conversation)",
+    )
 
     web_user_id = models.CharField(
         max_length=512,
@@ -1087,7 +1096,6 @@ class Conversation(models.Model):
         "web_user_id",
         "wa_phone_number",
         "twilio_phone_number",
-        "id",
     ]
 
     class Meta:
@@ -1105,7 +1113,9 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
-            models.Index(fields=["bot_integration", "twilio_phone_number"]),
+            models.Index(
+                fields=["bot_integration", "twilio_phone_number", "twilio_call_sid"]
+            ),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
@@ -1115,7 +1125,18 @@ class Conversation(models.Model):
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
-            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or " | ".join(
+                filter(
+                    None,
+                    [
+                        (
+                            self.twilio_phone_number
+                            and self.twilio_phone_number.as_international
+                        ),
+                        self.twilio_call_sid,
+                    ],
+                )
+            )
             or self.ig_username
             or self.fb_page_name
             or " in #".join(
@@ -1126,10 +1147,9 @@ class Conversation(models.Model):
 
     def unique_user_id(self) -> str | None:
         for col in self.user_id_fields:
-            if col == "id":
-                return self.api_integration_id()
             if value := getattr(self, col, None):
                 return value
+        return self.api_integration_id()
 
     get_display_name.short_description = "User"
 

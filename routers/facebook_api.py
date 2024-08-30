@@ -1,3 +1,5 @@
+import json
+
 import requests
 from fastapi.responses import RedirectResponse
 from furl import furl
@@ -7,6 +9,10 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings, db
+from daras_ai_v2.bot_integration_connect import (
+    connect_bot_to_published_run,
+    load_published_run_from_state,
+)
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
@@ -23,8 +29,8 @@ def fb_connect_whatsapp_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    on_completion = request.query_params.get("state")
-    retry_button = f'<a href="{wa_connect_url(on_completion)}">Retry</a>'
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{wa_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -64,7 +70,7 @@ def fb_connect_whatsapp_redirect(request: Request):
     # {'data': [{'verified_name': 'XXXX', 'code_verification_status': 'VERIFIED', 'display_phone_number': 'XXXX', 'quality_rating': 'UNKNOWN', 'platform_type': 'NOT_APPLICABLE', 'throughput': {'level': 'NOT_APPLICABLE'}, 'last_onboarded_time': '2024-02-22T20:42:16+0000', 'id': 'XXXX'}], 'paging': {'cursors': {'before': 'XXXX', 'after': 'XXXX'}}}
     phone_numbers = r.json()["data"]
 
-    integrations = []
+    redirect_url = None
     for phone_number in phone_numbers:
         business_name = phone_number["verified_name"]
         display_phone_number = phone_number["display_phone_number"]
@@ -98,7 +104,7 @@ def fb_connect_whatsapp_redirect(request: Request):
             )
             r.raise_for_status()
 
-        # subscript our app to weebhooks for WABA
+        # subscribe our app to weebhooks for WABA
         r = requests.post(
             f"https://graph.facebook.com/v19.0/{waba_id}/subscribed_apps?access_token={user_access_token}",
             json={
@@ -110,11 +116,12 @@ def fb_connect_whatsapp_redirect(request: Request):
         )
         r.raise_for_status()
 
-        integrations.append(bi)
+        redirect_url = connect_bot_to_published_run(bi, pr)
 
-    return return_to_app_url(integrations, on_completion) or HTMLResponse(
-        f"Sucessfully Connected to whatsapp! You may now close this page."
-    )
+    if redirect_url:
+        return RedirectResponse(redirect_url)
+    else:
+        return HTMLResponse("No phone numbers found! " + retry_button, status_code=404)
 
 
 @app.get("/__/fb/connect/")
@@ -123,8 +130,8 @@ def fb_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    on_completion = request.query_params.get("state")
-    retry_button = f'<a href="{fb_connect_url(on_completion)}">Retry</a>'
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{fb_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -147,14 +154,18 @@ def fb_connect_redirect(request: Request):
         )
 
     map_parallel(_subscribe_to_page, fb_pages)
-    integrations = BotIntegration.objects.reset_fb_pages_for_user(
+    integrations = BotIntegration.objects.add_fb_pages_for_user(
         request.user.uid, fb_pages
     )
 
-    page_names = ", ".join(map(str, integrations))
-    return return_to_app_url(integrations, on_completion) or HTMLResponse(
-        f"Sucessfully Connected to {page_names}! You may now close this page."
-    )
+    redirect_url = None
+    for bi in integrations:
+        redirect_url = connect_bot_to_published_run(bi, pr)
+
+    if redirect_url:
+        return RedirectResponse(redirect_url)
+    else:
+        return HTMLResponse("No pages found! " + retry_button, status_code=404)
 
 
 def get_currently_connected_fb_pages(user_access_token):
@@ -221,19 +232,6 @@ def fb_webhook(
     return Response("OK")
 
 
-def return_to_app_url(
-    integrations: list,
-    on_completion: str | None = None,
-) -> bool | RedirectResponse:
-    if not on_completion or not integrations:
-        return False
-    return RedirectResponse(
-        furl(on_completion)
-        .add(query_params={"connect_ids": ",".join([str(i.id) for i in integrations])})
-        .tostr()
-    )
-
-
 wa_connect_redirect_url = (
     furl(
         settings.APP_BASE_URL,
@@ -242,7 +240,7 @@ wa_connect_redirect_url = (
 ).tostr()
 
 
-def wa_connect_url(on_completion: str | None = None) -> str:
+def wa_connect_url(pr_id: int) -> str:
     return furl(
         "https://www.facebook.com/v18.0/dialog/oauth",
         query_params={
@@ -251,7 +249,7 @@ def wa_connect_url(on_completion: str | None = None) -> str:
             "redirect_uri": wa_connect_redirect_url,
             "response_type": "code",
             "config_id": settings.FB_WHATSAPP_CONFIG_ID,
-            "state": on_completion,
+            "state": json.dumps(dict(pr_id=pr_id)),
         },
     ).tostr()
 
@@ -264,7 +262,7 @@ fb_connect_redirect_url = (
 ).tostr()
 
 
-def fb_connect_url(on_completion: str | None = None) -> str:
+def fb_connect_url(pr_id: int) -> str:
     return furl(
         "https://www.facebook.com/dialog/oauth",
         query_params={
@@ -279,12 +277,12 @@ def fb_connect_url(on_completion: str | None = None) -> str:
                     "pages_show_list",
                 ]
             ),
-            "state": on_completion,
+            "state": json.dumps(dict(pr_id=pr_id)),
         },
     ).tostr()
 
 
-def ig_connect_url(on_completion: str | None = None) -> str:
+def ig_connect_url(current_run_id: str | None, published_run_id: str | None) -> str:
     return furl(
         "https://www.facebook.com/dialog/oauth",
         query_params={
@@ -302,7 +300,9 @@ def ig_connect_url(on_completion: str | None = None) -> str:
                     "pages_show_list",
                 ]
             ),
-            "state": on_completion,
+            "state": json.dumps(
+                dict(current_run_id=current_run_id, published_run_id=published_run_id)
+            ),
         },
     ).tostr()
 

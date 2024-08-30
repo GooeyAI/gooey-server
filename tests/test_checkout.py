@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
-from daras_ai_v2.billing import stripe_subscription_checkout_redirect
+from daras_ai_v2.billing import stripe_subscription_create
 from gooey_gui import RedirectException
 from payments.plans import PricingPlan
 from server import app
@@ -20,4 +20,4 @@ def test_create_checkout_session(
         return
 
     with pytest.raises(RedirectException):
-        stripe_subscription_checkout_redirect(force_authentication, plan)
+        stripe_subscription_create(force_authentication, plan)

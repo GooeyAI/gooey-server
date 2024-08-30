@@ -280,8 +280,10 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "docs",
 ]
 
-SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
-SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
+SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
+SAFETY_CHECKER_BILLING_EMAIL = config(
+    "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
@@ -319,7 +321,6 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
-SEON_API_KEY = config("SEON_API_KEY", None)
 APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
