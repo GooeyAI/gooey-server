@@ -4,8 +4,8 @@ import re
 import typing
 from datetime import timedelta
 
-from django.db.models.aggregates import Sum
 import stripe
+from django.db.models.aggregates import Sum
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.db.backends.base.schema import logger
@@ -21,8 +21,9 @@ from daras_ai_v2.crypto import get_random_doc_id
 from gooeysite.bg_db_conn import db_middleware
 from orgs.tasks import send_auto_accepted_email, send_invitation_email
 
+
 if typing.TYPE_CHECKING:
-    from app_users.models import AppUser
+    from app_users.models import AppUser, AppUserTransaction
 
 
 ORG_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]+$")
@@ -164,7 +165,7 @@ class Org(SafeDeleteModel):
         return slugify(self.name)
 
     def add_member(
-        self, user: AppUser, role: OrgRole, invitation: "OrgInvitation | None" = None
+        self, user: "AppUser", role: OrgRole, invitation: "OrgInvitation | None" = None
     ):
         OrgMembership(
             org=self,
@@ -177,7 +178,7 @@ class Org(SafeDeleteModel):
         self,
         *,
         invitee_email: str,
-        inviter: AppUser,
+        inviter: "AppUser",
         role: OrgRole,
         auto_accept: bool = False,
     ) -> "OrgInvitation":
