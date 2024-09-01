@@ -4,11 +4,7 @@ import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import (
-    AppUser,
-    PaymentProvider,
-    TransactionReason,
-)
+from app_users.models import PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal
 from orgs.models import Org
 from .models import Subscription
@@ -67,9 +63,9 @@ class PaypalWebhookHandler:
             return
 
         set_org_subscription(
-            provider=cls.PROVIDER,
-            plan=plan,
             org_id=pp_sub.custom_id,
+            plan=plan,
+            provider=cls.PROVIDER,
             external_id=pp_sub.id,
         )
 
@@ -77,7 +73,7 @@ class PaypalWebhookHandler:
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
         set_org_subscription(
-            uid=pp_sub.custom_id,
+            org_id=pp_sub.custom_id,
             plan=PricingPlan.STARTER,
             provider=None,
             external_id=None,
@@ -89,6 +85,8 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_invoice_paid(cls, org_id: str, invoice: stripe.Invoice):
+        from app_users.tasks import save_stripe_default_payment_method
+
         kwargs = {}
         if invoice.subscription and invoice.subscription_details:
             kwargs["plan"] = PricingPlan.get_by_key(
@@ -122,7 +120,7 @@ class StripeWebhookHandler:
 
         save_stripe_default_payment_method.delay(
             payment_intent_id=invoice.payment_intent,
-            uid=uid,
+            org_id=org_id,
             amount=amount,
             charged_amount=charged_amount,
             reason=reason,
@@ -173,9 +171,9 @@ class StripeWebhookHandler:
             return
 
         set_org_subscription(
-            provider=cls.PROVIDER,
-            plan=plan,
             org_id=org_id,
+            plan=plan,
+            provider=cls.PROVIDER,
             external_id=stripe_sub.id,
         )
 
