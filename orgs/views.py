@@ -2,21 +2,13 @@ from __future__ import annotations
 
 import html as html_lib
 
-import stripe
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
 
-from app_users.models import AppUser, PaymentProvider
-from daras_ai_v2.billing import format_card_brand, payment_provider_radio
-from daras_ai_v2.grid_layout_widget import grid_layout
+from app_users.models import AppUser
 from orgs.models import Org, OrgInvitation, OrgMembership, OrgRole
-from daras_ai_v2 import icons, settings
-from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
-from daras_ai_v2.settings import templates
-from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from payments.models import PaymentMethodSummary
-from payments.plans import PricingPlan
-from scripts.migrate_existing_subscriptions import available_subscriptions
+from daras_ai_v2 import icons
+from daras_ai_v2.fastapi_tricks import get_route_path
 
 
 DEFAULT_ORG_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
@@ -70,7 +62,7 @@ def invitation_page(user: AppUser, invitation: OrgInvitation):
 
 
 def orgs_page(user: AppUser):
-    memberships = user.org_memberships.all()
+    memberships = user.org_memberships.filter()
     if not memberships:
         gui.write("*You're not part of an organization yet... Create one?*")
 
@@ -119,10 +111,6 @@ def render_org_by_membership(membership: OrgMembership):
                     )
 
     with gui.div(className="mt-4"):
-        gui.write("# Billing")
-        billing_section(org=org, current_member=membership)
-
-    with gui.div(className="mt-4"):
         with gui.div(className="d-flex justify-content-between align-items-center"):
             gui.write("## Members")
 
@@ -157,361 +145,6 @@ def render_org_by_membership(membership: OrgMembership):
             org_leave_modal.open()
 
 
-def billing_section(*, org: Org, current_member: OrgMembership):
-    render_payments_setup()
-
-    if org.subscription and org.subscription.external_id:
-        render_current_plan(org)
-
-    with gui.div(className="my-5"):
-        render_credit_balance(org)
-
-    with gui.div(className="my-5"):
-        selected_payment_provider = render_all_plans(org)
-
-    with gui.div(className="my-5"):
-        render_addon_section(org, selected_payment_provider)
-
-    if org.subscription and org.subscription.external_id:
-        # if org.subscription.payment_provider == PaymentProvider.STRIPE:
-        #     with gui.div(className="my-5"):
-        #         render_auto_recharge_section(user)
-        with gui.div(className="my-5"):
-            render_payment_information(org)
-
-    with gui.div(className="my-5"):
-        render_billing_history(org)
-
-
-def render_payments_setup():
-    from routers.account import payment_processing_route
-
-    gui.html(
-        templates.get_template("payment_setup.html").render(
-            settings=settings,
-            payment_processing_url=get_app_route_url(payment_processing_route),
-        )
-    )
-
-
-def render_current_plan(org: Org):
-    plan = PricingPlan.from_sub(org.subscription)
-    provider = (
-        PaymentProvider(org.subscription.payment_provider)
-        if org.subscription.payment_provider
-        else None
-    )
-
-    with gui.div(className=f"{rounded_border} border-dark"):
-        # ROW 1: Plan title and next invoice date
-        left, right = left_and_right()
-        with left:
-            gui.write(f"#### Gooey.AI {plan.title}")
-
-            if provider:
-                gui.write(
-                    f"[{icons.edit} Manage Subscription](#payment-information)",
-                    unsafe_allow_html=True,
-                )
-        with right, gui.div(className="d-flex align-items-center gap-1"):
-            if provider and (
-                next_invoice_ts := gui.run_in_thread(
-                    org.subscription.get_next_invoice_timestamp, cache=True
-                )
-            ):
-                gui.html("Next invoice on ")
-                gui.pill(
-                    "...",
-                    text_bg="dark",
-                    **render_local_date_attrs(
-                        next_invoice_ts,
-                        date_options={"day": "numeric", "month": "long"},
-                    ),
-                )
-
-        if plan is PricingPlan.ENTERPRISE:
-            # charge details are not relevant for Enterprise customers
-            return
-
-        # ROW 2: Plan pricing details
-        left, right = left_and_right(className="mt-5")
-        with left:
-            gui.write(f"# {plan.pricing_title()}", className="no-margin")
-            if plan.monthly_charge:
-                provider_text = f" **via {provider.label}**" if provider else ""
-                gui.caption("per month" + provider_text)
-
-        with right, gui.div(className="text-end"):
-            gui.write(f"# {plan.credits:,} credits", className="no-margin")
-            if plan.monthly_charge:
-                gui.write(
-                    f"**${plan.monthly_charge:,}** monthly renewal for {plan.credits:,} credits"
-                )
-
-
-def render_credit_balance(org: Org):
-    gui.write(f"## Credit Balance: {org.balance:,}")
-    gui.caption(
-        "Every time you submit a workflow or make an API call, we deduct credits from your account."
-    )
-
-
-def render_all_plans(org: Org) -> PaymentProvider | None:
-    current_plan = (
-        PricingPlan.from_sub(org.subscription)
-        if org.subscription
-        else PricingPlan.STARTER
-    )
-    all_plans = [plan for plan in PricingPlan if not plan.deprecated]
-
-    gui.write("## All Plans")
-    plans_div = gui.div(className="mb-1")
-
-    if org.subscription and org.subscription.payment_provider:
-        selected_payment_provider = None
-    else:
-        with gui.div():
-            selected_payment_provider = PaymentProvider[
-                payment_provider_radio() or PaymentProvider.STRIPE.name
-            ]
-
-    def _render_plan(plan: PricingPlan):
-        if plan == current_plan:
-            extra_class = "border-dark"
-        else:
-            extra_class = "bg-light"
-        with gui.div(className="d-flex flex-column h-100"):
-            with gui.div(
-                className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
-            ):
-                _render_plan_details(plan)
-                # _render_plan_action_button(
-                #     user, plan, current_plan, selected_payment_provider
-                # )
-
-    with plans_div:
-        grid_layout(4, all_plans, _render_plan, separator=False)
-
-    with gui.div(className="my-2 d-flex justify-content-center"):
-        gui.caption(
-            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**"
-        )
-
-    return selected_payment_provider
-
-
-def _render_plan_details(plan: PricingPlan):
-    with gui.div(className="flex-grow-1"):
-        with gui.div(className="mb-4"):
-            with gui.tag("h4", className="mb-0"):
-                gui.html(plan.title)
-            gui.caption(
-                plan.description,
-                style={
-                    "minHeight": "calc(var(--bs-body-line-height) * 2em)",
-                    "display": "block",
-                },
-            )
-        with gui.div(className="my-3 w-100"):
-            with gui.tag("h4", className="my-0 d-inline me-2"):
-                gui.html(plan.pricing_title())
-            with gui.tag("span", className="text-muted my-0"):
-                gui.html(plan.pricing_caption())
-        gui.write(plan.long_description, unsafe_allow_html=True)
-
-
-def render_payment_information(org: Org):
-    assert org.subscription
-
-    gui.write("## Payment Information", id="payment-information", className="d-block")
-    col1, col2, col3 = gui.columns(3, responsive=False)
-    with col1:
-        gui.write("**Pay via**")
-    with col2:
-        provider = PaymentProvider(org.subscription.payment_provider)
-        gui.write(provider.label)
-    with col3:
-        if gui.button(f"{icons.edit} Edit", type="link", key="manage-payment-provider"):
-            raise gui.RedirectException(org.subscription.get_external_management_url())
-
-    pm_summary = gui.run_in_thread(
-        org.subscription.get_payment_method_summary, cache=True
-    )
-    if not pm_summary:
-        return
-    pm_summary = PaymentMethodSummary(*pm_summary)
-    if pm_summary.card_brand and pm_summary.card_last4:
-        col1, col2, col3 = gui.columns(3, responsive=False)
-        with col1:
-            gui.write("**Payment Method**")
-        with col2:
-            gui.write(
-                f"{format_card_brand(pm_summary.card_brand)} ending in {pm_summary.card_last4}",
-                unsafe_allow_html=True,
-            )
-        with col3:
-            if gui.button(f"{icons.edit} Edit", type="link", key="edit-payment-method"):
-                change_payment_method(org)
-
-    if pm_summary.billing_email:
-        col1, col2, _ = gui.columns(3, responsive=False)
-        with col1:
-            gui.write("**Billing Email**")
-        with col2:
-            gui.html(pm_summary.billing_email)
-
-
-def change_payment_method(org: Org):
-    from routers.account import payment_processing_route
-    from routers.account import account_route
-
-    match org.subscription.payment_provider:
-        case PaymentProvider.STRIPE:
-            session = stripe.checkout.Session.create(
-                mode="setup",
-                currency="usd",
-                customer=org.get_or_create_stripe_customer().id,
-                setup_intent_data={
-                    "metadata": {"subscription_id": org.subscription.external_id},
-                },
-                success_url=get_app_route_url(payment_processing_route),
-                cancel_url=get_app_route_url(account_route),
-            )
-            raise gui.RedirectException(session.url, status_code=303)
-        case _:
-            gui.error("Not implemented for this payment provider")
-
-
-def render_billing_history(org: Org, limit: int = 50):
-    import pandas as pd
-
-    txns = org.transactions.filter(amount__gt=0).order_by("-created_at")
-    if not txns:
-        return
-
-    gui.write("## Billing History", className="d-block")
-    gui.table(
-        pd.DataFrame.from_records(
-            [
-                {
-                    "Date": txn.created_at.strftime("%m/%d/%Y"),
-                    "Description": txn.reason_note(),
-                    "Amount": f"-${txn.charged_amount / 100:,.2f}",
-                    "Credits": f"+{txn.amount:,}",
-                    "Balance": f"{txn.end_balance:,}",
-                }
-                for txn in txns[:limit]
-            ]
-        ),
-    )
-    if txns.count() > limit:
-        gui.caption(f"Showing only the most recent {limit} transactions.")
-
-
-def render_addon_section(org: Org, selected_payment_provider: PaymentProvider):
-    if org.subscription:
-        gui.write("# Purchase More Credits")
-    else:
-        gui.write("# Purchase Credits")
-    gui.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
-
-    if org.subscription and org.subscription.payment_provider:
-        provider = PaymentProvider(org.subscription.payment_provider)
-    else:
-        provider = selected_payment_provider
-    match provider:
-        case PaymentProvider.STRIPE | None:
-            render_stripe_addon_buttons(org)
-        case PaymentProvider.PAYPAL:
-            render_paypal_addon_buttons()
-
-
-def render_paypal_addon_buttons():
-    selected_amt = gui.horizontal_radio(
-        "",
-        settings.ADDON_AMOUNT_CHOICES,
-        format_func=lambda amt: f"${amt:,}",
-        checked_by_default=False,
-    )
-    if selected_amt:
-        gui.js(
-            f"setPaypalAddonQuantity({int(selected_amt) * settings.ADDON_CREDITS_PER_DOLLAR})"
-        )
-    gui.div(
-        id="paypal-addon-buttons",
-        className="mt-2",
-        style={"width": "fit-content"},
-    )
-    gui.div(id="paypal-result-message")
-
-
-def render_stripe_addon_buttons(org: Org):
-    for dollar_amt in settings.ADDON_AMOUNT_CHOICES:
-        render_stripe_addon_button(dollar_amt, org)
-
-
-def render_stripe_addon_button(dollar_amt: int, org: Org):
-    confirm_purchase_modal = gui.Modal(
-        "Confirm Purchase", key=f"confirm-purchase-{dollar_amt}"
-    )
-    if gui.button(f"${dollar_amt:,}", type="primary"):
-        if org.subscription and org.subscription.external_id:
-            confirm_purchase_modal.open()
-        else:
-            stripe_addon_checkout_redirect(org, dollar_amt)
-
-    if not confirm_purchase_modal.is_open():
-        return
-    with confirm_purchase_modal.container():
-        gui.write(
-            f"""
-                Please confirm your purchase:  
-                 **{dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR:,} credits for ${dollar_amt}**.
-                 """,
-            className="py-4 d-block text-center",
-        )
-        with gui.div(className="d-flex w-100 justify-content-end"):
-            if gui.session_state.get("--confirm-purchase"):
-                success = gui.run_in_thread(
-                    org.subscription.stripe_attempt_addon_purchase,
-                    args=[dollar_amt],
-                    placeholder="Processing payment...",
-                )
-                if success is None:
-                    return
-                gui.session_state.pop("--confirm-purchase")
-                if success:
-                    confirm_purchase_modal.close()
-                else:
-                    gui.error("Payment failed... Please try again.")
-                return
-
-            if gui.button("Cancel", className="border border-danger text-danger me-2"):
-                confirm_purchase_modal.close()
-            gui.button("Buy", type="primary", key="--confirm-purchase")
-
-
-def stripe_addon_checkout_redirect(org: Org, dollar_amt: int):
-    from routers.account import account_route
-    from routers.account import payment_processing_route
-
-    line_item = available_subscriptions["addon"]["stripe"].copy()
-    line_item["quantity"] = dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR
-    checkout_session = stripe.checkout.Session.create(
-        line_items=[line_item],
-        mode="payment",
-        success_url=get_app_route_url(payment_processing_route),
-        cancel_url=get_app_route_url(account_route),
-        customer=org.get_or_create_stripe_customer().id,
-        invoice_creation={"enabled": True},
-        allow_promotion_codes=True,
-        saved_payment_method_options={
-            "payment_method_save": "enabled",
-        },
-    )
-    raise gui.RedirectException(checkout_session.url, status_code=303)
-
-
 def render_org_creation_view(user: AppUser):
     gui.write(f"# {icons.company} Create an Org", unsafe_allow_html=True)
     org_fields = render_org_create_or_edit_form()
@@ -525,7 +158,7 @@ def render_org_creation_view(user: AppUser):
         except ValidationError as e:
             gui.write(", ".join(e.messages), className="text-danger")
         else:
-            gui.experimental_rerun()
+            gui.rerun()
 
 
 def render_org_edit_view_by_membership(membership: OrgMembership, *, modal: gui.Modal):
