@@ -216,6 +216,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
     autocomplete_fields = ["user"]
     list_display = [
         "invoice_id",
+        "org",
         "user",
         "amount",
         "dollar_amount",
