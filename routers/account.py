@@ -204,7 +204,8 @@ class AccountTabs(TabData, Enum):
 
 
 def billing_tab(request: Request):
-    return billing_page(request.user)
+    org, _ = request.user.get_or_create_personal_org()
+    return billing_page(org)
 
 
 def profile_tab(request: Request):
