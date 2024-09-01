@@ -1,5 +1,6 @@
 import requests
 import stripe
+import typing
 from django.db import models, IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -13,6 +14,9 @@ from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import Handle
 from payments.plans import PricingPlan
+
+if typing.TYPE_CHECKING:
+    from orgs.models import Org
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -249,13 +253,13 @@ class AppUser(models.Model):
         return self
 
     def get_or_create_personal_org(self) -> tuple["Org", bool]:
-        from orgs.models import Org
+        from orgs.models import Org, OrgMembership
 
-        org_membership = self.org_memberships.filter(
+        org_membership: OrgMembership | None = self.org_memberships.filter(
             org__is_personal=True, org__created_by=self
         ).first()
         if org_membership:
-            return org_membership, False
+            return org_membership.org, False
         else:
             return Org.objects.migrate_from_appuser(self), True
 
