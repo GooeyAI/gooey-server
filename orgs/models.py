@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import typing
 from datetime import timedelta
 
 from django.db.models.aggregates import Sum
@@ -19,6 +20,9 @@ from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.crypto import get_random_doc_id
 from gooeysite.bg_db_conn import db_middleware
 from orgs.tasks import send_auto_accepted_email, send_invitation_email
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
 
 
 ORG_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]+$")
@@ -259,7 +263,7 @@ class Org(SafeDeleteModel):
             customer = stripe.Customer.create(
                 name=self.created_by.display_name,
                 email=self.created_by.email,
-                phone=self.created_by.phone,
+                phone=self.created_by.phone_number,
                 metadata={"uid": self.org_id, "org_id": self.org_id, "id": self.pk},
             )
             self.stripe_customer_id = customer.id
