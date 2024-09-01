@@ -1,8 +1,10 @@
+import typing
+
 import gooey_gui as gui
 import stripe
 from django.core.exceptions import ValidationError
 
-from app_users.models import AppUser, PaymentProvider
+from app_users.models import AppUserTransaction, PaymentProvider
 from daras_ai_v2 import icons, settings, paypal
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -14,34 +16,38 @@ from payments.plans import PricingPlan
 from payments.webhooks import StripeWebhookHandler, set_org_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
+if typing.TYPE_CHECKING:
+    from orgs.models import Org
+
+
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def billing_page(user: AppUser):
+def billing_page(org: "Org"):
     render_payments_setup()
 
-    if user.subscription and user.subscription.is_paid():
-        render_current_plan(user)
+    if org.subscription and org.subscription.is_paid():
+        render_current_plan(org)
 
     with gui.div(className="my-5"):
-        render_credit_balance(user)
+        render_credit_balance(org)
 
     with gui.div(className="my-5"):
-        selected_payment_provider = render_all_plans(user)
+        selected_payment_provider = render_all_plans(org)
 
     with gui.div(className="my-5"):
-        render_addon_section(user, selected_payment_provider)
+        render_addon_section(org, selected_payment_provider)
 
-    if user.subscription:
-        if user.subscription.payment_provider == PaymentProvider.STRIPE:
+    if org.subscription:
+        if org.subscription.payment_provider == PaymentProvider.STRIPE:
             with gui.div(className="my-5"):
-                render_auto_recharge_section(user)
+                render_auto_recharge_section(org)
 
         with gui.div(className="my-5"):
-            render_payment_information(user)
+            render_payment_information(org)
 
     with gui.div(className="my-5"):
-        render_billing_history(user)
+        render_billing_history(org)
 
 
 def render_payments_setup():
@@ -55,10 +61,10 @@ def render_payments_setup():
     )
 
 
-def render_current_plan(user: AppUser):
-    plan = PricingPlan.from_sub(user.subscription)
-    if user.subscription.payment_provider:
-        provider = PaymentProvider(user.subscription.payment_provider)
+def render_current_plan(org: "Org"):
+    plan = PricingPlan.from_sub(org.subscription)
+    if org.subscription.payment_provider:
+        provider = PaymentProvider(org.subscription.payment_provider)
     else:
         provider = None
 
@@ -76,7 +82,7 @@ def render_current_plan(user: AppUser):
         with right, gui.div(className="d-flex align-items-center gap-1"):
             if provider and (
                 next_invoice_ts := gui.run_in_thread(
-                    user.subscription.get_next_invoice_timestamp, cache=True
+                    org.subscription.get_next_invoice_timestamp, cache=True
                 )
             ):
                 gui.html("Next invoice on ")
@@ -112,17 +118,17 @@ def render_current_plan(user: AppUser):
                 )
 
 
-def render_credit_balance(user: AppUser):
-    gui.write(f"## Credit Balance: {user.balance:,}")
+def render_credit_balance(org: "Org"):
+    gui.write(f"## Credit Balance: {org.balance:,}")
     gui.caption(
         "Every time you submit a workflow or make an API call, we deduct credits from your account."
     )
 
 
-def render_all_plans(user: AppUser) -> PaymentProvider:
+def render_all_plans(org: "Org") -> PaymentProvider:
     current_plan = (
-        PricingPlan.from_sub(user.subscription)
-        if user.subscription
+        PricingPlan.from_sub(org.subscription)
+        if org.subscription
         else PricingPlan.STARTER
     )
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
@@ -130,8 +136,8 @@ def render_all_plans(user: AppUser) -> PaymentProvider:
     gui.write("## All Plans")
     plans_div = gui.div(className="mb-1")
 
-    if user.subscription and user.subscription.payment_provider:
-        selected_payment_provider = user.subscription.payment_provider
+    if org.subscription and org.subscription.payment_provider:
+        selected_payment_provider = org.subscription.payment_provider
     else:
         with gui.div():
             selected_payment_provider = PaymentProvider[
@@ -149,7 +155,7 @@ def render_all_plans(user: AppUser) -> PaymentProvider:
             ):
                 _render_plan_details(plan)
                 _render_plan_action_button(
-                    user=user,
+                    org=org,
                     plan=plan,
                     current_plan=current_plan,
                     payment_provider=selected_payment_provider,
@@ -187,7 +193,7 @@ def _render_plan_details(plan: PricingPlan):
 
 
 def _render_plan_action_button(
-    user: AppUser,
+    org: "Org",
     plan: PricingPlan,
     current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
@@ -201,75 +207,72 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             gui.html("Contact Us")
-    elif (
-        user.subscription and user.subscription.plan == PricingPlan.ENTERPRISE.db_value
-    ):
+    elif org.subscription and org.subscription.plan == PricingPlan.ENTERPRISE.db_value:
         # don't show upgrade/downgrade buttons for enterprise customers
         return
-    else:
-        if user.subscription and user.subscription.is_paid():
-            # subscription exists, show upgrade/downgrade button
-            if plan.credits > current_plan.credits:
-                modal, confirmed = confirm_modal(
-                    title="Upgrade Plan",
-                    key=f"--modal-{plan.key}",
-                    text=f"""
+    elif org.subscription and org.subscription.is_paid():
+        # subscription exists, show upgrade/downgrade button
+        if plan.credits > current_plan.credits:
+            modal, confirmed = confirm_modal(
+                title="Upgrade Plan",
+                key=f"--modal-{plan.key}",
+                text=f"""
 Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
 
 Your payment method will be charged ${plan.monthly_charge:,} today and again every month until you cancel.
 
 **{plan.credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
 will be refreshed to {plan.credits:,} Credits.
-                    """,
-                    button_label="Upgrade",
+                """,
+                button_label="Upgrade",
+            )
+            if gui.button(
+                "Upgrade", className="primary", key=f"--change-sub-{plan.key}"
+            ):
+                modal.open()
+            if confirmed:
+                change_subscription(
+                    org,
+                    plan,
+                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                    billing_cycle_anchor="now",
                 )
-                if gui.button(
-                    "Upgrade", className="primary", key=f"--change-sub-{plan.key}"
-                ):
-                    modal.open()
-                if confirmed:
-                    change_subscription(
-                        user,
-                        plan,
-                        # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                        billing_cycle_anchor="now",
-                    )
-            else:
-                modal, confirmed = confirm_modal(
-                    title="Downgrade Plan",
-                    key=f"--modal-{plan.key}",
-                    text=f"""
+        else:
+            modal, confirmed = confirm_modal(
+                title="Downgrade Plan",
+                key=f"--modal-{plan.key}",
+                text=f"""
 Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
 
 This will take effect from the next billing cycle.
-                    """,
-                    button_label="Downgrade",
-                    button_class="border-danger bg-danger text-white",
-                )
-                if gui.button(
-                    "Downgrade", className="secondary", key=f"--change-sub-{plan.key}"
-                ):
-                    modal.open()
-                if confirmed:
-                    change_subscription(user, plan)
-        else:
-            assert payment_provider is not None  # for sanity
-            _render_create_subscription_button(
-                user=user,
-                plan=plan,
-                payment_provider=payment_provider,
+                """,
+                button_label="Downgrade",
+                button_class="border-danger bg-danger text-white",
             )
+            if gui.button(
+                "Downgrade", className="secondary", key=f"--change-sub-{plan.key}"
+            ):
+                modal.open()
+            if confirmed:
+                change_subscription(org, plan)
+    else:
+        assert payment_provider is not None  # for sanity
+        _render_create_subscription_button(
+            org=org,
+            plan=plan,
+            payment_provider=payment_provider,
+        )
 
 
 def _render_create_subscription_button(
     *,
-    user: AppUser,
+    org: "Org",
     plan: PricingPlan,
     payment_provider: PaymentProvider,
 ):
     match payment_provider:
         case PaymentProvider.STRIPE:
-            render_stripe_subscription_button(user=user, plan=plan)
+            render_stripe_subscription_button(org=org, plan=plan)
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
 
@@ -281,27 +284,27 @@ def fmt_price(plan: PricingPlan) -> str:
         return "Free"
 
 
-def change_subscription(user: AppUser, new_plan: PricingPlan, **kwargs):
+def change_subscription(org: "Org", new_plan: PricingPlan, **kwargs):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    current_plan = PricingPlan.from_sub(user.subscription)
+    current_plan = PricingPlan.from_sub(org.subscription)
 
     if new_plan == current_plan:
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
-        user.subscription.cancel()
+        org.subscription.cancel()
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303
         )
 
-    match user.subscription.payment_provider:
+    match org.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             if not new_plan.supports_stripe():
                 gui.error(f"Stripe subscription not available for {new_plan}")
 
-            subscription = stripe.Subscription.retrieve(user.subscription.external_id)
+            subscription = stripe.Subscription.retrieve(org.subscription.external_id)
             stripe.Subscription.modify(
                 subscription.id,
                 items=[
@@ -345,20 +348,20 @@ def payment_provider_radio(**props) -> str | None:
         )
 
 
-def render_addon_section(user: AppUser, selected_payment_provider: PaymentProvider):
-    if user.subscription:
+def render_addon_section(org: "Org", selected_payment_provider: PaymentProvider):
+    if org.subscription:
         gui.write("# Purchase More Credits")
     else:
         gui.write("# Purchase Credits")
     gui.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    if user.subscription and user.subscription.payment_provider:
-        provider = PaymentProvider(user.subscription.payment_provider)
+    if org.subscription and org.subscription.payment_provider:
+        provider = PaymentProvider(org.subscription.payment_provider)
     else:
         provider = selected_payment_provider
     match provider:
         case PaymentProvider.STRIPE:
-            render_stripe_addon_buttons(user)
+            render_stripe_addon_buttons(org)
         case PaymentProvider.PAYPAL:
             render_paypal_addon_buttons()
 
@@ -382,8 +385,8 @@ def render_paypal_addon_buttons():
     gui.div(id="paypal-result-message")
 
 
-def render_stripe_addon_buttons(user: AppUser):
-    if not (user.subscription and user.subscription.payment_provider):
+def render_stripe_addon_buttons(org: "Org"):
+    if not (org.subscription and org.subscription.payment_provider):
         save_pm = gui.checkbox(
             "Save payment method for future purchases & auto-recharge", value=True
         )
@@ -391,10 +394,10 @@ def render_stripe_addon_buttons(user: AppUser):
         save_pm = True
 
     for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
-        render_stripe_addon_button(dollat_amt, user, save_pm)
+        render_stripe_addon_button(dollat_amt, org, save_pm)
 
 
-def render_stripe_addon_button(dollat_amt: int, user: AppUser, save_pm: bool):
+def render_stripe_addon_button(dollat_amt: int, org: "Org", save_pm: bool):
     modal, confirmed = confirm_modal(
         title="Purchase Credits",
         key=f"--addon-modal-{dollat_amt}",
@@ -408,14 +411,14 @@ This is a one-time purchase and your account will be credited once the payment i
     )
 
     if gui.button(f"${dollat_amt:,}", type="primary"):
-        if user.subscription and user.subscription.stripe_get_default_payment_method():
+        if org.subscription and org.subscription.stripe_get_default_payment_method():
             modal.open()
         else:
-            stripe_addon_checkout_redirect(user, dollat_amt, save_pm)
+            stripe_addon_checkout_redirect(org, dollat_amt, save_pm)
 
     if confirmed:
         success = gui.run_in_thread(
-            user.subscription.stripe_attempt_addon_purchase,
+            org.subscription.stripe_attempt_addon_purchase,
             args=[dollat_amt],
             placeholder="",
         )
@@ -426,10 +429,10 @@ This is a one-time purchase and your account will be credited once the payment i
             modal.close()
         else:
             # fallback to stripe checkout flow if the auto payment failed
-            stripe_addon_checkout_redirect(user, dollat_amt, save_pm)
+            stripe_addon_checkout_redirect(org, dollat_amt, save_pm)
 
 
-def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int, save_pm: bool):
+def stripe_addon_checkout_redirect(org: "Org", dollat_amt: int, save_pm: bool):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -445,7 +448,7 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int, save_pm: bool
         mode="payment",
         success_url=get_app_route_url(payment_processing_route),
         cancel_url=get_app_route_url(account_route),
-        customer=user.get_or_create_stripe_customer(),
+        customer=org.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
         **kwargs,
@@ -455,7 +458,7 @@ def stripe_addon_checkout_redirect(user: AppUser, dollat_amt: int, save_pm: bool
 
 def render_stripe_subscription_button(
     *,
-    user: AppUser,
+    org: "Org",
     plan: PricingPlan,
 ):
     if not plan.supports_stripe():
@@ -483,36 +486,38 @@ This will charge you the full amount today, and every month thereafter.
         key=f"--change-sub-{plan.key}",
         type="primary",
     ):
-        if user.subscription and user.subscription.stripe_get_default_payment_method():
+        if org.subscription and org.subscription.stripe_get_default_payment_method():
             modal.open()
         else:
-            stripe_subscription_create(user=user, plan=plan)
+            stripe_subscription_create(org=org, plan=plan)
 
     if confirmed:
-        stripe_subscription_create(user=user, plan=plan)
+        stripe_subscription_create(org=org, plan=plan)
 
 
-def stripe_subscription_create(user: AppUser, plan: PricingPlan):
+def stripe_subscription_create(org: "Org", plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    if user.subscription and user.subscription.plan == plan.db_value:
+    if org.subscription and org.subscription.is_paid():
         # sanity check: already subscribed to some plan
-        return
+        gui.rerun()
 
     # check for existing subscriptions on stripe
-    customer = user.get_or_create_stripe_customer()
+    customer = org.get_or_create_stripe_customer()
     for sub in stripe.Subscription.list(
         customer=customer, status="active", limit=1
     ).data:
-        StripeWebhookHandler.handle_subscription_updated(uid=user.uid, stripe_sub=sub)
+        StripeWebhookHandler.handle_subscription_updated(
+            org_id=org.org_id, stripe_sub=sub
+        )
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303
         )
 
     # try to directly create the subscription without checkout
-    pm = user.subscription and user.subscription.stripe_get_default_payment_method()
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
+    pm = org.subscription and org.subscription.stripe_get_default_payment_method()
     line_items = [plan.get_stripe_line_item()]
     if pm:
         sub = stripe.Subscription.create(
@@ -562,12 +567,12 @@ def render_paypal_subscription_button(
     )
 
 
-def render_payment_information(user: AppUser):
-    if not user.subscription:
+def render_payment_information(org: "Org"):
+    if not org.subscription:
         return
 
     pm_summary = gui.run_in_thread(
-        user.subscription.get_payment_method_summary, cache=True
+        org.subscription.get_payment_method_summary, cache=True
     )
     if not pm_summary:
         return
@@ -579,7 +584,7 @@ def render_payment_information(user: AppUser):
             gui.write("**Pay via**")
         with col2:
             provider = PaymentProvider(
-                user.subscription.payment_provider or PaymentProvider.STRIPE
+                org.subscription.payment_provider or PaymentProvider.STRIPE
             )
             gui.write(provider.label)
         with col3:
@@ -587,7 +592,7 @@ def render_payment_information(user: AppUser):
                 f"{icons.edit} Edit", type="link", key="manage-payment-provider"
             ):
                 raise gui.RedirectException(
-                    user.subscription.get_external_management_url()
+                    org.subscription.get_external_management_url()
                 )
 
         pm_summary = PaymentMethodSummary(*pm_summary)
@@ -607,7 +612,7 @@ def render_payment_information(user: AppUser):
                 if gui.button(
                     f"{icons.edit} Edit", type="link", key="edit-payment-method"
                 ):
-                    change_payment_method(user)
+                    change_payment_method(org)
 
         if pm_summary.billing_email:
             col1, col2, _ = gui.columns(3, responsive=False)
@@ -636,12 +641,12 @@ This will cancel your subscription and remove your saved payment method.
         modal.open()
     if confirmed:
         set_org_subscription(
-            org_id=user.get_personal_org().org_id,
+            org_id=org.org_id,
             plan=PricingPlan.STARTER,
             provider=None,
             external_id=None,
         )
-        pm = user.subscription and user.subscription.stripe_get_default_payment_method()
+        pm = org.subscription and org.subscription.stripe_get_default_payment_method()
         if pm:
             pm.detach()
         raise gui.RedirectException(
@@ -649,18 +654,18 @@ This will cancel your subscription and remove your saved payment method.
         )
 
 
-def change_payment_method(user: AppUser):
+def change_payment_method(org: "Org"):
     from routers.account import payment_processing_route
     from routers.account import account_route
 
-    match user.subscription.payment_provider:
+    match org.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             session = stripe.checkout.Session.create(
                 mode="setup",
                 currency="usd",
-                customer=user.get_or_create_stripe_customer(),
+                customer=org.get_or_create_stripe_customer(),
                 setup_intent_data={
-                    "metadata": {"subscription_id": user.subscription.external_id},
+                    "metadata": {"subscription_id": org.subscription.external_id},
                 },
                 success_url=get_app_route_url(payment_processing_route),
                 cancel_url=get_app_route_url(account_route),
@@ -674,10 +679,13 @@ def format_card_brand(brand: str) -> str:
     return icons.card_icons.get(brand.lower(), brand.capitalize())
 
 
-def render_billing_history(user: AppUser, limit: int = 50):
+def render_billing_history(org: "Org", limit: int = 50):
     import pandas as pd
 
-    txns = user.transactions.filter(amount__gt=0).order_by("-created_at")
+    txns = AppUserTransaction.objects.filter(
+        org=org,
+        amount__gt=0,
+    ).order_by("-created_at")
     if not txns:
         return
 
@@ -700,9 +708,9 @@ def render_billing_history(user: AppUser, limit: int = 50):
         gui.caption(f"Showing only the most recent {limit} transactions.")
 
 
-def render_auto_recharge_section(user: AppUser):
-    assert user.subscription
-    subscription = user.subscription
+def render_auto_recharge_section(org: "Org"):
+    assert org.subscription
+    subscription = org.subscription
 
     gui.write("## Auto Recharge & Limits")
     with gui.div(className="h4"):
@@ -746,10 +754,10 @@ def render_auto_recharge_section(user: AppUser):
             """,
         )
         with gui.div(className="d-flex align-items-center"):
-            user.subscription.monthly_spending_budget = gui.number_input(
+            subscription.monthly_spending_budget = gui.number_input(
                 "",
                 min_value=10,
-                value=user.subscription.monthly_spending_budget,
+                value=subscription.monthly_spending_budget,
                 key="monthly-spending-budget",
             )
             gui.write("USD", className="d-block ms-2")
@@ -762,13 +770,11 @@ def render_auto_recharge_section(user: AppUser):
             """
         )
         with gui.div(className="d-flex align-items-center"):
-            user.subscription.monthly_spending_notification_threshold = (
-                gui.number_input(
-                    "",
-                    min_value=10,
-                    value=user.subscription.monthly_spending_notification_threshold,
-                    key="monthly-spending-notification-threshold",
-                )
+            subscription.monthly_spending_notification_threshold = gui.number_input(
+                "",
+                min_value=10,
+                value=subscription.monthly_spending_notification_threshold,
+                key="monthly-spending-notification-threshold",
             )
             gui.write("USD", className="d-block ms-2")
 
