@@ -893,6 +893,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             "+RTS", f"-M{MAX_PANDOC_MEM_MB}M", "-RTS", "--sandbox",
             "--standalone",
             infile.name,
+            "--wrap", "none",
             "--to", to,
             "--output",
             outfile.name,

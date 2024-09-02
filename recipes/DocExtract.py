@@ -120,7 +120,6 @@ If not specified or invalid, no glossary will be used. Read about the expected f
     def render_form_v2(self):
         bulk_documents_uploader(
             "#### 🤖 Youtube/PDF/Drive/Web URLs",
-            accept=("audio/*", "application/pdf", "video/*"),
         )
         gui.text_input(
             "📊 Google Sheets URL _(optional)_",
