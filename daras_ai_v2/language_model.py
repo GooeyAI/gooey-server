@@ -1,4 +1,5 @@
 import base64
+import json
 import mimetypes
 import re
 import typing
@@ -75,7 +76,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
-        model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o"),
+        model_id="gpt-4o-2024-08-06",
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=10,
@@ -91,6 +92,14 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         supports_json=True,
+    )
+    chatgpt_4_o = LLMSpec(
+        label="ChatGPT-4o (openai) 🧪",
+        model_id="chatgpt-4o-latest",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=10,
+        is_vision_model=True,
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
@@ -232,13 +241,23 @@ class LargeLanguageModels(Enum):
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-    gemini_1_5_pro = LLMSpec(
-        label="Gemini 1.5 Pro (Google)",
-        model_id="gemini-1.5-pro-preview-0409",
+    gemini_1_5_flash = LLMSpec(
+        label="Gemini 1.5 Flash (Google)",
+        model_id="gemini-1.5-flash",
         llm_api=LLMApis.gemini,
-        context_window=1_000_000,
+        context_window=1_048_576,
         price=15,
         is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_1_5_pro = LLMSpec(
+        label="Gemini 1.5 Pro (Google)",
+        model_id="gemini-1.5-pro",
+        llm_api=LLMApis.gemini,
+        context_window=2_097_152,
+        price=15,
+        is_vision_model=True,
+        supports_json=True,
     )
     gemini_1_pro_vision = LLMSpec(
         label="Gemini 1.0 Pro Vision (Google)",
@@ -280,6 +299,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=15,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_opus = LLMSpec(
         label="Claude 3 Opus [L] (Anthropic)",
@@ -288,6 +308,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=75,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_sonnet = LLMSpec(
         label="Claude 3 Sonnet [M] (Anthropic)",
@@ -296,6 +317,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=15,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_haiku = LLMSpec(
         label="Claude 3 Haiku [S] (Anthropic)",
@@ -304,6 +326,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=2,
         is_vision_model=True,
+        supports_json=True,
     )
 
     sea_lion_7b_instruct = LLMSpec(
@@ -666,6 +689,7 @@ def _run_chat_model(
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 temperature=temperature,
+                response_format_type=response_format_type,
             )
         case LLMApis.palm2:
             if tools:
@@ -696,6 +720,7 @@ def _run_chat_model(
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stop=stop,
+                response_format_type=response_format_type,
             )
         case LLMApis.self_hosted:
             return [
@@ -785,6 +810,7 @@ def _run_anthropic_chat(
     max_tokens: int,
     temperature: float,
     stop: list[str] | None,
+    response_format_type: ResponseFormatType | None,
 ):
     import anthropic
     from usage_costs.cost_utils import record_cost_auto
@@ -818,6 +844,27 @@ def _run_anthropic_chat(
             content = get_entry_text(msg)
         anthropic_msgs.append({"role": role, "content": content})
 
+    if response_format_type == "json_object":
+        kwargs = dict(
+            tools=[
+                {
+                    "name": "json_output",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "response": {
+                                "type": "object",
+                                "description": "The response to the user's prompt as a JSON object.",
+                            },
+                        },
+                    },
+                }
+            ],
+            tool_choice={"type": "tool", "name": "json_output"},
+        )
+    else:
+        kwargs = {}
+
     client = anthropic.Anthropic()
     response = client.messages.create(
         model=model,
@@ -826,6 +873,7 @@ def _run_anthropic_chat(
         messages=anthropic_msgs,
         stop_sequences=stop,
         temperature=temperature,
+        **kwargs,
     )
 
     record_cost_auto(
@@ -839,9 +887,21 @@ def _run_anthropic_chat(
         quantity=response.usage.output_tokens,
     )
 
+    if response_format_type == "json_object":
+        for entry in response.content:
+            if entry.type == "tool_use":
+                response = entry.input
+                if isinstance(response, dict):
+                    response = response.get("response", {})
+                return [
+                    {
+                        "role": CHATML_ROLE_ASSISTANT,
+                        "content": json.dumps(response),
+                    }
+                ]
     return [
         {
-            "role": CHATML_ROLE_USER,
+            "role": CHATML_ROLE_ASSISTANT,
             "content": "".join(entry.text for entry in response.content),
         }
     ]
@@ -1212,6 +1272,7 @@ def _run_gemini_pro(
     messages: list[ConversationEntry],
     max_output_tokens: int,
     temperature: float,
+    response_format_type: ResponseFormatType | None,
 ):
     contents = []
     for entry in messages:
@@ -1244,6 +1305,7 @@ def _run_gemini_pro(
         contents=contents,
         max_output_tokens=max_output_tokens,
         temperature=temperature,
+        response_format_type=response_format_type,
     )
     return [{"role": CHATML_ROLE_ASSISTANT, "content": msg}]
 
@@ -1292,18 +1354,22 @@ def _call_gemini_api(
     contents: list[dict],
     max_output_tokens: int,
     temperature: float,
-    stop: list[str] = None,
+    stop: list[str] | None = None,
+    response_format_type: ResponseFormatType | None = None,
 ) -> str:
     session, project = get_google_auth_session()
+    generation_config = {
+        "temperature": temperature,
+        "maxOutputTokens": max_output_tokens,
+        "stopSequences": stop or [],
+    }
+    if response_format_type == "json_object":
+        generation_config["response_mime_type"] = "application/json"
     r = session.post(
         f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:generateContent",
         json={
             "contents": contents,
-            "generation_config": {
-                "temperature": temperature,
-                "maxOutputTokens": max_output_tokens,
-                "stopSequences": stop or [],
-            },
+            "generation_config": generation_config,
         },
     )
     raise_for_status(r)
