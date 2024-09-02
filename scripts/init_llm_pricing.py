@@ -20,6 +20,24 @@ def run():
     # GPT-4o
 
     llm_pricing_create(
+        model_id="chatgpt-4o-latest",
+        model_name=LargeLanguageModels.chatgpt_4_o.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-2024-08-06",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=2.5,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+    llm_pricing_create(
         model_id="gpt-4o",
         model_name=LargeLanguageModels.gpt_4_o.name,
         unit_cost_input=5,
@@ -410,13 +428,22 @@ def run():
     # Gemini
 
     llm_pricing_create(
-        model_id="gemini-1.5-pro-preview-0409",
-        model_name=LargeLanguageModels.gemini_1_5_pro.name,
-        unit_cost_input=0.0025,
-        unit_cost_output=0.0075,
-        unit_quantity=1000,
+        model_id="gemini-1.5-flash",
+        model_name=LargeLanguageModels.gemini_1_5_flash.name,
+        unit_cost_input=0.075,
+        unit_cost_output=0.30,
+        unit_quantity=10**6,
         provider=ModelProvider.google,
-        pricing_url="https://cloud.google.com/vertex-ai/docs/generative-ai/pricing#text_generation",
+        pricing_url="https://ai.google.dev/pricing",
+    )
+    llm_pricing_create(
+        model_id="gemini-1.5-pro",
+        model_name=LargeLanguageModels.gemini_1_5_pro.name,
+        unit_cost_input=3.50,
+        unit_cost_output=10.50,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/pricing",
     )
 
     ModelPricing.objects.get_or_create(

@@ -235,13 +235,16 @@ def render_documents(state, label="**Documents**", *, key="documents"):
     if not documents:
         return
     gui.write(label)
-    for doc in documents:
-        if is_user_uploaded_url(doc):
-            f = furl(doc)
-            filename = f.path.segments[-1]
-        else:
-            filename = doc
-        gui.write(f"🔗[*{filename}*]({doc})")
+    with gui.div(
+        className="overflow-auto bg-light p-2 mb-3", style=dict(maxHeight="200px")
+    ):
+        for doc in documents:
+            if is_user_uploaded_url(doc):
+                f = furl(doc)
+                filename = f.path.segments[-1]
+            else:
+                filename = doc
+            gui.write(f"🔗[*{filename}*]({doc})")
 
 
 def render_doc_search_step(state: dict):
