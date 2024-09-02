@@ -177,7 +177,7 @@ def _handle_invoice_paid(order_id: str):
     purchase_unit = order["purchase_units"][0]
     payment_capture = purchase_unit["payments"]["captures"][0]
     add_balance_for_payment(
-        uid=payment_capture["custom_id"],
+        org_id=payment_capture["custom_id"],
         amount=int(purchase_unit["items"][0]["quantity"]),
         invoice_id=payment_capture["id"],
         payment_provider=PaymentProvider.PAYPAL,
