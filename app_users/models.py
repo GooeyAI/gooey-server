@@ -162,9 +162,6 @@ class AppUser(models.Model):
         else:
             return name + "'s"
 
-    def get_personal_org(self) -> "Org | None":
-        return self.orgs.filter(is_personal=True).first()
-
     @db_middleware
     @transaction.atomic
     def add_balance(
