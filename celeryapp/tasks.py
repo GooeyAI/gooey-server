@@ -97,7 +97,7 @@ def runner_task(
     except Exception as e:
         if isinstance(e, UserError):
             sentry_level = e.sentry_level
-            logger.warning(e)
+            logger.warning("\n".join(map(str, [e, e.__cause__])))
         else:
             sentry_level = "error"
             traceback.print_exc()
