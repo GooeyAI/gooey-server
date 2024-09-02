@@ -222,8 +222,8 @@ def set_org_subscription(
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
-    amount: int = None,
-    charged_amount: int = None,
+    amount: int | None = None,
+    charged_amount: int | None = None,
 ) -> Subscription:
     with transaction.atomic():
         org = Org.objects.get_or_create_from_org_id(org_id)[0]

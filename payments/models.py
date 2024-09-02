@@ -89,7 +89,11 @@ class Subscription(models.Model):
         return ret
 
     def full_clean(
-        self, amount: int = None, charged_amount: int = None, *args, **kwargs
+        self,
+        amount: int | None = None,
+        charged_amount: int | None = None,
+        *args,
+        **kwargs,
     ):
         if self.auto_recharge_enabled:
             if amount is None:
