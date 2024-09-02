@@ -1100,7 +1100,7 @@ This will also delete all the associated versions.
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return sr.parent_published_run()
+            return sr.parent_published_run() or cls.get_root_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
