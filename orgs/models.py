@@ -252,6 +252,7 @@ class Org(SafeDeleteModel):
         kwargs.setdefault("plan", org.subscription and org.subscription.plan)
         return AppUserTransaction.objects.create(
             org=org,
+            user=org.created_by if org.is_personal else None,
             invoice_id=invoice_id,
             amount=amount,
             end_balance=org.balance,
