@@ -325,7 +325,7 @@ def change_subscription(org: "Org", new_plan: PricingPlan, **kwargs):
             if not new_plan.supports_paypal():
                 gui.error(f"Paypal subscription not available for {new_plan}")
 
-            subscription = paypal.Subscription.retrieve(user.subscription.external_id)
+            subscription = paypal.Subscription.retrieve(org.subscription.external_id)
             paypal_plan_info = new_plan.get_paypal_plan()
             approval_url = subscription.update_plan(
                 plan_id=paypal_plan_info["plan_id"],
