@@ -888,17 +888,31 @@ def _run_anthropic_chat(
     )
 
     if response_format_type == "json_object":
+        if response.stop_reason == "max_tokens":
+            raise UserError(
+                "Claude’s response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
+                "Please retry the request with a higher max_tokens value to get the full tool use. "
+            ) from anthropic.AnthropicError(
+                f"Hit {response.stop_reason=} when generating JSON: {response.content=}"
+            )
+        if response.stop_reason != "tool_use":
+            raise UserError(
+                f"Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
+            ) from anthropic.AnthropicError(
+                f"Failed to generate JSON response: {response.stop_reason=} {response.content}"
+            )
         for entry in response.content:
-            if entry.type == "tool_use":
-                response = entry.input
-                if isinstance(response, dict):
-                    response = response.get("response", {})
-                return [
-                    {
-                        "role": CHATML_ROLE_ASSISTANT,
-                        "content": json.dumps(response),
-                    }
-                ]
+            if entry.type != "tool_use":
+                continue
+            response = entry.input
+            if isinstance(response, dict):
+                response = response.get("response", {})
+            return [
+                {
+                    "role": CHATML_ROLE_ASSISTANT,
+                    "content": json.dumps(response),
+                }
+            ]
     return [
         {
             "role": CHATML_ROLE_ASSISTANT,
