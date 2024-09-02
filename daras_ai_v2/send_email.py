@@ -82,7 +82,7 @@ def send_email_via_postmark(
         "outbound", "gooey-ai-workflows", "announcements"
     ] = "outbound",
 ):
-    if is_running_pytest or not settings.POSTMARK_API_TOKEN:
+    if is_running_pytest:
         pytest_outbox.append(
             dict(
                 from_address=from_address,
