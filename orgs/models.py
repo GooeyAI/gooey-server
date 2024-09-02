@@ -98,6 +98,15 @@ class OrgManager(SafeDeleteManager):
             is_paying=user.is_paying,
         )
 
+    def get_dollars_spent_this_month(self) -> float:
+        today = timezone.now()
+        cents_spent = self.transactions.filter(
+            created_at__month=today.month,
+            created_at__year=today.year,
+            amount__gt=0,
+        ).aggregate(total=Sum("charged_amount"))["total"]
+        return (cents_spent or 0) / 100
+
 
 class Org(SafeDeleteModel):
     _safedelete_policy = SOFT_DELETE_CASCADE

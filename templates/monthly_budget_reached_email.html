@@ -1,6 +1,6 @@
-{% set dollars_spent = user.get_dollars_spent_this_month() %}
-{% set monthly_budget = user.subscription.monthly_spending_budget %}
-{% set threshold = user.subscription.auto_recharge_balance_threshold %}
+{% set dollars_spent = org.get_dollars_spent_this_month() %}
+{% set monthly_budget = org.subscription.monthly_spending_budget %}
+{% set threshold = org.subscription.auto_recharge_balance_threshold %}
 
 <p>
   Hey, {{ user.first_name() }}!
@@ -18,7 +18,7 @@
 </p>
 
 <ul>
-  <li>Credit Balance: {{ user.balance }} credits</li>
+  <li>Credit Balance: {{ org.balance }} credits</li>
   <li>Monthly Budget: ${{ monthly_budget }}</li>
   <li>Spending this month: ${{ dollars_spent }}</li>
 </ul>

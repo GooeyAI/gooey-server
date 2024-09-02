@@ -1,4 +1,4 @@
-{% set dollars_spent = user.get_dollars_spent_this_month() %}
+{% set dollars_spent = org.get_dollars_spent_this_month() %}
 
 <p>
     Hi, {{ user.first_name() }}!
@@ -6,11 +6,11 @@
 
 <p>
     Your spend on Gooey.AI so far this month is ${{ dollars_spent }}, exceeding your notification threshold
-    of ${{ user.subscription.monthly_spending_notification_threshold }}. 
+    of ${{ org.subscription.monthly_spending_notification_threshold }}. 
 </p>
 
 <p>
-    Your monthly budget is ${{ user.subscription.monthly_spending_budget }}, after which auto-recharge will be
+    Your monthly budget is ${{ org.subscription.monthly_spending_budget }}, after which auto-recharge will be
     paused and all runs / API calls will be rejected.
 </p>
 

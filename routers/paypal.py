@@ -126,7 +126,8 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if plan.deprecated:
         return JSONResponse({"error": "Deprecated plan"}, status_code=400)
 
-    if request.user.subscription and request.user.subscription.is_paid():
+    org, _ = request.user.get_or_create_personal_org()
+    if org.subscription and org.subscription.is_paid():
         return JSONResponse(
             {"error": "User already has an active subscription"}, status_code=400
         )
@@ -134,7 +135,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     paypal_plan_info = plan.get_paypal_plan()
     pp_subscription = paypal.Subscription.create(
         plan_id=paypal_plan_info["plan_id"],
-        custom_id=request.user.uid,
+        custom_id=org.org_id,
         plan=paypal_plan_info.get("plan", {}),
         application_context={
             "brand_name": "Gooey.AI",

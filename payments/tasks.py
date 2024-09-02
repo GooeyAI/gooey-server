@@ -29,6 +29,7 @@ def send_monthly_spending_notification_email(id: int):
                 "monthly_spending_notification_threshold_email.html"
             ).render(
                 user=owner.user,
+                org=org,
                 account_url=get_app_route_url(account_route),
             ),
         )
@@ -40,43 +41,27 @@ def send_monthly_spending_notification_email(id: int):
         org.subscription.save(update_fields=["monthly_spending_notification_sent_at"])
 
 
-def send_monthly_budget_reached_email(user: AppUser):
+def send_monthly_budget_reached_email(org: Org):
     from routers.account import account_route
 
-    if not user.email:
-        return
+    for owner in org.get_owners():
+        if not owner.user.email:
+            continue
 
-    email_body = templates.get_template("monthly_budget_reached_email.html").render(
-        user=user,
-        account_url=get_app_route_url(account_route),
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=user.email,
-        subject="[Gooey.AI] Monthly Budget Reached",
-        html_body=email_body,
-    )
+        email_body = templates.get_template("monthly_budget_reached_email.html").render(
+            user=owner.user,
+            org=org,
+            account_url=get_app_route_url(account_route),
+        )
+        send_email_via_postmark(
+            from_address=settings.SUPPORT_EMAIL,
+            to_address=owner.user.email,
+            subject="[Gooey.AI] Monthly Budget Reached",
+            html_body=email_body,
+        )
 
     # IMPORTANT: always use update_fields=... when updating subscription
     # info. We don't want to overwrite other changes made to subscription
     # during the same time
-    user.subscription.monthly_budget_email_sent_at = timezone.now()
-    user.subscription.save(update_fields=["monthly_budget_email_sent_at"])
-
-
-def send_auto_recharge_failed_email(user: AppUser):
-    from routers.account import account_route
-
-    if not user.email:
-        return
-
-    email_body = templates.get_template("auto_recharge_failed_email.html").render(
-        user=user,
-        account_url=get_app_route_url(account_route),
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=user.email,
-        subject="[Gooey.AI] Auto-Recharge failed",
-        html_body=email_body,
-    )
+    org.subscription.monthly_budget_email_sent_at = timezone.now()
+    org.subscription.save(update_fields=["monthly_budget_email_sent_at"])
