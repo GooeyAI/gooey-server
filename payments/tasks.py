@@ -57,9 +57,7 @@ def send_payment_failed_email_with_invoice(
         from_address=settings.PAYMENT_EMAIL,
         to_address=user.email,
         subject=subject,
-        html_body=templates.get_template(
-            "off_session_payment_failed_email.html"
-        ).render(
+        html_body=templates.get_template("auto_payment_failed_email.html").render(
             user=user,
             dollar_amt=f"{dollar_amt:.2f}",
             invoice_url=invoice_url,
