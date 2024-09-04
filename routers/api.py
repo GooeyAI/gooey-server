@@ -434,7 +434,8 @@ class BalanceResponse(BaseModel):
 
 @app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
 def get_balance(user: AppUser = Depends(api_auth_header)):
-    return BalanceResponse(balance=user.balance)
+    workspace, _ = user.get_or_create_personal_workspace()
+    return BalanceResponse(balance=workspace.balance)
 
 
 @app.get("/status")
