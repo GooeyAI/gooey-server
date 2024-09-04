@@ -161,7 +161,7 @@ def err_msg_for_exc(e: Exception):
         return f"{type(e).__name__}: {e}"
 
 
-def run_low_balance_email_check(workspace: Workspace):
+def run_low_balance_email_check(workspace: "Workspace"):
     # don't send email if feature is disabled
     if not settings.LOW_BALANCE_EMAIL_ENABLED:
         return
