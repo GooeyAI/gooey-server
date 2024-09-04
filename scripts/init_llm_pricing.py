@@ -719,7 +719,7 @@ def llm_pricing_create(
         ),
     )
     if created:
-        print(f"created {obj}")
+        print("created", obj)
     obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
         sku=ModelSku.llm_completion,

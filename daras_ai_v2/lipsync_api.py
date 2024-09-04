@@ -10,8 +10,8 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
 class LipsyncModel(Enum):
-    Wav2Lip = "SD: Fast but low-res"
-    SadTalker = "HD (SadTalker): Hi-res but slow"
+    Wav2Lip = "SD, Low-res (~480p), Fast (Rudrabha/Wav2Lip)"
+    SadTalker = "HD, Hi-res (max 1080p), Slow (OpenTalker/SadTalker)"
 
 
 class SadTalkerSettings(BaseModel):
@@ -72,7 +72,7 @@ def run_sadtalker(
     settings: SadTalkerSettings,
     face: str,
     audio: str,
-    truncate_to_seconds: float | None = None,
+    max_frames: int | None = None,
 ) -> tuple[str, float]:
     links, metadata = call_celery_task_outfile_with_ret(
         "lipsync.sadtalker",
@@ -80,11 +80,9 @@ def run_sadtalker(
             model_id="SadTalker_V0.0.2_512.safetensors",
             preprocess=settings.preprocess,
         ),
-        inputs=settings.dict()
-        | dict(
-            source_image=face,
-            driven_audio=audio,
-            truncate_to_seconds=truncate_to_seconds,
+        inputs=(
+            settings.dict()
+            | dict(source_image=face, driven_audio=audio, max_frames=max_frames)
         ),
         content_type="video/mp4",
         filename=f"gooey.ai lipsync.mp4",
@@ -98,7 +96,7 @@ def run_wav2lip(
     face: str,
     audio: str,
     pads: tuple[int, int, int, int],
-    truncate_to_seconds: float | None = None,
+    max_frames: int | None = None,
 ) -> tuple[str, float]:
     try:
         links, metadata = call_celery_task_outfile_with_ret(
@@ -114,7 +112,7 @@ def run_wav2lip(
                 # "out_height": 480,
                 # "smooth": True,
                 # "fps": 25,
-                truncate_to_seconds=truncate_to_seconds,
+                max_frames=max_frames,
             ),
             content_type="video/mp4",
             filename=f"gooey.ai lipsync.mp4",

@@ -1328,7 +1328,11 @@ This will also delete all the associated versions.
 
     def render_run_cost(self):
         url = self.get_credits_click_url()
-        run_cost = self.get_price_roundoff(gui.session_state)
+        sr = self.get_current_sr()
+        if sr.price:
+            run_cost = sr.price
+        else:
+            run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
 
         cost_note = self.get_cost_note()

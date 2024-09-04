@@ -1,9 +1,9 @@
 import typing
-
-import requests
-from pydantic import BaseModel
+from math import ceil
 
 import gooey_gui as gui
+from pydantic import BaseModel
+
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -12,9 +12,18 @@ from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
+DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
+
+
 CREDITS_PER_MINUTE = 36
 
-DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
+
+def price_for_model(selected_model: str | None) -> float:
+    if selected_model == LipsyncModel.SadTalker.name:
+        multiplier = 2
+    else:
+        multiplier = 1
+    return CREDITS_PER_MINUTE * multiplier
 
 
 class LipsyncPage(BasePage):
@@ -31,8 +40,7 @@ class LipsyncPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
-        seconds: float = 0
-        truncated: bool = False
+        duration_sec: float | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG
@@ -55,6 +63,12 @@ class LipsyncPage(BasePage):
             """,
             key="input_audio",
         )
+        if not (self.is_current_user_paying() or self.is_current_user_admin()):
+            gui.error(
+                "Input Audio longer than 10 seconds will be truncated for free users. Please [upgrade](/account) to generate long videos.",
+                icon="⚠️",
+                color="#ffe8b2",
+            )
 
         enum_selector(
             LipsyncModel,
@@ -74,17 +88,15 @@ class LipsyncPage(BasePage):
         request = self.RequestModel.parse_obj(state)
 
         if self.is_current_user_paying() or self.is_current_user_admin():
-            truncate_to_seconds = None
-            state["truncated"] = False
+            max_frames = None
         else:
-            truncate_to_seconds = 10
-            state["truncated"] = True
+            max_frames = 250
 
         model = LipsyncModel[request.selected_model]
         yield f"Running {model.value}..."
         match model:
             case LipsyncModel.Wav2Lip:
-                state["output_video"], state["seconds"] = run_wav2lip(
+                state["output_video"], state["duration_sec"] = run_wav2lip(
                     face=request.input_face,
                     audio=request.input_audio,
                     pads=(
@@ -93,14 +105,14 @@ class LipsyncPage(BasePage):
                         request.face_padding_left or 0,
                         request.face_padding_right or 0,
                     ),
-                    truncate_to_seconds=truncate_to_seconds,
+                    max_frames=max_frames,
                 )
             case LipsyncModel.SadTalker:
-                state["output_video"], state["seconds"] = run_sadtalker(
+                state["output_video"], state["duration_sec"] = run_sadtalker(
                     request.sadtalker_settings,
                     face=request.input_face,
                     audio=request.input_audio,
-                    truncate_to_seconds=truncate_to_seconds,
+                    max_frames=max_frames,
                 )
 
     def render_example(self, state: dict):
@@ -110,12 +122,6 @@ class LipsyncPage(BasePage):
             gui.video(output_video, autoplay=True, show_download_button=True)
         else:
             gui.div()
-        if state.get("truncated"):
-            st.error(
-                "Audio durations greater than 10 seconds will be truncated for free users. Please upgrade to process longer audio files.",
-                icon="⚠️",
-                color="orange",
-            )
 
     def render_output(self):
         self.render_example(gui.session_state)
@@ -135,22 +141,16 @@ class LipsyncPage(BasePage):
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
 
     def get_cost_note(self) -> str | None:
-        multiplier = (
-            2
-            if gui.session_state.get("selected_model") == LipsyncModel.SadTalker.name
-            else 1
-        )
-        return f"{CREDITS_PER_MINUTE * multiplier}/minute"
+        selected_model = gui.session_state.get("selected_model")
+        return f"{price_for_model(selected_model)}/minute"
 
     def get_raw_price(self, state: dict) -> float:
-        from math import ceil
+        try:
+            duration_sec = state["duration_sec"]
+        except KeyError:
+            return 1
+        duration_sec = ceil(duration_sec / 5) * 5  # round up to nearest 5 seconds
 
-        seconds = self.get_duration(state)
-        seconds = ceil(seconds / 5) * 5  # round up to nearest 5 seconds
-        multiplier = (
-            2 if state.get("selected_model") == LipsyncModel.SadTalker.name else 1
-        )
-        return seconds * CREDITS_PER_MINUTE * multiplier / 60
+        price = price_for_model(state.get("selected_model"))
 
-    def get_duration(self, state: dict) -> float:
-        return state.get("seconds", 0.0)
+        return duration_sec / 60 * price
