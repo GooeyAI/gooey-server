@@ -2,6 +2,7 @@ import gooey_gui as gui
 import sentry_sdk
 import stripe
 from django.core.exceptions import ValidationError
+from loguru import logger
 
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import icons, settings, paypal
@@ -239,6 +240,7 @@ This will charge you the full amount today, and every month thereafter.
                     except (stripe.CardError, stripe.InvalidRequestError) as e:
                         if isinstance(e, stripe.InvalidRequestError):
                             sentry_sdk.capture_exception(e)
+                            logger.warning(e)
 
                         # only handle error if it's related to mandates
                         # cancel current subscription & redirect user to new subscription page
