@@ -10,20 +10,20 @@ from daras_ai_v2.settings import templates
 
 @app.task
 def send_invitation_email(invitation_pk: int):
-    from orgs.models import OrgInvitation
+    from workspaces.models import WorkspaceInvitation
 
-    invitation = OrgInvitation.objects.get(pk=invitation_pk)
+    invitation = WorkspaceInvitation.objects.get(pk=invitation_pk)
 
     assert invitation.status == invitation.Status.PENDING
 
     logger.info(
-        f"Sending inviation email to {invitation.invitee_email} for org {invitation.org}..."
+        f"Sending inviation email to {invitation.invitee_email} for workspace {invitation.workspace}..."
     )
     send_email_via_postmark(
         to_address=invitation.invitee_email,
         from_address=settings.SUPPORT_EMAIL,
-        subject=f"[Gooey.AI] Invitation to join {invitation.org.name}",
-        html_body=templates.get_template("org_invitation_email.html").render(
+        subject=f"[Gooey.AI] Invitation to join {invitation.workspace.name}",
+        html_body=templates.get_template("workspace_invitation_email.html").render(
             settings=settings,
             invitation=invitation,
         ),
@@ -37,10 +37,10 @@ def send_invitation_email(invitation_pk: int):
 
 @app.task
 def send_auto_accepted_email(invitation_pk: int):
-    from orgs.models import OrgInvitation
-    from routers.account import orgs_route
+    from workspaces.models import WorkspaceInvitation
+    from routers.account import workspaces_route
 
-    invitation = OrgInvitation.objects.get(pk=invitation_pk)
+    invitation = WorkspaceInvitation.objects.get(pk=invitation_pk)
     assert invitation.auto_accepted and invitation.status == invitation.Status.ACCEPTED
     assert invitation.status_changed_by
 
@@ -50,19 +50,19 @@ def send_auto_accepted_email(invitation_pk: int):
         return
 
     logger.info(
-        f"Sending auto-accepted email to {user.email} for org {invitation.org}..."
+        f"Sending auto-accepted email to {user.email} for workspace {invitation.workspace}..."
     )
     send_email_via_postmark(
         to_address=user.email,
         from_address=settings.SUPPORT_EMAIL,
         subject=f"[Gooey.AI] You've been added to a new team!",
         html_body=templates.get_template(
-            "org_invitation_auto_accepted_email.html"
+            "workspace_invitation_auto_accepted_email.html"
         ).render(
             settings=settings,
             user=user,
-            org=invitation.org,
-            orgs_url=get_app_route_url(orgs_route),
+            workspace=invitation.workspace,
+            workspaces_url=get_app_route_url(workspaces_route),
         ),
         message_stream="outbound",
     )

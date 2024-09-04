@@ -3,16 +3,16 @@ from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
 from celeryapp.celeryconfig import app
-from payments.models import Subscription
 from payments.plans import PricingPlan
-from payments.webhooks import set_org_subscription
+from payments.webhooks import set_workspace_subscription
+from workspaces.models import Workspace
 
 
 @app.task
 def save_stripe_default_payment_method(
     *,
+    workspace_id_or_uid: int | str,
     payment_intent_id: str,
-    org_id: str,
     amount: int,
     charged_amount: int,
     reason: TransactionReason,
@@ -36,16 +36,24 @@ def save_stripe_default_payment_method(
         invoice_settings=dict(default_payment_method=pm),
     )
 
-    # if user doesn't already have a active billing/autorecharge info, so we don't need to do anything
-    # set user's subscription to the free plan
-    if (
-        reason == TransactionReason.ADDON
-        and not Subscription.objects.filter(
-            org__org_id=org_id, payment_provider__isnull=False
-        ).exists()
-    ):
-        set_org_subscription(
-            org_id=org_id,
+    # if user already has a subscription with payment info, we do nothing
+    # otherwise, we set the user's subscription to the free plan
+    if reason == TransactionReason.ADDON:
+        try:
+            workspace = Workspace.objects.select_related("subscription").get(
+                int(workspace_id_or_uid)
+            )
+        except (ValueError, Workspace.DoesNotExist):
+            workspace, _ = Workspace.objects.get_or_create_from_uid(workspace_id_or_uid)
+
+        if workspace.subscription and (
+            workspace.subscription.is_paid() or workspace.subscription.payment_provider
+        ):
+            # already has a subscription
+            return
+
+        set_workspace_subscription(
+            workspace_id_or_uid=workspace.id,
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,

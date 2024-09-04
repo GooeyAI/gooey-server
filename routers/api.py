@@ -354,6 +354,7 @@ def submit_api_call(
             enable_rate_limits=enable_rate_limits,
             is_api_call=True,
             retention_policy=retention_policy or RetentionPolicy.keep,
+            billed_workspace=self.get_current_workspace(),
         )
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=gui.session_state) from e

@@ -15,80 +15,80 @@ from django.utils.text import slugify
 from safedelete.managers import SafeDeleteManager
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
+from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.crypto import get_random_doc_id
 from gooeysite.bg_db_conn import db_middleware
-from orgs.tasks import send_auto_accepted_email, send_invitation_email
+from .tasks import send_auto_accepted_email, send_invitation_email
 
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
 
 
-ORG_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]+$")
+WORKSPACE_DOMAIN_NAME_RE = re.compile(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]+$")
 
 
-def validate_org_domain_name(value):
+def validate_workspace_domain_name(value):
     from handles.models import COMMON_EMAIL_DOMAINS
 
-    if not ORG_DOMAIN_NAME_RE.fullmatch(value):
+    if not WORKSPACE_DOMAIN_NAME_RE.fullmatch(value):
         raise ValidationError("Invalid domain name")
 
     if value in COMMON_EMAIL_DOMAINS:
         raise ValidationError("This domain name is reserved")
 
 
-class OrgRole(models.IntegerChoices):
+class WorkspaceRole(models.IntegerChoices):
     OWNER = 1
     ADMIN = 2
     MEMBER = 3
 
 
-class OrgManager(SafeDeleteManager):
-    def create_org(
+class WorkspaceManager(SafeDeleteManager):
+    def create_workspace(
         self,
         *,
         created_by: "AppUser",
-        org_id: str | None = None,
         balance: int | None = None,
         **kwargs,
-    ) -> Org:
-        org = self.model(
-            org_id=org_id or get_random_doc_id(),
+    ) -> Workspace:
+        workspace = self.model(
             created_by=created_by,
             balance=balance,
             **kwargs,
         )
         if (
             balance is None
-            and Org.all_objects.filter(created_by=created_by).count() <= 1
+            and Workspace.all_objects.filter(created_by=created_by).count() <= 1
         ):
             # set some balance for first team created by user
-            # Org.all_objects is important to include deleted orgs
-            org.balance = settings.FIRST_ORG_FREE_CREDITS
+            # Workspace.all_objects is important to include deleted workspaces
+            workspace.balance = settings.FIRST_WORKSPACE_FREE_CREDITS
 
-        org.full_clean()
-        org.save()
-        org.add_member(
+        workspace.full_clean()
+        workspace.save()
+        workspace.add_member(
             created_by,
-            role=OrgRole.OWNER,
+            role=WorkspaceRole.OWNER,
         )
-        return org
+        return workspace
 
-    def get_or_create_from_org_id(self, org_id: str) -> tuple[Org, bool]:
-        from app_users.models import AppUser
+    def get_or_create_from_uid(self, uid: str) -> tuple[Workspace, bool]:
+        workspace = Workspace.objects.filter(
+            is_personal=True, created_by__uid=uid
+        ).first()
+        if workspace:
+            return workspace, False
 
-        try:
-            return self.get(org_id=org_id), False
-        except self.model.DoesNotExist:
-            user = AppUser.objects.get_or_create_from_uid(org_id)[0]
-            return self.migrate_from_appuser(user), True
+        user, _ = AppUser.objects.get_or_create_from_uid(uid)
+        workspace = self.migrate_from_appuser(user)
+        return workspace, True
 
-    def migrate_from_appuser(self, user: "AppUser") -> Org:
-        return self.create_org(
+    def migrate_from_appuser(self, user: "AppUser") -> Workspace:
+        return self.create_workspace(
             name=f"{user.first_name()}'s Personal Workspace",
-            org_id=user.uid or get_random_doc_id(),
             created_by=user,
             is_personal=True,
             balance=user.balance,
@@ -108,10 +108,8 @@ class OrgManager(SafeDeleteManager):
         return (cents_spent or 0) / 100
 
 
-class Org(SafeDeleteModel):
+class Workspace(SafeDeleteModel):
     _safedelete_policy = SOFT_DELETE_CASCADE
-
-    org_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
 
     name = models.CharField(max_length=100)
     created_by = models.ForeignKey(
@@ -119,13 +117,13 @@ class Org(SafeDeleteModel):
         on_delete=models.CASCADE,
     )
 
-    logo = models.URLField(null=True, blank=True)
+    logo = CustomURLField(null=True, blank=True)
     domain_name = models.CharField(
         max_length=30,
         blank=True,
         null=True,
         validators=[
-            validate_org_domain_name,
+            validate_workspace_domain_name,
         ],
     )
 
@@ -136,7 +134,7 @@ class Org(SafeDeleteModel):
     subscription = models.OneToOneField(
         "payments.Subscription",
         on_delete=models.SET_NULL,
-        related_name="org",
+        related_name="workspace",
         null=True,
         blank=True,
     )
@@ -147,7 +145,7 @@ class Org(SafeDeleteModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = OrgManager()
+    objects = WorkspaceManager()
 
     class Meta:
         constraints = [
@@ -160,7 +158,7 @@ class Org(SafeDeleteModel):
             models.UniqueConstraint(
                 "created_by",
                 condition=Q(deleted__isnull=True, is_personal=True),
-                name="unique_personal_org_per_user",
+                name="unique_personal_workspace_per_user",
             ),
         ]
 
@@ -174,10 +172,13 @@ class Org(SafeDeleteModel):
         return slugify(self.name)
 
     def add_member(
-        self, user: "AppUser", role: OrgRole, invitation: "OrgInvitation | None" = None
+        self,
+        user: "AppUser",
+        role: WorkspaceRole,
+        invitation: "WorkspaceInvitation | None" = None,
     ):
-        OrgMembership(
-            org=self,
+        WorkspaceMembership(
+            workspace=self,
             user=user,
             role=role,
             invitation=invitation,
@@ -188,9 +189,9 @@ class Org(SafeDeleteModel):
         *,
         invitee_email: str,
         inviter: "AppUser",
-        role: OrgRole,
+        role: WorkspaceRole,
         auto_accept: bool = False,
-    ) -> "OrgInvitation":
+    ) -> "WorkspaceInvitation":
         """
         auto_accept: If True, the user will be automatically added if they have an account
         """
@@ -198,15 +199,17 @@ class Org(SafeDeleteModel):
             if member.user.email == invitee_email:
                 raise ValidationError(f"{member.user} is already a member of this team")
 
-        for invitation in self.invitations.filter(status=OrgInvitation.Status.PENDING):
+        for invitation in self.invitations.filter(
+            status=WorkspaceInvitation.Status.PENDING
+        ):
             if invitation.invitee_email == invitee_email:
                 raise ValidationError(
                     f"{invitee_email} was already invited to this team"
                 )
 
-        invitation = OrgInvitation(
+        invitation = WorkspaceInvitation(
             invite_id=get_random_doc_id(),
-            org=self,
+            workspace=self,
             invitee_email=invitee_email,
             inviter=inviter,
             role=role,
@@ -225,8 +228,8 @@ class Org(SafeDeleteModel):
 
         return invitation
 
-    def get_owners(self) -> list[OrgMembership]:
-        return self.memberships.filter(role=OrgRole.OWNER)
+    def get_owners(self) -> models.QuerySet[WorkspaceMembership]:
+        return self.memberships.filter(role=WorkspaceRole.OWNER)
 
     @db_middleware
     @transaction.atomic
@@ -255,51 +258,58 @@ class Org(SafeDeleteModel):
         # It won't lock this row for reads, and multiple threads can update the same row leading incorrect balance
         #
         # Also we're not using .update() here because it won't give back the updated end balance
-        org: Org = Org.objects.select_for_update().get(pk=self.pk)
-        org.balance += amount
-        org.save(update_fields=["balance"])
-        kwargs.setdefault("plan", org.subscription and org.subscription.plan)
+        workspace: Workspace = Workspace.objects.select_for_update().get(pk=self.pk)
+        workspace.balance += amount
+        workspace.save(update_fields=["balance"])
+        kwargs.setdefault(
+            "plan", workspace.subscription and workspace.subscription.plan
+        )
         return AppUserTransaction.objects.create(
-            org=org,
-            user=org.created_by if org.is_personal else None,
+            workspace=workspace,
+            user=workspace.created_by if workspace.is_personal else None,
             invoice_id=invoice_id,
             amount=amount,
-            end_balance=org.balance,
+            end_balance=workspace.balance,
             **kwargs,
         )
 
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = self.search_stripe_customer()
         if not customer:
+            metadata = {"workspace_id": self.id}
+            if self.is_personal:
+                metadata["uid"] = self.created_by.uid
+
             customer = stripe.Customer.create(
                 name=self.created_by.display_name,
                 email=self.created_by.email,
                 phone=self.created_by.phone_number,
-                metadata={"uid": self.org_id, "org_id": self.org_id, "id": self.pk},
+                metadata=metadata,
             )
             self.stripe_customer_id = customer.id
             self.save()
         return customer
 
     def search_stripe_customer(self) -> stripe.Customer | None:
-        if not self.org_id:
-            return None
         if self.stripe_customer_id:
             try:
                 return stripe.Customer.retrieve(self.stripe_customer_id)
-            except stripe.error.InvalidRequestError as e:
+            except stripe.InvalidRequestError as e:
                 if e.http_status != 404:
                     raise
+
         try:
             customer = stripe.Customer.search(
-                query=f'metadata["uid"]:"{self.org_id}"'
+                query=f'metadata["workspace_id"]:"{self.id}"'
             ).data[0]
         except IndexError:
-            return None
-        else:
-            self.stripe_customer_id = customer.id
-            self.save()
-            return customer
+            customer = self.is_personal and self.created_by.search_stripe_customer()
+            if not customer:
+                return None
+
+        self.stripe_customer_id = customer.id
+        self.save()
+        return customer
 
     def get_dollars_spent_this_month(self) -> float:
         today = timezone.now()
@@ -311,13 +321,17 @@ class Org(SafeDeleteModel):
         return (cents_spent or 0) / 100
 
 
-class OrgMembership(SafeDeleteModel):
-    org = models.ForeignKey(Org, on_delete=models.CASCADE, related_name="memberships")
+class WorkspaceMembership(SafeDeleteModel):
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="memberships"
+    )
     user = models.ForeignKey(
-        "app_users.AppUser", on_delete=models.CASCADE, related_name="org_memberships"
+        "app_users.AppUser",
+        on_delete=models.CASCADE,
+        related_name="workspace_memberships",
     )
     invitation = models.OneToOneField(
-        "OrgInvitation",
+        "WorkspaceInvitation",
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
@@ -325,7 +339,9 @@ class OrgMembership(SafeDeleteModel):
         related_name="membership",
     )
 
-    role = models.IntegerField(choices=OrgRole.choices, default=OrgRole.MEMBER)
+    role = models.IntegerField(
+        choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)  # same as joining date
     updated_at = models.DateTimeField(auto_now=True)
@@ -335,45 +351,45 @@ class OrgMembership(SafeDeleteModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["org", "user"],
+                fields=["workspace", "user"],
                 condition=Q(deleted__isnull=True),
-                name="unique_org_user",
+                name="unique_workspace_user",
             )
         ]
 
     def __str__(self):
-        return f"{self.get_role_display()} - {self.user} ({self.org})"
+        return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
-    def can_edit_org_metadata(self):
-        return self.role in (OrgRole.OWNER, OrgRole.ADMIN)
+    def can_edit_workspace_metadata(self):
+        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
-    def can_delete_org(self):
-        return self.role == OrgRole.OWNER
+    def can_delete_workspace(self):
+        return self.role == WorkspaceRole.OWNER
 
-    def has_higher_role_than(self, other: "OrgMembership"):
+    def has_higher_role_than(self, other: "WorkspaceMembership"):
         # creator > owner > admin > member
         match other.role:
-            case OrgRole.OWNER:
-                return self.org.created_by == OrgRole.OWNER
-            case OrgRole.ADMIN:
-                return self.role == OrgRole.OWNER
-            case OrgRole.MEMBER:
-                return self.role in (OrgRole.OWNER, OrgRole.ADMIN)
+            case WorkspaceRole.OWNER:
+                return self.workspace.created_by == WorkspaceRole.OWNER
+            case WorkspaceRole.ADMIN:
+                return self.role == WorkspaceRole.OWNER
+            case WorkspaceRole.MEMBER:
+                return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
-    def can_change_role(self, other: "OrgMembership"):
+    def can_change_role(self, other: "WorkspaceMembership"):
         return self.has_higher_role_than(other)
 
-    def can_kick(self, other: "OrgMembership"):
+    def can_kick(self, other: "WorkspaceMembership"):
         return self.has_higher_role_than(other)
 
     def can_transfer_ownership(self):
-        return self.role == OrgRole.OWNER
+        return self.role == WorkspaceRole.OWNER
 
     def can_invite(self):
-        return self.role in (OrgRole.OWNER, OrgRole.ADMIN)
+        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
 
-class OrgInvitation(SafeDeleteModel):
+class WorkspaceInvitation(SafeDeleteModel):
     class Status(models.IntegerChoices):
         PENDING = 1
         ACCEPTED = 2
@@ -384,14 +400,18 @@ class OrgInvitation(SafeDeleteModel):
     invite_id = models.CharField(max_length=100, unique=True)
     invitee_email = models.EmailField()
 
-    org = models.ForeignKey(Org, on_delete=models.CASCADE, related_name="invitations")
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="invitations"
+    )
     inviter = models.ForeignKey(
         "app_users.AppUser", on_delete=models.CASCADE, related_name="sent_invitations"
     )
 
     status = models.IntegerField(choices=Status.choices, default=Status.PENDING)
     auto_accepted = models.BooleanField(default=False)
-    role = models.IntegerField(choices=OrgRole.choices, default=OrgRole.MEMBER)
+    role = models.IntegerField(
+        choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
+    )
 
     last_email_sent_at = models.DateTimeField(null=True, blank=True, default=None)
     status_changed_at = models.DateTimeField(null=True, blank=True, default=None)
@@ -407,12 +427,12 @@ class OrgInvitation(SafeDeleteModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.invitee_email} - {self.org} ({self.get_status_display()})"
+        return f"{self.invitee_email} - {self.workspace} ({self.get_status_display()})"
 
     def has_expired(self):
         return self.status == self.Status.EXPIRED or (
             timezone.now() - (self.last_email_sent_at or self.created_at)
-            > timedelta(days=settings.ORG_INVITATION_EXPIRY_DAYS)
+            > timedelta(days=settings.WORKSPACE_INVITATION_EXPIRY_DAYS)
         )
 
     def auto_accept(self):
@@ -431,7 +451,9 @@ class OrgInvitation(SafeDeleteModel):
         self.accept(invitee, auto_accepted=True)
 
         if self.auto_accepted:
-            logger.info(f"User {invitee} auto-accepted invitation to org {self.org}")
+            logger.info(
+                f"User {invitee} auto-accepted invitation to workspace {self.workspace}"
+            )
             send_auto_accepted_email.delay(self.pk)
 
     def get_url(self):
@@ -439,7 +461,10 @@ class OrgInvitation(SafeDeleteModel):
 
         return get_app_route_url(
             invitation_route,
-            path_params={"invite_id": self.invite_id, "org_slug": self.org.get_slug()},
+            path_params={
+                "invite_id": self.invite_id,
+                "workspace_slug": self.workspace.get_slug(),
+            },
         )
 
     def send_email(self):
@@ -469,7 +494,7 @@ class OrgInvitation(SafeDeleteModel):
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
 
-        if self.org.memberships.filter(user_id=user.pk).exists():
+        if self.workspace.memberships.filter(user_id=user.pk).exists():
             raise ValidationError(f"User is already a member of this team.")
 
         self.status = self.Status.ACCEPTED
@@ -480,8 +505,8 @@ class OrgInvitation(SafeDeleteModel):
         self.full_clean()
 
         with transaction.atomic():
-            user.org_memberships.all().delete()  # delete current memberships
-            self.org.add_member(
+            user.workspace_memberships.all().delete()  # delete current memberships
+            self.workspace.add_member(
                 user,
                 role=self.role,
                 invitation=self,
@@ -505,5 +530,5 @@ class OrgInvitation(SafeDeleteModel):
             return True
 
         return timezone.now() - self.last_email_sent_at > timedelta(
-            seconds=settings.ORG_INVITATION_EMAIL_COOLDOWN_INTERVAL
+            seconds=settings.WORKSPACE_INVITATION_EMAIL_COOLDOWN_INTERVAL
         )

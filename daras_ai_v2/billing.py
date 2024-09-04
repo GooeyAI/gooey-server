@@ -13,41 +13,41 @@ from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
-from payments.webhooks import StripeWebhookHandler, set_org_subscription
+from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
 if typing.TYPE_CHECKING:
-    from orgs.models import Org
+    from workspaces.models import Workspace
 
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def billing_page(org: "Org"):
+def billing_page(workspace: "Workspace"):
     render_payments_setup()
 
-    if org.subscription and org.subscription.is_paid():
-        render_current_plan(org)
+    if workspace.subscription and workspace.subscription.is_paid():
+        render_current_plan(workspace)
 
     with gui.div(className="my-5"):
-        render_credit_balance(org)
+        render_credit_balance(workspace)
 
     with gui.div(className="my-5"):
-        selected_payment_provider = render_all_plans(org)
+        selected_payment_provider = render_all_plans(workspace)
 
     with gui.div(className="my-5"):
-        render_addon_section(org, selected_payment_provider)
+        render_addon_section(workspace, selected_payment_provider)
 
-    if org.subscription:
-        if org.subscription.payment_provider == PaymentProvider.STRIPE:
+    if workspace.subscription:
+        if workspace.subscription.payment_provider == PaymentProvider.STRIPE:
             with gui.div(className="my-5"):
-                render_auto_recharge_section(org)
+                render_auto_recharge_section(workspace)
 
         with gui.div(className="my-5"):
-            render_payment_information(org)
+            render_payment_information(workspace)
 
     with gui.div(className="my-5"):
-        render_billing_history(org)
+        render_billing_history(workspace)
 
 
 def render_payments_setup():
@@ -61,10 +61,10 @@ def render_payments_setup():
     )
 
 
-def render_current_plan(org: "Org"):
-    plan = PricingPlan.from_sub(org.subscription)
-    if org.subscription.payment_provider:
-        provider = PaymentProvider(org.subscription.payment_provider)
+def render_current_plan(workspace: "Workspace"):
+    plan = PricingPlan.from_sub(workspace.subscription)
+    if workspace.subscription.payment_provider:
+        provider = PaymentProvider(workspace.subscription.payment_provider)
     else:
         provider = None
 
@@ -82,7 +82,7 @@ def render_current_plan(org: "Org"):
         with right, gui.div(className="d-flex align-items-center gap-1"):
             if provider and (
                 next_invoice_ts := gui.run_in_thread(
-                    org.subscription.get_next_invoice_timestamp, cache=True
+                    workspace.subscription.get_next_invoice_timestamp, cache=True
                 )
             ):
                 gui.html("Next invoice on ")
@@ -118,17 +118,17 @@ def render_current_plan(org: "Org"):
                 )
 
 
-def render_credit_balance(org: "Org"):
-    gui.write(f"## Credit Balance: {org.balance:,}")
+def render_credit_balance(workspace: "Workspace"):
+    gui.write(f"## Credit Balance: {workspace.balance:,}")
     gui.caption(
         "Every time you submit a workflow or make an API call, we deduct credits from your account."
     )
 
 
-def render_all_plans(org: "Org") -> PaymentProvider:
+def render_all_plans(workspace: "Workspace") -> PaymentProvider:
     current_plan = (
-        PricingPlan.from_sub(org.subscription)
-        if org.subscription
+        PricingPlan.from_sub(workspace.subscription)
+        if workspace.subscription
         else PricingPlan.STARTER
     )
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
@@ -136,8 +136,8 @@ def render_all_plans(org: "Org") -> PaymentProvider:
     gui.write("## All Plans")
     plans_div = gui.div(className="mb-1")
 
-    if org.subscription and org.subscription.payment_provider:
-        selected_payment_provider = org.subscription.payment_provider
+    if workspace.subscription and workspace.subscription.payment_provider:
+        selected_payment_provider = workspace.subscription.payment_provider
     else:
         with gui.div():
             selected_payment_provider = PaymentProvider[
@@ -155,7 +155,7 @@ def render_all_plans(org: "Org") -> PaymentProvider:
             ):
                 _render_plan_details(plan)
                 _render_plan_action_button(
-                    org=org,
+                    workspace=workspace,
                     plan=plan,
                     current_plan=current_plan,
                     payment_provider=selected_payment_provider,
@@ -193,7 +193,7 @@ def _render_plan_details(plan: PricingPlan):
 
 
 def _render_plan_action_button(
-    org: "Org",
+    workspace: "Workspace",
     plan: PricingPlan,
     current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
@@ -207,10 +207,13 @@ def _render_plan_action_button(
             className=btn_classes + " btn btn-theme btn-primary",
         ):
             gui.html("Contact Us")
-    elif org.subscription and org.subscription.plan == PricingPlan.ENTERPRISE.db_value:
+    elif (
+        workspace.subscription
+        and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
+    ):
         # don't show upgrade/downgrade buttons for enterprise customers
         return
-    elif org.subscription and org.subscription.is_paid():
+    elif workspace.subscription and workspace.subscription.is_paid():
         # subscription exists, show upgrade/downgrade button
         if plan.credits > current_plan.credits:
             modal, confirmed = confirm_modal(
@@ -232,7 +235,7 @@ will be refreshed to {plan.credits:,} Credits.
                 modal.open()
             if confirmed:
                 change_subscription(
-                    org,
+                    workspace,
                     plan,
                     # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
                     billing_cycle_anchor="now",
@@ -254,11 +257,11 @@ This will take effect from the next billing cycle.
             ):
                 modal.open()
             if confirmed:
-                change_subscription(org, plan)
+                change_subscription(workspace, plan)
     else:
         assert payment_provider is not None  # for sanity
         _render_create_subscription_button(
-            org=org,
+            workspace=workspace,
             plan=plan,
             payment_provider=payment_provider,
         )
@@ -266,13 +269,13 @@ This will take effect from the next billing cycle.
 
 def _render_create_subscription_button(
     *,
-    org: "Org",
+    workspace: "Workspace",
     plan: PricingPlan,
     payment_provider: PaymentProvider,
 ):
     match payment_provider:
         case PaymentProvider.STRIPE:
-            render_stripe_subscription_button(org=org, plan=plan)
+            render_stripe_subscription_button(workspace=workspace, plan=plan)
         case PaymentProvider.PAYPAL:
             render_paypal_subscription_button(plan=plan)
 
@@ -284,27 +287,29 @@ def fmt_price(plan: PricingPlan) -> str:
         return "Free"
 
 
-def change_subscription(org: "Org", new_plan: PricingPlan, **kwargs):
+def change_subscription(workspace: "Workspace", new_plan: PricingPlan, **kwargs):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    current_plan = PricingPlan.from_sub(org.subscription)
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
     if new_plan == current_plan:
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
-        org.subscription.cancel()
+        workspace.subscription.cancel()
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303
         )
 
-    match org.subscription.payment_provider:
+    match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             if not new_plan.supports_stripe():
                 gui.error(f"Stripe subscription not available for {new_plan}")
 
-            subscription = stripe.Subscription.retrieve(org.subscription.external_id)
+            subscription = stripe.Subscription.retrieve(
+                workspace.subscription.external_id
+            )
             stripe.Subscription.modify(
                 subscription.id,
                 items=[
@@ -325,7 +330,9 @@ def change_subscription(org: "Org", new_plan: PricingPlan, **kwargs):
             if not new_plan.supports_paypal():
                 gui.error(f"Paypal subscription not available for {new_plan}")
 
-            subscription = paypal.Subscription.retrieve(org.subscription.external_id)
+            subscription = paypal.Subscription.retrieve(
+                workspace.subscription.external_id
+            )
             paypal_plan_info = new_plan.get_paypal_plan()
             approval_url = subscription.update_plan(
                 plan_id=paypal_plan_info["plan_id"],
@@ -348,20 +355,22 @@ def payment_provider_radio(**props) -> str | None:
         )
 
 
-def render_addon_section(org: "Org", selected_payment_provider: PaymentProvider):
-    if org.subscription:
+def render_addon_section(
+    workspace: "Workspace", selected_payment_provider: PaymentProvider
+):
+    if workspace.subscription:
         gui.write("# Purchase More Credits")
     else:
         gui.write("# Purchase Credits")
     gui.caption(f"Buy more credits. $1 per {settings.ADDON_CREDITS_PER_DOLLAR} credits")
 
-    if org.subscription and org.subscription.payment_provider:
-        provider = PaymentProvider(org.subscription.payment_provider)
+    if workspace.subscription and workspace.subscription.payment_provider:
+        provider = PaymentProvider(workspace.subscription.payment_provider)
     else:
         provider = selected_payment_provider
     match provider:
         case PaymentProvider.STRIPE:
-            render_stripe_addon_buttons(org)
+            render_stripe_addon_buttons(workspace)
         case PaymentProvider.PAYPAL:
             render_paypal_addon_buttons()
 
@@ -385,8 +394,8 @@ def render_paypal_addon_buttons():
     gui.div(id="paypal-result-message")
 
 
-def render_stripe_addon_buttons(org: "Org"):
-    if not (org.subscription and org.subscription.payment_provider):
+def render_stripe_addon_buttons(workspace: "Workspace"):
+    if not (workspace.subscription and workspace.subscription.payment_provider):
         save_pm = gui.checkbox(
             "Save payment method for future purchases & auto-recharge", value=True
         )
@@ -394,10 +403,10 @@ def render_stripe_addon_buttons(org: "Org"):
         save_pm = True
 
     for dollat_amt in settings.ADDON_AMOUNT_CHOICES:
-        render_stripe_addon_button(dollat_amt, org, save_pm)
+        render_stripe_addon_button(dollat_amt, workspace, save_pm)
 
 
-def render_stripe_addon_button(dollat_amt: int, org: "Org", save_pm: bool):
+def render_stripe_addon_button(dollat_amt: int, workspace: "Workspace", save_pm: bool):
     modal, confirmed = confirm_modal(
         title="Purchase Credits",
         key=f"--addon-modal-{dollat_amt}",
@@ -411,14 +420,17 @@ This is a one-time purchase and your account will be credited once the payment i
     )
 
     if gui.button(f"${dollat_amt:,}", type="primary"):
-        if org.subscription and org.subscription.stripe_get_default_payment_method():
+        if (
+            workspace.subscription
+            and workspace.subscription.stripe_get_default_payment_method()
+        ):
             modal.open()
         else:
-            stripe_addon_checkout_redirect(org, dollat_amt, save_pm)
+            stripe_addon_checkout_redirect(workspace, dollat_amt, save_pm)
 
     if confirmed:
         success = gui.run_in_thread(
-            org.subscription.stripe_attempt_addon_purchase,
+            workspace.subscription.stripe_attempt_addon_purchase,
             args=[dollat_amt],
             placeholder="",
         )
@@ -429,10 +441,12 @@ This is a one-time purchase and your account will be credited once the payment i
             modal.close()
         else:
             # fallback to stripe checkout flow if the auto payment failed
-            stripe_addon_checkout_redirect(org, dollat_amt, save_pm)
+            stripe_addon_checkout_redirect(workspace, dollat_amt, save_pm)
 
 
-def stripe_addon_checkout_redirect(org: "Org", dollat_amt: int, save_pm: bool):
+def stripe_addon_checkout_redirect(
+    workspace: "Workspace", dollat_amt: int, save_pm: bool
+):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -448,7 +462,7 @@ def stripe_addon_checkout_redirect(org: "Org", dollat_amt: int, save_pm: bool):
         mode="payment",
         success_url=get_app_route_url(payment_processing_route),
         cancel_url=get_app_route_url(account_route),
-        customer=org.get_or_create_stripe_customer(),
+        customer=workspace.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
         **kwargs,
@@ -458,7 +472,7 @@ def stripe_addon_checkout_redirect(org: "Org", dollat_amt: int, save_pm: bool):
 
 def render_stripe_subscription_button(
     *,
-    org: "Org",
+    workspace: "Workspace",
     plan: PricingPlan,
 ):
     if not plan.supports_stripe():
@@ -486,30 +500,33 @@ This will charge you the full amount today, and every month thereafter.
         key=f"--change-sub-{plan.key}",
         type="primary",
     ):
-        if org.subscription and org.subscription.stripe_get_default_payment_method():
+        if (
+            workspace.subscription
+            and workspace.subscription.stripe_get_default_payment_method()
+        ):
             modal.open()
         else:
-            stripe_subscription_create(org=org, plan=plan)
+            stripe_subscription_create(workspace=workspace, plan=plan)
 
     if confirmed:
-        stripe_subscription_create(org=org, plan=plan)
+        stripe_subscription_create(workspace=workspace, plan=plan)
 
 
-def stripe_subscription_create(org: "Org", plan: PricingPlan):
+def stripe_subscription_create(workspace: "Workspace", plan: PricingPlan):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
-    if org.subscription and org.subscription.is_paid():
+    if workspace.subscription and workspace.subscription.is_paid():
         # sanity check: already subscribed to some plan
         gui.rerun()
 
     # check for existing subscriptions on stripe
-    customer = org.get_or_create_stripe_customer()
+    customer = workspace.get_or_create_stripe_customer()
     for sub in stripe.Subscription.list(
         customer=customer, status="active", limit=1
     ).data:
         StripeWebhookHandler.handle_subscription_updated(
-            org_id=org.org_id, stripe_sub=sub
+            workspace_id_or_uid=workspace.id, stripe_sub=sub
         )
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303
@@ -517,7 +534,10 @@ def stripe_subscription_create(org: "Org", plan: PricingPlan):
 
     # try to directly create the subscription without checkout
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
-    pm = org.subscription and org.subscription.stripe_get_default_payment_method()
+    pm = (
+        workspace.subscription
+        and workspace.subscription.stripe_get_default_payment_method()
+    )
     line_items = [plan.get_stripe_line_item()]
     if pm:
         sub = stripe.Subscription.create(
@@ -567,12 +587,12 @@ def render_paypal_subscription_button(
     )
 
 
-def render_payment_information(org: "Org"):
-    if not org.subscription:
+def render_payment_information(workspace: "Workspace"):
+    if not workspace.subscription:
         return
 
     pm_summary = gui.run_in_thread(
-        org.subscription.get_payment_method_summary, cache=True
+        workspace.subscription.get_payment_method_summary, cache=True
     )
     if not pm_summary:
         return
@@ -584,7 +604,7 @@ def render_payment_information(org: "Org"):
             gui.write("**Pay via**")
         with col2:
             provider = PaymentProvider(
-                org.subscription.payment_provider or PaymentProvider.STRIPE
+                workspace.subscription.payment_provider or PaymentProvider.STRIPE
             )
             gui.write(provider.label)
         with col3:
@@ -592,7 +612,7 @@ def render_payment_information(org: "Org"):
                 f"{icons.edit} Edit", type="link", key="manage-payment-provider"
             ):
                 raise gui.RedirectException(
-                    org.subscription.get_external_management_url()
+                    workspace.subscription.get_external_management_url()
                 )
 
         pm_summary = PaymentMethodSummary(*pm_summary)
@@ -612,7 +632,7 @@ def render_payment_information(org: "Org"):
                 if gui.button(
                     f"{icons.edit} Edit", type="link", key="edit-payment-method"
                 ):
-                    change_payment_method(org)
+                    change_payment_method(workspace)
 
         if pm_summary.billing_email:
             col1, col2, _ = gui.columns(3, responsive=False)
@@ -640,13 +660,16 @@ This will cancel your subscription and remove your saved payment method.
     ):
         modal.open()
     if confirmed:
-        set_org_subscription(
-            org_id=org.org_id,
+        set_workspace_subscription(
+            workspace_id_or_uid=workspace.id,
             plan=PricingPlan.STARTER,
             provider=None,
             external_id=None,
         )
-        pm = org.subscription and org.subscription.stripe_get_default_payment_method()
+        pm = (
+            workspace.subscription
+            and workspace.subscription.stripe_get_default_payment_method()
+        )
         if pm:
             pm.detach()
         raise gui.RedirectException(
@@ -654,18 +677,18 @@ This will cancel your subscription and remove your saved payment method.
         )
 
 
-def change_payment_method(org: "Org"):
+def change_payment_method(workspace: "Workspace"):
     from routers.account import payment_processing_route
     from routers.account import account_route
 
-    match org.subscription.payment_provider:
+    match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             session = stripe.checkout.Session.create(
                 mode="setup",
                 currency="usd",
-                customer=org.get_or_create_stripe_customer(),
+                customer=workspace.get_or_create_stripe_customer(),
                 setup_intent_data={
-                    "metadata": {"subscription_id": org.subscription.external_id},
+                    "metadata": {"subscription_id": workspace.subscription.external_id},
                 },
                 success_url=get_app_route_url(payment_processing_route),
                 cancel_url=get_app_route_url(account_route),
@@ -679,11 +702,11 @@ def format_card_brand(brand: str) -> str:
     return icons.card_icons.get(brand.lower(), brand.capitalize())
 
 
-def render_billing_history(org: "Org", limit: int = 50):
+def render_billing_history(workspace: "Workspace", limit: int = 50):
     import pandas as pd
 
     txns = AppUserTransaction.objects.filter(
-        org=org,
+        workspace=workspace,
         amount__gt=0,
     ).order_by("-created_at")
     if not txns:
@@ -708,9 +731,9 @@ def render_billing_history(org: "Org", limit: int = 50):
         gui.caption(f"Showing only the most recent {limit} transactions.")
 
 
-def render_auto_recharge_section(org: "Org"):
-    assert org.subscription
-    subscription = org.subscription
+def render_auto_recharge_section(workspace: "Workspace"):
+    assert workspace.subscription
+    subscription = workspace.subscription
 
     gui.write("## Auto Recharge & Limits")
     with gui.div(className="h4"):

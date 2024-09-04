@@ -18,10 +18,10 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
-from orgs.models import OrgInvitation
+from workspaces.models import WorkspaceInvitation
 from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
-from orgs.views import invitation_page, orgs_page
+from workspaces.views import invitation_page, workspaces_page
 
 from routers.custom_api_router import CustomAPIRouter
 
@@ -142,10 +142,10 @@ def api_keys_route(request: Request):
     )
 
 
-@gui.route(app, "/orgs/")
-def orgs_route(request: Request):
-    with account_page_wrapper(request, AccountTabs.orgs):
-        orgs_tab(request)
+@gui.route(app, "/workspaces/")
+def workspaces_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.workspaces):
+        workspaces_tab(request)
 
     url = get_og_url_path(request)
     return dict(
@@ -159,8 +159,8 @@ def orgs_route(request: Request):
     )
 
 
-@gui.route(app, "/invitation/{org_slug}/{invite_id}/")
-def invitation_route(request: Request, org_slug: str, invite_id: str):
+@gui.route(app, "/invitation/{workspace_slug}/{invite_id}/")
+def invitation_route(request: Request, workspace_slug: str, invite_id: str):
     from routers.root import login
 
     if not request.user or request.user.is_anonymous:
@@ -169,8 +169,8 @@ def invitation_route(request: Request, org_slug: str, invite_id: str):
         raise RedirectException(redirect_url)
 
     try:
-        invitation = OrgInvitation.objects.get(invite_id=invite_id)
-    except OrgInvitation.DoesNotExist:
+        invitation = WorkspaceInvitation.objects.get(invite_id=invite_id)
+    except WorkspaceInvitation.DoesNotExist:
         return Response(status_code=404)
 
     with page_wrapper(request):
@@ -178,8 +178,8 @@ def invitation_route(request: Request, org_slug: str, invite_id: str):
     return dict(
         meta=raw_build_meta_tags(
             url=str(request.url),
-            title=f"Join {invitation.org.name} • Gooey.AI",
-            description=f"Invitation to join {invitation.org.name}",
+            title=f"Join {invitation.workspace.name} • Gooey.AI",
+            description=f"Invitation to join {invitation.workspace.name}",
             robots="noindex,nofollow",
         )
     )
@@ -195,7 +195,7 @@ class AccountTabs(TabData, Enum):
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
-    orgs = TabData(title=f"{icons.company} Teams", route=orgs_route)
+    workspaces = TabData(title=f"{icons.company} Teams", route=workspaces_route)
 
     @property
     def url_path(self) -> str:
@@ -203,8 +203,8 @@ class AccountTabs(TabData, Enum):
 
 
 def billing_tab(request: Request):
-    org, _ = request.user.get_or_create_personal_org()
-    return billing_page(org)
+    workspace, _ = request.user.get_or_create_personal_workspace()
+    return billing_page(workspace)
 
 
 def profile_tab(request: Request):
@@ -256,14 +256,14 @@ def api_keys_tab(request: Request):
     manage_api_keys(request.user)
 
 
-def orgs_tab(request: Request):
+def workspaces_tab(request: Request):
     """only accessible to admins"""
     from daras_ai_v2.base import BasePage
 
     if not BasePage.is_user_admin(request.user):
         raise RedirectException(get_route_path(account_route))
 
-    orgs_page(request.user)
+    workspaces_page(request.user)
 
 
 def get_tabs(request: Request) -> list[AccountTabs]:
@@ -276,7 +276,7 @@ def get_tabs(request: Request) -> list[AccountTabs]:
         AccountTabs.api_keys,
     ]
     if BasePage.is_user_admin(request.user):
-        tab_list.append(AccountTabs.orgs)
+        tab_list.append(AccountTabs.workspaces)
 
     return tab_list
 

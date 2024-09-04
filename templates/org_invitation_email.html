@@ -4,7 +4,7 @@
 
 <p>
   <b>{{ invitation.inviter.display_name or invitation.inviter.first_name() }}</b> has invited
-  you to join their team <b>{{ invitation.org.name }}</b> on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
+  you to join their team <b>{{ invitation.workspace.name }}</b> on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
 </p>
 
 <p>
@@ -14,7 +14,7 @@
 </p>
 
 <p>
-  The link will expire in {{ settings.ORG_INVITATION_EXPIRY_DAYS }} days.
+  The link will expire in {{ settings.WORKSPACE_INVITATION_EXPIRY_DAYS }} days.
 </p>
 
 <p>

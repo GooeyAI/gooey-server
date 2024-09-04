@@ -82,8 +82,8 @@ class Subscription(models.Model):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
         # if self.has_user:
         #     ret = f"{ret} | {self.user}"
-        if self.has_org:
-            ret = f"{ret} | {self.org}"
+        if self.has_workspace:
+            ret = f"{ret} | {self.workspace}"
         if self.auto_recharge_enabled:
             ret = f"Auto | {ret}"
         return ret
@@ -138,10 +138,10 @@ class Subscription(models.Model):
         return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
 
     @property
-    def has_org(self) -> bool:
+    def has_workspace(self) -> bool:
         try:
-            self.org
-        except Subscription.org.RelatedObjectDoesNotExist:
+            self.workspace
+        except Subscription.workspace.RelatedObjectDoesNotExist:
             return False
         else:
             return True
@@ -376,12 +376,12 @@ class Subscription(models.Model):
         )
 
     def should_send_monthly_spending_notification(self) -> bool:
-        assert self.has_org
+        assert self.has_workspace
 
         return bool(
             self.monthly_spending_notification_threshold
             and not self.has_sent_monthly_spending_notification_this_month()
-            and self.org.get_dollars_spent_this_month()
+            and self.workspace.get_dollars_spent_this_month()
             >= self.monthly_spending_notification_threshold
         )
 

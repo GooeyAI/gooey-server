@@ -5,43 +5,44 @@ import html as html_lib
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
 
+from .models import Workspace, WorkspaceInvitation, WorkspaceMembership, WorkspaceRole
 from app_users.models import AppUser
-from orgs.models import Org, OrgInvitation, OrgMembership, OrgRole
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
 
 
-DEFAULT_ORG_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
 
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def invitation_page(user: AppUser, invitation: OrgInvitation):
-    from routers.account import orgs_route
+def invitation_page(user: AppUser, invitation: WorkspaceInvitation):
+    from routers.account import workspaces_route
 
-    orgs_page_path = get_route_path(orgs_route)
+    workspaces_page_path = get_route_path(workspaces_route)
 
     with gui.div(className="text-center my-5"):
         gui.write(
-            f"# Invitation to join {invitation.org.name}", className="d-block mb-5"
+            f"# Invitation to join {invitation.workspace.name}",
+            className="d-block mb-5",
         )
 
-        if invitation.org.memberships.filter(user=user).exists():
-            # redirect to org page
-            raise gui.RedirectException(orgs_page_path)
+        if invitation.workspace.memberships.filter(user=user).exists():
+            # redirect to workspace page
+            raise gui.RedirectException(workspaces_page_path)
 
-        if invitation.status != OrgInvitation.Status.PENDING:
+        if invitation.status != WorkspaceInvitation.Status.PENDING:
             gui.write(f"This invitation has been {invitation.get_status_display()}.")
             return
 
         gui.write(
-            f"**{format_user_name(invitation.inviter)}** has invited you to join **{invitation.org.name}**."
+            f"**{format_user_name(invitation.inviter)}** has invited you to join **{invitation.workspace.name}**."
         )
 
-        if other_m := user.org_memberships.first():
+        if other_m := user.workspace_memberships.first():
             gui.caption(
-                f"You are currently a member of [{other_m.org.name}]({orgs_page_path}). You will be removed from that team if you accept this invitation."
+                f"You are currently a member of [{other_m.workspace.name}]({workspaces_page_path}). You will be removed from that team if you accept this invitation."
             )
             accept_label = "Leave and Accept"
         else:
@@ -56,58 +57,61 @@ def invitation_page(user: AppUser, invitation: OrgInvitation):
 
         if accept_button:
             invitation.accept(user=user)
-            raise gui.RedirectException(orgs_page_path)
+            raise gui.RedirectException(workspaces_page_path)
         if reject_button:
             invitation.reject(user=user)
 
 
-def orgs_page(user: AppUser):
-    memberships = user.org_memberships.filter()
+def workspaces_page(user: AppUser):
+    memberships = user.workspace_memberships.filter()
     if not memberships:
-        gui.write("*You're not part of an organization yet... Create one?*")
+        gui.write("*You're not part of an workspaceanization yet... Create one?*")
 
-        render_org_creation_view(user)
+        render_workspace_creation_view(user)
     else:
-        # only support one org for now
-        render_org_by_membership(memberships.first())
+        # only support one workspace for now
+        render_workspace_by_membership(memberships.first())
 
 
-def render_org_by_membership(membership: OrgMembership):
+def render_workspace_by_membership(membership: WorkspaceMembership):
     """
     membership object has all the information we need:
-        - org
+        - workspace
         - current user
-        - current user's role in the org (and other metadata)
+        - current user's role in the workspace (and other metadata)
     """
-    org = membership.org
+    workspace = membership.workspace
     current_user = membership.user
 
     with gui.div(
         className="d-xs-block d-sm-flex flex-row-reverse justify-content-between"
     ):
         with gui.div(className="d-flex justify-content-center align-items-center"):
-            if membership.can_edit_org_metadata():
-                org_edit_modal = gui.Modal("Edit Org", key="edit-org-modal")
-                if org_edit_modal.is_open():
-                    with org_edit_modal.container():
-                        render_org_edit_view_by_membership(
-                            membership, modal=org_edit_modal
+            if membership.can_edit_workspace_metadata():
+                workspace_edit_modal = gui.Modal(
+                    "Edit Workspace", key="edit-workspace-modal"
+                )
+                if workspace_edit_modal.is_open():
+                    with workspace_edit_modal.container():
+                        render_workspace_edit_view_by_membership(
+                            membership, modal=workspace_edit_modal
                         )
 
                 if gui.button(f"{icons.edit} Edit", type="secondary"):
-                    org_edit_modal.open()
+                    workspace_edit_modal.open()
 
         with gui.div(className="d-flex align-items-center"):
             gui.image(
-                org.logo or DEFAULT_ORG_LOGO,
+                workspace.logo or DEFAULT_WORKSPACE_LOGO,
                 className="my-0 me-4 rounded",
                 style={"width": "128px", "height": "128px", "object-fit": "contain"},
             )
             with gui.div(className="d-flex flex-column justify-content-center"):
-                gui.write(f"# {org.name}")
-                if org.domain_name:
+                gui.write(f"# {workspace.name}")
+                if workspace.domain_name:
                     gui.write(
-                        f"Org Domain: `@{org.domain_name}`", className="text-muted"
+                        f"Workspace Domain: `@{workspace.domain_name}`",
+                        className="text-muted",
                     )
 
     with gui.div(className="mt-4"):
@@ -122,38 +126,44 @@ def render_org_by_membership(membership: OrgMembership):
                 if invite_modal.is_open():
                     with invite_modal.container():
                         render_invite_creation_view(
-                            org=org, inviter=current_user, modal=invite_modal
+                            workspace=workspace,
+                            inviter=current_user,
+                            modal=invite_modal,
                         )
 
-        render_members_list(org=org, current_member=membership)
+        render_members_list(workspace=workspace, current_member=membership)
 
     with gui.div(className="mt-4"):
-        render_pending_invitations_list(org=org, current_member=membership)
+        render_pending_invitations_list(workspace=workspace, current_member=membership)
 
     with gui.div(className="mt-4"):
-        org_leave_modal = gui.Modal("Leave Org", key="leave-org-modal")
-        if org_leave_modal.is_open():
-            with org_leave_modal.container():
-                render_org_leave_view_by_membership(membership, modal=org_leave_modal)
+        workspace_leave_modal = gui.Modal(
+            "Leave Workspace", key="leave-workspace-modal"
+        )
+        if workspace_leave_modal.is_open():
+            with workspace_leave_modal.container():
+                render_workspace_leave_view_by_membership(
+                    membership, modal=workspace_leave_modal
+                )
 
         with gui.div(className="text-end"):
-            leave_org = gui.button(
+            leave_workspace = gui.button(
                 "Leave",
                 className="btn btn-theme bg-danger border-danger text-white",
             )
-        if leave_org:
-            org_leave_modal.open()
+        if leave_workspace:
+            workspace_leave_modal.open()
 
 
-def render_org_creation_view(user: AppUser):
-    gui.write(f"# {icons.company} Create an Org", unsafe_allow_html=True)
-    org_fields = render_org_create_or_edit_form()
+def render_workspace_creation_view(user: AppUser):
+    gui.write(f"# {icons.company} Create an Workspace", unsafe_allow_html=True)
+    workspace_fields = render_workspace_create_or_edit_form()
 
     if gui.button("Create"):
         try:
-            Org.objects.create_org(
+            Workspace.objects.create_workspace(
                 created_by=user,
-                **org_fields,
+                **workspace_fields,
             )
         except ValidationError as e:
             gui.write(", ".join(e.messages), className="text-danger")
@@ -161,50 +171,54 @@ def render_org_creation_view(user: AppUser):
             gui.rerun()
 
 
-def render_org_edit_view_by_membership(membership: OrgMembership, *, modal: gui.Modal):
-    org = membership.org
-    render_org_create_or_edit_form(org=org)
+def render_workspace_edit_view_by_membership(
+    membership: WorkspaceMembership, *, modal: gui.Modal
+):
+    workspace = membership.workspace
+    render_workspace_create_or_edit_form(workspace=workspace)
 
     if gui.button("Save", className="w-100", type="primary"):
         try:
-            org.full_clean()
+            workspace.full_clean()
         except ValidationError as e:
             # newlines in markdown
             gui.write("  \n".join(e.messages), className="text-danger")
         else:
-            org.save()
+            workspace.save()
             modal.close()
 
-    if membership.can_delete_org() or membership.can_transfer_ownership():
+    if membership.can_delete_workspace() or membership.can_transfer_ownership():
         gui.write("---")
         render_danger_zone_by_membership(membership)
 
 
-def render_danger_zone_by_membership(membership: OrgMembership):
+def render_danger_zone_by_membership(membership: WorkspaceMembership):
     gui.write("### Danger Zone", className="d-block my-2")
 
-    if membership.can_delete_org():
-        org_deletion_modal = gui.Modal("Delete Organization", key="delete-org-modal")
-        if org_deletion_modal.is_open():
-            with org_deletion_modal.container():
-                render_org_deletion_view_by_membership(
-                    membership, modal=org_deletion_modal
+    if membership.can_delete_workspace():
+        workspace_deletion_modal = gui.Modal(
+            "Delete Workspaceanization", key="delete-workspace-modal"
+        )
+        if workspace_deletion_modal.is_open():
+            with workspace_deletion_modal.container():
+                render_workspace_deletion_view_by_membership(
+                    membership, modal=workspace_deletion_modal
                 )
 
         with gui.div(className="d-flex justify-content-between align-items-center"):
-            gui.write("Delete Organization")
+            gui.write("Delete Workspaceanization")
             if gui.button(
                 f"{icons.delete} Delete",
                 className="btn btn-theme py-2 bg-danger border-danger text-white",
             ):
-                org_deletion_modal.open()
+                workspace_deletion_modal.open()
 
 
-def render_org_deletion_view_by_membership(
-    membership: OrgMembership, *, modal: gui.Modal
+def render_workspace_deletion_view_by_membership(
+    membership: WorkspaceMembership, *, modal: gui.Modal
 ):
     gui.write(
-        f"Are you sure you want to delete **{membership.org.name}**? This action is irreversible."
+        f"Are you sure you want to delete **{membership.workspace.name}**? This action is irreversible."
     )
 
     with gui.div(className="d-flex"):
@@ -216,34 +230,37 @@ def render_org_deletion_view_by_membership(
         if gui.button(
             "Delete", className="btn btn-theme bg-danger border-danger text-light w-50"
         ):
-            membership.org.delete()
+            membership.workspace.delete()
             modal.close()
 
 
-def render_org_leave_view_by_membership(
-    current_member: OrgMembership, *, modal: gui.Modal
+def render_workspace_leave_view_by_membership(
+    current_member: WorkspaceMembership, *, modal: gui.Modal
 ):
-    org = current_member.org
+    workspace = current_member.workspace
 
-    gui.write("Are you sure you want to leave this organization?")
+    gui.write("Are you sure you want to leave this workspaceanization?")
 
     new_owner = None
-    if current_member.role == OrgRole.OWNER and org.memberships.count() == 1:
+    if (
+        current_member.role == WorkspaceRole.OWNER
+        and workspace.memberships.count() == 1
+    ):
         gui.caption(
             "You are the only member. You will lose access to this team if you leave."
         )
     elif (
-        current_member.role == OrgRole.OWNER
-        and org.memberships.filter(role=OrgRole.OWNER).count() == 1
+        current_member.role == WorkspaceRole.OWNER
+        and workspace.memberships.filter(role=WorkspaceRole.OWNER).count() == 1
     ):
         members_by_uid = {
             m.user.uid: m
-            for m in org.memberships.all().select_related("user")
+            for m in workspace.memberships.all().select_related("user")
             if m != current_member
         }
 
         gui.caption(
-            "You are the only owner of this organization. Please choose another member to promote to owner."
+            "You are the only owner of this workspaceanization. Please choose another member to promote to owner."
         )
         new_owner_uid = gui.selectbox(
             "New Owner",
@@ -262,13 +279,13 @@ def render_org_leave_view_by_membership(
             "Leave", className="btn btn-theme bg-danger border-danger text-light w-50"
         ):
             if new_owner:
-                new_owner.role = OrgRole.OWNER
+                new_owner.role = WorkspaceRole.OWNER
                 new_owner.save()
             current_member.delete()
             modal.close()
 
 
-def render_members_list(org: Org, current_member: OrgMembership):
+def render_members_list(workspace: Workspace, current_member: WorkspaceMembership):
     with gui.tag("table", className="table table-responsive"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
@@ -281,7 +298,7 @@ def render_members_list(org: Org, current_member: OrgMembership):
                 gui.html("")
 
         with gui.tag("tbody"):
-            for m in org.memberships.all().order_by("created_at"):
+            for m in workspace.memberships.all().order_by("created_at"):
                 with gui.tag("tr"):
                     with gui.tag("td"):
                         name = format_user_name(
@@ -300,9 +317,11 @@ def render_members_list(org: Org, current_member: OrgMembership):
                         render_membership_actions(m, current_member=current_member)
 
 
-def render_membership_actions(m: OrgMembership, current_member: OrgMembership):
+def render_membership_actions(
+    m: WorkspaceMembership, current_member: WorkspaceMembership
+):
     if current_member.can_change_role(m):
-        if m.role == OrgRole.MEMBER:
+        if m.role == WorkspaceRole.MEMBER:
             modal, confirmed = button_with_confirmation_modal(
                 f"{icons.admin} Make Admin",
                 key=f"promote-member-{m.pk}",
@@ -312,10 +331,10 @@ def render_membership_actions(m: OrgMembership, current_member: OrgMembership):
                 modal_key=f"promote-member-{m.pk}-modal",
             )
             if confirmed:
-                m.role = OrgRole.ADMIN
+                m.role = WorkspaceRole.ADMIN
                 m.save()
                 modal.close()
-        elif m.role == OrgRole.ADMIN:
+        elif m.role == WorkspaceRole.ADMIN:
             modal, confirmed = button_with_confirmation_modal(
                 f"{icons.remove_user} Revoke Admin",
                 key=f"demote-member-{m.pk}",
@@ -325,7 +344,7 @@ def render_membership_actions(m: OrgMembership, current_member: OrgMembership):
                 modal_key=f"demote-member-{m.pk}-modal",
             )
             if confirmed:
-                m.role = OrgRole.MEMBER
+                m.role = WorkspaceRole.MEMBER
                 m.save()
                 modal.close()
 
@@ -334,7 +353,7 @@ def render_membership_actions(m: OrgMembership, current_member: OrgMembership):
             f"{icons.remove_user} Remove",
             key=f"remove-member-{m.pk}",
             unsafe_allow_html=True,
-            confirmation_text=f"Are you sure you want to remove **{format_user_name(m.user)}** from **{m.org.name}**?",
+            confirmation_text=f"Are you sure you want to remove **{format_user_name(m.user)}** from **{m.workspace.name}**?",
             modal_title="Remove Member",
             modal_key=f"remove-member-{m.pk}-modal",
             className="bg-danger border-danger text-light",
@@ -382,8 +401,12 @@ def button_with_confirmation_modal(
     return modal, False
 
 
-def render_pending_invitations_list(org: Org, *, current_member: OrgMembership):
-    pending_invitations = org.invitations.filter(status=OrgInvitation.Status.PENDING)
+def render_pending_invitations_list(
+    workspace: Workspace, *, current_member: WorkspaceMembership
+):
+    pending_invitations = workspace.invitations.filter(
+        status=WorkspaceInvitation.Status.PENDING
+    )
     if not pending_invitations:
         return
 
@@ -419,7 +442,9 @@ def render_pending_invitations_list(org: Org, *, current_member: OrgMembership):
                         render_invitation_actions(invite, current_member=current_member)
 
 
-def render_invitation_actions(invitation: OrgInvitation, current_member: OrgMembership):
+def render_invitation_actions(
+    invitation: WorkspaceInvitation, current_member: WorkspaceMembership
+):
     if current_member.can_invite() and invitation.can_resend_email():
         modal, confirmed = button_with_confirmation_modal(
             f"{icons.email} Resend",
@@ -453,20 +478,23 @@ def render_invitation_actions(invitation: OrgInvitation, current_member: OrgMemb
             modal.close()
 
 
-def render_invite_creation_view(org: Org, inviter: AppUser, modal: gui.Modal):
+def render_invite_creation_view(
+    workspace: Workspace, inviter: AppUser, modal: gui.Modal
+):
     email = gui.text_input("Email")
-    if org.domain_name:
+    if workspace.domain_name:
         gui.caption(
-            f"Users with `@{org.domain_name}` email will be added automatically."
+            f"Users with `@{workspace.domain_name}` email will be added automatically."
         )
 
     if gui.button(f"{icons.add_user} Invite", type="primary", unsafe_allow_html=True):
         try:
-            org.invite_user(
+            workspace.invite_user(
                 invitee_email=email,
                 inviter=inviter,
-                role=OrgRole.MEMBER,
-                auto_accept=org.domain_name.lower() == email.split("@")[1].lower(),
+                role=WorkspaceRole.MEMBER,
+                auto_accept=workspace.domain_name.lower()
+                == email.split("@")[1].lower(),
             )
         except ValidationError as e:
             gui.write(", ".join(e.messages), className="text-danger")
@@ -474,24 +502,28 @@ def render_invite_creation_view(org: Org, inviter: AppUser, modal: gui.Modal):
             modal.close()
 
 
-def render_org_create_or_edit_form(org: Org | None = None) -> AttrDict | Org:
-    org_proxy = org or AttrDict()
+def render_workspace_create_or_edit_form(
+    workspace: Workspace | None = None,
+) -> AttrDict | Workspace:
+    workspace_proxy = workspace or AttrDict()
 
-    org_proxy.name = gui.text_input("Team Name", value=org and org.name or "")
-    org_proxy.logo = gui.file_uploader(
-        "Logo", accept=["image/*"], value=org and org.logo or ""
+    workspace_proxy.name = gui.text_input(
+        "Team Name", value=workspace and workspace.name or ""
     )
-    org_proxy.domain_name = gui.text_input(
+    workspace_proxy.logo = gui.file_uploader(
+        "Logo", accept=["image/*"], value=workspace and workspace.logo or ""
+    )
+    workspace_proxy.domain_name = gui.text_input(
         "Domain Name (Optional)",
         placeholder="e.g. gooey.ai",
-        value=org and org.domain_name or "",
+        value=workspace and workspace.domain_name or "",
     )
-    if org_proxy.domain_name:
+    if workspace_proxy.domain_name:
         gui.caption(
-            f"Invite any user with `@{org_proxy.domain_name}` email to this organization."
+            f"Invite any user with `@{workspace_proxy.domain_name}` email to this workspaceanization."
         )
 
-    return org_proxy
+    return workspace_proxy
 
 
 def format_user_name(user: AppUser, current_user: AppUser | None = None):

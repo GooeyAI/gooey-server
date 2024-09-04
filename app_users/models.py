@@ -16,7 +16,7 @@ from handles.models import Handle
 from payments.plans import PricingPlan
 
 if typing.TYPE_CHECKING:
-    from orgs.models import Org
+    from workspaces.models import Workspace
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -249,16 +249,13 @@ class AppUser(models.Model):
 
         return self
 
-    def get_or_create_personal_org(self) -> tuple["Org", bool]:
-        from orgs.models import Org, OrgMembership
+    def get_or_create_personal_workspace(self) -> tuple["Workspace", bool]:
+        from workspaces.models import Workspace
 
-        org_membership: OrgMembership | None = self.org_memberships.filter(
-            org__is_personal=True, org__created_by=self
-        ).first()
-        if org_membership:
-            return org_membership.org, False
-        else:
-            return Org.objects.migrate_from_appuser(self), True
+        try:
+            return Workspace.objects.get(is_personal=True, created_by=self), False
+        except Workspace.DoesNotExist:
+            return Workspace.objects.migrate_from_appuser(self), True
 
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = self.search_stripe_customer()
@@ -322,8 +319,8 @@ class AppUserTransaction(models.Model):
         related_name="transactions",
         null=True,
     )
-    org = models.ForeignKey(
-        "orgs.Org",
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
         on_delete=models.SET_NULL,
         related_name="transactions",
         null=True,

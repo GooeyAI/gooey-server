@@ -212,8 +212,8 @@ class SavedRun(models.Model):
     )
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
-    billed_org = models.ForeignKey(
-        "orgs.Org",
+    billed_workspace = models.ForeignKey(
+        "workspaces.Workspace",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

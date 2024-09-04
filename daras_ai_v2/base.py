@@ -83,6 +83,10 @@ from payments.auto_recharge import (
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
+
 DEFAULT_META_IMG = (
     # Small
     "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec2100aa-1f6e-11ef-ba0b-02420a000159/Main.jpg"
@@ -571,7 +575,7 @@ class BasePage:
                 gui.radio(
                     "",
                     options=[
-                        '<span class="text-muted">Anyone at my org (coming soon)</span>'
+                        '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
                     ],
                     disabled=True,
                     checked_by_default=False,
@@ -1204,6 +1208,12 @@ This will also delete all the associated versions.
             visibility=visibility,
         )
 
+    def get_current_workspace(self) -> "Workspace":
+        assert self.request.user
+
+        workspace, _ = self.request.user.get_or_create_personal_workspace()
+        return workspace
+
     def duplicate_published_run(
         self,
         published_run: PublishedRun,
@@ -1599,7 +1609,9 @@ This will also delete all the associated versions.
 
     def on_submit(self):
         try:
-            sr = self.create_new_run(enable_rate_limits=True)
+            sr = self.create_new_run(
+                enable_rate_limits=True, billed_workspace=self.get_current_workspace()
+            )
         except ValidationError as e:
             gui.session_state[StateKeys.run_status] = None
             gui.session_state[StateKeys.error_msg] = str(e)
@@ -1612,7 +1624,7 @@ This will also delete all the associated versions.
         return sr
 
     def should_submit_after_login(self) -> bool:
-        return (
+        return bool(
             gui.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
             and self.request
             and self.request.user
@@ -2084,18 +2096,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
 
-        user = self.request.user
         price = self.get_price_roundoff(state)
+        workspace, _ = self.request.user.get_or_create_personal_workspace()
 
-        if user.balance >= price:
+        if workspace.balance >= price:
             return
 
-        if should_attempt_auto_recharge(user):
+        if should_attempt_auto_recharge(workspace):
             yield "Low balance detected. Recharging..."
-            run_auto_recharge_gracefully(user)
-            user.refresh_from_db()
+            run_auto_recharge_gracefully(workspace)
+            workspace.refresh_from_db()
 
-        if user.balance >= price:
+        if workspace.balance >= price:
             return
 
         raise InsufficientCredits(self.request.user, sr)
@@ -2106,8 +2118,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ), "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
-        org, _ = self.request.user.get_or_create_personal_org()
-        txn = org.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        workspace, _ = self.request.user.get_or_create_personal_workspace()
+        txn = workspace.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
         return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
@@ -2204,7 +2216,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     @classmethod
     def is_user_admin(cls, user: AppUser) -> bool:
         email = user.email
-        return email and email in settings.ADMIN_EMAILS
+        return bool(email and email in settings.ADMIN_EMAILS)
 
     def is_current_user_admin(self) -> bool:
         if not self.request or not self.request.user:
