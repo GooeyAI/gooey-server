@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Any
 
 import stripe
+from furl import furl
 
 from daras_ai_v2 import paypal, settings
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
@@ -192,7 +193,7 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
-        contact_us_link=f"mailto:{settings.SALES_EMAIL}",
+        contact_us_link=str(furl("mailto:") / settings.SALES_EMAIL),
         title_override="Let's talk",
         caption_override="",
     )
@@ -211,7 +212,7 @@ class PricingPlan(PricingPlanData, Enum):
 
     @classmethod
     def db_choices(cls):
-        return [(plan.db_value, plan.name) for plan in cls]
+        return [(plan.db_value, plan.title) for plan in cls]
 
     @classmethod
     def from_sub(cls, sub: "Subscription") -> PricingPlan:
@@ -240,7 +241,7 @@ class PricingPlan(PricingPlanData, Enum):
                 return plan
 
     @classmethod
-    def get_by_key(cls, key: str):
+    def get_by_key(cls, key: str) -> PricingPlan | None:
         for plan in cls:
             if plan.key == key:
                 return plan

@@ -1,14 +1,16 @@
-import json
 import typing
 
+import gooey_gui as gui
 import requests
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.prompt_vars import variables_input
+from functions.models import CalledFunction
 
 
 class ConsoleLogs(BaseModel):
@@ -20,12 +22,19 @@ class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    show_settings = False
+    price = 1
 
     class RequestModel(BaseModel):
         code: str = Field(
             None,
             title="Code",
             description="The JS code to be executed.",
+        )
+        variables: dict[str, typing.Any] = Field(
+            {},
+            title="Variables",
+            description="Variables to be used in the code",
         )
 
     class ResponseModel(BaseModel):
@@ -50,42 +59,64 @@ class FunctionsPage(BasePage):
         request: "FunctionsPage.RequestModel",
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
+        query_params = gui.get_query_params()
+        run_id = query_params.get("run_id")
+        uid = query_params.get("uid")
+        tag = f"run_id={run_id}&uid={uid}"
+
         yield "Running your code..."
+        # this will run functions/executor.js in deno deploy
         r = requests.post(
             settings.DENO_FUNCTIONS_URL,
             headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
-            json=request.code,
+            json=dict(code=request.code, variables=request.variables or {}, tag=tag),
         )
+        raise_for_status(r)
         data = r.json()
         response.logs = data.get("logs")
-        if r.ok:
-            response.return_value = data.get("retval")
-        else:
-            response.error = data.get("error")
+        response.return_value = data.get("retval")
+        response.error = data.get("error")
 
     def render_form_v2(self):
-        st.text_area(
-            "##### " + field_title_desc(self.RequestModel, "code"),
+        gui.code_editor(
+            label="##### " + field_title_desc(self.RequestModel, "code"),
             key="code",
-            height=500,
+            language="javascript",
+            height=300,
+        )
+
+    def get_price_roundoff(self, state: dict) -> float:
+        if CalledFunction.objects.filter(function_run=self.get_current_sr()).exists():
+            return 0
+        return super().get_price_roundoff(state)
+
+    def additional_notes(self):
+        return "\nFunctions are free if called from another workflow."
+
+    def render_variables(self):
+        variables_input(
+            template_keys=["code"],
+            allow_add=True,
+            description="Pass custom parameters to your function and access the parent workflow data. "
+            "Variables will be passed down as the first argument to your anonymous JS function.",
         )
 
     def render_output(self):
-        if error := st.session_state.get("error"):
-            with st.tag("pre", className="bg-danger bg-opacity-25"):
-                st.html(error)
+        if error := gui.session_state.get("error"):
+            with gui.tag("pre", className="bg-danger bg-opacity-25"):
+                gui.html(error)
 
-        if return_value := st.session_state.get("return_value"):
-            st.write("**Return value**")
-            st.json(return_value)
+        if return_value := gui.session_state.get("return_value"):
+            gui.write("**Return value**")
+            gui.json(return_value)
 
-        logs = st.session_state.get("logs")
+        logs = gui.session_state.get("logs")
         if not logs:
             return
 
-        st.write("---")
-        st.write("**Logs**")
-        with st.tag(
+        gui.write("---")
+        gui.write("**Logs**")
+        with gui.tag(
             "pre", style=dict(maxHeight=500, overflowY="auto"), className="bg-light p-2"
         ):
             for i, log in enumerate(logs):
@@ -97,7 +128,7 @@ class FunctionsPage(BasePage):
                     borderClass = "border-top"
                 else:
                     borderClass = ""
-                st.html(
+                gui.html(
                     log.get("message"),
                     className=f"d-block py-1 {borderClass} {textClass}",
                 )

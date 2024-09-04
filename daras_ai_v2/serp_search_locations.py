@@ -2,19 +2,19 @@ from django.db.models import TextChoices
 from pydantic import BaseModel
 from pydantic import Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai_v2.field_render import field_title_desc
 
 
 def serp_search_settings():
-    st.write("##### Web Search Tools\n(via [serper.dev](https://serper.dev/))")
+    gui.write("##### Web Search Tools\n(via [serper.dev](https://serper.dev/))")
 
-    col1, col2 = st.columns(2)
+    col1, col2 = gui.columns(2)
     with col1:
         serp_search_type_selectbox()
     with col2:
         serp_search_location_selectbox()
-    st.number_input(
+    gui.number_input(
         label="""
         ###### Max Search URLs
         The maximum number of search URLs to consider as References
@@ -26,7 +26,7 @@ def serp_search_settings():
 
 
 def serp_search_type_selectbox(key="serp_search_type"):
-    st.selectbox(
+    gui.selectbox(
         f"###### {field_title_desc(GoogleSearchMixin, key)}",
         options=SerpSearchType,
         format_func=lambda x: x.label,
@@ -35,7 +35,7 @@ def serp_search_type_selectbox(key="serp_search_type"):
 
 
 def serp_search_location_selectbox(key="serp_search_location"):
-    st.selectbox(
+    gui.selectbox(
         f"###### {field_title_desc(GoogleSearchMixin, key)}",
         options=SerpSearchLocation,
         format_func=lambda x: f"{x.label} ({x.value})",
@@ -244,7 +244,7 @@ class SerpSearchLocation(TextChoices):
     SAINT_VINCENT_AND_THE_GRENADINES = "vc", "Saint Vincent and the Grenadines"
     SAMOA = "ws", "Samoa"
     SAN_MARINO = "sm", "San Marino"
-    SAO_TOME_AND_PRINCIPE = "st", "Sao Tome and Principe"
+    SAO_TOME_AND_PRINCIPE = "gui", "Sao Tome and Principe"
     SAUDI_ARABIA = "sa", "Saudi Arabia"
     SENEGAL = "sn", "Senegal"
     SERBIA_AND_MONTENEGRO = "rs", "Serbia and Montenegro"

@@ -4,7 +4,8 @@ from django.db.models import Sum
 
 from app_users import models
 from bots.admin_links import open_in_new_tab, list_related_html_url
-from bots.models import SavedRun
+from bots.models import SavedRun, PublishedRun
+from embeddings.models import EmbeddedFile
 from usage_costs.models import UsageCost
 
 
@@ -31,7 +32,12 @@ class AppUserAdmin(admin.ModelAdmin):
                     "is_paying",
                     "disable_safety_checker",
                     "disable_rate_limits",
-                    ("user_runs", "view_transactions"),
+                    (
+                        "view_saved_runs",
+                        "view_published_runs",
+                        "view_embedded_files",
+                        "view_transactions",
+                    ),
                     "created_at",
                     "upgraded_from_anonymous_at",
                     ("open_in_firebase", "open_in_stripe"),
@@ -86,7 +92,9 @@ class AppUserAdmin(admin.ModelAdmin):
         "total_usage_cost",
         "created_at",
         "upgraded_from_anonymous_at",
-        "user_runs",
+        "view_saved_runs",
+        "view_published_runs",
+        "view_embedded_files",
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
@@ -95,11 +103,29 @@ class AppUserAdmin(admin.ModelAdmin):
     autocomplete_fields = ["handle", "subscription"]
 
     @admin.display(description="User Runs")
-    def user_runs(self, user: models.AppUser):
+    def view_saved_runs(self, user: models.AppUser):
         return list_related_html_url(
             SavedRun.objects.filter(uid=user.uid),
             query_param="uid",
             instance_id=user.uid,
+            show_add=False,
+        )
+
+    @admin.display(description="Published Runs")
+    def view_published_runs(self, user: models.AppUser):
+        return list_related_html_url(
+            PublishedRun.objects.filter(created_by=user),
+            query_param="created_by",
+            instance_id=user.id,
+            show_add=False,
+        )
+
+    @admin.display(description="Embedded Files")
+    def view_embedded_files(self, user: models.AppUser):
+        return list_related_html_url(
+            EmbeddedFile.objects.filter(created_by=user),
+            query_param="created_by",
+            instance_id=user.id,
             show_add=False,
         )
 
@@ -192,25 +218,38 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "invoice_id",
         "user",
         "amount",
+        "dollar_amount",
         "end_balance",
         "payment_provider",
-        "dollar_amount",
+        "reason",
+        "plan",
         "created_at",
     ]
-    readonly_fields = ["created_at"]
+    readonly_fields = ["view_payment_provider_url", "created_at"]
     list_filter = [
-        "created_at",
+        "reason",
         ("payment_provider", admin.EmptyFieldListFilter),
         "payment_provider",
+        "plan",
+        "created_at",
     ]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
+    search_fields = ["invoice_id"]
 
     @admin.display(description="Charged Amount")
     def dollar_amount(self, obj: models.AppUserTransaction):
         if not obj.payment_provider:
             return
         return f"${obj.charged_amount / 100}"
+
+    @admin.display(description="Payment Provider URL")
+    def view_payment_provider_url(self, txn: models.AppUserTransaction):
+        url = txn.payment_provider_url()
+        if url:
+            return open_in_new_tab(url, label=url)
+        else:
+            raise txn.DoesNotExist
 
 
 @admin.register(LogEntry)

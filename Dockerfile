@@ -45,16 +45,17 @@ COPY ./pyproject.toml ./poetry.lock ./
 # install python dependencies
 RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only main --no-interaction
 
-# install nltk stopwords
-RUN poetry run python -c 'import nltk; nltk.download("stopwords")'
 # install playwright
-RUN poetry run playwright install-deps && poetry run playwright install
+RUN poetry run playwright install-deps && poetry run playwright install chromium
 
 # copy the code into the container
 COPY . .
 
 ENV FORWARDED_ALLOW_IPS='*'
 ENV PYTHONUNBUFFERED=1
+
+ARG CAPROVER_GIT_COMMIT_SHA=${CAPROVER_GIT_COMMIT_SHA}
+ENV CAPROVER_GIT_COMMIT_SHA=${CAPROVER_GIT_COMMIT_SHA}
 
 EXPOSE 8000
 EXPOSE 8501

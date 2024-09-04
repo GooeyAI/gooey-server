@@ -3,7 +3,7 @@ import typing
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -23,7 +23,7 @@ class LipsyncPage(BasePage):
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
-    class RequestModel(LipsyncSettings, BaseModel):
+    class RequestModel(LipsyncSettings, BasePage.RequestModel):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )
@@ -38,7 +38,7 @@ class LipsyncPage(BasePage):
         return DEFAULT_LIPSYNC_META_IMG
 
     def render_form_v2(self):
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Input Face
             Upload a video/image that contains faces to use  
@@ -47,7 +47,7 @@ class LipsyncPage(BasePage):
             key="input_face",
         )
 
-        st.file_uploader(
+        gui.file_uploader(
             """
             #### Input Audio
             Upload the video/audio file to use as audio source for lipsyncing  
@@ -64,12 +64,11 @@ class LipsyncPage(BasePage):
         )
 
     def validate_form_v2(self):
-        input_audio = st.session_state.get("input_audio")
-        assert input_audio, "Please provide an Audio file"
-        assert st.session_state.get("input_face"), "Please provide an Input Face"
+        assert gui.session_state.get("input_audio"), "Please provide an Audio file"
+        assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
     def render_settings(self):
-        lipsync_settings(st.session_state.get("selected_model"))
+        lipsync_settings(gui.session_state.get("selected_model"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
@@ -107,10 +106,10 @@ class LipsyncPage(BasePage):
     def render_example(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
-            st.write("#### Output Video")
-            st.video(output_video, autoplay=True, show_download_button=True)
+            gui.write("#### Output Video")
+            gui.video(output_video, autoplay=True, show_download_button=True)
         else:
-            st.div()
+            gui.div()
         if state.get("truncated"):
             st.error(
                 "Audio durations greater than 10 seconds will be truncated for free users. Please upgrade to process longer audio files.",
@@ -119,7 +118,7 @@ class LipsyncPage(BasePage):
             )
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self.render_example(gui.session_state)
 
     def related_workflows(self) -> list:
         from recipes.DeforumSD import DeforumSDPage
@@ -138,7 +137,7 @@ class LipsyncPage(BasePage):
     def get_cost_note(self) -> str | None:
         multiplier = (
             2
-            if st.session_state.get("selected_model") == LipsyncModel.SadTalker.name
+            if gui.session_state.get("selected_model") == LipsyncModel.SadTalker.name
             else 1
         )
         return f"{CREDITS_PER_MINUTE * multiplier}/minute"

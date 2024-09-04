@@ -5,21 +5,23 @@ import hashlib
 import io
 import mimetypes
 import multiprocessing
-import random
 import re
 import tempfile
 import typing
 from functools import partial
 from time import time
 
+import gooey_gui as gui
 import numpy as np
 import requests
 from django.db import transaction
+from django.db.models import F
+from django.utils import timezone
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
 
-import gooey_ui as gui
+from app_users.models import AppUser
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -42,7 +44,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import create_embeddings_cached, EmbeddingModels
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
-from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     flatmap_parallel,
     map_parallel,
@@ -55,6 +56,11 @@ from daras_ai_v2.gdrive_downloader import (
     gdrive_metadata,
 )
 from daras_ai_v2.redis_cache import redis_lock
+from daras_ai_v2.scraping_proxy import (
+    get_scraping_proxy_cert_path,
+    requests_scraping_kwargs,
+    SCRAPING_PROXIES,
+)
 from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
@@ -112,8 +118,7 @@ Snippet: """
 
 
 def get_top_k_references(
-    request: DocSearchRequest,
-    is_user_url: bool = True,
+    request: DocSearchRequest, is_user_url: bool = True, current_user: AppUser = None
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
@@ -121,6 +126,7 @@ def get_top_k_references(
     Args:
         request: the document search request
         is_user_url: whether the url is user-uploaded
+        current_user: the current user
 
     Returns:
         the top k documents
@@ -148,8 +154,8 @@ def get_top_k_references(
             EmbeddedFile._meta.get_field("embedding_model").default
         ),
     )
-    embedding_refs: list[EmbeddedFile] = map_parallel(
-        lambda f_url, file_meta: get_or_create_embeddings(
+    embedded_files: list[EmbeddedFile] = map_parallel(
+        lambda f_url, file_meta: get_or_create_embedded_file(
             f_url=f_url,
             file_meta=file_meta,
             max_context_words=request.max_context_words,
@@ -158,20 +164,26 @@ def get_top_k_references(
             selected_asr_model=selected_asr_model,
             embedding_model=embedding_model,
             is_user_url=is_user_url,
+            current_user=current_user,
         ),
         file_urls,
         file_metas,
         max_workers=4,
     )
-    if not embedding_refs:
+    if not embedded_files:
         yield "No embeddings found - skipping search"
         return []
 
-    vespa_file_ids = [ref.vespa_file_id for ref in embedding_refs]
+    yield "Searching knowledge base..."
+
+    vespa_file_ids = [ref.vespa_file_id for ref in embedded_files]
+    EmbeddedFile.objects.filter(id__in=[ref.id for ref in embedded_files]).update(
+        query_count=F("query_count") + 1,
+        last_query_at=timezone.now(),
+    )
     # chunk_count = sum(len(ref.document_ids) for ref in embedding_refs)
     # logger.debug(f"Knowledge base has {len(file_ids)} documents ({chunk_count} chunks)")
 
-    yield "Searching knowledge base..."
     s = time()
     search_result = query_vespa(
         request.search_query,
@@ -303,11 +315,14 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         total_bytes = int(meta.get("size") or 0)
     else:
         try:
-            r = requests.head(
-                f_url,
-                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-            )
+            if is_user_uploaded_url(f_url):
+                r = requests.head(f_url)
+            else:
+                r = requests.head(
+                    f_url,
+                    timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+                    **requests_scraping_kwargs(),
+                )
             raise_for_status(r)
         except requests.RequestException as e:
             logger.warning(f"ignore error while downloading {f_url}: {e}")
@@ -328,7 +343,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             total_bytes = int(r.headers.get("content-length") or 0)
     # extract filename from url as a fallback
     if not name:
-        if is_user_uploaded_url(str(f)):
+        if is_user_uploaded_url(f_url):
             name = f.path.segments[-1]
         else:
             name = f"{f.host}{f.path}"
@@ -350,7 +365,12 @@ def yt_dlp_extract_info(url: str) -> dict:
     import yt_dlp
 
     # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
-    params = dict(ignoreerrors=True, check_formats=False)
+    params = dict(
+        ignoreerrors=True,
+        check_formats=False,
+        proxy=SCRAPING_PROXIES.get("https"),
+        client_certificate=get_scraping_proxy_cert_path(),
+    )
     with yt_dlp.YoutubeDL(params) as ydl:
         data = ydl.extract_info(url, download=False)
         if not data:
@@ -361,16 +381,17 @@ def yt_dlp_extract_info(url: str) -> dict:
         return data
 
 
-def get_or_create_embeddings(
+def get_or_create_embedded_file(
+    *,
     f_url: str,
     file_meta: FileMetadata,
-    *,
     max_context_words: int,
     scroll_jump: int,
     google_translate_target: str | None,
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     is_user_url: bool,
+    current_user: AppUser,
 ) -> EmbeddedFile:
     """
     Return Vespa document ids and document tags
@@ -408,7 +429,11 @@ def get_or_create_embeddings(
                 file_meta.save()
                 embedded_file = EmbeddedFile.objects.get_or_create(
                     **lookup,
-                    defaults=dict(metadata=file_meta, vespa_file_id=file_id),
+                    defaults=dict(
+                        metadata=file_meta,
+                        vespa_file_id=file_id,
+                        created_by=current_user,
+                    ),
                 )[0]
                 for ref in refs:
                     ref.embedded_file = embedded_file
@@ -652,10 +677,10 @@ def download_content_bytes(
         return gdrive_download(f, mime_type)
     try:
         # download from url
-        r = requests.get(
-            f_url,
-            headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-        )
+        if is_user_uploaded_url(f_url):
+            r = requests.get(f_url)
+        else:
+            r = requests.get(f_url, **requests_scraping_kwargs())
         raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
         logger.warning(f"ignore error while downloading {f_url}: {e}")
@@ -716,7 +741,8 @@ def any_bytes_to_text_pages_or_df(
 
 
 def is_yt_url(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
+    origin = furl(url).origin
+    return "youtube.com" in origin or "youtu.be" in origin
 
 
 def pdf_or_tabular_bytes_to_text_pages_or_df(
@@ -867,6 +893,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             "+RTS", f"-M{MAX_PANDOC_MEM_MB}M", "-RTS", "--sandbox",
             "--standalone",
             infile.name,
+            "--wrap", "none",
             "--to", to,
             "--output",
             outfile.name,

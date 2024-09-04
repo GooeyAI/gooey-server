@@ -1,10 +1,10 @@
 from textwrap import dedent
 
-import gooey_ui as st
+import gooey_gui as gui
 
 
 def html_error(body, icon="⚠️"):
-    st.write(
+    gui.write(
         f"""
 <div style="background-color: rgba(255, 108, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
 <span style="font-size: 1.25rem">{icon}</span>

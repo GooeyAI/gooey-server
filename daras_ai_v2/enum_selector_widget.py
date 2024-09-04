@@ -2,9 +2,9 @@ import enum
 import typing
 from typing import TypeVar, Type
 
-import gooey_ui as st
+import gooey_gui as gui
 from daras_ai_v2.grid_layout_widget import grid_layout
-from gooey_ui import BLANK_OPTION
+from gooey_gui import BLANK_OPTION
 
 E = TypeVar("E", bound=Type[enum.Enum])
 
@@ -21,7 +21,7 @@ def enum_multiselect(
     except AttributeError:
         deprecated = set()
     enums = []
-    value = st.session_state.get(key, [])
+    value = gui.session_state.get(key) or []
     for e in enum_cls:
         if e in deprecated and e.name not in value:
             continue
@@ -30,26 +30,26 @@ def enum_multiselect(
 
     if checkboxes:
         if label:
-            st.caption(label)
-        selected = set(st.session_state.get(key, []))
+            gui.caption(label)
+        selected = set(gui.session_state.get(key, []))
         ret_val = []
 
         def render(name):
             inner_key = f"{key} => {name}"
-            if inner_key not in st.session_state:
-                st.session_state[inner_key] = name in selected
+            if inner_key not in gui.session_state:
+                gui.session_state[inner_key] = name in selected
 
-            st.checkbox(_format_func(enum_cls)(name), key=inner_key)
+            gui.checkbox(_format_func(enum_cls)(name), key=inner_key)
 
-            if st.session_state.get(inner_key):
+            if gui.session_state.get(inner_key):
                 ret_val.append(name)
 
         grid_layout(2, enum_names, render, separator=False)
 
-        st.session_state[key] = ret_val
+        gui.session_state[key] = ret_val
         return ret_val
     else:
-        return st.multiselect(
+        return gui.multiselect(
             options=enum_names,
             format_func=_format_func(enum_cls),
             label=label,
@@ -77,9 +77,9 @@ def enum_selector(
     if allow_none:
         options.insert(0, None)
     if use_selectbox:
-        widget = st.selectbox
+        widget = gui.selectbox
     else:
-        widget = st.radio
+        widget = gui.radio
     kwargs.setdefault("format_func", _format_func(enum_cls))
     return widget(
         **kwargs,

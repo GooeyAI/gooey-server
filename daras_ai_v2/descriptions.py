@@ -1,10 +1,10 @@
-import gooey_ui as st
+import gooey_gui as gui
 from furl import furl
 from daras_ai_v2 import settings
 
 
 def prompting101():
-    st.markdown(
+    gui.markdown(
         """
         #### Prompting 101: 
 
@@ -12,7 +12,7 @@ def prompting101():
         `I want an image of an astronaut in a space suit walking on the streets of Mumbai.`
         """
     )
-    st.markdown(
+    gui.markdown(
         """
         ###### Step 2: Think about your descriptors and break it down as follows: 
 
@@ -26,14 +26,14 @@ def prompting101():
         eg. facial features or expressions, the space and landscape, lighting or the colours etc. 
         """
     )
-    st.markdown(
+    gui.markdown(
         f"""
         ###### Step 3: Construct your prompt:
         `An analogue film still of an astronaut in a space suit walking on the busy streets of Mumbai, golden light on the astronaut, 4k`
         [example]({furl(settings.APP_BASE_URL).add(path='compare-ai-image-generators').add({"example_id": "s9nmzy34"}).url})
         """
     )
-    st.markdown(
+    gui.markdown(
         """
         You can keep editing your prompt until you have your desired output. Consider AI generators as a collaborative tool. 
         ##### What is the difference between Submit and Regenerate? 

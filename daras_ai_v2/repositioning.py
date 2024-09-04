@@ -1,6 +1,6 @@
+import gooey_gui as gui
 import numpy as np
 
-import gooey_ui
 from daras_ai.image_input import bytes_to_cv2_img, cv2_img_to_bytes
 
 
@@ -165,4 +165,4 @@ def repositioning_preview_img(img: np.ndarray):
 
         cv2.rectangle(img, (0, 0), (img_x, img_y), color, stroke)
 
-    gooey_ui.image(img, style=dict(maxWidth="300px", maxHeight="300px"))
+    gui.image(img, style=dict(maxWidth="300px", maxHeight="300px"))

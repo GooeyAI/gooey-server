@@ -5,7 +5,7 @@ from threading import Thread
 from typing import Any
 
 import hashids
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse, Response
@@ -19,11 +19,12 @@ from daras_ai_v2.redis_cache import get_redis_cache
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import (
     AsyncApiResponseModelV3,
-    build_api_response,
     AsyncStatusResponseModelV3,
+    build_async_api_response,
 )
+from routers.custom_api_router import CustomAPIRouter
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT)
 MSG_ID_PREFIX = "web-"
@@ -78,18 +79,12 @@ class CreateStreamResponse(BaseModel):
 
 
 @app.post(
-    "/v3/integrations/stream/",
+    "/v3/integrations/stream",
     response_model=CreateStreamResponse,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
     tags=["Copilot Integrations"],
     name="Copilot Integrations Create Stream",
-)
-@app.post(
-    "/v3/integrations/stream/",
-    response_model=CreateStreamResponse,
-    responses={402: {}},
-    include_in_schema=False,
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
@@ -172,18 +167,12 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
 
 
 @app.get(
-    "/v3/integrations/stream/{request_id}/",
+    "/v3/integrations/stream/{request_id}",
     response_model=StreamEvent,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream",
     tags=["Copilot Integrations"],
     name="Copilot integrations Stream Response",
-)
-@app.get(
-    "/v3/integrations/stream/{request_id}",
-    response_model=StreamEvent,
-    responses={402: {}},
-    include_in_schema=False,
 )
 def stream_response(request_id: str):
     r = get_redis_cache().getdel(f"gooey/stream-init/v1/{request_id}")
@@ -290,13 +279,12 @@ class ApiInterface(BotInterface):
                 created_at=self.convo.created_at.isoformat(),
             )
         )
-
-        if request.input_prompt:
+        if request.input_images:
+            self.input_type = "image"
+        elif request.input_prompt:
             self.input_type = "text"
         elif request.input_audio:
             self.input_type = "audio"
-        elif request.input_images:
-            self.input_type = "image"
         elif request.input_documents:
             self.input_type = "document"
         elif button := request.button_pressed:
@@ -307,7 +295,7 @@ class ApiInterface(BotInterface):
                 status_code=400, detail="No input provided. Please provide input."
             )
 
-        self._unpack_bot_integration()
+        super().__init__()
 
     def runner(self):
         try:
@@ -338,11 +326,7 @@ class ApiInterface(BotInterface):
         self.run_id = run_id
         self.uid = uid
         self.queue.put(
-            RunStart(
-                **build_api_response(
-                    page=page, result=result, run_async=True, run_id=run_id, uid=uid
-                ),
-            )
+            RunStart(**build_async_api_response(page=page, run_id=run_id, uid=uid))
         )
 
     def send_run_status(self, update_msg_id: str | None) -> str | None:

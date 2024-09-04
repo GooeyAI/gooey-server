@@ -1,5 +1,5 @@
 from html_sanitizer import Sanitizer
-import gooey_ui as gui
+import gooey_gui as gui
 
 
 def scrollable_html(

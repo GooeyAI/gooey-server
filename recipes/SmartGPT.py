@@ -3,9 +3,8 @@ import typing
 import jinja2.sandbox
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
-from recipes.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -14,8 +13,13 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_ASSISTANT,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.pt import PromptTree
+from recipes.GoogleGPT import render_output_with_refs
 
 DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3d71b434-9457-11ee-8edd-02420a0001c7/Smart%20GPT.jpg.png"
 
@@ -27,7 +31,7 @@ class SmartGPTPage(BasePage):
     slug_versions = ["SmartGPT"]
     price = 20
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str
 
         cot_prompt: str | None
@@ -37,11 +41,9 @@ class SmartGPTPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -52,7 +54,7 @@ class SmartGPTPage(BasePage):
         return DEFAULT_SMARTGPT_META_IMG
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             """,
@@ -62,25 +64,26 @@ class SmartGPTPage(BasePage):
         )
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 1: CoT Prompt
                 """,
             key="cot_prompt",
         )
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 2: Reflexion Prompt
                 """,
             key="reflexion_prompt",
         )
-        st.text_area(
+        gui.text_area(
             """
 ##### Step 3: DERA Prompt 
                 """,
             key="dera_prompt",
         )
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
     def related_workflows(self):
         from recipes.CompareLLM import CompareLLMPage
@@ -118,6 +121,7 @@ class SmartGPTPage(BasePage):
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
         state["prompt_tree"] = prompt_tree = [
             {
@@ -139,6 +143,7 @@ class SmartGPTPage(BasePage):
                 quality=request.quality,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
+                response_format_type=request.response_format_type,
             )[0],
             prompt_tree,
         )
@@ -171,26 +176,27 @@ class SmartGPTPage(BasePage):
             quality=request.quality,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
         state["output_text"] = dera_outputs
 
     def render_output(self):
-        render_output_with_refs(st.session_state)
+        render_output_with_refs(gui.session_state)
 
     def render_example(self, state: dict):
-        st.write("**Prompt**")
-        st.write("```properties\n" + state.get("input_prompt", "") + "\n```")
+        gui.write("**Prompt**")
+        gui.write("```properties\n" + state.get("input_prompt", "") + "\n```")
         render_output_with_refs(state, 200)
 
     def render_steps(self):
-        prompt_tree = st.session_state.get("prompt_tree", {})
+        prompt_tree = gui.session_state.get("prompt_tree", {})
         if prompt_tree:
-            st.write("**Prompt Tree**")
-            st.json(prompt_tree, expanded=True)
+            gui.write("**Prompt Tree**")
+            gui.json(prompt_tree, expanded=True)
 
-        output_text: list = st.session_state.get("output_text", [])
+        output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**Output Text**",
                 help=f"output {idx}",
                 disabled=True,

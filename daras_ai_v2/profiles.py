@@ -1,15 +1,14 @@
 import hashlib
 import typing
 from html import escape as escape_html
-from dataclasses import dataclass
 
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
-from django.db.models import Count
 from django.db import IntegrityError, transaction
+from django.db.models import Count
 from fastapi import Request
 from furl import furl
 
-import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import (
     PublishedRun,
@@ -28,7 +27,6 @@ from daras_ai_v2.meta_content import (
     TITLE_SUFFIX as META_TITLE_SUFFIX,
     raw_build_meta_tags,
 )
-from gooey_ui.components.pills import pill
 from handles.models import Handle
 
 
@@ -54,9 +52,9 @@ def get_meta_tags_for_profile(user: AppUser):
 
 
 def user_profile_page(request: Request, user: AppUser):
-    with st.div(className="mt-3"):
+    with gui.div(className="mt-3"):
         user_profile_header(request, user)
-    st.html("\n<hr>\n")
+    gui.html("\n<hr>\n")
     user_profile_main_content(user)
 
 
@@ -65,12 +63,12 @@ def user_profile_header(request, user: AppUser):
         with _banner_image_div(user.banner_url, className="my-3"):
             pass
 
-    with st.div(className="mt-3"):
-        col1, col2 = st.columns([2, 10])
+    with gui.div(className="mt-3"):
+        col1, col2 = gui.columns([2, 10])
 
     with (
         col1,
-        st.div(className="d-flex justify-content-center align-items-center h-100"),
+        gui.div(className="d-flex justify-content-center align-items-center h-100"),
     ):
         render_profile_image(
             get_profile_image(user),
@@ -82,39 +80,39 @@ def user_profile_header(request, user: AppUser):
 
     with (
         col2,
-        st.div(
+        gui.div(
             className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
         ),
     ):
-        with st.div(
+        with gui.div(
             className="d-inline d-lg-flex w-100 justify-content-between align-items-end"
         ):
-            with st.tag("h1", className="d-inline my-0 me-2"):
-                st.html(escape_html(get_profile_title(user)))
+            with gui.tag("h1", className="d-inline my-0 me-2"):
+                gui.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
                 from routers.account import AccountTabs
 
-                with st.link(
+                with gui.link(
                     to=AccountTabs.profile.url_path,
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
-                    st.html(f"{icons.edit} Edit Profile")
+                    gui.html(f"{icons.edit} Edit Profile")
 
-        with st.tag("p", className="lead text-secondary mb-0"):
-            st.html(escape_html(user.handle and user.handle.name or ""))
+        with gui.tag("p", className="lead text-secondary mb-0"):
+            gui.html(escape_html(user.handle and user.handle.name or ""))
 
         if user.bio:
-            with st.div(className="mt-2 text-secondary"):
-                st.html(escape_html(user.bio))
+            with gui.div(className="mt-2 text-secondary"):
+                gui.html(escape_html(user.bio))
 
-        with st.div(className="mt-3 d-flex flex-column d-lg-block"):
+        with gui.div(className="mt-3 d-flex flex-column d-lg-block"):
             if user.github_username:
-                with st.link(
+                with gui.link(
                     to=github_url_for_username(user.github_username),
                     className="text-decoration-none",
                 ):
-                    pill(
+                    gui.pill(
                         f"{icons.github} " + escape_html(user.github_username),
                         unsafe_allow_html=True,
                         text_bg=None,
@@ -123,23 +121,23 @@ def user_profile_header(request, user: AppUser):
 
             if user.website_url:
                 with (
-                    st.tag(
+                    gui.tag(
                         "span",
                         className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1",
                     ),
-                    st.link(to=user.website_url, className="text-decoration-none"),
+                    gui.link(to=user.website_url, className="text-decoration-none"),
                 ):
-                    st.html(
+                    gui.html(
                         f"{icons.link} "
                         + escape_html(urls.remove_scheme(user.website_url))
                     )
 
             if user.company:
-                with st.tag(
+                with gui.tag(
                     "span",
                     className="text-sm text-muted me-lg-4 mb-1 d-inline-block",
                 ):
-                    st.html(f"{icons.company} " + escape_html(user.company))
+                    gui.html(f"{icons.company} " + escape_html(user.company))
 
         top_contributions_text = make_natural_english_list(
             [
@@ -149,7 +147,7 @@ def user_profile_header(request, user: AppUser):
             last_sep=", ",
         )
 
-        st.html(
+        gui.html(
             f"""\
 <div class="d-flex mt-3">
     <div class="me-3 text-secondary">
@@ -177,13 +175,13 @@ def user_profile_main_content(user: AppUser):
         workflow = Workflow(pr.workflow)
         page_cls = workflow.page_cls
 
-        pill(workflow.short_title, className="mb-2 border border-dark")
+        gui.pill(workflow.short_title, className="mb-2 border border-dark")
         page_cls().render_published_run_preview(pr)
 
     if public_runs:
         grid_layout(3, public_runs, _render)
     else:
-        st.write("No public runs yet", className="text-muted")
+        gui.write("No public runs yet", className="text-muted")
 
 
 def get_run_count(user: AppUser) -> int:
@@ -230,7 +228,7 @@ def render_profile_image(url: str, **props):
         "objectFit": "cover",
     } | props.pop("style", {})
     className = "w-100 rounded-circle " + props.pop("className", "")
-    st.image(
+    gui.image(
         url,
         style=style,
         className=className,
@@ -243,17 +241,17 @@ def _set_new_profile_photo(user: AppUser, image_url: str):
     try:
         user.full_clean()
     except (ValidationError, IntegrityError) as e:
-        st.error(e)
+        gui.error(e)
     else:
         user.save(update_fields=["photo_url"])
 
 
 def _is_uploading_photo() -> bool:
-    return bool(st.session_state.get("_uploading_photo"))
+    return bool(gui.session_state.get("_uploading_photo"))
 
 
 def _set_is_uploading_photo(val: bool):
-    st.session_state["_uploading_photo"] = val
+    gui.session_state["_uploading_photo"] = val
 
 
 def edit_user_profile_page(user: AppUser):
@@ -261,7 +259,7 @@ def edit_user_profile_page(user: AppUser):
     _edit_user_profile_banner(user)
 
     colspec = [2, 10] if not _is_uploading_photo() else [6, 6]
-    photo_col, form_col = st.columns(colspec)
+    photo_col, form_col = gui.columns(colspec)
     with photo_col:
         _edit_user_profile_photo_section(user)
     with form_col:
@@ -269,21 +267,21 @@ def edit_user_profile_page(user: AppUser):
 
 
 def _edit_user_profile_header(user: AppUser):
-    with st.div(
+    with gui.div(
         className="d-block d-md-flex flex-row-reverse justify-content-between align-items-center"
     ):
-        with st.tag(
+        with gui.tag(
             "a", href="/logout/", className="btn btn-theme btn-secondary d-inline-block"
         ):
-            st.write("Sign out")
-        st.write("# Update your Profile")
+            gui.write("Sign out")
+        gui.write("# Update your Profile")
 
-    with st.div(className="mb-3"):
-        with st.tag("span"):
-            with st.tag("span", className="text-muted"):
-                st.html("Your profile and public saved runs appear on ")
-            with st.tag("span"):
-                st.html(
+    with gui.div(className="mb-3"):
+        with gui.tag("span"):
+            with gui.tag("span", className="text-muted"):
+                gui.html("Your profile and public saved runs appear on ")
+            with gui.tag("span"):
+                gui.html(
                     str(furl(settings.APP_BASE_URL) / "/")
                     + f"<strong>{escape_html(user.handle.name) if user.handle else 'your-username'}</strong> ",
                 )
@@ -295,11 +293,11 @@ def _edit_user_profile_header(user: AppUser):
                 type="tertiary",
                 className="m-0",
             )
-            with st.link(
+            with gui.link(
                 to=user.handle.get_app_url(),
                 className="btn btn-theme btn-tertiary m-0",
             ):
-                st.html(f"{icons.preview} Preview")
+                gui.html(f"{icons.preview} Preview")
 
 
 def _banner_image_div(url: str | None, **props):
@@ -320,22 +318,22 @@ def _banner_image_div(url: str | None, **props):
 
     className = "w-100 h-100 rounded-2 " + props.pop("className", "")
     style |= props.pop("style", {})
-    return st.div(style=style, className=className)
+    return gui.div(style=style, className=className)
 
 
 def _edit_user_profile_banner(user: AppUser):
     def _is_uploading_banner_photo() -> bool:
-        return bool(st.session_state.get("_uploading_banner_photo"))
+        return bool(gui.session_state.get("_uploading_banner_photo"))
 
     def _set_uploading_banner_photo(val: bool):
         if val:
-            st.session_state["_uploading_banner_photo"] = val
+            gui.session_state["_uploading_banner_photo"] = val
         else:
-            st.session_state.pop("_uploading_banner_photo", None)
-            st.session_state.pop("banner_photo_url", None)
+            gui.session_state.pop("_uploading_banner_photo", None)
+            gui.session_state.pop("banner_photo_url", None)
 
     def _get_uploading_banner_photo() -> str | None:
-        return st.session_state.get("banner_photo_url")
+        return gui.session_state.get("banner_photo_url")
 
     banner_photo = _get_uploading_banner_photo() or user.banner_url or None
     with _banner_image_div(
@@ -345,32 +343,32 @@ def _edit_user_profile_banner(user: AppUser):
         if _is_uploading_banner_photo():
             translucent_style = {"backgroundColor": "rgba(255, 255, 255, 0.2)"}
             with (
-                st.div(
+                gui.div(
                     className="d-flex justify-content-center align-items-center w-100 h-100",
                     style=translucent_style,
                 ),
-                st.div(),
+                gui.div(),
             ):
-                banner_url = st.file_uploader(
+                banner_url = gui.file_uploader(
                     "", accept=["image/*"], key="banner_photo_url"
                 )
 
-                with st.div(className="d-flex justify-content-center"):
-                    if banner_url and st.button(f"{icons.save} Save", type="primary"):
+                with gui.div(className="d-flex justify-content-center"):
+                    if banner_url and gui.button(f"{icons.save} Save", type="primary"):
                         user.banner_url = banner_url
                         user.save(update_fields=["banner_url"])
                         _set_uploading_banner_photo(False)
-                        st.experimental_rerun()
+                        gui.rerun()
 
-                    if st.button(
+                    if gui.button(
                         f"{icons.cancel} Cancel",
                         className="text-danger",
                     ):
                         _set_uploading_banner_photo(False)
-                        st.experimental_rerun()
+                        gui.rerun()
         else:
-            with st.div(className="position-absolute bottom-0 end-0"):
-                if user.banner_url and st.button(
+            with gui.div(className="position-absolute bottom-0 end-0"):
+                if user.banner_url and gui.button(
                     f"{icons.clear} Clear",
                     type="tertiary",
                     className="text-dark",
@@ -378,70 +376,70 @@ def _edit_user_profile_banner(user: AppUser):
                     user.banner_url = ""
                     user.save(update_fields=["banner_url"])
                     _set_uploading_banner_photo(False)
-                    st.experimental_rerun()
+                    gui.rerun()
 
                 upload_banner_text = (
                     f"{icons.camera} Edit Cover Photo"
                     if user.banner_url
                     else f"{icons.camera} Add Cover Photo"
                 )
-                if st.button(
+                if gui.button(
                     upload_banner_text, className="mb-3 me-3", type="secondary"
                 ):
                     _set_uploading_banner_photo(True)
-                    st.experimental_rerun()
+                    gui.rerun()
 
 
 def _edit_user_profile_photo_section(user: AppUser):
-    with st.div(className="w-100 h-100 d-flex align-items-center flex-column"):
+    with gui.div(className="w-100 h-100 d-flex align-items-center flex-column"):
         if _is_uploading_photo():
-            image_div = st.div(
+            image_div = gui.div(
                 className="d-flex justify-content-center align-items-center"
             )
-            image_url = st.file_uploader("", accept=["image/*"])
+            image_url = gui.file_uploader("", accept=["image/*"])
 
-            with st.div(className="d-flex justify-content-center"):
-                if st.button(
+            with gui.div(className="d-flex justify-content-center"):
+                if gui.button(
                     "Save", type="primary", disabled=not image_url, className="me-3"
                 ):
                     _set_new_profile_photo(user, image_url)
                     _set_is_uploading_photo(False)
-                    st.experimental_rerun()
+                    gui.rerun()
 
-                if st.button(
+                if gui.button(
                     f"{icons.cancel} Cancel",
                     className="text-danger",
                 ):
                     _set_is_uploading_photo(False)
-                    st.experimental_rerun()
+                    gui.rerun()
 
             with image_div:
                 render_profile_image(get_profile_image(user))
         else:
             render_profile_image(get_profile_image(user))
 
-            with st.div(className="mt-2"):
-                if st.button(
+            with gui.div(className="mt-2"):
+                if gui.button(
                     f"{icons.camera} Upload",
                     type="link",
                     className="d-block text-decoration-none px-2 py-1 my-2",
                 ):
                     _set_is_uploading_photo(True)
-                    st.experimental_rerun()
-                if user.photo_url and st.button(
+                    gui.rerun()
+                if user.photo_url and gui.button(
                     f"{icons.clear} Clear",
                     type="link",
                     className="d-block text-decoration-none px-2 py-1 my-2",
                 ):
                     _set_new_profile_photo(user, "")
-                    st.experimental_rerun()
+                    gui.rerun()
 
 
 def _edit_user_profile_form_section(user: AppUser):
-    user.display_name = st.text_input("Name", value=user.display_name)
+    user.display_name = gui.text_input("Name", value=user.display_name)
 
     handle_style: dict[str, str] = {}
-    if handle := st.text_input(
+    if handle := gui.text_input(
         "Username",
         value=(user.handle and user.handle.name or ""),
         style=handle_style,
@@ -450,23 +448,23 @@ def _edit_user_profile_form_section(user: AppUser):
             try:
                 Handle(name=handle).full_clean()
             except ValidationError as e:
-                st.error(e.messages[0], icon="")
+                gui.error(e.messages[0], icon="")
                 handle_style["border"] = "1px solid var(--bs-danger)"
             else:
-                st.success("Handle is available", icon="")
+                gui.success("Handle is available", icon="")
                 handle_style["border"] = "1px solid var(--bs-success)"
 
     if email := user.email:
-        st.text_input("Email", value=email, disabled=True)
+        gui.text_input("Email", value=email, disabled=True)
     if phone_number := user.phone_number:
-        st.text_input(
+        gui.text_input(
             "Phone Number", value=phone_number.as_international, disabled=True
         )
 
-    user.bio = st.text_area("Bio", value=user.bio)
-    user.company = st.text_input("Company", value=user.company)
-    user.github_username = st.text_input("GitHub Username", value=user.github_username)
-    user.website_url = st.text_input("Website URL", value=user.website_url)
+    user.bio = gui.text_area("Bio", value=user.bio)
+    user.company = gui.text_input("Company", value=user.company)
+    user.github_username = gui.text_input("GitHub Username", value=user.github_username)
+    user.website_url = gui.text_input("Website URL", value=user.website_url)
 
     error_msg: str | None = None
     try:
@@ -475,9 +473,9 @@ def _edit_user_profile_form_section(user: AppUser):
         error_msg = "\n\n".join(e.messages)
 
     if error_msg:
-        st.error(error_msg, icon="⚠️")
+        gui.error(error_msg, icon="⚠️")
 
-    if st.button(
+    if gui.button(
         "Save",
         type="primary",
         disabled=bool(error_msg),
@@ -501,9 +499,9 @@ def _edit_user_profile_form_section(user: AppUser):
                 user.save()
         except (ValidationError, IntegrityError) as e:
             for m in e.messages:
-                st.error(m, icon="⚠️")
+                gui.error(m, icon="⚠️")
         else:
-            st.success("Changes saved")
+            gui.success("Changes saved")
 
 
 def _get_meta_title_for_profile(user: AppUser) -> str:

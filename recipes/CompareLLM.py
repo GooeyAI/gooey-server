@@ -2,22 +2,23 @@ import math
 import random
 import typing
 
-from pydantic import BaseModel, Field
+import gooey_gui as gui
+from pydantic import BaseModel
 
-import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect, BLANK_OPTION
-from daras_ai_v2.field_render import field_title
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     SUPERSCRIPT,
-    ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 
@@ -30,6 +31,8 @@ class CompareLLMPage(BasePage):
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
+    functions_in_settings = False
+
     sane_defaults = {
         "avoid_repetition": False,
         "num_outputs": 1,
@@ -38,24 +41,14 @@ class CompareLLMPage(BasePage):
         "sampling_temperature": 0.7,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
         )
 
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
-
-        variables: dict[str, typing.Any] | None
-
-        response_format_type: ResponseFormatType = Field(
-            None,
-            title="Response Format",
-        )
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: dict[
@@ -73,7 +66,7 @@ class CompareLLMPage(BasePage):
         return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 👩‍💻 Prompt
             """,
@@ -81,32 +74,26 @@ class CompareLLMPage(BasePage):
             help="What a fine day..",
             height=300,
         )
-        prompt_vars_widget("input_prompt")
 
         enum_multiselect(
             LargeLanguageModels,
-            label="#### 🤗 Compare Language Models",
+            label="#### 🧠 Language Models",
             key="selected_models",
+            checkboxes=False,
         )
 
+        gui.markdown("#### 💪 Capabilities")
+        # -- functions will render here in parent --
+
     def validate_form_v2(self):
-        assert st.session_state["input_prompt"], "Please enter a Prompt"
-        assert st.session_state["selected_models"], "Please select at least one model"
+        assert gui.session_state["input_prompt"], "Please enter a Prompt"
+        assert gui.session_state["selected_models"], "Please select at least one model"
 
     def render_usage_guide(self):
         youtube_video("dhexRRDAuY8")
 
     def render_settings(self):
-        language_model_settings(show_selector=False)
-        st.selectbox(
-            f"###### {field_title(self.RequestModel, 'response_format_type')}",
-            options=[None, "json_object"],
-            key="response_format_type",
-            format_func={
-                None: BLANK_OPTION,
-                "json_object": "JSON Object",
-            }.__getitem__,
-        )
+        language_model_settings()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -133,15 +120,15 @@ class CompareLLMPage(BasePage):
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        _render_outputs(st.session_state, 450)
+        _render_outputs(gui.session_state, 450)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
-            st.write("**Prompt**")
-            st.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
+            gui.write("**Prompt**")
+            gui.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
             for key, value in state.get("variables", {}).items():
-                st.text_area(f"`{key}`", value=value, disabled=True)
+                gui.text_area(f"`{key}`", value=str(value), disabled=True)
         with col2:
             _render_outputs(state, 300)
 
@@ -178,7 +165,7 @@ def _render_outputs(state, height):
     for key in selected_models:
         output_text: dict = state.get("output_text", {}).get(key, [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**{LargeLanguageModels[key].value}**",
                 help=f"output {key} {idx} {random.random()}",
                 disabled=True,

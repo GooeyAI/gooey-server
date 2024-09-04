@@ -155,6 +155,8 @@ class Subscription(PaypalResource):
     billing_info: BillingInfo | None
 
     def cancel(self, *, reason: str = "cancellation_requested") -> None:
+        if self.status in ["CANCELLED", "EXPIRED"]:
+            return
         r = requests.post(
             str(self.get_resource_url() / "cancel"),
             headers=get_default_headers(),

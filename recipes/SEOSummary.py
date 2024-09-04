@@ -1,7 +1,7 @@
-import random
 import re
 import typing
 
+import gooey_gui as gui
 import readability
 import requests
 from furl import furl
@@ -9,19 +9,22 @@ from html_sanitizer import Sanitizer
 from loguru import logger
 from pydantic import BaseModel
 
-import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
@@ -86,7 +89,7 @@ class SEOSummaryPage(BasePage):
         # enable_blog_mode=False,
     )
 
-    class RequestModel(GoogleSearchMixin, BaseModel):
+    class RequestModelBase(BaseModel):
         search_query: str
         keywords: str
         title: str
@@ -99,11 +102,6 @@ class SEOSummaryPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        sampling_temperature: float | None
-        max_tokens: int | None
-        num_outputs: int | None
-        quality: float | None
-        avoid_repetition: bool | None
 
         max_search_urls: int | None
 
@@ -112,6 +110,9 @@ class SEOSummaryPage(BasePage):
         # enable_blog_mode: bool | None
 
         seed: int | None
+
+    class RequestModel(GoogleSearchMixin, LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_content: list[str]
@@ -138,7 +139,7 @@ class SEOSummaryPage(BasePage):
         youtube_video("8VDYTYWhOaw")
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
         This workflow is designed to make it incredibly easy to create a webpage that Google's search engine will rank well. 
 
@@ -158,44 +159,45 @@ SearchSEO > Page Parsing > GPT3
         )
 
     def render_form_v2(self):
-        st.write("#### Inputs")
-        st.text_input("Google Search Query", key="search_query")
-        st.text_input("Website Name", key="title")
-        st.text_input("Website URL", key="company_url")
-        st.text_area("Focus Keywords *(optional)*", key="keywords")
+        gui.write("#### Inputs")
+        gui.text_input("Google Search Query", key="search_query")
+        gui.text_input("Website Name", key="title")
+        gui.text_input("Website URL", key="company_url")
+        gui.text_area("Focus Keywords *(optional)*", key="keywords")
 
     def validate_form_v2(self):
-        assert st.session_state["search_query"], "Please provide Google Search Query"
-        assert st.session_state["title"], "Please provide Website Name"
-        assert st.session_state["company_url"], "Please provide Website URL"
-        # assert st.session_state["keywords"], "Please provide Focus Keywords"
+        assert gui.session_state["search_query"], "Please provide Google Search Query"
+        assert gui.session_state["title"], "Please provide Website Name"
+        assert gui.session_state["company_url"], "Please provide Website URL"
+        # assert gui.session_state["keywords"], "Please provide Focus Keywords"
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             "### Task Instructions",
             key="task_instructions",
             height=300,
         )
 
-        # st.checkbox("Blog Generator Mode", key="enable_blog_mode")
-        st.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
-        st.checkbox("Enable HTML Formatting", key="enable_html")
+        # gui.checkbox("Blog Generator Mode", key="enable_blog_mode")
+        gui.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
+        gui.checkbox("Enable HTML Formatting", key="enable_html")
 
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
-        st.write("---")
+        gui.write("---")
 
         serp_search_settings()
 
     def render_output(self):
-        output_content = st.session_state.get("output_content")
+        output_content = gui.session_state.get("output_content")
         if output_content:
-            st.write("#### Generated Content")
+            gui.write("#### Generated Content")
             for idx, text in enumerate(output_content):
-                if st.session_state.get("enable_html"):
+                if gui.session_state.get("enable_html"):
                     scrollable_html(text)
                 else:
-                    st.text_area(
+                    gui.text_area(
                         f"output {idx}",
                         label_visibility="collapsed",
                         value=text,
@@ -204,47 +206,47 @@ SearchSEO > Page Parsing > GPT3
                     )
 
         else:
-            st.div()
+            gui.div()
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
 
         with col1:
-            serp_results = st.session_state.get(
-                "serp_results", st.session_state.get("scaleserp_results")
+            serp_results = gui.session_state.get(
+                "serp_results", gui.session_state.get("scaleserp_results")
             )
             if serp_results:
-                st.write("**Web Search Results**")
-                st.json(serp_results)
+                gui.write("**Web Search Results**")
+                gui.json(serp_results)
 
         with col2:
-            search_urls = st.session_state.get("search_urls")
+            search_urls = gui.session_state.get("search_urls")
             if search_urls:
-                st.write("**Search URLs**")
-                st.json(search_urls, expanded=False)
+                gui.write("**Search URLs**")
+                gui.json(search_urls, expanded=False)
             else:
-                st.div()
+                gui.div()
 
-        summarized_urls = st.session_state.get("summarized_urls")
+        summarized_urls = gui.session_state.get("summarized_urls")
         if summarized_urls:
-            st.write("**Summarized URLs**")
-            st.json(summarized_urls, expanded=False)
+            gui.write("**Summarized URLs**")
+            gui.json(summarized_urls, expanded=False)
         else:
-            st.div()
+            gui.div()
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area(
+            gui.text_area(
                 "Final Prompt",
                 value=final_prompt,
                 height=400,
                 disabled=True,
             )
         else:
-            st.div()
+            gui.div()
 
     def render_example(self, state: dict):
-        st.write(
+        gui.write(
             f"""
             Search Query `{state.get('search_query', '')}` \\
             Company Name `{state.get('title', '')}` \\
@@ -258,7 +260,7 @@ SearchSEO > Page Parsing > GPT3
             if state.get("enable_html"):
                 scrollable_html(output_content[0], height=300)
             else:
-                st.text_area(
+                gui.text_area(
                     "Generated Content",
                     value=output_content[0],
                     height=200,
@@ -346,6 +348,7 @@ def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str
         max_tokens=request.max_tokens,
         stop=[STOP_SEQ],
         avoid_repetition=request.avoid_repetition,
+        response_format_type=request.response_format_type,
     )
 
 
@@ -448,8 +451,8 @@ def html_to_text(text):
 def _call_summarize_url(url: str) -> tuple[str | None, str | None]:
     r = requests.get(
         url,
-        headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
+        **requests_scraping_kwargs(),
     )
     raise_for_status(r)
     # we only support HTML for now

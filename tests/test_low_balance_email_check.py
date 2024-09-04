@@ -12,7 +12,7 @@ def test_dont_send_email_if_feature_is_disabled(transactional_db):
         uid="test_user", is_paying=True, balance=0, is_anonymous=False
     )
     settings.LOW_BALANCE_EMAIL_ENABLED = False
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox
 
 
@@ -21,7 +21,7 @@ def test_dont_send_email_if_user_is_not_paying(transactional_db):
         uid="test_user", is_paying=False, balance=0, is_anonymous=False
     )
     settings.LOW_BALANCE_EMAIL_ENABLED = True
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox
 
 
@@ -31,7 +31,7 @@ def test_dont_send_email_if_user_has_enough_balance(transactional_db):
     )
     settings.LOW_BALANCE_EMAIL_CREDITS = 100
     settings.LOW_BALANCE_EMAIL_ENABLED = True
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox
 
 
@@ -46,7 +46,7 @@ def test_dont_send_email_if_user_has_been_emailed_recently(transactional_db):
     settings.LOW_BALANCE_EMAIL_ENABLED = True
     settings.LOW_BALANCE_EMAIL_DAYS = 1
     settings.LOW_BALANCE_EMAIL_CREDITS = 100
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox
 
 
@@ -77,14 +77,14 @@ def test_send_email_if_user_has_been_email_recently_but_made_a_purchase(
     settings.LOW_BALANCE_EMAIL_ENABLED = True
     settings.LOW_BALANCE_EMAIL_DAYS = 1
     settings.LOW_BALANCE_EMAIL_CREDITS = 100
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
 
     assert len(pytest_outbox) == 1
     assert " 22" in pytest_outbox[0]["html_body"]
     assert " 78" in pytest_outbox[0]["html_body"]
 
     pytest_outbox.clear()
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox
 
 
@@ -114,7 +114,7 @@ def test_send_email(transactional_db):
     settings.LOW_BALANCE_EMAIL_DAYS = 1
     settings.LOW_BALANCE_EMAIL_CREDITS = 100
 
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert len(pytest_outbox) == 1
     body = pytest_outbox[0]["html_body"]
     assert " 66" in body
@@ -123,5 +123,5 @@ def test_send_email(transactional_db):
     assert " 100" not in body
 
     pytest_outbox.clear()
-    run_low_balance_email_check(user.uid)
+    run_low_balance_email_check(user)
     assert not pytest_outbox

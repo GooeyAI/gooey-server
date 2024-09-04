@@ -2,11 +2,10 @@ import typing
 
 from django.db import transaction, IntegrityError
 from django.db.models import Model
-from django.db.models.utils import resolve_callables
 
 
 def get_or_create_lazy(
-    model: typing.Type[Model], get_defaults: typing.Callable[..., dict] = None, **kwargs
+    model: typing.Type[Model], create: typing.Callable[..., dict] = None, **kwargs
 ):
     """
     Look up an object with the given kwargs, creating one if necessary.
@@ -20,13 +19,10 @@ def get_or_create_lazy(
     try:
         return self.get(**kwargs), False
     except self.model.DoesNotExist:
-        defaults = get_defaults and get_defaults()
-        params = self._extract_model_params(defaults, **kwargs)
         # Try to create an object using passed params.
         try:
             with transaction.atomic(using=self.db):
-                params = dict(resolve_callables(params))
-                return self.create(**params), True
+                return create(**kwargs), True
         except IntegrityError:
             try:
                 return self.get(**kwargs), False

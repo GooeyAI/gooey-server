@@ -133,7 +133,7 @@ async function createOrder() {
 
 async function onApprove(data, actions) {
     try {
-        const response = await fetch(`/__/paypal/orders/${data.orderID}/capture`, {
+        const response = await fetch(`/__/paypal/orders/${data.orderID}/capture/`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

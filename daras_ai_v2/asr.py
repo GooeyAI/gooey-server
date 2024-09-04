@@ -1,19 +1,19 @@
+import multiprocessing
 import os.path
 import os.path
 import tempfile
 import typing
 from enum import Enum
 
+import gooey_gui as gui
 import requests
 import typing_extensions
 from django.db.models import F
 from furl import furl
 
-import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -31,6 +31,7 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
 
 TRANSLATE_BATCH_SIZE = 8
@@ -75,16 +76,15 @@ WHISPER_SUPPORTED = {
     "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
 }  # fmt: skip
 
-# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
+# https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
 # For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
-SEAMLESS_SUPPORTED = {
-    "afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb",
-    "cmn", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "gaz", "gle", "glg", "guj", "heb", "hin",
-    "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kam", "kan", "kat", "kaz", "kea", "khk", "khm",
-    "kir", "kor", "lao", "lit", "ltz", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld",
-    "nno", "nob", "npi", "nya", "oci", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna",
-    "snd", "som", "spa", "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie",
-    "xho", "yor", "yue", "zlm", "zul"
+SEAMLESS_v2_ASR_SUPPORTED = {
+    "afr", "amh", "arb", "ary", "arz", "asm", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb", "cmn",
+    "cmn-Hant", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "fuv", "gaz", "gle", "glg", "guj", "heb",
+    "hin", "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kan", "kat", "kaz", "khk", "khm", "kir",
+    "kor", "lao", "lit", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld", "nno", "nob",
+    "npi", "nya", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna", "snd", "som", "spa",
+    "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "yor", "yue", "zul",
 }  # fmt: skip
 
 AZURE_SUPPORTED = {
@@ -199,7 +199,8 @@ MMS_SUPPORTED = {
 }  # fmt: skip
 
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
-GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
+                       'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
 
 
@@ -215,11 +216,22 @@ class AsrModels(Enum):
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
-    seamless_m4t = "Seamless M4T (Facebook Research)"
+    seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
+    seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
+
     def supports_auto_detect(self) -> bool:
-        return self not in {self.azure, self.gcp_v1, self.mms_1b_all}
+        return self not in {
+            self.azure,
+            self.gcp_v1,
+            self.mms_1b_all,
+            self.seamless_m4t_v2,
+        }
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.seamless_m4t}
 
 
 asr_model_ids = {
@@ -230,7 +242,7 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
-    AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
+    AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
 }
 
@@ -248,7 +260,7 @@ asr_supported_languages = {
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
-    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
+    AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
 }
@@ -297,7 +309,7 @@ def translation_language_selector(
     **kwargs,
 ) -> str | None:
     if not model:
-        st.session_state[key] = None
+        gui.session_state[key] = None
         return
 
     if model == TranslationModels.google:
@@ -308,7 +320,7 @@ def translation_language_selector(
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -351,7 +363,7 @@ def google_translate_language_selector(
     """
     languages = google_translate_target_languages()
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
@@ -408,12 +420,10 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
-    import langcodes
-
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
-        st.session_state[key] = forced_lang
+        gui.session_state[key] = forced_lang
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
@@ -421,18 +431,14 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_val = st.session_state.get(key)
-    if old_val and old_val not in options:
-        old_val_lang = langcodes.Language.get(old_val).language
-        for opt in options:
-            try:
-                if opt and langcodes.Language.get(opt).language == old_val_lang:
-                    st.session_state[key] = opt
-                    break
-            except langcodes.LanguageTagError:
-                pass
+    old_lang = gui.session_state.get(key)
+    if old_lang:
+        try:
+            gui.session_state[key] = normalised_lang_in_collection(old_lang, options)
+        except UserError:
+            gui.session_state[key] = None
 
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -584,13 +590,26 @@ def run_google_translate(
 def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
     import langcodes
 
-    for candidate in collection:
-        if langcodes.get(candidate).language == langcodes.get(target).language:
-            return candidate
-
-    raise UserError(
+    ERROR = UserError(
         f"Unsupported language: {target!r} | must be one of {set(collection)}"
     )
+
+    if target in collection:
+        return target
+
+    try:
+        target_lan = langcodes.Language.get(target).language
+    except langcodes.LanguageTagError:
+        raise ERROR
+
+    for candidate in collection:
+        try:
+            if candidate and langcodes.Language.get(candidate).language == target_lan:
+                return candidate
+        except langcodes.LanguageTagError:
+            pass
+
+    raise ERROR
 
 
 def _translate_text(
@@ -776,15 +795,14 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-    elif selected_model == AsrModels.seamless_m4t:
+    elif selected_model == AsrModels.seamless_m4t_v2:
         data = call_celery_task(
-            "seamless",
+            "seamless.asr",
             pipeline=dict(
-                model_id=asr_model_ids[AsrModels.seamless_m4t],
+                model_id=asr_model_ids[AsrModels.seamless_m4t_v2],
             ),
             inputs=dict(
                 audio=audio_url,
-                task="ASR",
                 src_lang=language,
             ),
         )
@@ -964,20 +982,30 @@ def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
+_yt_dlp_lock = multiprocessing.Semaphore(1)
+
+
 def download_youtube_to_wav(youtube_url: str) -> bytes:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _yt_dlp_lock, tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
+        proxy_args = []
+        if proxy := SCRAPING_PROXIES.get("https"):
+            proxy_args += ["--proxy", proxy]
+        if cert := get_scraping_proxy_cert_path():
+            proxy_args += ["--client-certificate-key", cert]
         # run yt-dlp to download audio
         call_cmd(
-            "yt-dlp",
+            "yt-dlp", "-v",
             "--no-playlist",
-            "--format",
-            "bestaudio",
-            "--output",
-            infile,
+            "--max-downloads", "1",
+            "--format", "bestaudio",
+            "--output", infile,
+            *proxy_args,
             youtube_url,
-        )
+            # ignore MaxDownloadsReached - https://github.com/ytdl-org/youtube-dl/blob/a452f9437c8a3048f75fc12f75bcfd3eed78430f/youtube_dl/__init__.py#L468
+            ok_returncodes={101},
+        )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory
@@ -988,7 +1016,15 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    raise_for_status(r, is_user_url=True)
+    try:
+        raise_for_status(r, is_user_url=True)
+    except requests.HTTPError:
+        # wait 3 seconds and try again (handles cases where the url has just been uploaded but cache is not updated yet, e.g. for Twilio)
+        from time import sleep
+
+        sleep(3)
+        r = requests.get(audio_url)
+        raise_for_status(r, is_user_url=True)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:
@@ -1057,7 +1093,15 @@ def iterate_subtitles(
         yield segment_start, segment_end, segment_text
 
 
-def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker: str):
+INFINITY_SECONDS = 99 * 3600 + 59 * 60 + 59  # 99:59:59 in seconds
+
+
+def format_timestamp(
+    seconds: float | None, always_include_hours: bool, decimal_marker: str
+):
+    if seconds is None:
+        # treat None as end of time
+        seconds = INFINITY_SECONDS
     assert seconds >= 0, "non-negative timestamp expected"
     milliseconds = round(seconds * 1000.0)
 

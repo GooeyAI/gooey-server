@@ -56,11 +56,25 @@ def resolve_url(url: str) -> ResolverMatch | None:
     return None
 
 
-def get_route_url(route_fn: typing.Callable, params: dict = None) -> str:
-    return str(furl(settings.APP_BASE_URL) / get_route_path(route_fn, params=params))
+def get_api_route_url(
+    route_fn: typing.Callable, *, path_params: dict = None, query_params: dict = None
+) -> str:
+    return str(
+        furl(settings.API_BASE_URL, query_params=query_params)
+        / get_route_path(route_fn, path_params=path_params)
+    )
 
 
-def get_route_path(route_fn: typing.Callable, params: dict = None) -> str:
+def get_app_route_url(
+    route_fn: typing.Callable, *, path_params: dict = None, query_params: dict = None
+) -> str:
+    return str(
+        furl(settings.APP_BASE_URL, query_params=query_params)
+        / get_route_path(route_fn, path_params=path_params)
+    )
+
+
+def get_route_path(route_fn: typing.Callable, path_params: dict = None) -> str:
     from server import app
 
-    return os.path.join(app.url_path_for(route_fn.__name__, **(params or {})), "")
+    return os.path.join(app.url_path_for(route_fn.__name__, **(path_params or {})), "")

@@ -1,6 +1,6 @@
 import datetime
 
-import gooey_ui as st
+import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -14,7 +14,7 @@ from daras_ai_v2.crypto import (
 
 
 def manage_api_keys(user: AppUser):
-    st.write(
+    gui.write(
         """
 Your secret API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
@@ -29,9 +29,9 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
     db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     api_keys = _load_api_keys(db_collection, user)
 
-    table_area = st.div()
+    table_area = gui.div()
 
-    if st.button("＋ Create new secret key"):
+    if gui.button("＋ Create new secret key"):
         doc = _generate_new_key_doc()
         doc["uid"] = user.uid
         api_keys.append(doc)
@@ -40,7 +40,7 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
     with table_area:
         import pandas as pd
 
-        st.table(
+        gui.table(
             pd.DataFrame.from_records(
                 columns=["Secret Key (Preview)", "Created At"],
                 data=[
@@ -69,7 +69,7 @@ def _generate_new_key_doc() -> dict:
     secret_key_hash = hasher.encode(new_api_key)
     created_at = datetime.datetime.utcnow()
 
-    st.success(
+    gui.success(
         f"""
 ##### API key generated
 
@@ -78,9 +78,9 @@ For security reasons, **you won't be able to view it again** through your accoun
 If you lose this secret key, you'll need to generate a new one.
             """
     )
-    col1, col2 = st.columns([3, 1], responsive=False)
+    col1, col2 = gui.columns([3, 1], responsive=False)
     with col1:
-        st.text_input(
+        gui.text_input(
             "recipe url",
             label_visibility="collapsed",
             disabled=True,

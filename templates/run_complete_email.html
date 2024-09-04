@@ -1,20 +1,14 @@
-<p>
-    Your {{ title }} Gooey.AI run completed in {{ run_time_sec }} seconds.
-</p>
-<p>
-    View output here: {{ app_url }}
-</p>
-<p>
-    Your prompt: <code>{{ prompt }}</code>
-</p>
+<p>Your {{ recipe_title }} Gooey.AI run completed in {{ run_time_sec }} seconds.</p>
+<p>View output here: {{ app_url }}</p>
+
+{% if prompt %}
+    <p>Your prompt: <code>{{ prompt }}</code></p>
+{% endif %}
+
+<p>We can’t wait to see what you build with Gooey!</p>
 
 <p>
-    We can’t wait to see what you build with Gooey!
-</p>
-
-<p>
-    Cheers,
-    <br>
+    Cheers,<br>
     The Gooey.AI Team
 </p>
-{{  "{{{ pm:unsubscribe }}}" }}
+{{ "{{{ pm:unsubscribe }}}" }}

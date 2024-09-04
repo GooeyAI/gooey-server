@@ -4,7 +4,7 @@ import typing
 from furl import furl
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -20,9 +20,13 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -63,22 +67,18 @@ class DocSearchPage(BasePage):
         "dense_weight": 1.0,
     }
 
-    class RequestModel(DocSearchRequest):
+    class RequestModelBase(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
-        variables: dict[str, typing.Any] | None
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -92,14 +92,13 @@ class DocSearchPage(BasePage):
         return ["documents"]
 
     def render_form_v2(self):
-        st.text_area("#### Search Query", key="search_query")
+        gui.text_area("#### Search Query", key="search_query")
         bulk_documents_uploader("#### Documents")
-        prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
-        search_query = st.session_state.get("search_query", "").strip()
+        search_query = gui.session_state.get("search_query", "").strip()
         assert search_query, "Please enter a Search Query"
-        assert st.session_state.get("documents"), "Please provide at least 1 Document"
+        assert gui.session_state.get("documents"), "Please provide at least 1 Document"
 
     def related_workflows(self) -> list:
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -115,30 +114,31 @@ class DocSearchPage(BasePage):
         ]
 
     def render_output(self):
-        render_output_with_refs(st.session_state)
-        refs = st.session_state.get("references", [])
+        render_output_with_refs(gui.session_state)
+        refs = gui.session_state.get("references", [])
         render_sources_widget(refs)
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.html("**Search Query**")
-        st.write("```properties\n" + state.get("search_query", "") + "\n```")
+        gui.html("**Search Query**")
+        gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         render_output_with_refs(state, 200)
 
     def render_settings(self):
-        st.text_area(
-            "### 👩‍🏫 Task Instructions",
+        gui.text_area(
+            "##### 👩‍🏫 Task Instructions",
             key="task_instructions",
             height=300,
         )
-        st.write("---")
-        language_model_settings()
-        st.write("---")
-        st.write("##### 🔎 Document Search Settings")
+        gui.write("---")
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
+        gui.write("---")
+        gui.write("##### 🔎 Document Search Settings")
         citation_style_selector()
         doc_extract_selector(self.request and self.request.user)
-        st.write("---")
         query_instructions_widget()
+        gui.write("---")
         doc_search_advanced_settings()
 
     def preview_image(self, state: dict) -> str | None:
@@ -148,7 +148,7 @@ class DocSearchPage(BasePage):
         return "Add your PDF, Word, HTML or Text docs, train our AI on them with OpenAI embeddings & vector search and then process results with a GPT3 script. This workflow is perfect for anything NOT in ChatGPT: 250-page compliance PDFs, training manuals, your diary, etc."
 
     def render_steps(self):
-        render_doc_search_step(st.session_state)
+        render_doc_search_step(gui.session_state)
 
     def render_usage_guide(self):
         youtube_video("Xe4L_dQ2KvU")
@@ -175,6 +175,7 @@ class DocSearchPage(BasePage):
                     "search_query": response.final_search_query,
                 },
             ),
+            current_user=self.request and self.request.user,
         )
 
         # empty search result, abort!
@@ -205,6 +206,7 @@ class DocSearchPage(BasePage):
             prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )
 
         citation_style = (
@@ -222,7 +224,7 @@ class DocSearchPage(BasePage):
 
     def additional_notes(self):
         try:
-            model = LargeLanguageModels[st.session_state["selected_model"]].value
+            model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
         return f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
@@ -232,29 +234,32 @@ def render_documents(state, label="**Documents**", *, key="documents"):
     documents = state.get(key, [])
     if not documents:
         return
-    st.write(label)
-    for doc in documents:
-        if is_user_uploaded_url(doc):
-            f = furl(doc)
-            filename = f.path.segments[-1]
-        else:
-            filename = doc
-        st.write(f"🔗[*{filename}*]({doc})")
+    gui.write(label)
+    with gui.div(
+        className="overflow-auto bg-light p-2 mb-3", style=dict(maxHeight="200px")
+    ):
+        for doc in documents:
+            if is_user_uploaded_url(doc):
+                f = furl(doc)
+                filename = f.path.segments[-1]
+            else:
+                filename = doc
+            gui.write(f"🔗[*{filename}*]({doc})")
 
 
 def render_doc_search_step(state: dict):
     final_search_query = state.get("final_search_query")
     if final_search_query:
-        st.text_area("**Final Search Query**", value=final_search_query, disabled=True)
+        gui.text_area("**Final Search Query**", value=final_search_query, disabled=True)
 
     references = state.get("references")
     if references:
-        st.write("**References**")
-        st.json(references, expanded=False)
+        gui.write("**References**")
+        gui.json(references, expanded=False)
 
     final_prompt = state.get("final_prompt")
     if final_prompt:
-        st.text_area(
+        gui.text_area(
             "**Final Prompt**",
             value=final_prompt,
             height=400,
@@ -263,7 +268,7 @@ def render_doc_search_step(state: dict):
 
     output_text = state.get("output_text", [])
     for idx, text in enumerate(output_text):
-        st.text_area(
+        gui.text_area(
             f"**Output Text**",
             help=f"output {idx}",
             disabled=True,

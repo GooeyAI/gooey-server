@@ -7,7 +7,7 @@ TRANSLATION_TESTS = [
     (
         "hi",
         "Hi Sir Mera khet me mircha ke ped me fal gal Kar gir hai to  iske liye  ham kon sa dawa  de please  help me",
-        "hi sir in my field the fruits of chilli tree are rotting and falling so which medicine should i give for this please help",
+        "hi sir the fruits on the chilli tree in my field have fallen down what medicine should i give you? please help me",
     ),
     (
         "hi",

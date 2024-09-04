@@ -7,6 +7,15 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 
 
 class EmbeddedFile(models.Model):
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="embedded_files",
+    )
+
     url = CustomURLField(help_text="The URL of the original resource (e.g. a document)")
     metadata = models.ForeignKey(
         "files.FileMetadata",
@@ -31,6 +40,11 @@ class EmbeddedFile(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    query_count = models.PositiveIntegerField(default=0, db_index=True)
+    last_query_at = models.DateTimeField(
+        null=True, blank=True, default=None, db_index=True
+    )
 
     def __str__(self):
         return f"{self.url} ({self.metadata})"

@@ -1,16 +1,17 @@
 import re
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 from pydantic import BaseModel
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -38,7 +39,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "twitter_handle": "seanb",
     }
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         email_address: str | None
         twitter_handle: str | None
 
@@ -99,7 +100,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
     *EmailID > Profile pic > Face Masking + Zoom > Stable Diffusion > GFPGAN > Email*  
     
@@ -117,7 +118,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Describe the scene that you'd like to generate around the face. 
@@ -125,14 +126,14 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="text_prompt",
             placeholder="winter's day in paris",
         )
-        if "__photo_source" not in st.session_state:
-            st.session_state["__photo_source"] = (
+        if "__photo_source" not in gui.session_state:
+            gui.session_state["__photo_source"] = (
                 "Email Address"
-                if st.session_state.get("email_address")
+                if gui.session_state.get("email_address")
                 else "Twitter Handle"
             )
 
-        source = st.radio(
+        source = gui.radio(
             """
             #### Photo Source
             From where we should get the photo?""",
@@ -140,7 +141,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="__photo_source",
         )
         if source == "Email Address":
-            st.text_input(
+            gui.text_input(
                 """
                 #### Email Address
                 Give us your email address and we'll try to get your photo 
@@ -148,9 +149,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 key="email_address",
                 placeholder="john@appleseed.com",
             )
-            st.session_state["twitter_handle"] = None
+            gui.session_state["twitter_handle"] = None
         else:
-            st.text_input(
+            gui.text_input(
                 """
                 #### Twitter Handle
                 Give us your twitter handle, we'll try to get your photo from there
@@ -158,28 +159,28 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 key="twitter_handle",
                 max_chars=15,
             )
-            st.session_state["email_address"] = None
+            gui.session_state["email_address"] = None
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("text_prompt")
-        email_address = st.session_state.get("email_address")
-        twitter_handle = st.session_state.get("twitter_handle")
+        text_prompt = gui.session_state.get("text_prompt")
+        email_address = gui.session_state.get("email_address")
+        twitter_handle = gui.session_state.get("twitter_handle")
         assert text_prompt, "Please provide a Prompt and your Email Address"
 
-        if st.session_state.get("twitter_handle"):
+        if gui.session_state.get("twitter_handle"):
             assert re.fullmatch(
                 twitter_handle_regex, twitter_handle
             ), "Please provide a valid Twitter Handle"
-        elif st.session_state.get("email_address"):
+        elif gui.session_state.get("email_address"):
             assert re.fullmatch(
                 email_regex, email_address
             ), "Please provide a valid Email Address"
         else:
             raise AssertionError("Please provide an Email Address or Twitter Handle")
 
-        from_email = st.session_state.get("email_from")
-        email_subject = st.session_state.get("email_subject")
-        email_body = st.session_state.get("email_body")
+        from_email = gui.session_state.get("email_from")
+        email_subject = gui.session_state.get("email_subject")
+        email_body = gui.session_state.get("email_body")
         assert (
             from_email and email_subject and email_body
         ), "Please provide a From Email, Subject & Body"
@@ -200,56 +201,56 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_usage_guide(self):
         youtube_video("3C23HwQPITg")
 
-    def render_settings(self):
-        super().render_settings()
-        st.write(
-            """
-            ### Email settings
-            """
-        )
-
-        st.checkbox(
-            "Send email",
-            key="should_send_email",
-        )
-        st.text_input(
-            label="From",
-            key="email_from",
-        )
-        st.text_input(
-            label="Cc (You can enter multiple emails separated by comma)",
-            key="email_cc",
-            placeholder="john@gmail.com, cathy@gmail.com",
-        )
-        st.text_input(
-            label="Bcc (You can enter multiple emails separated by comma)",
-            key="email_bcc",
-            placeholder="john@gmail.com, cathy@gmail.com",
-        )
-        st.text_input(
-            label="Subject",
-            key="email_subject",
-        )
-        st.checkbox(
-            label="Enable HTML Body",
-            key="email_body_enable_html",
-        )
-        st.text_area(
-            label="Body (use {{output_images}} to insert the images into the email)",
-            key="email_body",
-        )
-        st.text_area(
-            label="Fallback Body (in case of failure)",
-            key="fallback_email_body",
-        )
-
-    def render_output(self):
-        super().render_output()
-
-        if st.session_state.get("email_sent"):
-            st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
-        else:
-            st.div()
+    # def render_settings(self):
+    #     super().render_settings()
+    #     gui.write(
+    #         """
+    #         ### Email settings
+    #         """
+    #     )
+    #
+    #     gui.checkbox(
+    #         "Send email",
+    #         key="should_send_email",
+    #     )
+    #     gui.text_input(
+    #         label="From",
+    #         key="email_from",
+    #     )
+    #     gui.text_input(
+    #         label="Cc (You can enter multiple emails separated by comma)",
+    #         key="email_cc",
+    #         placeholder="john@gmail.com, cathy@gmail.com",
+    #     )
+    #     gui.text_input(
+    #         label="Bcc (You can enter multiple emails separated by comma)",
+    #         key="email_bcc",
+    #         placeholder="john@gmail.com, cathy@gmail.com",
+    #     )
+    #     gui.text_input(
+    #         label="Subject",
+    #         key="email_subject",
+    #     )
+    #     gui.checkbox(
+    #         label="Enable HTML Body",
+    #         key="email_body_enable_html",
+    #     )
+    #     gui.text_area(
+    #         label="Body (use {{output_images}} to insert the images into the email)",
+    #         key="email_body",
+    #     )
+    #     gui.text_area(
+    #         label="Fallback Body (in case of failure)",
+    #         key="fallback_email_body",
+    #     )
+    #
+    # def render_output(self):
+    #     super().render_output()
+    #
+    #     if gui.session_state.get("email_sent"):
+    #         gui.write(f"✅ Email sent to {gui.session_state.get('email_address')}")
+    #     else:
+    #         gui.div()
 
     def run(self, state: dict):
         request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
@@ -262,21 +263,21 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             state["input_image"] = photo_url
             yield from super().run(state)
 
-        output_images = state.get("output_images")
-
-        if request.should_send_email and (output_images or request.fallback_email_body):
-            yield "Sending Email..."
-
-            send_email_via_postmark(
-                from_address=request.email_from,
-                to_address=request.email_address,
-                cc=request.email_cc,
-                bcc=request.email_bcc,
-                subject=request.email_subject,
-                html_body=self._get_email_body(request, output_images),
-                message_stream="gooey-ai-workflows",
-            )
-            state["email_sent"] = True
+        # output_images = state.get("output_images")
+        #
+        # if request.should_send_email and (output_images or request.fallback_email_body):
+        #     yield "Sending Email..."
+        #
+        #     send_email_via_postmark(
+        #         from_address=request.email_from,
+        #         to_address=request.email_address,
+        #         cc=request.email_cc,
+        #         bcc=request.email_bcc,
+        #         subject=request.email_subject,
+        #         html_body=self._get_email_body(request, output_images),
+        #         message_stream="gooey-ai-workflows",
+        #     )
+        #     state["email_sent"] = True
 
         if not photo_url:
             raise ImageNotFound(
@@ -334,13 +335,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     def render_example(self, state: dict):
         if state.get("email_address"):
-            st.write("**Input Email** -", state.get("email_address"))
+            gui.write("**Input Email** -", state.get("email_address"))
         elif state.get("twitter_handle"):
-            st.write("**Input Twitter Handle** -", state.get("twitter_handle"))
+            gui.write("**Input Twitter Handle** -", state.get("twitter_handle"))
         output_images = state.get("output_images")
         if output_images:
             for img in output_images:
-                st.image(
+                gui.image(
                     img,
                     caption="```"
                     + state.get("text_prompt", "").replace("\n", "")
@@ -359,38 +360,11 @@ class TwitterError(Exception):
 
 
 def get_photo_for_email(email_address):
-    import glom
-
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()
     photo_url = doc.get("photo_url")
     if photo_url:
-        return photo_url
-
-    r = requests.get(
-        f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
-        headers={"X-API-KEY": settings.SEON_API_KEY},
-    )
-    raise_for_status(r)
-
-    account_details = glom.glom(r.json(), "data.account_details", default={})
-    for spec in [
-        "linkedin.photo",
-        "facebook.photo",
-        "google.photo",
-        "skype.photo",
-        "foursquare.photo",
-    ]:
-        photo = glom.glom(account_details, spec, default=None)
-        if not photo:
-            continue
-
-        photo_url = upload_file_from_bytes(
-            "face_photo.png", requests.get(photo).content
-        )
-        doc_ref.set({"photo_url": photo_url})
-
         return photo_url
 
 

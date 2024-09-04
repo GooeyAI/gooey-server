@@ -1,6 +1,6 @@
 import typing
 
-import gooey_ui as gui
+import gooey_gui as gui
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -85,7 +85,7 @@ def render_description(page: BasePage):
     with gui.link(to=page.app_url()):
         gui.markdown(f"#### {page.get_recipe_title()}")
 
-    root_pr = page.get_or_create_root_published_run()
+    root_pr = page.get_root_published_run()
     notes = root_pr.notes or page.preview_description(state=page.sane_defaults)
     with gui.tag("p", style={"marginBottom": "25px"}):
         gui.write(notes, line_clamp=4)

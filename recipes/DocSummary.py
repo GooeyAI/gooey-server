@@ -2,9 +2,9 @@ import typing
 from enum import Enum
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -16,8 +16,13 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
+    ResponseFormatType,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.pt import PromptTree
 from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.vector_search import (
@@ -57,7 +62,7 @@ class DocSummaryPage(BasePage):
         "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
         task_instructions: str | None
@@ -66,16 +71,14 @@ class DocSummaryPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         google_translate_target: str | None
+
+    class RequestModel(LanguageModelSettings, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -92,10 +95,10 @@ class DocSummaryPage(BasePage):
 
     def render_form_v2(self):
         bulk_documents_uploader("#### 📎 Documents")
-        st.text_area("#### 👩‍💻 Instructions", key="task_instructions")
+        gui.text_area("#### 👩‍💻 Instructions", key="task_instructions")
 
     def render_settings(self):
-        st.text_area(
+        gui.text_area(
             """
 ##### 📄+📄 Merge Instructions
 Prompt for merging several outputs together 
@@ -109,46 +112,47 @@ Prompt for merging several outputs together
         # """,
         #             key="chain_type",
         #         )
-        st.write("---")
+        gui.write("---")
 
-        language_model_settings()
+        selected_model = language_model_selector()
+        language_model_settings(selected_model)
 
     def preview_description(self, state: dict) -> str:
         return "Upload any collection of PDFs, docs and/or audio files and we'll transcribe them. Then give any GPT based instruction and we'll do a map-reduce and return the result. Great for summarizing large data sets to create structured data. Check out the examples for more."
 
     def validate_form_v2(self):
-        search_query = st.session_state.get("task_instructions", "").strip()
+        search_query = gui.session_state.get("task_instructions", "").strip()
         assert search_query, "Please enter the Instructions"
-        assert st.session_state.get("documents"), "Please provide at least 1 Document"
+        assert gui.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
-        render_output_with_refs(st.session_state)
+        render_output_with_refs(gui.session_state)
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.write("**Instructions**")
-        st.write("```properties\n" + state.get("task_instructions", "") + "\n```")
+        gui.write("**Instructions**")
+        gui.write("```properties\n" + state.get("task_instructions", "") + "\n```")
         render_output_with_refs(state, 200)
 
     def render_steps(self):
-        prompt_tree = st.session_state.get("prompt_tree", {})
+        prompt_tree = gui.session_state.get("prompt_tree", {})
         if prompt_tree:
-            st.write("**Prompt Tree**")
-            st.json(prompt_tree, expanded=False)
+            gui.write("**Prompt Tree**")
+            gui.json(prompt_tree, expanded=False)
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area(
+            gui.text_area(
                 "**Final Prompt**",
                 value=final_prompt,
                 disabled=True,
             )
         else:
-            st.div()
+            gui.div()
 
-        output_text: list = st.session_state.get("output_text", [])
+        output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
-            st.text_area(
+            gui.text_area(
                 f"**Output Text**",
                 help=f"output {idx}",
                 disabled=True,
@@ -240,6 +244,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
         )[0]
 
     state["prompt_tree"] = prompt_tree = []

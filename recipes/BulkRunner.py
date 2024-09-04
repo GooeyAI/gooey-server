@@ -5,9 +5,10 @@ import uuid
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2 import icons
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -31,7 +32,6 @@ from daras_ai_v2.workflow_url_input import (
     get_published_run_options,
     edit_done_button,
 )
-from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
@@ -45,7 +45,7 @@ class BulkRunnerPage(BasePage):
     slug_versions = ["bulk-runner", "bulk"]
     price = 1
 
-    class RequestModel(BaseModel):
+    class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
@@ -96,9 +96,9 @@ List of URLs to the evaluation runs that you requested.
         return DEFAULT_BULK_META_IMG
 
     def render_form_v2(self):
-        st.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
+        gui.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
         run_urls = list_view_editor(
-            add_btn_label="➕ Add a Workflow",
+            add_btn_label="Add a Workflow",
             key="run_urls",
             render_inputs=self.render_run_url_inputs,
             flatten_dict_key="url",
@@ -155,19 +155,19 @@ List of URLs to the evaluation runs that you requested.
                 for field, model_field in page_cls.ResponseModel.__fields__.items()
             }
 
-        st.write(
+        gui.write(
             """
 ###### **Preview**: Here's what you uploaded
             """
         )
         for file in files:
-            st.data_table(file)
+            gui.data_table(file)
 
         if not (required_input_fields or optional_input_fields):
             return
 
-        with st.div(className="pt-3"):
-            st.write(
+        with gui.div(className="pt-3"):
+            gui.write(
                 """
 ###### **Columns**
 Please select which CSV column corresponds to your workflow's input fields.
@@ -176,17 +176,17 @@ To understand what each field represents, check out our [API docs](https://api.g
                 """,
             )
 
-        visible_col1, visible_col2 = st.columns(2)
-        with st.expander("🤲 Show All Columns"):
-            hidden_col1, hidden_col2 = st.columns(2)
+        visible_col1, visible_col2 = gui.columns(2)
+        with gui.expander("🤲 Show All Columns"):
+            hidden_col1, hidden_col2 = gui.columns(2)
 
         with visible_col1:
-            st.write("##### Inputs")
+            gui.write("##### Inputs")
         with hidden_col1:
-            st.write("##### Inputs")
+            gui.write("##### Inputs")
 
-        input_columns_old = st.session_state.pop("input_columns", {})
-        input_columns_new = st.session_state.setdefault("input_columns", {})
+        input_columns_old = gui.session_state.pop("input_columns", {})
+        input_columns_new = gui.session_state.setdefault("input_columns", {})
 
         column_options = [None, *get_columns(files)]
         for fields, div in (
@@ -195,7 +195,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         ):
             for field, title in fields.items():
                 with div:
-                    col = st.selectbox(
+                    col = gui.selectbox(
                         label="`" + title + "`",
                         options=column_options,
                         key="--input-mapping:" + field,
@@ -205,9 +205,9 @@ To understand what each field represents, check out our [API docs](https://api.g
                     input_columns_new[field] = col
 
         with visible_col2:
-            st.write("##### Outputs")
+            gui.write("##### Outputs")
         with hidden_col2:
-            st.write("##### Outputs")
+            gui.write("##### Outputs")
 
         visible_out_fields = {}
         # only show the first output & run url field by default, and hide others
@@ -227,8 +227,8 @@ To understand what each field represents, check out our [API docs](https://api.g
             "error_msg": "Error Msg",
         } | {k: v for k, v in output_fields.items() if k not in visible_out_fields}
 
-        output_columns_old = st.session_state.pop("output_columns", {})
-        output_columns_new = st.session_state.setdefault("output_columns", {})
+        output_columns_old = gui.session_state.pop("output_columns", {})
+        output_columns_new = gui.session_state.setdefault("output_columns", {})
 
         for fields, div, checked in (
             (visible_out_fields, visible_col2, True),
@@ -236,7 +236,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         ):
             for field, title in fields.items():
                 with div:
-                    col = st.checkbox(
+                    col = gui.checkbox(
                         label="`" + title + "`",
                         key="--output-mapping:" + field,
                         value=bool(output_columns_old.get(field, checked)),
@@ -244,10 +244,10 @@ To understand what each field represents, check out our [API docs](https://api.g
                 if col:
                     output_columns_new[field] = title
 
-        st.write("---")
-        st.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")
+        gui.write("---")
+        gui.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")
         list_view_editor(
-            add_btn_label="➕ Add an Eval",
+            add_btn_label="Add an Eval",
             key="eval_urls",
             render_inputs=self.render_eval_url_inputs,
             flatten_dict_key="url",
@@ -257,28 +257,28 @@ To understand what each field represents, check out our [API docs](https://api.g
         render_documents(state)
 
     def render_output(self):
-        eval_runs = st.session_state.get("eval_runs")
+        eval_runs = gui.session_state.get("eval_runs")
 
         if eval_runs:
-            _backup = st.session_state
+            _backup = gui.session_state
             for url in eval_runs:
                 try:
                     page_cls, sr, _ = url_to_runs(url)
                 except SavedRun.DoesNotExist:
                     continue
-                st.set_session_state(sr.state)
+                gui.set_session_state(sr.state)
                 try:
                     page_cls().render_output()
                 except Exception as e:
-                    st.error(repr(e))
-                st.write(url)
-                st.write("---")
-            st.set_session_state(_backup)
+                    gui.error(repr(e))
+                gui.write(url)
+                gui.write("---")
+            gui.set_session_state(_backup)
         else:
-            files = st.session_state.get("output_documents", [])
+            files = gui.session_state.get("output_documents", [])
             for file in files:
-                st.write(file)
-                st.data_table(file)
+                gui.write(file)
+                gui.data_table(file)
 
     def run_v2(
         self,
@@ -318,7 +318,9 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     result, sr = sr.submit_api_call(
-                        current_user=self.request.user, request_body=request_body
+                        current_user=self.request.user,
+                        request_body=request_body,
+                        parent_pr=pr,
                     )
                     get_celery_result_db_safe(result)
                     sr.refresh_from_db()
@@ -388,7 +390,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 documents=response.output_documents
             ).dict(exclude_unset=True)
             result, sr = sr.submit_api_call(
-                current_user=self.request.user, request_body=request_body
+                current_user=self.request.user, request_body=request_body, parent_pr=pr
             )
             get_celery_result_db_safe(result)
             sr.refresh_from_db()
@@ -404,7 +406,7 @@ More tips in the Details below.
         """
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
 Building complex AI workflows like copilot) and then evaluating each iteration is complex.
 Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs.
@@ -426,12 +428,12 @@ To get started:
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        added_options = init_workflow_selector(d, key)
+        init_workflow_selector(d, key)
 
-        col1, col2, col3, col4 = st.columns([9, 1, 1, 1], responsive=False)
+        col1, col2, col3, col4 = gui.columns([9, 1, 1, 1], responsive=False)
         if not d.get("workflow") and d.get("url"):
             with col1:
-                url = st.text_input(
+                url = gui.text_input(
                     "",
                     key=key,
                     value=d.get("url"),
@@ -441,34 +443,35 @@ To get started:
                 edit_done_button(key)
         else:
             with col1:
-                scol1, scol2 = st.columns([1, 1], responsive=False)
+                scol1, scol2 = gui.columns([1, 1], responsive=False)
             with scol1:
-                with st.div(className="pt-1"):
+                with gui.div(className="pt-1"):
                     options = {
                         page_cls.workflow: page_cls.get_recipe_title()
                         for page_cls in all_home_pages
                     }
                     last_workflow_key = "__last_run_url_workflow"
-                    workflow = st.selectbox(
+                    workflow = gui.selectbox(
                         "",
                         key=key + ":workflow",
                         value=(
-                            d.get("workflow") or st.session_state.get(last_workflow_key)
+                            d.get("workflow")
+                            or gui.session_state.get(last_workflow_key)
                         ),
                         options=options,
                         format_func=lambda x: options[x],
                     )
                     d["workflow"] = workflow
                     # use this to set default for next time
-                    st.session_state[last_workflow_key] = workflow
+                    gui.session_state[last_workflow_key] = workflow
             with scol2:
                 page_cls = Workflow(workflow).page_cls
                 options = get_published_run_options(
                     page_cls, current_user=self.request.user
                 )
-                options.update(added_options)
-                with st.div(className="pt-1"):
-                    url = st.selectbox(
+                options.update(d.get("--added_workflows", {}))
+                with gui.div(className="pt-1"):
+                    url = gui.selectbox(
                         "",
                         key=key,
                         options=options,
@@ -478,14 +481,14 @@ To get started:
             with col2:
                 edit_button(key)
         with col3:
-            url_button(url)
+            gui.url_button(url)
         with col4:
             del_button(del_key)
 
         try:
             url_to_runs(url)
         except Exception as e:
-            st.error(repr(e))
+            gui.error(repr(e))
         d["url"] = url
 
     def render_eval_url_inputs(self, key: str, del_key: str | None, d: dict):
@@ -588,7 +591,7 @@ def is_obj(field_props: dict | None) -> bool:
     return bool(field_props.get("type") == "object" or field_props.get("$ref"))
 
 
-@st.cache_in_session_state
+@gui.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
     try:
         dfs = map_parallel(read_df_any, files)
@@ -617,7 +620,8 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
 
 def list_view_editor(
     *,
-    add_btn_label: str,
+    add_btn_label: str = None,
+    add_btn_type: str = "secondary",
     key: str,
     render_labels: typing.Callable = None,
     render_inputs: typing.Callable[[str, str, dict], None],
@@ -625,9 +629,9 @@ def list_view_editor(
 ):
     if flatten_dict_key:
         list_key = f"--list-view:{key}"
-        st.session_state.setdefault(
+        gui.session_state.setdefault(
             list_key,
-            [{flatten_dict_key: val} for val in st.session_state.get(key, [])],
+            [{flatten_dict_key: val} for val in gui.session_state.get(key, [])],
         )
         new_lst = list_view_editor(
             add_btn_label=add_btn_label,
@@ -636,25 +640,27 @@ def list_view_editor(
             render_inputs=render_inputs,
         )
         ret = [d[flatten_dict_key] for d in new_lst]
-        st.session_state[key] = ret
+        gui.session_state[key] = ret
         return ret
 
-    old_lst = st.session_state.setdefault(key, [])
+    old_lst = gui.session_state.get(key) or []
     add_key = f"--{key}:add"
-    if st.session_state.get(add_key):
+    if gui.session_state.get(add_key):
         old_lst.append({})
-    label_placeholder = st.div()
+    label_placeholder = gui.div()
     new_lst = []
     for d in old_lst:
         entry_key = d.setdefault("__key__", f"--{key}:{uuid.uuid1()}")
         del_key = entry_key + ":del"
-        if st.session_state.pop(del_key, None):
+        if gui.session_state.pop(del_key, None):
             continue
         render_inputs(entry_key, del_key, d)
         new_lst.append(d)
     if new_lst and render_labels:
         with label_placeholder:
             render_labels()
-    st.session_state[key] = new_lst
-    st.button(add_btn_label, key=add_key)
+    gui.session_state[key] = new_lst
+    if add_btn_label:
+        with gui.center():
+            gui.button(f"{icons.add} {add_btn_label}", key=add_key, type=add_btn_type)
     return new_lst

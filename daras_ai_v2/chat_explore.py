@@ -1,6 +1,6 @@
 import datetime
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import BotIntegration, Platform, PublishedRunVisibility, Message
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
@@ -12,10 +12,10 @@ from recipes.VideoBots import VideoBotsPage
 
 
 def render():
-    st.write("# Explore our Bots")
-    st.caption("Tap on a bot to chat with it.")
+    gui.write("# Explore our Bots")
+    gui.caption("Tap on a bot to chat with it.")
 
-    st.newline()
+    gui.newline()
 
     integrations = BotIntegration.objects.filter(
         published_run__isnull=False,
@@ -27,7 +27,7 @@ def render():
 
 
 def _render_bi(bi: BotIntegration):
-    st.html(
+    gui.html(
         f"""
         <h4>
             {Platform(bi.platform).get_icon()} 
@@ -39,7 +39,7 @@ def _render_bi(bi: BotIntegration):
     )
 
     if bi.published_run.created_by:
-        with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
+        with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
             VideoBotsPage.render_author(
                 bi.published_run.created_by,
                 image_size="20px",
@@ -49,20 +49,20 @@ def _render_bi(bi: BotIntegration):
     tb = get_title_breadcrumbs(
         VideoBotsPage, bi.published_run.saved_run, bi.published_run
     )
-    st.write(tb.h1_title)
+    gui.write(tb.h1_title)
 
-    with st.div(className="d-flex align-items-center justify-content-between"):
-        with st.div():
+    with gui.div(className="d-flex align-items-center justify-content-between"):
+        with gui.div():
             updated_at = bi.published_run.saved_run.updated_at
             if updated_at and isinstance(updated_at, datetime.datetime):
-                st.caption("Loading...", **render_local_dt_attrs(updated_at))
+                gui.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         num_msgs = Message.objects.filter(conversation__bot_integration=bi).count()
         if num_msgs:
             msg_count = format_number_with_suffix(num_msgs)
-            st.caption(f"{icons.chat} {msg_count} Msgs", unsafe_allow_html=True)
+            gui.caption(f"{icons.chat} {msg_count} Msgs", unsafe_allow_html=True)
         else:
-            st.caption("&nbsp;", unsafe_allow_html=True)
+            gui.caption("&nbsp;", unsafe_allow_html=True)
 
     if bi.published_run.notes:
-        st.caption(bi.published_run.notes, line_clamp=2)
+        gui.caption(bi.published_run.notes, line_clamp=2)

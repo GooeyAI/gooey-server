@@ -1,35 +1,30 @@
 import json
-import smtplib
 import time
-from email.mime.application import MIMEApplication
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from os.path import basename
 
+import gooey_gui as gui
 import requests
-import gooey_ui as st
 from decouple import config
 
 
 def get_audio(uuid):
-    with st.spinner(f"Generating your audio file ..."):
+    with gui.spinner(f"Generating your audio file ..."):
         while True:
             data = requests.get(f"https://api.uberduck.ai/speak-status?uuid={uuid}")
             path = json.loads(data.text)["path"]
             if path:
-                st.audio(path)
+                gui.audio(path)
                 break
             else:
                 time.sleep(2)
 
 
 def main():
-    st.write("# Text To Audio")
+    gui.write("# Text To Audio")
 
-    with st.form(key="send_email", clear_on_submit=False):
-        voice = st.text_input(label="Voice", value="zwf")
-        text = st.text_area(label="Text input", value="This is a test.")
-        submitted = st.form_submit_button("Generate")
+    with gui.form(key="send_email", clear_on_submit=False):
+        voice = gui.text_input(label="Voice", value="zwf")
+        text = gui.text_area(label="Text input", value="This is a test.")
+        submitted = gui.form_submit_button("Generate")
         if submitted:
             response = requests.post(
                 "https://api.uberduck.ai/speak",

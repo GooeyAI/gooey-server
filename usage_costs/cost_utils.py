@@ -1,18 +1,18 @@
 from loguru import logger
 
-from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
 from usage_costs.models import (
     UsageCost,
     ModelSku,
     ModelPricing,
 )
+import gooey_gui as gui
 
 
 def record_cost_auto(model: str, sku: ModelSku, quantity: int):
     from bots.models import SavedRun
 
-    _, run_id, uid = extract_query_params(gooey_get_query_params())
+    _, run_id, uid = extract_query_params(gui.get_query_params())
     if not run_id or not uid:
         return
 
