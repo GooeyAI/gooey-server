@@ -1,12 +1,13 @@
+import json
 from itertools import zip_longest
 from textwrap import dedent
 
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
@@ -16,6 +17,41 @@ from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
+
+
+def integrations_welcome_screen(title: str):
+    with gui.center():
+        gui.markdown(f"#### {title}")
+
+    col1, col2, col3 = gui.columns(
+        3,
+        column_props=dict(
+            style=dict(
+                display="flex",
+                flexDirection="column",
+                alignItems="center",
+                textAlign="center",
+                maxWidth="300px",
+            ),
+        ),
+        style={"justifyContent": "center"},
+    )
+    with col1:
+        gui.html("🏃‍♀️", style={"fontSize": "4rem"})
+        gui.markdown(
+            """
+            1. Fork & Save your Run
+            """
+        )
+        gui.caption("Make changes, Submit & Save your perfect workflow")
+    with col2:
+        gui.image(icons.integrations_img, alt="Integrations", style={"height": "5rem"})
+        gui.markdown("2. Connect to Slack, Whatsapp or your App")
+        gui.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
+    with col3:
+        gui.html("📈", style={"fontSize": "4rem"})
+        gui.markdown("3. Test, Analyze & Iterate")
+        gui.caption("Analyze your usage. Update your Saved Run to test changes.")
 
 
 def general_integration_settings(bi: BotIntegration, current_user: AppUser):
@@ -94,7 +130,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
                 input_analysis_runs.append(dict(saved_run=sr, published_run=None))
 
     list_view_editor(
-        add_btn_label="➕ Add",
+        add_btn_label="Add",
         key="analysis_urls",
         render_inputs=render_workflow_url_input,
         flatten_dict_key="url",
@@ -126,7 +162,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
 
 
 def twilio_specific_settings(bi: BotIntegration):
-    SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url"]  # fmt:skip
+    SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url", "twilio_fresh_conversation_per_call"]  # fmt:skip
     if gui.session_state.get(f"_bi_reset_{bi.id}"):
         for field in SETTINGS_FIELDS:
             gui.session_state[f"_bi_{field}_{bi.id}"] = BotIntegration._meta.get_field(
@@ -165,6 +201,11 @@ def twilio_specific_settings(bi: BotIntegration):
     )
     gui.caption(
         "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
+    )
+    bi.twilio_fresh_conversation_per_call = gui.checkbox(
+        "🔄 Fresh Conversation History for Each Call",
+        value=bi.twilio_fresh_conversation_per_call,
+        key=f"_bi_twilio_fresh_conversation_per_call_{bi.id}",
     )
 
 
@@ -311,19 +352,27 @@ def get_bot_test_link(bi: BotIntegration) -> str | None:
         return None
 
 
-def get_web_widget_embed_code(bi: BotIntegration) -> str:
+def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str:
     lib_src = get_app_route_url(
         chat_lib_route,
         path_params=dict(
             integration_id=bi.api_integration_id(),
             integration_name=slugify(bi.name) or "untitled",
         ),
-    )
+    ).rstrip("/")
+    if config is None:
+        config = {}
     return dedent(
-        f"""
-        <div id="gooey-embed"></div>
-        <script async defer onload="GooeyEmbed.mount()" src="{lib_src}"></script>
         """
+        <div id="gooey-embed"></div>
+        <script>
+            function onLoadGooeyEmbed() {
+                GooeyEmbed.mount(%(config_json)s);
+            }
+        </script>
+        <script async defer onload="onLoadGooeyEmbed()" src="%(lib_src)s"></script>
+        """
+        % dict(config_json=json.dumps(config), lib_src=lib_src)
     ).strip()
 
 
@@ -375,7 +424,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 mode="inline",
                 showSources=True,
                 enablePhotoUpload=False,
-                enableLipsyncVideo=False,
+                autoPlayResponses=True,
                 enableAudioMessage=True,
                 branding=(
                     dict(showPoweredByGooey=True)
@@ -397,8 +446,8 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             config["enableAudioMessage"] = gui.checkbox(
                 "Enable Audio Message", value=config["enableAudioMessage"]
             )
-            config["enableLipsyncVideo"] = gui.checkbox(
-                "Enable Lipsync Video", value=config["enableLipsyncVideo"]
+            config["autoPlayResponses"] = gui.checkbox(
+                "Auto-play responses", value=config["autoPlayResponses"]
             )
             # config["branding"]["showPoweredByGooey"] = gui.checkbox(
             #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]

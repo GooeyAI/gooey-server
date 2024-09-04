@@ -1,4 +1,5 @@
 import base64
+import json
 import mimetypes
 import re
 import typing
@@ -32,7 +33,6 @@ from daras_ai_v2.text_splitter import (
 )
 from functions.recipe_functions import LLMTools
 
-DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
     "Don't output markdown or HTML, instead print the JSON object directly without formatting."
@@ -76,7 +76,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
-        model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o"),
+        model_id="gpt-4o-2024-08-06",
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=10,
@@ -92,6 +92,14 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         supports_json=True,
+    )
+    chatgpt_4_o = LLMSpec(
+        label="ChatGPT-4o (openai) 🧪",
+        model_id="chatgpt-4o-latest",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=10,
+        is_vision_model=True,
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
@@ -233,13 +241,23 @@ class LargeLanguageModels(Enum):
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-    gemini_1_5_pro = LLMSpec(
-        label="Gemini 1.5 Pro (Google)",
-        model_id="gemini-1.5-pro-preview-0409",
+    gemini_1_5_flash = LLMSpec(
+        label="Gemini 1.5 Flash (Google)",
+        model_id="gemini-1.5-flash",
         llm_api=LLMApis.gemini,
-        context_window=1_000_000,
+        context_window=1_048_576,
         price=15,
         is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_1_5_pro = LLMSpec(
+        label="Gemini 1.5 Pro (Google)",
+        model_id="gemini-1.5-pro",
+        llm_api=LLMApis.gemini,
+        context_window=2_097_152,
+        price=15,
+        is_vision_model=True,
+        supports_json=True,
     )
     gemini_1_pro_vision = LLMSpec(
         label="Gemini 1.0 Pro Vision (Google)",
@@ -281,6 +299,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=15,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_opus = LLMSpec(
         label="Claude 3 Opus [L] (Anthropic)",
@@ -289,6 +308,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=75,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_sonnet = LLMSpec(
         label="Claude 3 Sonnet [M] (Anthropic)",
@@ -297,6 +317,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=15,
         is_vision_model=True,
+        supports_json=True,
     )
     claude_3_haiku = LLMSpec(
         label="Claude 3 Haiku [S] (Anthropic)",
@@ -305,11 +326,27 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         price=2,
         is_vision_model=True,
+        supports_json=True,
     )
 
     sea_lion_7b_instruct = LLMSpec(
-        label="SEA-LION-7B-Instruct (aisingapore)",
+        label="SEA-LION-7B-Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/sea-lion-7b-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=2048,
+        price=1,
+        is_deprecated=True,
+    )
+    llama3_8b_cpt_sea_lion_v2_instruct = LLMSpec(
+        label="Llama3 8B CPT SEA-LIONv2 Instruct (aisingapore)",
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=8192,
+        price=1,
+    )
+    sarvam_2b = LLMSpec(
+        label="Sarvam 2B (sarvamai)",
+        model_id="sarvamai/sarvam-2b-v0.5",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
         price=1,
@@ -452,7 +489,6 @@ def run_language_model(
         if prompt and not messages:
             # convert text prompt to chat messages
             messages = [
-                format_chat_entry(role=CHATML_ROLE_SYSTEM, content=DEFAULT_SYSTEM_MSG),
                 format_chat_entry(role=CHATML_ROLE_USER, content=prompt),
             ]
         if not model.is_vision_model:
@@ -599,6 +635,17 @@ def _run_text_model(
                 temperature=temperature,
                 stop=stop,
             )
+        case LLMApis.self_hosted:
+            return [
+                _run_self_hosted_llm(
+                    model=model,
+                    text_inputs=prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    avoid_repetition=avoid_repetition,
+                    stop=stop,
+                )
+            ]
         case _:
             raise UserError(f"Unsupported text api: {api}")
 
@@ -642,6 +689,7 @@ def _run_chat_model(
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 temperature=temperature,
+                response_format_type=response_format_type,
             )
         case LLMApis.palm2:
             if tools:
@@ -672,16 +720,22 @@ def _run_chat_model(
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stop=stop,
+                response_format_type=response_format_type,
             )
         case LLMApis.self_hosted:
-            return _run_self_hosted_chat(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                avoid_repetition=avoid_repetition,
-                stop=stop,
-            )
+            return [
+                {
+                    "role": CHATML_ROLE_ASSISTANT,
+                    "content": _run_self_hosted_llm(
+                        model=model,
+                        text_inputs=messages,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        avoid_repetition=avoid_repetition,
+                        stop=stop,
+                    ),
+                },
+            ]
         # case LLMApis.together:
         #     if tools:
         #         raise UserError("Only OpenAI chat models support Tools")
@@ -697,32 +751,36 @@ def _run_chat_model(
             raise UserError(f"Unsupported chat api: {api}")
 
 
-def _run_self_hosted_chat(
+def _run_self_hosted_llm(
     *,
     model: str,
-    messages: list[ConversationEntry],
+    text_inputs: list[ConversationEntry] | str,
     max_tokens: int,
     temperature: float,
     avoid_repetition: bool,
     stop: list[str] | None,
-) -> list[dict]:
+) -> str:
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
     # sea lion doesnt support system prompt
-    if model == LargeLanguageModels.sea_lion_7b_instruct.model_id:
-        for i, entry in enumerate(messages):
+    if (
+        not isinstance(text_inputs, str)
+        and model == LargeLanguageModels.sea_lion_7b_instruct.model_id
+    ):
+        for i, entry in enumerate(text_inputs):
             if entry["role"] == CHATML_ROLE_SYSTEM:
-                messages[i]["role"] = CHATML_ROLE_USER
-                messages.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
+                text_inputs[i]["role"] = CHATML_ROLE_USER
+                text_inputs.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
 
     ret = call_celery_task(
         "llm.chat",
         pipeline=dict(
             model_id=model,
+            fallback_chat_template_from="meta-llama/Llama-2-7b-chat-hf",
         ),
         inputs=dict(
-            messages=messages,
+            text_inputs=text_inputs,
             max_new_tokens=max_tokens,
             stop_strings=stop,
             temperature=temperature,
@@ -742,12 +800,7 @@ def _run_self_hosted_chat(
             quantity=usage["completion_tokens"],
         )
 
-    return [
-        {
-            "role": CHATML_ROLE_ASSISTANT,
-            "content": ret["generated_text"],
-        }
-    ]
+    return ret["generated_text"]
 
 
 def _run_anthropic_chat(
@@ -757,6 +810,7 @@ def _run_anthropic_chat(
     max_tokens: int,
     temperature: float,
     stop: list[str] | None,
+    response_format_type: ResponseFormatType | None,
 ):
     import anthropic
     from usage_costs.cost_utils import record_cost_auto
@@ -790,6 +844,27 @@ def _run_anthropic_chat(
             content = get_entry_text(msg)
         anthropic_msgs.append({"role": role, "content": content})
 
+    if response_format_type == "json_object":
+        kwargs = dict(
+            tools=[
+                {
+                    "name": "json_output",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "response": {
+                                "type": "object",
+                                "description": "The response to the user's prompt as a JSON object.",
+                            },
+                        },
+                    },
+                }
+            ],
+            tool_choice={"type": "tool", "name": "json_output"},
+        )
+    else:
+        kwargs = {}
+
     client = anthropic.Anthropic()
     response = client.messages.create(
         model=model,
@@ -798,6 +873,7 @@ def _run_anthropic_chat(
         messages=anthropic_msgs,
         stop_sequences=stop,
         temperature=temperature,
+        **kwargs,
     )
 
     record_cost_auto(
@@ -811,9 +887,35 @@ def _run_anthropic_chat(
         quantity=response.usage.output_tokens,
     )
 
+    if response_format_type == "json_object":
+        if response.stop_reason == "max_tokens":
+            raise UserError(
+                "Claude’s response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
+                "Please retry the request with a higher max_tokens value to get the full tool use. "
+            ) from anthropic.AnthropicError(
+                f"Hit {response.stop_reason=} when generating JSON: {response.content=}"
+            )
+        if response.stop_reason != "tool_use":
+            raise UserError(
+                f"Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
+            ) from anthropic.AnthropicError(
+                f"Failed to generate JSON response: {response.stop_reason=} {response.content}"
+            )
+        for entry in response.content:
+            if entry.type != "tool_use":
+                continue
+            response = entry.input
+            if isinstance(response, dict):
+                response = response.get("response", {})
+            return [
+                {
+                    "role": CHATML_ROLE_ASSISTANT,
+                    "content": json.dumps(response),
+                }
+            ]
     return [
         {
-            "role": CHATML_ROLE_USER,
+            "role": CHATML_ROLE_ASSISTANT,
             "content": "".join(entry.text for entry in response.content),
         }
     ]
@@ -1184,6 +1286,7 @@ def _run_gemini_pro(
     messages: list[ConversationEntry],
     max_output_tokens: int,
     temperature: float,
+    response_format_type: ResponseFormatType | None,
 ):
     contents = []
     for entry in messages:
@@ -1216,6 +1319,7 @@ def _run_gemini_pro(
         contents=contents,
         max_output_tokens=max_output_tokens,
         temperature=temperature,
+        response_format_type=response_format_type,
     )
     return [{"role": CHATML_ROLE_ASSISTANT, "content": msg}]
 
@@ -1264,18 +1368,22 @@ def _call_gemini_api(
     contents: list[dict],
     max_output_tokens: int,
     temperature: float,
-    stop: list[str] = None,
+    stop: list[str] | None = None,
+    response_format_type: ResponseFormatType | None = None,
 ) -> str:
     session, project = get_google_auth_session()
+    generation_config = {
+        "temperature": temperature,
+        "maxOutputTokens": max_output_tokens,
+        "stopSequences": stop or [],
+    }
+    if response_format_type == "json_object":
+        generation_config["response_mime_type"] = "application/json"
     r = session.post(
         f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:generateContent",
         json={
             "contents": contents,
-            "generation_config": {
-                "temperature": temperature,
-                "maxOutputTokens": max_output_tokens,
-                "stopSequences": stop or [],
-            },
+            "generation_config": generation_config,
         },
     )
     raise_for_status(r)

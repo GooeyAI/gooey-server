@@ -20,7 +20,9 @@ from daras_ai_v2.profiles import edit_user_profile_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.root import page_wrapper, get_og_url_path
 
-app = APIRouter()
+from routers.custom_api_router import CustomAPIRouter
+
+app = CustomAPIRouter()
 
 
 @gui.route(app, "/payment-processing/")

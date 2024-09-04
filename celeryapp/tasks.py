@@ -11,6 +11,7 @@ import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
+from loguru import logger
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
@@ -40,7 +41,8 @@ def runner_task(
     uid: str,
     channel: str,
     unsaved_state: dict[str, typing.Any] = None,
-) -> int:
+    deduct_credits: bool = True,
+):
     start_time = time()
     error_msg = None
 
@@ -95,6 +97,7 @@ def runner_task(
     except Exception as e:
         if isinstance(e, UserError):
             sentry_level = e.sentry_level
+            logger.warning("\n".join(map(str, [e, e.__cause__])))
         else:
             sentry_level = "error"
             traceback.print_exc()
@@ -105,13 +108,14 @@ def runner_task(
 
     # run completed successfully, deduct credits
     else:
-        sr.transaction, sr.price = page.deduct_credits(gui.session_state)
+        if deduct_credits:
+            sr.transaction, sr.price = page.deduct_credits(gui.session_state)
 
     # save everything, mark run as completed
     finally:
         save_on_step(done=True)
 
-    return sr.id
+    post_runner_tasks.delay(sr.id)
 
 
 @app.task

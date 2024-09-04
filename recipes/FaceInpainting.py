@@ -252,7 +252,10 @@ class FaceInpaintingPage(BasePage):
     def run(self, state: dict):
         if not self.request.user.disable_safety_checker:
             yield "Running safety checker..."
-            safety_checker(image=state["input_image"])
+            safety_checker(
+                text=state["text_prompt"],
+                image=state["input_image"],
+            )
 
         yield "Extracting Face..."
 

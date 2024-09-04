@@ -1,8 +1,14 @@
+from copy import copy
+
 import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import AppUser, PaymentProvider, TransactionReason
+from app_users.models import (
+    AppUser,
+    PaymentProvider,
+    TransactionReason,
+)
 from daras_ai_v2 import paypal
 from .models import Subscription
 from .plans import PricingPlan
@@ -59,7 +65,7 @@ class PaypalWebhookHandler:
             )
             return
 
-        _set_user_subscription(
+        set_user_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             uid=pp_sub.custom_id,
@@ -69,8 +75,11 @@ class PaypalWebhookHandler:
     @classmethod
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
-        _remove_subscription_for_user(
-            provider=cls.PROVIDER, uid=pp_sub.custom_id, external_id=pp_sub.id
+        set_user_subscription(
+            uid=pp_sub.custom_id,
+            plan=PricingPlan.STARTER,
+            provider=None,
+            external_id=None,
         )
 
 
@@ -79,6 +88,8 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_invoice_paid(cls, uid: str, invoice: stripe.Invoice):
+        from app_users.tasks import save_stripe_default_payment_method
+
         kwargs = {}
         if invoice.subscription:
             kwargs["plan"] = PricingPlan.get_by_key(
@@ -97,32 +108,48 @@ class StripeWebhookHandler:
             reason = TransactionReason.AUTO_RECHARGE
         else:
             reason = TransactionReason.ADDON
+
+        amount = invoice.lines.data[0].quantity
+        charged_amount = invoice.lines.data[0].amount
         add_balance_for_payment(
             uid=uid,
-            amount=invoice.lines.data[0].quantity,
+            amount=amount,
             invoice_id=invoice.id,
             payment_provider=cls.PROVIDER,
-            charged_amount=invoice.lines.data[0].amount,
+            charged_amount=charged_amount,
             reason=reason,
             **kwargs,
         )
 
+        save_stripe_default_payment_method.delay(
+            payment_intent_id=invoice.payment_intent,
+            uid=uid,
+            amount=amount,
+            charged_amount=charged_amount,
+            reason=reason,
+        )
+
     @classmethod
     def handle_checkout_session_completed(cls, uid: str, session_data):
-        if setup_intent_id := session_data.get("setup_intent") is None:
+        setup_intent_id = session_data.get("setup_intent")
+        if not setup_intent_id:
             # not a setup mode checkout -- do nothing
             return
+
         setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
-
-        # subscription_id was passed to metadata when creating the session
-        sub_id = setup_intent.metadata["subscription_id"]
-        assert (
-            sub_id
-        ), f"subscription_id is missing in setup_intent metadata {setup_intent}"
-
-        stripe.Subscription.modify(
-            sub_id, default_payment_method=setup_intent.payment_method
-        )
+        if sub_id := setup_intent.metadata.get("subscription_id"):
+            # subscription_id was passed to metadata when creating the session
+            stripe.Subscription.modify(
+                sub_id, default_payment_method=setup_intent.payment_method
+            )
+        elif customer_id := session_data.get("customer"):
+            # no subscription_id, so update the customer's default payment method instead
+            stripe.Customer.modify(
+                customer_id,
+                invoice_settings=dict(
+                    default_payment_method=setup_intent.payment_method
+                ),
+            )
 
     @classmethod
     def handle_subscription_updated(cls, uid: str, stripe_sub: stripe.Subscription):
@@ -146,7 +173,7 @@ class StripeWebhookHandler:
             )
             return
 
-        _set_user_subscription(
+        set_user_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             uid=uid,
@@ -154,10 +181,12 @@ class StripeWebhookHandler:
         )
 
     @classmethod
-    def handle_subscription_cancelled(cls, uid: str, stripe_sub):
-        logger.info(f"Stripe subscription cancelled: {stripe_sub.id}")
-        _remove_subscription_for_user(
-            provider=cls.PROVIDER, uid=uid, external_id=stripe_sub.id
+    def handle_subscription_cancelled(cls, uid: str):
+        set_user_subscription(
+            uid=uid,
+            plan=PricingPlan.STARTER,
+            provider=PaymentProvider.STRIPE,
+            external_id=None,
         )
 
 
@@ -190,44 +219,37 @@ def add_balance_for_payment(
         send_monthly_spending_notification_email.delay(user.id)
 
 
-def _set_user_subscription(
-    *, provider: PaymentProvider, plan: PricingPlan, uid: str, external_id: str
-):
+def set_user_subscription(
+    *,
+    uid: str,
+    plan: PricingPlan,
+    provider: PaymentProvider | None,
+    external_id: str | None,
+    amount: int = None,
+    charged_amount: int = None,
+) -> Subscription:
     with transaction.atomic():
-        subscription, created = Subscription.objects.get_or_create(
-            payment_provider=provider,
-            external_id=external_id,
-            defaults=dict(plan=plan.db_value),
-        )
-        subscription.plan = plan.db_value
-        subscription.full_clean()
-        subscription.save()
-
         user = AppUser.objects.get_or_create_from_uid(uid)[0]
-        existing = user.subscription
 
-        user.subscription = subscription
-        user.save(update_fields=["subscription"])
+        old_sub = user.subscription
+        if old_sub:
+            new_sub = copy(old_sub)
+        else:
+            old_sub = None
+            new_sub = Subscription()
 
-    if not existing:
-        return
+        new_sub.plan = plan.db_value
+        new_sub.payment_provider = provider
+        new_sub.external_id = external_id
+        new_sub.full_clean(amount=amount, charged_amount=charged_amount)
+        new_sub.save()
 
-    # cancel existing subscription if it's not the same as the new one
-    if existing.external_id != external_id:
-        existing.cancel()
+        if not old_sub:
+            user.subscription = new_sub
+            user.save(update_fields=["subscription"])
 
-    # delete old db record if it exists
-    if existing.id != subscription.id:
-        existing.delete()
+    # cancel previous subscription if it's not the same as the new one
+    if old_sub and old_sub.external_id != external_id:
+        old_sub.cancel()
 
-
-def _remove_subscription_for_user(
-    *, uid: str, provider: PaymentProvider, external_id: str
-):
-    AppUser.objects.filter(
-        uid=uid,
-        subscription__payment_provider=provider,
-        subscription__external_id=external_id,
-    ).update(
-        subscription=None,
-    )
+    return new_sub

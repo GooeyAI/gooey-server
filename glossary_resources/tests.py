@@ -1,6 +1,6 @@
 import pytest
 
-from daras_ai.image_input import storage_blob_for
+from daras_ai.image_input import gcs_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
@@ -64,7 +64,7 @@ def glossary_url():
     import pandas as pd
 
     df = pd.DataFrame.from_records(GLOSSARY)
-    blob = storage_blob_for("test glossary.csv")
+    blob = gcs_blob_for("test glossary.csv")
     blob.upload_from_string(df.to_csv(index=False).encode(), content_type="text/csv")
 
     try:

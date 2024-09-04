@@ -77,6 +77,7 @@ twilio_fields = [
     "twilio_username",
     "twilio_password",
     "twilio_use_missed_call",
+    "twilio_fresh_conversation_per_call",
     "twilio_initial_text",
     "twilio_initial_audio_url",
     "twilio_waiting_text",
@@ -290,12 +291,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 class PublishedRunVersionAdmin(admin.ModelAdmin):
     search_fields = ["id", "version_id", "published_run__published_run_id"]
     autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+    readonly_fields = ["created_at"]
 
 
 class PublishedRunVersionInline(admin.TabularInline):
     model = PublishedRunVersion
     extra = 0
     autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
+    readonly_fields = PublishedRunVersionAdmin.readonly_fields
 
 
 @admin.register(PublishedRun)
@@ -438,7 +441,7 @@ class SavedRunAdmin(admin.ModelAdmin):
             page = Workflow(sr.workflow).page_cls(
                 request=SimpleNamespace(user=AppUser.objects.get(uid=sr.uid))
             )
-            page.call_runner_task(sr)
+            page.call_runner_task(sr, deduct_credits=False)
         self.message_user(
             request,
             f"Started re-running {queryset.count()} tasks in the background.",

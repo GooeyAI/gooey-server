@@ -230,6 +230,8 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
+
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
@@ -276,8 +278,10 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "docs",
 ]
 
-SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
-SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
+SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
+SAFETY_CHECKER_BILLING_EMAIL = config(
+    "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
@@ -315,7 +319,6 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
-SEON_API_KEY = config("SEON_API_KEY", None)
 APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
@@ -394,3 +397,8 @@ DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
 TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
 TWILIO_API_KEY_SECRET = config("TWILIO_API_KEY_SECRET", "")
+
+SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
+SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")
+SCRAPING_PROXY_PASSWORD = config("SCRAPING_PROXY_PASSWORD", "")
+SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")

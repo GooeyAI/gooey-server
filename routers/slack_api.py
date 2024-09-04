@@ -2,7 +2,7 @@ import json
 
 import requests
 from django.db import transaction
-from fastapi import APIRouter, HTTPException, Depends, Request, Response, Header
+from fastapi import HTTPException, Depends, Request, Response, Header
 from furl import furl
 from requests import HTTPError
 from requests.auth import HTTPBasicAuth
@@ -10,9 +10,18 @@ from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from bots.models import BotIntegration, Platform, Conversation, Message
+from bots.models import (
+    BotIntegration,
+    Platform,
+    Conversation,
+    Message,
+)
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
+from daras_ai_v2.bot_integration_connect import (
+    connect_bot_to_published_run,
+    load_published_run_from_state,
+)
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import (
@@ -27,12 +36,12 @@ from daras_ai_v2.slack_bot import (
     fetch_user_info,
     parse_slack_response,
 )
-from routers.facebook_api import return_to_app_url
+from routers.custom_api_router import CustomAPIRouter
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
-def slack_connect_url(on_completion: str | None = None):
+def slack_connect_url(pr_id: int):
     return furl(
         "https://slack.com/oauth/v2/authorize",
         query_params=dict(
@@ -65,7 +74,7 @@ def slack_connect_url(on_completion: str | None = None):
                     "groups:write.invites",
                 ]
             ),
-            state=on_completion,
+            state=json.dumps(dict(pr_id=pr_id)),
         ),
     )
 
@@ -76,8 +85,8 @@ def slack_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    on_completion = request.query_params.get("state")
-    retry_button = f'<a href="{slack_connect_url(on_completion)}">Retry</a>'
+    pr = load_published_run_from_state(request)
+    retry_button = f'<a href="{slack_connect_url(pr.id)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -143,9 +152,8 @@ def slack_connect_redirect(request: Request):
     if bi.slack_create_personal_channels:
         create_personal_channels_for_all_members.delay(bi.id)
 
-    return return_to_app_url([bi], on_completion) or HTMLResponse(
-        f"Sucessfully Connected to {slack_team_name} workspace on #{slack_channel_name}! You may now close this page."
-    )
+    redirect_url = connect_bot_to_published_run(bi, pr)
+    return RedirectResponse(redirect_url)
 
 
 @router.post("/__/slack/interaction/")

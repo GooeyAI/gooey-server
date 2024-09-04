@@ -14,6 +14,7 @@ link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
 copy = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
+add = '<i class="fa-regular fa-add"></i>'
 
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'
@@ -30,3 +31,5 @@ card_icons = {
     "jcb": '<i class="fa-brands fa-cc-jcb"></i>',
     "diners": '<i class="fa-brands fa-cc-diners-club"></i>',
 }
+
+integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
