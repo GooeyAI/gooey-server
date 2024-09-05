@@ -426,6 +426,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 enablePhotoUpload=False,
                 autoPlayResponses=True,
                 enableAudioMessage=True,
+                enableConversations=True,
                 branding=(
                     dict(showPoweredByGooey=True)
                     | bi.web_config_extras.get("branding", {})
@@ -441,6 +442,9 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             )
             config["enablePhotoUpload"] = gui.checkbox(
                 "Allow Photo Upload", value=config["enablePhotoUpload"]
+            )
+            config["enableConversations"] = gui.checkbox(
+                'Show "New Chat"', value=config["enableConversations"]
             )
         with scol2:
             config["enableAudioMessage"] = gui.checkbox(
