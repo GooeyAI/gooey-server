@@ -65,7 +65,7 @@ class LipsyncPage(BasePage):
         )
         if not (self.is_current_user_paying() or self.is_current_user_admin()):
             gui.error(
-                "Input Audio longer than 10 seconds will be truncated for free users. Please [upgrade](/account) to generate long videos.",
+                "Output videos will be truncated to 250 frames for free users. Please [upgrade](/account) to generate long videos.",
                 icon="⚠️",
                 color="#ffe8b2",
             )

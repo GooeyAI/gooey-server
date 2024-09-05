@@ -67,6 +67,12 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+        if not (self.is_current_user_paying() or self.is_current_user_admin()):
+            gui.error(
+                "Output videos will be truncated to 250 frames for free users. Please [upgrade](/account) to generate long videos.",
+                icon="⚠️",
+                color="#ffe8b2",
+            )
 
         enum_selector(
             LipsyncModel,
