@@ -42,6 +42,8 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     match event["type"]:
         case "invoice.paid":
             StripeWebhookHandler.handle_invoice_paid(uid, data)
+        case "invoice.payment_failed":
+            StripeWebhookHandler.handle_invoice_failed(uid, data)
         case "checkout.session.completed":
             StripeWebhookHandler.handle_checkout_session_completed(uid, data)
         case "customer.subscription.created" | "customer.subscription.updated":
