@@ -39,6 +39,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         audio_url: str | None
 
         output_video: FieldHttpUrl
+        duration_sec: float | None
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
