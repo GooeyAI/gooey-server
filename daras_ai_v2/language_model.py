@@ -338,8 +338,16 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     llama3_8b_cpt_sea_lion_v2_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2 Instruct (aisingapore)",
+        label="Llama3 8B CPT SEA-LIONv2 Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=8192,
+        price=1,
+        is_deprecated=True,
+    )
+    llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
+        label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
         llm_api=LLMApis.self_hosted,
         context_window=8192,
         price=1,
