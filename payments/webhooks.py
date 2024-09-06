@@ -9,7 +9,10 @@ from daras_ai_v2 import paypal
 from workspaces.models import Workspace
 from .models import Subscription
 from .plans import PricingPlan
-from .tasks import send_monthly_spending_notification_email
+from .tasks import (
+    send_monthly_spending_notification_email,
+    send_payment_failed_email_with_invoice,
+)
 
 
 class PaypalWebhookHandler:
@@ -190,6 +193,28 @@ class StripeWebhookHandler:
             provider=PaymentProvider.STRIPE,
             external_id=None,
         )
+
+    @classmethod
+    def handle_invoice_failed(cls, uid: str, data: dict):
+        if stripe.Charge.list(payment_intent=data["payment_intent"], limit=1).has_more:
+            # we must have already sent an invoice for this to the user. so we should just ignore this event
+            logger.info("Charge already exists for this payment intent")
+            return
+
+        if data.get("metadata", {}).get("auto_recharge"):
+            send_payment_failed_email_with_invoice.delay(
+                uid=uid,
+                invoice_url=data["hosted_invoice_url"],
+                dollar_amt=data["amount_due"] / 100,
+                subject="Payment failure on your Gooey.AI auto-recharge",
+            )
+        elif data.get("subscription_details", {}):
+            send_payment_failed_email_with_invoice.delay(
+                uid=uid,
+                invoice_url=data["hosted_invoice_url"],
+                dollar_amt=data["amount_due"] / 100,
+                subject="Payment failure on your Gooey.AI subscription",
+            )
 
 
 def add_balance_for_payment(

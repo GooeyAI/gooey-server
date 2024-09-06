@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
+from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
@@ -54,7 +55,7 @@ def integrations_welcome_screen(title: str):
         gui.caption("Analyze your usage. Update your Saved Run to test changes.")
 
 
-def general_integration_settings(bi: BotIntegration, current_user: AppUser):
+def general_integration_settings(bi: BotIntegration, request: Request):
     if gui.session_state.get(f"_bi_reset_{bi.id}"):
         gui.session_state[f"_bi_streaming_enabled_{bi.id}"] = (
             BotIntegration._meta.get_field("streaming_enabled").default
@@ -101,9 +102,10 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
             "📊 View Results",
             str(
                 furl(
-                    VideoBotsPage.current_app_url(
-                        RecipeTabs.integrations,
+                    VideoBotsPage.app_url(
+                        tab=RecipeTabs.integrations,
                         path_params=dict(integration_id=bi.api_integration_id()),
+                        query_params=dict(request.query_params),
                     )
                 )
                 / "analysis/"
@@ -119,7 +121,7 @@ def general_integration_settings(bi: BotIntegration, current_user: AppUser):
                 key=key,
                 internal_state=d,
                 del_key=del_key,
-                current_user=current_user,
+                current_user=request.user,
             )
             if not ret:
                 return
@@ -426,6 +428,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 enablePhotoUpload=False,
                 autoPlayResponses=True,
                 enableAudioMessage=True,
+                enableConversations=True,
                 branding=(
                     dict(showPoweredByGooey=True)
                     | bi.web_config_extras.get("branding", {})
@@ -441,6 +444,9 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             )
             config["enablePhotoUpload"] = gui.checkbox(
                 "Allow Photo Upload", value=config["enablePhotoUpload"]
+            )
+            config["enableConversations"] = gui.checkbox(
+                'Show "New Chat"', value=config["enableConversations"]
             )
         with scol2:
             config["enableAudioMessage"] = gui.checkbox(

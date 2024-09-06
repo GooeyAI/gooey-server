@@ -6,10 +6,9 @@ from furl import furl
 from app_users.models import AppUser
 from bots.custom_fields import CustomURLField
 from bots.models import Workflow, SavedRun
+from celeryapp.tasks import get_running_saved_run
 from daras_ai.image_input import truncate_filename
 from daras_ai_v2 import settings
-from daras_ai_v2.query_params_util import extract_query_params
-import gooey_gui as gui
 
 
 class ShortenedURLQuerySet(models.QuerySet):
@@ -17,14 +16,8 @@ class ShortenedURLQuerySet(models.QuerySet):
         self, *, user: AppUser, workflow: Workflow, **kwargs
     ) -> tuple["ShortenedURL", bool]:
         surl, created = self.filter_first_or_create(user=user, **kwargs)
-        _, run_id, uid = extract_query_params(gui.get_query_params())
-        surl.saved_runs.add(
-            SavedRun.objects.get_or_create(
-                workflow=workflow,
-                run_id=run_id,
-                uid=uid,
-            )[0],
-        )
+        sr = get_running_saved_run()
+        surl.saved_runs.add(sr)
         return surl, created
 
     def filter_first_or_create(self, defaults=None, **kwargs):

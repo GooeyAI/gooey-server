@@ -42,6 +42,34 @@ def send_monthly_spending_notification_email(id: int):
         )
 
 
+@app.task
+def send_payment_failed_email_with_invoice(
+    uid: str,
+    invoice_url: str,
+    dollar_amt: float,
+    subject: str,
+):
+    from routers.account import account_route
+
+    user = AppUser.objects.get(uid=uid)
+    if not user.email:
+        logger.error(f"User doesn't have an email: {user=}")
+        return
+
+    send_email_via_postmark(
+        from_address=settings.PAYMENT_EMAIL,
+        to_address=user.email,
+        subject=subject,
+        html_body=templates.get_template("auto_payment_failed_email.html").render(
+            user=user,
+            dollar_amt=f"{dollar_amt:.2f}",
+            invoice_url=invoice_url,
+            account_url=get_app_route_url(account_route),
+        ),
+        message_stream="billing",
+    )
+
+
 def send_monthly_budget_reached_email(workspace: Workspace):
     from routers.account import account_route
 

@@ -262,13 +262,12 @@ def resp_say_or_tts_play(
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
                 {**bot.saved_run.state, "text_prompt": text}
             ).dict()
-            result, sr = TextToSpeechPage.get_root_published_run().submit_api_call(
+            result, sr = TextToSpeechPage.get_root_pr().submit_api_call(
                 current_user=AppUser.objects.get(uid=bot.billing_account_uid),
                 request_body=tts_state,
             )
             # wait for the TTS to finish
-            get_celery_result_db_safe(result)
-            sr.refresh_from_db()
+            sr.wait_for_celery_result(result)
             # check for errors
             if sr.error_msg:
                 raise RuntimeError(sr.error_msg)
