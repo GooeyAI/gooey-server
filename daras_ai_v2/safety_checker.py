@@ -38,8 +38,7 @@ def safety_checker_text(text_input: str):
     )
 
     # wait for checker
-    get_celery_result_db_safe(result)
-    sr.refresh_from_db()
+    sr.wait_for_celery_result(result)
     # if checker failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)

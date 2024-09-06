@@ -2,10 +2,10 @@ import datetime
 import typing
 import uuid
 
+import gooey_gui as gui
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons
@@ -322,8 +322,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                         request_body=request_body,
                         parent_pr=pr,
                     )
-                    get_celery_result_db_safe(result)
-                    sr.refresh_from_db()
+                    sr.wait_for_celery_result(result)
 
                     run_time = datetime.timedelta(
                         seconds=int(sr.run_time.total_seconds())
@@ -390,10 +389,11 @@ To understand what each field represents, check out our [API docs](https://api.g
                 documents=response.output_documents
             ).dict(exclude_unset=True)
             result, sr = sr.submit_api_call(
-                current_user=self.request.user, request_body=request_body, parent_pr=pr
+                current_user=self.request.user,
+                request_body=request_body,
+                parent_pr=pr,
             )
-            get_celery_result_db_safe(result)
-            sr.refresh_from_db()
+            sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())
 
     def preview_description(self, state: dict) -> str:

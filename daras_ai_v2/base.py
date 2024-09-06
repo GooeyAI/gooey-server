@@ -164,8 +164,7 @@ class BasePage:
         self.run_user = run_user
 
     @classmethod
-    @property
-    def endpoint(cls) -> str:
+    def api_endpoint(cls) -> str:
         return f"/v2/{cls.slug_versions[0]}"
 
     def current_app_url(
@@ -241,7 +240,9 @@ class BasePage:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
+        return (
+            furl(settings.API_BASE_URL, query_params=query_params) / cls.api_endpoint()
+        )
 
     @classmethod
     def clean_query_params(cls, *, example_id, run_id, uid) -> dict:

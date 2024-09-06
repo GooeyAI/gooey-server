@@ -267,8 +267,7 @@ def resp_say_or_tts_play(
                 request_body=tts_state,
             )
             # wait for the TTS to finish
-            get_celery_result_db_safe(result)
-            sr.refresh_from_db()
+            sr.wait_for_celery_result(result)
             # check for errors
             if sr.error_msg:
                 raise RuntimeError(sr.error_msg)
