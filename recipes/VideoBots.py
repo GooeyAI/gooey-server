@@ -1015,9 +1015,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
                 {**gui.session_state, "text_prompt": text}
             ).dict()
-            yield from TextToSpeechPage(
-                request=self.request, run_user=self.run_user
-            ).run(tts_state)
+            yield from TextToSpeechPage(request=self.request).run(tts_state)
             response.output_audio.append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -1031,9 +1029,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "selected_model": request.lipsync_model,
                 }
             ).dict()
-            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
-                lip_state
-            )
+            yield from LipsyncPage(request=self.request).run(lip_state)
             response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):

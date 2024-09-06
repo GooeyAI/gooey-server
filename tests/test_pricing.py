@@ -1,6 +1,3 @@
-from types import SimpleNamespace
-
-import gooey_gui as gui
 import pytest
 from starlette.testclient import TestClient
 
@@ -49,10 +46,8 @@ def test_copilot_get_raw_price_round_up():
         dollar_amount=model_pricing.unit_cost * 1 / model_pricing.unit_quantity,
     )
     copilot_page = VideoBotsPage(
-        request=SimpleNamespace(
-            user=user,
-            query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
-        ),
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
     )
     assert (
         copilot_page.get_price_roundoff(state=state)
@@ -114,10 +109,8 @@ def test_multiple_llm_sums_usage_cost():
     )
 
     llm_page = CompareLLMPage(
-        request=SimpleNamespace(
-            user=user,
-            query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
-        )
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
     )
     assert llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS)
 
@@ -163,10 +156,8 @@ def test_workflowmetadata_2x_multiplier():
     metadata.save()
 
     llm_page = CompareLLMPage(
-        request=SimpleNamespace(
-            user=user,
-            query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
-        )
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
     )
     assert (
         llm_page.get_price_roundoff(state=state) == (210 + llm_page.PROFIT_CREDITS) * 2

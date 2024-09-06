@@ -4,7 +4,6 @@ import threading
 import traceback
 import typing
 from time import time
-from types import SimpleNamespace
 
 import gooey_gui as gui
 import requests
@@ -92,10 +91,7 @@ def runner_task(
         page.dump_state_to_sr(gui.session_state | output, sr)
 
     page = page_cls(
-        request=SimpleNamespace(
-            user=AppUser.objects.get(id=user_id),
-            query_params=dict(run_id=run_id, uid=uid),
-        ),
+        user=AppUser.objects.get(id=user_id), query_params=dict(run_id=run_id, uid=uid)
     )
     page.setup_sentry()
     sr = page.current_sr
