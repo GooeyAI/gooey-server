@@ -18,6 +18,7 @@ from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunction, CalledFunctionResponse
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
@@ -358,8 +359,8 @@ class SavedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
-        parent_pr: "PublishedRun" = None,
         deduct_credits: bool = True,
+        parent_pr: "PublishedRun" = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -373,19 +374,21 @@ class SavedRun(models.Model):
                 query_params = page_cls.clean_query_params(
                     example_id=self.example_id, run_id=self.run_id, uid=self.uid
                 )
-            page, result, run_id, uid = pool.apply(
+            return pool.apply(
                 submit_api_call,
                 kwds=dict(
                     page_cls=page_cls,
                     query_params=query_params,
-                    user=current_user,
+                    current_user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
                     deduct_credits=deduct_credits,
                 ),
             )
 
-        return result, page.current_sr
+    def wait_for_celery_result(self, result: "celery.result.AsyncResult"):
+        get_celery_result_db_safe(result)
+        self.refresh_from_db()
 
     def get_creator(self) -> AppUser | None:
         if self.uid:
@@ -1839,8 +1842,8 @@ class PublishedRun(models.Model):
             current_user=current_user,
             request_body=request_body,
             enable_rate_limits=enable_rate_limits,
-            parent_pr=self,
             deduct_credits=deduct_credits,
+            parent_pr=self,
         )
 
 

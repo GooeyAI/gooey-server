@@ -31,7 +31,7 @@ from starlette.status import (
 
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
-from bots.models import RetentionPolicy
+from bots.models import RetentionPolicy, Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
@@ -41,8 +41,11 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from routers.custom_api_router import CustomAPIRouter
+
+if typing.TYPE_CHECKING:
+    from bots.models import SavedRun
+    import celery.result
 
 app = CustomAPIRouter()
 
@@ -117,7 +120,7 @@ class RunSettings(BaseModel):
 
 
 def script_to_api(page_cls: typing.Type[BasePage]):
-    endpoint = page_cls().endpoint.rstrip("/")
+    endpoint = page_cls.api_endpoint().rstrip("/")
     # add the common settings to the request model
     request_model = create_model(
         page_cls.__name__ + "Request",
@@ -156,15 +159,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request: request_model,
         user: AppUser = Depends(api_auth_header),
     ):
-        page, result, run_id, uid = submit_api_call(
+        result, sr = submit_api_call(
             page_cls=page_cls,
-            user=user,
-            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
+            current_user=user,
+            request_body=page_request.dict(exclude_unset=True),
             enable_rate_limits=True,
         )
-        return build_sync_api_response(page=page, result=result, run_id=run_id, uid=uid)
+        return build_sync_api_response(result, sr)
 
     @app.post(
         os.path.join(endpoint, "form"),
@@ -205,15 +208,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request: request_model,
         user: AppUser = Depends(api_auth_header),
     ):
-        page, _, run_id, uid = submit_api_call(
+        result, sr = submit_api_call(
             page_cls=page_cls,
-            user=user,
-            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
+            current_user=user,
+            request_body=page_request.dict(exclude_unset=True),
             enable_rate_limits=True,
         )
-        ret = build_async_api_response(page=page, run_id=run_id, uid=uid)
+        ret = build_async_api_response(sr)
         response.headers["Location"] = ret["status_url"]
         response.headers["Access-Control-Expose-Headers"] = "Location"
         return ret
@@ -332,19 +335,21 @@ def _parse_form_data(
 def submit_api_call(
     *,
     page_cls: typing.Type[BasePage],
-    request_body: dict,
-    user: AppUser,
     query_params: dict,
     retention_policy: RetentionPolicy = None,
+    current_user: AppUser,
+    request_body: dict,
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
-) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
+) -> tuple["celery.result.AsyncResult", "SavedRun"]:
     # init a new page for every request
-    query_params.setdefault("uid", user.uid)
-    self = page_cls(request=SimpleNamespace(user=user, query_params=query_params))
+    query_params.setdefault("uid", current_user.uid)
+    page = page_cls(
+        request=SimpleNamespace(user=current_user, query_params=query_params)
+    )
 
     # get saved state from db
-    state = self.current_sr_to_session_state()
+    state = page.current_sr_to_session_state()
     # load request data
     state.update(request_body)
 
@@ -353,7 +358,7 @@ def submit_api_call(
 
     # create a new run
     try:
-        sr = self.create_new_run(
+        sr = page.create_new_run(
             enable_rate_limits=enable_rate_limits,
             is_api_call=True,
             retention_policy=retention_policy or RetentionPolicy.keep,
@@ -361,20 +366,19 @@ def submit_api_call(
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
     # submit the task
-    result = self.call_runner_task(sr, deduct_credits=deduct_credits)
-    return self, result, sr.run_id, sr.uid
+    result = page.call_runner_task(sr, deduct_credits=deduct_credits)
+    return result, sr
 
 
-def build_async_api_response(*, page: BasePage, run_id: str, uid: str) -> dict:
-    web_url = page.app_url(run_id=run_id, uid=uid)
+def build_async_api_response(sr: "SavedRun") -> dict:
+    web_url = sr.get_app_url()
     status_url = str(
-        furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
-        / page.endpoint.replace("v2", "v3")
+        furl(settings.API_BASE_URL, query_params=dict(run_id=sr.run_id))
+        / Workflow(sr.workflow).page_cls.api_endpoint().replace("v2", "v3")
         / "status/"
     )
-    sr = page.current_sr
     return dict(
-        run_id=run_id,
+        run_id=sr.run_id,
         web_url=web_url,
         created_at=sr.created_at.isoformat(),
         status_url=status_url,
@@ -382,17 +386,11 @@ def build_async_api_response(*, page: BasePage, run_id: str, uid: str) -> dict:
 
 
 def build_sync_api_response(
-    *,
-    page: BasePage,
-    result: "celery.result.AsyncResult",
-    run_id: str,
-    uid: str,
+    result: "celery.result.AsyncResult", sr: "SavedRun"
 ) -> JSONResponse:
-    web_url = page.app_url(run_id=run_id, uid=uid)
+    web_url = sr.get_app_url()
     # wait for the result
-    get_celery_result_db_safe(result)
-    sr = page.current_sr
-    sr.refresh_from_db()
+    sr.wait_for_celery_result(result)
     if sr.retention_policy == RetentionPolicy.delete:
         sr.state = {}
         sr.save(update_fields=["state"])
@@ -401,7 +399,7 @@ def build_sync_api_response(
         return JSONResponse(
             dict(
                 detail=dict(
-                    id=run_id,
+                    id=sr.run_id,
                     url=web_url,
                     created_at=sr.created_at.isoformat(),
                     error=sr.error_msg,
@@ -414,7 +412,7 @@ def build_sync_api_response(
         return JSONResponse(
             jsonable_encoder(
                 dict(
-                    id=run_id,
+                    id=sr.run_id,
                     url=web_url,
                     created_at=sr.created_at.isoformat(),
                     output=sr.api_output(),
