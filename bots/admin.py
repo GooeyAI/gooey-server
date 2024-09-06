@@ -1,6 +1,5 @@
 import datetime
 import json
-from types import SimpleNamespace
 
 import django.db.models
 from django import forms
@@ -439,10 +438,8 @@ class SavedRunAdmin(admin.ModelAdmin):
         sr: SavedRun
         for sr in queryset.all():
             page = Workflow(sr.workflow).page_cls(
-                request=SimpleNamespace(
-                    user=AppUser.objects.get(uid=sr.uid),
-                    query_params=dict(run_id=sr.run_id, uid=sr.uid),
-                )
+                user=AppUser.objects.get(uid=sr.uid),
+                query_params=dict(run_id=sr.run_id, uid=sr.uid),
             )
             page.call_runner_task(sr, deduct_credits=False)
         self.message_user(

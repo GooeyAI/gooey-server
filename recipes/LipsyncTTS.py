@@ -122,12 +122,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         if not self.request.user.disable_safety_checker:
             safety_checker(text=state["text_prompt"])
 
-        yield from TextToSpeechPage(request=self.request, run_user=self.run_user).run(
-            state
-        )
+        yield from TextToSpeechPage(request=self.request).run(state)
         # IMP: Copy output of TextToSpeechPage "audio_url" to Lipsync as "input_audio"
         state["input_audio"] = state["audio_url"]
-        yield from LipsyncPage(request=self.request, run_user=self.run_user).run(state)
+        yield from LipsyncPage(request=self.request).run(state)
 
     def render_example(self, state: dict):
         output_video = state.get("output_video")

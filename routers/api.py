@@ -3,7 +3,6 @@ import os
 import os.path
 import os.path
 import typing
-from types import SimpleNamespace
 
 import gooey_gui as gui
 from fastapi import Depends
@@ -262,11 +261,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: AppUser = Depends(api_auth_header),
     ):
         # init a new page for every request
-        self = page_cls(
-            request=SimpleNamespace(
-                user=user, query_params=dict(run_id=run_id, uid=user.uid)
-            )
-        )
+        self = page_cls(user=user, query_params=dict(run_id=run_id, uid=user.uid))
         sr = self.current_sr
         web_url = str(furl(self.app_url(run_id=run_id, uid=user.uid)))
         ret = {
@@ -344,9 +339,7 @@ def submit_api_call(
 ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
-    page = page_cls(
-        request=SimpleNamespace(user=current_user, query_params=query_params)
-    )
+    page = page_cls(user=current_user, query_params=query_params)
 
     # get saved state from db
     state = page.current_sr_to_session_state()

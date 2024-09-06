@@ -12,7 +12,6 @@ from functools import cached_property
 from itertools import pairwise
 from random import Random
 from time import sleep
-from types import SimpleNamespace
 
 import gooey_gui as gui
 import sentry_sdk
@@ -26,7 +25,6 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from starlette.requests import Request
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -94,7 +92,6 @@ DEFAULT_META_IMG = (
 MAX_SEED = 4294967294
 gooey_rng = Random()
 
-
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
@@ -115,6 +112,12 @@ class StateKeys:
     pressed_randomize = "__randomize"
 
     hidden = "__hidden"
+
+
+class BasePageRequest:
+    user: AppUser | None
+    session: dict
+    query_params: dict
 
 
 class BasePage:
@@ -154,14 +157,20 @@ class BasePage:
         self,
         *,
         tab: RecipeTabs = RecipeTabs.run,
-        request: Request | SimpleNamespace | None = None,
-        run_user: AppUser | None = None,
+        request: BasePageRequest | None = None,
+        user: AppUser | None = None,
+        request_session: dict | None = None,
+        query_params: dict | None = None,
     ):
-        if request is None:
-            request = SimpleNamespace(user=None, query_params={})
         self.tab = tab
+
+        if not request:
+            request = BasePageRequest()
+            request.user = user
+            request.session = request_session or {}
+            request.query_params = query_params or {}
+
         self.request = request
-        self.run_user = run_user
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -349,7 +358,7 @@ class BasePage:
 
         with gui.div(className="d-flex justify-content-between mt-4"):
             with gui.div(className="d-lg-flex d-block align-items-center"):
-                if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
+                if not tbreadcrumbs.has_breadcrumbs() and not self.current_sr_user:
                     self._render_title(tbreadcrumbs.h1_title)
 
                 if tbreadcrumbs:
@@ -362,7 +371,7 @@ class BasePage:
                 if is_example:
                     author = pr.created_by
                 else:
-                    author = self.run_user or sr.get_creator()
+                    author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
                     self.render_author(author)
 
@@ -386,7 +395,7 @@ class BasePage:
                         self._render_published_run_save_buttons(sr=sr, pr=pr)
                     self._render_social_buttons(show_button_text=not show_save_buttons)
 
-        if tbreadcrumbs.has_breadcrumbs() or self.run_user:
+        if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
             # only render title here if the above row was not empty
             self._render_title(tbreadcrumbs.h1_title)
 
@@ -810,7 +819,7 @@ This will also delete all the associated versions.
         return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
-        if self.run_user and self.run_user.is_disabled:
+        if self.current_sr_user and self.current_sr_user.is_disabled:
             msg = (
                 "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
                 "Contact us at support@gooey.ai if you think this is a mistake."
@@ -1009,7 +1018,7 @@ This will also delete all the associated versions.
 
             send_reported_run_email(
                 user=self.request.user,
-                run_uid=str(self.run_user.uid),
+                run_uid=str(self.current_sr_user.uid),
                 url=self.current_app_url(),
                 recipe_name=self.title,
                 report_type=report_type,
@@ -1052,11 +1061,22 @@ This will also delete all the associated versions.
         sr.save(update_fields=["is_flagged"])
         gui.session_state["is_flagged"] = is_flagged
 
-    @property
+    @cached_property
+    def current_sr_user(self) -> AppUser | None:
+        if not self.current_sr.uid:
+            return None
+        if self.request.user and self.request.user.uid == self.current_sr.uid:
+            return self.request.user
+        try:
+            return AppUser.objects.get(uid=self.current_sr.uid)
+        except AppUser.DoesNotExist:
+            return None
+
+    @cached_property
     def current_sr(self) -> SavedRun:
         return self.current_sr_pr[0]
 
-    @property
+    @cached_property
     def current_pr(self) -> PublishedRun:
         return self.current_sr_pr[1]
 
@@ -1571,7 +1591,7 @@ This will also delete all the associated versions.
             uid = self.request.user.uid
         else:
             uid = auth.create_user().uid
-            self.request.scope["user"] = AppUser.objects.create(
+            self.request.user = AppUser.objects.create(
                 uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
             )
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
@@ -2138,7 +2158,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(self.request.user and self.request.user.is_paying)
 
     def is_current_user_owner(self) -> bool:
-        return bool(self.request.user and self.run_user == self.request.user)
+        return bool(self.request.user and self.current_sr_user == self.request.user)
 
 
 def started_at_text(dt: datetime.datetime):

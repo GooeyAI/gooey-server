@@ -242,7 +242,7 @@ def explore_page(request: Request):
 @gui.route(app, "/api/")
 def api_docs_page(request: Request):
     with page_wrapper(request):
-        _api_docs_page(request)
+        _api_docs_page()
     return dict(
         meta=raw_build_meta_tags(
             url=get_og_url_path(request),
@@ -255,7 +255,7 @@ def api_docs_page(request: Request):
     )
 
 
-def _api_docs_page(request):
+def _api_docs_page():
     from daras_ai_v2.all_pages import all_api_pages
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
@@ -312,7 +312,7 @@ Authorization: Bearer GOOEY_API_KEY
     as_async = gui.checkbox("Run Async")
     as_form_data = gui.checkbox("Upload Files via Form Data")
 
-    page = workflow.page_cls(request=request)
+    page = workflow.page_cls()
     state = page.get_root_pr().saved_run.to_dict()
     api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
@@ -667,11 +667,13 @@ def render_recipe_page(
         )
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
-    # this is because the code still expects example_id to be in the query params
-    request._query_params = dict(request.query_params) | dict(example_id=example_id)
-
-    page = page_cls(tab=tab, request=request)
-    page.run_user = get_run_user(request, page.current_sr.uid)
+    page = page_cls(
+        tab=tab,
+        user=request.user,
+        request_session=request.session,
+        # this is because the code still expects example_id to be in the query params
+        query_params=dict(request.query_params) | dict(example_id=example_id),
+    )
 
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
@@ -690,17 +692,6 @@ def get_og_url_path(request) -> str:
     return str(
         (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
     )
-
-
-def get_run_user(request: Request, uid: str) -> AppUser | None:
-    if not uid:
-        return
-    if request.user and request.user.uid == uid:
-        return request.user
-    try:
-        return AppUser.objects.get(uid=uid)
-    except AppUser.DoesNotExist:
-        pass
 
 
 @contextmanager
