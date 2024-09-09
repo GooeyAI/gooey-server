@@ -26,6 +26,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OLD_ELEVEN_LABS_VOICES,
     elevenlabs_init_state,
 )
+import uuid
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -401,6 +402,22 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = upload_file_from_bytes(
                     "openai_tts.mp3", response.content
                 )
+            case TextToSpeechProviders.GHANA_NLP:
+                data = requests.post(
+                    "https://translation-api.ghananlp.org/tts/v1/tts",
+                    headers={
+                        "Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)
+                    },
+                    json={
+                        "text": text,
+                        "language": "tw",
+                    },
+                )
+                raise_for_status(data)
+                audio_url = upload_file_from_bytes(
+                    f"ghana_gen_{uuid.uuid4()}.wav", data.content
+                )
+                state["audio_url"] = audio_url
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))

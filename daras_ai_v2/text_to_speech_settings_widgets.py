@@ -53,6 +53,7 @@ class TextToSpeechProviders(Enum):
     BARK = "Bark (suno-ai)"
     AZURE_TTS = "Azure Text-to-Speech"
     OPEN_AI = "OpenAI"
+    GHANA_NLP = "GhanaNLP Text-To-Speech"
 
 
 # This exists only for backwards compatiblity
