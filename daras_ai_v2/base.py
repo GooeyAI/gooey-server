@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
+from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -119,6 +120,7 @@ class BasePageRequest:
     user: AppUser | None
     session: dict
     query_params: dict
+    url: URL | None
 
 
 class BasePage:
@@ -161,6 +163,7 @@ class BasePage:
         request: BasePageRequest | None = None,
         user: AppUser | None = None,
         request_session: dict | None = None,
+        request_url: URL | None = None,
         query_params: dict | None = None,
     ):
         self.tab = tab
@@ -170,6 +173,7 @@ class BasePage:
             request.user = user
             request.session = request_session or {}
             request.query_params = query_params or {}
+            request.url = request_url
 
         self.request = request
 
