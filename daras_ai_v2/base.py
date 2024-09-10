@@ -51,6 +51,7 @@ from daras_ai_v2.db import (
 )
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -347,6 +348,16 @@ class BasePage:
 
         with header_placeholder:
             self._render_header()
+
+        github_url = github_url_for_file(inspect.getfile(self.__class__))
+        gui.html(
+            f"""
+            <a style="position: absolute; top: 0; right: 0; z-index: 9" href="{github_url}" target="_blank">
+            <i class="d-lg-none fa-brands fa-github-alt fa-lg pe-3 pt-4"></i>
+            <img class="d-none d-lg-block" decoding="async" width="149" height="149" src="https://github.blog/wp-content/uploads/2008/12/forkme_right_darkblue_121621.png?resize=149%2C149" alt="Fork me on GitHub" loading="lazy">
+            </a>
+            """
+        )
 
     def _render_header(self):
         sr, pr = self.current_sr_pr
