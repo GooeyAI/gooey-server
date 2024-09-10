@@ -349,16 +349,6 @@ class BasePage:
         with header_placeholder:
             self._render_header()
 
-        github_url = github_url_for_file(inspect.getfile(self.__class__))
-        gui.html(
-            f"""
-            <a style="position: absolute; top: 0; right: 0; z-index: 9" href="{github_url}" target="_blank">
-            <i class="d-lg-none fa-brands fa-github-alt fa-lg pe-3 pt-4"></i>
-            <img class="d-none d-lg-block" decoding="async" width="149" height="149" src="https://github.blog/wp-content/uploads/2008/12/forkme_right_darkblue_121621.png?resize=149%2C149" alt="Fork me on GitHub" loading="lazy">
-            </a>
-            """
-        )
-
     def _render_header(self):
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
@@ -456,6 +446,15 @@ class BasePage:
 
     def _render_social_buttons(self, show_button_text: bool = False):
         if show_button_text:
+            github_url = github_url_for_file(inspect.getfile(self.__class__))
+            gui.anchor(
+                '<i class="fa-brands fa-github-alt fa-lg"></i> <span class="d-none d-lg-inline">GitHub</span>',
+                href=github_url,
+                unsafe_allow_html=True,
+                target="_blank",
+                type="tertiary",
+            )
+
             button_text = '<span class="d-none d-lg-inline"> Copy Link</span>'
         else:
             button_text = ""

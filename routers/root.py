@@ -711,7 +711,7 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("header.html").render(**context))
         gui.html(copy_to_clipboard_scripts)
 
-        with gui.div(id="main-content", className="container " + className):
+        with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
         gui.html(templates.get_template("footer.html").render(**context))
