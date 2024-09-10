@@ -46,6 +46,10 @@ class OpenAI_TTS_Voices(GooeyEnum):
     shimmer = "shimmer"
 
 
+class GHANA_TTS_LANGUAGES(GooeyEnum):
+    tw = "Twi"
+
+
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Text-to-Speech"
     ELEVEN_LABS = "Eleven Labs"
@@ -153,6 +157,8 @@ def text_to_speech_provider_selector(page):
                 azure_tts_selector()
             case TextToSpeechProviders.OPEN_AI.name:
                 openai_tts_selector()
+            case TextToSpeechProviders.GHANA_NLP.name:
+                ghana_tts_selector()
     return tts_provider
 
 
@@ -170,6 +176,15 @@ def text_to_speech_settings(page, tts_provider):
             azure_tts_settings()
         case TextToSpeechProviders.OPEN_AI.name:
             openai_tts_settings()
+
+
+def ghana_tts_selector():
+    enum_selector(
+        GHANA_TTS_LANGUAGES,
+        label="###### Language",
+        key="ghana_tts_language",
+        use_selectbox=True,
+    )
 
 
 def openai_tts_selector():
