@@ -197,9 +197,7 @@ class VideoBotsPage(BasePage):
         bot_script: str | None
 
         # llm model
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
         document_model: str | None = Field(
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "

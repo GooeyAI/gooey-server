@@ -138,6 +138,9 @@ class BasePage:
     )
 
     class RequestModel(BaseModel):
+        class Config:
+            use_enum_values = True
+
         functions: list[RecipeFunction] | None = Field(
             title="🧩 Developer Tools and Functions",
         )

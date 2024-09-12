@@ -1,7 +1,7 @@
 import typing
 
 import jinja2.sandbox
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -39,9 +39,7 @@ class SmartGPTPage(BasePage):
         reflexion_prompt: str | None
         dera_prompt: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

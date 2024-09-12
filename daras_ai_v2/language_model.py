@@ -25,6 +25,7 @@ from openai.types.chat import (
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.text_splitter import (
@@ -72,7 +73,7 @@ class LLMSpec(typing.NamedTuple):
     supports_json: bool = False
 
 
-class LargeLanguageModels(Enum):
+class LargeLanguageModels(GooeyEnum):
     # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",

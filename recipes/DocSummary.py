@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -16,7 +16,6 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
-    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -69,9 +68,7 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         merge_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 

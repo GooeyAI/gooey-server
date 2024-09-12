@@ -2,7 +2,7 @@ import math
 import typing
 
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -72,9 +72,7 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 

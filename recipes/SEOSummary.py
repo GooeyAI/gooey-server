@@ -100,9 +100,7 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
         max_search_urls: int | None
 
