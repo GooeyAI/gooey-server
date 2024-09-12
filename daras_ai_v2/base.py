@@ -120,6 +120,7 @@ class BasePage:
     title: str
     workflow: Workflow
     slug_versions: list[str]
+    sdk_method_name: str
 
     sane_defaults: dict = {}
 
@@ -307,8 +308,7 @@ class BasePage:
     @classmethod
     def get_openapi_extra(cls) -> dict[str, typing.Any]:
         return {
-            "x-fern-sdk-group-name": cls.slug_versions[-1].title().replace("-", ""),
-            "x-fern-sdk-method-name": "status",
+            "x-fern-sdk-method-name": cls.sdk_method_name,
         }
 
     def refresh_state(self):
