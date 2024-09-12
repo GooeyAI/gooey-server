@@ -202,8 +202,7 @@ MMS_SUPPORTED = {
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
-GHANA_API_AUTH_HEADERS = {"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)}
-GHANA_ASR_V1_SUPPORTED = {
+GHANA_NLP_ASR_V2_SUPPORTED = {
     "tw": "Twi",
     "gaa": "Ga",
     "dag": "Dagbani",
@@ -229,7 +228,7 @@ class AsrModels(Enum):
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
-    ghana_nlp_asr_v1 = "Ghana NLP ASR v1"
+    ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
 
     def supports_auto_detect(self) -> bool:
         return self not in {
@@ -237,7 +236,7 @@ class AsrModels(Enum):
             self.gcp_v1,
             self.mms_1b_all,
             self.seamless_m4t_v2,
-            self.ghana_nlp_asr_v1,
+            self.ghana_nlp_asr_v2,
         }
 
     @classmethod
@@ -274,7 +273,7 @@ asr_supported_languages = {
     AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
-    AsrModels.ghana_nlp_asr_v1: GHANA_ASR_V1_SUPPORTED,
+    AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
 }
 
 
@@ -901,9 +900,9 @@ def run_asr(
             ),
             # queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
-    elif selected_model == AsrModels.ghana_nlp_asr_v1:
+    elif selected_model == AsrModels.ghana_nlp_asr_v2:
         r = requests.post(
-            f"https://translation-api.ghananlp.org/asr/v1/transcribe?language={language}",
+            f"https://translation-api.ghananlp.org/asr/v2/transcribe?language={language}",
             headers={
                 "Content-Type": "audio/wav",
                 "Cache-Control": "no-cache",
@@ -912,7 +911,7 @@ def run_asr(
             data=requests.get(audio_url).content,
         )
         raise_for_status(r)
-        data = dict(text=r.json())
+        data = r.json()
     # call one of the self-hosted models
     else:
         kwargs = {}
