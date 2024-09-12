@@ -82,7 +82,9 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: LargeLanguageModels.api_enum() | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
 
         max_search_urls: int | None
 

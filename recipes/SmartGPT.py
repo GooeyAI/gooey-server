@@ -39,7 +39,9 @@ class SmartGPTPage(BasePage):
         reflexion_prompt: str | None
         dera_prompt: str | None
 
-        selected_model: LargeLanguageModels.api_enum() | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

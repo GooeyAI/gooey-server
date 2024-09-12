@@ -15,7 +15,6 @@ from aifail import (
     vertex_ai_should_retry,
     try_all,
 )
-from daras_ai_v2.custom_enum import GooeyEnum
 from django.conf import settings
 from loguru import logger
 from openai.types.chat import (
@@ -73,7 +72,7 @@ class LLMSpec(typing.NamedTuple):
     supports_json: bool = False
 
 
-class LargeLanguageModels(GooeyEnum):
+class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",

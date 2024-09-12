@@ -186,7 +186,9 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             """,
         )
 
-        selected_model: LargeLanguageModels.api_enum() | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

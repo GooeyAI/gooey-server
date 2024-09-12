@@ -72,7 +72,9 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: LargeLanguageModels.api_enum() | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
