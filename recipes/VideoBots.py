@@ -291,8 +291,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
     @classmethod
     def get_openapi_extra(cls) -> dict[str, typing.Any]:
         return {
-            "x-sdk-group-name": cls.sdk_group_name,
-            "x-sdk-method-name": cls.sdk_method_name,
+            "x-fern-sdk-group-name": cls.sdk_group_name,
+            "x-fern-sdk-method-name": cls.sdk_method_name,
         }
 
     def preview_image(self, state: dict) -> str | None:
