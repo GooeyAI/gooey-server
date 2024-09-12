@@ -37,7 +37,6 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
-from recipes.EmailFaceInpainting import get_photo_for_email
 from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -58,6 +57,7 @@ class QRCodeGeneratorPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/03d6538e-88d5-11ee-ad97-02420a00016c/W.I.2.png.png"
     workflow = Workflow.QR_CODE
     slug_versions = ["art-qr-code", "qr", "qr-code"]
+    sdk_method_name = "qrCode"
 
     sane_defaults = dict(
         num_outputs=2,

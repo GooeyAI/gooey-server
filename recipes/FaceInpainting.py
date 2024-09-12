@@ -33,6 +33,7 @@ class FaceInpaintingPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/10c2ce06-88da-11ee-b428-02420a000168/ai%20image%20with%20a%20face.png.png"
     workflow = Workflow.FACE_INPAINTING
     slug_versions = ["FaceInpainting", "face-in-ai-generated-photo"]
+    sdk_method_name = "portrait"
 
     sane_defaults = {
         "num_outputs": 1,

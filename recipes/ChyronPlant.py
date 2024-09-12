@@ -1,4 +1,5 @@
 import gooey_gui as gui
+from gooey_gui.components import typing
 from pydantic import BaseModel
 
 from bots.models import Workflow
@@ -12,6 +13,7 @@ class ChyronPlantPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.CHYRON_PLANT
     slug_versions = ["ChyronPlant"]
+    sdk_method_name = ""
 
     class RequestModel(BasePage.RequestModel):
         midi_notes: str
@@ -29,6 +31,10 @@ class ChyronPlantPage(BasePage):
     class ResponseModel(BaseModel):
         midi_translation: str
         chyron_output: str
+
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {"x-fern-ignore": True}
 
     def render_form_v2(self):
         gui.text_input(

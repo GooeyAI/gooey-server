@@ -30,6 +30,7 @@ class CompareLLMPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae42015e-88d7-11ee-aac9-02420a00016b/Compare%20LLMs.png.png"
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
+    sdk_method_name = "llm"
 
     functions_in_settings = False
 
@@ -43,9 +44,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
-        )
+        selected_models: list[
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
+        ]
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

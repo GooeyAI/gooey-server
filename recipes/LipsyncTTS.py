@@ -23,6 +23,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1acfa370-88d9-11ee-bf6c-02420a000166/Lipsync%20with%20audio%201.png.png"
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
+    sdk_method_name = "lipsyncTTS"
 
     sane_defaults = {
         "elevenlabs_model": "eleven_multilingual_v2",

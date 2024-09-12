@@ -69,6 +69,7 @@ class TextToSpeechPage(BasePage):
         "text2speech",
         "compare-text-to-speech-engines",
     ]
+    sdk_method_name = "textToSpeech"
 
     sane_defaults = {
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,

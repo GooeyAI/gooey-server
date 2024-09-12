@@ -61,6 +61,7 @@ class SEOSummaryPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85f38b42-88d6-11ee-ad97-02420a00016c/Create%20SEO%20optimized%20content%20option%202.png.png"
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
+    sdk_method_name = "seoContent"
 
     def preview_image(self, state: dict) -> str | None:
         return SEO_SUMMARY_DEFAULT_META_IMG

@@ -17,6 +17,7 @@ class EmbeddingsPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.EMBEDDINGS
     slug_versions = ["embeddings", "embed", "text-embedings"]
+    sdk_method_name = "embed"
     price = 1
 
     class RequestModel(BasePage.RequestModel):

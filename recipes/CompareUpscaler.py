@@ -20,6 +20,7 @@ class CompareUpscalerPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/64393e0c-88db-11ee-b428-02420a000168/AI%20Image%20Upscaler.png.png"
     workflow = Workflow.COMPARE_UPSCALER
     slug_versions = ["compare-ai-upscalers"]
+    sdk_method_name = "upscale"
 
     class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl | None = Field(None, description="Input Image")

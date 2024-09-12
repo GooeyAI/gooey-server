@@ -137,6 +137,9 @@ class VideoBotsPage(BasePage):
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
+    sdk_group_name = "copilot"
+    sdk_method_name = "completion"
+
     functions_in_settings = False
 
     sane_defaults = {
@@ -286,6 +289,13 @@ Translation Glossary for LLM Language (English) -> User Langauge
         reply_buttons: list[ReplyButton] | None
 
         finish_reason: list[str] | None
+
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {
+            "x-sdk-group-name": cls.sdk_group_name,
+            "x-sdk-method-name": cls.sdk_method_name,
+        }
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG

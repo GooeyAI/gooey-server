@@ -27,6 +27,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec0df5aa-9521-11ee-93d3-02420a0001e5/Email%20Profile%20Lookup.png.png"
     workflow = Workflow.EMAIL_FACE_INPAINTING
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
+    sdk_method_name = "imageFromEmail"
 
     sane_defaults = {
         "num_outputs": 1,

@@ -86,6 +86,7 @@ class DocExtractPage(BasePage):
         "youtube-bot",
         "doc-extract",
     ]
+    sdk_method_name = "synthesizeData"
     price = 500
 
     class RequestModelBase(BasePage.RequestModel):

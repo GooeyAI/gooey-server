@@ -39,6 +39,7 @@ class CompareText2ImgPage(BasePage):
         "text2img",
         "compare-ai-image-generators",
     ]
+    sdk_method_name = "textToImage"
 
     sane_defaults = {
         "guidance_scale": 7.5,

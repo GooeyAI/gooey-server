@@ -139,6 +139,7 @@ class BulkEvalPage(BasePage):
     title = "Evaluator"
     workflow = Workflow.BULK_EVAL
     slug_versions = ["bulk-eval", "eval"]
+    sdk_method_name = "eval"
 
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
 

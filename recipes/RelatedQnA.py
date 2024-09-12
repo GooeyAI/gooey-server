@@ -28,6 +28,7 @@ class RelatedQnAPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/37b0ba22-88d6-11ee-b549-02420a000167/People%20also%20ask.png.png"
     workflow = Workflow.RELATED_QNA_MAKER
     slug_versions = ["related-qna-maker"]
+    sdk_method_name = "seoPeopleAlsoAsk"
 
     price = 75
 

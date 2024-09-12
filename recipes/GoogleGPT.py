@@ -1,7 +1,7 @@
 import typing
 
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -11,11 +11,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_advanced_settings,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.language_model import (
-    run_language_model,
-    LargeLanguageModels,
-    ResponseFormatType,
-)
+from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
     language_model_selector,
@@ -51,6 +47,7 @@ class GoogleGPTPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
+    sdk_method_name = "webSearchLLM"
 
     price = 175
 

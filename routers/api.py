@@ -152,6 +152,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
         openapi_extra={"x-fern-ignore": True},
+        include_in_schema=False,
     )
     def run_api_json(
         request: Request,
@@ -258,10 +259,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
-        openapi_extra={
-            "x-fern-sdk-return-value": "output",
-            **page_cls.get_openapi_extra(),
-        },
+        openapi_extra={"x-fern-ignore": True},
     )
     def get_run_status(
         run_id: str,
@@ -445,6 +443,6 @@ def get_balance(user: AppUser = Depends(api_auth_header)):
     return BalanceResponse(balance=user.balance)
 
 
-@app.get("/status")
+@app.get("/status", openapi_extra={"x-fern-ignore": True})
 async def health():
     return "OK"

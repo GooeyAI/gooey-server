@@ -37,6 +37,7 @@ class GoogleImageGenPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
+    sdk_method_name = "imageFromWebSearch"
 
     sane_defaults = dict(
         num_outputs=1,

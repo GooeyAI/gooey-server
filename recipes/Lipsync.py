@@ -22,6 +22,7 @@ class LipsyncPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f33e6332-88d8-11ee-89f9-02420a000169/Lipsync%20TTS.png.png"
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
+    sdk_method_name = "lipsync"
 
     class RequestModel(LipsyncSettings, BasePage.RequestModel):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (

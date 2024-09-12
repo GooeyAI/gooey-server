@@ -38,6 +38,7 @@ class TranslationPage(BasePage):
     title = "Compare AI Translations"
     workflow = Workflow.TRANSLATION
     slug_versions = ["translate", "translation", "compare-ai-translation"]
+    sdk_method_name = "translate"
 
     class RequestModelBase(BasePage.RequestModel):
         texts: list[str] = Field([])

@@ -32,6 +32,7 @@ class SocialLookupEmailPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fbd475a-88d7-11ee-aac9-02420a00016b/personalized%20email.png.png"
     workflow = Workflow.SOCIAL_LOOKUP_EMAIL
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
+    sdk_method_name = "personalizeEmail"
 
     sane_defaults = {
         "selected_model": LargeLanguageModels.gpt_4.name,

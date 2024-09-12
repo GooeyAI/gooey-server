@@ -37,6 +37,7 @@ class ImageSegmentationPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/06fc595e-88db-11ee-b428-02420a000168/AI%20Background%20Remover.png.png"
     workflow = Workflow.IMAGE_SEGMENTATION
     slug_versions = ["ImageSegmentation", "remove-image-background-with-ai"]
+    sdk_method_name = "removeBackground"
 
     sane_defaults = {
         "mask_threshold": 0.5,

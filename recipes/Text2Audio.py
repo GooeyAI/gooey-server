@@ -32,6 +32,7 @@ class Text2AudioPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4481d58-88d9-11ee-aa86-02420a000165/Text%20guided%20audio%20generator.png.png"
     workflow = Workflow.TEXT_2_AUDIO
     slug_versions = ["text2audio"]
+    sdk_method_name = "textToMusic"
 
     sane_defaults = dict(
         seed=42,

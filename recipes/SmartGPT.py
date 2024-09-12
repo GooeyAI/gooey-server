@@ -29,6 +29,7 @@ class SmartGPTPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ffd24ad8-88d7-11ee-a658-02420a000163/SmartGPT.png.png"
     workflow = Workflow.SMART_GPT
     slug_versions = ["SmartGPT"]
+    sdk_method_name = "smartGPT"
     price = 20
 
     class RequestModelBase(BasePage.RequestModel):
