@@ -50,7 +50,10 @@ class CompareLLMPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        output_text: dict[LargeLanguageModels.api_choices, list[str]]
+        class Config:
+            use_enum_values = True
+
+        output_text: dict[LargeLanguageModels.api_enum, list[str]]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COMPARE_LM_META_IMG
