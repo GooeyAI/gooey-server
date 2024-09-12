@@ -1,8 +1,8 @@
 import typing
 import uuid
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from django.db.models import TextChoices
 from pydantic import BaseModel
 from typing_extensions import TypedDict
 
@@ -18,17 +18,28 @@ from daras_ai_v2.safety_checker import safety_checker
 DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
 
 
-class AnimationModels(TextChoices):
-    protogen_2_2 = ("Protogen_V2.2.ckpt", "Protogen V2.2 (darkstorm2150)")
-    epicdream = ("epicdream.safetensors", "epiCDream (epinikion)")
+class AnimationModel(typing.NamedTuple):
+    model_id: str
+    label: str
 
 
-class _AnimationPrompt(TypedDict):
+class AnimationModels(AnimationModel, GooeyEnum):
+    protogen_2_2 = AnimationModel(
+        model_id="Protogen_V2.2.ckpt",
+        label="Protogen V2.2 (darkstorm2150)",
+    )
+    epicdream = AnimationModel(
+        model_id="epicdream.safetensors",
+        label="epiCDream (epinikion)",
+    )
+
+
+class AnimationPrompt(TypedDict):
     frame: str
     prompt: str
 
 
-AnimationPrompts = list[_AnimationPrompt]
+AnimationPrompts = list[AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -186,7 +197,7 @@ class DeforumSDPage(BasePage):
         animation_prompts: AnimationPrompts
         max_frames: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in AnimationModels)] | None
+        selected_model: AnimationModels.api_enum | None
 
         animation_mode: str | None
         zoom: str | None
@@ -456,11 +467,15 @@ Choose fps for the video.
         if not self.request.user.disable_safety_checker:
             safety_checker(text=self.preview_input(state))
 
+        print("selected_model", request.selected_model)
+        print(f'{state["selected_model"]=}')
+        print(f"{type(request.selected_model)=}")
+
         try:
             state["output_video"] = call_celery_task_outfile(
                 "deforum",
                 pipeline=dict(
-                    model_id=AnimationModels[request.selected_model].value,
+                    model_id=AnimationModels[request.selected_model].model_id,
                     seed=request.seed,
                 ),
                 inputs=dict(

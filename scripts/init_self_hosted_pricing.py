@@ -18,7 +18,7 @@ category = ModelCategory.SELF_HOSTED
 
 def run():
     for model in AnimationModels:
-        add_model(model.value, model.name)
+        add_model(model.model_id, model.name)
     for model_enum, model_ids in [
         (Text2ImgModels, text2img_model_ids),
         (Img2ImgModels, img2img_model_ids),
