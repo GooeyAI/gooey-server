@@ -327,7 +327,7 @@ def translation_language_selector(
     if model == TranslationModels.google:
         languages = google_translate_target_languages()
     elif model == TranslationModels.ghana_nlp:
-        languages = GHANA_NLP_SUPPORTED
+        languages = ghana_nlp_translate_target_languages()
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -383,6 +383,21 @@ def google_translate_language_selector(
         allow_none=allow_none,
         **kwargs,
     )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def ghana_nlp_translate_target_languages():
+    """
+    Get list of supported languages for Ghana NLP Translation.
+    :return: Dictionary of language codes and display names.
+    Reference: https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+    """
+    r = requests.get(
+        "https://translation-api.ghananlp.org/v1/languages",
+        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+    )
+    raise_for_status(r)
+    return r.json().get("languages", {})
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
