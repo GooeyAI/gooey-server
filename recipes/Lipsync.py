@@ -8,7 +8,7 @@ from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
-from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
+from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
@@ -25,9 +25,7 @@ class LipsyncPage(BasePage):
     sdk_method_name = "lipsync"
 
     class RequestModel(LipsyncSettings, BasePage.RequestModel):
-        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        selected_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
         input_audio: FieldHttpUrl = None
 
     class ResponseModel(BaseModel):
@@ -56,7 +54,7 @@ class LipsyncPage(BasePage):
         )
 
         enum_selector(
-            LipsyncModel,
+            LipsyncModels,
             label="###### Lipsync Model",
             key="selected_model",
             use_selectbox=True,
@@ -72,10 +70,10 @@ class LipsyncPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        model = LipsyncModel[request.selected_model]
+        model = LipsyncModels[request.selected_model]
         yield f"Running {model.value}..."
         match model:
-            case LipsyncModel.Wav2Lip:
+            case LipsyncModels.Wav2Lip:
                 state["output_video"] = run_wav2lip(
                     face=request.input_face,
                     audio=request.input_audio,
@@ -86,7 +84,7 @@ class LipsyncPage(BasePage):
                         request.face_padding_right or 0,
                     ),
                 )
-            case LipsyncModel.SadTalker:
+            case LipsyncModels.SadTalker:
                 state["output_video"] = run_sadtalker(
                     request.sadtalker_settings,
                     face=request.input_face,
@@ -121,7 +119,7 @@ class LipsyncPage(BasePage):
     def get_cost_note(self) -> str | None:
         multiplier = (
             3
-            if gui.session_state.get("lipsync_model") == LipsyncModel.SadTalker.name
+            if gui.session_state.get("lipsync_model") == LipsyncModels.SadTalker.name
             else 1
         )
         return f"{CREDITS_PER_MB * multiplier} credits per MB"
@@ -141,6 +139,6 @@ class LipsyncPage(BasePage):
 
         total_mb = total_bytes / 1024 / 1024
         multiplier = (
-            3 if state.get("lipsync_model") == LipsyncModel.SadTalker.name else 1
+            3 if state.get("lipsync_model") == LipsyncModels.SadTalker.name else 1
         )
         return total_mb * CREDITS_PER_MB * multiplier

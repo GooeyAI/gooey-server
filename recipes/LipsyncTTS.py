@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -32,9 +32,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     }
 
     class RequestModel(LipsyncSettings, TextToSpeechPage.RequestModel):
-        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        selected_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
 
     class ResponseModel(BaseModel):
         audio_url: str | None
@@ -70,7 +68,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
         enum_selector(
-            LipsyncModel,
+            LipsyncModels,
             label="###### Lipsync Model",
             key="selected_model",
             use_selectbox=True,

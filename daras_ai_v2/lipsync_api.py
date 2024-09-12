@@ -1,15 +1,15 @@
 import typing
-from enum import Enum
 
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
-class LipsyncModel(Enum):
+class LipsyncModels(GooeyEnum):
     Wav2Lip = "Rudrabha/Wav2Lip"
     SadTalker = "OpenTalker/SadTalker"
 

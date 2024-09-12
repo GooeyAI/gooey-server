@@ -79,7 +79,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
     LanguageModelSettings,
 )
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModels
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars
@@ -251,9 +251,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             """,
         )
 
-        lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        lipsync_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
 
         tools: list[LLMTools] | None = Field(
             title="🛠️ Tools",
@@ -381,7 +379,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="input_face",
             )
             enum_selector(
-                LipsyncModel,
+                LipsyncModels,
                 label="###### Lipsync Model",
                 key="lipsync_model",
                 use_selectbox=True,
