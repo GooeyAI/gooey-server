@@ -55,9 +55,7 @@ class SocialLookupEmailPage(BasePage):
         # domain: str | None
         # key_words: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum() | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

@@ -69,9 +69,7 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         merge_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum() | None
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 

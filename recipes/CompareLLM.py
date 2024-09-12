@@ -44,17 +44,13 @@ class CompareLLMPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ]
+        selected_models: list[LargeLanguageModels.api_enum()] | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
-        output_text: dict[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)], list[str]
-        ]
+        output_text: dict[LargeLanguageModels.api_enum(), list[str]]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COMPARE_LM_META_IMG

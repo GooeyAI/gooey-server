@@ -105,9 +105,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 
         task_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum() | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
