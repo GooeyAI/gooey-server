@@ -355,7 +355,6 @@ def submit_api_call(
             enable_rate_limits=enable_rate_limits,
             is_api_call=True,
             retention_policy=retention_policy or RetentionPolicy.keep,
-            billed_workspace=self.get_current_workspace(),
         )
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
@@ -429,7 +428,7 @@ class BalanceResponse(BaseModel):
 
 @app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
 def get_balance(user: AppUser = Depends(api_auth_header)):
-    workspace, _ = user.get_or_create_personal_workspace()
+    workspace = user.get_or_create_personal_workspace()[0]
     return BalanceResponse(balance=workspace.balance)
 
 

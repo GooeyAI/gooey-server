@@ -20,4 +20,5 @@ def test_create_checkout_session(
         return
 
     with pytest.raises(RedirectException):
-        stripe_subscription_create(force_authentication, plan)
+        workspace = force_authentication.get_or_create_personal_workspace()[0]
+        stripe_subscription_create(workspace, plan)

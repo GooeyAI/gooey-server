@@ -37,7 +37,7 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, urls
+from daras_ai_v2 import settings, urls, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -52,7 +52,6 @@ from daras_ai_v2.db import (
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
-from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -81,6 +80,7 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
+from workspaces.widgets import get_current_workspace
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -479,52 +479,51 @@ class BasePage:
             )
 
             if can_edit:
-                pressed_options = gui.button(
-                    '<i class="fa-regular fa-ellipsis"></i>',
-                    className="mb-0 ms-lg-2",
-                    type="tertiary",
-                )
+                ref = gui.use_alert_dialog(key="options-modal")
+                if gui.button(
+                    label=icons.fork_lg, className="mb-0 ms-lg-2", type="tertiary"
+                ):
+                    ref.set_open(True)
+                if ref.is_open:
+                    with gui.alert_dialog(ref=ref, modal_title="#### Options"):
+                        self._render_options_modal(sr=sr, pr=pr)
+                label = "Update"
             else:
-                pressed_options = False
-            options_modal = gui.Modal("Options", key="published-run-options-modal")
-            if pressed_options:
-                options_modal.open()
-            if options_modal.is_open():
-                with options_modal.container(style={"minWidth": "min(300px, 100vw)"}):
-                    self._render_options_modal(
-                        current_run=sr,
-                        published_run=pr,
-                        modal=options_modal,
-                    )
+                label = "Save"
 
-            save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
-            if can_edit:
-                save_text = "Update"
-            else:
-                save_text = "Save"
-            pressed_save = gui.button(
-                f'{save_icon} <span class="d-none d-lg-inline">{save_text}</span>',
+            ref = gui.use_confirm_dialog(key="publish-modal", close_on_confirm=False)
+            if gui.button(
+                f'<i class="fa-regular fa-floppy-disk"></i> <span class="d-none d-lg-inline">{label}</span>',
                 className="mb-0 ms-lg-2 px-lg-4",
                 type="primary",
-            )
-            publish_modal = gui.Modal("Publish to", key="publish-modal")
-            if pressed_save:
-                publish_modal.open()
-            if publish_modal.is_open():
-                with publish_modal.container(style={"minWidth": "min(500px, 100vw)"}):
-                    self._render_publish_modal(
-                        sr=sr,
-                        pr=pr,
-                        modal=publish_modal,
-                        is_update_mode=can_edit,
-                    )
+            ):
+                self.clear_publish_form()
+                ref.set_open(True)
 
-    def _render_publish_modal(
+            if not ref.is_open:
+                return
+            with gui.confirm_dialog(
+                ref=ref,
+                modal_title=f"#### {label} this Workflow",
+                confirm_label='<i class="fa fa-rocket"></i> Publish',
+                large=True,
+            ):
+                self._render_publish_form(
+                    sr=sr, pr=pr, dialog=ref, is_update_mode=can_edit
+                )
+
+    @staticmethod
+    def clear_publish_form():
+        keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
+        for k in keys:
+            gui.session_state.pop(k, None)
+
+    def _render_publish_form(
         self,
         *,
         sr: SavedRun,
         pr: PublishedRun,
-        modal: gui.Modal,
+        dialog: gui.ConfirmDialogRef,
         is_update_mode: bool = False,
     ):
         if pr.is_root() and self.is_current_user_admin():
@@ -533,11 +532,12 @@ class BasePage:
                     "###### You're about to update the root workflow as an admin. "
                 )
             gui.html(
-                'If you want to create a new example, press <i class="fa-regular fa-ellipsis"></i> and "Duplicate" instead.'
+                f'If you want to create a new example, press {icons.fork_lg} and "{icons.copy_solid} Duplicate" instead.'
             )
             published_run_visibility = PublishedRunVisibility.PUBLIC
         else:
             with gui.div(className="visibility-radio"):
+                gui.write("###### Publish to")
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
@@ -559,6 +559,7 @@ class BasePage:
                             "",
                             options=options,
                             format_func=options.__getitem__,
+                            key="published_run_visibility",
                             value=str(pr.visibility),
                         )
                     )
@@ -579,26 +580,19 @@ class BasePage:
                 recipe_title = self.get_root_pr().title or self.title
                 title = f"{self.request.user.first_name_possesive()} {recipe_title}"
             published_run_title = gui.text_input(
-                "##### Title",
+                "###### Title",
                 key="published_run_title",
                 value=title,
             )
             published_run_notes = gui.text_area(
-                "##### Notes",
+                "###### Notes",
                 key="published_run_notes",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
 
-        with gui.div(className="mt-4 d-flex justify-content-center"):
-            pressed_save = gui.button(
-                f'<i class="fa-regular fa-floppy-disk"></i> Save',
-                className="px-4",
-                type="primary",
-            )
-
         self._render_admin_options(sr, pr)
 
-        if not pressed_save:
+        if not dialog.pressed_confirm:
             return
 
         is_root_published_run = is_update_mode and pr.is_root()
@@ -612,7 +606,8 @@ class BasePage:
         if self._has_request_changed():
             sr = self.on_submit()
             if not sr:
-                modal.close()
+                dialog.set_open(False)
+                raise gui.RerunException()
 
         if is_update_mode:
             updates = dict(
@@ -683,56 +678,46 @@ class BasePage:
         else:
             return False
 
-    def _render_options_modal(
-        self,
-        *,
-        current_run: SavedRun,
-        published_run: PublishedRun,
-        modal: gui.Modal,
-    ):
-        is_latest_version = published_run.saved_run == current_run
+    def _render_options_modal(self, *, sr: SavedRun, pr: PublishedRun):
+        is_latest_version = pr.saved_run == sr
 
-        with gui.div(className="mt-4"):
-            duplicate_button = None
-            save_as_new_button = None
-            duplicate_icon = save_as_new_icon = '<i class="fa-regular fa-copy"></i>'
-            if is_latest_version:
-                duplicate_button = gui.button(
-                    f"{duplicate_icon} Duplicate", className="w-100"
-                )
-            else:
-                save_as_new_button = gui.button(
-                    f"{save_as_new_icon} Save as New", className="w-100"
-                )
+        duplicate_button = None
+        save_as_new_button = None
+        if is_latest_version:
+            duplicate_button = gui.button(
+                f"{icons.copy_solid} Duplicate", className="w-100"
+            )
+        else:
+            save_as_new_button = gui.button(
+                f"{icons.copy_solid} Save as New", className="w-100"
+            )
 
-            if not published_run.is_root():
-                confirm_delete_modal, confirmed = confirm_modal(
-                    title="Are you sure?",
-                    key="--delete-run-modal",
-                    text=f"""
+        if not pr.is_root():
+            ref = gui.use_confirm_dialog(key="--delete-run-modal")
+            gui.button_with_confirm_dialog(
+                ref=ref,
+                trigger_label='<i class="fa-regular fa-trash"></i> Delete',
+                trigger_className="w-100 text-danger",
+                modal_title="#### Are you sure?",
+                modal_content=f"""
 Are you sure you want to delete this published run? 
 
-**{published_run.title}**
+**{pr.title}**
 
 This will also delete all the associated versions.          
-                        """,
-                    button_label="Delete",
-                    button_class="border-danger bg-danger text-white",
-                )
-                if gui.button(
-                    f'<i class="fa-regular fa-trash"></i> Delete',
-                    className="w-100 text-danger",
-                ):
-                    confirm_delete_modal.open()
-                if confirmed:
-                    published_run.delete()
-                    raise gui.RedirectException(self.app_url())
+                """,
+                confirm_label="Delete",
+                confirm_className="border-danger bg-danger text-white",
+            )
+            if ref.pressed_confirm:
+                pr.delete()
+                raise gui.RedirectException(self.app_url())
 
         if duplicate_button:
             duplicate_pr = self.duplicate_published_run(
-                published_run,
-                title=f"{published_run.title} (Copy)",
-                notes=published_run.notes,
+                pr,
+                title=f"{pr.title} (Copy)",
+                notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
             raise gui.RedirectException(
@@ -742,10 +727,10 @@ This will also delete all the associated versions.
         if save_as_new_button:
             new_pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
-                saved_run=current_run,
+                saved_run=sr,
                 user=self.request.user,
-                title=f"{published_run.title} (Copy)",
-                notes=published_run.notes,
+                title=f"{pr.title} (Copy)",
+                notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
             raise gui.RedirectException(
@@ -1066,6 +1051,11 @@ This will also delete all the associated versions.
         gui.session_state["is_flagged"] = is_flagged
 
     @cached_property
+    def current_workspace(self) -> "Workspace":
+        assert self.request.user
+        return get_current_workspace(self.request.user, self.request.session)
+
+    @cached_property
     def current_sr_user(self) -> AppUser | None:
         if not self.current_sr.uid:
             return None
@@ -1163,12 +1153,6 @@ This will also delete all the associated versions.
             notes=notes,
             visibility=visibility,
         )
-
-    def get_current_workspace(self) -> "Workspace":
-        assert self.request.user
-
-        workspace, _ = self.request.user.get_or_create_personal_workspace()
-        return workspace
 
     def duplicate_published_run(
         self,
@@ -1568,9 +1552,7 @@ This will also delete all the associated versions.
 
     def on_submit(self):
         try:
-            sr = self.create_new_run(
-                enable_rate_limits=True, billed_workspace=self.get_current_workspace()
-            )
+            sr = self.create_new_run(enable_rate_limits=True)
         except ValidationError as e:
             gui.session_state[StateKeys.run_status] = None
             gui.session_state[StateKeys.error_msg] = str(e)
@@ -1609,7 +1591,7 @@ This will also delete all the associated versions.
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
 
         if enable_rate_limits:
-            ensure_rate_limits(self.workflow, self.request.user)
+            ensure_rate_limits(self.workflow, self.request.user, self.current_workspace)
 
         run_id = get_random_doc_id()
 
@@ -1623,7 +1605,14 @@ This will also delete all the associated versions.
             run_id,
             uid,
             create=True,
-            defaults=dict(parent=parent, parent_version=parent_version) | defaults,
+            defaults=(
+                dict(
+                    parent=parent,
+                    parent_version=parent_version,
+                    workspace=self.current_workspace,
+                )
+                | defaults
+            ),
         )
 
         # ensure the request is validated
@@ -1833,7 +1822,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with gui.link(to=str(next_url)):
             gui.html(
                 # language=HTML
-                f"""<button type="button" class="btn btn-theme">Load More</button>"""
+                """<button type="button" class="btn btn-theme">Load More</button>"""
             )
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
@@ -2043,11 +2032,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:
             return
-        assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
 
+        workspace = self.current_workspace
         price = self.get_price_roundoff(state)
-        workspace, _ = self.request.user.get_or_create_personal_workspace()
 
         if workspace.balance >= price:
             return
@@ -2066,8 +2054,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         assert self.request.user, "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
-        workspace, _ = self.request.user.get_or_create_personal_workspace()
-        txn = workspace.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        txn = self.current_workspace.add_balance(
+            amount=-amount,
+            invoice_id=f"gooey_in_{uuid.uuid1()}",
+            user=self.request.user,
+        )
         return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
@@ -2159,16 +2150,19 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_cost_note(self) -> str | None:
         pass
 
-    @classmethod
-    def is_user_admin(cls, user: AppUser) -> bool:
-        email = user.email
-        return bool(email and email in settings.ADMIN_EMAILS)
-
     def is_current_user_admin(self) -> bool:
-        return self.request.user and self.is_user_admin(self.request.user)
+        return self.is_user_admin(self.request.user)
+
+    @classmethod
+    def is_user_admin(cls, user: AppUser | None) -> bool:
+        return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
 
     def is_current_user_paying(self) -> bool:
-        return bool(self.request.user and self.request.user.is_paying)
+        return bool(
+            self.request.user
+            and self.current_workspace
+            and self.current_workspace.is_paying
+        )
 
     def is_current_user_owner(self) -> bool:
         return bool(self.request.user and self.current_sr_user == self.request.user)

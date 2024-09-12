@@ -6,11 +6,13 @@ from starlette.exceptions import HTTPException
 from app_users.models import AppUser
 from bots.models import Workflow, SavedRun
 from daras_ai_v2 import settings
+from workspaces.models import Workspace
 
 
 def ensure_rate_limits(
     workflow: Workflow,
     user: AppUser,
+    workspace: Workspace,
     *,
     max_requests: int = None,
     max_requests_reset_min: float = None,
@@ -24,7 +26,7 @@ def ensure_rate_limits(
     if max_requests is None:
         if user.is_anonymous:
             max_requests = settings.MAX_RPM_ANON
-        elif user.is_paying:
+        elif workspace.is_paying:
             max_requests = settings.MAX_RPM_PAID
         else:
             max_requests = settings.MAX_RPM_FREE
@@ -33,7 +35,7 @@ def ensure_rate_limits(
     if max_concurrency is None:
         if user.is_anonymous:
             max_concurrency = settings.MAX_CONCURRENCY_ANON
-        elif user.is_paying:
+        elif workspace.is_paying:
             max_concurrency = settings.MAX_CONCURRENCY_PAID
         else:
             max_concurrency = settings.MAX_CONCURRENCY_FREE

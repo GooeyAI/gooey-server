@@ -88,7 +88,7 @@ def main():
                 "display_name": user.display_name,
                 "email": str(user.email or user.phone_number),
                 "created_at": user.created_at.astimezone(timezone),
-                "balance": user.balance,
+                "balance": user.get_or_create_personal_workspace()[0].balance,
             }
             for user in signups
         ]

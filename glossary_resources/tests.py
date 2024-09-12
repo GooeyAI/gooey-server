@@ -75,8 +75,7 @@ def glossary_url():
 
 
 @pytest.mark.skipif(not settings.GS_BUCKET_NAME, reason="No GCS bucket")
-@pytest.mark.django_db
-def test_google_translate_glossary(glossary_url, threadpool_subtest):
+def test_google_translate_glossary(transactional_db, glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
             google_translate_check,

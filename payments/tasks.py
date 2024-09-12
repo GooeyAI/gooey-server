@@ -10,24 +10,24 @@ from daras_ai_v2.settings import templates
 
 
 @app.task
-def send_monthly_spending_notification_email(id: int):
+def send_monthly_spending_notification_email(workspace_id: int):
     from routers.account import account_route
 
-    workspace = Workspace.objects.get(id=id)
+    workspace = Workspace.objects.get(id=workspace_id)
     threshold = workspace.subscription.monthly_spending_notification_threshold
-    for owner in workspace.get_owners():
-        if not owner.user.email:
-            logger.error(f"Workspace Owner doesn't have an email: {owner=}")
-            return
+    for user in workspace.get_owners():
+        if not user.email:
+            logger.error(f"Workspace Owner doesn't have an email: {user=}")
+            continue
 
         send_email_via_postmark(
             from_address=settings.SUPPORT_EMAIL,
-            to_address=owner.user.email,
+            to_address=user.email,
             subject=f"[Gooey.AI] Monthly spending has exceeded ${threshold}",
             html_body=templates.get_template(
                 "monthly_spending_notification_threshold_email.html"
             ).render(
-                user=owner.user,
+                user=user,
                 workspace=workspace,
                 account_url=get_app_route_url(account_route),
             ),
@@ -44,47 +44,48 @@ def send_monthly_spending_notification_email(id: int):
 
 @app.task
 def send_payment_failed_email_with_invoice(
-    uid: str,
+    workspace_id: int,
     invoice_url: str,
     dollar_amt: float,
     subject: str,
 ):
     from routers.account import account_route
 
-    user = AppUser.objects.get(uid=uid)
-    if not user.email:
-        logger.error(f"User doesn't have an email: {user=}")
-        return
+    workspace = Workspace.objects.get(id=workspace_id)
+    for user in workspace.get_owners():
+        if not user.email:
+            logger.error(f"User doesn't have an email: {user=}")
+            continue
 
-    send_email_via_postmark(
-        from_address=settings.PAYMENT_EMAIL,
-        to_address=user.email,
-        subject=subject,
-        html_body=templates.get_template("auto_payment_failed_email.html").render(
-            user=user,
-            dollar_amt=f"{dollar_amt:.2f}",
-            invoice_url=invoice_url,
-            account_url=get_app_route_url(account_route),
-        ),
-        message_stream="billing",
-    )
+        send_email_via_postmark(
+            from_address=settings.PAYMENT_EMAIL,
+            to_address=user.email,
+            subject=subject,
+            html_body=templates.get_template("auto_payment_failed_email.html").render(
+                user=user,
+                dollar_amt=f"{dollar_amt:.2f}",
+                invoice_url=invoice_url,
+                account_url=get_app_route_url(account_route),
+            ),
+            message_stream="billing",
+        )
 
 
 def send_monthly_budget_reached_email(workspace: Workspace):
     from routers.account import account_route
 
-    for owner in workspace.get_owners():
-        if not owner.user.email:
+    for user in workspace.get_owners():
+        if not user.email:
             continue
 
         email_body = templates.get_template("monthly_budget_reached_email.html").render(
-            user=owner.user,
+            user=user,
             workspace=workspace,
             account_url=get_app_route_url(account_route),
         )
         send_email_via_postmark(
             from_address=settings.SUPPORT_EMAIL,
-            to_address=owner.user.email,
+            to_address=user.email,
             subject="[Gooey.AI] Monthly Budget Reached",
             html_body=email_body,
         )

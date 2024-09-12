@@ -118,6 +118,4 @@ def _auto_recharge_workspace(workspace: Workspace):
         ) from e
     else:
         assert invoice_data.paid
-        StripeWebhookHandler.handle_invoice_paid(
-            workspace_id_or_uid=workspace.id, invoice=invoice_data
-        )
+        StripeWebhookHandler.handle_invoice_paid(workspace, invoice_data)

@@ -11,6 +11,7 @@ from loguru import logger
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
+from workspaces.models import Workspace
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -80,8 +81,6 @@ class Subscription(models.Model):
 
     def __str__(self):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
-        # if self.has_user:
-        #     ret = f"{ret} | {self.user}"
         if self.has_workspace:
             ret = f"{ret} | {self.workspace}"
         if self.auto_recharge_enabled:
@@ -141,7 +140,7 @@ class Subscription(models.Model):
     def has_workspace(self) -> bool:
         try:
             self.workspace
-        except Subscription.workspace.RelatedObjectDoesNotExist:
+        except Workspace.DoesNotExist:
             return False
         else:
             return True
@@ -159,7 +158,7 @@ class Subscription(models.Model):
                 except stripe.error.InvalidRequestError as e:
                     if e.code == "resource_missing":
                         StripeWebhookHandler.handle_subscription_cancelled(
-                            self.user.uid
+                            self.workspace
                         )
                     else:
                         raise
@@ -313,7 +312,7 @@ class Subscription(models.Model):
             subscription = stripe.Subscription.retrieve(self.external_id)
             return subscription.customer
         else:
-            return self.user.get_or_create_stripe_customer().id
+            return self.workspace.get_or_create_stripe_customer().id
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
         from payments.webhooks import StripeWebhookHandler
@@ -334,7 +333,7 @@ class Subscription(models.Model):
             return False
         if not invoice.paid:
             return False
-        StripeWebhookHandler.handle_invoice_paid(self.user.uid, invoice)
+        StripeWebhookHandler.handle_invoice_paid(self.workspace, invoice)
         return True
 
     def get_external_management_url(self) -> str:

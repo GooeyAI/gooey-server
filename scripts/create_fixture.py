@@ -12,6 +12,8 @@ USER_FIELDS = {
     "uid",
     "display_name",
     "balance",
+    "created_at",
+    "updated_at",
 }
 
 

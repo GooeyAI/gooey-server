@@ -50,17 +50,20 @@ def send_low_balance_email(
 ):
     from routers.account import account_route
 
+    print("sending...")
+
     recipeints = "support@gooey.ai, devs@gooey.ai"
-    for owner in workspace.get_owners():
+    for user in workspace.get_owners():
         html_body = templates.get_template("low_balance_email.html").render(
-            user=owner.user,
+            user=user,
+            workspace=workspace,
             url=get_app_route_url(account_route),
             total_credits_consumed=total_credits_consumed,
             settings=settings,
         )
         send_email_via_postmark(
             from_address=settings.SUPPORT_EMAIL,
-            to_address=owner.user.email or recipeints,
+            to_address=user.email or recipeints,
             bcc=recipeints,
             subject="Your Gooey.AI credit balance is low",
             html_body=html_body,

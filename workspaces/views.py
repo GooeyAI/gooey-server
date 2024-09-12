@@ -1,15 +1,17 @@
-from __future__ import annotations
-
 import html as html_lib
+from copy import copy
 
 import gooey_gui as gui
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
 
-from .models import Workspace, WorkspaceInvitation, WorkspaceMembership, WorkspaceRole
 from app_users.models import AppUser
 from daras_ai_v2 import icons
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
-
+from daras_ai_v2.user_date_widgets import render_local_date_attrs
+from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
+from .widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
 
@@ -17,60 +19,67 @@ DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def invitation_page(user: AppUser, invitation: WorkspaceInvitation):
+def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvite):
     from routers.account import workspaces_route
 
     workspaces_page_path = get_route_path(workspaces_route)
 
     with gui.div(className="text-center my-5"):
         gui.write(
-            f"# Invitation to join {invitation.workspace.name}",
+            f"# Invitation to join {invite.workspace.display_name(current_user)}",
             className="d-block mb-5",
         )
 
-        if invitation.workspace.memberships.filter(user=user).exists():
+        if invite.workspace.memberships.filter(user=current_user).exists():
             # redirect to workspace page
             raise gui.RedirectException(workspaces_page_path)
 
-        if invitation.status != WorkspaceInvitation.Status.PENDING:
-            gui.write(f"This invitation has been {invitation.get_status_display()}.")
+        if invite.email != current_user.email:
+            gui.write(
+                f"Doh! This invitation is for **{invite.email}**, not you. Please log in with the correct email address.",
+            )
             return
 
-        gui.write(
-            f"**{format_user_name(invitation.inviter)}** has invited you to join **{invitation.workspace.name}**."
-        )
+        if invite.status != WorkspaceInvite.Status.PENDING:
+            gui.write(f"This invitation has been {invite.get_status_display()}.")
+            return
 
-        if other_m := user.workspace_memberships.first():
-            gui.caption(
-                f"You are currently a member of [{other_m.workspace.name}]({workspaces_page_path}). You will be removed from that team if you accept this invitation."
-            )
-            accept_label = "Leave and Accept"
-        else:
-            accept_label = "Accept"
+        gui.write(f"You've been invited by **{invite.created_by.full_name()}**")
+        gui.newline()
 
         with gui.div(
             className="d-flex justify-content-center align-items-center mx-auto",
             style={"max-width": "600px"},
         ):
-            accept_button = gui.button(accept_label, type="primary", className="w-50")
-            reject_button = gui.button("Decline", type="secondary", className="w-50")
+            if gui.button("Decline", className="w-50"):
+                invite.reject(current_user)
+                gui.rerun()
 
-        if accept_button:
-            invitation.accept(user=user)
-            raise gui.RedirectException(workspaces_page_path)
-        if reject_button:
-            invitation.reject(user=user)
+            if gui.button("Accept", type="primary", className="w-50"):
+                invite.accept(current_user, updated_by=current_user)
+                set_current_workspace(session, int(invite.workspace_id))
+                raise gui.RedirectException(workspaces_page_path)
 
 
-def workspaces_page(user: AppUser):
-    memberships = user.workspace_memberships.filter()
-    if not memberships:
-        gui.write("*You're not part of an workspaceanization yet... Create one?*")
+def workspaces_page(user: AppUser, session: dict):
+    workspace = get_current_workspace(user, session)
+    membership = workspace.memberships.get(user=user)
+    render_workspace_by_membership(membership)
 
-        render_workspace_creation_view(user)
-    else:
-        # only support one workspace for now
-        render_workspace_by_membership(memberships.first())
+
+def render_workspace_creation_view(user: AppUser):
+    gui.write(f"# {icons.company} Create an Workspace", unsafe_allow_html=True)
+
+    workspace = Workspace(created_by=user)
+    render_workspace_create_or_edit_form(workspace, user)
+
+    if gui.button("Create"):
+        try:
+            workspace.create_with_owner()
+        except ValidationError as e:
+            gui.write(str(e), className="text-danger")
+        else:
+            gui.rerun()
 
 
 def render_workspace_by_membership(membership: WorkspaceMembership):
@@ -81,24 +90,12 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         - current user's role in the workspace (and other metadata)
     """
     workspace = membership.workspace
-    current_user = membership.user
 
     with gui.div(
         className="d-xs-block d-sm-flex flex-row-reverse justify-content-between"
     ):
         with gui.div(className="d-flex justify-content-center align-items-center"):
-            if membership.can_edit_workspace_metadata():
-                workspace_edit_modal = gui.Modal(
-                    "Edit Workspace", key="edit-workspace-modal"
-                )
-                if workspace_edit_modal.is_open():
-                    with workspace_edit_modal.container():
-                        render_workspace_edit_view_by_membership(
-                            membership, modal=workspace_edit_modal
-                        )
-
-                if gui.button(f"{icons.edit} Edit", type="secondary"):
-                    workspace_edit_modal.open()
+            edit_workspace_button_with_dialog(membership)
 
         with gui.div(className="d-flex align-items-center"):
             gui.image(
@@ -107,182 +104,233 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                 style={"width": "128px", "height": "128px", "object-fit": "contain"},
             )
             with gui.div(className="d-flex flex-column justify-content-center"):
-                gui.write(f"# {workspace.name}")
+                gui.write(f"# {workspace.display_name(membership.user)}")
                 if workspace.domain_name:
                     gui.write(
                         f"Workspace Domain: `@{workspace.domain_name}`",
                         className="text-muted",
                     )
 
-    with gui.div(className="mt-4"):
-        with gui.div(className="d-flex justify-content-between align-items-center"):
-            gui.write("## Members")
+    gui.newline()
 
-            if membership.can_invite():
-                invite_modal = gui.Modal("Invite Member", key="invite-member-modal")
-                if gui.button(f"{icons.add_user} Invite"):
-                    invite_modal.open()
+    with gui.div(className="d-flex justify-content-between align-items-center"):
+        gui.write("## Members")
+        member_invite_button_with_dialog(membership)
+    render_members_list(workspace=workspace, current_member=membership)
 
-                if invite_modal.is_open():
-                    with invite_modal.container():
-                        render_invite_creation_view(
-                            workspace=workspace,
-                            inviter=current_user,
-                            modal=invite_modal,
-                        )
+    gui.newline()
 
-        render_members_list(workspace=workspace, current_member=membership)
+    render_pending_invites_list(workspace=workspace, current_member=membership)
 
-    with gui.div(className="mt-4"):
-        render_pending_invitations_list(workspace=workspace, current_member=membership)
+    can_leave = membership.can_leave_workspace()
+    if not can_leave:
+        return
 
-    with gui.div(className="mt-4"):
-        workspace_leave_modal = gui.Modal(
-            "Leave Workspace", key="leave-workspace-modal"
-        )
-        if workspace_leave_modal.is_open():
-            with workspace_leave_modal.container():
-                render_workspace_leave_view_by_membership(
-                    membership, modal=workspace_leave_modal
-                )
+    gui.newline()
 
-        with gui.div(className="text-end"):
-            leave_workspace = gui.button(
-                "Leave",
-                className="btn btn-theme bg-danger border-danger text-white",
+    dialog_ref = gui.use_confirm_dialog(key="leave-workspace", close_on_confirm=False)
+    with gui.div(className="text-end"):
+        if gui.button(
+            label=f"{icons.sign_out} Leave",
+            className="py-2 bg-danger border-danger text-light",
+        ):
+            dialog_ref.set_open(True)
+
+    if dialog_ref.is_open:
+        new_owner_id = render_workspace_leave_dialog(dialog_ref, membership)
+    else:
+        new_owner_id = None
+
+    if dialog_ref.pressed_confirm:
+        if new_owner_id:
+            WorkspaceMembership.objects.filter(
+                user_id=new_owner_id, workspace=membership.workspace
+            ).update(
+                role=WorkspaceRole.OWNER,
             )
-        if leave_workspace:
-            workspace_leave_modal.open()
+        membership.delete()
+        gui.rerun()
 
 
-def render_workspace_creation_view(user: AppUser):
-    gui.write(f"# {icons.company} Create an Workspace", unsafe_allow_html=True)
-    workspace_fields = render_workspace_create_or_edit_form()
+def member_invite_button_with_dialog(membership: WorkspaceMembership):
+    if not membership.can_invite():
+        return
 
-    if gui.button("Create"):
+    ref = gui.use_confirm_dialog(key="invite-member", close_on_confirm=False)
+
+    if gui.button(label=f"{icons.add_user} Invite"):
+        clear_invite_creation_form()
+        ref.set_open(True)
+    if not ref.is_open:
+        return
+
+    with gui.confirm_dialog(
+        ref=ref,
+        modal_title="#### Invite Member",
+        confirm_label=f"{icons.send} Send Invite",
+    ):
+        role, email = render_invite_creation_form(membership.workspace)
+
+        if not ref.pressed_confirm:
+            return
         try:
-            Workspace.objects.create_workspace(
-                created_by=user,
-                **workspace_fields,
+            WorkspaceInvite.objects.create_and_send_invite(
+                workspace=membership.workspace,
+                email=email,
+                current_user=membership.user,
+                defaults=dict(role=role),
             )
         except ValidationError as e:
-            gui.write(", ".join(e.messages), className="text-danger")
+            gui.write(str(e), className="text-danger")
         else:
+            ref.set_open(False)
+            gui.rerun()
+
+
+def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
+    if not membership.can_edit_workspace_metadata():
+        return
+
+    ref = gui.use_confirm_dialog(key="edit-workspace", close_on_confirm=False)
+
+    if gui.button(label=f"{icons.edit} Edit"):
+        clear_workspace_create_or_edit_form()
+        ref.set_open(True)
+    if not ref.is_open:
+        return
+
+    with gui.confirm_dialog(
+        ref=ref,
+        modal_title="#### Edit Workspace",
+        confirm_label=f"{icons.save} Save",
+    ):
+        workspace_copy = render_workspace_edit_view_by_membership(ref, membership)
+
+        if not ref.pressed_confirm:
+            return
+        try:
+            workspace_copy.full_clean()
+        except ValidationError as e:
+            # newlines in markdown
+            gui.write(str(e), className="text-danger")
+        else:
+            workspace_copy.save()
+            membership.workspace.refresh_from_db()
+            ref.set_open(False)
             gui.rerun()
 
 
 def render_workspace_edit_view_by_membership(
-    membership: WorkspaceMembership, *, modal: gui.Modal
+    dialog_ref: gui.ConfirmDialogRef, membership: WorkspaceMembership
 ):
-    workspace = membership.workspace
-    render_workspace_create_or_edit_form(workspace=workspace)
-
-    if gui.button("Save", className="w-100", type="primary"):
-        try:
-            workspace.full_clean()
-        except ValidationError as e:
-            # newlines in markdown
-            gui.write("  \n".join(e.messages), className="text-danger")
-        else:
-            workspace.save()
-            modal.close()
-
-    if membership.can_delete_workspace() or membership.can_transfer_ownership():
-        gui.write("---")
-        render_danger_zone_by_membership(membership)
+    workspace = copy(membership.workspace)
+    render_workspace_create_or_edit_form(workspace, membership.user)
+    render_danger_zone_by_membership(dialog_ref, membership)
+    return workspace
 
 
-def render_danger_zone_by_membership(membership: WorkspaceMembership):
-    gui.write("### Danger Zone", className="d-block my-2")
-
-    if membership.can_delete_workspace():
-        workspace_deletion_modal = gui.Modal(
-            "Delete Workspaceanization", key="delete-workspace-modal"
-        )
-        if workspace_deletion_modal.is_open():
-            with workspace_deletion_modal.container():
-                render_workspace_deletion_view_by_membership(
-                    membership, modal=workspace_deletion_modal
-                )
-
-        with gui.div(className="d-flex justify-content-between align-items-center"):
-            gui.write("Delete Workspaceanization")
-            if gui.button(
-                f"{icons.delete} Delete",
-                className="btn btn-theme py-2 bg-danger border-danger text-white",
-            ):
-                workspace_deletion_modal.open()
+def clear_invite_creation_form():
+    keys = {k for k in gui.session_state.keys() if k.startswith("invite-")}
+    for k in keys:
+        gui.session_state.pop(k, None)
 
 
-def render_workspace_deletion_view_by_membership(
-    membership: WorkspaceMembership, *, modal: gui.Modal
-):
-    gui.write(
-        f"Are you sure you want to delete **{membership.workspace.name}**? This action is irreversible."
+def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
+    gui.write("Invite a new member to this workspace.")
+
+    choices = dict(WorkspaceRole.choices)
+    role = gui.selectbox(
+        "######  Role",
+        options=choices.keys(),
+        format_func=choices.get,
+        value=WorkspaceRole.MEMBER.value,
+        key="invite-role",
     )
 
-    with gui.div(className="d-flex"):
-        if gui.button(
-            "Cancel", type="secondary", className="border-danger text-danger w-50"
-        ):
-            modal.close()
+    email = gui.text_input(
+        "###### Email",
+        style=dict(minWidth="300px"),
+        key="invite-email",
+    ).strip()
 
-        if gui.button(
-            "Delete", className="btn btn-theme bg-danger border-danger text-light w-50"
-        ):
-            membership.workspace.delete()
-            modal.close()
+    if workspace.domain_name:
+        gui.caption(
+            f"Users with `@{workspace.domain_name}` email will be added automatically."
+        )
+
+    return role, email
 
 
-def render_workspace_leave_view_by_membership(
-    current_member: WorkspaceMembership, *, modal: gui.Modal
+def render_danger_zone_by_membership(
+    parent_dialog: gui.ConfirmDialogRef, membership: WorkspaceMembership
 ):
-    workspace = current_member.workspace
+    if not membership.can_delete_workspace():
+        return
+    with gui.expander("💀 Danger Zone"):
+        with gui.div(className="d-flex justify-content-between align-items-center"):
+            gui.write("Delete Workspace")
 
-    gui.write("Are you sure you want to leave this workspaceanization?")
+            dialog_ref = gui.use_confirm_dialog(key="delete-workspace")
+            gui.button_with_confirm_dialog(
+                ref=dialog_ref,
+                trigger_label=f"{icons.delete} Delete",
+                trigger_className="py-2 bg-danger border-danger text-light",
+                modal_title="#### Delete Workspace",
+                modal_content=(
+                    f"Are you sure you want to delete **{membership.workspace.display_name(membership.user)}**? This action is irreversible.\n\n"
+                    f"Your subscriptions will be canceled and all data will be lost."
+                ),
+                confirm_label="Delete",
+                confirm_className="bg-danger border-danger text-light",
+            )
 
-    new_owner = None
-    if (
-        current_member.role == WorkspaceRole.OWNER
-        and workspace.memberships.count() == 1
+            if dialog_ref.pressed_confirm:
+                if membership.workspace.subscription:
+                    membership.workspace.subscription.cancel()
+                    membership.workspace.subscription.delete()
+                membership.workspace.delete()
+                parent_dialog.set_open(False)
+                gui.rerun()
+
+
+def render_workspace_leave_dialog(
+    dialog_ref: gui.ConfirmDialogRef, current_member: WorkspaceMembership
+) -> int | None:
+    with gui.confirm_dialog(
+        ref=dialog_ref,
+        modal_title="#### Leave Workspace",
+        confirm_label="Leave",
+        confirm_className="bg-danger border-danger text-light",
     ):
-        gui.caption(
-            "You are the only member. You will lose access to this team if you leave."
-        )
-    elif (
-        current_member.role == WorkspaceRole.OWNER
-        and workspace.memberships.filter(role=WorkspaceRole.OWNER).count() == 1
-    ):
-        members_by_uid = {
-            m.user.uid: m
-            for m in workspace.memberships.all().select_related("user")
-            if m != current_member
-        }
+        gui.write("Are you sure you want to leave this workspace?")
 
-        gui.caption(
-            "You are the only owner of this workspaceanization. Please choose another member to promote to owner."
-        )
-        new_owner_uid = gui.selectbox(
-            "New Owner",
-            options=list(members_by_uid),
-            format_func=lambda uid: format_user_name(members_by_uid[uid].user),
-        )
-        new_owner = members_by_uid[new_owner_uid]
+        if current_member.role != WorkspaceRole.OWNER:
+            return
+        workspace = current_member.workspace
 
-    with gui.div(className="d-flex"):
-        if gui.button(
-            "Cancel", type="secondary", className="border-danger text-danger w-50"
-        ):
-            modal.close()
+        if workspace.memberships.count() == 1:
+            gui.caption(
+                "You are the only member. You will lose access to this team if you leave."
+            )
 
-        if gui.button(
-            "Leave", className="btn btn-theme bg-danger border-danger text-light w-50"
-        ):
-            if new_owner:
-                new_owner.role = WorkspaceRole.OWNER
-                new_owner.save()
-            current_member.delete()
-            modal.close()
+        elif workspace.memberships.filter(role=WorkspaceRole.OWNER).count() == 1:
+            gui.caption(
+                "You are the only owner of this workspace. Please choose another member to promote to owner."
+            )
+            qs = (
+                AppUser.objects.filter(
+                    workspace_memberships__workspace=workspace,
+                    workspace_memberships__deleted__isnull=True,
+                )
+                .exclude(id=current_member.user_id)
+                .order_by("workspace_memberships__role")
+            )
+            choices = {user.id: user.full_name() for user in qs}
+            return gui.selectbox(
+                "###### New Owner",
+                options=choices,
+                format_func=choices.get,
+            )
 
 
 def render_members_list(workspace: Workspace, current_member: WorkspaceMembership):
@@ -299,11 +347,9 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
 
         with gui.tag("tbody"):
             for m in workspace.memberships.all().order_by("created_at"):
-                with gui.tag("tr"):
+                with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
-                        name = format_user_name(
-                            m.user, current_user=current_member.user
-                        )
+                        name = m.user.full_name(current_user=current_member.user)
                         if m.user.handle_id:
                             with gui.link(to=m.user.handle.get_app_url()):
                                 gui.html(html_lib.escape(name))
@@ -312,7 +358,7 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                     with gui.tag("td"):
                         gui.html(m.get_role_display())
                     with gui.tag("td"):
-                        gui.html(m.created_at.strftime("%b %d, %Y"))
+                        gui.html("...", **render_local_date_attrs(m.created_at))
                     with gui.tag("td", className="text-end"):
                         render_membership_actions(m, current_member=current_member)
 
@@ -322,92 +368,56 @@ def render_membership_actions(
 ):
     if current_member.can_change_role(m):
         if m.role == WorkspaceRole.MEMBER:
-            modal, confirmed = button_with_confirmation_modal(
-                f"{icons.admin} Make Admin",
-                key=f"promote-member-{m.pk}",
-                unsafe_allow_html=True,
-                confirmation_text=f"Are you sure you want to promote **{format_user_name(m.user)}** to an admin?",
-                modal_title="Make Admin",
-                modal_key=f"promote-member-{m.pk}-modal",
+            ref = gui.use_confirm_dialog(key=f"promote-member-{m.pk}")
+            gui.button_with_confirm_dialog(
+                ref=ref,
+                trigger_label=f"{icons.admin} Make Admin",
+                trigger_className="btn-sm my-0 py-0",
+                modal_title="#### Make an Admin",
+                modal_content=f"Are you sure you want to promote **{m.user.full_name()}** to an admin?",
+                confirm_label="Promote",
             )
-            if confirmed:
+            if ref.pressed_confirm:
                 m.role = WorkspaceRole.ADMIN
-                m.save()
-                modal.close()
+                m.save(update_fields=["role"])
+                gui.rerun()
+
         elif m.role == WorkspaceRole.ADMIN:
-            modal, confirmed = button_with_confirmation_modal(
-                f"{icons.remove_user} Revoke Admin",
-                key=f"demote-member-{m.pk}",
-                unsafe_allow_html=True,
-                confirmation_text=f"Are you sure you want to revoke admin privileges from **{format_user_name(m.user)}**?",
-                modal_title="Revoke Admin",
-                modal_key=f"demote-member-{m.pk}-modal",
+            ref = gui.use_confirm_dialog(key=f"demote-member-{m.pk}")
+            gui.button_with_confirm_dialog(
+                ref=ref,
+                trigger_label=f"{icons.remove_user} Revoke Admin",
+                trigger_className="btn-sm my-0 py-0",
+                modal_title="#### Revoke an Admin",
+                modal_content=f"Are you sure you want to revoke admin privileges from **{m.user.full_name()}**?",
+                confirm_label="Revoke",
             )
-            if confirmed:
+            if ref.pressed_confirm:
                 m.role = WorkspaceRole.MEMBER
-                m.save()
-                modal.close()
+                m.save(update_fields=["role"])
+                gui.rerun()
 
     if current_member.can_kick(m):
-        modal, confirmed = button_with_confirmation_modal(
-            f"{icons.remove_user} Remove",
-            key=f"remove-member-{m.pk}",
-            unsafe_allow_html=True,
-            confirmation_text=f"Are you sure you want to remove **{format_user_name(m.user)}** from **{m.workspace.name}**?",
-            modal_title="Remove Member",
-            modal_key=f"remove-member-{m.pk}-modal",
-            className="bg-danger border-danger text-light",
+        ref = gui.use_confirm_dialog(key=f"remove-member-{m.pk}")
+        gui.button_with_confirm_dialog(
+            ref=ref,
+            trigger_label=f"{icons.remove_user} Remove",
+            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            modal_title="#### Remove a Member",
+            modal_content=f"Are you sure you want to remove **{m.user.full_name()}** from **{m.workspace.display_name(m.user)}**?",
+            confirm_label="Remove",
+            confirm_className="bg-danger border-danger text-light",
         )
-        if confirmed:
+        if ref.pressed_confirm:
             m.delete()
-            modal.close()
+            gui.rerun()
 
 
-def button_with_confirmation_modal(
-    btn_label: str,
-    confirmation_text: str,
-    modal_title: str | None = None,
-    modal_key: str | None = None,
-    modal_className: str = "",
-    **btn_props,
-) -> tuple[gui.Modal, bool]:
-    """
-    Returns boolean for whether user confirmed the action or not.
-    """
-
-    modal = gui.Modal(modal_title or btn_label, key=modal_key)
-
-    btn_classes = "btn btn-theme btn-sm my-0 py-0 " + btn_props.pop("className", "")
-    if gui.button(btn_label, className=btn_classes, **btn_props):
-        modal.open()
-
-    if modal.is_open():
-        with modal.container(className=modal_className):
-            gui.write(confirmation_text)
-            with gui.div(className="d-flex"):
-                if gui.button(
-                    "Cancel",
-                    type="secondary",
-                    className="border-danger text-danger w-50",
-                ):
-                    modal.close()
-
-                confirmed = gui.button(
-                    "Confirm",
-                    className="btn btn-theme bg-danger border-danger text-light w-50",
-                )
-                return modal, confirmed
-
-    return modal, False
-
-
-def render_pending_invitations_list(
+def render_pending_invites_list(
     workspace: Workspace, *, current_member: WorkspaceMembership
 ):
-    pending_invitations = workspace.invitations.filter(
-        status=WorkspaceInvitation.Status.PENDING
-    )
-    if not pending_invitations:
+    pending_invites = workspace.invites.filter(status=WorkspaceInvite.Status.PENDING)
+    if not pending_invites:
         return
 
     gui.write("## Pending")
@@ -418,125 +428,109 @@ def render_pending_invitations_list(
             with gui.tag("th", scope="col"):
                 gui.html("Invited By")
             with gui.tag("th", scope="col"):
-                gui.html(f"{icons.time} Last invited on")
+                gui.html(f"{icons.time} Invite Sent")
             with gui.tag("th", scope="col"):
                 pass
 
         with gui.tag("tbody"):
-            for invite in pending_invitations:
-                with gui.tag("tr", className="text-break"):
+            for invite in pending_invites:
+                with gui.tag("tr", className="text-break align-middle"):
                     with gui.tag("td"):
-                        gui.html(html_lib.escape(invite.invitee_email))
+                        gui.html(html_lib.escape(invite.email))
                     with gui.tag("td"):
                         gui.html(
                             html_lib.escape(
-                                format_user_name(
-                                    invite.inviter, current_user=current_member.user
+                                invite.created_by.full_name(
+                                    current_user=current_member.user
                                 )
                             )
                         )
                     with gui.tag("td"):
                         last_invited_at = invite.last_email_sent_at or invite.created_at
-                        gui.html(last_invited_at.strftime("%b %d, %Y"))
+                        gui.html(naturaltime(last_invited_at))
                     with gui.tag("td", className="text-end"):
                         render_invitation_actions(invite, current_member=current_member)
 
 
 def render_invitation_actions(
-    invitation: WorkspaceInvitation, current_member: WorkspaceMembership
+    invite: WorkspaceInvite, current_member: WorkspaceMembership
 ):
-    if current_member.can_invite() and invitation.can_resend_email():
-        modal, confirmed = button_with_confirmation_modal(
-            f"{icons.email} Resend",
-            className="btn btn-theme btn-sm my-0 py-0",
-            key=f"resend-invitation-{invitation.pk}",
-            unsafe_allow_html=True,
-            confirmation_text=f"Resend invitation to **{invitation.invitee_email}**?",
-            modal_title="Resend Invitation",
-            modal_key=f"resend-invitation-{invitation.pk}-modal",
+    if current_member.can_invite() and invite.can_resend_email():
+        ref = gui.use_confirm_dialog(key=f"resend-invite-{invite.pk}")
+        gui.button_with_confirm_dialog(
+            ref=ref,
+            trigger_className="btn-sm my-0 py-0",
+            trigger_label=f"{icons.email} Resend",
+            modal_title="#### Resend Invitation",
+            modal_content=f"Resend invitation to **{invite.email}**?",
+            confirm_label="Resend",
         )
-        if confirmed:
+        if ref.pressed_confirm:
             try:
-                invitation.send_email()
+                invite.send_email()
             except ValidationError as e:
                 pass
-            finally:
-                modal.close()
 
     if current_member.can_invite():
-        modal, confirmed = button_with_confirmation_modal(
-            f"{icons.delete} Cancel",
-            key=f"cancel-invitation-{invitation.pk}",
-            unsafe_allow_html=True,
-            confirmation_text=f"Are you sure you want to cancel the invitation to **{invitation.invitee_email}**?",
-            modal_title="Cancel Invitation",
-            modal_key=f"cancel-invitation-{invitation.pk}-modal",
-            className="bg-danger border-danger text-light",
-        )
-        if confirmed:
-            invitation.cancel(user=current_member.user)
-            modal.close()
-
-
-def render_invite_creation_view(
-    workspace: Workspace, inviter: AppUser, modal: gui.Modal
-):
-    email = gui.text_input("Email")
-    if workspace.domain_name:
-        gui.caption(
-            f"Users with `@{workspace.domain_name}` email will be added automatically."
+        copy_to_clipboard_button(
+            label=f"{icons.copy_solid} Copy Invite",
+            value=invite.get_invite_url(),
+            type="secondary",
+            className="btn-sm my-0 py-0",
         )
 
-    if gui.button(f"{icons.add_user} Invite", type="primary", unsafe_allow_html=True):
-        try:
-            workspace.invite_user(
-                invitee_email=email,
-                inviter=inviter,
-                role=WorkspaceRole.MEMBER,
-                auto_accept=workspace.domain_name.lower()
-                == email.split("@")[1].lower(),
-            )
-        except ValidationError as e:
-            gui.write(", ".join(e.messages), className="text-danger")
-        else:
-            modal.close()
+        ref = gui.use_confirm_dialog(key=f"cancel-invitation-{invite.pk}")
+        gui.button_with_confirm_dialog(
+            ref=ref,
+            trigger_label=f"{icons.cancel} Cancel",
+            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            modal_title="#### Cancel Invitation",
+            modal_content=f"Are you sure you want to cancel the invitation to **{invite.email}**?",
+            cancel_label="No, keep it",
+            confirm_label="Yes, Cancel",
+            confirm_className="bg-danger border-danger text-light",
+        )
+        if ref.pressed_confirm:
+            invite.cancel(user=current_member.user)
+            gui.rerun()
+
+
+def clear_workspace_create_or_edit_form():
+    keys = {k for k in gui.session_state.keys() if k.startswith("workspace-")}
+    for k in keys:
+        gui.session_state.pop(k, None)
 
 
 def render_workspace_create_or_edit_form(
-    workspace: Workspace | None = None,
-) -> AttrDict | Workspace:
-    workspace_proxy = workspace or AttrDict()
-
-    workspace_proxy.name = gui.text_input(
-        "Team Name", value=workspace and workspace.name or ""
-    )
-    workspace_proxy.logo = gui.file_uploader(
-        "Logo", accept=["image/*"], value=workspace and workspace.logo or ""
-    )
-    workspace_proxy.domain_name = gui.text_input(
-        "Domain Name (Optional)",
-        placeholder="e.g. gooey.ai",
-        value=workspace and workspace.domain_name or "",
-    )
-    if workspace_proxy.domain_name:
-        gui.caption(
-            f"Invite any user with `@{workspace_proxy.domain_name}` email to this workspaceanization."
+    workspace: Workspace,
+    current_user: AppUser,
+):
+    workspace.name = gui.text_input(
+        "###### Team Name",
+        key="workspace-name",
+        value=workspace.name,
+    ).strip()
+    if current_user.email or workspace.domain_name:
+        workspace.domain_name = gui.selectbox(
+            "###### Domain Name _(Optional)_",
+            options={
+                workspace.domain_name,
+                current_user.email and current_user.email.split("@")[1],
+            }
+            | {None},
+            key="workspace-domain-name",
+            value=workspace.domain_name,
         )
-
-    return workspace_proxy
-
-
-def format_user_name(user: AppUser, current_user: AppUser | None = None):
-    name = user.display_name or user.first_name()
-    if current_user and user == current_user:
-        name += " (You)"
-    return name
-
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__dict__ = self
+    if workspace.domain_name:
+        gui.caption(
+            f"We'll automatically add any user with an `@{workspace.domain_name}` email to this workspace."
+        )
+    workspace.logo = gui.file_uploader(
+        "###### Logo",
+        accept=["image/*"],
+        key="workspace-logo",
+        value=workspace.logo,
+    )
 
 
 def left_and_right(*, className: str = "", **props):

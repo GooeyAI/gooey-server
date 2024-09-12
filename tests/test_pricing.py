@@ -1,4 +1,3 @@
-import pytest
 from starlette.testclient import TestClient
 
 from bots.models import AppUser
@@ -11,8 +10,7 @@ from usage_costs.models import UsageCost, ModelPricing
 client = TestClient(app)
 
 
-@pytest.mark.django_db
-def test_copilot_get_raw_price_round_up():
+def test_copilot_get_raw_price_round_up(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -55,8 +53,7 @@ def test_copilot_get_raw_price_round_up():
     )
 
 
-@pytest.mark.django_db
-def test_multiple_llm_sums_usage_cost():
+def test_multiple_llm_sums_usage_cost(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -115,8 +112,7 @@ def test_multiple_llm_sums_usage_cost():
     assert llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS)
 
 
-@pytest.mark.django_db
-def test_workflowmetadata_2x_multiplier():
+def test_workflowmetadata_2x_multiplier(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )

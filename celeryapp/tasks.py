@@ -28,6 +28,7 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
+from workspaces.widgets import SESSION_SELECTED_WORKSPACE
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -53,7 +54,7 @@ def runner_task(
     run_id: str,
     uid: str,
     channel: str,
-    unsaved_state: dict[str, typing.Any] = None,
+    unsaved_state: dict[str, typing.Any] | None = None,
     deduct_credits: bool = True,
 ):
     start_time = time()
@@ -95,10 +96,12 @@ def runner_task(
         page.dump_state_to_sr(gui.session_state | output, sr)
 
     page = page_cls(
-        user=AppUser.objects.get(id=user_id), query_params=dict(run_id=run_id, uid=uid)
+        user=AppUser.objects.get(id=user_id),
+        query_params=dict(run_id=run_id, uid=uid),
     )
     page.setup_sentry()
     sr = page.current_sr
+    page.request.session[SESSION_SELECTED_WORKSPACE] = sr.workspace_id
     threadlocal.saved_run = sr
     gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
 
@@ -140,10 +143,10 @@ def post_runner_tasks(saved_run_id: int):
     if not sr.is_api_call:
         send_email_on_completion(sr)
 
-    if should_attempt_auto_recharge(sr.billed_workspace):
-        run_auto_recharge_gracefully(sr.billed_workspace)
+    if should_attempt_auto_recharge(sr.workspace):
+        run_auto_recharge_gracefully(sr.workspace)
 
-    run_low_balance_email_check(sr.billed_workspace)
+    run_low_balance_email_check(sr.workspace)
 
 
 def err_msg_for_exc(e: Exception):

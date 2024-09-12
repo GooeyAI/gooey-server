@@ -43,6 +43,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
+from workspaces.widgets import workspace_selector
 
 app = CustomAPIRouter()
 
@@ -140,7 +141,6 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
                 existing_user = AppUser.objects.get(uid=uid)
                 if existing_user.is_anonymous:
                     existing_user.copy_from_firebase_user(auth.get_user(uid))
-                    existing_user.save()
             except AppUser.DoesNotExist:
                 pass
             return RedirectResponse(
@@ -696,6 +696,8 @@ def get_og_url_path(request) -> str:
 
 @contextmanager
 def page_wrapper(request: Request, className=""):
+    from daras_ai_v2.base import BasePage
+
     context = {
         "request": request,
         "settings": settings,
@@ -710,6 +712,16 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("gtag.html").render(**context))
         gui.html(templates.get_template("header.html").render(**context))
         gui.html(copy_to_clipboard_scripts)
+
+        if request.user and BasePage.is_user_admin(request.user):
+            with (
+                gui.div(
+                    className="container justify-content-center text-center d-flex",
+                    style=dict(marginBottom="-20pt"),
+                ),
+                gui.div(style=dict(minWidth="200pt")),
+            ):
+                workspace_selector(request.user, request.session)
 
         with gui.div(id="main-content", className="container " + className):
             yield

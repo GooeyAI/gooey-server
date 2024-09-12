@@ -1,9 +1,7 @@
 import typing
 
-import pytest
 from starlette.testclient import TestClient
 
-from auth.auth_backend import force_authentication
 from bots.models import Workflow, PublishedRun
 from daras_ai_v2.all_pages import all_test_pages
 from daras_ai_v2.base import BasePage
@@ -14,36 +12,40 @@ MAX_WORKERS = 20
 client = TestClient(app)
 
 
-@pytest.mark.django_db
-def test_apis_sync(mock_celery_tasks, force_authentication, threadpool_subtest):
+def test_apis_sync(
+    mock_celery_tasks, db_fixtures, force_authentication, threadpool_subtest
+):
     for page_cls in all_test_pages:
-        threadpool_subtest(_test_api_sync, page_cls)
+        endpoint = f"/v2/{page_cls.slug_versions[0]}/"
+        threadpool_subtest(_test_api_sync, page_cls, endpoint, msg=endpoint)
 
 
-def _test_api_sync(page_cls: typing.Type[BasePage]):
+def _test_api_sync(page_cls: typing.Type[BasePage], endpoint: str):
     state = page_cls.get_root_pr().saved_run.state
     r = client.post(
-        f"/v2/{page_cls.slug_versions[0]}/",
+        endpoint,
         json=page_cls.get_example_request(state)[1],
-        headers={"Authorization": f"Token None"},
+        headers={"Authorization": "Token None"},
         allow_redirects=False,
     )
     assert r.status_code == 200, r.text
 
 
-@pytest.mark.django_db
-def test_apis_async(mock_celery_tasks, force_authentication, threadpool_subtest):
+def test_apis_async(
+    mock_celery_tasks, db_fixtures, force_authentication, threadpool_subtest
+):
     for page_cls in all_test_pages:
-        threadpool_subtest(_test_api_async, page_cls)
+        endpoint = f"/v3/{page_cls.slug_versions[0]}/async/"
+        threadpool_subtest(_test_api_async, page_cls, endpoint, msg=endpoint)
 
 
-def _test_api_async(page_cls: typing.Type[BasePage]):
+def _test_api_async(page_cls: typing.Type[BasePage], endpoint: str):
     state = page_cls.get_root_pr().saved_run.state
 
     r = client.post(
-        f"/v3/{page_cls.slug_versions[0]}/async/",
+        endpoint,
         json=page_cls.get_example_request(state)[1],
-        headers={"Authorization": f"Token None"},
+        headers={"Authorization": "Token None"},
         allow_redirects=False,
     )
     assert r.status_code == 202, r.text
@@ -52,7 +54,7 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
 
     r = client.get(
         status_url,
-        headers={"Authorization": f"Token None"},
+        headers={"Authorization": "Token None"},
         allow_redirects=False,
     )
     assert r.status_code == 200, r.text
@@ -64,8 +66,9 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
         assert "output" in data, data
 
 
-@pytest.mark.django_db
-def test_apis_examples(mock_celery_tasks, force_authentication, threadpool_subtest):
+def test_apis_examples(
+    mock_celery_tasks, db_fixtures, force_authentication, threadpool_subtest
+):
     qs = (
         PublishedRun.objects.exclude(is_approved_example=False)
         .exclude(published_run_id="")
@@ -82,14 +85,13 @@ def _test_apis_examples(endpoint: str, body: dict):
     r = client.post(
         endpoint,
         json=body,
-        headers={"Authorization": f"Token None"},
+        headers={"Authorization": "Token None"},
         allow_redirects=False,
     )
     assert r.status_code == 200, r.text
 
 
-@pytest.mark.django_db
-def test_get_balance(force_authentication):
+def test_get_balance(transactional_db, force_authentication):
     r = client.get(
         "/v1/balance/",
         headers={"Authorization": "Token None"},

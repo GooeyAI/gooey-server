@@ -4,7 +4,7 @@ import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import PaymentProvider, TransactionReason
+from app_users.models import PaymentProvider, TransactionReason, AppUser
 from daras_ai_v2 import paypal
 from workspaces.models import Workspace
 from .models import Subscription
@@ -25,8 +25,10 @@ class PaypalWebhookHandler:
             return
 
         pp_sub = paypal.Subscription.retrieve(sale.billing_agreement_id)
-        assert pp_sub.custom_id, "pp_sub is missing workspace_id"
-        assert pp_sub.plan_id, "pp_sub is missing plan ID"
+        assert (
+            pp_sub.custom_id
+        ), f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
+        assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
         assert plan, f"Plan {pp_sub.plan_id} not found"
@@ -39,7 +41,7 @@ class PaypalWebhookHandler:
             )
 
         add_balance_for_payment(
-            workspace_id_or_uid=pp_sub.custom_id,
+            workspace=Workspace.objects.from_pp_custom_id(pp_sub.custom_id),
             amount=plan.credits,
             invoice_id=sale.id,
             payment_provider=cls.PROVIDER,
@@ -54,7 +56,7 @@ class PaypalWebhookHandler:
 
         assert (
             pp_sub.custom_id
-        ), f"PayPal subscription {pp_sub.id} is missing workspace_id"
+        ), f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
         assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
@@ -67,9 +69,9 @@ class PaypalWebhookHandler:
             return
 
         set_workspace_subscription(
-            workspace_id_or_uid=pp_sub.custom_id,
-            plan=plan,
             provider=cls.PROVIDER,
+            plan=plan,
+            workspace=Workspace.objects.from_pp_custom_id(pp_sub.custom_id),
             external_id=pp_sub.id,
         )
 
@@ -77,7 +79,7 @@ class PaypalWebhookHandler:
     def handle_subscription_cancelled(cls, pp_sub: paypal.Subscription):
         assert pp_sub.custom_id, f"PayPal subscription {pp_sub.id} is missing uid"
         set_workspace_subscription(
-            workspace_id_or_uid=pp_sub.custom_id,
+            workspace=Workspace.objects.from_pp_custom_id(pp_sub.custom_id),
             plan=PricingPlan.STARTER,
             provider=None,
             external_id=None,
@@ -88,9 +90,7 @@ class StripeWebhookHandler:
     PROVIDER = PaymentProvider.STRIPE
 
     @classmethod
-    def handle_invoice_paid(
-        cls, workspace_id_or_uid: str | int, invoice: stripe.Invoice
-    ):
+    def handle_invoice_paid(cls, workspace: Workspace, invoice: stripe.Invoice):
         from app_users.tasks import save_stripe_default_payment_method
 
         kwargs = {}
@@ -115,7 +115,7 @@ class StripeWebhookHandler:
         amount = invoice.lines.data[0].quantity
         charged_amount = invoice.lines.data[0].amount
         add_balance_for_payment(
-            workspace_id_or_uid=workspace_id_or_uid,
+            workspace=workspace,
             amount=amount,
             invoice_id=invoice.id,
             payment_provider=cls.PROVIDER,
@@ -125,15 +125,15 @@ class StripeWebhookHandler:
         )
 
         save_stripe_default_payment_method.delay(
-            workspace_id_or_uid=workspace_id_or_uid,
             payment_intent_id=invoice.payment_intent,
+            workspace_id=workspace.id,
             amount=amount,
             charged_amount=charged_amount,
             reason=reason,
         )
 
     @classmethod
-    def handle_checkout_session_completed(cls, workspace_id_or_uid: str, session_data):
+    def handle_checkout_session_completed(cls, session_data):
         setup_intent_id = session_data.get("setup_intent")
         if not setup_intent_id:
             # not a setup mode checkout -- do nothing
@@ -156,7 +156,7 @@ class StripeWebhookHandler:
 
     @classmethod
     def handle_subscription_updated(
-        cls, workspace_id_or_uid: int | str, stripe_sub: stripe.Subscription
+        cls, workspace: Workspace, stripe_sub: stripe.Subscription
     ):
         logger.info(f"Stripe subscription updated: {stripe_sub.id}")
 
@@ -179,23 +179,23 @@ class StripeWebhookHandler:
             return
 
         set_workspace_subscription(
-            workspace_id_or_uid=workspace_id_or_uid,
-            plan=plan,
             provider=cls.PROVIDER,
+            plan=plan,
+            workspace=workspace,
             external_id=stripe_sub.id,
         )
 
     @classmethod
-    def handle_subscription_cancelled(cls, workspace_id_or_uid: int | str):
+    def handle_subscription_cancelled(cls, workspace: Workspace):
         set_workspace_subscription(
-            workspace_id_or_uid=workspace_id_or_uid,
+            workspace=workspace,
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,
         )
 
     @classmethod
-    def handle_invoice_failed(cls, uid: str, data: dict):
+    def handle_invoice_failed(cls, workspace: Workspace, data: dict):
         if stripe.Charge.list(payment_intent=data["payment_intent"], limit=1).has_more:
             # we must have already sent an invoice for this to the user. so we should just ignore this event
             logger.info("Charge already exists for this payment intent")
@@ -203,14 +203,14 @@ class StripeWebhookHandler:
 
         if data.get("metadata", {}).get("auto_recharge"):
             send_payment_failed_email_with_invoice.delay(
-                uid=uid,
+                workspace_id=workspace.id,
                 invoice_url=data["hosted_invoice_url"],
                 dollar_amt=data["amount_due"] / 100,
                 subject="Payment failure on your Gooey.AI auto-recharge",
             )
         elif data.get("subscription_details", {}):
             send_payment_failed_email_with_invoice.delay(
-                uid=uid,
+                workspace_id=workspace.id,
                 invoice_url=data["hosted_invoice_url"],
                 dollar_amt=data["amount_due"] / 100,
                 subject="Payment failure on your Gooey.AI subscription",
@@ -219,18 +219,13 @@ class StripeWebhookHandler:
 
 def add_balance_for_payment(
     *,
-    workspace_id_or_uid: int | str,
+    workspace: Workspace,
     amount: int,
     invoice_id: str,
     payment_provider: PaymentProvider,
     charged_amount: int,
     **kwargs,
 ):
-    try:
-        workspace = Workspace.objects.get(id=int(workspace_id_or_uid))
-    except (ValueError, Workspace.DoesNotExist):
-        workspace, _ = Workspace.objects.get_or_create_from_uid(workspace_id_or_uid)
-
     workspace.add_balance(
         amount=amount,
         invoice_id=invoice_id,
@@ -247,23 +242,18 @@ def add_balance_for_payment(
         workspace.subscription
         and workspace.subscription.should_send_monthly_spending_notification()
     ):
-        send_monthly_spending_notification_email.delay(workspace.id)
+        send_monthly_spending_notification_email.delay(workspace_id=workspace.id)
 
 
 def set_workspace_subscription(
     *,
-    workspace_id_or_uid: int | str,
+    workspace: Workspace,
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
     amount: int | None = None,
     charged_amount: int | None = None,
 ) -> Subscription:
-    try:
-        workspace = Workspace.objects.get(id=int(workspace_id_or_uid))
-    except (ValueError, Workspace.DoesNotExist):
-        workspace, _ = Workspace.objects.get_or_create_from_uid(workspace_id_or_uid)
-
     with transaction.atomic():
         old_sub = workspace.subscription
         if old_sub:

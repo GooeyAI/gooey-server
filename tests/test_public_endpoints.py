@@ -1,4 +1,3 @@
-import pytest
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
@@ -33,8 +32,7 @@ route_paths = [
 ]
 
 
-@pytest.mark.django_db
-def test_all_get(threadpool_subtest):
+def test_all_get(db_fixtures, threadpool_subtest):
     for path in route_paths:
         threadpool_subtest(_test_get_path, path)
 
@@ -44,22 +42,18 @@ def _test_get_path(path):
     assert r.ok, r.content
 
 
-@pytest.mark.django_db
-def test_all_tabs(force_authentication, threadpool_subtest):
+def test_all_post(db_fixtures, force_authentication, threadpool_subtest):
     for page_cls in all_api_pages + all_hidden_pages:
         for slug in page_cls.slug_versions:
             for tab in RecipeTabs:
                 threadpool_subtest(_test_post_path, tab.url_path(slug))
 
-
-@pytest.mark.django_db
-def test_all_examples(threadpool_subtest):
-    qs = (
+    published_examples = (
         PublishedRun.objects.exclude(is_approved_example=False)
         .exclude(published_run_id="")
         .order_by("workflow")
     )
-    for pr in qs:
+    for pr in published_examples:
         slug = Workflow(pr.workflow).page_cls.slug_versions[-1]
         threadpool_subtest(
             _test_post_path,
