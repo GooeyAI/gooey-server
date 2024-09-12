@@ -94,7 +94,7 @@ class DocExtractPage(BasePage):
 
         sheet_url: FieldHttpUrl | None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_asr_model: AsrModels.api_enum | None
         # language: str | None
         google_translate_target: str | None
         glossary_document: FieldHttpUrl | None = Field(

@@ -72,7 +72,7 @@ class DocSummaryPage(BasePage):
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_asr_model: AsrModels.api_enum | None
         google_translate_target: str | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):

@@ -221,7 +221,7 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
-        asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+        asr_model: AsrModels.api_enum | None = Field(
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )

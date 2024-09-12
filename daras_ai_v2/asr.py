@@ -14,6 +14,7 @@ from furl import furl
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -204,7 +205,7 @@ GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', '
 GHANA_NLP_MAXLEN = 500
 
 
-class AsrModels(Enum):
+class AsrModels(GooeyEnum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"

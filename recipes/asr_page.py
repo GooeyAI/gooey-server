@@ -44,7 +44,7 @@ class AsrPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
-        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_model: AsrModels.api_enum | None
         language: str | None
 
         translation_model: (
