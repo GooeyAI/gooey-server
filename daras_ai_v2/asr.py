@@ -3,7 +3,6 @@ import os.path
 import os.path
 import tempfile
 import typing
-from enum import Enum
 
 import gooey_gui as gui
 import requests
@@ -278,7 +277,7 @@ class AsrOutputJson(typing_extensions.TypedDict):
     chunks: typing_extensions.NotRequired[list[AsrChunk]]
 
 
-class AsrOutputFormat(Enum):
+class AsrOutputFormat(GooeyEnum):
     text = "Text"
     json = "JSON"
     srt = "SRT"

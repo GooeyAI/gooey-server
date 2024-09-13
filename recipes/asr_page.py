@@ -49,7 +49,7 @@ class AsrPage(BasePage):
 
         translation_model: TranslationModels.api_enum | None
 
-        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
+        output_format: AsrOutputFormat.api_enum | None
 
         google_translate_target: str | None = Field(
             deprecated=True,
