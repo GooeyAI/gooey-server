@@ -66,19 +66,14 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
-        )
+        selected_models: list[Text2ImgModels.api_enum] | None
         scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         edit_instruction: str | None
         image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
-        output_images: dict[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[FieldHttpUrl],
-        ]
+        output_images: dict[Text2ImgModels.api_enum, list[FieldHttpUrl]]
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
@@ -193,7 +188,7 @@ class CompareText2ImgPage(BasePage):
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {Text2ImgModels[selected_model].value}..."
+            yield f"Running {Text2ImgModels[selected_model].label}..."
 
             output_images[selected_model] = text2img(
                 selected_model=selected_model,
@@ -254,7 +249,7 @@ class CompareText2ImgPage(BasePage):
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 gui.image(
-                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                    img, caption=Text2ImgModels[key].label, show_download_button=True
                 )
 
     def preview_description(self, state: dict) -> str:

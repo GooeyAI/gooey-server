@@ -55,7 +55,7 @@ class GoogleImageGenPage(BasePage):
         search_query: str
         text_prompt: str
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: Img2ImgModels.api_enum | None
 
         negative_prompt: str | None
 

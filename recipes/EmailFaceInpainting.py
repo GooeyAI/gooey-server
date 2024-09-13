@@ -50,7 +50,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         face_pos_x: float | None
         face_pos_y: float | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: InpaintingModels.api_enum | None
 
         negative_prompt: str | None
 

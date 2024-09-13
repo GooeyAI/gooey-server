@@ -96,7 +96,7 @@ class QRCodeGeneratorPage(BasePage):
         image_prompt_pos_x: float | None
         image_prompt_pos_y: float | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
+        selected_model: Text2ImgModels.api_enum | None
         selected_controlnet_model: list[ControlNetModels.api_enum] | None
 
         output_width: int | None
@@ -482,7 +482,7 @@ Here is the final output:
 
         state["raw_images"] = raw_images = []
 
-        yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        yield f"Running {Text2ImgModels[request.selected_model].label}..."
         if isinstance(request.selected_controlnet_model, str):
             request.selected_controlnet_model = [request.selected_controlnet_model]
         init_images = [image] * len(request.selected_controlnet_model)

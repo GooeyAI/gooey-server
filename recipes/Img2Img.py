@@ -46,7 +46,7 @@ class Img2ImgPage(BasePage):
         input_image: FieldHttpUrl
         text_prompt: str | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: Img2ImgModels.api_enum | None
         selected_controlnet_model: (
             list[ControlNetModels.api_enum] | ControlNetModels.api_enum | None
         )

@@ -28,96 +28,138 @@ from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 SD_IMG_MAX_SIZE = (768, 768)
 
 
-class InpaintingModels(Enum):
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    runway_ml = "Stable Diffusion v1.5 (RunwayML)"
-    dall_e = "Dall-E (OpenAI)"
+class InpaintingModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
+
+class InpaintingModels(InpaintingModel, GooeyEnum):
+    sd_2 = InpaintingModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-inpainting",
+    )
+    runway_ml = InpaintingModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-inpainting",
+    )
+    dall_e = InpaintingModel(label="Dall-E (OpenAI)", model_id="dall-e-2")
+
+    jack_qiao = InpaintingModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao}
 
 
-inpaint_model_ids = {
-    InpaintingModels.sd_2: "stabilityai/stable-diffusion-2-inpainting",
-    InpaintingModels.runway_ml: "runwayml/stable-diffusion-inpainting",
-}
+class Text2ImgModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
 
-class Text2ImgModels(Enum):
+class Text2ImgModels(Text2ImgModel, GooeyEnum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    dream_shaper = "DreamShaper (Lykon)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = Text2ImgModel(
+        label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
+    )
+    dreamlike_2 = Text2ImgModel(
+        label="Dreamlike Photoreal 2.0 (dreamlike.art)",
+        model_id="dreamlike-art/dreamlike-photoreal-2.0",
+    )
+    sd_2 = Text2ImgModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-1",
+    )
+    sd_1_5 = Text2ImgModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-v1-5",
+    )
 
-    dall_e = "DALL·E 2 (OpenAI)"
-    dall_e_3 = "DALL·E 3 (OpenAI)"
+    dall_e = Text2ImgModel(label="DALL·E 2 (OpenAI)", model_id="dall-e-2")
+    dall_e_3 = Text2ImgModel(label="DALL·E 3 (OpenAI)", model_id="dall-e-3")
 
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    openjourney = "Open Journey (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    openjourney_2 = Text2ImgModel(
+        label="Open Journey v2 beta (PromptHero)", model_id="prompthero/openjourney-v2"
+    )
+    openjourney = Text2ImgModel(
+        label="Open Journey (PromptHero)", model_id="prompthero/openjourney"
+    )
+    analog_diffusion = Text2ImgModel(
+        label="Analog Diffusion (wavymulder)", model_id="wavymulder/Analog-Diffusion"
+    )
+    protogen_5_3 = Text2ImgModel(
+        label="Protogen v5.3 (darkstorm2150)",
+        model_id="darkstorm2150/Protogen_v5.3_Official_Release",
+    )
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
-    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
+    jack_qiao = Text2ImgModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
+    rodent_diffusion_1_5 = Text2ImgModel(
+        label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
+    )
+    deepfloyd_if = Text2ImgModel(
+        label="DeepFloyd IF [Deprecated] (stability.ai)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao, cls.deepfloyd_if, cls.rodent_diffusion_1_5}
 
 
-text2img_model_ids = {
-    Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
-    Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
-    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Text2ImgModels.openjourney: "prompthero/openjourney",
-    Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
-    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
-}
-dall_e_model_ids = {
-    Text2ImgModels.dall_e: "dall-e-2",
-    Text2ImgModels.dall_e_3: "dall-e-3",
-}
+class Img2ImgModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
 
-class Img2ImgModels(Enum):
-    dream_shaper = "DreamShaper (Lykon)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+class Img2ImgModels(Img2ImgModel, GooeyEnum):
+    dream_shaper = Img2ImgModel(
+        label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
+    )
+    dreamlike_2 = Img2ImgModel(
+        label="Dreamlike Photoreal 2.0 (dreamlike.art)",
+        model_id="dreamlike-art/dreamlike-photoreal-2.0",
+    )
+    sd_2 = Img2ImgModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-1",
+    )
+    sd_1_5 = Img2ImgModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-v1-5",
+    )
 
-    dall_e = "Dall-E (OpenAI)"
+    dall_e = Img2ImgModel(label="Dall-E (OpenAI)", model_id=None)
 
-    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
-    openjourney = "Open Journey (PromptHero) 🐢"
-    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+    instruct_pix2pix = Img2ImgModel(
+        label="✨ InstructPix2Pix (Tim Brooks)", model_id=None
+    )
+    openjourney_2 = Img2ImgModel(
+        label="Open Journey v2 beta (PromptHero) 🐢",
+        model_id="prompthero/openjourney-v2",
+    )
+    openjourney = Img2ImgModel(
+        label="Open Journey (PromptHero) 🐢", model_id="prompthero/openjourney"
+    )
+    analog_diffusion = Img2ImgModel(
+        label="Analog Diffusion (wavymulder) 🐢", model_id="wavymulder/Analog-Diffusion"
+    )
+    protogen_5_3 = Img2ImgModel(
+        label="Protogen v5.3 (darkstorm2150) 🐢",
+        model_id="darkstorm2150/Protogen_v5.3_Official_Release",
+    )
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
+    jack_qiao = Img2ImgModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
+    rodent_diffusion_1_5 = Img2ImgModel(
+        label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao, cls.rodent_diffusion_1_5}
-
-
-img2img_model_ids = {
-    Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
-    Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
-    Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Img2ImgModels.openjourney: "prompthero/openjourney",
-    Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Img2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
-    Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
-}
 
 
 class ControlNetModel(typing.NamedTuple):
@@ -315,7 +357,7 @@ def text2img(
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[Text2ImgModels[selected_model]],
+                    model=Text2ImgModels[selected_model].model_id,
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -342,7 +384,7 @@ def text2img(
             return call_sd_multi(
                 "diffusion.text2img",
                 pipeline={
-                    "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+                    "model_id": Text2ImgModels[selected_model].model_id,
                     "scheduler": Schedulers[scheduler].label if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -435,7 +477,7 @@ def img2img(
             return call_sd_multi(
                 "diffusion.img2img",
                 pipeline={
-                    "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+                    "model_id": Img2ImgModels[selected_model].model_id,
                     # "scheduler": "UniPCMultistepScheduler",
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -478,7 +520,7 @@ def controlnet(
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+            "model_id": Text2ImgModels[selected_model].model_id,
             "seed": seed,
             "scheduler": (
                 Schedulers[scheduler].label if scheduler else "UniPCMultistepScheduler"
@@ -556,7 +598,7 @@ def inpainting(
             out_imgs_urls = call_sd_multi(
                 "diffusion.inpaint",
                 pipeline={
-                    "model_id": inpaint_model_ids[InpaintingModels[selected_model]],
+                    "model_id": InpaintingModels[selected_model].model_id,
                     "seed": seed,
                     # "scheduler": Schedulers[scheduler].label
                     # if scheduler

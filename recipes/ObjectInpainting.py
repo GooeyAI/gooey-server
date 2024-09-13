@@ -56,7 +56,7 @@ class ObjectInpaintingPage(BasePage):
 
         mask_threshold: float | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: InpaintingModels.api_enum | None
 
         negative_prompt: str | None
 

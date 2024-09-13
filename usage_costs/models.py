@@ -63,9 +63,9 @@ def get_model_choices():
     return (
         [(api.name, api.value) for api in LargeLanguageModels]
         + [(model.name, model.label) for model in AnimationModels]
-        + [(model.name, model.value) for model in Text2ImgModels]
-        + [(model.name, model.value) for model in Img2ImgModels]
-        + [(model.name, model.value) for model in InpaintingModels]
+        + [(model.name, model.label) for model in Text2ImgModels]
+        + [(model.name, model.label) for model in Img2ImgModels]
+        + [(model.name, model.label) for model in InpaintingModels]
         + [("wav2lip", "LipSync (wav2lip)")]
     )
 

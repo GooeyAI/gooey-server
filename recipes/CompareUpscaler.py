@@ -30,21 +30,22 @@ class CompareUpscalerPage(BasePage):
             description="The final upsampling scale of the image", ge=1, le=4
         )
 
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
-        )
+        selected_models: list[UpscalerModels.api_enum] | None
         selected_bg_model: (
             typing.Literal[tuple(e.name for e in UpscalerModels if e.is_bg_model)]
             | None
+        ) = Field(
+            title="Selected Background Model",
+            **{"x-fern-type-name": "BackgroundUpscalerModels"},
         )
 
     class ResponseModel(BaseModel):
-        output_images: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
-        ] = Field({}, description="Output Images")
-        output_videos: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
-        ] = Field({}, description="Output Videos")
+        output_images: dict[UpscalerModels.api_enum, FieldHttpUrl] = Field(
+            default_factory=dict, description="Output Images"
+        )
+        output_videos: dict[UpscalerModels.api_enum, FieldHttpUrl] = Field(
+            default_factory=dict, description="Output Videos"
+        )
 
     def validate_form_v2(self):
         assert gui.session_state.get(
@@ -70,6 +71,7 @@ class CompareUpscalerPage(BasePage):
         for selected_model in request.selected_models:
             model = UpscalerModels[selected_model]
             yield f"Running {model.label}..."
+            print(f"{request.input_image=}, {request.input_video=}")
             if request.input_image:
                 response.output_images[selected_model] = run_upscaler_model(
                     selected_model=model,
