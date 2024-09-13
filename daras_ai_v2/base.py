@@ -8,10 +8,10 @@ import typing
 import uuid
 from copy import deepcopy, copy
 from enum import Enum
+from functools import cached_property
 from itertools import pairwise
 from random import Random
 from time import sleep
-from types import SimpleNamespace
 
 import gooey_gui as gui
 import sentry_sdk
@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from starlette.requests import Request
+from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -52,6 +52,7 @@ from daras_ai_v2.db import (
 )
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.gui_confirm import confirm_modal
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -93,7 +94,6 @@ DEFAULT_META_IMG = (
 MAX_SEED = 4294967294
 gooey_rng = Random()
 
-
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
@@ -114,6 +114,13 @@ class StateKeys:
     pressed_randomize = "__randomize"
 
     hidden = "__hidden"
+
+
+class BasePageRequest:
+    user: AppUser | None
+    session: dict
+    query_params: dict
+    url: URL | None
 
 
 class BasePage:
@@ -155,22 +162,31 @@ class BasePage:
 
     def __init__(
         self,
-        tab: RecipeTabs = "",
-        request: Request | SimpleNamespace = None,
-        run_user: AppUser = None,
+        *,
+        tab: RecipeTabs = RecipeTabs.run,
+        request: BasePageRequest | None = None,
+        user: AppUser | None = None,
+        request_session: dict | None = None,
+        request_url: URL | None = None,
+        query_params: dict | None = None,
     ):
         self.tab = tab
+
+        if not request:
+            request = BasePageRequest()
+            request.user = user
+            request.session = request_session or {}
+            request.query_params = query_params or {}
+            request.url = request_url
+
         self.request = request
-        self.run_user = run_user
 
     @classmethod
-    @property
-    def endpoint(cls) -> str:
+    def api_endpoint(cls) -> str:
         return f"/v2/{cls.slug_versions[0]}"
 
-    @classmethod
     def current_app_url(
-        cls,
+        self,
         tab: RecipeTabs = RecipeTabs.run,
         *,
         query_params: dict = None,
@@ -178,8 +194,8 @@ class BasePage:
     ) -> str:
         if query_params is None:
             query_params = {}
-        example_id, run_id, uid = extract_query_params(gui.get_query_params())
-        return cls.app_url(
+        example_id, run_id, uid = extract_query_params(self.request.query_params)
+        return self.app_url(
             tab=tab,
             example_id=example_id,
             run_id=run_id,
@@ -213,7 +229,7 @@ class BasePage:
         run_slug = None
         if example_id:
             try:
-                pr = cls.get_published_run(published_run_id=example_id)
+                pr = cls.get_pr_from_example_id(example_id=example_id)
             except PublishedRun.DoesNotExist:
                 pr = None
             if pr and pr.title:
@@ -230,11 +246,6 @@ class BasePage:
         )
 
     @classmethod
-    def current_api_url(cls) -> furl | None:
-        pr = cls.get_current_published_run()
-        return cls.api_url(example_id=pr and pr.published_run_id)
-
-    @classmethod
     def api_url(
         cls,
         example_id: str = None,
@@ -247,7 +258,9 @@ class BasePage:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
+        return (
+            furl(settings.API_BASE_URL, query_params=query_params) / cls.api_endpoint()
+        )
 
     @classmethod
     def clean_query_params(cls, *, example_id, run_id, uid) -> dict:
@@ -280,12 +293,12 @@ class BasePage:
             )
         else:
             request["url"] = self.app_url(
-                tab=self.tab, query_params=gui.get_query_params()
+                tab=self.tab, query_params=dict(self.request.query_params)
             )
         return event
 
     def sentry_event_set_user(self, event, hint):
-        if user := self.request and self.request.user:
+        if user := self.request.user:
             event["user"] = {
                 "id": user.id,
                 "name": user.display_name,
@@ -315,7 +328,7 @@ class BasePage:
         }
 
     def refresh_state(self):
-        sr = self.get_current_sr()
+        sr = self.current_sr
         channel = self.realtime_channel_name(sr.run_id, sr.uid)
         output = gui.realtime_pull([channel])[0]
         if output:
@@ -351,34 +364,29 @@ class BasePage:
             self._render_header()
 
     def _render_header(self):
-        current_run = self.get_current_sr()
-        published_run = self.get_current_published_run()
-        is_example = published_run.saved_run == current_run
-        is_root_example = is_example and published_run.is_root()
-        tbreadcrumbs = get_title_breadcrumbs(
-            self, current_run, published_run, tab=self.tab
-        )
-        can_save = self.can_user_save_run(current_run, published_run)
+        sr, pr = self.current_sr_pr
+        is_example = pr.saved_run == sr
+        is_root_example = is_example and pr.is_root()
+        tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
+        can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
         with gui.div(className="d-flex justify-content-between mt-4"):
             with gui.div(className="d-lg-flex d-block align-items-center"):
-                if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
+                if not tbreadcrumbs.has_breadcrumbs() and not self.current_sr_user:
                     self._render_title(tbreadcrumbs.h1_title)
 
                 if tbreadcrumbs:
                     with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                         render_breadcrumbs(
                             tbreadcrumbs,
-                            is_api_call=(
-                                current_run.is_api_call and self.tab == RecipeTabs.run
-                            ),
+                            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
 
                 if is_example:
-                    author = published_run.created_by
+                    author = pr.created_by
                 else:
-                    author = self.run_user or current_run.get_creator()
+                    author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
                     self.render_author(author)
 
@@ -399,27 +407,24 @@ class BasePage:
 
                     show_save_buttons = request_changed or can_save
                     if show_save_buttons:
-                        self._render_published_run_save_buttons(
-                            current_run=current_run,
-                            published_run=published_run,
-                        )
+                        self._render_published_run_save_buttons(sr=sr, pr=pr)
                     self._render_social_buttons(show_button_text=not show_save_buttons)
 
-        if tbreadcrumbs.has_breadcrumbs() or self.run_user:
+        if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
             # only render title here if the above row was not empty
             self._render_title(tbreadcrumbs.h1_title)
 
         if self.tab != RecipeTabs.run:
             return
-        if published_run and published_run.notes:
-            gui.write(published_run.notes, line_clamp=2)
+        if pr and pr.notes:
+            gui.write(pr.notes, line_clamp=2)
         elif is_root_example and self.tab != RecipeTabs.integrations:
-            gui.write(self.preview_description(current_run.to_dict()), line_clamp=2)
+            gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
 
     def can_user_save_run(
         self,
         current_run: SavedRun,
-        published_run: PublishedRun | None,
+        published_run: PublishedRun,
     ) -> bool:
         return (
             self.is_current_user_admin()
@@ -435,13 +440,9 @@ class BasePage:
             )
         )
 
-    def can_user_edit_published_run(
-        self, published_run: PublishedRun | None = None
-    ) -> bool:
-        published_run = published_run or self.get_current_published_run()
+    def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
         return self.is_current_user_admin() or bool(
-            published_run
-            and self.request
+            self.request
             and self.request.user
             and published_run.created_by_id
             and published_run.created_by_id == self.request.user.id
@@ -459,6 +460,15 @@ class BasePage:
 
     def _render_social_buttons(self, show_button_text: bool = False):
         if show_button_text:
+            github_url = github_url_for_file(inspect.getfile(self.__class__))
+            gui.anchor(
+                '<i class="fa-brands fa-github-alt fa-lg"></i> <span class="d-none d-lg-inline">GitHub</span>',
+                href=github_url,
+                unsafe_allow_html=True,
+                target="_blank",
+                type="tertiary",
+            )
+
             button_text = '<span class="d-none d-lg-inline"> Copy Link</span>'
         else:
             button_text = ""
@@ -470,13 +480,8 @@ class BasePage:
             className="mb-0 ms-lg-2",
         )
 
-    def _render_published_run_save_buttons(
-        self,
-        *,
-        current_run: SavedRun,
-        published_run: PublishedRun,
-    ):
-        can_edit = self.can_user_edit_published_run(published_run)
+    def _render_published_run_save_buttons(self, *, sr: SavedRun, pr: PublishedRun):
+        can_edit = self.can_user_edit_published_run(pr)
 
         with gui.div(className="d-flex justify-content-end"):
             gui.html(
@@ -507,8 +512,8 @@ class BasePage:
             if options_modal.is_open():
                 with options_modal.container(style={"minWidth": "min(300px, 100vw)"}):
                     self._render_options_modal(
-                        current_run=current_run,
-                        published_run=published_run,
+                        current_run=sr,
+                        published_run=pr,
                         modal=options_modal,
                     )
 
@@ -528,8 +533,8 @@ class BasePage:
             if publish_modal.is_open():
                 with publish_modal.container(style={"minWidth": "min(500px, 100vw)"}):
                     self._render_publish_modal(
-                        current_run=current_run,
-                        published_run=published_run,
+                        sr=sr,
+                        pr=pr,
                         modal=publish_modal,
                         is_update_mode=can_edit,
                     )
@@ -537,12 +542,12 @@ class BasePage:
     def _render_publish_modal(
         self,
         *,
-        current_run: SavedRun,
-        published_run: PublishedRun,
+        sr: SavedRun,
+        pr: PublishedRun,
         modal: gui.Modal,
         is_update_mode: bool = False,
     ):
-        if published_run.is_root() and self.is_current_user_admin():
+        if pr.is_root() and self.is_current_user_admin():
             with gui.div(className="text-danger"):
                 gui.write(
                     "###### You're about to update the root workflow as an admin. "
@@ -574,7 +579,7 @@ class BasePage:
                             "",
                             options=options,
                             format_func=options.__getitem__,
-                            value=str(published_run.visibility),
+                            value=str(pr.visibility),
                         )
                     )
                 )
@@ -589,9 +594,9 @@ class BasePage:
 
         with gui.div(className="mt-4"):
             if is_update_mode:
-                title = published_run.title or self.title
+                title = pr.title or self.title
             else:
-                recipe_title = self.get_root_published_run().title or self.title
+                recipe_title = self.get_root_pr().title or self.title
                 title = f"{self.request.user.first_name_possesive()} {recipe_title}"
             published_run_title = gui.text_input(
                 "##### Title",
@@ -601,11 +606,7 @@ class BasePage:
             published_run_notes = gui.text_area(
                 "##### Notes",
                 key="published_run_notes",
-                value=(
-                    published_run.notes
-                    or self.preview_description(gui.session_state)
-                    or ""
-                ),
+                value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
 
         with gui.div(className="mt-4 d-flex justify-content-center"):
@@ -615,12 +616,12 @@ class BasePage:
                 type="primary",
             )
 
-        self._render_admin_options(current_run, published_run)
+        self._render_admin_options(sr, pr)
 
         if not pressed_save:
             return
 
-        is_root_published_run = is_update_mode and published_run.is_root()
+        is_root_published_run = is_update_mode and pr.is_root()
         if not is_root_published_run:
             try:
                 self._validate_published_run_title(published_run_title)
@@ -629,33 +630,31 @@ class BasePage:
                 return
 
         if self._has_request_changed():
-            current_run = self.on_submit()
-            if not current_run:
+            sr = self.on_submit()
+            if not sr:
                 modal.close()
 
         if is_update_mode:
             updates = dict(
-                saved_run=current_run,
+                saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-            if not self._has_published_run_changed(
-                published_run=published_run, **updates
-            ):
+            if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
                 return
-            published_run.add_version(user=self.request.user, **updates)
+            pr.add_version(user=self.request.user, **updates)
         else:
-            published_run = self.create_published_run(
+            pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
-                saved_run=current_run,
+                saved_run=sr,
                 user=self.request.user,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        raise gui.RedirectException(published_run.get_app_url())
+        raise gui.RedirectException(pr.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -823,7 +822,7 @@ This will also delete all the associated versions.
                     className="text-danger",
                 )
                 if gui.button("👌 Yes, Update the Root Workflow"):
-                    root_run = self.get_root_published_run()
+                    root_run = self.get_root_pr()
                     root_run.add_version(
                         user=self.request.user,
                         title=published_run.title,
@@ -835,7 +834,7 @@ This will also delete all the associated versions.
 
     @classmethod
     def get_recipe_title(cls) -> str:
-        return cls.get_root_published_run().title or cls.title or cls.workflow.label
+        return cls.get_root_pr().title or cls.title or cls.workflow.label
 
     def get_explore_image(self) -> str:
         meta = self.workflow.get_or_create_metadata()
@@ -844,7 +843,7 @@ This will also delete all the associated versions.
         return meta_preview_url(img, fallback_img)
 
     def _user_disabled_check(self):
-        if self.run_user and self.run_user.is_disabled:
+        if self.current_sr_user and self.current_sr_user.is_disabled:
             msg = (
                 "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
                 "Contact us at support@gooey.ai if you think this is a mistake."
@@ -863,7 +862,7 @@ This will also delete all the associated versions.
     def render_selected_tab(self):
         match self.tab:
             case RecipeTabs.run:
-                if self.get_current_sr().retention_policy == RetentionPolicy.delete:
+                if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                     return
 
@@ -894,15 +893,12 @@ This will also delete all the associated versions.
                 self._saved_tab()
 
     def _render_version_history(self):
-        published_run = self.get_current_published_run()
-
-        if published_run:
-            versions = published_run.versions.all()
-            first_version = versions[0]
-            for version, older_version in pairwise(versions):
-                first_version = older_version
-                self._render_version_row(version, older_version)
-            self._render_version_row(first_version, None)
+        versions = self.current_pr.versions.all()
+        first_version = versions[0]
+        for version, older_version in pairwise(versions):
+            first_version = older_version
+            self._render_version_row(version, older_version)
+        self._render_version_row(first_version, None)
 
     def _render_version_row(
         self,
@@ -967,7 +963,7 @@ This will also delete all the associated versions.
 
         def _render(page_cls: typing.Type[BasePage]):
             page = page_cls()
-            root_run = page.get_root_published_run()
+            root_run = page.get_root_pr()
             state = root_run.saved_run.to_dict()
             preview_image = page.get_explore_image()
 
@@ -1044,11 +1040,9 @@ This will also delete all the associated versions.
                 gui.error("Reason for report cannot be empty")
                 return
 
-            example_id, run_id, uid = extract_query_params(gui.get_query_params())
-
             send_reported_run_email(
                 user=self.request.user,
-                run_uid=uid,
+                run_uid=str(self.current_sr_user.uid),
                 url=self.current_app_url(),
                 recipe_name=self.title,
                 report_type=report_type,
@@ -1057,7 +1051,7 @@ This will also delete all the associated versions.
             )
 
             if report_type == inappropriate_radio_text:
-                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+                self.update_flag_for_run(is_flagged=True)
 
             # gui.success("Reported.")
             gui.session_state["show_report_workflow"] = False
@@ -1074,10 +1068,8 @@ This will also delete all the associated versions.
             if not unflag_pressed:
                 return
             with gui.spinner("Removing flag..."):
-                example_id, run_id, uid = extract_query_params(gui.get_query_params())
-                if run_id and uid:
-                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
-            gui.success("Removed flag.", icon="✅")
+                self.update_flag_for_run(is_flagged=False)
+            gui.success("Removed flag.")
             sleep(2)
             gui.rerun()
         else:
@@ -1087,87 +1079,58 @@ This will also delete all the associated versions.
             # Return and Don't render the run any further
             gui.stop()
 
+    def update_flag_for_run(self, is_flagged: bool):
+        sr = self.current_sr
+        sr.is_flagged = is_flagged
+        sr.save(update_fields=["is_flagged"])
+        gui.session_state["is_flagged"] = is_flagged
+
+    @cached_property
+    def current_sr_user(self) -> AppUser | None:
+        if not self.current_sr.uid:
+            return None
+        if self.request.user and self.request.user.uid == self.current_sr.uid:
+            return self.request.user
+        try:
+            return AppUser.objects.get(uid=self.current_sr.uid)
+        except AppUser.DoesNotExist:
+            return None
+
+    @cached_property
+    def current_sr(self) -> SavedRun:
+        return self.current_sr_pr[0]
+
+    @cached_property
+    def current_pr(self) -> PublishedRun:
+        return self.current_sr_pr[1]
+
+    @cached_property
+    def current_sr_pr(self) -> tuple[SavedRun, PublishedRun]:
+        return self.get_sr_pr_from_query_params(
+            *extract_query_params(self.request.query_params)
+        )
+
     @classmethod
-    def get_runs_from_query_params(
+    def get_sr_pr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
-    ) -> tuple[SavedRun, PublishedRun | None]:
+    ) -> tuple[SavedRun, PublishedRun]:
         if run_id and uid:
-            sr = cls.run_doc_sr(run_id, uid)
-            pr = sr.parent_published_run()
+            sr = cls.get_sr_from_ids(run_id, uid)
+            pr = sr.parent_published_run() or cls.get_root_pr()
         else:
-            pr = cls.get_published_run(published_run_id=example_id or "")
+            if example_id:
+                pr = cls.get_pr_from_example_id(example_id=example_id)
+            else:
+                pr = cls.get_root_pr()
             sr = pr.saved_run
         return sr, pr
 
     @classmethod
-    def get_current_published_run(cls) -> PublishedRun | None:
-        example_id, run_id, uid = extract_query_params(gui.get_query_params())
-        return cls.get_pr_from_query_params(example_id, run_id, uid)
-
-    @classmethod
-    def get_pr_from_query_params(
-        cls, example_id: str, run_id: str, uid: str
-    ) -> PublishedRun | None:
-        if run_id and uid:
-            sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return sr.parent_published_run() or cls.get_root_published_run()
-        elif example_id:
-            return cls.get_published_run(published_run_id=example_id)
-        else:
-            return cls.get_root_published_run()
-
-    @classmethod
-    def get_published_run(cls, *, published_run_id: str):
-        return PublishedRun.objects.get(
-            workflow=cls.workflow,
-            published_run_id=published_run_id,
-        )
-
-    @classmethod
-    def get_current_sr(cls) -> SavedRun:
-        return cls.get_sr_from_query_params_dict(gui.get_query_params())
-
-    @classmethod
-    def get_sr_from_query_params_dict(cls, query_params) -> SavedRun:
-        example_id, run_id, uid = extract_query_params(query_params)
-        return cls.get_sr_from_query_params(example_id, run_id, uid)
-
-    @classmethod
-    def get_sr_from_query_params(
-        cls, example_id: str | None, run_id: str | None, uid: str | None
-    ) -> SavedRun:
-        try:
-            if run_id and uid:
-                sr = cls.run_doc_sr(run_id, uid)
-            elif example_id:
-                pr = cls.get_published_run(published_run_id=example_id)
-                assert (
-                    pr.saved_run is not None
-                ), "invalid published run: without a saved run"
-                sr = pr.saved_run
-            else:
-                sr = cls.recipe_doc_sr()
-            return sr
-        except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
-            raise HTTPException(status_code=404)
-
-    @classmethod
-    def get_total_runs(cls) -> int:
-        # TODO: fix to also handle published run case
-        return SavedRun.objects.filter(workflow=cls.workflow).count()
-
-    @classmethod
-    def recipe_doc_sr(cls, create: bool = True) -> SavedRun:
-        if create:
-            return cls.get_root_published_run().saved_run
-        else:
-            return cls.get_root_published_run().saved_run
-
-    @classmethod
-    def run_doc_sr(
+    def get_sr_from_ids(
         cls,
         run_id: str,
         uid: str,
+        *,
         create: bool = False,
         defaults: dict = None,
     ) -> SavedRun:
@@ -1178,7 +1141,14 @@ This will also delete all the associated versions.
             return SavedRun.objects.get(**config)
 
     @classmethod
-    def get_root_published_run(cls) -> PublishedRun:
+    def get_pr_from_example_id(cls, *, example_id: str):
+        return PublishedRun.objects.get(
+            workflow=cls.workflow,
+            published_run_id=example_id,
+        )
+
+    @classmethod
+    def get_root_pr(cls) -> PublishedRun:
         return PublishedRun.objects.get_or_create_with_version(
             workflow=cls.workflow,
             published_run_id="",
@@ -1228,6 +1198,11 @@ This will also delete all the associated versions.
             notes=notes,
             visibility=visibility,
         )
+
+    @classmethod
+    def get_total_runs(cls) -> int:
+        # TODO: fix to also handle published run case
+        return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     def render_description(self):
         pass
@@ -1338,7 +1313,10 @@ This will also delete all the associated versions.
 
     def render_run_cost(self):
         url = self.get_credits_click_url()
-        run_cost = self.get_price_roundoff(gui.session_state)
+        if self.current_sr.price:
+            run_cost = self.current_sr.price
+        else:
+            run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
 
         cost_note = self.get_cost_note()
@@ -1362,7 +1340,7 @@ This will also delete all the associated versions.
             with col2:
                 placeholder = gui.div()
                 render_called_functions(
-                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.pre
+                    saved_run=self.current_sr, trigger=FunctionTrigger.pre
                 )
                 try:
                     self.render_steps()
@@ -1372,7 +1350,7 @@ This will also delete all the associated versions.
                     with placeholder:
                         gui.write("##### 👣 Steps")
                 render_called_functions(
-                    saved_run=self.get_current_sr(), trigger=FunctionTrigger.post
+                    saved_run=self.current_sr, trigger=FunctionTrigger.post
                 )
 
     def _render_help(self):
@@ -1453,9 +1431,10 @@ This will also delete all the associated versions.
         raise NotImplementedError
 
     def _render_report_button(self):
-        example_id, run_id, uid = extract_query_params(gui.get_query_params())
-        # only logged in users can report a run (but not examples/default runs)
-        if not (self.request.user and run_id and uid):
+        sr, pr = self.current_sr_pr
+        is_example = pr.saved_run_id == sr.id
+        # only logged in users can report a run (but not examples/root runs)
+        if not self.request.user or is_example:
             return
 
         reported = gui.button(
@@ -1466,12 +1445,6 @@ This will also delete all the associated versions.
 
         gui.session_state["show_report_workflow"] = reported
         gui.rerun()
-
-    def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
-        ref = self.run_doc_sr(uid=uid, run_id=run_id)
-        ref.is_flagged = is_flagged
-        ref.save(update_fields=["is_flagged"])
-        gui.session_state["is_flagged"] = is_flagged
 
     # Functions in every recipe feels like overkill for now, hide it in settings
     functions_in_settings = True
@@ -1623,8 +1596,7 @@ This will also delete all the associated versions.
 
     def should_submit_after_login(self) -> bool:
         return (
-            gui.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
-            and self.request
+            self.request.query_params.get(SUBMIT_AFTER_LOGIN_Q)
             and self.request.user
             and not self.request.user.is_anonymous
         )
@@ -1643,7 +1615,7 @@ This will also delete all the associated versions.
             uid = self.request.user.uid
         else:
             uid = auth.create_user().uid
-            self.request.scope["user"] = AppUser.objects.create(
+            self.request.user = AppUser.objects.create(
                 uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
             )
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
@@ -1653,19 +1625,13 @@ This will also delete all the associated versions.
 
         run_id = get_random_doc_id()
 
-        parent_example_id, parent_run_id, parent_uid = extract_query_params(
-            gui.get_query_params()
-        )
-        parent = self.get_sr_from_query_params(
-            parent_example_id, parent_run_id, parent_uid
-        )
-        published_run = self.get_current_published_run()
+        parent, pr = self.current_sr_pr
         try:
-            parent_version = published_run and published_run.versions.latest()
+            parent_version = pr.versions.latest()
         except PublishedRunVersion.DoesNotExist:
             parent_version = None
 
-        sr = self.run_doc_sr(
+        sr = self.get_sr_from_ids(
             run_id,
             uid,
             create=True,
@@ -1703,7 +1669,7 @@ This will also delete all the associated versions.
         )
 
     @classmethod
-    def realtime_channel_name(cls, run_id, uid):
+    def realtime_channel_name(cls, run_id: str, uid: str) -> str:
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, run_id, uid) -> str:
@@ -1762,12 +1728,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 gui.session_state[StateKeys.pressed_randomize] = True
                 gui.rerun()
 
-    @classmethod
-    def load_state_from_sr(cls, sr: SavedRun) -> dict:
-        state = sr.to_dict()
+    def current_sr_to_session_state(self) -> dict:
+        state = self.current_sr.to_dict()
         if state is None:
             raise HTTPException(status_code=404)
-        return cls.load_state_defaults(state)
+        return self.load_state_defaults(state)
 
     @classmethod
     def load_state_defaults(cls, state: dict):
@@ -1855,7 +1820,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
 
-        before = gui.get_query_params().get("updated_at__lt", None)
+        before = self.request.query_params.get("updated_at__lt", None)
         if before:
             before = datetime.datetime.fromisoformat(before)
         else:
@@ -2057,11 +2022,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = gui.checkbox("##### Run Async")
         as_form_data = gui.checkbox("##### Upload Files via Form Data")
 
-        pr = self.get_current_published_run()
         api_url, request_body = self.get_example_request(
             gui.session_state,
             include_all=include_all,
-            pr=pr,
+            pr=self.current_pr,
         )
         response_body = self.get_example_response_body(
             gui.session_state, as_async=as_async, include_all=include_all
@@ -2111,9 +2075,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         raise InsufficientCredits(self.request.user, sr)
 
     def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
-        assert (
-            self.request and self.request.user
-        ), "request.user must be set to deduct credits"
+        assert self.request.user, "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
         txn = self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
@@ -2130,7 +2092,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def get_total_linked_usage_cost_in_credits(self, default=1):
         """Return the sum of the linked usage costs in gooey credits."""
-        sr = self.get_current_sr()
+        sr = self.current_sr
         total = sr.usage_costs.aggregate(total=Sum("dollar_amount"))["total"]
         if not total:
             return default
@@ -2138,10 +2100,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def get_grouped_linked_usage_cost_in_credits(self):
         """Return the linked usage costs grouped by model name in gooey credits."""
-        qs = (
-            self.get_current_sr()
-            .usage_costs.values("pricing__model_name")
-            .annotate(total=Sum("dollar_amount") * settings.ADDON_CREDITS_PER_DOLLAR)
+        qs = self.current_sr.usage_costs.values("pricing__model_name").annotate(
+            total=Sum("dollar_amount") * settings.ADDON_CREDITS_PER_DOLLAR
         )
         return {item["pricing__model_name"]: item["total"] for item in qs}
 
@@ -2185,7 +2145,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
-        sr = self.get_current_sr()
+        sr = self.current_sr
         output = sr.api_output(extract_model_fields(self.ResponseModel, state))
         if as_async:
             return dict(
@@ -2216,17 +2176,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return email and email in settings.ADMIN_EMAILS
 
     def is_current_user_admin(self) -> bool:
-        if not self.request or not self.request.user:
-            return False
-        return self.is_user_admin(self.request.user)
+        return self.request.user and self.is_user_admin(self.request.user)
 
     def is_current_user_paying(self) -> bool:
-        return bool(self.request and self.request.user and self.request.user.is_paying)
+        return bool(self.request.user and self.request.user.is_paying)
 
     def is_current_user_owner(self) -> bool:
-        return bool(
-            self.request and self.request.user and self.run_user == self.request.user
-        )
+        return bool(self.request.user and self.current_sr_user == self.request.user)
 
 
 def started_at_text(dt: datetime.datetime):

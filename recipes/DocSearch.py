@@ -135,7 +135,7 @@ class DocSearchPage(BasePage):
         gui.write("---")
         gui.write("##### 🔎 Document Search Settings")
         citation_style_selector()
-        doc_extract_selector(self.request and self.request.user)
+        doc_extract_selector(self.request.user)
         query_instructions_widget()
         gui.write("---")
         doc_search_advanced_settings()
@@ -174,7 +174,7 @@ class DocSearchPage(BasePage):
                     "search_query": response.final_search_query,
                 },
             ),
-            current_user=self.request and self.request.user,
+            current_user=self.request.user,
         )
 
         # empty search result, abort!

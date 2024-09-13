@@ -1,9 +1,9 @@
 import datetime
 import html
+import threading
 import traceback
 import typing
 from time import time
-from types import SimpleNamespace
 
 import gooey_gui as gui
 import requests
@@ -30,6 +30,15 @@ from payments.auto_recharge import (
 )
 
 DEFAULT_RUN_STATUS = "Running..."
+
+threadlocal = threading.local()
+
+
+def get_running_saved_run() -> SavedRun | None:
+    try:
+        return threadlocal.saved_run
+    except AttributeError:
+        return None
 
 
 @app.task
@@ -81,12 +90,13 @@ def runner_task(
         # save to db
         page.dump_state_to_sr(gui.session_state | output, sr)
 
-    user = AppUser.objects.get(id=user_id)
-    page = page_cls(request=SimpleNamespace(user=user))
+    page = page_cls(
+        user=AppUser.objects.get(id=user_id), query_params=dict(run_id=run_id, uid=uid)
+    )
     page.setup_sentry()
-    sr = page.run_doc_sr(run_id, uid)
+    sr = page.current_sr
+    threadlocal.saved_run = sr
     gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
-    gui.set_query_params(dict(run_id=run_id, uid=uid))
 
     try:
         save_on_step()
@@ -114,6 +124,7 @@ def runner_task(
     # save everything, mark run as completed
     finally:
         save_on_step(done=True)
+        threadlocal.saved_run = None
 
     post_runner_tasks.delay(sr.id)
 

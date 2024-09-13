@@ -39,7 +39,6 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -243,7 +242,7 @@ def explore_page(request: Request):
 @gui.route(app, "/api/")
 def api_docs_page(request: Request):
     with page_wrapper(request):
-        _api_docs_page(request)
+        _api_docs_page()
     return dict(
         meta=raw_build_meta_tags(
             url=get_og_url_path(request),
@@ -256,7 +255,7 @@ def api_docs_page(request: Request):
     )
 
 
-def _api_docs_page(request):
+def _api_docs_page():
     from daras_ai_v2.all_pages import all_api_pages
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
@@ -313,8 +312,8 @@ Authorization: Bearer GOOEY_API_KEY
     as_async = gui.checkbox("Run Async")
     as_form_data = gui.checkbox("Upload Files via Form Data")
 
-    page = workflow.page_cls(request=request)
-    state = page.get_root_published_run().saved_run.to_dict()
+    page = workflow.page_cls()
+    state = page.get_root_pr().saved_run.to_dict()
     api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
@@ -668,26 +667,24 @@ def render_recipe_page(
         )
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
-    # this is because the code still expects example_id to be in the query params
-    gui.set_query_params(dict(request.query_params) | dict(example_id=example_id))
-    _, run_id, uid = extract_query_params(request.query_params)
+    page = page_cls(
+        tab=tab,
+        user=request.user,
+        request_session=request.session,
+        request_url=request.url,
+        # this is because the code still expects example_id to be in the query params
+        query_params=dict(request.query_params) | dict(example_id=example_id),
+    )
 
-    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not gui.session_state:
-        sr = page.get_sr_from_query_params(example_id, run_id, uid)
-        gui.session_state.update(page.load_state_from_sr(sr))
+        gui.session_state.update(page.current_sr_to_session_state())
 
     with page_wrapper(request):
         page.render()
 
     return dict(
         meta=build_meta_tags(
-            url=get_og_url_path(request),
-            page=page,
-            state=gui.session_state,
-            run_id=run_id,
-            uid=uid,
-            example_id=example_id,
+            url=get_og_url_path(request), page=page, state=gui.session_state
         ),
     )
 
@@ -696,17 +693,6 @@ def get_og_url_path(request) -> str:
     return str(
         (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
     )
-
-
-def get_run_user(request, uid) -> AppUser | None:
-    if not uid:
-        return
-    if request.user and request.user.uid == uid:
-        return request.user
-    try:
-        return AppUser.objects.get(uid=uid)
-    except AppUser.DoesNotExist:
-        pass
 
 
 @contextmanager
@@ -726,7 +712,7 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("header.html").render(**context))
         gui.html(copy_to_clipboard_scripts)
 
-        with gui.div(id="main-content", className="container " + className):
+        with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
         gui.html(templates.get_template("footer.html").render(**context))
@@ -761,7 +747,7 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img width="24" height="24" style="margin-right: 4px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
+        title=f'<img width="24" height="24" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
         label="Integrations",
         route=integrations_route,
     )

@@ -76,7 +76,7 @@ def send_email_via_postmark(
     html_body: str = "",
     text_body: str = "",
     message_stream: typing.Literal[
-        "outbound", "gooey-ai-workflows", "announcements"
+        "outbound", "gooey-ai-workflows", "announcements", "billing"
     ] = "outbound",
 ):
     if is_running_pytest:

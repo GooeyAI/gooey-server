@@ -67,6 +67,7 @@ def get_model_choices():
         + [(model.name, model.label) for model in ImageToImageModels]
         + [(model.name, model.label) for model in InpaintingModels]
         + [("wav2lip", "LipSync (wav2lip)")]
+        + [("sadtalker", "LipSync (sadtalker)")]
     )
 
 

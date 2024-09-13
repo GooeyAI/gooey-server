@@ -29,7 +29,7 @@ def safety_checker_text(text_input: str):
     # run in a thread to avoid messing up threadlocals
     result, sr = (
         CompareLLMPage()
-        .get_published_run(published_run_id=settings.SAFETY_CHECKER_EXAMPLE_ID)
+        .get_pr_from_example_id(example_id=settings.SAFETY_CHECKER_EXAMPLE_ID)
         .submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),
@@ -38,8 +38,7 @@ def safety_checker_text(text_input: str):
     )
 
     # wait for checker
-    get_celery_result_db_safe(result)
-    sr.refresh_from_db()
+    sr.wait_for_celery_result(result)
     # if checker failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)

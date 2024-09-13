@@ -24,10 +24,11 @@ def run():
             if "dall_e" not in m.name and m.model_id:
                 add_model(m.model_id, m.name)
     add_model("wav2lip_gan.pth", "wav2lip")
+    add_model("SadTalker_V0.0.2_512.safetensors", "sadtalker")
 
 
-def add_model(model_id, model_name):
-    ModelPricing.objects.get_or_create(
+def add_model(model_id: str, model_name: str):
+    obj, created = ModelPricing.objects.get_or_create(
         model_id=build_queue_name("gooey-gpu", model_id),
         sku=ModelSku.gpu_ms,
         defaults=dict(
@@ -40,3 +41,5 @@ def add_model(model_id, model_name):
             pricing_url="https://azure.microsoft.com/en-in/pricing/details/virtual-machines/linux/#pricing",
         ),
     )
+    if created:
+        print("created", obj)

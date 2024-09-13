@@ -85,7 +85,6 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import (
     parse_refs,
     CitationStyles,
@@ -525,7 +524,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             citation_style_selector()
             gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
 
-            doc_extract_selector(self.request and self.request.user)
+            doc_extract_selector(self.request.user)
 
             gui.write("---")
 
@@ -890,7 +889,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         "keyword_query": response.final_keyword_query,
                     },
                 ),
-                current_user=self.request and self.request.user,
+                current_user=self.request.user,
             )
             if request.use_url_shortener:
                 for reference in response.references:
@@ -1020,9 +1019,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
                 {**gui.session_state, "text_prompt": text}
             ).dict()
-            yield from TextToSpeechPage(
-                request=self.request, run_user=self.run_user
-            ).run(tts_state)
+            yield from TextToSpeechPage(request=self.request).run(tts_state)
             response.output_audio.append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -1036,9 +1033,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "selected_model": request.lipsync_model,
                 }
             ).dict()
-            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
-                lip_state
-            )
+            yield from LipsyncPage(request=self.request).run(lip_state)
             response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):
@@ -1065,9 +1060,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
             return
 
-        sr, pr = self.get_runs_from_query_params(
-            *extract_query_params(gui.get_query_params())
-        )
+        sr, pr = self.current_sr_pr
 
         # make user the user knows that they are on a saved run not the published run
         if pr and pr.saved_run_id != sr.id:
@@ -1381,7 +1374,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     slack_specific_settings(bi, run_title)
                 if bi.platform == Platform.TWILIO:
                     twilio_specific_settings(bi)
-                general_integration_settings(bi, self.request.user)
+                general_integration_settings(bi, self.request)
 
                 if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
                     gui.newline()

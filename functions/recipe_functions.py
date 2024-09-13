@@ -63,8 +63,7 @@ def call_recipe_functions(
         # wait for the result if its a pre request function
         if trigger == FunctionTrigger.post:
             continue
-        get_celery_result_db_safe(result)
-        sr.refresh_from_db()
+        sr.wait_for_celery_result(result)
         # if failed, raise error
         if sr.error_msg:
             raise RuntimeError(sr.error_msg)

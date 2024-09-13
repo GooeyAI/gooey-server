@@ -1,4 +1,3 @@
-import os
 import traceback
 
 from fastapi.exception_handlers import (
@@ -6,7 +5,6 @@ from fastapi.exception_handlers import (
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
-from furl import furl
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -15,6 +13,7 @@ from starlette.status import (
     HTTP_405_METHOD_NOT_ALLOWED,
 )
 
+from daras_ai_v2.github_tools import github_url_for_exc
 from daras_ai_v2.pydantic_validation import convert_errors
 from daras_ai_v2.settings import templates
 from gooeysite import wsgi
@@ -158,19 +157,3 @@ async def _exc_handler(request: Request, exc: Exception, template_name: str):
             ),
             status_code=500,
         )
-
-
-GITHUB_REPO = "https://github.com/GooeyAI/gooey-server/"
-
-
-def github_url_for_exc(exc: Exception) -> str | None:
-    base_dir = str(settings.BASE_DIR)
-    ref = (os.environ.get("CAPROVER_GIT_COMMIT_SHA") or "master").strip()
-    for frame in reversed(traceback.extract_tb(exc.__traceback__)):
-        if not frame.filename.startswith(base_dir):
-            continue
-        path = os.path.relpath(frame.filename, base_dir)
-        return str(
-            furl(GITHUB_REPO, fragment_path=f"L{frame.lineno}") / "blob" / ref / path
-        )
-    return GITHUB_REPO

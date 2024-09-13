@@ -10,7 +10,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse, Response
 
-from bots.models import Platform, Conversation, BotIntegration, Message
+from bots.models import Platform, Conversation, BotIntegration, Message, SavedRun
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, BasePage, StateKeys
@@ -304,7 +304,7 @@ class ApiInterface(BotInterface):
             msg_handler(self)
             # raise ValueError("Stream ended")
             if self.run_id and self.uid:
-                sr = self.page_cls.run_doc_sr(run_id=self.run_id, uid=self.uid)
+                sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
                 self.queue.put(
                     FinalResponse(
@@ -322,14 +322,10 @@ class ApiInterface(BotInterface):
         finally:
             self.queue.put(None)
 
-    def on_run_created(
-        self, page: BasePage, result: "celery.result.AsyncResult", run_id: str, uid: str
-    ):
-        self.run_id = run_id
-        self.uid = uid
-        self.queue.put(
-            RunStart(**build_async_api_response(page=page, run_id=run_id, uid=uid))
-        )
+    def on_run_created(self, sr: SavedRun):
+        self.run_id = sr.run_id
+        self.uid = sr.uid
+        self.queue.put(RunStart(**build_async_api_response(sr)))
 
     def send_run_status(self, update_msg_id: str | None) -> str | None:
         self.queue.put(

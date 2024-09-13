@@ -60,10 +60,8 @@ class FunctionsPage(BasePage):
         request: "FunctionsPage.RequestModel",
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
-        query_params = gui.get_query_params()
-        run_id = query_params.get("run_id")
-        uid = query_params.get("uid")
-        tag = f"run_id={run_id}&uid={uid}"
+        sr = self.current_sr
+        tag = f"run_id={sr.run_id}&uid={sr.uid}"
 
         yield "Running your code..."
         # this will run functions/executor.js in deno deploy
@@ -87,7 +85,7 @@ class FunctionsPage(BasePage):
         )
 
     def get_price_roundoff(self, state: dict) -> float:
-        if CalledFunction.objects.filter(function_run=self.get_current_sr()).exists():
+        if CalledFunction.objects.filter(function_run=self.current_sr).exists():
             return 0
         return super().get_price_roundoff(state)
 

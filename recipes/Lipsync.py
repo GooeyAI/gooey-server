@@ -1,9 +1,9 @@
 import typing
-
-import requests
-from pydantic import BaseModel
+from math import ceil
 
 import gooey_gui as gui
+from pydantic import BaseModel
+
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -12,9 +12,18 @@ from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
-CREDITS_PER_MB = 2
-
 DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
+
+
+CREDITS_PER_MINUTE = 36
+
+
+def price_for_model(selected_model: str | None) -> float:
+    if selected_model == LipsyncModels.SadTalker.name:
+        multiplier = 2
+    else:
+        multiplier = 1
+    return CREDITS_PER_MINUTE * multiplier
 
 
 class LipsyncPage(BasePage):
@@ -30,6 +39,7 @@ class LipsyncPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
+        duration_sec: float | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG
@@ -52,6 +62,12 @@ class LipsyncPage(BasePage):
             """,
             key="input_audio",
         )
+        if not (self.is_current_user_paying() or self.is_current_user_admin()):
+            gui.error(
+                "Output videos will be truncated to 250 frames for free users. Please [upgrade](/account) to generate long videos.",
+                icon="⚠️",
+                color="#ffe8b2",
+            )
 
         enum_selector(
             LipsyncModels,
@@ -70,11 +86,16 @@ class LipsyncPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
+        if self.is_current_user_paying() or self.is_current_user_admin():
+            max_frames = None
+        else:
+            max_frames = 250
+
         model = LipsyncModels[request.selected_model]
         yield f"Running {model.value}..."
         match model:
             case LipsyncModels.Wav2Lip:
-                state["output_video"] = run_wav2lip(
+                state["output_video"], state["duration_sec"] = run_wav2lip(
                     face=request.input_face,
                     audio=request.input_audio,
                     pads=(
@@ -83,12 +104,14 @@ class LipsyncPage(BasePage):
                         request.face_padding_left or 0,
                         request.face_padding_right or 0,
                     ),
+                    max_frames=max_frames,
                 )
             case LipsyncModels.SadTalker:
-                state["output_video"] = run_sadtalker(
+                state["output_video"], state["duration_sec"] = run_sadtalker(
                     request.sadtalker_settings,
                     face=request.input_face,
                     audio=request.input_audio,
+                    max_frames=max_frames,
                 )
 
     def render_example(self, state: dict):
@@ -117,28 +140,16 @@ class LipsyncPage(BasePage):
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
 
     def get_cost_note(self) -> str | None:
-        multiplier = (
-            3
-            if gui.session_state.get("lipsync_model") == LipsyncModels.SadTalker.name
-            else 1
-        )
-        return f"{CREDITS_PER_MB * multiplier} credits per MB"
+        selected_model = gui.session_state.get("selected_model")
+        return f"{price_for_model(selected_model)}/minute"
 
     def get_raw_price(self, state: dict) -> float:
-        total_bytes = 0
+        try:
+            duration_sec = state["duration_sec"]
+        except KeyError:
+            return 1
+        duration_sec = ceil(duration_sec / 5) * 5  # round up to nearest 5 seconds
 
-        input_audio = state.get("input_audio")
-        if input_audio:
-            r = requests.head(input_audio)
-            total_bytes += float(r.headers.get("Content-length") or "1")
+        price = price_for_model(state.get("selected_model"))
 
-        input_face = state.get("input_face")
-        if input_face:
-            r = requests.head(input_face)
-            total_bytes += float(r.headers.get("Content-length") or "1")
-
-        total_mb = total_bytes / 1024 / 1024
-        multiplier = (
-            3 if state.get("lipsync_model") == LipsyncModels.SadTalker.name else 1
-        )
-        return total_mb * CREDITS_PER_MB * multiplier
+        return duration_sec / 60 * price

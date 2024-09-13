@@ -662,6 +662,18 @@ def run():
         pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
     )
 
+    # AfroLlama3
+
+    llm_pricing_create(
+        model_id="Jacaranda/AfroLlama_V1",
+        model_name=LargeLanguageModels.afrollama_v1.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
     # SEA-LION
 
     llm_pricing_create(
@@ -673,10 +685,18 @@ def run():
         provider=ModelProvider.aks,
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
     )
-
     llm_pricing_create(
         model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
         model_name=LargeLanguageModels.llama3_8b_cpt_sea_lion_v2_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+    llm_pricing_create(
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
+        model_name=LargeLanguageModels.llama3_8b_cpt_sea_lion_v2_1_instruct.name,
         unit_cost_input=5,
         unit_cost_output=15,
         unit_quantity=10**6,
@@ -719,7 +739,7 @@ def llm_pricing_create(
         ),
     )
     if created:
-        print(f"created {obj}")
+        print("created", obj)
     obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
         sku=ModelSku.llm_completion,

@@ -330,6 +330,14 @@ class LargeLanguageModels(GooeyEnum):
         supports_json=True,
     )
 
+    afrollama_v1 = LLMSpec(
+        label="AfroLlama3 v1 (Jacaranda)",
+        model_id="Jacaranda/AfroLlama_V1",
+        llm_api=LLMApis.self_hosted,
+        context_window=2048,
+        price=1,
+        is_chat_model=False,
+    )
     sea_lion_7b_instruct = LLMSpec(
         label="SEA-LION-7B-Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/sea-lion-7b-instruct",
@@ -339,8 +347,16 @@ class LargeLanguageModels(GooeyEnum):
         is_deprecated=True,
     )
     llama3_8b_cpt_sea_lion_v2_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2 Instruct (aisingapore)",
+        label="Llama3 8B CPT SEA-LIONv2 Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=8192,
+        price=1,
+        is_deprecated=True,
+    )
+    llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
+        label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
         llm_api=LLMApis.self_hosted,
         context_window=8192,
         price=1,
