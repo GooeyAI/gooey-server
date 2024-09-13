@@ -31,8 +31,8 @@ class RelatedQnADocPage(BasePage):
     sane_defaults = dict(
         citation_style=CitationStyles.number.name,
         dense_weight=1.0,
-        serp_search_type=SerpSearchType.search,
-        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
     )
 
     class RequestModel(GoogleSearchMixin, DocSearchPage.RequestModel):

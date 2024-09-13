@@ -43,7 +43,7 @@ def serp_search_location_selectbox(key="serp_search_location"):
         options=[e.api_value for e in SerpSearchLocations],
         format_func=lambda e: f"{SerpSearchLocations.from_api(e).label} ({e})",
         key=key,
-        value=SerpSearchLocations.UNITED_STATES.name,
+        value=SerpSearchLocations.UNITED_STATES.api_value,
     )
 
 
@@ -57,10 +57,6 @@ class SerpSearchType(GooeyEnum):
     @property
     def label(self):
         return self.value
-
-    @property
-    def api_value(self):
-        return self.name
 
 
 class SerpSearchLocation(typing.NamedTuple):

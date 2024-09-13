@@ -34,8 +34,8 @@ class RelatedQnAPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         dense_weight=1.0,
-        serp_search_type=SerpSearchType.search,
-        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
     )
 
     class RequestModel(GoogleGPTPage.RequestModel):
