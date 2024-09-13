@@ -47,9 +47,7 @@ class AsrPage(BasePage):
         selected_model: AsrModels.api_enum | None
         language: str | None
 
-        translation_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        translation_model: TranslationModels.api_enum | None
 
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 

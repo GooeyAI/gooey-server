@@ -291,7 +291,7 @@ class TranslationModel(typing.NamedTuple):
     supports_auto_detect: bool = False
 
 
-class TranslationModels(TranslationModel, Enum):
+class TranslationModels(TranslationModel, GooeyEnum):
     google = TranslationModel(
         label="Google Translate",
         supports_glossary=True,

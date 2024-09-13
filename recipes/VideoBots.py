@@ -230,9 +230,7 @@ class VideoBotsPage(BasePage):
             description="Choose a language to transcribe incoming audio messages to text.",
         )
 
-        translation_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        translation_model: TranslationModels.api_enum | None
         user_language: str | None = Field(
             title="User Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",

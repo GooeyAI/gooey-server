@@ -43,9 +43,9 @@ class TranslationPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         texts: list[str] = Field([])
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)]
-        ) | None = Field(TranslationModels.google.name)
+        selected_model: TranslationModels.api_enum | None = Field(
+            TranslationModels.google.name
+        )
 
     class RequestModel(TranslationOptions, RequestModelBase):
         pass
