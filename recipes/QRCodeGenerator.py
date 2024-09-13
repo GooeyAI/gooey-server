@@ -82,7 +82,9 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         qr_code_data: str | None
         qr_code_input_image: FieldHttpUrl | None
-        qr_code_vcard: VCARD | None = Field(title="VCard")
+        qr_code_vcard: VCARD | None = Field(
+            title="VCard", **{"x-fern-type-name": "VCard"}
+        )
         qr_code_file: FieldHttpUrl | None
 
         use_url_shortener: bool | None
