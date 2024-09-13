@@ -18,6 +18,7 @@ from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
 
 def integrations_welcome_screen(title: str):
@@ -461,7 +462,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
 
         with gui.expander("Embed Settings"):
             gui.caption(
-                "These settings will take effect when you embed the widget on your website."
+                'These settings will take effect when you embed the widget on your website. Press "Update Web Preview" below after making any changes.'
             )
             scol1, scol2 = gui.columns(2)
             with scol1:
@@ -478,6 +479,12 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                     )
                 else:
                     config["branding"].pop("fabLabel", None)
+                embed_code = get_web_widget_embed_code(bi)
+                copy_to_clipboard_button(
+                    f"{icons.code} Copy Embed Code",
+                    value=embed_code,
+                    type="secondary",
+                )
 
         # remove defaults
         bi.web_config_extras = config
