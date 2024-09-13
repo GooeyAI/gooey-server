@@ -55,8 +55,8 @@ class TextToSpeechSettings(BaseModel):
 
     azure_voice_name: str | None
 
-    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
-    openai_tts_model: OpenAI_TTS_Models.api_choices | None
+    openai_voice_name: OpenAI_TTS_Voices.api_enum | None
+    openai_tts_model: OpenAI_TTS_Models.api_enum | None
 
 
 class TextToSpeechPage(BasePage):

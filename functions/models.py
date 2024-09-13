@@ -22,7 +22,7 @@ class RecipeFunction(BaseModel):
         title="URL",
         description="The URL of the [function](https://gooey.ai/functions) to call.",
     )
-    trigger: FunctionTrigger.api_choices = Field(
+    trigger: FunctionTrigger.api_enum = Field(
         title="Trigger",
         description="When to run this function. `pre` runs before the recipe, `post` runs after the recipe.",
     )
@@ -30,7 +30,7 @@ class RecipeFunction(BaseModel):
 
 class CalledFunctionResponse(BaseModel):
     url: str
-    trigger: FunctionTrigger.api_choices
+    trigger: FunctionTrigger.api_enum
     return_value: typing.Any
 
     @classmethod

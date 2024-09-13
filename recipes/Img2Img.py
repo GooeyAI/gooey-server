@@ -2,7 +2,7 @@ import typing
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -49,7 +49,7 @@ class Img2ImgPage(BasePage):
         selected_model: ImageToImageModels.api_enum | None
         selected_controlnet_model: (
             list[ControlNetModels.api_enum] | ControlNetModels.api_enum | None
-        )
+        ) = Field(**{"x-fern-type-name": "SelectedControlNetModels"})
         negative_prompt: str | None
 
         num_outputs: int | None

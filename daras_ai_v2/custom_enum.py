@@ -46,11 +46,6 @@ class GooeyEnum(Enum):
 
     @classmethod
     @property
-    def api_choices(cls):
-        return typing.Literal[tuple(e.api_value for e in cls)]
-
-    @classmethod
-    @property
     @cached_classmethod
     def api_enum(cls):
         """

@@ -75,7 +75,9 @@ class DocSearchRequest(BaseModel):
         use_enum_values = True
 
     search_query: str
-    keyword_query: str | list[str] | None
+    keyword_query: str | list[str] | None = Field(
+        **{"x-fern-type-name": "KeywordQuery"}
+    )
 
     documents: list[str] | None
 
