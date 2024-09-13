@@ -13,6 +13,7 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -119,47 +120,68 @@ img2img_model_ids = {
 }
 
 
-class ControlNetModels(Enum):
-    sd_controlnet_canny = "Canny"
-    sd_controlnet_depth = "Depth"
-    sd_controlnet_hed = "HED Boundary"
-    sd_controlnet_mlsd = "M-LSD Straight Line"
-    sd_controlnet_normal = "Normal Map"
-    sd_controlnet_openpose = "Human Pose"
-    sd_controlnet_scribble = "Scribble"
-    sd_controlnet_seg = "Image Segmentation"
-    sd_controlnet_tile = "Tiling"
-    sd_controlnet_brightness = "Brightness"
-    control_v1p_sd15_qrcode_monster_v2 = "QR Monster V2"
+class ControlNetModel(typing.NamedTuple):
+    label: str
+    model_id: str
+    explanation: str
 
 
-controlnet_model_explanations = {
-    ControlNetModels.sd_controlnet_canny: "Canny edge detection",
-    ControlNetModels.sd_controlnet_depth: "Depth estimation",
-    ControlNetModels.sd_controlnet_hed: "HED edge detection",
-    ControlNetModels.sd_controlnet_mlsd: "M-LSD straight line detection",
-    ControlNetModels.sd_controlnet_normal: "Normal map estimation",
-    ControlNetModels.sd_controlnet_openpose: "Human pose estimation",
-    ControlNetModels.sd_controlnet_scribble: "Scribble",
-    ControlNetModels.sd_controlnet_seg: "Image segmentation",
-    ControlNetModels.sd_controlnet_tile: "Tiling: to preserve small details",
-    ControlNetModels.sd_controlnet_brightness: "Brightness: to increase contrast naturally",
-    ControlNetModels.control_v1p_sd15_qrcode_monster_v2: "QR Monster: make beautiful QR codes that still scan with a controlnet specifically trained for this purpose",
-}
-
-controlnet_model_ids = {
-    ControlNetModels.sd_controlnet_canny: "lllyasviel/sd-controlnet-canny",
-    ControlNetModels.sd_controlnet_depth: "lllyasviel/sd-controlnet-depth",
-    ControlNetModels.sd_controlnet_hed: "lllyasviel/sd-controlnet-hed",
-    ControlNetModels.sd_controlnet_mlsd: "lllyasviel/sd-controlnet-mlsd",
-    ControlNetModels.sd_controlnet_normal: "lllyasviel/sd-controlnet-normal",
-    ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
-    ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
-    ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
-    ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
-    ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
-    ControlNetModels.control_v1p_sd15_qrcode_monster_v2: "monster-labs/control_v1p_sd15_qrcode_monster/v2",
-}
+class ControlNetModels(ControlNetModel, GooeyEnum):
+    sd_controlnet_canny = ControlNetModel(
+        label="Canny",
+        explanation="Canny edge detection",
+        model_id="lllyasviel/sd-controlnet-canny",
+    )
+    sd_controlnet_depth = ControlNetModel(
+        label="Depth",
+        explanation="Depth estimation",
+        model_id="lllyasviel/sd-controlnet-depth",
+    )
+    sd_controlnet_hed = ControlNetModel(
+        label="HED Boundary",
+        explanation="HED edge detection",
+        model_id="lllyasviel/sd-controlnet-hed",
+    )
+    sd_controlnet_mlsd = ControlNetModel(
+        label="M-LSD Straight Line",
+        explanation="M-LSD straight line detection",
+        model_id="lllyasviel/sd-controlnet-mlsd",
+    )
+    sd_controlnet_normal = ControlNetModel(
+        label="Normal Map",
+        explanation="Normal map estimation",
+        model_id="lllyasviel/sd-controlnet-normal",
+    )
+    sd_controlnet_openpose = ControlNetModel(
+        label="Human Pose",
+        explanation="Human pose estimation",
+        model_id="lllyasviel/sd-controlnet-openpose",
+    )
+    sd_controlnet_scribble = ControlNetModel(
+        label="Scribble",
+        explanation="Scribble",
+        model_id="lllyasviel/sd-controlnet-scribble",
+    )
+    sd_controlnet_seg = ControlNetModel(
+        label="Image Segmentation",
+        explanation="Image segmentation",
+        model_id="lllyasviel/sd-controlnet-seg",
+    )
+    sd_controlnet_tile = ControlNetModel(
+        label="Tiling",
+        explanation="Tiling: to preserve small details",
+        model_id="lllyasviel/control_v11f1e_sd15_tile",
+    )
+    sd_controlnet_brightness = ControlNetModel(
+        label="Brightness",
+        explanation="Brightness: to increase contrast naturally",
+        model_id="ioclab/control_v1p_sd15_brightness",
+    )
+    control_v1p_sd15_qrcode_monster_v2 = ControlNetModel(
+        label="QR Monster V2",
+        explanation="QR Monster: make beautiful QR codes that still scan with a controlnet specifically trained for this purpose",
+        model_id="monster-labs/control_v1p_sd15_qrcode_monster/v2",
+    )
 
 
 class Schedulers(models.TextChoices):
@@ -463,8 +485,7 @@ def controlnet(
             ),
             "disable_safety_checker": True,
             "controlnet_model_id": [
-                controlnet_model_ids[ControlNetModels[model]]
-                for model in selected_controlnet_model
+                ControlNetModels[model].model_id for model in selected_controlnet_model
             ],
         },
         inputs={

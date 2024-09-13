@@ -6,7 +6,6 @@ from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
     ControlNetModels,
-    controlnet_model_explanations,
     Schedulers,
 )
 
@@ -130,9 +129,7 @@ def controlnet_settings(
     if not models:
         return
 
-    if extra_explanations is None:
-        extra_explanations = {}
-    explanations = controlnet_model_explanations | extra_explanations
+    extra_explanations = extra_explanations or {}
 
     state_values = gui.session_state.get("controlnet_conditioning_scale", [])
     new_values = []
@@ -157,7 +154,9 @@ def controlnet_settings(
             pass
         new_values.append(
             controlnet_weight_setting(
-                selected_controlnet_model=model, explanations=explanations, key=key
+                selected_controlnet_model=model,
+                extra_explanations=extra_explanations,
+                key=key,
             ),
         )
     gui.session_state["controlnet_conditioning_scale"] = new_values
@@ -166,13 +165,13 @@ def controlnet_settings(
 def controlnet_weight_setting(
     *,
     selected_controlnet_model: str,
-    explanations: dict[ControlNetModels, str],
+    extra_explanations: dict[ControlNetModels, str],
     key: str = "controlnet_conditioning_scale",
 ):
     model = ControlNetModels[selected_controlnet_model]
     return gui.slider(
         label=f"""
-        {explanations[model]}.
+        {extra_explanations.get(model, model.explanation)}.
         """,
         key=key,
         min_value=CONTROLNET_CONDITIONING_SCALE_RANGE[0],
