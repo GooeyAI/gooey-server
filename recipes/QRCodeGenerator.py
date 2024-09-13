@@ -8,7 +8,7 @@ import requests
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pyzbar import pyzbar
 
 import gooey_gui as gui
@@ -82,7 +82,7 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         qr_code_data: str | None
         qr_code_input_image: FieldHttpUrl | None
-        qr_code_vcard: VCARD | None
+        qr_code_vcard: VCARD | None = Field(title="VCard")
         qr_code_file: FieldHttpUrl | None
 
         use_url_shortener: bool | None
