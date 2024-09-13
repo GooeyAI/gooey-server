@@ -16,7 +16,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
+from daras_ai_v2.image_segmentation import ImageSegmentationModels, dis, u2net
 from daras_ai_v2.img_io import opencv_to_pil, pil_to_bytes
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.polygon_fitter import (
@@ -51,9 +51,7 @@ class ImageSegmentationPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
-        )
+        selected_model: ImageSegmentationModels.api_enum | None
         mask_threshold: float | None
 
         rect_persepective_transform: bool | None
