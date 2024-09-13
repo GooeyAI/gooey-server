@@ -74,7 +74,7 @@ class DocSearchPage(BasePage):
 
         selected_model: LargeLanguageModels.api_enum | None
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: CitationStyles.api_enum | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

@@ -218,7 +218,7 @@ class VideoBotsPage(BasePage):
             "dense_weight"
         ].field_info
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: CitationStyles.api_enum | None
         use_url_shortener: bool | None
 
         asr_model: AsrModels.api_enum | None = Field(

@@ -1,10 +1,10 @@
 import re
 import typing
-from enum import Enum
 
 import jinja2
 from typing_extensions import TypedDict
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
@@ -16,7 +16,7 @@ class SearchReference(TypedDict):
     score: float
 
 
-class CitationStyles(Enum):
+class CitationStyles(GooeyEnum):
     number = "Numbers ( [1] [2] [3] ..)"
     title = "Source Title ( [Source 1] [Source 2] [Source 3] ..)"
     url = "Source URL ( [https://source1.com] [https://source2.com] [https://source3.com] ..)"
