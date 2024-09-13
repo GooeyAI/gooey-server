@@ -91,6 +91,9 @@ class SEOSummaryPage(BasePage):
     )
 
     class RequestModelBase(BaseModel):
+        class Config:
+            use_enum_values = True
+
         search_query: str
         keywords: str
         title: str
@@ -273,7 +276,7 @@ SearchSEO > Page Parsing > GPT3
 
         serp_results, links = get_links_from_serp_api(
             request.search_query,
-            search_type=request.serp_search_type,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
             search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         state["serp_results"] = serp_results
@@ -313,7 +316,7 @@ def _crosslink_keywords(output_content, request):
     all_results = map_parallel(
         lambda keyword: get_links_from_serp_api(
             f"site:{host} {keyword}",
-            search_type=request.serp_search_type,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
             search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )[1],
         relevant_keywords,
