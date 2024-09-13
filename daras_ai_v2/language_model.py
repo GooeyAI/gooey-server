@@ -459,7 +459,9 @@ def get_entry_text(entry: ConversationEntry) -> str:
     )
 
 
-ResponseFormatType = typing.Literal["text", "json_object"]
+class ResponseFormatType(str, GooeyEnum):
+    text = "text"
+    json_object = "json_object"
 
 
 def run_language_model(
