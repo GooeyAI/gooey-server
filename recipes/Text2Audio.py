@@ -1,6 +1,6 @@
 import typing
-from enum import Enum
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
@@ -18,7 +18,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 DEFAULT_TEXT2AUDIO_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85cf8ea4-9457-11ee-bd77-02420a0001ce/Text%20guided%20audio.jpg.png"
 
 
-class Text2AudioModels(Enum):
+class Text2AudioModels(GooeyEnum):
     audio_ldm = "AudioLDM (CVSSP)"
 
 
@@ -51,13 +51,11 @@ class Text2AudioPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in Text2AudioModels)]] | None
-        )
+        selected_models: list[Text2AudioModels.api_enum] | None
 
     class ResponseModel(BaseModel):
         output_audios: dict[
-            typing.Literal[tuple(e.name for e in Text2AudioModels)],
+            Text2AudioModels.api_enum,
             list[FieldHttpUrl],
         ]
 

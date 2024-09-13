@@ -1,6 +1,6 @@
 import typing
-from enum import Enum
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from pydantic import BaseModel
 
@@ -37,7 +37,7 @@ from recipes.GoogleGPT import render_output_with_refs, GoogleGPTPage
 DEFAULT_DOC_SUMMARY_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f35796d2-93fe-11ee-b86c-02420a0001c7/Summarize%20with%20GPT.jpg.png"
 
 
-class CombineDocumentsChains(Enum):
+class CombineDocumentsChains(GooeyEnum):
     map_reduce = "Map Reduce"
     # refine = "Refine"
     # stuff = "Stuffing (Only works for small documents)"
@@ -70,7 +70,7 @@ class DocSummaryPage(BasePage):
 
         selected_model: LargeLanguageModels.api_enum | None
 
-        chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
+        chain_type: CombineDocumentsChains.api_enum | None
 
         selected_asr_model: AsrModels.api_enum | None
         google_translate_target: str | None
