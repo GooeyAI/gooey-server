@@ -107,7 +107,7 @@ class QRCodeGeneratorPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        scheduler: Schedulers.api_enum | None
 
         seed: int | None
 

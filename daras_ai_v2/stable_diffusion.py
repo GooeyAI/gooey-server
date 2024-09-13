@@ -1,6 +1,5 @@
 import io
 import typing
-from enum import Enum
 
 import requests
 from PIL import Image
@@ -226,44 +225,51 @@ class ControlNetModels(ControlNetModel, GooeyEnum):
     )
 
 
-class Schedulers(models.TextChoices):
-    singlestep_dpm_solver = (
-        "DPM",
-        "DPMSolverSinglestepScheduler",
+class Scheduler(typing.NamedTuple):
+    label: str
+    model_id: str
+
+
+class Schedulers(Scheduler, GooeyEnum):
+    singlestep_dpm_solver = Scheduler(
+        label="DPM",
+        model_id="DPMSolverSinglestepScheduler",
     )
-    multistep_dpm_solver = "DPM Multistep", "DPMSolverMultistepScheduler"
-    dpm_sde = (
-        "DPM SDE",
-        "DPMSolverSDEScheduler",
+    multistep_dpm_solver = Scheduler(
+        label="DPM Multistep", model_id="DPMSolverMultistepScheduler"
     )
-    dpm_discrete = (
-        "DPM Discrete",
-        "KDPM2DiscreteScheduler",
+    dpm_sde = Scheduler(
+        label="DPM SDE",
+        model_id="DPMSolverSDEScheduler",
     )
-    dpm_discrete_ancestral = (
-        "DPM Anscetral",
-        "KDPM2AncestralDiscreteScheduler",
+    dpm_discrete = Scheduler(
+        label="DPM Discrete",
+        model_id="KDPM2DiscreteScheduler",
     )
-    unipc = "UniPC", "UniPCMultistepScheduler"
-    lms_discrete = (
-        "LMS",
-        "LMSDiscreteScheduler",
+    dpm_discrete_ancestral = Scheduler(
+        label="DPM Anscetral",
+        model_id="KDPM2AncestralDiscreteScheduler",
     )
-    heun = (
-        "Heun",
-        "HeunDiscreteScheduler",
+    unipc = Scheduler(label="UniPC", model_id="UniPCMultistepScheduler")
+    lms_discrete = Scheduler(
+        label="LMS",
+        model_id="LMSDiscreteScheduler",
     )
-    euler = "Euler", "EulerDiscreteScheduler"
-    euler_ancestral = (
-        "Euler ancestral",
-        "EulerAncestralDiscreteScheduler",
+    heun = Scheduler(
+        label="Heun",
+        model_id="HeunDiscreteScheduler",
     )
-    pndm = "PNDM", "PNDMScheduler"
-    ddpm = "DDPM", "DDPMScheduler"
-    ddim = "DDIM", "DDIMScheduler"
-    deis = (
-        "DEIS",
-        "DEISMultistepScheduler",
+    euler = Scheduler("Euler", "EulerDiscreteScheduler")
+    euler_ancestral = Scheduler(
+        label="Euler ancestral",
+        model_id="EulerAncestralDiscreteScheduler",
+    )
+    pndm = Scheduler(label="PNDM", model_id="PNDMScheduler")
+    ddpm = Scheduler(label="DDPM", model_id="DDPMScheduler")
+    ddim = Scheduler(label="DDIM", model_id="DDIMScheduler")
+    deis = Scheduler(
+        label="DEIS",
+        model_id="DEISMultistepScheduler",
     )
 
 
@@ -385,7 +391,7 @@ def text2img(
                 "diffusion.text2img",
                 pipeline={
                     "model_id": Text2ImgModels[selected_model].model_id,
-                    "scheduler": Schedulers[scheduler].label if scheduler else None,
+                    "scheduler": Schedulers[scheduler].model_id if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
                 },
@@ -523,7 +529,9 @@ def controlnet(
             "model_id": Text2ImgModels[selected_model].model_id,
             "seed": seed,
             "scheduler": (
-                Schedulers[scheduler].label if scheduler else "UniPCMultistepScheduler"
+                Schedulers[scheduler].model_id
+                if scheduler
+                else Schedulers.unipc.model_id
             ),
             "disable_safety_checker": True,
             "controlnet_model_id": [
@@ -600,7 +608,7 @@ def inpainting(
                 pipeline={
                     "model_id": InpaintingModels[selected_model].model_id,
                     "seed": seed,
-                    # "scheduler": Schedulers[scheduler].label
+                    # "scheduler": Schedulers[scheduler].model_id
                     # if scheduler
                     # else "UniPCMultistepScheduler",
                     "disable_safety_checker": True,

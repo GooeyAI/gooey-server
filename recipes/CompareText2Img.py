@@ -67,7 +67,7 @@ class CompareText2ImgPage(BasePage):
         sd_2_upscaling: bool | None
 
         selected_models: list[Text2ImgModels.api_enum] | None
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        scheduler: Schedulers.api_enum | None
 
         edit_instruction: str | None
         image_guidance_scale: float | None

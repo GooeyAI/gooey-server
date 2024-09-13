@@ -46,7 +46,7 @@ class OpenAI_TTS_Voices(GooeyEnum):
     shimmer = "shimmer"
 
 
-class TextToSpeechProviders(Enum):
+class TextToSpeechProviders(GooeyEnum):
     GOOGLE_TTS = "Google Text-to-Speech"
     ELEVEN_LABS = "Eleven Labs"
     UBERDUCK = "Uberduck.ai"
