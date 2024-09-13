@@ -28,9 +28,9 @@ from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_settings,
-    SerpSearchLocation,
+    SerpSearchLocations,
     SerpSearchType,
+    serp_search_settings,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 from recipes.GoogleGPT import GoogleSearchMixin
@@ -74,8 +74,8 @@ class SEOSummaryPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -274,7 +274,7 @@ SearchSEO > Page Parsing > GPT3
         serp_results, links = get_links_from_serp_api(
             request.search_query,
             search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         state["serp_results"] = serp_results
         state["search_urls"] = [it.url for it in links]
@@ -314,7 +314,7 @@ def _crosslink_keywords(output_content, request):
         lambda keyword: get_links_from_serp_api(
             f"site:{host} {keyword}",
             search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )[1],
         relevant_keywords,
     )

@@ -1,7 +1,7 @@
 import typing
 
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -27,9 +27,9 @@ from daras_ai_v2.search_ref import (
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     GoogleSearchMixin,
-    serp_search_settings,
-    SerpSearchLocation,
+    SerpSearchLocations,
     SerpSearchType,
+    serp_search_settings,
 )
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
@@ -56,8 +56,8 @@ class GoogleGPTPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -211,7 +211,7 @@ class GoogleGPTPage(BasePage):
         self,
         request: "GoogleGPTPage.RequestModel",
         response: "GoogleGPTPage.ResponseModel",
-    ):
+    ) -> typing.Iterator[str | None]:
         model = LargeLanguageModels[request.selected_model]
 
         query_instructions = (request.query_instructions or "").strip()
@@ -231,8 +231,8 @@ class GoogleGPTPage(BasePage):
             )
         response.serp_results, links = get_links_from_serp_api(
             response.final_search_query,
-            search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         # extract links & their corresponding titles
         link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}

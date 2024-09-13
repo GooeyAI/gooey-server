@@ -1,8 +1,11 @@
-from django.db.models import TextChoices
+import typing
+
 from pydantic import BaseModel
 from pydantic import Field
 
 import gooey_gui as gui
+from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
 
 
@@ -26,10 +29,10 @@ def serp_search_settings():
 
 
 def serp_search_type_selectbox(key="serp_search_type"):
-    gui.selectbox(
+    enum_selector(
+        SerpSearchType,
         f"###### {field_title_desc(GoogleSearchMixin, key)}",
-        options=SerpSearchType,
-        format_func=lambda x: x.label,
+        use_selectbox=True,
         key=key,
     )
 
@@ -37,22 +40,35 @@ def serp_search_type_selectbox(key="serp_search_type"):
 def serp_search_location_selectbox(key="serp_search_location"):
     gui.selectbox(
         f"###### {field_title_desc(GoogleSearchMixin, key)}",
-        options=SerpSearchLocation,
-        format_func=lambda x: f"{x.label} ({x.value})",
+        options=[e.api_value for e in SerpSearchLocations],
+        format_func=lambda e: f"{SerpSearchLocations.from_api(e).label} ({e})",
         key=key,
-        value=SerpSearchLocation.UNITED_STATES,
+        value=SerpSearchLocations.UNITED_STATES.name,
     )
 
 
-class SerpSearchType(TextChoices):
-    SEARCH = "search", "🔎 Search"
-    IMAGES = "images", "📷 Images"
-    VIDEOS = "videos", "🎥 Videos"
-    PLACES = "places", "📍 Places"
-    NEWS = "news", "📰 News"
+class SerpSearchType(GooeyEnum):
+    search = "🔎 Search"
+    images = "📷 Images"
+    videos = "🎥 Videos"
+    places = "📍 Places"
+    news = "📰 News"
+
+    @property
+    def label(self):
+        return self.value
+
+    @property
+    def api_value(self):
+        return self.name
 
 
-class SerpSearchLocation(TextChoices):
+class SerpSearchLocation(typing.NamedTuple):
+    api_value: str
+    label: str
+
+
+class SerpSearchLocations(SerpSearchLocation, GooeyEnum):
     AFGHANISTAN = "af", "Afghanistan"
     ALBANIA = "al", "Albania"
     ALGERIA = "dz", "Algeria"
@@ -304,7 +320,7 @@ class SerpSearchLocation(TextChoices):
 
 
 class GoogleSearchLocationMixin(BaseModel):
-    serp_search_location: SerpSearchLocation | None = Field(
+    serp_search_location: SerpSearchLocations.api_enum | None = Field(
         title="Web Search Location",
     )
     scaleserp_locations: list[str] | None = Field(
@@ -313,7 +329,7 @@ class GoogleSearchLocationMixin(BaseModel):
 
 
 class GoogleSearchMixin(GoogleSearchLocationMixin, BaseModel):
-    serp_search_type: SerpSearchType | None = Field(
+    serp_search_type: SerpSearchType.api_enum | None = Field(
         title="Web Search Type",
     )
     scaleserp_search_field: str | None = Field(

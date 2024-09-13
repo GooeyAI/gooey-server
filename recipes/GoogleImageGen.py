@@ -17,10 +17,10 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.serp_search import call_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_location_selectbox,
     GoogleSearchLocationMixin,
+    SerpSearchLocations,
     SerpSearchType,
-    SerpSearchLocation,
+    serp_search_location_selectbox,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
@@ -47,8 +47,8 @@ class GoogleImageGenPage(BasePage):
         sd_2_upscaling=False,
         seed=42,
         image_guidance_scale=1.2,
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
     )
 
     class RequestModel(GoogleSearchLocationMixin, BasePage.RequestModel):
@@ -113,8 +113,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         serp_results = call_serp_api(
             request.search_query,
-            search_type=SerpSearchType.IMAGES,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.images,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         image_urls = [
             link

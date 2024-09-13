@@ -8,10 +8,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
-from daras_ai_v2.serp_search_locations import (
-    SerpSearchLocation,
-    SerpSearchType,
-)
+from daras_ai_v2.serp_search_locations import SerpSearchLocations, SerpSearchType
 from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.RelatedQnADoc import render_qna_outputs
@@ -37,8 +34,8 @@ class RelatedQnAPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         dense_weight=1.0,
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.name,
     )
 
     class RequestModel(GoogleGPTPage.RequestModel):
@@ -118,7 +115,7 @@ class RelatedQnAPage(BasePage):
             related_questions,
         ) = get_related_questions_from_serp_api(
             request.search_query,
-            search_location=request.serp_search_location,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
 
         all_questions = [request.search_query] + related_questions[:9]
