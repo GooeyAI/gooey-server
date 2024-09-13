@@ -467,10 +467,6 @@ Choose fps for the video.
         if not self.request.user.disable_safety_checker:
             safety_checker(text=self.preview_input(state))
 
-        print("selected_model", request.selected_model)
-        print(f'{state["selected_model"]=}')
-        print(f"{type(request.selected_model)=}")
-
         try:
             state["output_video"] = call_celery_task_outfile(
                 "deforum",
