@@ -20,9 +20,9 @@ from daras_ai_v2.crypto import get_random_string
 from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
-    Img2ImgModels,
+    ImageToImageModels,
     text2img,
-    Text2ImgModels,
+    TextToImageModels,
     img2img,
     instruct_pix2pix,
     sd_upscale,
@@ -34,7 +34,7 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 
 # def fn():
 #     text2img(
-#         selected_model=Img2ImgModels.sd_1_5.name,
+#         selected_model=ImageToImageModels.sd_1_5.name,
 #         prompt=get_random_string(100, string.ascii_letters),
 #         num_outputs=1,
 #         num_inference_steps=1,
@@ -45,7 +45,7 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 #     # r = requests.get(GpuEndpoints.sd_multi / "magic")
 #     # raise_for_status(r)
 #     # img2img(
-#     #     selected_model=Img2ImgModels.sd_1_5.name,
+#     #     selected_model=ImageToImageModels.sd_1_5.name,
 #     #     prompt=get_random_string(100, string.ascii_letters),
 #     #     num_outputs=1,
 #     #     init_image=random_img,
@@ -55,7 +55,7 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 #     # )
 #     # controlnet(
 #     #     selected_controlnet_model=ControlNetModels.sd_controlnet_depth.name,
-#     #     selected_model=Img2ImgModels.sd_1_5.name,
+#     #     selected_model=ImageToImageModels.sd_1_5.name,
 #     #     prompt=get_random_string(100, string.ascii_letters),
 #     #     num_outputs=1,
 #     #     init_image=random_img,
@@ -72,11 +72,11 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 # exit()
 tasks = []
 
-for model in Img2ImgModels:
+for model in ImageToImageModels:
     if model in [
-        Img2ImgModels.instruct_pix2pix,
-        Img2ImgModels.dall_e,
-        Img2ImgModels.jack_qiao,
+        ImageToImageModels.instruct_pix2pix,
+        ImageToImageModels.dall_e,
+        ImageToImageModels.jack_qiao,
     ]:
         continue
     print(model)
@@ -96,7 +96,7 @@ for model in Img2ImgModels:
     )
     for controlnet_model in ControlNetModels:
         if model in [
-            Img2ImgModels.sd_2,
+            ImageToImageModels.sd_2,
         ]:
             continue
         print(controlnet_model)
@@ -115,10 +115,10 @@ for model in Img2ImgModels:
             )
         )
 
-for model in Text2ImgModels:
+for model in TextToImageModels:
     if model in [
-        Text2ImgModels.dall_e,
-        Text2ImgModels.jack_qiao,
+        TextToImageModels.dall_e,
+        TextToImageModels.jack_qiao,
     ]:
         continue
     print(model)

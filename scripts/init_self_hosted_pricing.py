@@ -1,7 +1,11 @@
 from decimal import Decimal
 
 from daras_ai_v2.gpu_server import build_queue_name
-from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels, InpaintingModels
+from daras_ai_v2.stable_diffusion import (
+    TextToImageModels,
+    ImageToImageModels,
+    InpaintingModels,
+)
 from recipes.DeforumSD import AnimationModels
 from usage_costs.models import ModelPricing
 from usage_costs.models import ModelSku, ModelCategory, ModelProvider
@@ -12,8 +16,8 @@ category = ModelCategory.SELF_HOSTED
 def run():
     for model_enum in [
         AnimationModels,
-        Text2ImgModels,
-        Img2ImgModels,
+        TextToImageModels,
+        ImageToImageModels,
         InpaintingModels,
     ]:
         for m in model_enum:
