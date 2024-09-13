@@ -28,7 +28,7 @@ class EmbeddedFile(models.Model):
     selected_asr_model = models.CharField(max_length=100, blank=True)
     embedding_model = models.CharField(
         max_length=100,
-        choices=[(model.name, model.label) for model in EmbeddingModels],
+        choices=EmbeddingModels.db_choices(),
         default=EmbeddingModels.openai_3_large.name,
     )
 

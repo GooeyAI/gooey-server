@@ -213,7 +213,7 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        embedding_model: EmbeddingModels.api_enum | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
