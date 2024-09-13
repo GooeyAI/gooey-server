@@ -30,10 +30,10 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
+    TextToImageModels,
     controlnet,
     ControlNetModels,
-    Img2ImgModels,
+    ImageToImageModels,
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
@@ -96,7 +96,7 @@ class QRCodeGeneratorPage(BasePage):
         image_prompt_pos_x: float | None
         image_prompt_pos_y: float | None
 
-        selected_model: Text2ImgModels.api_enum | None
+        selected_model: TextToImageModels.api_enum | None
         selected_controlnet_model: list[ControlNetModels.api_enum] | None
 
         output_width: int | None
@@ -293,7 +293,7 @@ Here is the final output:
         )
 
         img_model_settings(
-            Img2ImgModels,
+            ImageToImageModels,
             show_scheduler=True,
             require_controlnet=True,
             extra_explanations={
@@ -482,7 +482,7 @@ Here is the final output:
 
         state["raw_images"] = raw_images = []
 
-        yield f"Running {Text2ImgModels[request.selected_model].label}..."
+        yield f"Running {TextToImageModels[request.selected_model].label}..."
         if isinstance(request.selected_controlnet_model, str):
             request.selected_controlnet_model = [request.selected_controlnet_model]
         init_images = [image] * len(request.selected_controlnet_model)
@@ -543,12 +543,14 @@ Here is the final output:
         """
 
     def get_raw_price(self, state: dict) -> int:
-        selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
+        selected_model = state.get(
+            "selected_model", TextToImageModels.dream_shaper.name
+        )
         total = 5
         match selected_model:
-            case Text2ImgModels.deepfloyd_if.name:
+            case TextToImageModels.deepfloyd_if.name:
                 total += 3
-            case Text2ImgModels.dall_e.name:
+            case TextToImageModels.dall_e.name:
                 total += 10
         return total * state.get("num_outputs", 1)
 

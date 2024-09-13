@@ -10,7 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
-    Img2ImgModels,
+    ImageToImageModels,
     img2img,
     SD_IMG_MAX_SIZE,
     instruct_pix2pix,
@@ -46,7 +46,7 @@ class Img2ImgPage(BasePage):
         input_image: FieldHttpUrl
         text_prompt: str | None
 
-        selected_model: Img2ImgModels.api_enum | None
+        selected_model: ImageToImageModels.api_enum | None
         selected_controlnet_model: (
             list[ControlNetModels.api_enum] | ControlNetModels.api_enum | None
         )
@@ -123,7 +123,7 @@ class Img2ImgPage(BasePage):
         )
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels)
+        img_model_settings(ImageToImageModels)
 
     def render_usage_guide(self):
         youtube_video("narcZNyuNAg")
@@ -160,7 +160,7 @@ class Img2ImgPage(BasePage):
 
         yield "Generating Image..."
 
-        if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
+        if request.selected_model == ImageToImageModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -204,7 +204,7 @@ class Img2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
-            case Img2ImgModels.dall_e.name:
+            case ImageToImageModels.dall_e.name:
                 unit_price = 20
             case _:
                 unit_price = 5

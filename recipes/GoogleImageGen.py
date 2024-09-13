@@ -24,7 +24,7 @@ from daras_ai_v2.serp_search_locations import (
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
-    Img2ImgModels,
+    ImageToImageModels,
     SD_IMG_MAX_SIZE,
     instruct_pix2pix,
 )
@@ -55,7 +55,7 @@ class GoogleImageGenPage(BasePage):
         search_query: str
         text_prompt: str
 
-        selected_model: Img2ImgModels.api_enum | None
+        selected_model: ImageToImageModels.api_enum | None
 
         negative_prompt: str | None
 
@@ -153,7 +153,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Generating Images..."
 
-        if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
+        if request.selected_model == ImageToImageModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -186,7 +186,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        model_selector(Img2ImgModels)
+        model_selector(ImageToImageModels)
         gui.text_area(
             """
             #### 👩‍💻 Prompt
@@ -200,7 +200,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         youtube_video("rnjvtaYYe8g")
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels, render_model_selector=False)
+        img_model_settings(ImageToImageModels, render_model_selector=False)
         serp_search_location_selectbox()
 
     def render_output(self):

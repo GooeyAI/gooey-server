@@ -52,53 +52,53 @@ class InpaintingModels(InpaintingModel, GooeyEnum):
         return {cls.jack_qiao}
 
 
-class Text2ImgModel(typing.NamedTuple):
+class TextToImageModel(typing.NamedTuple):
     model_id: str | None
     label: str
 
 
-class Text2ImgModels(Text2ImgModel, GooeyEnum):
+class TextToImageModels(TextToImageModel, GooeyEnum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    dream_shaper = Text2ImgModel(
+    dream_shaper = TextToImageModel(
         label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
     )
-    dreamlike_2 = Text2ImgModel(
+    dreamlike_2 = TextToImageModel(
         label="Dreamlike Photoreal 2.0 (dreamlike.art)",
         model_id="dreamlike-art/dreamlike-photoreal-2.0",
     )
-    sd_2 = Text2ImgModel(
+    sd_2 = TextToImageModel(
         label="Stable Diffusion v2.1 (stability.ai)",
         model_id="stabilityai/stable-diffusion-2-1",
     )
-    sd_1_5 = Text2ImgModel(
+    sd_1_5 = TextToImageModel(
         label="Stable Diffusion v1.5 (RunwayML)",
         model_id="runwayml/stable-diffusion-v1-5",
     )
 
-    dall_e = Text2ImgModel(label="DALL·E 2 (OpenAI)", model_id="dall-e-2")
-    dall_e_3 = Text2ImgModel(label="DALL·E 3 (OpenAI)", model_id="dall-e-3")
+    dall_e = TextToImageModel(label="DALL·E 2 (OpenAI)", model_id="dall-e-2")
+    dall_e_3 = TextToImageModel(label="DALL·E 3 (OpenAI)", model_id="dall-e-3")
 
-    openjourney_2 = Text2ImgModel(
+    openjourney_2 = TextToImageModel(
         label="Open Journey v2 beta (PromptHero)", model_id="prompthero/openjourney-v2"
     )
-    openjourney = Text2ImgModel(
+    openjourney = TextToImageModel(
         label="Open Journey (PromptHero)", model_id="prompthero/openjourney"
     )
-    analog_diffusion = Text2ImgModel(
+    analog_diffusion = TextToImageModel(
         label="Analog Diffusion (wavymulder)", model_id="wavymulder/Analog-Diffusion"
     )
-    protogen_5_3 = Text2ImgModel(
+    protogen_5_3 = TextToImageModel(
         label="Protogen v5.3 (darkstorm2150)",
         model_id="darkstorm2150/Protogen_v5.3_Official_Release",
     )
 
-    jack_qiao = Text2ImgModel(
+    jack_qiao = TextToImageModel(
         label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
     )
-    rodent_diffusion_1_5 = Text2ImgModel(
+    rodent_diffusion_1_5 = TextToImageModel(
         label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
     )
-    deepfloyd_if = Text2ImgModel(
+    deepfloyd_if = TextToImageModel(
         label="DeepFloyd IF [Deprecated] (stability.ai)", model_id=None
     )
 
@@ -107,52 +107,52 @@ class Text2ImgModels(Text2ImgModel, GooeyEnum):
         return {cls.jack_qiao, cls.deepfloyd_if, cls.rodent_diffusion_1_5}
 
 
-class Img2ImgModel(typing.NamedTuple):
+class ImageToImageModel(typing.NamedTuple):
     model_id: str | None
     label: str
 
 
-class Img2ImgModels(Img2ImgModel, GooeyEnum):
-    dream_shaper = Img2ImgModel(
+class ImageToImageModels(ImageToImageModel, GooeyEnum):
+    dream_shaper = ImageToImageModel(
         label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
     )
-    dreamlike_2 = Img2ImgModel(
+    dreamlike_2 = ImageToImageModel(
         label="Dreamlike Photoreal 2.0 (dreamlike.art)",
         model_id="dreamlike-art/dreamlike-photoreal-2.0",
     )
-    sd_2 = Img2ImgModel(
+    sd_2 = ImageToImageModel(
         label="Stable Diffusion v2.1 (stability.ai)",
         model_id="stabilityai/stable-diffusion-2-1",
     )
-    sd_1_5 = Img2ImgModel(
+    sd_1_5 = ImageToImageModel(
         label="Stable Diffusion v1.5 (RunwayML)",
         model_id="runwayml/stable-diffusion-v1-5",
     )
 
-    dall_e = Img2ImgModel(label="Dall-E (OpenAI)", model_id=None)
+    dall_e = ImageToImageModel(label="Dall-E (OpenAI)", model_id=None)
 
-    instruct_pix2pix = Img2ImgModel(
+    instruct_pix2pix = ImageToImageModel(
         label="✨ InstructPix2Pix (Tim Brooks)", model_id=None
     )
-    openjourney_2 = Img2ImgModel(
+    openjourney_2 = ImageToImageModel(
         label="Open Journey v2 beta (PromptHero) 🐢",
         model_id="prompthero/openjourney-v2",
     )
-    openjourney = Img2ImgModel(
+    openjourney = ImageToImageModel(
         label="Open Journey (PromptHero) 🐢", model_id="prompthero/openjourney"
     )
-    analog_diffusion = Img2ImgModel(
+    analog_diffusion = ImageToImageModel(
         label="Analog Diffusion (wavymulder) 🐢", model_id="wavymulder/Analog-Diffusion"
     )
-    protogen_5_3 = Img2ImgModel(
+    protogen_5_3 = ImageToImageModel(
         label="Protogen v5.3 (darkstorm2150) 🐢",
         model_id="darkstorm2150/Protogen_v5.3_Official_Release",
     )
 
-    jack_qiao = Img2ImgModel(
+    jack_qiao = ImageToImageModel(
         label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
     )
-    rodent_diffusion_1_5 = Img2ImgModel(
+    rodent_diffusion_1_5 = ImageToImageModel(
         label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
     )
 
@@ -352,18 +352,18 @@ def text2img(
     dall_e_3_quality: str | None = None,
     dall_e_3_style: str | None = None,
 ):
-    if selected_model != Text2ImgModels.dall_e_3.name:
+    if selected_model != TextToImageModels.dall_e_3.name:
         _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
-        case Text2ImgModels.dall_e_3.name:
+        case TextToImageModels.dall_e_3.name:
             from openai import OpenAI
 
             client = OpenAI()
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=Text2ImgModels[selected_model].model_id,
+                    model=TextToImageModels[selected_model].model_id,
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -372,7 +372,7 @@ def text2img(
                     size=f"{width}x{height}",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.dall_e.name:
+        case TextToImageModels.dall_e.name:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
@@ -390,7 +390,7 @@ def text2img(
             return call_sd_multi(
                 "diffusion.text2img",
                 pipeline={
-                    "model_id": Text2ImgModels[selected_model].model_id,
+                    "model_id": TextToImageModels[selected_model].model_id,
                     "scheduler": Schedulers[scheduler].model_id if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -452,7 +452,7 @@ def img2img(
     _resolution_check(width, height)
 
     match selected_model:
-        case Img2ImgModels.dall_e.name:
+        case ImageToImageModels.dall_e.name:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
@@ -483,7 +483,7 @@ def img2img(
             return call_sd_multi(
                 "diffusion.img2img",
                 pipeline={
-                    "model_id": Img2ImgModels[selected_model].model_id,
+                    "model_id": ImageToImageModels[selected_model].model_id,
                     # "scheduler": "UniPCMultistepScheduler",
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -526,7 +526,7 @@ def controlnet(
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": Text2ImgModels[selected_model].model_id,
+            "model_id": TextToImageModels[selected_model].model_id,
             "seed": seed,
             "scheduler": (
                 Schedulers[scheduler].model_id
@@ -553,13 +553,13 @@ def controlnet(
 
 def add_prompt_prefix(prompt: str, selected_model: str) -> str:
     match selected_model:
-        case Text2ImgModels.openjourney.name:
+        case TextToImageModels.openjourney.name:
             prompt = "mdjrny-v4 style " + prompt
-        case Text2ImgModels.analog_diffusion.name:
+        case TextToImageModels.analog_diffusion.name:
             prompt = "analog style " + prompt
-        case Text2ImgModels.protogen_5_3.name:
+        case TextToImageModels.protogen_5_3.name:
             prompt = "modelshoot style " + prompt
-        case Text2ImgModels.dreamlike_2.name:
+        case TextToImageModels.dreamlike_2.name:
             prompt = "photo, " + prompt
     return prompt
 

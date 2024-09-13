@@ -2,9 +2,9 @@ import gooey_gui as gui
 
 from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
+    TextToImageModels,
     InpaintingModels,
-    Img2ImgModels,
+    ImageToImageModels,
     ControlNetModels,
     Schedulers,
 )
@@ -36,10 +36,10 @@ def img_model_settings(
     negative_prompt_setting(selected_model)
 
     num_outputs_setting(selected_model)
-    if models_enum is not Img2ImgModels:
+    if models_enum is not ImageToImageModels:
         output_resolution_setting()
 
-    if models_enum is Text2ImgModels:
+    if models_enum is TextToImageModels:
         sd_2_upscaling_setting()
 
     col1, col2 = gui.columns(2)
@@ -48,11 +48,11 @@ def img_model_settings(
         guidance_scale_setting(selected_model)
 
     with col2:
-        if models_enum is Img2ImgModels and not gui.session_state.get(
+        if models_enum is ImageToImageModels and not gui.session_state.get(
             "selected_controlnet_model"
         ):
             prompt_strength_setting(selected_model)
-        if selected_model == Img2ImgModels.instruct_pix2pix.name:
+        if selected_model == ImageToImageModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()
 
     if show_scheduler:
@@ -72,10 +72,10 @@ def model_selector(
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
-        Img2ImgModels.instruct_pix2pix.name,
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.jack_qiao.name,
-        Img2ImgModels.sd_2.name,
+        ImageToImageModels.instruct_pix2pix.name,
+        ImageToImageModels.dall_e.name,
+        ImageToImageModels.jack_qiao.name,
+        ImageToImageModels.sd_2.name,
     ]
     col1, col2 = gui.columns(2)
     with col1:
@@ -95,12 +95,12 @@ def model_selector(
             """
         )
         if (
-            models_enum is Img2ImgModels
+            models_enum is ImageToImageModels
             and gui.session_state.get("selected_model") in controlnet_unsupported_models
         ):
             if "selected_controlnet_model" in gui.session_state:
                 gui.session_state["selected_controlnet_model"] = None
-        elif models_enum is Img2ImgModels:
+        elif models_enum is ImageToImageModels:
             enum_multiselect(
                 ControlNetModels,
                 label=controlnet_explanation,
@@ -214,7 +214,7 @@ def quality_setting(selected_models=None):
         return
     if any(
         [
-            selected_model in [Text2ImgModels.dall_e_3.name]
+            selected_model in [TextToImageModels.dall_e_3.name]
             for selected_model in selected_models
         ]
     ):
@@ -374,8 +374,8 @@ def sd_2_upscaling_setting():
 
 def scheduler_setting(selected_model: str = None):
     if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.jack_qiao,
+        TextToImageModels.dall_e.name,
+        TextToImageModels.jack_qiao,
     ]:
         return
     enum_selector(
@@ -394,8 +394,8 @@ def scheduler_setting(selected_model: str = None):
 
 def guidance_scale_setting(selected_model: str = None):
     if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.jack_qiao,
+        TextToImageModels.dall_e.name,
+        TextToImageModels.jack_qiao,
     ]:
         return
     gui.slider(
@@ -434,8 +434,8 @@ usually at the expense of lower image quality
 
 def prompt_strength_setting(selected_model: str = None):
     if selected_model in [
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.instruct_pix2pix.name,
+        ImageToImageModels.dall_e.name,
+        ImageToImageModels.instruct_pix2pix.name,
     ]:
         return
 
@@ -457,7 +457,7 @@ def prompt_strength_setting(selected_model: str = None):
 
 
 def negative_prompt_setting(selected_model: str = None):
-    if selected_model in [Text2ImgModels.dall_e.name]:
+    if selected_model in [TextToImageModels.dall_e.name]:
         return
 
     gui.text_area(
