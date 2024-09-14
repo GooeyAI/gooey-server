@@ -166,15 +166,19 @@ class BasePage:
         request_url: URL | None = None,
         query_params: dict | None = None,
     ):
-        self.tab = tab
+        if request_session is None:
+            request_session = {}
+        if query_params is None:
+            query_params = {}
 
-        if not request:
+        if request is None:
             request = BasePageRequest()
             request.user = user
-            request.session = request_session or {}
-            request.query_params = query_params or {}
+            request.session = request_session
+            request.query_params = query_params
             request.url = request_url
 
+        self.tab = tab
         self.request = request
 
     @classmethod
