@@ -19,6 +19,8 @@ from payments.models import PricingPlan
 from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
 from routers.account import payment_processing_route, account_route
 from routers.custom_api_router import CustomAPIRouter
+from workspaces.models import Workspace
+from workspaces.widgets import get_current_workspace
 
 router = CustomAPIRouter()
 
@@ -62,6 +64,7 @@ class SubscriptionEvent(BaseWebhookEvent):
 def create_order(request: Request, payload: dict = fastapi_request_json):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
+    workspace = get_current_workspace(request.user, request.session)
 
     quantity = payload["quantity"]
     unit_amount = 1 / settings.ADDON_CREDITS_PER_DOLLAR
@@ -78,11 +81,11 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
             # "PayPal-Mock-Response": '{"mock_application_codes": "PERMISSION_DENIED"}'
             # "PayPal-Mock-Response": '{"mock_application_codes": "INTERNAL_SERVER_ERROR"}'
         },
-        json={
-            "intent": "CAPTURE",
-            "purchase_units": [
-                {
-                    "amount": {
+        json=dict(
+            intent="CAPTURE",
+            purchase_units=[
+                dict(
+                    amount={
                         "currency_code": "USD",
                         "value": str(value),
                         "breakdown": {
@@ -92,7 +95,7 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
                             }
                         },
                     },
-                    "items": [
+                    items=[
                         {
                             "name": "Top up Credits",
                             "quantity": str(quantity),
@@ -102,10 +105,10 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
                             },
                         }
                     ],
-                    "custom_id": request.user.uid,
-                },
+                    custom_id=workspace.get_pp_custom_id(),
+                ),
             ],
-        },
+        ),
     )
     raise_for_status(response)
     return JSONResponse(response.json(), response.status_code)
@@ -115,6 +118,7 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
 def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
+    workspace = get_current_workspace(request.user, request.session)
 
     lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
@@ -126,15 +130,15 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if plan.deprecated:
         return JSONResponse({"error": "Deprecated plan"}, status_code=400)
 
-    if request.user.subscription and request.user.subscription.is_paid():
+    if workspace.subscription and workspace.subscription.is_paid():
         return JSONResponse(
             {"error": "User already has an active subscription"}, status_code=400
         )
 
     paypal_plan_info = plan.get_paypal_plan()
-    pp_subscription = paypal.Subscription.create(
+    return paypal.Subscription.create(
         plan_id=paypal_plan_info["plan_id"],
-        custom_id=request.user.uid,
+        custom_id=workspace.get_pp_custom_id(),
         plan=paypal_plan_info.get("plan", {}),
         application_context={
             "brand_name": "Gooey.AI",
@@ -143,7 +147,6 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
             "cancel_url": get_app_route_url(account_route),
         },
     )
-    return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
 
 
 # Capture payment for the created order to complete the transaction.
@@ -176,7 +179,7 @@ def _handle_invoice_paid(order_id: str):
     purchase_unit = order["purchase_units"][0]
     payment_capture = purchase_unit["payments"]["captures"][0]
     add_balance_for_payment(
-        uid=payment_capture["custom_id"],
+        workspace=Workspace.objects.from_pp_custom_id(payment_capture["custom_id"]),
         amount=int(purchase_unit["items"][0]["quantity"]),
         invoice_id=payment_capture["id"],
         payment_provider=PaymentProvider.PAYPAL,

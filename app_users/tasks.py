@@ -5,14 +5,15 @@ from app_users.models import PaymentProvider, TransactionReason
 from celeryapp.celeryconfig import app
 from payments.models import Subscription
 from payments.plans import PricingPlan
-from payments.webhooks import set_user_subscription
+from payments.webhooks import set_workspace_subscription
+from workspaces.models import Workspace
 
 
 @app.task
 def save_stripe_default_payment_method(
     *,
     payment_intent_id: str,
-    uid: str,
+    workspace_id: int,
     amount: int,
     charged_amount: int,
     reason: TransactionReason,
@@ -36,16 +37,16 @@ def save_stripe_default_payment_method(
         invoice_settings=dict(default_payment_method=pm),
     )
 
-    # if user doesn't already have a active billing/autorecharge info, so we don't need to do anything
-    # set user's subscription to the free plan
+    # if user already has a subscription with payment info, we do nothing
+    # otherwise, we set the user's subscription to the free plan
     if (
         reason == TransactionReason.ADDON
         and not Subscription.objects.filter(
-            user__uid=uid, payment_provider__isnull=False
+            workspace__id=workspace_id, payment_provider__isnull=False
         ).exists()
     ):
-        set_user_subscription(
-            uid=uid,
+        set_workspace_subscription(
+            workspace=Workspace.objects.get(id=workspace_id),
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,

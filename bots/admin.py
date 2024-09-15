@@ -371,7 +371,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "retention_policy",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
-    autocomplete_fields = ["parent_version"]
+    autocomplete_fields = ["parent_version", "workspace"]
 
     readonly_fields = [
         "open_in_gooey",

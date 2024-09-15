@@ -11,6 +11,7 @@ from loguru import logger
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
+from workspaces.models import Workspace
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -80,14 +81,18 @@ class Subscription(models.Model):
 
     def __str__(self):
         ret = f"{self.get_plan_display()} | {self.get_payment_provider_display()}"
-        if self.has_user:
-            ret = f"{ret} | {self.user}"
+        if self.has_workspace:
+            ret = f"{ret} | {self.workspace}"
         if self.auto_recharge_enabled:
             ret = f"Auto | {ret}"
         return ret
 
     def full_clean(
-        self, amount: int = None, charged_amount: int = None, *args, **kwargs
+        self,
+        amount: int | None = None,
+        charged_amount: int | None = None,
+        *args,
+        **kwargs,
     ):
         if self.auto_recharge_enabled:
             if amount is None:
@@ -131,6 +136,15 @@ class Subscription(models.Model):
     def is_paid(self) -> bool:
         return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
 
+    @property
+    def has_workspace(self) -> bool:
+        try:
+            self.workspace
+        except Workspace.DoesNotExist:
+            return False
+        else:
+            return True
+
     def cancel(self):
         from payments.webhooks import StripeWebhookHandler
 
@@ -144,7 +158,7 @@ class Subscription(models.Model):
                 except stripe.error.InvalidRequestError as e:
                     if e.code == "resource_missing":
                         StripeWebhookHandler.handle_subscription_cancelled(
-                            self.user.uid
+                            self.workspace
                         )
                     else:
                         raise
@@ -298,7 +312,7 @@ class Subscription(models.Model):
             subscription = stripe.Subscription.retrieve(self.external_id)
             return subscription.customer
         else:
-            return self.user.get_or_create_stripe_customer().id
+            return self.workspace.get_or_create_stripe_customer().id
 
     def stripe_attempt_addon_purchase(self, amount_in_dollars: int) -> bool:
         from payments.webhooks import StripeWebhookHandler
@@ -319,7 +333,7 @@ class Subscription(models.Model):
             return False
         if not invoice.paid:
             return False
-        StripeWebhookHandler.handle_invoice_paid(self.user.uid, invoice)
+        StripeWebhookHandler.handle_invoice_paid(self.workspace, invoice)
         return True
 
     def get_external_management_url(self) -> str:
@@ -361,12 +375,12 @@ class Subscription(models.Model):
         )
 
     def should_send_monthly_spending_notification(self) -> bool:
-        assert self.has_user
+        assert self.has_workspace
 
         return bool(
             self.monthly_spending_notification_threshold
             and not self.has_sent_monthly_spending_notification_this_month()
-            and self.user.get_dollars_spent_this_month()
+            and self.workspace.get_dollars_spent_this_month()
             >= self.monthly_spending_notification_threshold
         )
 

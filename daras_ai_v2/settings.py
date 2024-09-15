@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "safedelete",
     "app_users",
     "files",
     "url_shortener",
@@ -62,6 +63,7 @@ INSTALLED_APPS = [
     "handles",
     "payments",
     "functions",
+    "workspaces",
 ]
 
 MIDDLEWARE = [
@@ -287,8 +289,8 @@ CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
+FIRST_WORKSPACE_FREE_CREDITS = config("WORKSPACE_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
-
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
@@ -397,6 +399,11 @@ DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
 TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
 TWILIO_API_KEY_SECRET = config("TWILIO_API_KEY_SECRET", "")
+
+WORKSPACE_INVITE_EXPIRY_DAYS = config("WORKSPACE_INVITE_EXPIRY_DAYS", 10, cast=int)
+WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL = config(
+    "WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL", 60 * 60 * 24, cast=int  # 24 hours
+)
 
 SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
 SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")

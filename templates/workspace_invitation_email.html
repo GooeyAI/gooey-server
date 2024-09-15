@@ -1,0 +1,28 @@
+<p>
+    Hi!
+</p>
+
+<p>
+    <b>{{ invite.created_by.display_name or invite.created_by.first_name() }}</b>
+    has invited you to join their team
+    <b>{{ invite.workspace.display_name() }}</b>
+    on
+    <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
+</p>
+
+<p>
+    {% set invite_url = invite.get_invite_url() %}
+    Visit this link to view the invite:
+    <a href="{{ invite_url }}">{{ invite_url }}</a>.
+</p>
+
+<p>
+    The link will expire in {{ settings.WORKSPACE_INVITATION_EXPIRY_DAYS }} days.
+</p>
+
+<p>
+    Cheers,<br/>
+    The Gooey.AI team
+</p>
+
+{{ "{{{ pm:unsubscribe }}}" }}

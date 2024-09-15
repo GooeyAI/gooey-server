@@ -77,19 +77,6 @@ available_subscriptions = {
 }
 
 
-def get_user_subscription(user: AppUser):
-    customer = user.search_stripe_customer()
-    if not customer:
-        return
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        try:
-            lookup_key = sub.metadata[USER_SUBSCRIPTION_METADATA_FIELD]
-            return available_subscriptions[lookup_key]
-        except KeyError:
-            pass
-
-
 def run():
     # list active stripe subscriptions
     for sub in stripe.Subscription.list(

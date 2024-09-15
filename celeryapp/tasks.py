@@ -28,6 +28,11 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
+from workspaces.widgets import SESSION_SELECTED_WORKSPACE
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
 
 DEFAULT_RUN_STATUS = "Running..."
 
@@ -49,7 +54,7 @@ def runner_task(
     run_id: str,
     uid: str,
     channel: str,
-    unsaved_state: dict[str, typing.Any] = None,
+    unsaved_state: dict[str, typing.Any] | None = None,
     deduct_credits: bool = True,
 ):
     start_time = time()
@@ -91,10 +96,12 @@ def runner_task(
         page.dump_state_to_sr(gui.session_state | output, sr)
 
     page = page_cls(
-        user=AppUser.objects.get(id=user_id), query_params=dict(run_id=run_id, uid=uid)
+        user=AppUser.objects.get(id=user_id),
+        query_params=dict(run_id=run_id, uid=uid),
     )
     page.setup_sentry()
     sr = page.current_sr
+    page.request.session[SESSION_SELECTED_WORKSPACE] = sr.workspace_id
     threadlocal.saved_run = sr
     gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
 
@@ -132,15 +139,14 @@ def runner_task(
 @app.task
 def post_runner_tasks(saved_run_id: int):
     sr = SavedRun.objects.get(id=saved_run_id)
-    user = AppUser.objects.get(uid=sr.uid)
 
     if not sr.is_api_call:
         send_email_on_completion(sr)
 
-    if should_attempt_auto_recharge(user):
-        run_auto_recharge_gracefully(user)
+    if should_attempt_auto_recharge(sr.workspace):
+        run_auto_recharge_gracefully(sr.workspace)
 
-    run_low_balance_email_check(user)
+    run_low_balance_email_check(sr.workspace)
 
 
 def err_msg_for_exc(e: Exception):
@@ -169,15 +175,18 @@ def err_msg_for_exc(e: Exception):
         return f"{type(e).__name__}: {e}"
 
 
-def run_low_balance_email_check(user: AppUser):
+def run_low_balance_email_check(workspace: "Workspace"):
     # don't send email if feature is disabled
     if not settings.LOW_BALANCE_EMAIL_ENABLED:
         return
     # don't send email if user is not paying or has enough balance
-    if not user.is_paying or user.balance > settings.LOW_BALANCE_EMAIL_CREDITS:
+    if (
+        not workspace.is_paying
+        or workspace.balance > settings.LOW_BALANCE_EMAIL_CREDITS
+    ):
         return
     last_purchase = (
-        AppUserTransaction.objects.filter(user=user, amount__gt=0)
+        AppUserTransaction.objects.filter(workspace=workspace, amount__gt=0)
         .order_by("-created_at")
         .first()
     )
@@ -187,22 +196,27 @@ def run_low_balance_email_check(user: AppUser):
     # send email if user has not been sent email in last X days or last purchase was after last email sent
     if (
         # user has not been sent any email
-        not user.low_balance_email_sent_at
+        not workspace.low_balance_email_sent_at
         # user was sent email before X days
-        or (user.low_balance_email_sent_at < email_date_cutoff)
+        or (workspace.low_balance_email_sent_at < email_date_cutoff)
         # user has made a purchase after last email sent
-        or (last_purchase and last_purchase.created_at > user.low_balance_email_sent_at)
+        or (
+            last_purchase
+            and last_purchase.created_at > workspace.low_balance_email_sent_at
+        )
     ):
         # calculate total credits consumed in last X days
         total_credits_consumed = abs(
             AppUserTransaction.objects.filter(
-                user=user, amount__lt=0, created_at__gte=email_date_cutoff
+                workspace=workspace, amount__lt=0, created_at__gte=email_date_cutoff
             ).aggregate(Sum("amount"))["amount__sum"]
             or 0
         )
-        send_low_balance_email(user=user, total_credits_consumed=total_credits_consumed)
-        user.low_balance_email_sent_at = timezone.now()
-        user.save(update_fields=["low_balance_email_sent_at"])
+        send_low_balance_email(
+            workspace=workspace, total_credits_consumed=total_credits_consumed
+        )
+        workspace.low_balance_email_sent_at = timezone.now()
+        workspace.save(update_fields=["low_balance_email_sent_at"])
 
 
 def send_email_on_completion(sr: SavedRun):

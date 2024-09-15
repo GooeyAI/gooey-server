@@ -209,6 +209,12 @@ class SavedRun(models.Model):
     )
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
+        related_name="saved_runs",
+        null=True,
+    )
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 

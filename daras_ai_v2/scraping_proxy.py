@@ -11,7 +11,7 @@ if settings.SCRAPING_PROXY_HOST:
         scheme: str(
             furl(
                 scheme="http",
-                origin=settings.SCRAPING_PROXY_HOST,
+                host=settings.SCRAPING_PROXY_HOST,
                 username=settings.SCRAPING_PROXY_USERNAME,
                 password=settings.SCRAPING_PROXY_PASSWORD,
             ),
