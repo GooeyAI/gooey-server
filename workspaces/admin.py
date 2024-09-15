@@ -48,6 +48,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "created_by",
         "is_paying",
         "balance",
+        "subscription",
         "domain_name",
         "created_at",
         "updated_at",
