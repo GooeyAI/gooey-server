@@ -144,9 +144,9 @@ class Workspace(SafeDeleteModel):
 
     def __str__(self):
         if self.deleted:
-            return f"[Deleted] {self.name}"
+            return f"[Deleted] {self.display_name()}"
         else:
-            return self.name
+            return self.display_name()
 
     def get_slug(self):
         return slugify(self.display_name())
