@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
+from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
@@ -51,6 +52,7 @@ from daras_ai_v2.db import (
 )
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -122,6 +124,7 @@ class BasePageRequest:
     user: AppUser | None
     session: dict
     query_params: dict
+    url: URL | None
 
 
 class BasePage:
@@ -164,16 +167,22 @@ class BasePage:
         request: BasePageRequest | None = None,
         user: AppUser | None = None,
         request_session: dict | None = None,
+        request_url: URL | None = None,
         query_params: dict | None = None,
     ):
-        self.tab = tab
+        if request_session is None:
+            request_session = {}
+        if query_params is None:
+            query_params = {}
 
-        if not request:
+        if request is None:
             request = BasePageRequest()
             request.user = user
-            request.session = request_session or {}
-            request.query_params = query_params or {}
+            request.session = request_session
+            request.query_params = query_params
+            request.url = request_url
 
+        self.tab = tab
         self.request = request
 
     @classmethod
@@ -449,6 +458,15 @@ class BasePage:
 
     def _render_social_buttons(self, show_button_text: bool = False):
         if show_button_text:
+            github_url = github_url_for_file(inspect.getfile(self.__class__))
+            gui.anchor(
+                '<i class="fa-brands fa-github-alt fa-lg"></i> <span class="d-none d-lg-inline">GitHub</span>',
+                href=github_url,
+                unsafe_allow_html=True,
+                target="_blank",
+                type="tertiary",
+            )
+
             button_text = '<span class="d-none d-lg-inline"> Copy Link</span>'
         else:
             button_text = ""

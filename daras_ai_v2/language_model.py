@@ -329,6 +329,14 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    afrollama_v1 = LLMSpec(
+        label="AfroLlama3 v1 (Jacaranda)",
+        model_id="Jacaranda/AfroLlama_V1",
+        llm_api=LLMApis.self_hosted,
+        context_window=2048,
+        price=1,
+        is_chat_model=False,
+    )
     sea_lion_7b_instruct = LLMSpec(
         label="SEA-LION-7B-Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/sea-lion-7b-instruct",

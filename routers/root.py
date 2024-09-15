@@ -242,7 +242,7 @@ def explore_page(request: Request):
 @gui.route(app, "/api/")
 def api_docs_page(request: Request):
     with page_wrapper(request):
-        _api_docs_page()
+        _api_docs_page(request)
     return dict(
         meta=raw_build_meta_tags(
             url=get_og_url_path(request),
@@ -255,7 +255,7 @@ def api_docs_page(request: Request):
     )
 
 
-def _api_docs_page():
+def _api_docs_page(request: Request):
     from daras_ai_v2.all_pages import all_api_pages
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
@@ -285,7 +285,7 @@ Authorization: Bearer GOOEY_API_KEY
 
     gui.write("---")
     options = {
-        page_cls.workflow.value: page_cls().get_recipe_title()
+        page_cls.workflow.value: page_cls.get_recipe_title()
         for page_cls in all_api_pages
     }
 
@@ -312,7 +312,12 @@ Authorization: Bearer GOOEY_API_KEY
     as_async = gui.checkbox("Run Async")
     as_form_data = gui.checkbox("Upload Files via Form Data")
 
-    page = workflow.page_cls()
+    page = workflow.page_cls(
+        user=request.user,
+        request_session=request.session,
+        request_url=request.url,
+        query_params=dict(request.query_params),
+    )
     state = page.get_root_pr().saved_run.to_dict()
     api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
@@ -671,6 +676,7 @@ def render_recipe_page(
         tab=tab,
         user=request.user,
         request_session=request.session,
+        request_url=request.url,
         # this is because the code still expects example_id to be in the query params
         query_params=dict(request.query_params) | dict(example_id=example_id),
     )
@@ -723,7 +729,7 @@ def page_wrapper(request: Request, className=""):
             ):
                 workspace_selector(request.user, request.session)
 
-        with gui.div(id="main-content", className="container " + className):
+        with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
         gui.html(templates.get_template("footer.html").render(**context))
