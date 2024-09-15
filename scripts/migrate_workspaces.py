@@ -38,7 +38,7 @@ def migrate_personal_workspaces():
         for user, workspace in zip(users, workspaces)
     ]
     print(f"creating {len(workspaces)} workspaces...")
-    Workspace.objects.bulk_create(workspaces)
+    Workspace.objects.bulk_create(workspaces, ignore_conflicts=True)
     WorkspaceMembership.objects.bulk_create(memberships)
 
 

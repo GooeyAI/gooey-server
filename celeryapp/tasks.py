@@ -28,7 +28,7 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
-from workspaces.widgets import SESSION_SELECTED_WORKSPACE
+from workspaces.widgets import SESSION_SELECTED_WORKSPACE, set_current_workspace
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -101,7 +101,7 @@ def runner_task(
     )
     page.setup_sentry()
     sr = page.current_sr
-    page.request.session[SESSION_SELECTED_WORKSPACE] = sr.workspace_id
+    set_current_workspace(page.request.session, SESSION_SELECTED_WORKSPACE)
     threadlocal.saved_run = sr
     gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
 
