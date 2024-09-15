@@ -43,12 +43,23 @@ class WorkspaceInviteInline(admin.TabularInline):
 @admin.register(models.Workspace)
 class WorkspaceAdmin(SafeDeleteAdmin):
     list_display = [
-        "name",
+        "display_name",
+        "is_personal",
+        "created_by",
+        "is_paying",
+        "balance",
         "domain_name",
         "created_at",
         "updated_at",
     ] + list(SafeDeleteAdmin.list_display)
-    list_filter = [SafeDeleteAdminFilter] + list(SafeDeleteAdmin.list_filter)
+    list_filter = (
+        [
+            "is_personal",
+            "is_paying",
+        ]
+        + [SafeDeleteAdminFilter]
+        + list(SafeDeleteAdmin.list_filter)
+    )
     fields = [
         "name",
         "domain_name",
@@ -73,6 +84,10 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     inlines = [WorkspaceMembershipInline, WorkspaceInviteInline]
     ordering = ["-created_at"]
     autocomplete_fields = ["created_by", "subscription"]
+
+    @admin.display(description="Name")
+    def display_name(self, workspace: models.Workspace):
+        return workspace.display_name()
 
     @admin.display(description="Total Payments")
     def total_payments(self, workspace: models.Workspace):
