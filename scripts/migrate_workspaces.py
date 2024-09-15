@@ -15,8 +15,10 @@ def run():
     # migrate_published_runs()
 
 
+@transaction.atomic
 def migrate_personal_workspaces():
-    users = AppUser.objects.exclude(workspace_memberships__workspace__is_personal=True)
+    users = AppUser.objects.exclude(created_workspaces__is_personal=True)
+
     workspaces = [
         Workspace(
             created_by=user,
@@ -29,6 +31,9 @@ def migrate_personal_workspaces():
         )
         for user in users
     ]
+    print(f"creating {len(workspaces)} workspaces...")
+    workspaces = Workspace.objects.bulk_create(workspaces)
+
     memberships = [
         WorkspaceMembership(
             workspace=workspace,
@@ -36,9 +41,9 @@ def migrate_personal_workspaces():
             role=WorkspaceRole.OWNER,
         )
         for user, workspace in zip(users, workspaces)
+        if workspace.id
     ]
-    print(f"creating {len(workspaces)} workspaces...")
-    Workspace.objects.bulk_create(workspaces, ignore_conflicts=True)
+    print(f"creating {len(memberships)} memberships...")
     WorkspaceMembership.objects.bulk_create(memberships)
 
 
