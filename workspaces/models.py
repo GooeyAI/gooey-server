@@ -260,9 +260,9 @@ class Workspace(SafeDeleteModel):
 
         # create a new customer if not found
         if not customer:
-            metadata = dict(workspace_id=self.id)
+            metadata = dict(workspace_id=str(self.id))
             if self.is_personal:
-                metadata["uid"] = self.created_by.uid
+                metadata["uid"] = str(self.created_by.uid)
             customer = stripe.Customer.create(
                 name=self.display_name(),
                 email=self.created_by.email,
@@ -277,7 +277,7 @@ class Workspace(SafeDeleteModel):
 
         # update the saved metadata in stripe
         if not customer.metadata.get("workspace_id"):
-            customer.metadata["workspace_id"] = self.id
+            customer.metadata["workspace_id"] = str(self.id)
             customer = stripe.Customer.modify(
                 id=customer.id, metadata=customer.metadata
             )
