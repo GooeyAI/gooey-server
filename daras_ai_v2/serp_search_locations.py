@@ -244,7 +244,7 @@ class SerpSearchLocation(TextChoices):
     SAINT_VINCENT_AND_THE_GRENADINES = "vc", "Saint Vincent and the Grenadines"
     SAMOA = "ws", "Samoa"
     SAN_MARINO = "sm", "San Marino"
-    SAO_TOME_AND_PRINCIPE = "gui", "Sao Tome and Principe"
+    SAO_TOME_AND_PRINCIPE = "st", "Sao Tome and Principe"
     SAUDI_ARABIA = "sa", "Saudi Arabia"
     SENEGAL = "sn", "Senegal"
     SERBIA_AND_MONTENEGRO = "rs", "Serbia and Montenegro"
