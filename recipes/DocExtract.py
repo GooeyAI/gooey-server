@@ -3,7 +3,7 @@ import threading
 import typing
 
 import gooey_gui as gui
-import pandas as pd
+
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
@@ -230,6 +230,8 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 def _doc_extract_and_upload(
     request: DocExtractPage.RequestModel, f_url: str, file_meta: FileMetadata
 ) -> str | None:
+    import pandas as pd
+
     pages = doc_url_to_text_pages(
         f_url=f_url,
         file_meta=file_meta,
