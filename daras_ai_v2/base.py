@@ -406,6 +406,8 @@ class BasePage:
                     show_save_buttons = request_changed or can_save
                     if show_save_buttons:
                         self._render_published_run_save_buttons(sr=sr, pr=pr)
+                    else:
+                        self._unsaved_options_button_with_dialog()
                     self._render_social_buttons(show_button_text=not show_save_buttons)
 
         if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
@@ -458,15 +460,6 @@ class BasePage:
 
     def _render_social_buttons(self, show_button_text: bool = False):
         if show_button_text:
-            github_url = github_url_for_file(inspect.getfile(self.__class__))
-            gui.anchor(
-                '<i class="fa-brands fa-github-alt fa-lg"></i> <span class="d-none d-lg-inline">GitHub</span>',
-                href=github_url,
-                unsafe_allow_html=True,
-                target="_blank",
-                type="tertiary",
-            )
-
             button_text = '<span class="d-none d-lg-inline"> Copy Link</span>'
         else:
             button_text = ""
@@ -504,7 +497,7 @@ class BasePage:
                     ref.set_open(True)
                 if ref.is_open:
                     with gui.alert_dialog(ref=ref, modal_title="#### Options"):
-                        self._render_options_modal(sr=sr, pr=pr)
+                        self._saved_options_modal(sr=sr, pr=pr)
                 label = "Update"
             else:
                 label = "Save"
@@ -696,7 +689,7 @@ class BasePage:
         else:
             return False
 
-    def _render_options_modal(self, *, sr: SavedRun, pr: PublishedRun):
+    def _saved_options_modal(self, *, sr: SavedRun, pr: PublishedRun):
         is_latest_version = pr.saved_run == sr
 
         duplicate_button = None
@@ -732,8 +725,8 @@ This will also delete all the associated versions.
                 raise gui.RedirectException(self.app_url())
 
         if duplicate_button:
-            duplicate_pr = self.duplicate_published_run(
-                pr,
+            duplicate_pr = pr.duplicate(
+                user=self.request.user,
                 title=f"{pr.title} (Copy)",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -758,6 +751,57 @@ This will also delete all the associated versions.
         with gui.div(className="mt-4"):
             gui.write("#### Version History", className="mb-4")
             self._render_version_history()
+
+    def _unsaved_options_button_with_dialog(self):
+        if not self.request.user or self.tab not in {
+            RecipeTabs.run,
+            RecipeTabs.run_as_api,
+            RecipeTabs.integrations,
+        }:
+            return
+        ref = gui.use_alert_dialog(key="fork-menu")
+        if gui.button(
+            label=icons.fork_lg,
+            className="mb-0 ms-lg-2",
+            type="tertiary",
+        ):
+            ref.set_open(True)
+        if not ref.is_open:
+            return
+        with gui.alert_dialog(ref=ref, modal_title="#### Options"):
+            gui.write(
+                "Like this workflow? Save a copy of it in your workspace and customize it to your needs."
+            )
+            duplicate_button = gui.button(
+                f"{icons.copy_solid} Duplicate", className="w-100"
+            )
+            if duplicate_button:
+                pr = self.current_pr
+                duplicate_pr = pr.duplicate(
+                    user=self.request.user,
+                    title=f"{self.request.user.first_name_possesive()} {pr.title}",
+                    notes=pr.notes,
+                    visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                )
+                raise gui.RedirectException(
+                    self.app_url(example_id=duplicate_pr.published_run_id)
+                )
+
+            gui.newline()
+            gui.newline()
+
+            contact_url = furl("mailto:") / settings.SALES_EMAIL
+            gui.write(
+                f"Can't find the functionality you need? "
+                f"[Contact Us]({contact_url}) with your requirements and we'll build something custom just for you."
+            )
+
+            github_url = github_url_for_file(inspect.getfile(self.__class__))
+            gui.caption(
+                f"Or perhaps you're geeky and want to see the code behind this workflow? "
+                f'Fork it on <i class="fa-brands fa-github-alt"></i> <a href="{github_url}" target="_blank">GitHub</a>!',
+                unsafe_allow_html=True,
+            )
 
     def _render_admin_options(self, current_run: SavedRun, published_run: PublishedRun):
         if (
@@ -1170,21 +1214,6 @@ This will also delete all the associated versions.
             published_run_id=published_run_id,
             saved_run=saved_run,
             user=user,
-            title=title,
-            notes=notes,
-            visibility=visibility,
-        )
-
-    def duplicate_published_run(
-        self,
-        published_run: PublishedRun,
-        *,
-        title: str,
-        notes: str,
-        visibility: PublishedRunVisibility,
-    ):
-        return published_run.duplicate(
-            user=self.request.user,
             title=title,
             notes=notes,
             visibility=visibility,

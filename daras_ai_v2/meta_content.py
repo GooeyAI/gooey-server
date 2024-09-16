@@ -188,7 +188,7 @@ def canonical_url_for_page(
     from routers.root import RecipeTabs
 
     kwargs = {}
-    if page.tab in [RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations]:
+    if page.tab in {RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations}:
         if pr and pr.saved_run == sr and pr.is_root():
             pass
         elif pr and pr.saved_run == sr:
