@@ -1,16 +1,15 @@
-import random
+import json
 import threading
 import typing
 
-from daras_ai_v2.field_render import field_title_desc
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+import gooey_gui as gui
+
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -29,10 +28,11 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
+    is_user_uploaded_url,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
@@ -48,13 +48,18 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import (
     add_page_number_to_pdf,
     yt_dlp_get_video_entries,
     doc_url_to_file_metadata,
     get_pdf_num_pages,
+    doc_url_to_text_pages,
+    doc_or_yt_url_to_metadatas,
 )
+from files.models import FileMetadata
 from recipes.DocSearch import render_documents
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
@@ -107,32 +112,35 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         pass
 
     class ResponseModel(BaseModel):
-        pass
+        output_documents: list[FieldHttpUrl] | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_YOUTUBE_BOT_META_IMG
 
     def render_form_v2(self):
         bulk_documents_uploader(
-            "#### 🤖 Youtube/PDF/Drive URLs",
-            accept=("audio/*", "application/pdf", "video/*"),
+            "#### 🤖 Youtube/PDF/Drive/Web URLs",
         )
         gui.text_input(
-            "#### 📊 Google Sheets URL",
+            "📊 Google Sheets URL _(optional)_",
             key="sheet_url",
         )
 
     def validate_form_v2(self):
-        assert gui.session_state.get("documents"), "Please enter Youtube/PDF/Drive URLs"
-        assert gui.session_state.get("sheet_url"), "Please enter a Google Sheet URL"
+        assert gui.session_state.get("documents"), "Please provide input documents"
 
     def preview_description(self, state: dict) -> str:
         return "Transcribe YouTube videos in any language with Whisper, Google Chirp & more, run your own GPT4 prompt on each transcript and save it all to a Google Sheet. Perfect for making a YouTube-based dataset to create your own chatbot or enterprise copilot (ie. just add the finished Google sheet url to the doc section in https://gooey.ai/copilot)."
 
     def render_example(self, state: dict):
-        render_documents(state)
-        gui.write("**Google Sheets URL**")
-        gui.write(state.get("sheet_url"))
+        if sheet_url := state.get("sheet_url"):
+            render_documents(state, label="**Input Documents**")
+            gui.write("**Google Sheets URL**")
+            gui.write(sheet_url)
+        else:
+            render_documents(
+                state, label="**Output Documents**", key="output_documents"
+            )
 
     def render_usage_guide(self):
         youtube_video("p7ZLb-loR_4")
@@ -146,7 +154,12 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
-        enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
+        enum_selector(
+            AsrModels,
+            label="##### ASR Model",
+            key="selected_asr_model",
+            use_selectbox=True,
+        )
         gui.write("---")
 
         google_translate_language_selector()
@@ -165,34 +178,82 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 
         return [VideoBotsPage, AsrPage, CompareLLMPage, DocSearchPage]
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
+    def run_v2(
+        self,
+        request: "DocExtractPage.RequestModel",
+        response: "DocExtractPage.ResponseModel",
+    ):
         import gspread.utils
 
-        request: DocExtractPage.RequestModel = self.RequestModel.parse_obj(state)
+        if request.sheet_url:
+            entries = yield from flatapply_parallel(
+                extract_info,
+                request.documents,
+                message="Extracting metadata...",
+                max_workers=50,
+            )
 
-        entries = yield from flatapply_parallel(
-            extract_info,
-            request.documents,
-            message="Extracting metadata...",
-            max_workers=50,
+            yield "Preparing sheet..."
+            spreadsheet_id = gspread.utils.extract_id_from_url(request.sheet_url)
+            ensure_header(spreadsheet_id)
+            row_numbers = init_sheet(spreadsheet_id, entries)
+
+            yield from apply_parallel(
+                lambda entry, row: process_entry(
+                    spreadsheet_id=spreadsheet_id,
+                    entry=entry,
+                    row=row,
+                    request=request,
+                ),
+                entries,
+                row_numbers,
+                max_workers=4,
+                message="Updating sheet...",
+            )
+        else:
+            file_url_metas = yield from flatapply_parallel(
+                doc_or_yt_url_to_metadatas,
+                request.documents,
+                message="Extracting metadata...",
+            )
+            file_urls, file_metas = zip(*file_url_metas)
+            output_documents = yield from apply_parallel(
+                lambda *args: _doc_extract_and_upload(request, *args),
+                file_urls,
+                file_metas,
+                max_workers=4,
+                message="Processing documents...",
+            )
+            response.output_documents = list(filter(None, output_documents))
+
+
+def _doc_extract_and_upload(
+    request: DocExtractPage.RequestModel, f_url: str, file_meta: FileMetadata
+) -> str | None:
+    import pandas as pd
+
+    pages = doc_url_to_text_pages(
+        f_url=f_url,
+        file_meta=file_meta,
+        selected_asr_model=request.selected_asr_model,
+    )
+    if isinstance(pages, pd.DataFrame):
+        return upload_file_from_bytes(
+            file_meta.name + ".csv",
+            pages.to_csv(index=False).encode(),
+            content_type="text/csv",
         )
-
-        yield "Preparing sheet..."
-        spreadsheet_id = gspread.utils.extract_id_from_url(request.sheet_url)
-        ensure_header(spreadsheet_id)
-        row_numbers = init_sheet(spreadsheet_id, entries)
-
-        yield from apply_parallel(
-            lambda entry, row: process_entry(
-                spreadsheet_id=spreadsheet_id,
-                entry=entry,
-                row=row,
-                request=request,
-            ),
-            entries,
-            row_numbers,
-            max_workers=4,
-            message="Updating sheet...",
+    elif len(pages) <= 1:
+        return upload_file_from_bytes(
+            file_meta.name + ".txt",
+            "".join(pages).encode(),
+            content_type="text/plain",
+        )
+    else:
+        return upload_file_from_bytes(
+            file_meta.name + ".json",
+            json.dumps(pages).encode(),
+            content_type="application/json",
         )
 
 
@@ -294,16 +355,6 @@ def extract_info(url: str) -> list[dict | None]:
     if is_yt_url(url):
         return yt_dlp_get_video_entries(url)
 
-        # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
-        params = dict(ignoreerrors=True, check_formats=False)
-        with yt_dlp.YoutubeDL(params) as ydl:
-            data = ydl.extract_info(url, download=False)
-        if data:
-            entries = data.get("entries", [data])
-            return [e for e in entries if e]
-        else:
-            return [{"webpage_url": url, "title": "Youtube Video"}]
-
     # assume it's a direct link
     file_meta = doc_url_to_file_metadata(url)
     assert file_meta.mime_type, f"Could not determine mime type for {url}"
@@ -316,11 +367,14 @@ def extract_info(url: str) -> list[dict | None]:
                 file_meta.name, f_bytes, content_type=file_meta.mime_type
             )
         else:
-            r = requests.get(
-                url,
-                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-            )
+            if is_user_uploaded_url(url):
+                r = requests.get(url)
+            else:
+                r = requests.get(
+                    url,
+                    timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+                    **requests_scraping_kwargs(),
+                )
             raise_for_status(r, is_user_url=True)
             f_bytes = r.content
             content_url = url

@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-import json
 from pathlib import Path
 
 import sentry_sdk
@@ -54,6 +53,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "safedelete",
     "app_users",
     "files",
     "url_shortener",
@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "handles",
     "payments",
     "functions",
+    "workspaces",
 ]
 
 MIDDLEWARE = [
@@ -230,6 +231,8 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
+
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
@@ -263,6 +266,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
+PAYMENT_EMAIL = "Gooey.AI Payments <payment-support@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 5)
 
 DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
@@ -276,15 +280,17 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "docs",
 ]
 
-SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
-SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
+SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
+SAFETY_CHECKER_BILLING_EMAIL = config(
+    "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
+FIRST_WORKSPACE_FREE_CREDITS = config("WORKSPACE_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
-
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
@@ -315,7 +321,6 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
-SEON_API_KEY = config("SEON_API_KEY", None)
 APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
@@ -394,3 +399,13 @@ DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
 TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
 TWILIO_API_KEY_SECRET = config("TWILIO_API_KEY_SECRET", "")
+
+WORKSPACE_INVITE_EXPIRY_DAYS = config("WORKSPACE_INVITE_EXPIRY_DAYS", 10, cast=int)
+WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL = config(
+    "WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL", 60 * 60 * 24, cast=int  # 24 hours
+)
+
+SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
+SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")
+SCRAPING_PROXY_PASSWORD = config("SCRAPING_PROXY_PASSWORD", "")
+SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")

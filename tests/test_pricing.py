@@ -1,5 +1,3 @@
-import gooey_gui as gui
-import pytest
 from starlette.testclient import TestClient
 
 from bots.models import AppUser
@@ -12,8 +10,7 @@ from usage_costs.models import UsageCost, ModelPricing
 client = TestClient(app)
 
 
-@pytest.mark.django_db
-def test_copilot_get_raw_price_round_up():
+def test_copilot_get_raw_price_round_up(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -46,16 +43,17 @@ def test_copilot_get_raw_price_round_up():
         unit_quantity=model_pricing.unit_quantity,
         dollar_amount=model_pricing.unit_cost * 1 / model_pricing.unit_quantity,
     )
-    copilot_page = VideoBotsPage(run_user=user)
-    gui.set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
+    copilot_page = VideoBotsPage(
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
+    )
     assert (
         copilot_page.get_price_roundoff(state=state)
         == 210 + copilot_page.PROFIT_CREDITS
     )
 
 
-@pytest.mark.django_db
-def test_multiple_llm_sums_usage_cost():
+def test_multiple_llm_sums_usage_cost(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -107,13 +105,14 @@ def test_multiple_llm_sums_usage_cost():
         dollar_amount=model_pricing2.unit_cost * 1 / model_pricing2.unit_quantity,
     )
 
-    llm_page = CompareLLMPage(run_user=user)
-    gui.set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
+    llm_page = CompareLLMPage(
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
+    )
     assert llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS)
 
 
-@pytest.mark.django_db
-def test_workflowmetadata_2x_multiplier():
+def test_workflowmetadata_2x_multiplier(transactional_db):
     user = AppUser.objects.create(
         uid="test_user", is_paying=False, balance=1000, is_anonymous=False
     )
@@ -152,8 +151,10 @@ def test_workflowmetadata_2x_multiplier():
     metadata.price_multiplier = 2
     metadata.save()
 
-    llm_page = CompareLLMPage(run_user=user)
-    gui.set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
+    llm_page = CompareLLMPage(
+        user=user,
+        query_params=dict(run_id=bot_saved_run.run_id or "", uid=user.uid or ""),
+    )
     assert (
         llm_page.get_price_roundoff(state=state) == (210 + llm_page.PROFIT_CREDITS) * 2
     )

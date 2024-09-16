@@ -20,6 +20,24 @@ def run():
     # GPT-4o
 
     llm_pricing_create(
+        model_id="chatgpt-4o-latest",
+        model_name=LargeLanguageModels.chatgpt_4_o.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-2024-08-06",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=2.5,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/pricing",
+    )
+    llm_pricing_create(
         model_id="gpt-4o",
         model_name=LargeLanguageModels.gpt_4_o.name,
         unit_cost_input=5,
@@ -410,13 +428,22 @@ def run():
     # Gemini
 
     llm_pricing_create(
-        model_id="gemini-1.5-pro-preview-0409",
-        model_name=LargeLanguageModels.gemini_1_5_pro.name,
-        unit_cost_input=0.0025,
-        unit_cost_output=0.0075,
-        unit_quantity=1000,
+        model_id="gemini-1.5-flash",
+        model_name=LargeLanguageModels.gemini_1_5_flash.name,
+        unit_cost_input=0.075,
+        unit_cost_output=0.30,
+        unit_quantity=10**6,
         provider=ModelProvider.google,
-        pricing_url="https://cloud.google.com/vertex-ai/docs/generative-ai/pricing#text_generation",
+        pricing_url="https://ai.google.dev/pricing",
+    )
+    llm_pricing_create(
+        model_id="gemini-1.5-pro",
+        model_name=LargeLanguageModels.gemini_1_5_pro.name,
+        unit_cost_input=3.50,
+        unit_cost_output=10.50,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/pricing",
     )
 
     ModelPricing.objects.get_or_create(
@@ -635,11 +662,51 @@ def run():
         pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
     )
 
+    # AfroLlama3
+
+    llm_pricing_create(
+        model_id="Jacaranda/AfroLlama_V1",
+        model_name=LargeLanguageModels.afrollama_v1.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
     # SEA-LION
 
     llm_pricing_create(
         model_id="aisingapore/sea-lion-7b-instruct",
         model_name=LargeLanguageModels.sea_lion_7b_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+    llm_pricing_create(
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
+        model_name=LargeLanguageModels.llama3_8b_cpt_sea_lion_v2_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+    llm_pricing_create(
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
+        model_name=LargeLanguageModels.llama3_8b_cpt_sea_lion_v2_1_instruct.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.aks,
+        notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
+    llm_pricing_create(
+        model_id="sarvamai/sarvam-2b-v0.5",
+        model_name=LargeLanguageModels.sarvam_2b.name,
         unit_cost_input=5,
         unit_cost_output=15,
         unit_quantity=10**6,
@@ -672,7 +739,7 @@ def llm_pricing_create(
         ),
     )
     if created:
-        print(f"created {obj}")
+        print("created", obj)
     obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
         sku=ModelSku.llm_completion,

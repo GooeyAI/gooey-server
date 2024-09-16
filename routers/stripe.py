@@ -1,13 +1,15 @@
 import stripe
-from fastapi import APIRouter, Request
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import fastapi_request_body
 from payments.webhooks import StripeWebhookHandler
+from routers.custom_api_router import CustomAPIRouter
+from workspaces.models import Workspace
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 @router.post("/__/stripe/webhook")
@@ -22,15 +24,25 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     data = event.data.object
 
     customer = stripe.Customer.retrieve(data.customer)
+    workspace = None
     try:
-        uid = customer.metadata.uid
-    except AttributeError:
-        uid = None
-    if not uid:
+        workspace_id = customer.metadata["workspace_id"]
+    except KeyError:
+        pass
+    else:
+        workspace = Workspace.objects.get(id=workspace_id)
+    try:
+        uid = customer.metadata["uid"]
+    except KeyError:
+        pass
+    else:
+        workspace = Workspace.objects.get_or_create_from_uid(uid)[0]
+
+    if not workspace:
         return JSONResponse(
             {
                 "status": "failed",
-                "error": "customer.metadata.uid not found",
+                "error": "customer workspace / user  not found",
             },
             status_code=400,
         )
@@ -40,12 +52,14 @@ def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:
         case "invoice.paid":
-            StripeWebhookHandler.handle_invoice_paid(uid, data)
+            StripeWebhookHandler.handle_invoice_paid(workspace, data)
+        case "invoice.payment_failed":
+            StripeWebhookHandler.handle_invoice_failed(workspace, data)
         case "checkout.session.completed":
-            StripeWebhookHandler.handle_checkout_session_completed(uid, data)
+            StripeWebhookHandler.handle_checkout_session_completed(data)
         case "customer.subscription.created" | "customer.subscription.updated":
-            StripeWebhookHandler.handle_subscription_updated(uid, data)
+            StripeWebhookHandler.handle_subscription_updated(workspace, data)
         case "customer.subscription.deleted":
-            StripeWebhookHandler.handle_subscription_cancelled(uid, data)
+            StripeWebhookHandler.handle_subscription_cancelled(workspace)
 
     return JSONResponse({"status": "success"})

@@ -2,17 +2,22 @@ import sys
 import typing
 
 import requests
+from loguru import logger
 
-from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.settings import templates
 
 
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
+
+
 def send_reported_run_email(
     *,
-    user: AppUser,
+    user: "AppUser",
     run_uid: str,
     url: str,
     recipe_name: str,
@@ -41,25 +46,29 @@ def send_reported_run_email(
 
 def send_low_balance_email(
     *,
-    user: AppUser,
+    workspace: "Workspace",
     total_credits_consumed: int,
 ):
     from routers.account import account_route
 
+    print("sending...")
+
     recipeints = "support@gooey.ai, devs@gooey.ai"
-    html_body = templates.get_template("low_balance_email.html").render(
-        user=user,
-        url=get_app_route_url(account_route),
-        total_credits_consumed=total_credits_consumed,
-        settings=settings,
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=user.email or recipeints,
-        bcc=recipeints,
-        subject="Your Gooey.AI credit balance is low",
-        html_body=html_body,
-    )
+    for user in workspace.get_owners():
+        html_body = templates.get_template("low_balance_email.html").render(
+            user=user,
+            workspace=workspace,
+            url=get_app_route_url(account_route),
+            total_credits_consumed=total_credits_consumed,
+            settings=settings,
+        )
+        send_email_via_postmark(
+            from_address=settings.SUPPORT_EMAIL,
+            to_address=user.email or recipeints,
+            bcc=recipeints,
+            subject="Your Gooey.AI credit balance is low",
+            html_body=html_body,
+        )
 
 
 is_running_pytest = "pytest" in sys.modules
@@ -70,13 +79,13 @@ def send_email_via_postmark(
     *,
     from_address: str,
     to_address: str,
-    cc: str = None,
-    bcc: str = None,
+    cc: str | None = None,
+    bcc: str | None = None,
     subject: str = "",
     html_body: str = "",
     text_body: str = "",
     message_stream: typing.Literal[
-        "outbound", "gooey-ai-workflows", "announcements"
+        "outbound", "gooey-ai-workflows", "announcements", "billing"
     ] = "outbound",
 ):
     if is_running_pytest:
@@ -134,4 +143,7 @@ def send_email_via_postmark(
             "MessageStream": message_stream,
         },
     )
+    if r.status_code == 422 and r.json().get("ErrorCode") == 406:
+        logger.warning(r.json())
+        return
     raise_for_status(r)

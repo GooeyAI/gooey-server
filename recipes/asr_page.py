@@ -64,8 +64,8 @@ class AsrPage(BasePage):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
 
-    def load_state_from_sr(self, sr: SavedRun) -> dict:
-        state = super().load_state_from_sr(sr)
+    def current_sr_to_session_state(self) -> dict:
+        state = super().current_sr_to_session_state()
         google_translate_target = state.pop("google_translate_target", None)
         translation_model = state.get("translation_model")
         if google_translate_target and not translation_model:

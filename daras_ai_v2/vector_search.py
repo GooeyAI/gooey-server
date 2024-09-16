@@ -5,13 +5,13 @@ import hashlib
 import io
 import mimetypes
 import multiprocessing
-import random
 import re
 import tempfile
 import typing
 from functools import partial
 from time import time
 
+import gooey_gui as gui
 import numpy as np
 import requests
 from django.db import transaction
@@ -21,7 +21,6 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -45,7 +44,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import create_embeddings_cached, EmbeddingModels
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
-from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     flatmap_parallel,
     map_parallel,
@@ -58,6 +56,11 @@ from daras_ai_v2.gdrive_downloader import (
     gdrive_metadata,
 )
 from daras_ai_v2.redis_cache import redis_lock
+from daras_ai_v2.scraping_proxy import (
+    get_scraping_proxy_cert_path,
+    requests_scraping_kwargs,
+    SCRAPING_PROXIES,
+)
 from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
@@ -312,11 +315,14 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         total_bytes = int(meta.get("size") or 0)
     else:
         try:
-            r = requests.head(
-                f_url,
-                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-            )
+            if is_user_uploaded_url(f_url):
+                r = requests.head(f_url)
+            else:
+                r = requests.head(
+                    f_url,
+                    timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+                    **requests_scraping_kwargs(),
+                )
             raise_for_status(r)
         except requests.RequestException as e:
             logger.warning(f"ignore error while downloading {f_url}: {e}")
@@ -337,7 +343,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             total_bytes = int(r.headers.get("content-length") or 0)
     # extract filename from url as a fallback
     if not name:
-        if is_user_uploaded_url(str(f)):
+        if is_user_uploaded_url(f_url):
             name = f.path.segments[-1]
         else:
             name = f"{f.host}{f.path}"
@@ -359,7 +365,12 @@ def yt_dlp_extract_info(url: str) -> dict:
     import yt_dlp
 
     # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
-    params = dict(ignoreerrors=True, check_formats=False)
+    params = dict(
+        ignoreerrors=True,
+        check_formats=False,
+        proxy=SCRAPING_PROXIES.get("https"),
+        client_certificate=get_scraping_proxy_cert_path(),
+    )
     with yt_dlp.YoutubeDL(params) as ydl:
         data = ydl.extract_info(url, download=False)
         if not data:
@@ -666,10 +677,10 @@ def download_content_bytes(
         return gdrive_download(f, mime_type)
     try:
         # download from url
-        r = requests.get(
-            f_url,
-            headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-        )
+        if is_user_uploaded_url(f_url):
+            r = requests.get(f_url)
+        else:
+            r = requests.get(f_url, **requests_scraping_kwargs())
         raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
         logger.warning(f"ignore error while downloading {f_url}: {e}")
@@ -730,7 +741,8 @@ def any_bytes_to_text_pages_or_df(
 
 
 def is_yt_url(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
+    origin = furl(url).origin
+    return "youtube.com" in origin or "youtu.be" in origin
 
 
 def pdf_or_tabular_bytes_to_text_pages_or_df(
@@ -881,6 +893,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             "+RTS", f"-M{MAX_PANDOC_MEM_MB}M", "-RTS", "--sandbox",
             "--standalone",
             infile.name,
+            "--wrap", "none",
             "--to", to,
             "--output",
             outfile.name,

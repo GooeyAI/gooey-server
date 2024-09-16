@@ -18,6 +18,7 @@ from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunction, CalledFunctionResponse
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
@@ -127,16 +128,12 @@ class Workflow(models.IntegerChoices):
             workflow=self,
             create=lambda **kwargs: WorkflowMetadata.objects.create(
                 **kwargs,
-                short_title=(
-                    self.page_cls.get_root_published_run().title or self.page_cls.title
-                ),
+                short_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 default_image=self.page_cls.explore_image or "",
-                meta_title=(
-                    self.page_cls.get_root_published_run().title or self.page_cls.title
-                ),
+                meta_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 meta_description=(
                     self.page_cls().preview_description(state={})
-                    or self.page_cls.get_root_published_run().notes
+                    or self.page_cls.get_root_pr().notes
                 ),
                 meta_image=self.page_cls.explore_image or "",
             ),
@@ -212,6 +209,12 @@ class SavedRun(models.Model):
     )
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
+        related_name="saved_runs",
+        null=True,
+    )
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
@@ -362,6 +365,7 @@ class SavedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        deduct_credits: bool = True,
         parent_pr: "PublishedRun" = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
@@ -376,18 +380,21 @@ class SavedRun(models.Model):
                 query_params = page_cls.clean_query_params(
                     example_id=self.example_id, run_id=self.run_id, uid=self.uid
                 )
-            page, result, run_id, uid = pool.apply(
+            return pool.apply(
                 submit_api_call,
                 kwds=dict(
                     page_cls=page_cls,
                     query_params=query_params,
-                    user=current_user,
+                    current_user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
+                    deduct_credits=deduct_credits,
                 ),
             )
 
-        return result, page.run_doc_sr(run_id, uid)
+    def wait_for_celery_result(self, result: "celery.result.AsyncResult"):
+        get_celery_result_db_safe(result)
+        self.refresh_from_db()
 
     def get_creator(self) -> AppUser | None:
         if self.uid:
@@ -419,7 +426,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
-    def reset_fb_pages_for_user(
+    def add_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
@@ -452,13 +459,13 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.name = bi.fb_page_name
             bi.save()
             saved.append(bi)
-        # delete pages that are no longer connected for this user
-        self.filter(
-            Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-            billing_account_uid=uid,
-        ).exclude(
-            id__in=[bi.id for bi in saved],
-        ).delete()
+        # # delete pages that are no longer connected for this user
+        # self.filter(
+        #     Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
+        #     billing_account_uid=uid,
+        # ).exclude(
+        #     id__in=[bi.id for bi in saved],
+        # ).delete()
         return saved
 
 
@@ -694,10 +701,14 @@ class BotIntegration(models.Model):
         blank=True,
         help_text="The audio url to play to the user while waiting for a response if using voice",
     )
+    twilio_fresh_conversation_per_call = models.BooleanField(
+        default=False,
+        help_text="If set, the bot will start a new conversation for each call",
+    )
 
     streaming_enabled = models.BooleanField(
-        default=False,
-        help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
+        default=True,
+        help_text="If set, the bot will stream messages to the frontend",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1064,6 +1075,11 @@ class Conversation(models.Model):
         default="",
         help_text="User's Twilio phone number (mandatory)",
     )
+    twilio_call_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio call sid (only used if each call is a new conversation)",
+    )
 
     web_user_id = models.CharField(
         max_length=512,
@@ -1085,7 +1101,6 @@ class Conversation(models.Model):
         "web_user_id",
         "wa_phone_number",
         "twilio_phone_number",
-        "id",
     ]
 
     class Meta:
@@ -1103,7 +1118,9 @@ class Conversation(models.Model):
                     "slack_channel_is_personal",
                 ],
             ),
-            models.Index(fields=["bot_integration", "twilio_phone_number"]),
+            models.Index(
+                fields=["bot_integration", "twilio_phone_number", "twilio_call_sid"]
+            ),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
@@ -1113,7 +1130,18 @@ class Conversation(models.Model):
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
-            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or " | ".join(
+                filter(
+                    None,
+                    [
+                        (
+                            self.twilio_phone_number
+                            and self.twilio_phone_number.as_international
+                        ),
+                        self.twilio_call_sid,
+                    ],
+                )
+            )
             or self.ig_username
             or self.fb_page_name
             or " in #".join(
@@ -1124,10 +1152,9 @@ class Conversation(models.Model):
 
     def unique_user_id(self) -> str | None:
         for col in self.user_id_fields:
-            if col == "id":
-                return self.api_integration_id()
             if value := getattr(self, col, None):
                 return value
+        return self.api_integration_id()
 
     get_display_name.short_description = "User"
 
@@ -1229,10 +1256,9 @@ class MessageQuerySet(models.QuerySet):
                         metadata__mime_type__startswith="image/"
                     ).values_list("url", flat=True)
                 ),
-                "Audio Input": ", ".join(
-                    message.attachments.filter(
-                        metadata__mime_type__startswith="audio/"
-                    ).values_list("url", flat=True)
+                "Audio Input": (
+                    (message.saved_run and message.saved_run.state.get("input_audio"))
+                    or ""
                 ),
             }
             rows.append(row)
@@ -1786,9 +1812,6 @@ class PublishedRun(models.Model):
             version.save()
             self.update_fields_to_latest_version()
 
-    def is_editor(self, user: AppUser):
-        return self.created_by == user
-
     def is_root(self):
         return not self.published_run_id
 
@@ -1819,11 +1842,13 @@ class PublishedRun(models.Model):
         current_user: AppUser,
         request_body: dict,
         enable_rate_limits: bool = False,
+        deduct_credits: bool = True,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         return self.saved_run.submit_api_call(
             current_user=current_user,
             request_body=request_body,
             enable_rate_limits=enable_rate_limits,
+            deduct_credits=deduct_credits,
             parent_pr=self,
         )
 

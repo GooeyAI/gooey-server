@@ -1,6 +1,7 @@
 import mimetypes
 import typing
 from datetime import datetime
+from types import SimpleNamespace
 
 import gooey_gui as gui
 from django.db import transaction
@@ -199,9 +200,7 @@ class BotInterface:
     def get_interactive_msg_info(self) -> ButtonPressed:
         raise NotImplementedError("This bot does not support interactive messages.")
 
-    def on_run_created(
-        self, page: BasePage, result: "celery.result.AsyncResult", run_id: str, uid: str
-    ):
+    def on_run_created(self, sr: "SavedRun"):
         pass
 
     def send_run_status(self, update_msg_id: str | None) -> str | None:
@@ -232,18 +231,6 @@ def _echo(bot, input_text):
         response_video = None
     msgs_to_save = []
     return msgs_to_save, response_audio, response_text, response_video
-
-
-def _mock_api_output(input_text):
-    return {
-        "url": "https://gooey.ai?example_id=mock-api-example",
-        "output": {
-            "input_text": input_text,
-            "raw_input_text": input_text,
-            "raw_output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-        },
-    }
 
 
 def msg_handler(bot: BotInterface):
@@ -369,27 +356,32 @@ def _process_and_send_msg(
     # get latest messages for context
     saved_msgs = bot.convo.msgs_for_llm_context()
 
-    # # mock testing
-    # result = _mock_api_output(input_text)
+    variables = (bot.saved_run.state.get("variables") or {}) | build_run_vars(
+        bot.convo, bot.user_msg_id
+    )
     body = dict(
         input_prompt=input_text,
         input_audio=input_audio,
         input_images=input_images,
         input_documents=input_documents,
         messages=saved_msgs,
-        variables=build_run_vars(bot.convo, bot.user_msg_id),
+        variables=variables,
     )
     if bot.user_language:
         body["user_language"] = bot.user_language
     if bot.request_overrides:
         body = bot.request_overrides | body
-    page, result, run_id, uid = submit_api_call(
+        try:
+            variables.update(bot.request_overrides["variables"])
+        except KeyError:
+            pass
+    result, sr = submit_api_call(
         page_cls=bot.page_cls,
-        user=billing_account_user,
-        request_body=body,
         query_params=bot.query_params,
+        current_user=billing_account_user,
+        request_body=body,
     )
-    bot.on_run_created(page, result, run_id, uid)
+    bot.on_run_created(sr)
 
     if bot.show_feedback_buttons:
         buttons = _feedback_start_buttons()
@@ -401,10 +393,10 @@ def _process_and_send_msg(
     last_idx = 0  # this is the last index of the text sent to the user
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
-        channel = page.realtime_channel_name(run_id, uid)
+        channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
         with gui.realtime_subscribe(channel) as realtime_gen:
             for state in realtime_gen:
-                bot.recipe_run_state = page.get_run_state(state)
+                bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
                 if bot.recipe_run_state == RecipeRunState.failed:
@@ -445,11 +437,10 @@ def _process_and_send_msg(
                     break  # we're done streaming, stop the loop
 
     # wait for the celery task to finish
-    get_celery_result_db_safe(result)
+    sr.wait_for_celery_result(result)
     # get the final state from db
-    sr = page.run_doc_sr(run_id, uid)
     state = sr.to_dict()
-    bot.recipe_run_state = page.get_run_state(state)
+    bot.recipe_run_state = bot.page_cls.get_run_state(state)
     bot.run_status = state.get(StateKeys.run_status) or ""
     # check for errors
     err_msg = state.get(StateKeys.error_msg)
@@ -497,7 +488,7 @@ def build_run_vars(convo: Conversation, user_msg_id: str):
 
     bi = convo.bot_integration
     if bi.platform == Platform.WEB:
-        user_msg_id = user_msg_id.lstrip(MSG_ID_PREFIX)
+        user_msg_id = user_msg_id.removeprefix(MSG_ID_PREFIX)
     variables = dict(
         platform=Platform(bi.platform).name,
         integration_id=bi.api_integration_id(),

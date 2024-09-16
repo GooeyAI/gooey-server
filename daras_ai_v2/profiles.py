@@ -288,7 +288,7 @@ def _edit_user_profile_header(user: AppUser):
 
         if user.handle:
             copy_to_clipboard_button(
-                f"{icons.copy} Copy",
+                f"{icons.copy_solid} Copy",
                 value=user.handle.get_app_url(),
                 type="tertiary",
                 className="m-0",

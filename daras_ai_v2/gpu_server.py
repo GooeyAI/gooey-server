@@ -4,9 +4,9 @@ import os
 import typing
 from time import time
 
-from daras_ai.image_input import storage_blob_for
+from daras_ai.image_input import gcs_blob_for
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import GPUError
+from daras_ai_v2.exceptions import GPUError, UserError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
 
@@ -43,7 +43,27 @@ def call_celery_task_outfile(
     filename: str,
     num_outputs: int = 1,
 ):
-    blobs = [storage_blob_for(filename) for i in range(num_outputs)]
+    links, _ = call_celery_task_outfile_with_ret(
+        task_name,
+        pipeline=pipeline,
+        inputs=inputs,
+        content_type=content_type,
+        filename=filename,
+        num_outputs=num_outputs,
+    )
+    return links
+
+
+def call_celery_task_outfile_with_ret(
+    task_name: str,
+    *,
+    pipeline: dict,
+    inputs: dict,
+    content_type: str | None,
+    filename: str,
+    num_outputs: int = 1,
+):
+    blobs = [gcs_blob_for(filename) for i in range(num_outputs)]
     pipeline["upload_urls"] = [
         blob.generate_signed_url(
             version="v4",
@@ -55,8 +75,8 @@ def call_celery_task_outfile(
         )
         for blob in blobs
     ]
-    call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
-    return [blob.public_url for blob in blobs]
+    ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
+    return [blob.public_url for blob in blobs], ret
 
 
 _app = None
@@ -94,7 +114,10 @@ def call_celery_task(
     try:
         result.maybe_throw()
     except Exception as e:
-        raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
+        if type(e).__name__ == "UserError" and e.args and isinstance(e.args[0], dict):
+            raise UserError(**e.args[0])
+        else:
+            raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
     record_cost_auto(
         model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
     )

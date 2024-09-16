@@ -28,8 +28,12 @@ BASE_HANDLE_BLACKLIST = [
     "about",
     "blog",
     "sales",
+    "js",
+    "css",
+    "assets",
+    "favicon.ico",
 ]
-COMMON_EMAIL_DOMAINS = [
+COMMON_EMAIL_DOMAINS = {
     "gmail.com",
     "googlemail.com",
     "outlook.com",
@@ -49,7 +53,7 @@ COMMON_EMAIL_DOMAINS = [
     "tuta.io",
     "keemail.me",
     "zohomail.com",
-]
+}
 PRIVATE_EMAIL_DOMAINS = [
     "privaterelay.appleid.com",
 ]

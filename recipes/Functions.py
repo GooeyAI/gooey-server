@@ -1,15 +1,16 @@
 import typing
 
+import gooey_gui as gui
 import requests
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.prompt_vars import variables_input
+from functions.models import CalledFunction
 
 
 class ConsoleLogs(BaseModel):
@@ -21,6 +22,8 @@ class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    show_settings = False
+    price = 1
 
     class RequestModel(BaseModel):
         code: str = Field(
@@ -56,10 +59,8 @@ class FunctionsPage(BasePage):
         request: "FunctionsPage.RequestModel",
         response: "FunctionsPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
-        query_params = gui.get_query_params()
-        run_id = query_params.get("run_id")
-        uid = query_params.get("uid")
-        tag = f"run_id={run_id}&uid={uid}"
+        sr = self.current_sr
+        tag = f"run_id={sr.run_id}&uid={sr.uid}"
 
         yield "Running your code..."
         # this will run functions/executor.js in deno deploy
@@ -82,8 +83,21 @@ class FunctionsPage(BasePage):
             height=300,
         )
 
+    def get_price_roundoff(self, state: dict) -> float:
+        if CalledFunction.objects.filter(function_run=self.current_sr).exists():
+            return 0
+        return super().get_price_roundoff(state)
+
+    def additional_notes(self):
+        return "\nFunctions are free if called from another workflow."
+
     def render_variables(self):
-        variables_input(template_keys=["code"], allow_add=True)
+        variables_input(
+            template_keys=["code"],
+            allow_add=True,
+            description="Pass custom parameters to your function and access the parent workflow data. "
+            "Variables will be passed down as the first argument to your anonymous JS function.",
+        )
 
     def render_output(self):
         if error := gui.session_state.get("error"):

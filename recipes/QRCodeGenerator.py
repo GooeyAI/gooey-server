@@ -28,6 +28,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     controlnet,
@@ -36,7 +37,6 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
-from recipes.EmailFaceInpainting import get_photo_for_email
 from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -472,6 +472,9 @@ Here is the final output:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        yield "Running safety checker..."
+        safety_checker(text=request.text_prompt, image=request.image_prompt)
+
         yield "Generating QR Code..."
         image, qr_code_data, did_shorten = generate_and_upload_qr_code(
             request, self.request.user
@@ -550,7 +553,8 @@ Here is the final output:
                 total += 3
             case Text2ImgModels.dall_e.name:
                 total += 10
-        return total * state.get("num_outputs", 1)
+        num_outputs = state.get("num_outputs") or 0
+        return total * num_outputs
 
     def render_usage_guide(self):
         youtube_video("Q1D6B_-UoxY")
@@ -762,13 +766,12 @@ def get_vcard_from_email(
     person = get_profile_for_email(email)
     if not person:
         return None
-    photo_url = get_photo_for_email(email)
     return VCARD(
         email=email,
         format_name=person.get("name") or "",
         tel=person.get("phone"),
         role=person.get("title"),
-        photo_url=photo_url,
+        # photo_url=photo_url,
         urls=list(set(filter(None, [person.get(field, "") for field in url_fields]))),
         note=person.get("headline"),
         organization=person.get("organization", {}).get("name"),

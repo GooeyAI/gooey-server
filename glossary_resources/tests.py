@@ -1,6 +1,6 @@
 import pytest
 
-from daras_ai.image_input import storage_blob_for
+from daras_ai.image_input import gcs_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
@@ -64,7 +64,7 @@ def glossary_url():
     import pandas as pd
 
     df = pd.DataFrame.from_records(GLOSSARY)
-    blob = storage_blob_for("test glossary.csv")
+    blob = gcs_blob_for("test glossary.csv")
     blob.upload_from_string(df.to_csv(index=False).encode(), content_type="text/csv")
 
     try:
@@ -75,8 +75,7 @@ def glossary_url():
 
 
 @pytest.mark.skipif(not settings.GS_BUCKET_NAME, reason="No GCS bucket")
-@pytest.mark.django_db
-def test_google_translate_glossary(glossary_url, threadpool_subtest):
+def test_google_translate_glossary(transactional_db, glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
             google_translate_check,

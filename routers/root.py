@@ -6,10 +6,10 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
+import gooey_gui as gui
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
-from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
 from loguru import logger
@@ -21,9 +21,8 @@ from starlette.responses import (
     FileResponse,
 )
 
-import gooey_gui as gui
 from app_users.models import AppUser
-from bots.models import Workflow, BotIntegration
+from bots.models import Workflow, BotIntegration, PublishedRun
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -40,35 +39,52 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from handles.models import Handle
+from routers.custom_api_router import CustomAPIRouter
+from routers.static_pages import serve_static_file
+from workspaces.widgets import workspace_selector
 
-app = APIRouter()
+app = CustomAPIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
 
 
 @app.get("/sitemap.xml/")
-async def get_sitemap():
-    from daras_ai_v2.all_pages import all_api_pages
-
+def get_sitemap():
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
-                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
 
-    all_paths = ["/", "/faq", "/pricing", "/privacy", "/terms", "/team/"] + [
-        page.slug_versions[-1] for page in all_api_pages
+    all_urls = [
+        furl(settings.APP_BASE_URL) / path
+        for path in [
+            "/",
+            "/faq",
+            "/pricing",
+            "/privacy",
+            "/terms",
+            "/team",
+            "/jobs",
+            "/farmerchat",
+            "/contact",
+            "/impact",
+            "/explore",
+            "/api",
+        ]
+    ] + [
+        pr.get_app_url()
+        for pr in (
+            PublishedRun.objects.filter(is_approved_example=True).order_by("workflow")
+        )
     ]
-
-    for path in all_paths:
-        url = furl(settings.APP_BASE_URL) / path
+    for url in all_urls:
         my_sitemap += f"""<url>
-              <loc>{url}</loc>
-              <lastmod>2022-12-26</lastmod>
-              <changefreq>daily</changefreq>
-              <priority>1.0</priority>
-          </url>"""
+          <loc>{url}</loc>
+          <lastmod>{datetime.datetime.today().strftime("%Y-%m-%d")}</lastmod>
+          <changefreq>daily</changefreq>
+          <priority>1.0</priority>
+        </url>"""
 
     my_sitemap += """</urlset>"""
 
@@ -76,9 +92,7 @@ async def get_sitemap():
 
 
 @app.get("/favicon")
-@app.get("/favicon/")
 @app.get("/favicon.ico")
-@app.get("/favicon.ico/")
 async def favicon():
     return FileResponse("static/favicon.ico")
 
@@ -127,7 +141,6 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
                 existing_user = AppUser.objects.get(uid=uid)
                 if existing_user.is_anonymous:
                     existing_user.copy_from_firebase_user(auth.get_user(uid))
-                    existing_user.save()
             except AppUser.DoesNotExist:
                 pass
             return RedirectResponse(
@@ -152,7 +165,7 @@ async def logout(request: Request):
 
 
 @app.post("/__/file-upload/url/meta")
-async def file_upload(body_json: dict = fastapi_request_json):
+async def file_upload_meta(body_json: dict = fastapi_request_json):
     return dict(name=body_json["url"], type="url/undefined")
 
 
@@ -162,6 +175,8 @@ def file_upload(form_data: FormData = fastapi_request_form):
 
     file = form_data["file"]
     data = file.file.read()
+    if not data:
+        return Response(content="No file uploaded", status_code=400)
     filename = file.filename
     content_type = file.content_type
 
@@ -188,7 +203,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"
-            img.transform(resize=form_data.get("resize", f"{1024**2}@>"))
+            img.transform(resize=form_data.get("resize", f"{1024 ** 2}@>"))
             data = img.make_blob()
 
     return {"url": upload_file_from_bytes(filename, data, content_type)}
@@ -242,7 +257,7 @@ def api_docs_page(request: Request):
     )
 
 
-def _api_docs_page(request):
+def _api_docs_page(request: Request):
     from daras_ai_v2.all_pages import all_api_pages
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
@@ -272,7 +287,7 @@ Authorization: Bearer GOOEY_API_KEY
 
     gui.write("---")
     options = {
-        page_cls.workflow.value: page_cls().get_recipe_title()
+        page_cls.workflow.value: page_cls.get_recipe_title()
         for page_cls in all_api_pages
     }
 
@@ -299,8 +314,13 @@ Authorization: Bearer GOOEY_API_KEY
     as_async = gui.checkbox("Run Async")
     as_form_data = gui.checkbox("Upload Files via Form Data")
 
-    page = workflow.page_cls(request=request)
-    state = page.get_root_published_run().saved_run.to_dict()
+    page = workflow.page_cls(
+        user=request.user,
+        request_session=request.session,
+        request_url=request.url,
+        query_params=dict(request.query_params),
+    )
+    state = page.get_root_pr().saved_run.to_dict()
     api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
@@ -339,7 +359,7 @@ Authorization: Bearer GOOEY_API_KEY
 def examples_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.examples, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.examples, example_id)
 
 
 @gui.route(
@@ -351,7 +371,7 @@ def examples_route(
 def api_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.run_as_api, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.run_as_api, example_id)
 
 
 @gui.route(
@@ -363,7 +383,7 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.history, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
 
 
 @gui.route(
@@ -375,7 +395,7 @@ def history_route(
 def save_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    return render_page(request, page_slug, RecipeTabs.saved, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.saved, example_id)
 
 
 @gui.route(
@@ -391,7 +411,7 @@ def add_integrations_route(
     example_id: str = None,
 ):
     gui.session_state["--add-integration"] = True
-    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -413,7 +433,7 @@ def integrations_stats_route(
         gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
-    return render_page(request, "stats", RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, "stats", RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -476,7 +496,7 @@ def integrations_route(
             gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
         except IndexError:
             raise HTTPException(status_code=404)
-    return render_page(request, page_slug, RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
 
 
 @gui.route(
@@ -504,6 +524,7 @@ def chat_route(
     request: Request, integration_id: str = None, integration_name: str = None
 ):
     from routers.bots_api import api_hashids
+    from daras_ai_v2.bot_integration_widgets import get_web_widget_embed_code
 
     try:
         bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
@@ -515,6 +536,7 @@ def chat_route(
         {
             "request": request,
             "bi": bi,
+            "embed_code": get_web_widget_embed_code(bi, config=dict(mode="fullscreen")),
             "meta": raw_build_meta_tags(
                 url=get_og_url_path(request),
                 title=f"Chat with {bi.name}",
@@ -526,7 +548,6 @@ def chat_route(
 
 
 @app.get("/chat/{integration_name}-{integration_id}/lib.js")
-@app.get("/chat/{integration_name}-{integration_id}/lib.js/")
 def chat_lib_route(request: Request, integration_id: str, integration_name: str = None):
     from routers.bots_api import api_hashids
 
@@ -573,22 +594,40 @@ let script = document.createElement("script");
 
 @gui.route(
     app,
+    "/{path:path}",
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
     "/{page_slug}/{run_slug}-{example_id}/",
 )
-def recipe_page_or_handle(
-    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+def recipe_or_handle_or_static(
+    request: Request, page_slug=None, run_slug=None, example_id=None, path=None
 ):
-    try:
-        handle = Handle.objects.get_by_name(page_slug)
-    except Handle.DoesNotExist:
-        return render_page(request, page_slug, RecipeTabs.run, example_id)
-    else:
-        return render_page_for_handle(request, handle)
+    parts = request.url.path.strip("/").split("/")
+
+    # try to render a recipe page
+    if len(parts) in {1, 2}:
+        try:
+            example_id = parts[1].split("-")[-1] or None
+        except IndexError:
+            example_id = None
+        try:
+            return render_recipe_page(request, parts[0], RecipeTabs.run, example_id)
+        except RecipePageNotFound:
+            pass
+
+    # try to render a handle page
+    if len(parts) == 1:
+        try:
+            return render_handle_page(request, parts[0])
+        except Handle.DoesNotExist:
+            pass
+
+    # try to serve a static file
+    return serve_static_file(request)
 
 
-def render_page_for_handle(request: Request, handle: Handle):
+def render_handle_page(request: Request, name: str):
+    handle = Handle.objects.get_by_name(name)
     if handle.has_user:
         with page_wrapper(request):
             user_profile_page(request, handle.user)
@@ -602,7 +641,12 @@ def render_page_for_handle(request: Request, handle: Handle):
         raise HTTPException(status_code=404)
 
 
-def render_page(
+class RecipePageNotFound(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(status_code=404)
+
+
+def render_recipe_page(
     request: Request, page_slug: str, tab: "RecipeTabs", example_id: str | None
 ):
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
@@ -611,7 +655,7 @@ def render_page(
     try:
         page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
-        raise HTTPException(status_code=404)
+        raise RecipePageNotFound
 
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
@@ -630,26 +674,24 @@ def render_page(
         )
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
-    # this is because the code still expects example_id to be in the query params
-    gui.set_query_params(dict(request.query_params) | dict(example_id=example_id))
-    _, run_id, uid = extract_query_params(request.query_params)
+    page = page_cls(
+        tab=tab,
+        user=request.user,
+        request_session=request.session,
+        request_url=request.url,
+        # this is because the code still expects example_id to be in the query params
+        query_params=dict(request.query_params) | dict(example_id=example_id),
+    )
 
-    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
     if not gui.session_state:
-        sr = page.get_sr_from_query_params(example_id, run_id, uid)
-        gui.session_state.update(page.load_state_from_sr(sr))
+        gui.session_state.update(page.current_sr_to_session_state())
 
     with page_wrapper(request):
         page.render()
 
     return dict(
         meta=build_meta_tags(
-            url=get_og_url_path(request),
-            page=page,
-            state=gui.session_state,
-            run_id=run_id,
-            uid=uid,
-            example_id=example_id,
+            url=get_og_url_path(request), page=page, state=gui.session_state
         ),
     )
 
@@ -660,19 +702,10 @@ def get_og_url_path(request) -> str:
     )
 
 
-def get_run_user(request, uid) -> AppUser | None:
-    if not uid:
-        return
-    if request.user and request.user.uid == uid:
-        return request.user
-    try:
-        return AppUser.objects.get(uid=uid)
-    except AppUser.DoesNotExist:
-        pass
-
-
 @contextmanager
 def page_wrapper(request: Request, className=""):
+    from daras_ai_v2.base import BasePage
+
     context = {
         "request": request,
         "settings": settings,
@@ -688,14 +721,21 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("header.html").render(**context))
         gui.html(copy_to_clipboard_scripts)
 
-        with gui.div(id="main-content", className="container " + className):
+        if request.user and BasePage.is_user_admin(request.user):
+            with (
+                gui.div(
+                    className="container justify-content-center text-center d-flex",
+                    style=dict(marginBottom="-20pt"),
+                ),
+                gui.div(style=dict(minWidth="200pt")),
+            ):
+                workspace_selector(request.user, request.session)
+
+        with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
-
-
-INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
 
 
 class TabData(typing.NamedTuple):
@@ -708,7 +748,7 @@ class RecipeTabs(TabData, Enum):
     run = TabData(
         title=f"{icons.run} Run",
         label="",
-        route=recipe_page_or_handle,
+        route=recipe_or_handle_or_static,
     )
     examples = TabData(
         title=f"{icons.example} Examples",
@@ -726,7 +766,7 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{INTEGRATION_IMG}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
+        title=f'<img width="24" height="24" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
         label="Integrations",
         route=integrations_route,
     )

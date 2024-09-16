@@ -8,7 +8,12 @@ from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
-from bots.models import BotIntegration, Platform
+from bots.models import (
+    BotIntegration,
+    Platform,
+    PublishedRun,
+    PublishedRunVisibility,
+)
 from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
@@ -30,6 +35,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, RecipeTabs
+from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
@@ -38,6 +44,7 @@ from daras_ai_v2.bot_integration_widgets import (
     get_bot_test_link,
     web_widget_config,
     get_web_widget_embed_code,
+    integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
@@ -78,7 +85,6 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import (
     parse_refs,
     CitationStyles,
@@ -104,7 +110,6 @@ from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
-INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
 GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
@@ -343,7 +348,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
-        gui.markdown("#### Capabilities")
+        gui.markdown("#### 💪 Capabilities")
         if gui.checkbox(
             "##### 🗣️ Text to Speech & Lipsync",
             value=bool(gui.session_state.get("tts_provider")),
@@ -425,9 +430,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if gui.checkbox(
             "##### 🩻 Photo & Document Intelligence",
-            value=bool(
-                gui.session_state.get("document_model"),
-            ),
+            value=bool(gui.session_state.get("document_model")),
         ):
             if settings.AZURE_FORM_RECOGNIZER_KEY:
                 doc_model_descriptions = azure_form_recognizer_models()
@@ -439,6 +442,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 options=doc_model_descriptions,
                 format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
             )
+            gui.write("---")
         else:
             gui.session_state["document_model"] = None
 
@@ -516,7 +520,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             citation_style_selector()
             gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
 
-            doc_extract_selector(self.request and self.request.user)
+            doc_extract_selector(self.request.user)
 
             gui.write("---")
 
@@ -657,7 +661,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.session_state["input_images"] = new_input_images or None
         gui.session_state["input_documents"] = new_input_documents or None
 
-        self.on_submit()
+        self.submit_and_redirect()
 
     def render_steps(self):
         if gui.session_state.get("tts_provider"):
@@ -797,7 +801,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
         if should_translate_lang(request.user_language):
-            yield f"Translating Input to English..."
+            yield "Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],
                 source_language=request.user_language,
@@ -807,7 +811,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )[0]
 
         if ocr_texts:
-            yield f"Translating Image Text to English..."
+            yield "Translating Image Text to English..."
             ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
@@ -881,7 +885,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         "keyword_query": response.final_keyword_query,
                     },
                 ),
-                current_user=self.request and self.request.user,
+                current_user=self.request.user,
             )
             if request.use_url_shortener:
                 for reference in response.references:
@@ -1011,9 +1015,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
                 {**gui.session_state, "text_prompt": text}
             ).dict()
-            yield from TextToSpeechPage(
-                request=self.request, run_user=self.run_user
-            ).run(tts_state)
+            yield from TextToSpeechPage(request=self.request).run(tts_state)
             response.output_audio.append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -1027,9 +1029,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "selected_model": request.lipsync_model,
                 }
             ).dict()
-            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
-                lip_state
-            )
+            yield from LipsyncPage(request=self.request).run(lip_state)
             response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):
@@ -1050,53 +1050,27 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # not signed in case
         if not self.request.user or self.request.user.is_anonymous:
-            integration_welcome_screen(title="Connect your Copilot")
+            integrations_welcome_screen(title="Connect your Copilot")
             gui.newline()
             with gui.center():
-                gui.anchor(
-                    "Get Started",
-                    href=self.get_auth_url(self.app_url()),
-                    type="primary",
-                )
+                gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gui.get_query_params())
-        )  # type: ignore
+        sr, pr = self.current_sr_pr
 
-        # signed in but not on a run the user can edit (admins will never see this)
-        if not self.can_user_edit_run(current_run, published_run):
-            integration_welcome_screen(title="Create your Saved Copilot")
-            gui.newline()
-            with gui.center():
-                gui.anchor(
-                    "Run & Save this Copilot",
-                    href=self.get_auth_url(self.app_url()),
-                    type="primary",
-                )
-            return
+        # make user the user knows that they are on a saved run not the published run
+        if pr and pr.saved_run_id != sr.id:
+            last_saved_url = self.app_url(
+                tab=RecipeTabs.integrations, example_id=pr.published_run_id
+            )
+            gui.caption(
+                f"Note: You seem to have unpublished changes. Integrations use the [last saved version]({last_saved_url}), not the currently visible edits.",
+                className="text-center text-muted",
+            )
 
-        # signed, has submitted run, but not published (admins will never see this)
-        # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
-        if not self.can_user_edit_published_run(published_run):
-            integration_welcome_screen(title="Save your Published Copilot")
-            gui.newline()
-            with gui.center():
-                self._render_published_run_buttons(
-                    current_run=current_run,
-                    published_run=published_run,
-                    redirect_to=self.current_app_url(RecipeTabs.integrations),
-                )
-            return
-
-        # if we come from an integration redirect, we connect the integrations
-        if "connect_ids" in self.request.query_params:
-            self.integrations_on_connect(current_run, published_run)
-
-        # see which integrations are available to the user for the current published run
-        assert published_run, "At this point, published_run should be available"
-        integrations_q = Q(published_run=published_run) | Q(
-            saved_run__example_id=published_run.published_run_id
+        # see which integrations are available to the user for the published run
+        integrations_q = Q(published_run=pr) | Q(
+            saved_run__example_id=pr.published_run_id
         )
         if not self.is_current_user_admin():
             integrations_q &= Q(billing_account_uid=self.request.user.uid)
@@ -1105,33 +1079,27 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             integrations_q
         ).order_by("platform", "-created_at")
 
-        run_title = get_title_breadcrumbs(
-            VideoBotsPage, current_run, published_run
-        ).h1_title
+        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).h1_title
 
-        # signed in, can edit, but no connected botintegrations on this run
-        if not integrations_qs.exists():
+        # no connected integrations on this run
+        if not (integrations_qs and integrations_qs.exists()):
             self.render_integrations_add(
-                label="""
-                #### Connect your Copilot
-                Run Saved ✅ • <b>Connect</b> • <span className="text-muted">Test & Configure</span>
-                """,
+                label="#### Connect your Copilot",
                 run_title=run_title,
+                pr=pr,
             )
             return
 
         # this gets triggered on the /add route
         if gui.session_state.pop("--add-integration", None):
-            cancel_url = self.current_app_url(RecipeTabs.integrations)
             self.render_integrations_add(
-                label=f"""
-                #### Configure your Copilot: Add a New Integration
-                Run Saved ✅ • <b>Connected</b> ✅ • [Test & Configure]({cancel_url}) ✅
-                """,
+                label="#### Add a New Integration to your Copilot",
                 run_title=run_title,
+                pr=pr,
             )
             with gui.center():
                 if gui.button("Return to Test & Configure"):
+                    cancel_url = self.current_app_url(RecipeTabs.integrations)
                     raise gui.RedirectException(cancel_url)
             return
 
@@ -1141,11 +1109,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 integrations=list(integrations_qs), run_title=run_title
             )
 
-    def render_integrations_add(self, label: str, run_title: str):
+    def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
         from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
+
+        can_edit = self.is_current_user_admin() or self.can_user_edit_published_run(pr)
+
         gui.newline()
 
         pressed_platform = None
@@ -1165,8 +1136,22 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     with gui.tag("td", className="ps-3"):
                         gui.caption(choice.label)
 
+        if not can_edit:
+            gui.caption(
+                "P.S. You're not an owner of this saved workflow, so we'll create a copy of it in your Saved Runs.",
+                className="text-center text-muted",
+            )
+
         if pressed_platform:
-            on_connect = self.current_app_url(RecipeTabs.integrations)
+            if not can_edit:
+                run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
+                pr = pr.duplicate(
+                    user=self.request.user,
+                    title=run_title,
+                    notes=pr.notes,
+                    visibility=PublishedRunVisibility.UNLISTED,
+                )
+
             match pressed_platform:
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
@@ -1174,16 +1159,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         billing_account_uid=self.request.user.uid,
                         platform=Platform.WEB,
                     )
-                    redirect_url = str(
-                        furl(on_connect).add(query_params=dict(connect_ids=str(bi.id)))
-                        / bi.api_integration_id()
-                    )
+                    redirect_url = connect_bot_to_published_run(bi, pr)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(on_connect)
+                    redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:
-                    redirect_url = slack_connect_url(on_connect)
+                    redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
-                    redirect_url = fb_connect_url(on_connect)
+                    redirect_url = fb_connect_url(pr.id)
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1288,12 +1270,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                    gui.anchor(
-                        f'<i class="fa-brands facebook-messenger"></i> Open Messenger',
-                        str(furl("https://www.messenger.com/t/") / bi.fb_page_id),
-                        unsafe_allow_html=True,
-                        new_tab=True,
-                    )
                 elif bi.platform == Platform.TWILIO:
                     gui.anchor(
                         '<i class="fa-regular fa-phone"></i> Start Voice Call',
@@ -1318,7 +1294,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Understand your Users")
-                gui.caption(f"See real-time analytics.")
+                gui.caption("See real-time analytics.")
             with col2:
                 gui.anchor(
                     "📊 View Analytics",
@@ -1354,7 +1330,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with col1:
                     gui.write("###### WhatsApp Business Management")
                     gui.caption(
-                        f"Access your WhatsApp account on Meta to approve message templates, etc."
+                        "Access your WhatsApp account on Meta to approve message templates, etc."
                     )
                 with col2:
                     gui.anchor(
@@ -1384,7 +1360,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.caption(f"Add another connection for {run_title}.")
             with col2:
                 gui.anchor(
-                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Integration',
                     str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
                     unsafe_allow_html=True,
                 )
@@ -1394,7 +1370,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     slack_specific_settings(bi, run_title)
                 if bi.platform == Platform.TWILIO:
                     twilio_specific_settings(bi)
-                general_integration_settings(bi, self.request.user)
+                general_integration_settings(bi, self.request)
 
                 if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
                     gui.newline()
@@ -1416,42 +1392,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.published_run = None
                         bi.save()
                         gui.rerun()
-
-    def integrations_on_connect(self, current_run, published_run):
-        from app_users.models import AppUser
-        from daras_ai_v2.slack_bot import send_confirmation_msg
-
-        bi = None
-        for bid in self.request.query_params.getlist("connect_ids"):
-            try:
-                bi = BotIntegration.objects.get(id=bid)
-            except BotIntegration.DoesNotExist:
-                continue
-            if bi.saved_run is not None:
-                with gui.center():
-                    gui.write(
-                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
-                    )
-                return
-
-            bi.streaming_enabled = True
-            bi.saved_run = current_run
-            if published_run and published_run.saved_run_id == current_run.id:
-                bi.published_run = published_run
-            else:
-                bi.published_run = None
-            if bi.platform == Platform.SLACK:
-                bi.slack_create_personal_channels = False
-                send_confirmation_msg(bi)
-            bi.save()
-
-        if bi:
-            path_params = dict(integration_id=bi.api_integration_id())
-        else:
-            path_params = dict()
-        raise gui.RedirectException(
-            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
-        )
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
@@ -1475,7 +1415,7 @@ def infer_asr_model_and_language(
     elif "bho" in user_lang:
         asr_model = AsrModels.vakyansh_bhojpuri
     elif "sw" in user_lang:
-        asr_model = AsrModels.seamless_m4t
+        asr_model = AsrModels.seamless_m4t_v2
         asr_lang = "swh"
     else:
         asr_model = default
@@ -1505,7 +1445,7 @@ def chat_list_view():
             output_video = gui.session_state.get("output_video", [])
             output_audio = gui.session_state.get("output_audio", [])
             if output_text:
-                gui.write(f"**Assistant**")
+                gui.write("**Assistant**")
                 for idx, text in enumerate(output_text):
                     gui.write(text)
                     try:
@@ -1617,41 +1557,6 @@ def convo_window_clipper(
         if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
-
-
-def integration_welcome_screen(title: str):
-    with gui.center():
-        gui.markdown(f"#### {title}")
-
-    col1, col2, col3 = gui.columns(
-        3,
-        column_props=dict(
-            style=dict(
-                display="flex",
-                flexDirection="column",
-                alignItems="center",
-                textAlign="center",
-                maxWidth="300px",
-            ),
-        ),
-        style={"justifyContent": "center"},
-    )
-    with col1:
-        gui.html("🏃‍♀️", style={"fontSize": "4rem"})
-        gui.markdown(
-            """
-            1. Fork & Save your Run
-            """
-        )
-        gui.caption("Make changes, Submit & Save your perfect workflow")
-    with col2:
-        gui.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
-        gui.markdown("2. Connect to Slack, Whatsapp or your App")
-        gui.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
-    with col3:
-        gui.html("📈", style={"fontSize": "4rem"})
-        gui.markdown("3. Test, Analyze & Iterate")
-        gui.caption("Analyze your usage. Update your Saved Run to test changes.")
 
 
 class ConnectChoice(typing.NamedTuple):

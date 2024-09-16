@@ -90,7 +90,7 @@ class TranslationPage(BasePage):
     def render_form_v2(self):
         gui.write("###### Source Texts")
         list_view_editor(
-            add_btn_label="➕ Add Text",
+            add_btn_label="Add Text",
             key="texts",
             render_inputs=render_text_input,
             flatten_dict_key="text",

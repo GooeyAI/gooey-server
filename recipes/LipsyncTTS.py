@@ -39,6 +39,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         audio_url: str | None
 
         output_video: FieldHttpUrl
+        duration_sec: float | None
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
@@ -67,6 +68,12 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+        if not (self.is_current_user_paying() or self.is_current_user_admin()):
+            gui.error(
+                "Output videos will be truncated to 250 frames for free users. Please [upgrade](/account) to generate long videos.",
+                icon="⚠️",
+                color="#ffe8b2",
+            )
 
         enum_selector(
             LipsyncModel,
@@ -115,12 +122,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         if not self.request.user.disable_safety_checker:
             safety_checker(text=state["text_prompt"])
 
-        yield from TextToSpeechPage(request=self.request, run_user=self.run_user).run(
-            state
-        )
+        yield from TextToSpeechPage(request=self.request).run(state)
         # IMP: Copy output of TextToSpeechPage "audio_url" to Lipsync as "input_audio"
         state["input_audio"] = state["audio_url"]
-        yield from LipsyncPage(request=self.request, run_user=self.run_user).run(state)
+        yield from LipsyncPage(request=self.request).run(state)
 
     def render_example(self, state: dict):
         output_video = state.get("output_video")

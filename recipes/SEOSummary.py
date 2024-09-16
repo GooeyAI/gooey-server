@@ -1,7 +1,7 @@
-import random
 import re
 import typing
 
+import gooey_gui as gui
 import readability
 import requests
 from furl import furl
@@ -9,11 +9,9 @@ from html_sanitizer import Sanitizer
 from loguru import logger
 from pydantic import BaseModel
 
-import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -26,6 +24,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
@@ -452,8 +451,8 @@ def html_to_text(text):
 def _call_summarize_url(url: str) -> tuple[str | None, str | None]:
     r = requests.get(
         url,
-        headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
+        **requests_scraping_kwargs(),
     )
     raise_for_status(r)
     # we only support HTML for now

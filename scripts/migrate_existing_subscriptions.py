@@ -29,7 +29,7 @@ available_subscriptions = {
             # "quantity": 1000,  # number of credits (set by html)
             "adjustable_quantity": {
                 "enabled": True,
-                "maximum": 50_000,
+                "maximum": 100_000,
                 "minimum": 1_000,
             },
         },
@@ -75,19 +75,6 @@ available_subscriptions = {
         },
     },
 }
-
-
-def get_user_subscription(user: AppUser):
-    customer = user.search_stripe_customer()
-    if not customer:
-        return
-    subscriptions = stripe.Subscription.list(customer=customer).data
-    for sub in subscriptions:
-        try:
-            lookup_key = sub.metadata[USER_SUBSCRIPTION_METADATA_FIELD]
-            return available_subscriptions[lookup_key]
-        except KeyError:
-            pass
 
 
 def run():

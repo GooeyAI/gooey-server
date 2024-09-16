@@ -17,11 +17,8 @@ def build_meta_tags(
     url: str,
     page: "BasePage",
     state: dict,
-    run_id: str,
-    uid: str,
-    example_id: str,
 ) -> list[dict]:
-    sr, pr = page.get_runs_from_query_params(example_id, run_id, uid)
+    sr, pr = page.current_sr_pr
     metadata = page.workflow.get_or_create_metadata()
 
     title = meta_title_for_page(
@@ -191,7 +188,7 @@ def canonical_url_for_page(
     from routers.root import RecipeTabs
 
     kwargs = {}
-    if page.tab in [RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations]:
+    if page.tab in {RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations}:
         if pr and pr.saved_run == sr and pr.is_root():
             pass
         elif pr and pr.saved_run == sr:

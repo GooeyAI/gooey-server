@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import gooey_gui as gui
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, CharField
 from django.db.models.functions import (
     TruncMonth,
     TruncDay,
@@ -84,8 +84,9 @@ class VideoBotsStatsPage(BasePage):
                             )
                         gui.breadcrumb_item(
                             "Integrations",
-                            link_to=VideoBotsPage.current_app_url(
-                                RecipeTabs.integrations,
+                            link_to=VideoBotsPage.app_url(
+                                tab=RecipeTabs.integrations,
+                                query_params=dict(self.request.query_params),
                                 path_params=dict(
                                     integration_id=bi.api_integration_id()
                                 ),
@@ -152,7 +153,7 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
-        run_url = VideoBotsPage.current_app_url()
+        run_url = VideoBotsPage.app_url(query_params=dict(self.request.query_params))
         if bi.published_run_id:
             run_title = bi.published_run.title
         else:
@@ -471,9 +472,9 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(Convos=Count("conversation_id", distinct=True))
         .annotate(
             Senders=Count(
-                Concat(*Message.convo_user_id_fields),
+                Concat(*Message.convo_user_id_fields, output_field=CharField()),
                 distinct=True,
-            )
+            ),
         )
         .annotate(Average_runtime=Avg("saved_run__run_time"))
         .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))

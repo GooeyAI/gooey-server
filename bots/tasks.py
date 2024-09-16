@@ -97,9 +97,7 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
     # save the run before the result is ready
     Message.objects.filter(id=msg_id).update(analysis_run=sr)
 
-    # wait for the result
-    get_celery_result_db_safe(result)
-    sr.refresh_from_db()
+    sr.wait_for_celery_result(result)
     # if failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)
