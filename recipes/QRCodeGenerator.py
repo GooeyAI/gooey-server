@@ -37,7 +37,6 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
-from recipes.EmailFaceInpainting import get_photo_for_email
 from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -554,7 +553,8 @@ Here is the final output:
                 total += 3
             case Text2ImgModels.dall_e.name:
                 total += 10
-        return total * state.get("num_outputs", 1)
+        num_outputs = state.get("num_outputs") or 0
+        return total * num_outputs
 
     def render_usage_guide(self):
         youtube_video("Q1D6B_-UoxY")

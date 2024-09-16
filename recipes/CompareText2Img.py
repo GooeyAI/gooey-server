@@ -210,7 +210,7 @@ class CompareText2ImgPage(BasePage):
             )
 
             if request.edit_instruction:
-                yield f"Running InstructPix2Pix..."
+                yield "Running InstructPix2Pix..."
 
                 output_images[selected_model] = instruct_pix2pix(
                     prompt=request.edit_instruction,
@@ -270,4 +270,5 @@ class CompareText2ImgPage(BasePage):
                     total += 15
                 case _:
                     total += 2
-        return total * state.get("num_outputs", 1)
+        num_outputs = state.get("num_outputs") or 0
+        return total * num_outputs
