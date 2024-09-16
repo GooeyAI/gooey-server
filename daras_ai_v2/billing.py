@@ -4,7 +4,6 @@ import gooey_gui as gui
 import sentry_sdk
 import stripe
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 from loguru import logger
 
 from app_users.models import AppUserTransaction, PaymentProvider
@@ -743,12 +742,7 @@ def render_billing_history(workspace: "Workspace", limit: int = 50):
     import pandas as pd
 
     txns = AppUserTransaction.objects.filter(
-        (
-            Q(user_id=workspace.created_by_id)
-            if workspace.is_personal
-            else Q(workspace=workspace)
-        ),
-        amount__gt=0,
+        workspace=workspace, amount__gt=0
     ).order_by("-created_at")
     if not txns:
         return

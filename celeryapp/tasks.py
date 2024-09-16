@@ -8,7 +8,7 @@ from time import time
 import gooey_gui as gui
 import requests
 import sentry_sdk
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
 from loguru import logger
@@ -186,14 +186,7 @@ def run_low_balance_email_check(workspace: "Workspace"):
     ):
         return
     last_purchase = (
-        AppUserTransaction.objects.filter(
-            (
-                Q(user_id=workspace.created_by_id)
-                if workspace.is_personal
-                else Q(workspace=workspace)
-            ),
-            amount__gt=0,
-        )
+        AppUserTransaction.objects.filter(workspace=workspace, amount__gt=0)
         .order_by("-created_at")
         .first()
     )
@@ -215,11 +208,7 @@ def run_low_balance_email_check(workspace: "Workspace"):
         # calculate total credits consumed in last X days
         total_credits_consumed = abs(
             AppUserTransaction.objects.filter(
-                (
-                    Q(user=workspace.created_by_id)
-                    if workspace.is_personal
-                    else Q(workspace=workspace)
-                ),
+                workspace=workspace,
                 amount__lt=0,
                 created_at__gte=email_date_cutoff,
             ).aggregate(Sum("amount"))["amount__sum"]

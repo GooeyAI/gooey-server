@@ -247,17 +247,14 @@ class TransactionReason(models.IntegerChoices):
 
 
 class AppUserTransaction(models.Model):
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="transactions",
+    )
     user = models.ForeignKey(
         "AppUser",
         on_delete=models.CASCADE,
-        related_name="transactions",
-        null=True,
-        default=None,
-        blank=True,
-    )
-    workspace = models.ForeignKey(
-        "workspaces.Workspace",
-        on_delete=models.SET_NULL,
         related_name="transactions",
         null=True,
         default=None,
