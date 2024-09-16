@@ -2,6 +2,7 @@ import sys
 import typing
 
 import requests
+from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
@@ -142,4 +143,7 @@ def send_email_via_postmark(
             "MessageStream": message_stream,
         },
     )
+    if r.status_code == 422 and r.json().get("ErrorCode") == 406:
+        logger.warning(r.json())
+        return
     raise_for_status(r)

@@ -165,7 +165,7 @@ async def logout(request: Request):
 
 
 @app.post("/__/file-upload/url/meta")
-async def file_upload(body_json: dict = fastapi_request_json):
+async def file_upload_meta(body_json: dict = fastapi_request_json):
     return dict(name=body_json["url"], type="url/undefined")
 
 
@@ -175,6 +175,8 @@ def file_upload(form_data: FormData = fastapi_request_form):
 
     file = form_data["file"]
     data = file.file.read()
+    if not data:
+        return Response(content="No file uploaded", status_code=400)
     filename = file.filename
     content_type = file.content_type
 

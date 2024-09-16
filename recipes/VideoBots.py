@@ -801,7 +801,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
         if should_translate_lang(request.user_language):
-            yield f"Translating Input to English..."
+            yield "Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],
                 source_language=request.user_language,
@@ -811,7 +811,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )[0]
 
         if ocr_texts:
-            yield f"Translating Image Text to English..."
+            yield "Translating Image Text to English..."
             ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
@@ -1144,7 +1144,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if pressed_platform:
             if not can_edit:
-                run_title = f"{self.request.user.first_name_possesive()} {run_title}"
+                run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
                 pr = pr.duplicate(
                     user=self.request.user,
                     title=run_title,
@@ -1294,7 +1294,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Understand your Users")
-                gui.caption(f"See real-time analytics.")
+                gui.caption("See real-time analytics.")
             with col2:
                 gui.anchor(
                     "📊 View Analytics",
@@ -1330,7 +1330,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with col1:
                     gui.write("###### WhatsApp Business Management")
                     gui.caption(
-                        f"Access your WhatsApp account on Meta to approve message templates, etc."
+                        "Access your WhatsApp account on Meta to approve message templates, etc."
                     )
                 with col2:
                     gui.anchor(
@@ -1445,7 +1445,7 @@ def chat_list_view():
             output_video = gui.session_state.get("output_video", [])
             output_audio = gui.session_state.get("output_audio", [])
             if output_text:
-                gui.write(f"**Assistant**")
+                gui.write("**Assistant**")
                 for idx, text in enumerate(output_text):
                     gui.write(text)
                     try:
