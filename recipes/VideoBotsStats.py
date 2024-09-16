@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import gooey_gui as gui
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, CharField
 from django.db.models.functions import (
     TruncMonth,
     TruncDay,
@@ -472,9 +472,9 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
         .annotate(Convos=Count("conversation_id", distinct=True))
         .annotate(
             Senders=Count(
-                Concat(*Message.convo_user_id_fields),
+                Concat(*Message.convo_user_id_fields, output_field=CharField()),
                 distinct=True,
-            )
+            ),
         )
         .annotate(Average_runtime=Avg("saved_run__run_time"))
         .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
