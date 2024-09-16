@@ -596,7 +596,7 @@ class BasePage:
                 title = pr.title or self.title
             else:
                 recipe_title = self.get_root_pr().title or self.title
-                title = f"{self.request.user.first_name_possesive()} {recipe_title}"
+                title = f"{self.request.user and self.request.user.first_name_possesive()} {recipe_title}"
             published_run_title = gui.text_input(
                 "###### Title",
                 key="published_run_title",
