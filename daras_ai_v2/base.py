@@ -1094,9 +1094,12 @@ This will also delete all the associated versions.
 
     @cached_property
     def current_sr_pr(self) -> tuple[SavedRun, PublishedRun]:
-        return self.get_sr_pr_from_query_params(
-            *extract_query_params(self.request.query_params)
-        )
+        try:
+            return self.get_sr_pr_from_query_params(
+                *extract_query_params(self.request.query_params)
+            )
+        except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
+            raise HTTPException(status_code=404)
 
     @classmethod
     def get_sr_pr_from_query_params(
