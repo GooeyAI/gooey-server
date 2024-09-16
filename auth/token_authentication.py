@@ -1,5 +1,3 @@
-from typing import Any
-
 from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
@@ -57,7 +55,7 @@ class APIAuth(SecurityBase):
     ### Usage:
 
     ```python
-    api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
+    api_auth = APIAuth(scheme_name="Bearer", description="Bearer $GOOEY_API_KEY")
 
     @app.get("/api/users")
     def get_users(authenticated_user: AppUser = Depends(api_auth)):
@@ -65,14 +63,9 @@ class APIAuth(SecurityBase):
     ```
     """
 
-    def __init__(
-        self, scheme_name: str, description: str, openapi_extra: dict[str, Any] = None
-    ):
+    def __init__(self, scheme_name: str, description: str):
         self.model = HTTPBaseModel(
-            type=SecuritySchemeType.http,
-            scheme=scheme_name,
-            description=description,
-            **(openapi_extra or {}),
+            type=SecuritySchemeType.http, scheme=scheme_name, description=description
         )
         self.scheme_name = scheme_name
         self.description = description
@@ -95,9 +88,7 @@ class APIAuth(SecurityBase):
         return authenticate_credentials(auth[1])
 
 
-auth_scheme = "bearer"
+auth_scheme = "Bearer"
 api_auth_header = APIAuth(
-    scheme_name=auth_scheme,
-    description=f"{auth_scheme} $GOOEY_API_KEY",
-    openapi_extra={"x-fern-bearer": {"name": "apiKey", "env": "GOOEY_API_KEY"}},
+    scheme_name=auth_scheme, description=f"{auth_scheme} $GOOEY_API_KEY"
 )
