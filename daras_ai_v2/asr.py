@@ -202,6 +202,7 @@ MMS_SUPPORTED = {
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
+GHANA_API_AUTH_HEADERS = {"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)}
 GHANA_NLP_ASR_V2_SUPPORTED = {
     "tw": "Twi",
     "gaa": "Ga",
@@ -238,6 +239,9 @@ class AsrModels(Enum):
             self.seamless_m4t_v2,
             self.ghana_nlp_asr_v2,
         }
+
+    def expects_wav_data(self) -> bool:
+        return self in {self.ghana_nlp_asr_v2}
 
     @classmethod
     def _deprecated(cls):
@@ -738,21 +742,32 @@ def run_asr(
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
+    audio_wav_data = None  # use this if the model expects audio in bytes data
+    filename = "yt_audio"
+    content_type = "audio/wav"
+
     if is_yt_url(audio_url):
-        audio_url, size = download_youtube_to_wav_url(audio_url)
+        audio_wav_data = download_youtube_to_wav(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        filename = meta.get("name", "gdrive_audio")
+        content_type = meta.get("mimeType", "audio/wav")
         anybytes, _ = gdrive_download(
             furl(audio_url), meta.get("mimeType", "audio/wav")
         )
-        wavbytes, size = audio_bytes_to_wav(anybytes)
-        audio_url = upload_file_from_bytes(
-            filename=meta.get("name", "gdrive_audio"),
-            data=wavbytes,
-            content_type=meta.get("mimeType", "audio/wav"),
-        )
+        audio_wav_data, size = audio_bytes_to_wav(anybytes)
     else:
-        audio_url, size = audio_url_to_wav(audio_url)
+        audio_wav_data, size = audio_url_to_wav(audio_url)
+        if not selected_model.expects_wav_data(selected_model):
+            filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
+
+    if not selected_model.expects_wav_data(selected_model):
+        audio_url = upload_file_from_bytes(
+            filename,
+            audio_wav_data,
+            content_type,
+        )
+
     is_short = size < SHORT_FILE_CUTOFF
 
     if selected_model == AsrModels.azure:
@@ -902,13 +917,16 @@ def run_asr(
         )
     elif selected_model == AsrModels.ghana_nlp_asr_v2:
         r = requests.post(
-            f"https://translation-api.ghananlp.org/asr/v2/transcribe?language={language}",
+            furl(
+                "https://translation-api.ghananlp.org/asr/v2/transcribe",
+                query_params=dict(language=language),
+            ),
             headers={
                 "Content-Type": "audio/wav",
                 "Cache-Control": "no-cache",
-                "Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY),
+                **GHANA_API_AUTH_HEADERS,
             },
-            data=requests.get(audio_url).content,
+            data=audio_wav_data,
         )
         raise_for_status(r)
         data = r.json()
@@ -1037,7 +1055,14 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
     return wavdata
 
 
-def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
+def audio_url_to_wav_url(bytes_data: bytes, audio_url: str) -> tuple[str, int]:
+    if not bytes_data:
+        return audio_url, 0
+    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
+    return upload_file_from_bytes(filename, bytes_data, "audio/wav"), len(bytes_data)
+
+
+def audio_url_to_wav(audio_url: str) -> tuple[bytes | None, int] | tuple[str, int]:
     r = requests.get(audio_url)
     try:
         raise_for_status(r, is_user_url=True)
@@ -1050,11 +1075,7 @@ def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
         raise_for_status(r, is_user_url=True)
 
     wavdata, size = audio_bytes_to_wav(r.content)
-    if not wavdata:
-        return audio_url, size
-
-    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
-    return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
+    return wavdata, size
 
 
 def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:

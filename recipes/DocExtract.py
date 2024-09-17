@@ -14,12 +14,13 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
-    google_translate_language_selector,
     AsrModels,
-    run_asr,
-    download_youtube_to_wav_url,
-    run_google_translate,
     audio_url_to_wav,
+    audio_url_to_wav_url,
+    download_youtube_to_wav_url,
+    google_translate_language_selector,
+    run_asr,
+    run_google_translate,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -465,7 +466,9 @@ def process_source(
                 webpage_url = upload_file_from_bytes(
                     doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
-            content_url, _ = audio_url_to_wav(webpage_url)
+            content_url, _ = audio_url_to_wav_url(
+                audio_url_to_wav(webpage_url), webpage_url
+            )
         elif is_pdf:
             content_url = entry.get("content_url") or webpage_url
         else:
