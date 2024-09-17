@@ -520,10 +520,10 @@ def run_ghana_nlp_translate(
         source_language and target_language
     ), "Both Source & Target language is required for Ghana NLP"
     source_language = normalised_lang_in_collection(
-        source_language, GHANA_NLP_SUPPORTED
+        source_language, ghana_nlp_translate_target_languages()
     )
     target_language = normalised_lang_in_collection(
-        target_language, GHANA_NLP_SUPPORTED
+        target_language, ghana_nlp_translate_target_languages()
     )
     if source_language == target_language:
         return texts
