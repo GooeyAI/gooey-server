@@ -394,10 +394,10 @@ def ghana_nlp_translate_target_languages():
     """
     r = requests.get(
         "https://translation-api.ghananlp.org/v1/languages",
-        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        headers=GHANA_API_AUTH_HEADERS,
     )
     raise_for_status(r)
-    return r.json().get("languages", {})
+    return r.json().get("languages", {}) or {}
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -549,7 +549,7 @@ def _call_ghana_nlp_chunked(
 def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
     r = requests.post(
         "https://translation-api.ghananlp.org/v1/translate",
-        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        headers=GHANA_API_AUTH_HEADERS,
         json={"in": text, "lang": source_language + "-" + target_language},
     )
     raise_for_status(r)
