@@ -309,7 +309,7 @@ class TranslationModels(TranslationModel, Enum):
         supports_auto_detect=True,
     )
     ghana_nlp = TranslationModel(
-        label="Ghana NLP Translate",
+        label="Ghana NLP Translate", supports_auto_detect=False
     )
 
 
@@ -332,6 +332,7 @@ def translation_language_selector(
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
+    print(options, ">>>")
     return gui.selectbox(
         label=label,
         key=key,
