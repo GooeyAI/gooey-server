@@ -174,7 +174,7 @@ def _generate_handle_options(user):
     if user.is_anonymous or not user.email:
         return
 
-    email_domain = user.email.split("@")[1]
+    email_domain = user.email.split("@")[-1]
 
     if email_domain in COMMON_EMAIL_DOMAINS:
         # popular mail provider where user set their own email prefix

@@ -426,7 +426,7 @@ class WorkspaceInviteQuerySet(models.QuerySet):
 
         should_auto_accept = (
             workspace.domain_name
-            and workspace.domain_name.lower() == email.split("@")[1].lower()
+            and workspace.domain_name.lower() == email.split("@")[-1].lower()
         )
         if should_auto_accept:
             try:

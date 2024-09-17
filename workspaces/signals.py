@@ -15,7 +15,7 @@ def add_user_existing_workspace(instance: AppUser, **kwargs):
     """
     if not instance.email:
         return
-    email_domain = instance.email.split("@")[1].lower()
+    email_domain = instance.email.split("@")[-1].lower()
     for workspace in Workspace.objects.filter(domain_name=email_domain):
         WorkspaceMembership.objects.get_or_create(workspace=workspace, user=instance)
         send_added_to_workspace_email.delay(

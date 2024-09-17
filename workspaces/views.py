@@ -468,7 +468,7 @@ def render_invitation_actions(
         if ref.pressed_confirm:
             try:
                 invite.send_email()
-            except ValidationError as e:
+            except ValidationError:
                 pass
 
     if current_member.can_invite():
@@ -515,7 +515,7 @@ def render_workspace_create_or_edit_form(
             "###### Domain Name _(Optional)_",
             options={
                 workspace.domain_name,
-                current_user.email and current_user.email.split("@")[1],
+                current_user.email and current_user.email.split("@")[-1],
             }
             | {None},
             key="workspace-domain-name",
