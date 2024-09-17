@@ -12,7 +12,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
 from gooey_gui import QueryParamsRedirectException
-from gooeysite.custom_filters import related_json_field_summary
+from gooeysite.custom_filters import related_json_field_summary, JSONBExtractPath
 from recipes.BulkRunner import list_view_editor
 from recipes.VideoBots import VideoBotsPage
 
@@ -218,12 +218,12 @@ def fetch_analysis_results(bi: BotIntegration) -> dict:
 def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
     key = graph_data["key"]
     gui.write(f"##### {key}")
-    obj_key = f"analysis_result__{key}"
 
     if graph_data["data_selection"] == DataSelection.last.value:
         latest_msg = (
             Message.objects.filter(conversation__bot_integration=bi)
-            .exclude(**{obj_key: None})
+            .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
+            .exclude(val__isnull=True)
             .latest()
         )
         if not latest_msg:
@@ -233,11 +233,11 @@ def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
     elif graph_data["data_selection"] == DataSelection.convo_last.value:
         values_list = (
             Message.objects.filter(conversation__bot_integration=bi)
-            .exclude(**{obj_key: None})
-            .exclude(**{f"analysis_result__{key}": None})
+            .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
+            .exclude(val__isnull=True)
             .order_by("conversation_id", "-created_at")
             .distinct("conversation_id")
-            .values_list(obj_key, flat=True)
+            .values_list("val", flat=True)
         )
         counts = Counter(values_list)
         values = [[value, counts[value]] for value in counts]
