@@ -15,9 +15,10 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from daras_ai_v2 import icons
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
-from functions.models import CalledFunction, CalledFunctionResponse
+from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 
@@ -38,20 +39,23 @@ class PublishedRunVisibility(models.IntegerChoices):
     def help_text(self):
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return "Only me + people with a link"
+                return f"{self.get_icon()} Only me + people with a link"
             case PublishedRunVisibility.PUBLIC:
-                return "Public"
-            case _:
-                return self.label
+                return f"{self.get_icon()} Public"
+
+    def get_icon(self):
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return icons.lock
+            case PublishedRunVisibility.PUBLIC:
+                return icons.globe
 
     def get_badge_html(self):
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return '<i class="fa-regular fa-lock"></i> Private'
+                return f"{self.get_icon()} Private"
             case PublishedRunVisibility.PUBLIC:
-                return '<i class="fa-regular fa-globe"></i> Public'
-            case _:
-                raise NotImplementedError(self)
+                return f"{self.get_icon()} Public"
 
 
 class Platform(models.IntegerChoices):
