@@ -173,7 +173,7 @@ def render_title_breadcrumb_share(
         with gui.div(className="d-flex align-items-center"):
             with gui.div(className="d-flex align-items-start right-action-icons"):
                 copy_to_clipboard_button(
-                    f'<i class="fa-regular fa-link"></i> <span class="d-none d-lg-inline"> Copy Link</span>',
+                    '<i class="fa-regular fa-link"></i> <span class="d-none d-lg-inline"> Copy Link</span>',
                     value=current_url,
                     type="secondary",
                     className="mb-0 ms-lg-2",
@@ -261,6 +261,9 @@ def render_graph_data(bi: BotIntegration, results: dict, graph_data: dict):
 
 
 def render_table_count(values):
+    if not values:
+        gui.write("No analysis results found")
+        return
     gui.div(className="p-1")
     gui.data_table(
         [["Value", "Count"]] + [[result[0], result[1]] for result in values],

@@ -5,7 +5,7 @@ from furl import furl
 
 from app_users.models import AppUser
 from bots.custom_fields import CustomURLField
-from bots.models import Workflow, SavedRun
+from bots.models import Workflow
 from celeryapp.tasks import get_running_saved_run
 from daras_ai.image_input import truncate_filename
 from daras_ai_v2 import settings
@@ -118,8 +118,9 @@ class ShortenedURL(models.Model):
     disabled = models.BooleanField(
         default=False, help_text="Disable this shortened url"
     )
-    enable_analytics = models.BooleanField(
-        default=True, help_text="Collect detailed analytics for this shortened url"
+    enable_tracking = models.BooleanField(
+        default=False,
+        help_text="Collect User Agent / IP tracking info for this shortened url",
     )
 
     objects = ShortenedURLQuerySet.as_manager()

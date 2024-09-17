@@ -2,7 +2,7 @@ import json
 import typing
 
 from django.db import DataError
-from django.db.models import F, Func, QuerySet, Count
+from django.db.models import Func, QuerySet, Count, Value, JSONField, TextField
 from django.urls import reverse
 from furl import furl
 
@@ -12,27 +12,27 @@ def json_field_nested_lookup_keys(
     field: str,
     max_depth: int = 3,
     exclude_keys: typing.Iterable[str] = (),
-) -> list[str]:
-    nested_keys = [field]
+) -> list[tuple]:
+    nested_keys = [()]
     for _ in range(max_depth):
-        next_keys = []
-        for parent in nested_keys:
+        for i, keypath in enumerate(nested_keys):
             try:
-                next_keys.extend(
-                    f"{parent}__{child}"
-                    for child in (
-                        qs.values(parent)
-                        .annotate(keys=Func(F(parent), function="jsonb_object_keys"))
-                        .order_by()
-                        .distinct()
-                        .values_list("keys", flat=True)
+                nested_keys.extend(
+                    keypath + (key,)
+                    for key in qs.values_list(
+                        JSONBObjectKeys(
+                            JSONBExtractPath(field, keypath) if keypath else field
+                        ),
+                        flat=True,
                     )
-                    if not child in exclude_keys
+                    .order_by()
+                    .distinct()
+                    if key not in exclude_keys
                 )
+                nested_keys.pop(i)
             except DataError:
-                next_keys.append(parent)
-        nested_keys = next_keys
-    return nested_keys
+                pass
+    return filter(None, nested_keys)
 
 
 def related_json_field_summary(
@@ -66,7 +66,7 @@ def related_json_field_summary(
     nested_keys = json_field_nested_lookup_keys(qs, field, exclude_keys=exclude_keys)
 
     results = {
-        key.split(field + "__")[-1]: [
+        "__".join(keypath): [
             (
                 str(val),
                 count,
@@ -76,20 +76,34 @@ def related_json_field_summary(
                     ),
                     query_params={
                         query_param: instance_id,
-                        field: json.dumps([key, val]),
+                        field: json.dumps([keypath, val]),
                     },
                 ),
             )
             for val, count in (
-                qs.values(key)
-                .annotate(count=Count("id"))
+                qs.values(val=JSONBExtractPath(field, keypath))
+                .annotate(count=Count("*"))
                 .order_by("-count")
-                .values_list(key, "count")[:max_keys]
+                .values_list("val", "count")[:max_keys]
             )
             if val is not None
         ]
-        for key in nested_keys
+        for keypath in nested_keys
     }
     if not results:
         raise model.DoesNotExist
     return results
+
+
+class JSONBExtractPath(Func):
+    function = "jsonb_extract_path"
+    output_field = JSONField()
+
+    def __init__(self, from_json, path_elems, **kwargs):
+        super().__init__(from_json, *map(Value, path_elems), **kwargs)
+
+
+class JSONBObjectKeys(Func):
+    function = "jsonb_object_keys"
+    output_field = TextField()
+    arity = 1

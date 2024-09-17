@@ -34,6 +34,7 @@ from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
+    JSONBExtractPath,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
 from recipes.VideoBots import VideoBotsPage
@@ -157,6 +158,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "billing_account_uid",
         "saved_run",
         "published_run",
+        "has_analysis_runs",
     ]
     list_filter = ["platform"]
 
@@ -246,6 +248,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     @admin.display(description="Conversations")
     def view_conversations(self, bi: BotIntegration):
         return list_related_html_url(bi.conversations)
+
+    @admin.display(description="Has Analysis Runs", boolean=True)
+    def has_analysis_runs(self, bi: BotIntegration):
+        return bi.analysis_runs.exists()
 
     @admin.display(description="Analysis Results")
     def view_analysis_results(self, bi: BotIntegration):
@@ -575,14 +581,16 @@ class AnalysisResultFilter(admin.SimpleListFilter):
         if val is None:
             return []
         k, v = json.loads(val)
-        return [(val, f"{k.split(self.parameter_name + '__')[-1]} = {v}")]
+        return [(val, f"{k[-1]} = {v}")]
 
     def queryset(self, request, queryset):
         val = self.value()
         if val is None:
             return queryset
         k, v = json.loads(val)
-        return queryset.filter(**{k: v})
+        return queryset.annotate(val=JSONBExtractPath(self.parameter_name, k)).filter(
+            val=v
+        )
 
 
 @admin.register(Message)

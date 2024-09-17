@@ -5,6 +5,7 @@ from fastapi.responses import Response
 
 from routers.custom_api_router import CustomAPIRouter
 from url_shortener.models import ShortenedURL
+from url_shortener.tasks import save_click_info
 
 app = CustomAPIRouter()
 
@@ -22,10 +23,10 @@ def url_shortener(hashid: str, request: Request):
     # increment the click count
     ShortenedURL.objects.filter(id=surl.id).update(clicks=F("clicks") + 1)
     # disable because iplist.cc is down
-    # if surl.enable_analytics:
-    #     save_click_info.delay(
-    #         surl.id, request.client.host, request.headers.get("user-agent", "")
-    #     )
+    if surl.enable_tracking:
+        save_click_info.delay(
+            surl.id, request.client.host, request.headers.get("user-agent", "")
+        )
     if surl.url:
         return RedirectResponse(
             url=surl.url, status_code=303  # because youtu.be redirects are 303
