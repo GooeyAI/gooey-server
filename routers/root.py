@@ -588,7 +588,7 @@ let script = document.createElement("script");
         ),
         headers={
             "Content-Type": "application/javascript",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Cache-Control": "no-store",
         },
     )
 
