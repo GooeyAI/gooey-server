@@ -1192,7 +1192,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.markdown("#### Configure your Copilot")
 
         if len(integrations) > 1:
-            with gui.div(style={"minWidth": "500px", "textAlign": "left"}):
+            with gui.div(
+                style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}
+            ):
                 integrations_map = {i.id: i for i in integrations}
                 bi_id = gui.selectbox(
                     label="",
