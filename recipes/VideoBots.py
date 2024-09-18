@@ -1250,13 +1250,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                elif bi.platform == Platform.WEB:
-                    embed_code = get_web_widget_embed_code(bi)
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=embed_code,
-                        type="secondary",
-                    )
 
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
