@@ -277,10 +277,12 @@ class Workspace(SafeDeleteModel):
 
         # update the saved metadata in stripe
         if not customer.metadata.get("workspace_id"):
-            customer.metadata["workspace_id"] = str(self.id)
-            customer = stripe.Customer.modify(
-                id=customer.id, metadata=customer.metadata
-            )
+            metadata = dict(workspace_id=str(self.id))
+            if self.is_personal:
+                metadata.update(
+                    dict(id=str(self.created_by.id), uid=str(self.created_by.uid))
+                )
+            customer = stripe.Customer.modify(id=customer.id, metadata=metadata)
 
         return customer
 
