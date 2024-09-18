@@ -18,7 +18,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     azure_tts_voices,
     ELEVEN_LABS_MODELS,
     elevenlabs_init_state,
-    GHANA_TTS_LANGUAGES,
+    GHANA_NLP_TTS_LANGUAGES,
     OLD_ELEVEN_LABS_VOICES,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
@@ -59,7 +59,7 @@ class TextToSpeechSettings(BaseModel):
 
     openai_voice_name: OpenAI_TTS_Voices.api_choices | None
     openai_tts_model: OpenAI_TTS_Models.api_choices | None
-    ghana_tts_language: GHANA_TTS_LANGUAGES.api_choices | None
+    ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"

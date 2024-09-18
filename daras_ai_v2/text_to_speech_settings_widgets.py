@@ -46,7 +46,7 @@ class OpenAI_TTS_Voices(GooeyEnum):
     shimmer = "shimmer"
 
 
-class GHANA_TTS_LANGUAGES(GooeyEnum):
+class GHANA_NLP_TTS_LANGUAGES(GooeyEnum):
     tw = "Twi"
 
 
@@ -158,7 +158,7 @@ def text_to_speech_provider_selector(page):
             case TextToSpeechProviders.OPEN_AI.name:
                 openai_tts_selector()
             case TextToSpeechProviders.GHANA_NLP.name:
-                ghana_tts_selector()
+                ghana_nlp_tts_selector()
     return tts_provider
 
 
@@ -178,11 +178,11 @@ def text_to_speech_settings(page, tts_provider):
             openai_tts_settings()
 
 
-def ghana_tts_selector():
+def ghana_nlp_tts_selector():
     enum_selector(
-        GHANA_TTS_LANGUAGES,
+        GHANA_NLP_TTS_LANGUAGES,
         label="###### Language",
-        key="ghana_tts_language",
+        key="ghana_nlp_tts_language",
         use_selectbox=True,
     )
 
