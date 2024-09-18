@@ -350,7 +350,7 @@ class WorkspaceMembership(SafeDeleteModel):
                 fields=["workspace", "user"],
                 condition=Q(deleted__isnull=True),
                 name="unique_workspace_user",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["workspace", "role", "deleted"]),
@@ -358,6 +358,11 @@ class WorkspaceMembership(SafeDeleteModel):
 
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
+
+    def clean(self) -> None:
+        if self.workspace.is_personal and self.user_id != self.workspace.created_by_id:
+            raise ValidationError("You cannot add users to a personal workspace")
+        return super().clean()
 
     def can_edit_workspace_metadata(self):
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
@@ -502,6 +507,11 @@ class WorkspaceInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.workspace} ({self.get_status_display()})"
+
+    def clean(self) -> None:
+        if self.workspace.is_personal:
+            raise ValidationError("You cannot invite users to a personal workspace")
+        return super().clean()
 
     @admin.display(description="Expired")
     def has_expired(self):
