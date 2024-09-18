@@ -249,7 +249,7 @@ class Workspace(SafeDeleteModel):
         if not customer:
             query = f'metadata["workspace_id"]:"{self.id}"'
             if self.is_personal:
-                query += f' or metadata["uid"]:"{self.created_by.uid}"'
+                query += f' or metadata["id"]:"{self.created_by.id}" or metadata["uid"]:"{self.created_by.uid}"'
 
             for candidate in stripe.Customer.search(query=query).data:
                 if candidate.get("deleted"):
@@ -260,14 +260,11 @@ class Workspace(SafeDeleteModel):
 
         # create a new customer if not found
         if not customer:
-            metadata = dict(workspace_id=str(self.id))
-            if self.is_personal:
-                metadata["uid"] = str(self.created_by.uid)
             customer = stripe.Customer.create(
                 name=self.display_name(),
                 email=self.created_by.email,
                 phone=self.created_by.phone_number,
-                metadata=metadata,
+                metadata=self.get_stripe_customer_metadata(),
             )
 
         # update the saved customer ID
@@ -276,15 +273,20 @@ class Workspace(SafeDeleteModel):
             self.save(update_fields=["stripe_customer_id"])
 
         # update the saved metadata in stripe
-        if not customer.metadata.get("workspace_id"):
-            metadata = dict(workspace_id=str(self.id))
-            if self.is_personal:
-                metadata.update(
-                    dict(id=str(self.created_by.id), uid=str(self.created_by.uid))
-                )
-            customer = stripe.Customer.modify(id=customer.id, metadata=metadata)
+        if not customer.get("metadata", {}).get("workspace_id"):
+            customer = stripe.Customer.modify(
+                id=customer.id, metadata=self.get_stripe_customer_metadata()
+            )
 
         return customer
+
+    def get_stripe_customer_metadata(self) -> dict:
+        metadata = dict(workspace_id=str(self.id))
+        if self.is_personal:
+            metadata.update(
+                dict(id=str(self.created_by.id), uid=str(self.created_by.uid))
+            )
+        return metadata
 
     def get_dollars_spent_this_month(self) -> float:
         today = timezone.now()
