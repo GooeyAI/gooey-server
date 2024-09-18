@@ -472,7 +472,9 @@ class BasePage:
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
-        if gui.button(label=icons.fork_lg, className="mb-0 ms-lg-2", type="tertiary"):
+        if gui.button(
+            label=icons.more_options, className="mb-0 ms-lg-2", type="tertiary"
+        ):
             ref.set_open(True)
         if ref.is_open:
             with gui.alert_dialog(ref=ref, modal_title="#### Options"):
@@ -650,7 +652,7 @@ class BasePage:
                     "###### You're about to update the root workflow as an admin. "
                 )
             gui.html(
-                f'If you want to create a new example, press {icons.fork_lg} and "{icons.copy_solid} Duplicate" instead.'
+                f'If you want to create a new example, press {icons.more_options} and "{icons.fork} Duplicate" instead.'
             )
 
         with gui.div(className="mt-4"):
@@ -796,9 +798,7 @@ class BasePage:
         duplicate_button = None
         save_as_new_button = None
         if is_latest_version:
-            duplicate_button = gui.button(
-                f"{icons.copy_solid} Duplicate", className="w-100"
-            )
+            duplicate_button = gui.button(f"{icons.fork} Duplicate", className="w-100")
         else:
             save_as_new_button = gui.button(
                 f"{icons.fork} Save as New", className="w-100"
@@ -857,11 +857,9 @@ This will also delete all the associated versions.
         assert self.request.user
 
         gui.write(
-            "Like this workflow? Save a copy of it in your workspace and customize it to your needs."
+            "Like this AI workflow? Duplicate and then customize it for your use case."
         )
-        duplicate_button = gui.button(
-            f"{icons.copy_solid} Duplicate", className="w-100"
-        )
+        duplicate_button = gui.button(f"{icons.fork} Duplicate", className="w-100")
         if duplicate_button:
             pr = self.current_pr
             duplicate_pr = pr.duplicate(
@@ -874,19 +872,12 @@ This will also delete all the associated versions.
                 self.app_url(example_id=duplicate_pr.published_run_id)
             )
 
-        gui.newline()
-        gui.newline()
-
-        contact_url = furl("mailto:") / settings.SALES_EMAIL
-        gui.write(
-            f"Can't find the functionality you need? "
-            f"[Contact Us]({contact_url}) with your requirements and we'll build something custom just for you."
-        )
+        gui.write("You can then collaborate on it by creating a Team Workspace.")
 
         github_url = github_url_for_file(inspect.getfile(self.__class__))
         gui.caption(
-            f"Or perhaps you're geeky and want to see the code behind this workflow? "
-            f'Fork it on <i class="fa-brands fa-github-alt"></i> <a href="{github_url}" target="_blank">GitHub</a>!',
+            "If you're geeky and want to contribute to the code behind this workflow, view it on "
+            f'{icons.github_alt} <a href="{github_url}" target="_blank">GitHub</a>.',
             unsafe_allow_html=True,
         )
 

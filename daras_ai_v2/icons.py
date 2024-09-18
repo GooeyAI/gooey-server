@@ -16,7 +16,7 @@ preview = '<i class="fa-solid fa-eye"></i>'
 add = '<i class="fa-regular fa-add"></i>'
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'
-fork_lg = '<i class="fa fa-code-fork fa-lg"></i>'
+more_options = '<i class="fa-solid fa-ellipsis-vertical"></i>'
 fork = '<i class="fa-regular fa-code-fork"></i>'
 delete = '<i class="fa-solid fa-trash-can"></i>'
 time = '<i class="fa-regular fa-clock"></i>'
@@ -32,6 +32,7 @@ globe = '<i class="fa-regular fa-globe"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
+github_alt = '<i class="fa-brands fa-github-alt"></i>'
 
 # cards
 card_icons = {
