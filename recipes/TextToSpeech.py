@@ -409,7 +409,7 @@ class TextToSpeechPage(BasePage):
                     headers=GHANA_API_AUTH_HEADERS,
                     json={
                         "text": text,
-                        "language": gui.session_state.get(
+                        "language": state.get(
                             "ghana_nlp_tts_language",
                             GHANA_NLP_TTS_LANGUAGES.tw.name,
                         ),
