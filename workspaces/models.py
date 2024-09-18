@@ -302,7 +302,7 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return "Your Workspace"
+            return "Personal Account"
         else:
             return f"{self.created_by.first_name_possesive()} Workspace"
 

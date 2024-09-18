@@ -186,7 +186,7 @@ class AppUserAdmin(admin.ModelAdmin):
     def view_transactions(self, user: models.AppUser):
         return list_related_html_url(user.transactions, show_add=False)
 
-    @admin.display(description="Personal Workspace")
+    @admin.display(description="Personal Account")
     def personal_workspace(self, user: models.AppUser):
         workspace = user.get_or_create_personal_workspace()[0]
         return change_obj_url(
