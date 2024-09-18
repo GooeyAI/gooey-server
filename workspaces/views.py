@@ -77,7 +77,7 @@ def render_workspace_creation_view(user: AppUser):
         try:
             workspace.create_with_owner()
         except ValidationError as e:
-            gui.write(str(e), className="text-danger")
+            gui.write(e.message, className="text-danger")
         else:
             gui.rerun()
 
@@ -181,7 +181,7 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
                 defaults=dict(role=role),
             )
         except ValidationError as e:
-            gui.write(str(e), className="text-danger")
+            gui.write(e.message, className="text-danger")
         else:
             ref.set_open(False)
             gui.rerun()
@@ -212,7 +212,7 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
             workspace_copy.full_clean()
         except ValidationError as e:
             # newlines in markdown
-            gui.write(str(e), className="text-danger")
+            gui.write(e.message, className="text-danger")
         else:
             workspace_copy.save()
             membership.workspace.refresh_from_db()
