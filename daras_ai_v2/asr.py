@@ -398,7 +398,7 @@ def ghana_nlp_translate_target_languages():
         headers=GHANA_API_AUTH_HEADERS,
     )
     raise_for_status(r)
-    return r.json().get("languages", {}) or {}
+    return r.json().get("languages") or {}
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
