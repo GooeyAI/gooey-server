@@ -20,7 +20,7 @@ def get_related_questions_from_serp_api(
 ) -> tuple[dict, list[str]]:
     data = call_serp_api(
         search_query,
-        search_type=SerpSearchType.SEARCH,
+        search_type=SerpSearchType.search,
         search_location=search_location,
     )
     items = data.get("peopleAlsoAsk", []) or data.get("relatedSearches", [])
@@ -66,10 +66,10 @@ def call_serp_api(
     search_location: SerpSearchLocation,
 ) -> dict:
     r = requests.post(
-        "https://google.serper.dev/" + search_type.value,
+        "https://google.serper.dev/" + search_type.api_value,
         json=dict(
             q=query,
-            gl=search_location.value,
+            gl=search_location.api_value,
         ),
         headers={"X-API-KEY": settings.SERPER_API_KEY},
     )

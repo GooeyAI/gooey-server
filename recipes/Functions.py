@@ -22,6 +22,7 @@ class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
     slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    sdk_method_name = "functions"
     show_settings = False
     price = 1
 

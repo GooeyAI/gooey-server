@@ -7,10 +7,7 @@ from daras_ai_v2.functional import apply_parallel
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
-from daras_ai_v2.serp_search_locations import (
-    SerpSearchLocation,
-    SerpSearchType,
-)
+from daras_ai_v2.serp_search_locations import SerpSearchLocations, SerpSearchType
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import DocSearchPage, render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import render_output_with_refs, GoogleSearchMixin
@@ -27,14 +24,15 @@ class RelatedQnADocPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.RELATED_QNA_MAKER_DOC
     slug_versions = ["related-qna-maker-doc"]
+    sdk_method_name = "seoPeopleAlsoAskDoc"
 
     price = 100
 
     sane_defaults = dict(
         citation_style=CitationStyles.number.name,
         dense_weight=1.0,
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
     )
 
     class RequestModel(GoogleSearchMixin, DocSearchPage.RequestModel):
@@ -111,7 +109,7 @@ class RelatedQnADocPage(BasePage):
             related_questions,
         ) = get_related_questions_from_serp_api(
             request.search_query,
-            search_location=request.serp_search_location,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
 
         all_questions = [request.search_query] + related_questions[:9]

@@ -17,14 +17,14 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.serp_search import call_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_location_selectbox,
     GoogleSearchLocationMixin,
+    SerpSearchLocations,
     SerpSearchType,
-    SerpSearchLocation,
+    serp_search_location_selectbox,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
-    Img2ImgModels,
+    ImageToImageModels,
     SD_IMG_MAX_SIZE,
     instruct_pix2pix,
 )
@@ -37,6 +37,7 @@ class GoogleImageGenPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
+    sdk_method_name = "imageFromWebSearch"
 
     sane_defaults = dict(
         num_outputs=1,
@@ -46,15 +47,15 @@ class GoogleImageGenPage(BasePage):
         sd_2_upscaling=False,
         seed=42,
         image_guidance_scale=1.2,
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
     )
 
     class RequestModel(GoogleSearchLocationMixin, BasePage.RequestModel):
         search_query: str
         text_prompt: str
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: ImageToImageModels.api_enum | None
 
         negative_prompt: str | None
 
@@ -112,8 +113,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         serp_results = call_serp_api(
             request.search_query,
-            search_type=SerpSearchType.IMAGES,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.images,
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         image_urls = [
             link
@@ -152,7 +153,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Generating Images..."
 
-        if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
+        if request.selected_model == ImageToImageModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -185,7 +186,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        model_selector(Img2ImgModels)
+        model_selector(ImageToImageModels)
         gui.text_area(
             """
             #### 👩‍💻 Prompt
@@ -199,7 +200,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         youtube_video("rnjvtaYYe8g")
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels, render_model_selector=False)
+        img_model_settings(ImageToImageModels, render_model_selector=False)
         serp_search_location_selectbox()
 
     def render_output(self):

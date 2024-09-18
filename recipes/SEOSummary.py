@@ -28,9 +28,9 @@ from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_settings,
-    SerpSearchLocation,
+    SerpSearchLocations,
     SerpSearchType,
+    serp_search_settings,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 from recipes.GoogleGPT import GoogleSearchMixin
@@ -61,6 +61,7 @@ class SEOSummaryPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85f38b42-88d6-11ee-ad97-02420a00016c/Create%20SEO%20optimized%20content%20option%202.png.png"
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
+    sdk_method_name = "seoContent"
 
     def preview_image(self, state: dict) -> str | None:
         return SEO_SUMMARY_DEFAULT_META_IMG
@@ -73,8 +74,8 @@ class SEOSummaryPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -90,6 +91,9 @@ class SEOSummaryPage(BasePage):
     )
 
     class RequestModelBase(BaseModel):
+        class Config:
+            use_enum_values = True
+
         search_query: str
         keywords: str
         title: str
@@ -99,9 +103,7 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
         max_search_urls: int | None
 
@@ -274,8 +276,8 @@ SearchSEO > Page Parsing > GPT3
 
         serp_results, links = get_links_from_serp_api(
             request.search_query,
-            search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         state["serp_results"] = serp_results
         state["search_urls"] = [it.url for it in links]
@@ -314,8 +316,8 @@ def _crosslink_keywords(output_content, request):
     all_results = map_parallel(
         lambda keyword: get_links_from_serp_api(
             f"site:{host} {keyword}",
-            search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )[1],
         relevant_keywords,
     )

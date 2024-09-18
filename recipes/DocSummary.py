@@ -1,8 +1,8 @@
 import typing
-from enum import Enum
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -16,7 +16,6 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
-    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -38,7 +37,7 @@ from recipes.GoogleGPT import render_output_with_refs, GoogleGPTPage
 DEFAULT_DOC_SUMMARY_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f35796d2-93fe-11ee-b86c-02420a0001c7/Summarize%20with%20GPT.jpg.png"
 
 
-class CombineDocumentsChains(Enum):
+class CombineDocumentsChains(GooeyEnum):
     map_reduce = "Map Reduce"
     # refine = "Refine"
     # stuff = "Stuffing (Only works for small documents)"
@@ -49,6 +48,7 @@ class DocSummaryPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1f858a7a-88d8-11ee-a658-02420a000163/Summarize%20your%20docs%20with%20gpt.png.png"
     workflow = Workflow.DOC_SUMMARY
     slug_versions = ["doc-summary"]
+    sdk_method_name = "docSummary"
 
     price = 225
 
@@ -68,13 +68,11 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         merge_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
-        chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
+        chain_type: CombineDocumentsChains.api_enum | None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_asr_model: AsrModels.api_enum | None
         google_translate_target: str | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):

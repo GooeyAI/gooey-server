@@ -8,7 +8,7 @@ from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
-from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
+from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
@@ -19,7 +19,7 @@ CREDITS_PER_MINUTE = 36
 
 
 def price_for_model(selected_model: str | None) -> float:
-    if selected_model == LipsyncModel.SadTalker.name:
+    if selected_model == LipsyncModels.SadTalker.name:
         multiplier = 2
     else:
         multiplier = 1
@@ -31,11 +31,10 @@ class LipsyncPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f33e6332-88d8-11ee-89f9-02420a000169/Lipsync%20TTS.png.png"
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
+    sdk_method_name = "lipsync"
 
     class RequestModel(LipsyncSettings, BasePage.RequestModel):
-        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        selected_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
         input_audio: FieldHttpUrl = None
 
     class ResponseModel(BaseModel):
@@ -71,7 +70,7 @@ class LipsyncPage(BasePage):
             )
 
         enum_selector(
-            LipsyncModel,
+            LipsyncModels,
             label="###### Lipsync Model",
             key="selected_model",
             use_selectbox=True,
@@ -92,10 +91,10 @@ class LipsyncPage(BasePage):
         else:
             max_frames = 250
 
-        model = LipsyncModel[request.selected_model]
+        model = LipsyncModels[request.selected_model]
         yield f"Running {model.value}..."
         match model:
-            case LipsyncModel.Wav2Lip:
+            case LipsyncModels.Wav2Lip:
                 state["output_video"], state["duration_sec"] = run_wav2lip(
                     face=request.input_face,
                     audio=request.input_audio,
@@ -107,7 +106,7 @@ class LipsyncPage(BasePage):
                     ),
                     max_frames=max_frames,
                 )
-            case LipsyncModel.SadTalker:
+            case LipsyncModels.SadTalker:
                 state["output_video"], state["duration_sec"] = run_sadtalker(
                     request.sadtalker_settings,
                     face=request.input_face,

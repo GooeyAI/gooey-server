@@ -1,15 +1,15 @@
 import gooey_gui as gui
 from daras_ai_v2.field_render import field_label_val
 
-from daras_ai_v2.lipsync_api import LipsyncModel, SadTalkerSettings
+from daras_ai_v2.lipsync_api import LipsyncModels, SadTalkerSettings
 
 
 def lipsync_settings(selected_model: str):
     match selected_model:
-        case LipsyncModel.Wav2Lip.name:
+        case LipsyncModels.Wav2Lip.name:
             wav2lip_settings()
             gui.session_state.pop("sadtalker_settings", None)
-        case LipsyncModel.SadTalker.name:
+        case LipsyncModels.SadTalker.name:
             settings = SadTalkerSettings.parse_obj(
                 gui.session_state.setdefault(
                     "sadtalker_settings", SadTalkerSettings().dict()

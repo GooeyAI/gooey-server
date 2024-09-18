@@ -51,6 +51,7 @@ R = typing.TypeVar("R", bound=BotBroadcastRequestModel)
     operation_id=VideoBotsPage.slug_versions[0] + "__broadcast",
     tags=["Misc"],
     name=f"Send Broadcast Message",
+    openapi_extra={"x-fern-ignore": True},
 )
 @app.post(
     f"/v2/{VideoBotsPage.slug_versions[0]}/broadcast/send",

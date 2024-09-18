@@ -1,7 +1,6 @@
 import hashlib
 import io
 import typing
-from enum import Enum
 from functools import partial
 
 import numpy as np
@@ -13,6 +12,7 @@ from aifail import (
 from jinja2.lexer import whitespace_re
 from loguru import logger
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model import get_openai_client
 from daras_ai_v2.redis_cache import (
@@ -25,7 +25,7 @@ class EmbeddingModel(typing.NamedTuple):
     label: str
 
 
-class EmbeddingModels(Enum):
+class EmbeddingModels(EmbeddingModel, GooeyEnum):
     openai_3_large = EmbeddingModel(
         model_id=("openai-text-embedding-3-large-prod-ca-1", "text-embedding-3-large"),
         label="Text Embedding 3 Large (OpenAI)",
@@ -65,12 +65,8 @@ class EmbeddingModels(Enum):
     )
 
     @property
-    def model_id(self) -> typing.Iterable[str] | str:
-        return self.value.model_id
-
-    @property
-    def label(self) -> str:
-        return self.value.label
+    def db_value(self):
+        return self.name
 
     @classmethod
     def get(cls, key, default=None):

@@ -1,11 +1,11 @@
 import typing
-from enum import Enum
 from pathlib import Path
 
 import replicate
 import requests
 
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
@@ -19,7 +19,7 @@ class UpscalerModel(typing.NamedTuple):
     is_bg_model: bool = False
 
 
-class UpscalerModels(UpscalerModel, Enum):
+class UpscalerModels(UpscalerModel, GooeyEnum):
     gfpgan_1_4 = UpscalerModel(
         model_id="GFPGANv1.4",
         label="GFPGAN v1.4 (Tencent ARC)",

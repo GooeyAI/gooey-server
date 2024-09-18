@@ -20,7 +20,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
+    TextToImageModels,
     text2img,
     instruct_pix2pix,
     sd_upscale,
@@ -39,6 +39,7 @@ class CompareText2ImgPage(BasePage):
         "text2img",
         "compare-ai-image-generators",
     ]
+    sdk_method_name = "textToImage"
 
     sane_defaults = {
         "guidance_scale": 7.5,
@@ -65,19 +66,14 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
-        )
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        selected_models: list[TextToImageModels.api_enum] | None
+        scheduler: Schedulers.api_enum | None
 
         edit_instruction: str | None
         image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
-        output_images: dict[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[FieldHttpUrl],
-        ]
+        output_images: dict[TextToImageModels.api_enum, list[FieldHttpUrl]]
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
@@ -124,7 +120,7 @@ class CompareText2ImgPage(BasePage):
         """
         )
         enum_multiselect(
-            Text2ImgModels,
+            TextToImageModels,
             key="selected_models",
         )
 
@@ -192,7 +188,7 @@ class CompareText2ImgPage(BasePage):
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {Text2ImgModels[selected_model].value}..."
+            yield f"Running {TextToImageModels[selected_model].label}..."
 
             output_images[selected_model] = text2img(
                 selected_model=selected_model,
@@ -253,7 +249,7 @@ class CompareText2ImgPage(BasePage):
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 gui.image(
-                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                    img, caption=TextToImageModels[key].label, show_download_button=True
                 )
 
     def preview_description(self, state: dict) -> str:
@@ -264,9 +260,9 @@ class CompareText2ImgPage(BasePage):
         total = 0
         for name in selected_models:
             match name:
-                case Text2ImgModels.deepfloyd_if.name:
+                case TextToImageModels.deepfloyd_if.name:
                     total += 5
-                case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
+                case TextToImageModels.dall_e.name | TextToImageModels.dall_e_3.name:
                     total += 15
                 case _:
                     total += 2

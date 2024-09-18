@@ -1,6 +1,5 @@
 import io
 import typing
-from enum import Enum
 
 import requests
 from PIL import Image
@@ -13,6 +12,7 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -27,179 +27,249 @@ from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 SD_IMG_MAX_SIZE = (768, 768)
 
 
-class InpaintingModels(Enum):
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    runway_ml = "Stable Diffusion v1.5 (RunwayML)"
-    dall_e = "Dall-E (OpenAI)"
+class InpaintingModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
+
+class InpaintingModels(InpaintingModel, GooeyEnum):
+    sd_2 = InpaintingModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-inpainting",
+    )
+    runway_ml = InpaintingModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-inpainting",
+    )
+    dall_e = InpaintingModel(label="Dall-E (OpenAI)", model_id="dall-e-2")
+
+    jack_qiao = InpaintingModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao}
 
 
-inpaint_model_ids = {
-    InpaintingModels.sd_2: "stabilityai/stable-diffusion-2-inpainting",
-    InpaintingModels.runway_ml: "runwayml/stable-diffusion-inpainting",
-}
+class TextToImageModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
 
-class Text2ImgModels(Enum):
+class TextToImageModels(TextToImageModel, GooeyEnum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    dream_shaper = "DreamShaper (Lykon)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = TextToImageModel(
+        label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
+    )
+    dreamlike_2 = TextToImageModel(
+        label="Dreamlike Photoreal 2.0 (dreamlike.art)",
+        model_id="dreamlike-art/dreamlike-photoreal-2.0",
+    )
+    sd_2 = TextToImageModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-1",
+    )
+    sd_1_5 = TextToImageModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-v1-5",
+    )
 
-    dall_e = "DALL·E 2 (OpenAI)"
-    dall_e_3 = "DALL·E 3 (OpenAI)"
+    dall_e = TextToImageModel(label="DALL·E 2 (OpenAI)", model_id="dall-e-2")
+    dall_e_3 = TextToImageModel(label="DALL·E 3 (OpenAI)", model_id="dall-e-3")
 
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    openjourney = "Open Journey (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    openjourney_2 = TextToImageModel(
+        label="Open Journey v2 beta (PromptHero)", model_id="prompthero/openjourney-v2"
+    )
+    openjourney = TextToImageModel(
+        label="Open Journey (PromptHero)", model_id="prompthero/openjourney"
+    )
+    analog_diffusion = TextToImageModel(
+        label="Analog Diffusion (wavymulder)", model_id="wavymulder/Analog-Diffusion"
+    )
+    protogen_5_3 = TextToImageModel(
+        label="Protogen v5.3 (darkstorm2150)",
+        model_id="darkstorm2150/Protogen_v5.3_Official_Release",
+    )
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
-    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
+    jack_qiao = TextToImageModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
+    rodent_diffusion_1_5 = TextToImageModel(
+        label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
+    )
+    deepfloyd_if = TextToImageModel(
+        label="DeepFloyd IF [Deprecated] (stability.ai)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao, cls.deepfloyd_if, cls.rodent_diffusion_1_5}
 
 
-text2img_model_ids = {
-    Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
-    Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
-    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Text2ImgModels.openjourney: "prompthero/openjourney",
-    Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
-    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
-}
-dall_e_model_ids = {
-    Text2ImgModels.dall_e: "dall-e-2",
-    Text2ImgModels.dall_e_3: "dall-e-3",
-}
+class ImageToImageModel(typing.NamedTuple):
+    model_id: str | None
+    label: str
 
 
-class Img2ImgModels(Enum):
-    dream_shaper = "DreamShaper (Lykon)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+class ImageToImageModels(ImageToImageModel, GooeyEnum):
+    dream_shaper = ImageToImageModel(
+        label="DreamShaper (Lykon)", model_id="Lykon/DreamShaper"
+    )
+    dreamlike_2 = ImageToImageModel(
+        label="Dreamlike Photoreal 2.0 (dreamlike.art)",
+        model_id="dreamlike-art/dreamlike-photoreal-2.0",
+    )
+    sd_2 = ImageToImageModel(
+        label="Stable Diffusion v2.1 (stability.ai)",
+        model_id="stabilityai/stable-diffusion-2-1",
+    )
+    sd_1_5 = ImageToImageModel(
+        label="Stable Diffusion v1.5 (RunwayML)",
+        model_id="runwayml/stable-diffusion-v1-5",
+    )
 
-    dall_e = "Dall-E (OpenAI)"
+    dall_e = ImageToImageModel(label="Dall-E (OpenAI)", model_id=None)
 
-    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
-    openjourney = "Open Journey (PromptHero) 🐢"
-    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+    instruct_pix2pix = ImageToImageModel(
+        label="✨ InstructPix2Pix (Tim Brooks)", model_id=None
+    )
+    openjourney_2 = ImageToImageModel(
+        label="Open Journey v2 beta (PromptHero) 🐢",
+        model_id="prompthero/openjourney-v2",
+    )
+    openjourney = ImageToImageModel(
+        label="Open Journey (PromptHero) 🐢", model_id="prompthero/openjourney"
+    )
+    analog_diffusion = ImageToImageModel(
+        label="Analog Diffusion (wavymulder) 🐢", model_id="wavymulder/Analog-Diffusion"
+    )
+    protogen_5_3 = ImageToImageModel(
+        label="Protogen v5.3 (darkstorm2150) 🐢",
+        model_id="darkstorm2150/Protogen_v5.3_Official_Release",
+    )
 
-    jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
+    jack_qiao = ImageToImageModel(
+        label="Stable Diffusion v1.4 [Deprecated] (Jack Qiao)", model_id=None
+    )
+    rodent_diffusion_1_5 = ImageToImageModel(
+        label="Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)", model_id=None
+    )
 
     @classmethod
     def _deprecated(cls):
         return {cls.jack_qiao, cls.rodent_diffusion_1_5}
 
 
-img2img_model_ids = {
-    Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
-    Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
-    Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Img2ImgModels.openjourney: "prompthero/openjourney",
-    Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Img2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
-    Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
-}
+class ControlNetModel(typing.NamedTuple):
+    label: str
+    model_id: str
+    explanation: str
 
 
-class ControlNetModels(Enum):
-    sd_controlnet_canny = "Canny"
-    sd_controlnet_depth = "Depth"
-    sd_controlnet_hed = "HED Boundary"
-    sd_controlnet_mlsd = "M-LSD Straight Line"
-    sd_controlnet_normal = "Normal Map"
-    sd_controlnet_openpose = "Human Pose"
-    sd_controlnet_scribble = "Scribble"
-    sd_controlnet_seg = "Image Segmentation"
-    sd_controlnet_tile = "Tiling"
-    sd_controlnet_brightness = "Brightness"
-    control_v1p_sd15_qrcode_monster_v2 = "QR Monster V2"
+class ControlNetModels(ControlNetModel, GooeyEnum):
+    sd_controlnet_canny = ControlNetModel(
+        label="Canny",
+        explanation="Canny edge detection",
+        model_id="lllyasviel/sd-controlnet-canny",
+    )
+    sd_controlnet_depth = ControlNetModel(
+        label="Depth",
+        explanation="Depth estimation",
+        model_id="lllyasviel/sd-controlnet-depth",
+    )
+    sd_controlnet_hed = ControlNetModel(
+        label="HED Boundary",
+        explanation="HED edge detection",
+        model_id="lllyasviel/sd-controlnet-hed",
+    )
+    sd_controlnet_mlsd = ControlNetModel(
+        label="M-LSD Straight Line",
+        explanation="M-LSD straight line detection",
+        model_id="lllyasviel/sd-controlnet-mlsd",
+    )
+    sd_controlnet_normal = ControlNetModel(
+        label="Normal Map",
+        explanation="Normal map estimation",
+        model_id="lllyasviel/sd-controlnet-normal",
+    )
+    sd_controlnet_openpose = ControlNetModel(
+        label="Human Pose",
+        explanation="Human pose estimation",
+        model_id="lllyasviel/sd-controlnet-openpose",
+    )
+    sd_controlnet_scribble = ControlNetModel(
+        label="Scribble",
+        explanation="Scribble",
+        model_id="lllyasviel/sd-controlnet-scribble",
+    )
+    sd_controlnet_seg = ControlNetModel(
+        label="Image Segmentation",
+        explanation="Image segmentation",
+        model_id="lllyasviel/sd-controlnet-seg",
+    )
+    sd_controlnet_tile = ControlNetModel(
+        label="Tiling",
+        explanation="Tiling: to preserve small details",
+        model_id="lllyasviel/control_v11f1e_sd15_tile",
+    )
+    sd_controlnet_brightness = ControlNetModel(
+        label="Brightness",
+        explanation="Brightness: to increase contrast naturally",
+        model_id="ioclab/control_v1p_sd15_brightness",
+    )
+    control_v1p_sd15_qrcode_monster_v2 = ControlNetModel(
+        label="QR Monster V2",
+        explanation="QR Monster: make beautiful QR codes that still scan with a controlnet specifically trained for this purpose",
+        model_id="monster-labs/control_v1p_sd15_qrcode_monster/v2",
+    )
 
 
-controlnet_model_explanations = {
-    ControlNetModels.sd_controlnet_canny: "Canny edge detection",
-    ControlNetModels.sd_controlnet_depth: "Depth estimation",
-    ControlNetModels.sd_controlnet_hed: "HED edge detection",
-    ControlNetModels.sd_controlnet_mlsd: "M-LSD straight line detection",
-    ControlNetModels.sd_controlnet_normal: "Normal map estimation",
-    ControlNetModels.sd_controlnet_openpose: "Human pose estimation",
-    ControlNetModels.sd_controlnet_scribble: "Scribble",
-    ControlNetModels.sd_controlnet_seg: "Image segmentation",
-    ControlNetModels.sd_controlnet_tile: "Tiling: to preserve small details",
-    ControlNetModels.sd_controlnet_brightness: "Brightness: to increase contrast naturally",
-    ControlNetModels.control_v1p_sd15_qrcode_monster_v2: "QR Monster: make beautiful QR codes that still scan with a controlnet specifically trained for this purpose",
-}
-
-controlnet_model_ids = {
-    ControlNetModels.sd_controlnet_canny: "lllyasviel/sd-controlnet-canny",
-    ControlNetModels.sd_controlnet_depth: "lllyasviel/sd-controlnet-depth",
-    ControlNetModels.sd_controlnet_hed: "lllyasviel/sd-controlnet-hed",
-    ControlNetModels.sd_controlnet_mlsd: "lllyasviel/sd-controlnet-mlsd",
-    ControlNetModels.sd_controlnet_normal: "lllyasviel/sd-controlnet-normal",
-    ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
-    ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
-    ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
-    ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
-    ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
-    ControlNetModels.control_v1p_sd15_qrcode_monster_v2: "monster-labs/control_v1p_sd15_qrcode_monster/v2",
-}
+class Scheduler(typing.NamedTuple):
+    label: str
+    model_id: str
 
 
-class Schedulers(models.TextChoices):
-    singlestep_dpm_solver = (
-        "DPM",
-        "DPMSolverSinglestepScheduler",
+class Schedulers(Scheduler, GooeyEnum):
+    singlestep_dpm_solver = Scheduler(
+        label="DPM",
+        model_id="DPMSolverSinglestepScheduler",
     )
-    multistep_dpm_solver = "DPM Multistep", "DPMSolverMultistepScheduler"
-    dpm_sde = (
-        "DPM SDE",
-        "DPMSolverSDEScheduler",
+    multistep_dpm_solver = Scheduler(
+        label="DPM Multistep", model_id="DPMSolverMultistepScheduler"
     )
-    dpm_discrete = (
-        "DPM Discrete",
-        "KDPM2DiscreteScheduler",
+    dpm_sde = Scheduler(
+        label="DPM SDE",
+        model_id="DPMSolverSDEScheduler",
     )
-    dpm_discrete_ancestral = (
-        "DPM Anscetral",
-        "KDPM2AncestralDiscreteScheduler",
+    dpm_discrete = Scheduler(
+        label="DPM Discrete",
+        model_id="KDPM2DiscreteScheduler",
     )
-    unipc = "UniPC", "UniPCMultistepScheduler"
-    lms_discrete = (
-        "LMS",
-        "LMSDiscreteScheduler",
+    dpm_discrete_ancestral = Scheduler(
+        label="DPM Anscetral",
+        model_id="KDPM2AncestralDiscreteScheduler",
     )
-    heun = (
-        "Heun",
-        "HeunDiscreteScheduler",
+    unipc = Scheduler(label="UniPC", model_id="UniPCMultistepScheduler")
+    lms_discrete = Scheduler(
+        label="LMS",
+        model_id="LMSDiscreteScheduler",
     )
-    euler = "Euler", "EulerDiscreteScheduler"
-    euler_ancestral = (
-        "Euler ancestral",
-        "EulerAncestralDiscreteScheduler",
+    heun = Scheduler(
+        label="Heun",
+        model_id="HeunDiscreteScheduler",
     )
-    pndm = "PNDM", "PNDMScheduler"
-    ddpm = "DDPM", "DDPMScheduler"
-    ddim = "DDIM", "DDIMScheduler"
-    deis = (
-        "DEIS",
-        "DEISMultistepScheduler",
+    euler = Scheduler("Euler", "EulerDiscreteScheduler")
+    euler_ancestral = Scheduler(
+        label="Euler ancestral",
+        model_id="EulerAncestralDiscreteScheduler",
+    )
+    pndm = Scheduler(label="PNDM", model_id="PNDMScheduler")
+    ddpm = Scheduler(label="DDPM", model_id="DDPMScheduler")
+    ddim = Scheduler(label="DDIM", model_id="DDIMScheduler")
+    deis = Scheduler(
+        label="DEIS",
+        model_id="DEISMultistepScheduler",
     )
 
 
@@ -282,18 +352,18 @@ def text2img(
     dall_e_3_quality: str | None = None,
     dall_e_3_style: str | None = None,
 ):
-    if selected_model != Text2ImgModels.dall_e_3.name:
+    if selected_model != TextToImageModels.dall_e_3.name:
         _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
-        case Text2ImgModels.dall_e_3.name:
+        case TextToImageModels.dall_e_3.name:
             from openai import OpenAI
 
             client = OpenAI()
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[Text2ImgModels[selected_model]],
+                    model=TextToImageModels[selected_model].model_id,
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -302,7 +372,7 @@ def text2img(
                     size=f"{width}x{height}",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.dall_e.name:
+        case TextToImageModels.dall_e.name:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
@@ -320,8 +390,8 @@ def text2img(
             return call_sd_multi(
                 "diffusion.text2img",
                 pipeline={
-                    "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
-                    "scheduler": Schedulers[scheduler].label if scheduler else None,
+                    "model_id": TextToImageModels[selected_model].model_id,
+                    "scheduler": Schedulers[scheduler].model_id if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
                 },
@@ -382,7 +452,7 @@ def img2img(
     _resolution_check(width, height)
 
     match selected_model:
-        case Img2ImgModels.dall_e.name:
+        case ImageToImageModels.dall_e.name:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
@@ -413,7 +483,7 @@ def img2img(
             return call_sd_multi(
                 "diffusion.img2img",
                 pipeline={
-                    "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+                    "model_id": ImageToImageModels[selected_model].model_id,
                     # "scheduler": "UniPCMultistepScheduler",
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -456,15 +526,16 @@ def controlnet(
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+            "model_id": TextToImageModels[selected_model].model_id,
             "seed": seed,
             "scheduler": (
-                Schedulers[scheduler].label if scheduler else "UniPCMultistepScheduler"
+                Schedulers[scheduler].model_id
+                if scheduler
+                else Schedulers.unipc.model_id
             ),
             "disable_safety_checker": True,
             "controlnet_model_id": [
-                controlnet_model_ids[ControlNetModels[model]]
-                for model in selected_controlnet_model
+                ControlNetModels[model].model_id for model in selected_controlnet_model
             ],
         },
         inputs={
@@ -482,13 +553,13 @@ def controlnet(
 
 def add_prompt_prefix(prompt: str, selected_model: str) -> str:
     match selected_model:
-        case Text2ImgModels.openjourney.name:
+        case TextToImageModels.openjourney.name:
             prompt = "mdjrny-v4 style " + prompt
-        case Text2ImgModels.analog_diffusion.name:
+        case TextToImageModels.analog_diffusion.name:
             prompt = "analog style " + prompt
-        case Text2ImgModels.protogen_5_3.name:
+        case TextToImageModels.protogen_5_3.name:
             prompt = "modelshoot style " + prompt
-        case Text2ImgModels.dreamlike_2.name:
+        case TextToImageModels.dreamlike_2.name:
             prompt = "photo, " + prompt
     return prompt
 
@@ -535,9 +606,9 @@ def inpainting(
             out_imgs_urls = call_sd_multi(
                 "diffusion.inpaint",
                 pipeline={
-                    "model_id": inpaint_model_ids[InpaintingModels[selected_model]],
+                    "model_id": InpaintingModels[selected_model].model_id,
                     "seed": seed,
-                    # "scheduler": Schedulers[scheduler].label
+                    # "scheduler": Schedulers[scheduler].model_id
                     # if scheduler
                     # else "UniPCMultistepScheduler",
                     "disable_safety_checker": True,

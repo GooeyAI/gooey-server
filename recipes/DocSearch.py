@@ -2,7 +2,7 @@ import math
 import typing
 
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -52,6 +52,7 @@ class DocSearchPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cbbb4dc6-88d7-11ee-bf6c-02420a000166/Search%20your%20docs%20with%20gpt.png.png"
     workflow = Workflow.DOC_SEARCH
     slug_versions = ["doc-search"]
+    sdk_method_name = "rag"
 
     sane_defaults = {
         "sampling_temperature": 0.1,
@@ -71,11 +72,9 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: CitationStyles.api_enum | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

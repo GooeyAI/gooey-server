@@ -1,14 +1,13 @@
-from enum import Enum
-
 import requests
 
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.gpu_server import (
     call_celery_task_outfile,
 )
 
 
-class ImageSegmentationModels(Enum):
+class ImageSegmentationModels(str, GooeyEnum):
     dis = "Dichotomous Image Segmentation"
     u2net = "U²-Net"
 

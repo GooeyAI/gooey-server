@@ -38,19 +38,18 @@ class AsrPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
     workflow = Workflow.ASR
     slug_versions = ["asr", "speech"]
+    sdk_method_name = "speechRecognition"
 
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
-        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_model: AsrModels.api_enum | None
         language: str | None
 
-        translation_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        translation_model: TranslationModels.api_enum | None
 
-        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
+        output_format: AsrOutputFormat.api_enum | None
 
         google_translate_target: str | None = Field(
             deprecated=True,

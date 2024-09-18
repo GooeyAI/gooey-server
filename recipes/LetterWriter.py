@@ -18,6 +18,7 @@ class LetterWriterPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.LETTER_WRITER
     slug_versions = ["LetterWriter"]
+    sdk_method_name = ""
 
     class RequestModel(BasePage.RequestModel):
         action_id: str
@@ -45,6 +46,10 @@ class LetterWriterPage(BasePage):
         response_json: typing.Any
         generated_input_prompt: str
         final_prompt: str
+
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {"x-fern-ignore": True}
 
     def render_description(self):
         gui.write(

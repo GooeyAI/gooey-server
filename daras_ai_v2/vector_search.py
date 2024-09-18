@@ -71,8 +71,13 @@ from files.models import FileMetadata
 
 
 class DocSearchRequest(BaseModel):
+    class Config:
+        use_enum_values = True
+
     search_query: str
-    keyword_query: str | list[str] | None
+    keyword_query: str | list[str] | None = Field(
+        **{"x-fern-type-name": "KeywordQuery"}
+    )
 
     documents: list[str] | None
 
@@ -82,7 +87,7 @@ class DocSearchRequest(BaseModel):
 
     doc_extract_url: str | None
 
-    embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+    embedding_model: EmbeddingModels.api_enum | None
     dense_weight: float | None = Field(
         ge=0.0,
         le=1.0,

@@ -85,6 +85,7 @@ class CreateStreamResponse(BaseModel):
     operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
     tags=["Copilot Integrations"],
     name="Copilot Integrations Create Stream",
+    openapi_extra={"x-fern-ignore": True},
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
@@ -173,6 +174,7 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
     operation_id=VideoBotsPage.slug_versions[0] + "__stream",
     tags=["Copilot Integrations"],
     name="Copilot integrations Stream Response",
+    openapi_extra={"x-fern-ignore": True},
 )
 def stream_response(request_id: str):
     r = get_redis_cache().getdel(f"gooey/stream-init/v1/{request_id}")

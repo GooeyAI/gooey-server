@@ -31,7 +31,7 @@ DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/da
 
 
 class TextToSpeechSettings(BaseModel):
-    tts_provider: typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+    tts_provider: TextToSpeechProviders.api_enum | None
 
     uberduck_voice_name: str | None
     uberduck_speaking_rate: float | None
@@ -55,8 +55,8 @@ class TextToSpeechSettings(BaseModel):
 
     azure_voice_name: str | None
 
-    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
-    openai_tts_model: OpenAI_TTS_Models.api_choices | None
+    openai_voice_name: OpenAI_TTS_Voices.api_enum | None
+    openai_tts_model: OpenAI_TTS_Models.api_enum | None
 
 
 class TextToSpeechPage(BasePage):
@@ -69,6 +69,7 @@ class TextToSpeechPage(BasePage):
         "text2speech",
         "compare-text-to-speech-engines",
     ]
+    sdk_method_name = "textToSpeech"
 
     sane_defaults = {
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,

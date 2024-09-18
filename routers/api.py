@@ -5,6 +5,7 @@ import os.path
 import typing
 
 import gooey_gui as gui
+from fastapi import Query
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
@@ -152,10 +153,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id=page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
+        openapi_extra={"x-fern-ignore": True},
+        include_in_schema=False,
     )
     def run_api_json(
         request: Request,
         page_request: request_model,
+        example_id: str | None = None,
         user: AppUser = Depends(api_auth_header),
     ):
         result, sr = submit_api_call(
@@ -200,11 +204,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         name=page_cls.title + " (v3 async)",
         tags=[page_cls.title],
         status_code=202,
+        openapi_extra=page_cls.get_openapi_extra(),
     )
     def run_api_json_async(
         request: Request,
         response: Response,
         page_request: request_model,
+        example_id: str | None = Query(default=None),
         user: AppUser = Depends(api_auth_header),
     ):
         result, sr = submit_api_call(
@@ -255,6 +261,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id="status__" + page_cls.slug_versions[0],
         tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
+        openapi_extra={"x-fern-ignore": True},
     )
     def get_run_status(
         run_id: str,
@@ -426,12 +433,17 @@ class BalanceResponse(BaseModel):
     balance: int = Field(description="Current balance in credits")
 
 
-@app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
+@app.get(
+    "/v1/balance/",
+    response_model=BalanceResponse,
+    tags=["Misc"],
+    openapi_extra={"x-fern-sdk-method-name": "getBalance"},
+)
 def get_balance(user: AppUser = Depends(api_auth_header)):
     workspace = user.get_or_create_personal_workspace()[0]
     return BalanceResponse(balance=workspace.balance)
 
 
-@app.get("/status")
+@app.get("/status", openapi_extra={"x-fern-ignore": True})
 async def health():
     return "OK"

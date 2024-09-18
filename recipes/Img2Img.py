@@ -2,7 +2,7 @@ import typing
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -10,7 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
-    Img2ImgModels,
+    ImageToImageModels,
     img2img,
     SD_IMG_MAX_SIZE,
     instruct_pix2pix,
@@ -27,6 +27,7 @@ class Img2ImgPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc9351a-88d9-11ee-bf6c-02420a000166/Edit%20an%20image%20with%20AI%201.png.png"
     workflow = Workflow.IMG_2_IMG
     slug_versions = ["Img2Img", "ai-photo-editor"]
+    sdk_method_name = "remixImage"
 
     sane_defaults = {
         "num_outputs": 1,
@@ -45,12 +46,10 @@ class Img2ImgPage(BasePage):
         input_image: FieldHttpUrl
         text_prompt: str | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: ImageToImageModels.api_enum | None
         selected_controlnet_model: (
-            list[typing.Literal[tuple(e.name for e in ControlNetModels)]]
-            | typing.Literal[tuple(e.name for e in ControlNetModels)]
-            | None
-        )
+            list[ControlNetModels.api_enum] | ControlNetModels.api_enum | None
+        ) = Field(**{"x-fern-type-name": "SelectedControlNetModels"})
         negative_prompt: str | None
 
         num_outputs: int | None
@@ -124,7 +123,7 @@ class Img2ImgPage(BasePage):
         )
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels)
+        img_model_settings(ImageToImageModels)
 
     def render_usage_guide(self):
         youtube_video("narcZNyuNAg")
@@ -161,7 +160,7 @@ class Img2ImgPage(BasePage):
 
         yield "Generating Image..."
 
-        if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
+        if request.selected_model == ImageToImageModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -205,7 +204,7 @@ class Img2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
-            case Img2ImgModels.dall_e.name:
+            case ImageToImageModels.dall_e.name:
                 unit_price = 20
             case _:
                 unit_price = 5

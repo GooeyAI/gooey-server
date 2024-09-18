@@ -1,7 +1,7 @@
 import typing
 
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -11,11 +11,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_advanced_settings,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.language_model import (
-    run_language_model,
-    LargeLanguageModels,
-    ResponseFormatType,
-)
+from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
     language_model_selector,
@@ -31,9 +27,9 @@ from daras_ai_v2.search_ref import (
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     GoogleSearchMixin,
-    serp_search_settings,
-    SerpSearchLocation,
+    SerpSearchLocations,
     SerpSearchType,
+    serp_search_settings,
 )
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
@@ -51,6 +47,7 @@ class GoogleGPTPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
+    sdk_method_name = "webSearchLLM"
 
     price = 175
 
@@ -59,8 +56,8 @@ class GoogleGPTPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_search_type=SerpSearchType.SEARCH,
-        serp_search_location=SerpSearchLocation.UNITED_STATES,
+        serp_search_type=SerpSearchType.search.name,
+        serp_search_location=SerpSearchLocations.UNITED_STATES.api_value,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -85,9 +82,7 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
         max_search_urls: int | None
 
@@ -95,7 +90,7 @@ class GoogleGPTPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        embedding_model: EmbeddingModels.api_enum | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -216,7 +211,7 @@ class GoogleGPTPage(BasePage):
         self,
         request: "GoogleGPTPage.RequestModel",
         response: "GoogleGPTPage.ResponseModel",
-    ):
+    ) -> typing.Iterator[str | None]:
         model = LargeLanguageModels[request.selected_model]
 
         query_instructions = (request.query_instructions or "").strip()
@@ -236,8 +231,8 @@ class GoogleGPTPage(BasePage):
             )
         response.serp_results, links = get_links_from_serp_api(
             response.final_search_query,
-            search_type=request.serp_search_type,
-            search_location=request.serp_search_location,
+            search_type=SerpSearchType.from_api(request.serp_search_type),
+            search_location=SerpSearchLocations.from_api(request.serp_search_location),
         )
         # extract links & their corresponding titles
         link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}

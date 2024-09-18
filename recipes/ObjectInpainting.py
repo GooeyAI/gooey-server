@@ -33,6 +33,7 @@ class ObjectInpaintingPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f07b731e-88d9-11ee-a658-02420a000163/W.I.3.png.png"
     workflow = Workflow.OBJECT_INPAINTING
     slug_versions = ["ObjectInpainting", "product-photo-background-generator"]
+    sdk_method_name = "productImage"
 
     sane_defaults = {
         "mask_threshold": 0.7,
@@ -55,7 +56,7 @@ class ObjectInpaintingPage(BasePage):
 
         mask_threshold: float | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: InpaintingModels.api_enum | None
 
         negative_prompt: str | None
 

@@ -131,6 +131,7 @@ class BasePage:
     title: str
     workflow: Workflow
     slug_versions: list[str]
+    sdk_method_name: str
 
     sane_defaults: dict = {}
 
@@ -148,6 +149,9 @@ class BasePage:
     )
 
     class RequestModel(BaseModel):
+        class Config:
+            use_enum_values = True
+
         functions: list[RecipeFunction] | None = Field(
             title="🧩 Developer Tools and Functions",
         )
@@ -324,6 +328,12 @@ class BasePage:
                 },
             }
         return event
+
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {
+            "x-fern-sdk-method-name": cls.sdk_method_name,
+        }
 
     def refresh_state(self):
         sr = self.current_sr

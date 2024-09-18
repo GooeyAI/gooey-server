@@ -79,7 +79,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
     LanguageModelSettings,
 )
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModels
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars
@@ -135,6 +135,9 @@ class VideoBotsPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
+
+    sdk_group_name = "copilot"
+    sdk_method_name = "completion"
 
     functions_in_settings = False
 
@@ -193,9 +196,7 @@ class VideoBotsPage(BasePage):
         bot_script: str | None
 
         # llm model
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
         document_model: str | None = Field(
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
@@ -211,15 +212,15 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        embedding_model: EmbeddingModels.api_enum | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: CitationStyles.api_enum | None
         use_url_shortener: bool | None
 
-        asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+        asr_model: AsrModels.api_enum | None = Field(
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )
@@ -228,9 +229,7 @@ class VideoBotsPage(BasePage):
             description="Choose a language to transcribe incoming audio messages to text.",
         )
 
-        translation_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        translation_model: TranslationModels.api_enum | None
         user_language: str | None = Field(
             title="User Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
@@ -249,9 +248,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             """,
         )
 
-        lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        lipsync_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
 
         tools: list[LLMTools] | None = Field(
             title="🛠️ Tools",
@@ -285,6 +282,13 @@ Translation Glossary for LLM Language (English) -> User Langauge
         reply_buttons: list[ReplyButton] | None
 
         finish_reason: list[str] | None
+
+    @classmethod
+    def get_openapi_extra(cls) -> dict[str, typing.Any]:
+        return {
+            "x-fern-sdk-group-name": cls.sdk_group_name,
+            "x-fern-sdk-method-name": cls.sdk_method_name,
+        }
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
@@ -372,7 +376,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="input_face",
             )
             enum_selector(
-                LipsyncModel,
+                LipsyncModels,
                 label="###### Lipsync Model",
                 key="lipsync_model",
                 use_selectbox=True,

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -23,6 +23,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1acfa370-88d9-11ee-bf6c-02420a000166/Lipsync%20with%20audio%201.png.png"
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
+    sdk_method_name = "lipsyncTTS"
 
     sane_defaults = {
         "elevenlabs_model": "eleven_multilingual_v2",
@@ -31,9 +32,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     }
 
     class RequestModel(LipsyncSettings, TextToSpeechPage.RequestModel):
-        selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
+        selected_model: LipsyncModels.api_enum = LipsyncModels.Wav2Lip.name
 
     class ResponseModel(BaseModel):
         audio_url: str | None
@@ -76,7 +75,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             )
 
         enum_selector(
-            LipsyncModel,
+            LipsyncModels,
             label="###### Lipsync Model",
             key="selected_model",
             use_selectbox=True,

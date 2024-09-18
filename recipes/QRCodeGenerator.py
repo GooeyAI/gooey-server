@@ -8,7 +8,7 @@ import requests
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pyzbar import pyzbar
 
 import gooey_gui as gui
@@ -30,10 +30,10 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
+    TextToImageModels,
     controlnet,
     ControlNetModels,
-    Img2ImgModels,
+    ImageToImageModels,
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
@@ -57,6 +57,7 @@ class QRCodeGeneratorPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/03d6538e-88d5-11ee-ad97-02420a00016c/W.I.2.png.png"
     workflow = Workflow.QR_CODE
     slug_versions = ["art-qr-code", "qr", "qr-code"]
+    sdk_method_name = "qrCode"
 
     sane_defaults = dict(
         num_outputs=2,
@@ -81,7 +82,9 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         qr_code_data: str | None
         qr_code_input_image: FieldHttpUrl | None
-        qr_code_vcard: VCARD | None
+        qr_code_vcard: VCARD | None = Field(
+            title="VCard", **{"x-fern-type-name": "VCard"}
+        )
         qr_code_file: FieldHttpUrl | None
 
         use_url_shortener: bool | None
@@ -89,18 +92,14 @@ class QRCodeGeneratorPage(BasePage):
         text_prompt: str
         negative_prompt: str | None
         image_prompt: str | None
-        image_prompt_controlnet_models: (
-            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
+        image_prompt_controlnet_models: list[ControlNetModels.api_enum] | None
         image_prompt_strength: float | None
         image_prompt_scale: float | None
         image_prompt_pos_x: float | None
         image_prompt_pos_y: float | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
-        selected_controlnet_model: (
-            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
+        selected_model: TextToImageModels.api_enum | None
+        selected_controlnet_model: list[ControlNetModels.api_enum] | None
 
         output_width: int | None
         output_height: int | None
@@ -110,7 +109,7 @@ class QRCodeGeneratorPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        scheduler: Schedulers.api_enum | None
 
         seed: int | None
 
@@ -296,7 +295,7 @@ Here is the final output:
         )
 
         img_model_settings(
-            Img2ImgModels,
+            ImageToImageModels,
             show_scheduler=True,
             require_controlnet=True,
             extra_explanations={
@@ -485,7 +484,7 @@ Here is the final output:
 
         state["raw_images"] = raw_images = []
 
-        yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        yield f"Running {TextToImageModels[request.selected_model].label}..."
         if isinstance(request.selected_controlnet_model, str):
             request.selected_controlnet_model = [request.selected_controlnet_model]
         init_images = [image] * len(request.selected_controlnet_model)
@@ -546,12 +545,14 @@ Here is the final output:
         """
 
     def get_raw_price(self, state: dict) -> int:
-        selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
+        selected_model = state.get(
+            "selected_model", TextToImageModels.dream_shaper.name
+        )
         total = 5
         match selected_model:
-            case Text2ImgModels.deepfloyd_if.name:
+            case TextToImageModels.deepfloyd_if.name:
                 total += 3
-            case Text2ImgModels.dall_e.name:
+            case TextToImageModels.dall_e.name:
                 total += 10
         num_outputs = state.get("num_outputs") or 0
         return total * num_outputs

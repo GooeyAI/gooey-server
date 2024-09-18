@@ -86,6 +86,7 @@ class DocExtractPage(BasePage):
         "youtube-bot",
         "doc-extract",
     ]
+    sdk_method_name = "synthesizeData"
     price = 500
 
     class RequestModelBase(BasePage.RequestModel):
@@ -93,7 +94,7 @@ class DocExtractPage(BasePage):
 
         sheet_url: FieldHttpUrl | None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_asr_model: AsrModels.api_enum | None
         # language: str | None
         google_translate_target: str | None
         glossary_document: FieldHttpUrl | None = Field(
@@ -104,9 +105,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 
         task_instructions: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: LargeLanguageModels.api_enum | None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
