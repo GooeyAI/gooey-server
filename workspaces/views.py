@@ -62,7 +62,12 @@ def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvit
 
 
 def workspaces_page(user: AppUser, session: dict):
+    from routers.account import account_route
+
     workspace = get_current_workspace(user, session)
+    if workspace.is_personal:
+        raise gui.RedirectException(get_route_path(account_route))
+
     membership = workspace.memberships.get(user=user)
     render_workspace_by_membership(membership)
 

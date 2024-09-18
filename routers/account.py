@@ -212,11 +212,14 @@ class AccountTabs(TabData, Enum):
         return get_route_path(self.route)
 
     @classmethod
-    def get_tabs_for_user(cls, user: AppUser | None) -> list["AccountTabs"]:
+    def get_tabs_for_request(cls, request: Request) -> list["AccountTabs"]:
         from daras_ai_v2.base import BasePage
 
         ret = list(cls)
-        if not BasePage.is_user_admin(user):
+        if (
+            not BasePage.is_user_admin(request.user)
+            or get_current_workspace(request.user, request.session).is_personal
+        ):
             ret.remove(cls.workspaces)
 
         return ret
@@ -286,7 +289,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
     with page_wrapper(request):
         gui.div(className="mt-5")
         with gui.nav_tabs():
-            for tab in AccountTabs.get_tabs_for_user(request.user):
+            for tab in AccountTabs.get_tabs_for_request(request):
                 with gui.nav_item(tab.url_path, active=tab == current_tab):
                     gui.html(tab.title)
 
