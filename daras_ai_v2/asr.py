@@ -321,7 +321,9 @@ def translation_language_selector(
     key: str,
     **kwargs,
 ) -> str | None:
-    if not model:
+    if not model or (
+        model == TranslationModels.ghana_nlp and not settings.GHANA_NLP_SUBKEY
+    ):
         gui.session_state[key] = None
         return
 
