@@ -202,6 +202,7 @@ MMS_SUPPORTED = {
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
+GHANA_API_AUTH_HEADERS = {"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)}
 GHANA_NLP_ASR_V2_SUPPORTED = {
     "tw": "Twi",
     "gaa": "Ga",
@@ -902,11 +903,14 @@ def run_asr(
         )
     elif selected_model == AsrModels.ghana_nlp_asr_v2:
         r = requests.post(
-            f"https://translation-api.ghananlp.org/asr/v2/transcribe?language={language}",
+            furl(
+                "https://translation-api.ghananlp.org/asr/v2/transcribe",
+                query_params=dict(language=language),
+            ),
             headers={
                 "Content-Type": "audio/wav",
                 "Cache-Control": "no-cache",
-                "Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY),
+                **GHANA_API_AUTH_HEADERS,
             },
             data=requests.get(audio_url).content,
         )
