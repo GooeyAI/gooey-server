@@ -609,7 +609,9 @@ class BasePage:
     def _publish_for_anonymous_user(self):
         query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
         if self._has_request_changed():
-            sr = self.create_new_run(enable_rate_limits=True, run_status=None)
+            sr = self.create_and_validate_new_run(
+                enable_rate_limits=True, run_status=None
+            )
         else:
             sr = self.current_sr
 
