@@ -179,6 +179,15 @@ class Workspace(SafeDeleteModel):
             workspace_memberships__deleted__isnull=True,
         )
 
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
+            workspace_memberships__deleted__isnull=True,
+        )
+
     @db_middleware
     @transaction.atomic
     def add_balance(

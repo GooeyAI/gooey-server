@@ -234,6 +234,11 @@ class AccountTabs(TabData, Enum):
         elif not workspace.is_personal:
             ret.remove(cls.profile)
 
+        owners_and_admins = workspace.get_owners() | workspace.get_admins()
+        if not owners_and_admins.filter(id=request.user.id).exists():
+            # don't show billing tab if user is not an owner or admin
+            ret.remove(cls.billing)
+
         return ret
 
 
