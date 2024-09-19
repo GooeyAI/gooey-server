@@ -10,6 +10,7 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
 
+from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
@@ -70,7 +71,7 @@ def payment_processing_route(
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
-        redirectUrl=get_app_route_url(billing_route),
+        redirectUrl=get_app_route_url(account_route),
     )
 
     return dict(
@@ -80,19 +81,6 @@ def payment_processing_route(
 
 @gui.route(app, "/account/")
 def account_route(request: Request):
-    from daras_ai_v2.base import BasePage
-
-    if (
-        not BasePage.is_user_admin(request.user)
-        or get_current_workspace(request.user, request.session).is_personal
-    ):
-        raise gui.RedirectException(get_route_path(profile_route))
-    else:
-        raise gui.RedirectException(get_route_path(workspaces_route))
-
-
-@gui.route(app, "/account/billing/")
-def billing_route(request: Request):
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
     url = get_og_url_path(request)
@@ -213,11 +201,11 @@ class TabData(typing.NamedTuple):
 
 
 class AccountTabs(TabData, Enum):
+    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
-    workspaces = TabData(title=f"{icons.company} Members", route=workspaces_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
-    billing = TabData(title=f"{icons.billing} Billing", route=billing_route)
+    workspaces = TabData(title=f"{icons.company} Teams", route=workspaces_route)
 
     @property
     def url_path(self) -> str:
@@ -228,11 +216,11 @@ class AccountTabs(TabData, Enum):
         from daras_ai_v2.base import BasePage
 
         ret = list(cls)
-        workspace = get_current_workspace(request.user, request.session)
-        if not BasePage.is_user_admin(request.user) or workspace.is_personal:
+        if (
+            not BasePage.is_user_admin(request.user)
+            or get_current_workspace(request.user, request.session).is_personal
+        ):
             ret.remove(cls.workspaces)
-        elif not workspace.is_personal:
-            ret.remove(cls.profile)
 
         owners_and_admins = workspace.get_owners() | workspace.get_admins()
         if not owners_and_admins.filter(id=request.user.id).exists():

@@ -17,7 +17,7 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_app_route_url
 from payments.models import PricingPlan
 from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
-from routers.account import payment_processing_route, billing_route
+from routers.account import payment_processing_route, account_route
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace
@@ -144,7 +144,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
             "return_url": get_app_route_url(payment_processing_route),
-            "cancel_url": get_app_route_url(billing_route),
+            "cancel_url": get_app_route_url(account_route),
         },
     )
 

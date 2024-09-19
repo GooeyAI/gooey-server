@@ -340,7 +340,7 @@ class Subscription(models.Model):
         """
         Get URL to Stripe/PayPal for user to manage the subscription.
         """
-        from routers.account import billing_route
+        from routers.account import account_route
 
         match self.payment_provider:
             case PaymentProvider.PAYPAL:
@@ -354,7 +354,7 @@ class Subscription(models.Model):
             case PaymentProvider.STRIPE:
                 portal = stripe.billing_portal.Session.create(
                     customer=self.stripe_get_customer_id(),
-                    return_url=get_app_route_url(billing_route),
+                    return_url=get_app_route_url(account_route),
                 )
                 return portal.url
             case _:

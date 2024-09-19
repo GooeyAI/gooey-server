@@ -49,16 +49,16 @@ def send_low_balance_email(
     workspace: "Workspace",
     total_credits_consumed: int,
 ):
-    from routers.account import billing_route
+    from routers.account import account_route
 
-    logger.info("Sending low balance email...")
+    print("sending...")
 
     recipeints = "support@gooey.ai, devs@gooey.ai"
     for user in workspace.get_owners():
         html_body = templates.get_template("low_balance_email.html").render(
             user=user,
             workspace=workspace,
-            url=get_app_route_url(billing_route),
+            url=get_app_route_url(account_route),
             total_credits_consumed=total_credits_consumed,
             settings=settings,
         )
