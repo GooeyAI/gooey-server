@@ -321,16 +321,17 @@ def translation_language_selector(
     key: str,
     **kwargs,
 ) -> str | None:
-    if not model or (
-        model == TranslationModels.ghana_nlp and not settings.GHANA_NLP_SUBKEY
-    ):
+    if not model:
         gui.session_state[key] = None
         return
 
     if model == TranslationModels.google:
         languages = google_translate_target_languages()
     elif model == TranslationModels.ghana_nlp:
-        languages = ghana_nlp_translate_target_languages()
+        if not settings.GHANA_NLP_SUBKEY:
+            languages = {}
+        else:
+            languages = ghana_nlp_translate_target_languages()
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
