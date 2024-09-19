@@ -902,6 +902,8 @@ def run_asr(
             # queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
     elif selected_model == AsrModels.ghana_nlp_asr_v2:
+        audio_r = requests.get(audio_url)
+        raise_for_status(audio_r)
         r = requests.post(
             furl(
                 "https://translation-api.ghananlp.org/asr/v2/transcribe",
@@ -912,7 +914,7 @@ def run_asr(
                 "Cache-Control": "no-cache",
                 **GHANA_API_AUTH_HEADERS,
             },
-            data=requests.get(audio_url).content,
+            data=audio_r.content,
         )
         raise_for_status(r)
         data = r.json()
