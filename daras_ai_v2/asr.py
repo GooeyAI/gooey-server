@@ -202,7 +202,7 @@ MMS_SUPPORTED = {
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
-
+GHANA_API_AUTH_HEADERS = {"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)}
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
