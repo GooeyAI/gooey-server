@@ -1683,10 +1683,10 @@ This will also delete all the associated versions.
 
         pr = self.create_published_run(
             published_run_id=get_random_doc_id(),
-            saved_run=sr or self.current_sr,
+            saved_run=sr,
             user=self.request.user,
             title=self._get_default_pr_title(),
-            notes=self.current_pr and self.current_pr.notes or "",
+            notes=self.current_pr.notes,
             visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
         )
         raise gui.RedirectException(pr.get_app_url())
