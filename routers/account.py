@@ -165,7 +165,7 @@ def workspaces_route(request: Request):
         meta=raw_build_meta_tags(
             url=url,
             canonical_url=url,
-            title="Teams • Gooey.AI",
+            title="Members • Gooey.AI",
             description="Your teams.",
             robots="noindex,nofollow",
         )
