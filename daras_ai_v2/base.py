@@ -1,5 +1,3 @@
-import base64
-import binascii
 import datetime
 import hashlib
 import html
@@ -17,13 +15,13 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
+from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
-from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
@@ -87,8 +85,7 @@ MAX_SEED = 4294967294
 gooey_rng = Random()
 
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
-SAVE_AFTER_LOGIN_Q = "saveafterlogin"
-REQUEST_STATE_Q = "requeststate"
+PUBLISH_AFTER_LOGIN_Q = "publishafterlogin"
 
 
 class RecipeRunState(Enum):
@@ -315,17 +312,6 @@ class BasePage:
             }
         return event
 
-    def _load_state_from_query_params(self):
-        request_state = self.request.query_params.get(REQUEST_STATE_Q)
-        if not request_state:
-            return
-
-        try:
-            request_state = base64.urlsafe_b64decode(request_state).decode()
-            gui.session_state.update(json.loads(request_state))
-        except (json.JSONDecodeError, binascii.Error) as e:
-            logger.warning(f"Failed to load request state from query params: {e}")
-
     def refresh_state(self):
         sr = self.current_sr
         channel = self.realtime_channel_name(sr.run_id, sr.uid)
@@ -335,7 +321,6 @@ class BasePage:
 
     def render(self):
         self.setup_sentry()
-        self._load_state_from_query_params()
 
         if self.get_run_state(gui.session_state) == RecipeRunState.running:
             self.refresh_state()
@@ -345,11 +330,10 @@ class BasePage:
         self._user_disabled_check()
         self._check_if_flagged()
 
+        if self.should_publish_after_login():
+            self.publish_and_redirect()
         if self.should_submit_after_login():
-            self.submit_and_redirect(save=self.should_save_after_login())
-
-        if self.should_save_after_login():
-            self.save_and_redirect()
+            self.submit_and_redirect()
 
         if gui.session_state.get("show_report_workflow"):
             self.render_report_form()
@@ -603,7 +587,7 @@ class BasePage:
                 type="primary",
             ):
                 if not self.request.user or self.request.user.is_anonymous:
-                    self._save_for_anonymous_user()
+                    self._publish_for_anonymous_user()
 
                 self.clear_publish_form()
                 ref.set_open(True)
@@ -622,14 +606,15 @@ class BasePage:
                     is_update_mode=can_edit,
                 )
 
-    def _save_for_anonymous_user(self):
-        query_params = {SUBMIT_AFTER_LOGIN_Q: "1", SAVE_AFTER_LOGIN_Q: "1"}
-        if diff := self._get_request_diff_to_save():
-            query_params[REQUEST_STATE_Q] = base64.urlsafe_b64encode(
-                json.dumps(diff).encode()
-            ).decode()
+    def _publish_for_anonymous_user(self):
+        query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
+        if self._has_request_changed():
+            sr = self.create_new_run(enable_rate_limits=True, run_status=None)
+        else:
+            sr = self.current_sr
+
         raise gui.RedirectException(
-            self.get_auth_url(next_url=self.current_app_url(query_params=query_params))
+            self.get_auth_url(next_url=sr.get_app_url(query_params=query_params))
         )
 
     @staticmethod
@@ -729,11 +714,7 @@ class BasePage:
 
     def _get_default_pr_title(self):
         recipe_title = self.get_root_pr().title or self.title
-        if self.request.user and not self.request.user.is_anonymous:
-            title = f"{self.request.user.first_name_possesive()} {recipe_title}"
-        else:
-            title = f"My {recipe_title}"
-        return title
+        return f"{self.request.user.first_name_possesive()} {recipe_title}"
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -781,14 +762,6 @@ class BasePage:
             return True
         else:
             return False
-
-    def _get_request_diff_to_save(self) -> dict[str, typing.Any]:
-        sr_state = self.current_sr_to_session_state()
-        return {
-            k: gui.session_state[k]
-            for k in self.RequestModel.__fields__
-            if k in gui.session_state and sr_state.get(k) != gui.session_state[k]
-        }
 
     def _saved_options_modal(self):
         assert self.request.user
@@ -1242,7 +1215,7 @@ This will also delete all the associated versions.
     def get_sr_from_ids(
         cls,
         run_id: str,
-        uid: str,
+        uid: str | None,
         *,
         create: bool = False,
         defaults: dict = None,
@@ -1672,47 +1645,57 @@ This will also delete all the associated versions.
     def estimate_run_duration(self) -> int | None:
         pass
 
-    def submit_and_redirect(self, save: bool = False) -> typing.NoReturn | None:
+    def submit_and_redirect(self) -> typing.NoReturn | None:
         sr = self.on_submit()
         if not sr:
             return
-        if save:
-            self.save_and_redirect(sr)
-        else:
-            raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
-    def save_and_redirect(self, sr: SavedRun | None = None) -> typing.NoReturn:
+    def publish_and_redirect(self) -> typing.NoReturn | None:
+        assert self.request.user and not self.request.user.is_anonymous
+
+        if (
+            self.get_run_state(gui.session_state) == RecipeRunState.starting
+            and self.current_sr_user
+        ):
+            with transaction.atomic():
+                # select_for_update() is important because we need to ensure the
+                # run is not being modified by another thread (e.g. in a different
+                # tab). otherwise, we could end up queueing the run twice.
+                sr = SavedRun.objects.select_for_update().get(id=self.current_sr.id)
+                if self.get_run_state(sr.to_dict()) != RecipeRunState.starting:
+                    # run has already been started in another tab
+                    gui.rerun()
+                if (
+                    sr.uid == self.current_sr_user.uid
+                    and self.current_sr_user.is_anonymous
+                ):
+                    # run belonged to an anonymous user who now logged
+                    # in from an existing account now, so we update the uid
+                    sr.uid = self.request.user.uid
+                    sr.save(update_fields=["uid"])
+                gui.session_state[StateKeys.run_status] = "Starting..."
+                self.dump_state_to_sr(self._get_validated_state(), sr)
+
+            self.call_runner_task(sr)
+        else:
+            sr = self.current_sr
+
         pr = self.create_published_run(
             published_run_id=get_random_doc_id(),
             saved_run=sr or self.current_sr,
             user=self.request.user,
-            title=gui.session_state.get(
-                "published_run_title", self._get_default_pr_title()
-            ),
-            notes=gui.session_state.get(
-                "published_run_notes", self.current_pr and self.current_pr.notes or ""
-            ),
-            visibility=PublishedRunVisibility(
-                int(
-                    gui.session_state.get(
-                        "published_run_visibility", PublishedRunVisibility.UNLISTED
-                    )
-                )
-            ),
+            title=self._get_default_pr_title(),
+            notes=self.current_pr and self.current_pr.notes or "",
+            visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
         )
         raise gui.RedirectException(pr.get_app_url())
 
     def on_submit(self):
-        try:
-            sr = self.create_new_run(enable_rate_limits=True)
-        except ValidationError as e:
-            gui.session_state[StateKeys.run_status] = None
-            gui.session_state[StateKeys.error_msg] = str(e)
+        sr = self.create_and_validate_new_run()
+        if not sr:
             return
-        except RateLimitExceeded as e:
-            gui.session_state[StateKeys.run_status] = None
-            gui.session_state[StateKeys.error_msg] = e.detail.get("error", "")
-            return
+
         self.call_runner_task(sr)
         return sr
 
@@ -1723,17 +1706,42 @@ This will also delete all the associated versions.
             and not self.request.user.is_anonymous
         )
 
-    def should_save_after_login(self) -> bool:
+    def should_publish_after_login(self) -> bool:
         return bool(
-            self.request.query_params.get(SAVE_AFTER_LOGIN_Q)
+            self.request.query_params.get(PUBLISH_AFTER_LOGIN_Q)
             and self.request.user
             and not self.request.user.is_anonymous
         )
 
+    def create_and_validate_new_run(
+        self,
+        *,
+        enable_rate_limits: bool = False,
+        run_status: str | None = "Starting...",
+        **defaults,
+    ) -> SavedRun | None:
+        try:
+            sr = self.create_new_run(
+                enable_rate_limits=enable_rate_limits, run_status=run_status, **defaults
+            )
+        except ValidationError as e:
+            gui.session_state[StateKeys.run_status] = None
+            gui.session_state[StateKeys.error_msg] = str(e)
+            return
+        except RateLimitExceeded as e:
+            gui.session_state[StateKeys.run_status] = None
+            gui.session_state[StateKeys.error_msg] = e.detail.get("error", "")
+            return
+        return sr
+
     def create_new_run(
-        self, *, enable_rate_limits: bool = False, **defaults
+        self,
+        *,
+        enable_rate_limits: bool = False,
+        run_status: str | None = "Starting...",
+        **defaults,
     ) -> SavedRun:
-        gui.session_state[StateKeys.run_status] = "Starting..."
+        gui.session_state[StateKeys.run_status] = run_status
         gui.session_state.pop(StateKeys.error_msg, None)
         gui.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
@@ -1774,13 +1782,15 @@ This will also delete all the associated versions.
             ),
         )
 
-        # ensure the request is validated
-        state = gui.session_state | json.loads(
-            self.RequestModel.parse_obj(gui.session_state).json(exclude_unset=True)
-        )
-        self.dump_state_to_sr(state, sr)
+        self.dump_state_to_sr(self._get_validated_state(), sr)
 
         return sr
+
+    def _get_validated_state(self) -> dict:
+        # ensure the request is validated
+        return gui.session_state | json.loads(
+            self.RequestModel.parse_obj(gui.session_state).json(exclude_unset=True)
+        )
 
     def dump_state_to_sr(self, state: dict, sr: SavedRun):
         sr.set(
