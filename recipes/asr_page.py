@@ -153,7 +153,11 @@ class AsrPage(BasePage):
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
                 key="translation_source",
-                allow_none=True,
+                allow_none=(
+                    translation_model.supports_auto_detect
+                    if translation_model
+                    else True
+                ),
             )
             gui.caption(
                 "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
@@ -211,7 +215,7 @@ class AsrPage(BasePage):
                 asr_output,
                 target_language=request.translation_target,
                 source_language=forced_asr_languages.get(
-                    selected_model, request.language or request.translation_source
+                    selected_model, request.translation_source or request.language
                 ),
                 glossary_url=request.glossary_document,
                 model=request.translation_model,

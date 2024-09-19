@@ -59,15 +59,16 @@ GCP_V1_SUPPORTED = {
 
 # https://cloud.google.com/speech-to-text/v2/docs/speech-to-text-supported-languages
 CHIRP_SUPPORTED = {
-    "af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG",
-    "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "yue-Hant-HK", "zh-TW", "hr-HR", "cs-CZ", "da-DK", "nl-NL",
-    "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE",
-    "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV",
-    "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU",
-    "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "no-NO", "ny-MW", "oc-FR", "ps-AF", "fa-IR",
-    "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI",
-    "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK",
-    "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"
+    'fa-IR', 'sr-RS', 'es-US', 'ur-PK', 'yo-NG', 'te-IN', 'sn-ZW', 'es-ES', 'jv-ID', 'no-NO', 'cmn-Hans-CN', 'ha-NG',
+    'es-419', 'wo-SN', 'rup-BG', 'ceb-PH', 'ms-MY', 'umb-AO', 'ny-MW', 'sw-KE', 'et-EE', 'ga-IE', 'kn-IN', 'sd-IN',
+    'en-GB', 'ml-IN', 'fil-PH', 'my-MM', 'uk-UA', 'lt-LT', 'en-US', 'ff-SN', 'su-ID', 'ru-RU', 'xh-ZA', 'en-IN',
+    'it-IT', 'ky-KG', 'en-AU', 'id-ID', 'ja-JP', 'fr-CA', 'nl-NL', 'fi-FI', 'zu-ZA', 'ar-EG', 'bs-BA', 'gl-ES', 'si-LK',
+    'pa-Guru-IN', 'ast-ES', 'tr-TR', 'mt-MT', 'hy-AM', 'da-DK', 'vi-VN', 'kam-KE', 'hu-HU', 'cs-CZ', 'sl-SI', 'ko-KR',
+    'km-KH', 'kk-KZ', 'nso-ZA', 'mk-MK', 'de-DE', 'mr-IN', 'th-TH', 'as-IN', 'kea-CV', 'bg-BG', 'sk-SK', 'bn-BD',
+    'el-GR', 'cy-GB', 'ro-RO', 'ckb-IQ', 'ca-ES', 'sq-AL', 'af-ZA', 'ig-NG', 'cmn-Hant-TW', 'mi-NZ', 'gu-IN', 'tg-TJ',
+    'oc-FR', 'so-SO', 'be-BY', 'fr-FR', 'luo-KE', 'sv-SE', 'is-IS', 'bn-IN', 'lg-UG', 'uz-UZ', 'iw-IL', 'ps-AF',
+    'ta-IN', 'sw', 'mn-MN', 'ka-GE', 'az-AZ', 'pt-BR', 'hi-IN', 'lo-LA', 'am-ET', 'eu-ES', 'yue-Hant-HK', 'pl-PL',
+    'om-ET', 'hr-HR', 'lv-LV', 'or-IN', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
 WHISPER_SUPPORTED = {
@@ -309,7 +310,7 @@ class TranslationModels(TranslationModel, Enum):
         supports_auto_detect=True,
     )
     ghana_nlp = TranslationModel(
-        label="Ghana NLP Translate",
+        label="Ghana NLP Translate", supports_auto_detect=False
     )
 
 
@@ -327,7 +328,10 @@ def translation_language_selector(
     if model == TranslationModels.google:
         languages = google_translate_target_languages()
     elif model == TranslationModels.ghana_nlp:
-        languages = GHANA_NLP_SUPPORTED
+        if not settings.GHANA_NLP_SUBKEY:
+            languages = {}
+        else:
+            languages = ghana_nlp_translate_target_languages()
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -383,6 +387,21 @@ def google_translate_language_selector(
         allow_none=allow_none,
         **kwargs,
     )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def ghana_nlp_translate_target_languages():
+    """
+    Get list of supported languages for Ghana NLP Translation.
+    :return: Dictionary of language codes and display names.
+    Reference: https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+    """
+    r = requests.get(
+        "https://translation-api.ghananlp.org/v1/languages",
+        headers=GHANA_API_AUTH_HEADERS,
+    )
+    raise_for_status(r)
+    return r.json().get("languages") or {}
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -505,10 +524,10 @@ def run_ghana_nlp_translate(
         source_language and target_language
     ), "Both Source & Target language is required for Ghana NLP"
     source_language = normalised_lang_in_collection(
-        source_language, GHANA_NLP_SUPPORTED
+        source_language, ghana_nlp_translate_target_languages()
     )
     target_language = normalised_lang_in_collection(
-        target_language, GHANA_NLP_SUPPORTED
+        target_language, ghana_nlp_translate_target_languages()
     )
     if source_language == target_language:
         return texts
@@ -534,7 +553,7 @@ def _call_ghana_nlp_chunked(
 def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
     r = requests.post(
         "https://translation-api.ghananlp.org/v1/translate",
-        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        headers=GHANA_API_AUTH_HEADERS,
         json={"in": text, "lang": source_language + "-" + target_language},
     )
     raise_for_status(r)
