@@ -588,9 +588,9 @@ class BasePage:
             ):
                 if not self.request.user or self.request.user.is_anonymous:
                     self._publish_for_anonymous_user()
-
-                self.clear_publish_form()
-                ref.set_open(True)
+                else:
+                    self.clear_publish_form()
+                    ref.set_open(True)
 
             if not ref.is_open:
                 return
