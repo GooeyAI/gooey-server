@@ -903,7 +903,7 @@ def run_asr(
         )
     elif selected_model == AsrModels.ghana_nlp_asr_v2:
         audio_r = requests.get(audio_url)
-        raise_for_status(audio_r)
+        raise_for_status(audio_r, is_user_url=True)
         r = requests.post(
             furl(
                 "https://translation-api.ghananlp.org/asr/v2/transcribe",
