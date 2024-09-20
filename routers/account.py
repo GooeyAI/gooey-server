@@ -231,12 +231,9 @@ class AccountTabs(TabData, Enum):
         workspace = get_current_workspace(request.user, request.session)
         if not BasePage.is_user_admin(request.user) or workspace.is_personal:
             ret.remove(cls.workspaces)
-        elif not workspace.is_personal:
-            ret.remove(cls.profile)
 
         if not workspace.is_personal:
             ret.remove(cls.profile)
-
             if not workspace.memberships.get(user=request.user).can_edit_workspace():
                 ret.remove(cls.billing)
 
