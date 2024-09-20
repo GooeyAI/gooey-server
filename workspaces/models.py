@@ -373,7 +373,8 @@ class WorkspaceMembership(SafeDeleteModel):
             raise ValidationError("You cannot add users to a personal workspace")
         return super().clean()
 
-    def can_edit_workspace_metadata(self):
+    def can_edit_workspace(self):
+        # workspace metadata, billing, etc.
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):

@@ -10,7 +10,6 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
 
-from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
@@ -201,11 +200,11 @@ class TabData(typing.NamedTuple):
 
 
 class AccountTabs(TabData, Enum):
-    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
+    workspaces = TabData(title=f"{icons.company} Teams", route=workspaces_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
-    workspaces = TabData(title=f"{icons.company} Teams", route=workspaces_route)
+    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
 
     @property
     def url_path(self) -> str:
@@ -216,22 +215,24 @@ class AccountTabs(TabData, Enum):
         from daras_ai_v2.base import BasePage
 
         ret = list(cls)
-        if (
-            not BasePage.is_user_admin(request.user)
-            or get_current_workspace(request.user, request.session).is_personal
-        ):
+
+        workspace = get_current_workspace(request.user, request.session)
+        if not BasePage.is_user_admin(request.user) or workspace.is_personal:
             ret.remove(cls.workspaces)
 
-        owners_and_admins = workspace.get_owners() | workspace.get_admins()
-        if not owners_and_admins.filter(id=request.user.id).exists():
-            # don't show billing tab if user is not an owner or admin
-            ret.remove(cls.billing)
+        if not workspace.is_personal:
+            ret.remove(cls.profile)
+
+            if not workspace.memberships.get(user=request.user).can_edit_workspace():
+                ret.remove(cls.billing)
 
         return ret
 
 
 def billing_tab(request: Request):
     workspace = get_current_workspace(request.user, request.session)
+    if not workspace.is_personal and not workspace.memberships.get(user=request.user):
+        raise gui.RedirectException(get_route_path(account_route))
     return billing_page(workspace)
 
 

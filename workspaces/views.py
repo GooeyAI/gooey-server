@@ -193,7 +193,7 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
-    if not membership.can_edit_workspace_metadata():
+    if not membership.can_edit_workspace():
         return
 
     ref = gui.use_confirm_dialog(key="edit-workspace", close_on_confirm=False)
