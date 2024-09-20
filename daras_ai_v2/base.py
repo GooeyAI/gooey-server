@@ -1841,9 +1841,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
+        workspace_id = self.current_workspace.id
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
+            workspace_id = self.request.query_params.get("workspace_id", workspace_id)
 
         before = self.request.query_params.get("updated_at__lt", None)
         if before:
@@ -1853,8 +1855,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         run_history = list(
             SavedRun.objects.filter(
                 workflow=self.workflow,
-                uid=uid,
                 updated_at__lt=before,
+                uid=uid,
+                workspace_id=workspace_id,
             )[:25]
         )
         if not run_history:
