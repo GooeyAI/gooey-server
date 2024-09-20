@@ -255,9 +255,8 @@ def profile_tab(request: Request):
 
 
 def all_saved_runs_tab(request: Request):
-    prs = PublishedRun.objects.filter(
-        created_by=request.user,
-    ).order_by("-updated_at")
+    workspace = get_current_workspace(request.user, request.session)
+    prs = PublishedRun.objects.filter(workspace=workspace).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
