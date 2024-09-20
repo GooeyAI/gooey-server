@@ -296,7 +296,8 @@ def all_saved_runs_tab(request: Request):
 
 def api_keys_tab(request: Request):
     gui.write("# 🔐 API Keys")
-    manage_api_keys(request.user)
+    workspace = get_current_workspace(request.user, request.session)
+    manage_api_keys(workspace, request.user)
 
 
 @contextmanager
