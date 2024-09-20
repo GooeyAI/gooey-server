@@ -127,6 +127,8 @@ class Workspace(SafeDeleteModel):
 
     objects = WorkspaceQuerySet.as_manager()
 
+    api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT + "/workspaces")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

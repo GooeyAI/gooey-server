@@ -550,14 +550,17 @@ class BasePage:
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
-                if self.request.user and self.request.user.handle:
+                if not self.current_workspace.is_personal:
+                    # TODO: implement with workspace handles
+                    pass
+                elif self.request.user and self.request.user.handle:
                     profile_url = self.request.user.handle.get_app_url()
                     pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
                     options[
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
                 elif self.request.user and not self.request.user.is_anonymous:
-                    edit_profile_url = AccountTabs.profile.url_path
+                    edit_profile_url = AccountTabs.profile.get_url_path(self.request)
                     options[
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'

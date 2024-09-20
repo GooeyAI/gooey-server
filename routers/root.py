@@ -704,7 +704,12 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
+def page_wrapper(
+    request: Request,
+    className="",
+    *,
+    route_fn: typing.Callable | None = None,
+):
     from daras_ai_v2.base import BasePage
 
     context = {
@@ -730,7 +735,7 @@ def page_wrapper(request: Request, className=""):
                 ),
                 gui.div(style=dict(minWidth="200pt")),
             ):
-                workspace_selector(request.user, request.session)
+                workspace_selector(request.user, request.session, route_fn=route_fn)
 
         with gui.div(id="main-content", className="container-xxl " + className):
             yield
