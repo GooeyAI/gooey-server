@@ -441,11 +441,9 @@ class BasePage:
         )
 
     def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and published_run.created_by_id
-            and published_run.created_by_id == self.request.user.id
+        return (
+            self.is_current_user_admin()
+            or published_run.workspace == self.current_workspace
         )
 
     def _render_title(self, title: str):
