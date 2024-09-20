@@ -23,7 +23,7 @@ RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.07.0.tar.xz' | tar -xJ
     && rm -rf poppler-23.07.0
 
 # install latest pandoc - https://github.com/jgm/pandoc/releases
-RUN wget -qO pandoc.deb 'https://github.com/jgm/pandoc/releases/download/3.1.13/pandoc-3.1.13-1-amd64.deb' \
+RUN wget -qO pandoc.deb 'https://github.com/jgm/pandoc/releases/download/3.2/pandoc-3.2-1-amd64.deb' \
     && dpkg -i pandoc.deb \
     && rm pandoc.deb
 
@@ -45,16 +45,17 @@ COPY ./pyproject.toml ./poetry.lock ./
 # install python dependencies
 RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only main --no-interaction
 
-# install nltk stopwords
-RUN poetry run python -c 'import nltk; nltk.download("stopwords")'
 # install playwright
-RUN poetry run playwright install-deps && poetry run playwright install
+RUN poetry run playwright install-deps && poetry run playwright install chromium
 
 # copy the code into the container
 COPY . .
 
 ENV FORWARDED_ALLOW_IPS='*'
 ENV PYTHONUNBUFFERED=1
+
+ARG CAPROVER_GIT_COMMIT_SHA=${CAPROVER_GIT_COMMIT_SHA}
+ENV CAPROVER_GIT_COMMIT_SHA=${CAPROVER_GIT_COMMIT_SHA}
 
 EXPOSE 8000
 EXPOSE 8501
@@ -65,4 +66,5 @@ HEALTHCHECK CMD \
     || bash -c 'poetry run celery -A celeryapp inspect ping -d celery@$HOSTNAME' \
     || exit 1
 
-CMD poetry run ./scripts/run-prod.sh
+ENTRYPOINT ["poetry", "run"]
+CMD ["./scripts/run-prod.sh"]

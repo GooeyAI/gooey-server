@@ -3,18 +3,23 @@ import math
 import mimetypes
 import typing
 
+import gooey_gui as gui
 from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
-from bots.models import BotIntegration, Platform
+from bots.models import (
+    BotIntegration,
+    Platform,
+    PublishedRun,
+    PublishedRunVisibility,
+)
 from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -30,29 +35,32 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, RecipeTabs
+from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
+    twilio_specific_settings,
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
     get_web_widget_embed_code,
+    integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
     keyword_instructions_widget,
     doc_search_advanced_settings,
     doc_extract_selector,
-    document_uploader,
+    bulk_documents_uploader,
     citation_style_selector,
+    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
-from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.glossary import glossary_input, validate_glossary_document
+from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -66,15 +74,17 @@ from daras_ai_v2.language_model import (
     format_chat_entry,
     SUPERSCRIPT,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_selector,
+    LanguageModelSettings,
+)
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
-from daras_ai_v2.query_params import gooey_get_query_params
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import (
     parse_refs,
     CitationStyles,
@@ -86,11 +96,10 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
+    elevenlabs_init_state,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
-from gooey_ui import RedirectException
+from functions.recipe_functions import LLMTools
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -101,7 +110,6 @@ from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
-INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
 GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
@@ -127,6 +135,8 @@ class VideoBotsPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
+
+    functions_in_settings = False
 
     sane_defaults = {
         "messages": [],
@@ -166,7 +176,7 @@ class VideoBotsPage(BasePage):
         "translation_model": TranslationModels.google.name,
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None
         input_audio: str | None
         input_images: list[FieldHttpUrl] | None
@@ -182,7 +192,7 @@ class VideoBotsPage(BasePage):
 
         bot_script: str | None
 
-        # llm settings
+        # llm model
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
@@ -191,11 +201,6 @@ class VideoBotsPage(BasePage):
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
             "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
         )
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
 
         # doc search
         task_instructions: str | None
@@ -248,14 +253,14 @@ Translation Glossary for LLM Language (English) -> User Langauge
             LipsyncModel.Wav2Lip.name
         )
 
-        variables: dict[str, typing.Any] | None
-
         tools: list[LLMTools] | None = Field(
             title="🛠️ Tools",
             description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
         )
 
-    class RequestModel(LipsyncSettings, TextToSpeechSettings, RequestModelBase):
+    class RequestModel(
+        LipsyncSettings, TextToSpeechSettings, LanguageModelSettings, RequestModelBase
+    ):
         pass
 
     class ResponseModel(BaseModel):
@@ -271,7 +276,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         raw_output_text: list[str] | None
 
         # doc search
-        references: list[SearchReference] | None
+        references: list[SearchReference] | None = []
         final_search_query: str | None
         final_keyword_query: str | list[str] | None
 
@@ -305,7 +310,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return {}
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
 Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
 
@@ -325,25 +330,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
         )
-        prompt_vars_widget(
-            "bot_script",
-        )
 
-        enum_selector(
-            LargeLanguageModels,
-            label="#### 🧠 Language Model",
-            key="selected_model",
-            use_selectbox=True,
-        )
+        language_model_selector(label="#### 🧠 Language Model")
 
-        document_uploader(
+        bulk_documents_uploader(
             """
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
@@ -351,23 +348,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
-        st.markdown("#### Capabilities")
-        if st.checkbox(
+        gui.markdown("#### 💪 Capabilities")
+        if gui.checkbox(
             "##### 🗣️ Text to Speech & Lipsync",
-            value=bool(st.session_state.get("tts_provider")),
+            value=bool(gui.session_state.get("tts_provider")),
         ):
             text_to_speech_provider_selector(self)
-            st.write("---")
+            gui.write("---")
 
-            enable_video = st.checkbox(
+            enable_video = gui.checkbox(
                 "##### 🫦 Add Lipsync Video",
-                value=bool(st.session_state.get("input_face")),
+                value=bool(gui.session_state.get("input_face")),
             )
         else:
-            st.session_state["tts_provider"] = None
+            gui.session_state["tts_provider"] = None
             enable_video = False
         if enable_video:
-            st.file_uploader(
+            gui.file_uploader(
                 """
                 ###### 👩‍🦰 Input Face
                 Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
@@ -380,20 +377,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="lipsync_model",
                 use_selectbox=True,
             )
-            st.write("---")
+            gui.write("---")
         else:
-            st.session_state["input_face"] = None
-            st.session_state.pop("lipsync_model", None)
+            gui.session_state["input_face"] = None
+            gui.session_state.pop("lipsync_model", None)
 
-        if st.checkbox(
+        if gui.checkbox(
             "##### 🔠 Translation & Speech Recognition",
             value=bool(
-                st.session_state.get("user_language")
-                or st.session_state.get("asr_model")
+                gui.session_state.get("user_language")
+                or gui.session_state.get("asr_model")
             ),
         ):
-            st.caption(field_desc(self.RequestModel, "user_language"))
-            col1, col2 = st.columns(2)
+            gui.caption(field_desc(self.RequestModel, "user_language"))
+            col1, col2 = gui.columns(2)
             with col1:
                 translation_model = translation_model_selector(allow_none=False)
             with col2:
@@ -402,9 +399,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     label=f"###### {field_title(self.RequestModel, 'user_language')}",
                     key="user_language",
                 )
-            st.write("---")
+            gui.write("---")
 
-            col1, col2 = st.columns(2, responsive=False)
+            col1, col2 = gui.columns(2, responsive=False)
             with col1:
                 selected_model = enum_selector(
                     AsrModels,
@@ -422,34 +419,36 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         key="asr_language",
                     )
             else:
-                st.caption(
+                gui.caption(
                     f"We'll automatically select an [ASR](https://gooey.ai/asr) model for you based on the {field_title(self.RequestModel, 'user_language')}."
                 )
-            st.write("---")
+            gui.write("---")
         else:
-            st.session_state["translation_model"] = None
-            st.session_state["asr_model"] = None
-            st.session_state["user_language"] = None
+            gui.session_state["translation_model"] = None
+            gui.session_state["asr_model"] = None
+            gui.session_state["user_language"] = None
 
-        if st.checkbox(
+        if gui.checkbox(
             "##### 🩻 Photo & Document Intelligence",
-            value=bool(
-                st.session_state.get("document_model"),
-            ),
+            value=bool(gui.session_state.get("document_model")),
         ):
-            doc_model_descriptions = azure_form_recognizer_models()
-            st.selectbox(
+            if settings.AZURE_FORM_RECOGNIZER_KEY:
+                doc_model_descriptions = azure_form_recognizer_models()
+            else:
+                doc_model_descriptions = {}
+            gui.selectbox(
                 f"{field_desc(self.RequestModel, 'document_model')}",
                 key="document_model",
                 options=doc_model_descriptions,
                 format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
             )
+            gui.write("---")
         else:
-            st.session_state["document_model"] = None
+            gui.session_state["document_model"] = None
 
     def validate_form_v2(self):
-        input_glossary = st.session_state.get("input_glossary_document", "")
-        output_glossary = st.session_state.get("output_glossary_document", "")
+        input_glossary = gui.session_state.get("input_glossary_document", "")
+        output_glossary = gui.session_state.get("output_glossary_document", "")
         if input_glossary:
             validate_glossary_document(input_glossary)
         if output_glossary:
@@ -459,55 +458,57 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        tts_provider = st.session_state.get("tts_provider")
+        tts_provider = gui.session_state.get("tts_provider")
         if tts_provider:
             text_to_speech_settings(self, tts_provider)
-            st.write("---")
+            gui.write("---")
 
-        lipsync_model = st.session_state.get("lipsync_model")
+        lipsync_model = gui.session_state.get("lipsync_model")
         if lipsync_model:
             lipsync_settings(lipsync_model)
-            st.write("---")
+            gui.write("---")
 
-        translation_model = st.session_state.get(
+        translation_model = gui.session_state.get(
             "translation_model", TranslationModels.google.name
         )
         if (
-            st.session_state.get("user_language")
-            and TranslationModels[translation_model].supports_glossary()
+            gui.session_state.get("user_language")
+            and TranslationModels[translation_model].supports_glossary
         ):
-            st.markdown("##### 🔠 Translation Settings")
-            enable_glossary = st.checkbox(
+            gui.markdown("##### 🔠 Translation Settings")
+            enable_glossary = gui.checkbox(
                 "📖 Add Glossary",
                 value=bool(
-                    st.session_state.get("input_glossary_document")
-                    or st.session_state.get("output_glossary_document")
+                    gui.session_state.get("input_glossary_document")
+                    or gui.session_state.get("output_glossary_document")
                 ),
             )
             if enable_glossary:
-                st.caption(
+                gui.caption(
                     """
                     Provide a glossary to customize translation and improve accuracy of domain-specific terms.
                     If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
                     """
                 )
-                glossary_input(
+                gui.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
                     key="input_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
-                glossary_input(
+                gui.file_uploader(
                     f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
                     key="output_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
             else:
-                st.session_state["input_glossary_document"] = None
-                st.session_state["output_glossary_document"] = None
-            st.write("---")
+                gui.session_state["input_glossary_document"] = None
+                gui.session_state["output_glossary_document"] = None
+            gui.write("---")
 
-        documents = st.session_state.get("documents")
+        documents = gui.session_state.get("documents")
         if documents:
-            st.write("#### 📄 Knowledge Base")
-            st.text_area(
+            gui.write("#### 📄 Knowledge Base")
+            gui.text_area(
                 """
             ###### 👩‍🏫 Search Instructions
             How should the LLM interpret the results from your knowledge base?
@@ -515,18 +516,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="task_instructions",
                 height=300,
             )
-            prompt_vars_widget(
-                "task_instructions",
-            )
 
             citation_style_selector()
-            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+            gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
 
-            doc_extract_selector(self.request and self.request.user)
+            doc_extract_selector(self.request.user)
 
-            st.write("---")
+            gui.write("---")
 
-        st.markdown(
+        gui.markdown(
             """
             #### Advanced Settings
             In general, you should not need to adjust these.
@@ -536,12 +534,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if documents:
             query_instructions_widget()
             keyword_instructions_widget()
+            gui.write("---")
             doc_search_advanced_settings()
-            st.write("---")
+            gui.write("---")
 
-        language_model_settings(show_selector=False)
+        gui.write("##### 🔠 Language Model Settings")
+        language_model_settings(gui.session_state.get("selected_model"))
 
-        st.write("---")
+        gui.write("---")
 
         enum_multiselect(
             enum_cls=LLMTools,
@@ -549,34 +549,43 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             key="tools",
         )
 
+    def fields_not_to_save(self):
+        return ["elevenlabs_api_key"]
+
     def fields_to_save(self) -> [str]:
-        fields = super().fields_to_save() + ["landbot_url"]
-        if "elevenlabs_api_key" in fields:
+        fields = super().fields_to_save()
+        try:
             fields.remove("elevenlabs_api_key")
+        except ValueError:
+            pass
         return fields
+
+    def run_as_api_tab(self):
+        elevenlabs_init_state(self)
+        super().run_as_api_tab()
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
-            st.write(
+            gui.write(
                 "**Prompt**\n```properties\n"
                 + truncate_text_words(input_prompt, maxlen=200)
                 + "\n```"
             )
 
-        st.write("**Response**")
+        gui.write("**Response**")
 
         output_video = state.get("output_video")
         if output_video:
-            st.video(output_video[0], autoplay=True)
+            gui.video(output_video[0], autoplay=True)
 
         output_text = state.get("output_text")
         if output_text:
-            st.write(output_text[0], line_clamp=5)
+            gui.write(output_text[0], line_clamp=5)
 
     def render_output(self):
         # chat window
-        with st.div(className="pb-3"):
+        with gui.div(className="pb-3"):
             chat_list_view()
             pressed_send, new_inputs = chat_input_view()
 
@@ -584,25 +593,28 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             self.on_send(*new_inputs)
 
         # clear chat inputs
-        if st.button("🗑️ Clear"):
-            st.session_state["messages"] = []
-            st.session_state["input_prompt"] = ""
-            st.session_state["input_images"] = None
-            st.session_state["input_audio"] = None
-            st.session_state["input_documents"] = None
-            st.session_state["raw_input_text"] = ""
+        if gui.button("🗑️ Clear"):
+            gui.session_state["messages"] = []
+            gui.session_state["input_prompt"] = ""
+            gui.session_state["input_images"] = None
+            gui.session_state["input_audio"] = None
+            gui.session_state["input_documents"] = None
+            gui.session_state["raw_input_text"] = ""
             self.clear_outputs()
-            st.session_state["final_keyword_query"] = ""
-            st.session_state["final_search_query"] = ""
-            st.experimental_rerun()
+            gui.session_state["final_keyword_query"] = ""
+            gui.session_state["final_search_query"] = ""
+            gui.rerun()
 
         # render sources
-        references = st.session_state.get("references", [])
+        references = gui.session_state.get("references", [])
         if not references:
             return
-        with st.expander("💁‍♀️ Sources"):
+        key = "sources-expander"
+        with gui.expander("💁‍♀️ Sources", key=key):
+            if not gui.session_state.get(key):
+                return
             for idx, ref in enumerate(references):
-                st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
+                gui.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
                     "Source Document",
                     value=ref["snippet"],
@@ -616,17 +628,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         new_input_audio: str,
         new_input_documents: list[str],
     ):
-        prev_input = st.session_state.get("raw_input_text") or ""
-        prev_output = (st.session_state.get("raw_output_text") or [""])[0]
-        prev_input_images = st.session_state.get("input_images")
-        prev_input_audio = st.session_state.get("input_audio")
-        prev_input_documents = st.session_state.get("input_documents")
+        prev_input = gui.session_state.get("raw_input_text") or ""
+        prev_output = (gui.session_state.get("raw_output_text") or [""])[0]
+        prev_input_images = gui.session_state.get("input_images")
+        prev_input_audio = gui.session_state.get("input_audio")
+        prev_input_documents = gui.session_state.get("input_documents")
 
         if (
             prev_input or prev_input_images or prev_input_audio or prev_input_documents
         ) and prev_output:
             # append previous input to the history
-            st.session_state["messages"] = st.session_state.get("messages", []) + [
+            gui.session_state["messages"] = gui.session_state.get("messages", []) + [
                 format_chat_entry(
                     role=CHATML_ROLE_USER,
                     content=prev_input,
@@ -644,67 +656,59 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 furl(url.strip("/")).path.segments[-1] for url in new_input_documents
             )
             new_input_text = f"Files: {filenames}\n\n{new_input_text}"
-        st.session_state["input_prompt"] = new_input_text
-        st.session_state["input_audio"] = new_input_audio or None
-        st.session_state["input_images"] = new_input_images or None
-        st.session_state["input_documents"] = new_input_documents or None
+        gui.session_state["input_prompt"] = new_input_text
+        gui.session_state["input_audio"] = new_input_audio or None
+        gui.session_state["input_images"] = new_input_images or None
+        gui.session_state["input_documents"] = new_input_documents or None
 
-        self.on_submit()
+        self.submit_and_redirect()
 
     def render_steps(self):
-        if st.session_state.get("tts_provider"):
-            st.video(st.session_state.get("input_face"), caption="Input Face")
+        if gui.session_state.get("tts_provider"):
+            gui.video(gui.session_state.get("input_face"), caption="Input Face")
 
-        final_search_query = st.session_state.get("final_search_query")
+        final_search_query = gui.session_state.get("final_search_query")
         if final_search_query:
-            st.text_area(
-                "**Final Search Query**", value=final_search_query, disabled=True
+            gui.text_area(
+                "###### `final_search_query`", value=final_search_query, disabled=True
             )
 
-        final_keyword_query = st.session_state.get("final_keyword_query")
+        final_keyword_query = gui.session_state.get("final_keyword_query")
         if final_keyword_query:
             if isinstance(final_keyword_query, list):
-                st.write("**Final Keyword Query**")
-                st.json(final_keyword_query)
+                gui.write("###### `final_keyword_query`")
+                gui.json(final_keyword_query)
             else:
-                st.text_area(
-                    "**Final Keyword Query**",
+                gui.text_area(
+                    "###### `final_keyword_query`",
                     value=str(final_keyword_query),
                     disabled=True,
                 )
 
-        references = st.session_state.get("references", [])
+        references = gui.session_state.get("references", [])
         if references:
-            st.write("**References**")
-            st.json(references, expanded=False)
+            gui.write("###### `references`")
+            gui.json(references)
 
-        final_prompt = st.session_state.get("final_prompt")
+        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
-                text_output("**Final Prompt**", value=final_prompt, height=300)
+                text_output("###### `final_prompt`", value=final_prompt, height=300)
             else:
-                st.write("**Final Prompt**")
-                st.json(final_prompt)
+                gui.write("###### `final_prompt`")
+                gui.json(final_prompt)
 
-        for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
-            st.text_area(
-                f"**Raw Text Response {idx + 1}**",
-                value=text,
-                disabled=True,
-            )
-
-        col1, col2 = st.columns(2)
-        with col1:
-            for idx, text in enumerate(st.session_state.get("output_text", [])):
-                st.text_area(
-                    f"**Final Response {idx + 1}**",
+        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
+            for idx, text in enumerate(gui.session_state.get(k) or []):
+                gui.text_area(
+                    f"###### `{k}[{idx}]`",
                     value=text,
                     disabled=True,
                 )
-        with col2:
-            for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
-                st.write(f"**Generated Audio {idx + 1}**")
-                st.audio(audio_url)
+
+        for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
+            gui.write(f"###### `output_audio[{idx}]`")
+            gui.audio(audio_url)
 
     def get_raw_price(self, state: dict):
         total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
@@ -723,18 +727,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def additional_notes(self):
         try:
-            model = LargeLanguageModels[st.session_state["selected_model"]].value
+            model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
         notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
         if (
-            st.session_state.get("tts_provider")
+            gui.session_state.get("tts_provider")
             == TextToSpeechProviders.ELEVEN_LABS.name
         ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
 
-        if st.session_state.get("input_face"):
+        if gui.session_state.get("input_face"):
             notes += " *+ 1 (lipsync)*"
 
         return notes
@@ -797,7 +801,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # translate input text
         translation_model = request.translation_model or TranslationModels.google.name
         if should_translate_lang(request.user_language):
-            yield f"Translating Input to English..."
+            yield "Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],
                 source_language=request.user_language,
@@ -807,7 +811,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )[0]
 
         if ocr_texts:
-            yield f"Translating Image Text to English..."
+            yield "Translating Image Text to English..."
             ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
@@ -819,7 +823,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # consturct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
-            bot_script = render_prompt_vars(bot_script, st.session_state)
+            bot_script = render_prompt_vars(bot_script, gui.session_state)
             # insert to top
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
         else:
@@ -829,7 +833,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.raw_input_text = user_input
 
         # if documents are provided, run doc search on the saved msgs and get back the references
-        references = None
         if request.documents:
             # formulate the search query as a history of all the messages
             query_msgs = request.messages + [
@@ -846,7 +849,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 response.final_search_query = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
-                    context={**st.session_state, "messages": chat_history},
+                    context={**gui.session_state, "messages": chat_history},
                 )
             else:
                 query_msgs.reverse()
@@ -864,7 +867,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     generate_final_search_query(
                         request=k_request,
                         instructions=keyword_instructions,
-                        context={**st.session_state, "messages": chat_history},
+                        context={**gui.session_state, "messages": chat_history},
                         response_format_type="json_object",
                     ),
                 )
@@ -874,31 +877,31 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # return
 
             # perform doc search
-            references = yield from get_top_k_references(
+            response.references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
                     {
-                        **st.session_state,
+                        **gui.session_state,
                         "search_query": response.final_search_query,
                         "keyword_query": response.final_keyword_query,
                     },
                 ),
+                current_user=self.request.user,
             )
             if request.use_url_shortener:
-                for reference in references:
+                for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
                         url=reference["url"],
                         user=self.request.user,
                         workflow=Workflow.VIDEO_BOTS,
                     )[0].shortened_url()
-            response.references = references
         # if doc search is successful, add the search results to the user prompt
-        if references:
+        if response.references:
             # add task instructions
             task_instructions = render_prompt_vars(
-                request.task_instructions, st.session_state
+                request.task_instructions, gui.session_state
             )
             user_input = (
-                references_as_prompt(references)
+                references_as_prompt(response.references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_input
             )
@@ -943,6 +946,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
             tools=request.tools,
             stream=True,
         )
@@ -960,9 +964,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
-            # save model response
+            # save model response without citations
             response.raw_output_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, references))
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
 
@@ -976,14 +980,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     glossary_url=request.output_glossary_document,
                     model=translation_model,
                 )
+                # save translated response for tts
                 response.raw_tts_text = [
-                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    "".join(
+                        snippet for snippet, _ in parse_refs(text, response.references)
+                    )
                     for text in output_text
                 ]
 
-            if references:
+            if response.references:
                 all_refs_list = apply_response_formattings_prefix(
-                    output_text, references, citation_style
+                    output_text, response.references, citation_style
                 )
             else:
                 all_refs_list = None
@@ -1006,11 +1013,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         response.output_audio = []
         for text in response.raw_tts_text or response.raw_output_text:
             tts_state = TextToSpeechPage.RequestModel.parse_obj(
-                {**st.session_state, "text_prompt": text}
+                {**gui.session_state, "text_prompt": text}
             ).dict()
-            yield from TextToSpeechPage(
-                request=self.request, run_user=self.run_user
-            ).run(tts_state)
+            yield from TextToSpeechPage(request=self.request).run(tts_state)
             response.output_audio.append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -1019,14 +1024,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         for audio_url in response.output_audio:
             lip_state = LipsyncPage.RequestModel.parse_obj(
                 {
-                    **st.session_state,
+                    **gui.session_state,
                     "input_audio": audio_url,
                     "selected_model": request.lipsync_model,
                 }
             ).dict()
-            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
-                lip_state
-            )
+            yield from LipsyncPage(request=self.request).run(lip_state)
             response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):
@@ -1043,57 +1046,31 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_integrations_tab(self):
         from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 
-        st.newline()
+        gui.newline()
 
         # not signed in case
         if not self.request.user or self.request.user.is_anonymous:
-            integration_welcome_screen(title="Connect your Copilot")
-            st.newline()
-            with st.center():
-                st.anchor(
-                    "Get Started",
-                    href=self.get_auth_url(self.app_url()),
-                    type="primary",
-                )
+            integrations_welcome_screen(title="Connect your Copilot")
+            gui.newline()
+            with gui.center():
+                gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )  # type: ignore
+        sr, pr = self.current_sr_pr
 
-        # signed in but not on a run the user can edit (admins will never see this)
-        if not self.can_user_edit_run(current_run, published_run):
-            integration_welcome_screen(title="Create your Saved Copilot")
-            st.newline()
-            with st.center():
-                st.anchor(
-                    "Run & Save this Copilot",
-                    href=self.get_auth_url(self.app_url()),
-                    type="primary",
-                )
-            return
+        # make user the user knows that they are on a saved run not the published run
+        if pr and pr.saved_run_id != sr.id:
+            last_saved_url = self.app_url(
+                tab=RecipeTabs.integrations, example_id=pr.published_run_id
+            )
+            gui.caption(
+                f"Note: You seem to have unpublished changes. Integrations use the [last saved version]({last_saved_url}), not the currently visible edits.",
+                className="text-center text-muted",
+            )
 
-        # signed, has submitted run, but not published (admins will never see this)
-        # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
-        if not self.can_user_edit_published_run(published_run):
-            integration_welcome_screen(title="Save your Published Copilot")
-            st.newline()
-            with st.center():
-                self._render_published_run_buttons(
-                    current_run=current_run,
-                    published_run=published_run,
-                    redirect_to=self.current_app_url(RecipeTabs.integrations),
-                )
-            return
-
-        # if we come from an integration redirect, we connect the integrations
-        if "connect_ids" in self.request.query_params:
-            self.integrations_on_connect(current_run, published_run)
-
-        # see which integrations are available to the user for the current published run
-        assert published_run, "At this point, published_run should be available"
-        integrations_q = Q(published_run=published_run) | Q(
-            saved_run__example_id=published_run.published_run_id
+        # see which integrations are available to the user for the published run
+        integrations_q = Q(published_run=pr) | Q(
+            saved_run__example_id=pr.published_run_id
         )
         if not self.is_current_user_admin():
             integrations_q &= Q(billing_account_uid=self.request.user.uid)
@@ -1102,68 +1079,79 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             integrations_q
         ).order_by("platform", "-created_at")
 
-        run_title = get_title_breadcrumbs(
-            VideoBotsPage, current_run, published_run
-        ).h1_title
+        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).h1_title
 
-        # signed in, can edit, but no connected botintegrations on this run
-        if not integrations_qs.exists():
+        # no connected integrations on this run
+        if not (integrations_qs and integrations_qs.exists()):
             self.render_integrations_add(
-                label="""
-                #### Connect your Copilot
-                Run Saved ✅ • <b>Connect</b> • <span className="text-muted">Test & Configure</span>
-                """,
+                label="#### Connect your Copilot",
                 run_title=run_title,
+                pr=pr,
             )
             return
 
         # this gets triggered on the /add route
-        if st.session_state.pop("--add-integration", None):
-            cancel_url = self.current_app_url(RecipeTabs.integrations)
+        if gui.session_state.pop("--add-integration", None):
             self.render_integrations_add(
-                label=f"""
-                #### Configure your Copilot: Add a New Integration
-                Run Saved ✅ • <b>Connected</b> ✅ • [Test & Configure]({cancel_url}) ✅
-                """,
+                label="#### Add a New Integration to your Copilot",
                 run_title=run_title,
+                pr=pr,
             )
-            with st.center():
-                if st.button("Return to Test & Configure"):
-                    raise RedirectException(cancel_url)
+            with gui.center():
+                if gui.button("Return to Test & Configure"):
+                    cancel_url = self.current_app_url(RecipeTabs.integrations)
+                    raise gui.RedirectException(cancel_url)
             return
 
-        with st.center():
+        with gui.center():
             # signed in, can edit, and has connected botintegrations on this run
             self.render_integrations_settings(
                 integrations=list(integrations_qs), run_title=run_title
             )
 
-    def render_integrations_add(self, label: str, run_title: str):
+    def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
         from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
 
-        st.write(label, unsafe_allow_html=True, className="text-center")
-        st.newline()
+        gui.write(label, unsafe_allow_html=True, className="text-center")
+
+        can_edit = self.is_current_user_admin() or self.can_user_edit_published_run(pr)
+
+        gui.newline()
 
         pressed_platform = None
         with (
-            st.tag("table", className="d-flex justify-content-center"),
-            st.tag("tbody"),
+            gui.tag("table", className="d-flex justify-content-center"),
+            gui.tag("tbody"),
         ):
             for choice in connect_choices:
-                with st.tag("tr"):
-                    with st.tag("td"):
-                        if st.button(
+                with gui.tag("tr"):
+                    with gui.tag("td"):
+                        if gui.button(
                             f'<img src="{choice.img}" alt="{choice.platform.name}" style="max-width: 80%; max-height: 90%" draggable="false">',
                             className="p-0 border border-1 border-secondary rounded",
                             style=dict(width="160px", height="60px"),
                         ):
                             pressed_platform = choice.platform
-                    with st.tag("td", className="ps-3"):
-                        st.caption(choice.label)
+                    with gui.tag("td", className="ps-3"):
+                        gui.caption(choice.label)
+
+        if not can_edit:
+            gui.caption(
+                "P.S. You're not an owner of this saved workflow, so we'll create a copy of it in your Saved Runs.",
+                className="text-center text-muted",
+            )
 
         if pressed_platform:
-            on_connect = self.current_app_url(RecipeTabs.integrations)
+            if not can_edit:
+                run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
+                pr = pr.duplicate(
+                    user=self.request.user,
+                    title=run_title,
+                    notes=pr.notes,
+                    visibility=PublishedRunVisibility.UNLISTED,
+                )
+
             match pressed_platform:
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
@@ -1171,16 +1159,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         billing_account_uid=self.request.user.uid,
                         platform=Platform.WEB,
                     )
-                    redirect_url = str(
-                        furl(on_connect).add(query_params=dict(connect_ids=str(bi.id)))
-                        / bi.api_integration_id()
-                    )
+                    redirect_url = connect_bot_to_published_run(bi, pr)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(on_connect)
+                    redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:
-                    redirect_url = slack_connect_url(on_connect)
+                    redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
-                    redirect_url = fb_connect_url(on_connect)
+                    redirect_url = fb_connect_url(pr.id)
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1190,11 +1175,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     platform=pressed_platform,
                     run_url=self.current_app_url() or "",
                 )
-            raise RedirectException(redirect_url)
+            raise gui.RedirectException(redirect_url)
 
-        st.newline()
+        gui.newline()
         api_tab_url = self.current_app_url(RecipeTabs.run_as_api)
-        st.write(
+        gui.write(
             f"Or use [our API]({api_tab_url}) to build custom integrations with your server.",
             className="text-center",
         )
@@ -1204,101 +1189,109 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
-        st.markdown("#### Configure your Copilot")
+        gui.markdown("#### Configure your Copilot")
 
         if len(integrations) > 1:
-            with st.div(style={"minWidth": "500px", "textAlign": "left"}):
+            with gui.div(
+                style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}
+            ):
                 integrations_map = {i.id: i for i in integrations}
-                bi_id = st.selectbox(
+                bi_id = gui.selectbox(
                     label="",
                     options=integrations_map.keys(),
                     format_func=lambda bi_id: f"{Platform(integrations_map[bi_id].platform).get_icon()} &nbsp; {integrations_map[bi_id].name}",
                     key="bi_id",
                 )
                 bi = integrations_map[bi_id]
-                old_bi_id = st.session_state.get("old_bi_id", bi_id)
+                old_bi_id = gui.session_state.get("old_bi_id", bi_id)
                 if bi_id != old_bi_id:
-                    raise RedirectException(
+                    raise gui.RedirectException(
                         self.current_app_url(
                             RecipeTabs.integrations,
                             path_params=dict(integration_id=bi.api_integration_id()),
                         )
                     )
-                st.session_state["old_bi_id"] = bi_id
+                gui.session_state["old_bi_id"] = bi_id
         else:
             bi = integrations[0]
         icon = Platform(bi.platform).get_icon()
 
         if bi.platform == Platform.WEB:
             web_widget_config(bi, self.request.user)
-            st.newline()
+            gui.newline()
 
-        st.newline()
-        with st.div(style={"width": "100%", "textAlign": "left"}):
+        gui.newline()
+        with gui.div(style={"width": "100%", "textAlign": "left"}):
             test_link = get_bot_test_link(bi)
-            col1, col2 = st.columns(2, style={"alignItems": "center"})
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                st.write("###### Connected To")
-                st.write(f"{icon} {bi}", unsafe_allow_html=True)
+                gui.write("###### Connected To")
+                gui.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                if test_link:
+                if not test_link:
+                    gui.write("Message quicklink not available.")
+                elif bi.platform == Platform.TWILIO:
+                    copy_to_clipboard_button(
+                        '<i class="fa-regular fa-link"></i> Copy Phone Number',
+                        value=bi.twilio_phone_number.as_e164,
+                        type="secondary",
+                    )
+                else:
                     copy_to_clipboard_button(
                         f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                         value=test_link,
                         type="secondary",
                     )
-                else:
-                    st.write("Message quicklink not available.")
+
                 if bi.platform == Platform.FACEBOOK:
-                    st.anchor(
+                    gui.anchor(
                         '<i class="fa-regular fa-inbox"></i> Open Inbox',
-                        f"https://www.facebook.com/latest/inbox",
+                        "https://www.facebook.com/latest/inbox",
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
 
-            col1, col2 = st.columns(2, style={"alignItems": "center"})
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                st.write("###### Test")
-                st.caption(f"Send a test message via {Platform(bi.platform).label}.")
+                gui.write("###### Test")
+                gui.caption(f"Send a test message via {Platform(bi.platform).label}.")
             with col2:
-                if bi.platform == Platform.FACEBOOK and test_link:
-                    st.anchor(
+                if not test_link:
+                    gui.write("Message quicklink not available.")
+                elif bi.platform == Platform.FACEBOOK:
+                    gui.anchor(
                         f"{icon} Open Profile",
                         test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                    st.anchor(
-                        '<img src="https://upload.wikimedia.org/wikipedia/commons/b/be/Facebook_Messenger_logo_2020.svg" width="20" height="20" /> Open Messenger',
-                        f"https://www.messenger.com/t/{bi.fb_page_id}",
+                elif bi.platform == Platform.TWILIO:
+                    gui.anchor(
+                        '<i class="fa-regular fa-phone"></i> Start Voice Call',
+                        test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                elif test_link:
-                    st.anchor(
+                    gui.anchor(
+                        '<i class="fa-regular fa-sms"></i> Send SMS',
+                        str(furl("sms:") / bi.twilio_phone_number.as_e164),
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
+                else:
+                    gui.anchor(
                         f"{icon} Message {bi.get_display_name()}",
                         test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-                else:
-                    st.write("Message quicklink not available.")
 
-                if bi.platform == Platform.WEB:
-                    embed_code = get_web_widget_embed_code(bi)
-                    copy_to_clipboard_button(
-                        f"{icons.code} Copy Embed Code",
-                        value=embed_code,
-                        type="secondary",
-                    )
-
-            col1, col2 = st.columns(2, style={"alignItems": "center"})
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                st.write("###### Understand your Users")
-                st.caption(f"See real-time analytics.")
+                gui.write("###### Understand your Users")
+                gui.caption("See real-time analytics.")
             with col2:
-                st.anchor(
+                gui.anchor(
                     "📊 View Analytics",
                     str(
                         furl(
@@ -1313,98 +1306,87 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ),
                     new_tab=True,
                 )
+                if bi.platform == Platform.TWILIO and bi.twilio_phone_number_sid:
+                    gui.anchor(
+                        f"{icon} Open Twilio Console",
+                        str(
+                            furl(
+                                "https://console.twilio.com/us1/develop/phone-numbers/manage/incoming/"
+                            )
+                            / bi.twilio_phone_number_sid
+                            / "calls"
+                        ),
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                    )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
-                col1, col2 = st.columns(2, style={"alignItems": "center"})
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 with col1:
-                    st.write("###### WhatsApp Business Management")
-                    st.caption(
-                        f"Access your WhatsApp account on Meta to approve message templates, etc."
+                    gui.write("###### WhatsApp Business Management")
+                    gui.caption(
+                        "Access your WhatsApp account on Meta to approve message templates, etc."
                     )
                 with col2:
-                    st.anchor(
+                    gui.anchor(
                         "Business Settings",
-                        f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                        str(
+                            furl(
+                                "https://business.facebook.com/settings/whatsapp-business-accounts/"
+                            )
+                            / bi.wa_business_waba_id
+                        ),
                         new_tab=True,
                     )
-                    st.anchor(
+                    gui.anchor(
                         "WhatsApp Manager",
-                        f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                        str(
+                            furl(
+                                "https://business.facebook.com/wa/manage/home/",
+                                query_params=dict(waba_id=bi.wa_business_waba_id),
+                            )
+                        ),
                         new_tab=True,
                     )
 
-            col1, col2 = st.columns(2, style={"alignItems": "center"})
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                st.write("###### Add Integration")
-                st.caption(f"Add another connection for {run_title}.")
+                gui.write("###### Add Integration")
+                gui.caption(f"Add another connection for {run_title}.")
             with col2:
-                st.anchor(
-                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                gui.anchor(
+                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Integration',
                     str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
                     unsafe_allow_html=True,
                 )
 
-            with st.expander("Configure Settings 🛠️"):
+            with gui.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
                     slack_specific_settings(bi, run_title)
-                general_integration_settings(bi, self.request.user)
+                if bi.platform == Platform.TWILIO:
+                    twilio_specific_settings(bi)
+                general_integration_settings(bi, self.request)
 
-                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
-                    st.newline()
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
+                    gui.newline()
                     broadcast_input(bi)
-                    st.write("---")
+                    gui.write("---")
 
-                col1, col2 = st.columns(2, style={"alignItems": "center"})
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 with col1:
-                    st.write("###### Disconnect")
-                    st.caption(
+                    gui.write("###### Disconnect")
+                    gui.caption(
                         f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
                     )
                 with col2:
-                    if st.button(
+                    if gui.button(
                         "💔️ Disconnect",
                         key="btn_disconnect",
                     ):
                         bi.saved_run = None
                         bi.published_run = None
                         bi.save()
-                        st.experimental_rerun()
-
-    def integrations_on_connect(self, current_run, published_run):
-        from app_users.models import AppUser
-        from daras_ai_v2.slack_bot import send_confirmation_msg
-
-        bi = None
-        for bid in self.request.query_params.getlist("connect_ids"):
-            try:
-                bi = BotIntegration.objects.get(id=bid)
-            except BotIntegration.DoesNotExist:
-                continue
-            if bi.saved_run is not None:
-                with st.center():
-                    st.write(
-                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
-                    )
-                return
-
-            bi.streaming_enabled = True
-            bi.saved_run = current_run
-            if published_run and published_run.saved_run_id == current_run.id:
-                bi.published_run = published_run
-            else:
-                bi.published_run = None
-            if bi.platform == Platform.SLACK:
-                bi.slack_create_personal_channels = False
-                send_confirmation_msg(bi)
-            bi.save()
-
-        if bi:
-            path_params = dict(integration_id=bi.api_integration_id())
-        else:
-            path_params = dict()
-        raise RedirectException(
-            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
-        )
+                        gui.rerun()
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
@@ -1428,7 +1410,7 @@ def infer_asr_model_and_language(
     elif "bho" in user_lang:
         asr_model = AsrModels.vakyansh_bhojpuri
     elif "sw" in user_lang:
-        asr_model = AsrModels.seamless_m4t
+        asr_model = AsrModels.seamless_m4t_v2
         asr_lang = "swh"
     else:
         asr_model = default
@@ -1437,7 +1419,7 @@ def infer_asr_model_and_language(
 
 def chat_list_view():
     # render a reversed list view
-    with st.div(
+    with gui.div(
         className="pb-1",
         style=dict(
             maxHeight="80vh",
@@ -1447,39 +1429,39 @@ def chat_list_view():
             border="1px solid #c9c9c9",
         ),
     ):
-        with st.div(className="px-3"):
-            show_raw_msgs = st.checkbox("_Show Raw Output_")
+        with gui.div(className="px-3"):
+            show_raw_msgs = gui.checkbox("_Show Raw Output_")
         # render the last output
         with msg_container_widget(CHATML_ROLE_ASSISTANT):
             if show_raw_msgs:
-                output_text = st.session_state.get("raw_output_text", [])
+                output_text = gui.session_state.get("raw_output_text", [])
             else:
-                output_text = st.session_state.get("output_text", [])
-            output_video = st.session_state.get("output_video", [])
-            output_audio = st.session_state.get("output_audio", [])
+                output_text = gui.session_state.get("output_text", [])
+            output_video = gui.session_state.get("output_video", [])
+            output_audio = gui.session_state.get("output_audio", [])
             if output_text:
-                st.write(f"**Assistant**")
+                gui.write("**Assistant**")
                 for idx, text in enumerate(output_text):
-                    st.write(text)
+                    gui.write(text)
                     try:
-                        st.video(output_video[idx])
+                        gui.video(output_video[idx])
                     except IndexError:
                         try:
-                            st.audio(output_audio[idx])
+                            gui.audio(output_audio[idx])
                         except IndexError:
                             pass
-            output_documents = st.session_state.get("output_documents", [])
+            output_documents = gui.session_state.get("output_documents", [])
             if output_documents:
                 for doc in output_documents:
-                    st.write(doc)
-        messages = st.session_state.get("messages", []).copy()
+                    gui.write(doc)
+        messages = gui.session_state.get("messages", []).copy()
         # add last input to history if present
         if show_raw_msgs:
-            input_prompt = st.session_state.get("raw_input_text")
+            input_prompt = gui.session_state.get("raw_input_text")
         else:
-            input_prompt = st.session_state.get("input_prompt")
-        input_images = st.session_state.get("input_images")
-        input_audio = st.session_state.get("input_audio")
+            input_prompt = gui.session_state.get("input_prompt")
+        input_images = gui.session_state.get("input_images")
+        input_audio = gui.session_state.get("input_audio")
         if input_prompt or input_images or input_audio:
             messages += [
                 format_chat_entry(
@@ -1492,36 +1474,36 @@ def chat_list_view():
                 images = get_entry_images(entry)
                 text = get_entry_text(entry)
                 if text or images or input_audio:
-                    st.write(f"**{entry['role'].capitalize()}**  \n{text}")
+                    gui.write(f"**{entry['role'].capitalize()}**  \n{text}")
                 if images:
                     for im in images:
-                        st.image(im, style={"maxHeight": "200px"})
+                        gui.image(im, style={"maxHeight": "200px"})
                 if input_audio:
-                    st.audio(input_audio)
+                    gui.audio(input_audio)
                     input_audio = None
 
 
 def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
-    with st.div(
+    with gui.div(
         className="px-3 pt-3 d-flex gap-1",
         style=dict(background="rgba(239, 239, 239, 0.6)"),
     ):
         show_uploader_key = "--show-file-uploader"
-        show_uploader = st.session_state.setdefault(show_uploader_key, False)
-        if st.button(
+        show_uploader = gui.session_state.setdefault(show_uploader_key, False)
+        if gui.button(
             "📎",
             style=dict(height="3.2rem", backgroundColor="white"),
         ):
             show_uploader = not show_uploader
-            st.session_state[show_uploader_key] = show_uploader
+            gui.session_state[show_uploader_key] = show_uploader
 
-        with st.div(className="flex-grow-1"):
-            new_input_text = st.text_area("", placeholder="Send a message", height=50)
+        with gui.div(className="flex-grow-1"):
+            new_input_text = gui.text_area("", placeholder="Send a message", height=50)
 
-        pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
+        pressed_send = gui.button("✈ Send", style=dict(height="3.2rem"))
 
     if show_uploader:
-        uploaded_files = st.file_uploader("", accept_multiple_files=True)
+        uploaded_files = gui.file_uploader("", accept_multiple_files=True)
         new_input_images = []
         new_input_audio = None
         new_input_documents = []
@@ -1550,7 +1532,7 @@ def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
 
 
 def msg_container_widget(role: str):
-    return st.div(
+    return gui.div(
         className="px-3 py-1 pt-2",
         style=dict(
             background=(
@@ -1570,41 +1552,6 @@ def convo_window_clipper(
         if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
-
-
-def integration_welcome_screen(title: str):
-    with st.center():
-        st.markdown(f"#### {title}")
-
-    col1, col2, col3 = st.columns(
-        3,
-        column_props=dict(
-            style=dict(
-                display="flex",
-                flexDirection="column",
-                alignItems="center",
-                textAlign="center",
-                maxWidth="300px",
-            ),
-        ),
-        style={"justifyContent": "center"},
-    )
-    with col1:
-        st.html("🏃‍♀️", style={"fontSize": "4rem"})
-        st.markdown(
-            """
-            1. Fork & Save your Run
-            """
-        )
-        st.caption("Make changes, Submit & Save your perfect workflow")
-    with col2:
-        st.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
-        st.markdown("2. Connect to Slack, Whatsapp or your App")
-        st.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
-    with col3:
-        st.html("📈", style={"fontSize": "4rem"})
-        st.markdown("3. Test, Analyze & Iterate")
-        st.caption("Analyze your usage. Update your Saved Run to test changes.")
 
 
 class ConnectChoice(typing.NamedTuple):

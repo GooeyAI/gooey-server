@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
 from app_users.models import AppUser
-from bots.admin_links import list_related_html_url, change_obj_url
+from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
 from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
@@ -27,13 +27,18 @@ from bots.models import (
     MessageAttachment,
     WorkflowMetadata,
     BotIntegrationAnalysisRun,
+    Workflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
+    JSONBExtractPath,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
+from recipes.VideoBots import VideoBotsPage
+from routers.root import integrations_stats_route
 
 fb_fields = [
     "fb_page_id",
@@ -65,6 +70,19 @@ slack_fields = [
     "slack_create_personal_channels",
 ]
 web_fields = ["web_allowed_origins", "web_config_extras"]
+twilio_fields = [
+    "twilio_phone_number",
+    "twilio_phone_number_sid",
+    "twilio_account_sid",
+    "twilio_username",
+    "twilio_password",
+    "twilio_use_missed_call",
+    "twilio_fresh_conversation_per_call",
+    "twilio_initial_text",
+    "twilio_initial_audio_url",
+    "twilio_waiting_text",
+    "twilio_waiting_audio_url",
+]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -127,17 +145,20 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "slack_channel_name",
         "slack_channel_hook_url",
         "slack_access_token",
+        "twilio_phone_number",
     ]
     list_display = [
         "name",
         "get_display_name",
         "platform",
         "wa_phone_number",
+        "twilio_phone_number",
         "created_at",
         "updated_at",
         "billing_account_uid",
         "saved_run",
         "published_run",
+        "has_analysis_runs",
     ]
     list_filter = ["platform"]
 
@@ -160,7 +181,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "view_messsages",
         "created_at",
         "updated_at",
-        "api_integration_id",
+        "api_integration_stats_url",
     ]
 
     fieldsets = [
@@ -173,7 +194,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "published_run",
                     "billing_account_uid",
                     "user_language",
-                    "api_integration_id",
+                    "api_integration_stats_url",
                 ],
             },
         ),
@@ -187,6 +208,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *wa_fields,
                     *slack_fields,
                     *web_fields,
+                    *twilio_fields,
                 ]
             },
         ),
@@ -227,6 +249,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     def view_conversations(self, bi: BotIntegration):
         return list_related_html_url(bi.conversations)
 
+    @admin.display(description="Has Analysis Runs", boolean=True)
+    def has_analysis_runs(self, bi: BotIntegration):
+        return bi.analysis_runs.exists()
+
     @admin.display(description="Analysis Results")
     def view_analysis_results(self, bi: BotIntegration):
         msgs = Message.objects.filter(
@@ -247,6 +273,37 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         )
         html = mark_safe(html)
         return html
+
+    @admin.display(description="Integration Stats")
+    def api_integration_stats_url(self, bi: BotIntegration):
+        if not bi.id:
+            raise bi.DoesNotExist
+
+        integration_id = bi.api_integration_id()
+        return open_in_new_tab(
+            url=get_app_route_url(
+                integrations_stats_route,
+                path_params=dict(
+                    page_slug=VideoBotsPage.slug_versions[-1],
+                    integration_id=integration_id,
+                ),
+            ),
+            label=integration_id,
+        )
+
+
+@admin.register(PublishedRunVersion)
+class PublishedRunVersionAdmin(admin.ModelAdmin):
+    search_fields = ["id", "version_id", "published_run__published_run_id"]
+    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+    readonly_fields = ["created_at"]
+
+
+class PublishedRunVersionInline(admin.TabularInline):
+    model = PublishedRunVersion
+    extra = 0
+    autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
+    readonly_fields = PublishedRunVersionAdmin.readonly_fields
 
 
 @admin.register(PublishedRun)
@@ -270,6 +327,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+    inlines = [PublishedRunVersionInline]
 
     def view_user(self, published_run: PublishedRun):
         if published_run.created_by is None:
@@ -306,13 +364,20 @@ class SavedRunAdmin(admin.ModelAdmin):
         "is_api_call",
         "created_at",
         "updated_at",
+        "run_status",
+        "error_msg",
     ]
     list_filter = [
         "workflow",
         "is_api_call",
+        "is_flagged",
+        ("run_status", admin.EmptyFieldListFilter),
+        ("error_msg", admin.EmptyFieldListFilter),
+        "created_at",
+        "retention_policy",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
-    autocomplete_fields = ["parent_version"]
+    autocomplete_fields = ["parent_version", "workspace"]
 
     readonly_fields = [
         "open_in_gooey",
@@ -327,7 +392,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "is_api_call",
     ]
 
-    actions = [export_to_csv, export_to_excel]
+    actions = [export_to_csv, export_to_excel, "rerun_tasks"]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
@@ -374,11 +439,19 @@ class SavedRunAdmin(admin.ModelAdmin):
             saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
         )
 
-
-@admin.register(PublishedRunVersion)
-class PublishedRunVersionAdmin(admin.ModelAdmin):
-    search_fields = ["id", "version_id", "published_run__published_run_id"]
-    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
+    @admin.action(description="Re-Run Tasks")
+    def rerun_tasks(self, request, queryset):
+        sr: SavedRun
+        for sr in queryset.all():
+            page = Workflow(sr.workflow).page_cls(
+                user=AppUser.objects.get(uid=sr.uid),
+                query_params=dict(run_id=sr.run_id, uid=sr.uid),
+            )
+            page.call_runner_task(sr, deduct_credits=False)
+        self.message_user(
+            request,
+            f"Started re-running {queryset.count()} tasks in the background.",
+        )
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
@@ -441,6 +514,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "slack_user_name",
         "slack_channel_id",
         "slack_channel_name",
+        "twilio_phone_number",
     ] + [f"bot_integration__{field}" for field in BotIntegrationAdmin.search_fields]
     actions = [export_to_csv, export_to_excel]
 
@@ -507,14 +581,16 @@ class AnalysisResultFilter(admin.SimpleListFilter):
         if val is None:
             return []
         k, v = json.loads(val)
-        return [(val, f"{k.split(self.parameter_name + '__')[-1]} = {v}")]
+        return [(val, f"{k[-1]} = {v}")]
 
     def queryset(self, request, queryset):
         val = self.value()
         if val is None:
             return queryset
         k, v = json.loads(val)
-        return queryset.filter(**{k: v})
+        return queryset.annotate(val=JSONBExtractPath(self.parameter_name, k)).filter(
+            val=v
+        )
 
 
 @admin.register(Message)

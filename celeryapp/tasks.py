@@ -1,153 +1,160 @@
 import datetime
 import html
+import threading
 import traceback
 import typing
 from time import time
-from types import SimpleNamespace
 
+import gooey_gui as gui
 import requests
 import sentry_sdk
 from django.db.models import Sum
 from django.utils import timezone
 from fastapi import HTTPException
+from loguru import logger
 
-import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
-from bots.models import SavedRun, Platform
+from bots.models import SavedRun, Platform, Workflow
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.auto_recharge import auto_recharge_user
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
-from gooey_ui.pubsub import realtime_push
-from gooey_ui.state import set_query_params
-from gooeysite.bg_db_conn import db_middleware, next_db_safe
+from gooeysite.bg_db_conn import db_middleware
+from payments.auto_recharge import (
+    should_attempt_auto_recharge,
+    run_auto_recharge_gracefully,
+)
+from workspaces.widgets import set_current_workspace
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
+
+DEFAULT_RUN_STATUS = "Running..."
+
+threadlocal = threading.local()
+
+
+def get_running_saved_run() -> SavedRun | None:
+    try:
+        return threadlocal.saved_run
+    except AttributeError:
+        return None
 
 
 @app.task
-def gui_runner(
+def runner_task(
     *,
     page_cls: typing.Type[BasePage],
-    user_id: str,
+    user_id: int,
     run_id: str,
     uid: str,
-    state: dict,
     channel: str,
-    query_params: dict = None,
-    is_api_call: bool = False,
+    unsaved_state: dict[str, typing.Any] | None = None,
+    deduct_credits: bool = True,
 ):
-    page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
-
-    def event_processor(event, hint):
-        event["request"] = {
-            "method": "POST",
-            "url": page.app_url(query_params=query_params),
-            "data": state,
-        }
-        return event
-
-    page.setup_sentry(event_processor=event_processor)
-
-    sr = page.run_doc_sr(run_id, uid)
-    sr.is_api_call = is_api_call
-
-    st.set_session_state(state)
-    run_time = 0
-    yield_val = None
+    start_time = time()
     error_msg = None
-    set_query_params(query_params or {})
 
     @db_middleware
-    def save(done=False):
+    def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
+        if isinstance(yield_val, tuple):
+            run_status, extra_output = yield_val
+        else:
+            run_status = yield_val
+            extra_output = {}
+
         if done:
-            # clear run status
             run_status = None
         else:
-            # set run status to the yield value of generator
-            run_status = yield_val or "Running..."
-        if isinstance(run_status, tuple):
-            run_status, extra_output = run_status
-        else:
-            extra_output = {}
-        # set run status and run time
-        status = {
-            StateKeys.run_time: run_time,
-            StateKeys.error_msg: error_msg,
-            StateKeys.run_status: run_status,
-        }
+            run_status = run_status or DEFAULT_RUN_STATUS
+
         output = (
-            status
-            |
-            # extract outputs from local state
+            # extract status of the run
             {
+                StateKeys.error_msg: error_msg,
+                StateKeys.run_time: time() - start_time,
+                StateKeys.run_status: run_status,
+            }
+            # extract outputs from local state
+            | {
                 k: v
-                for k, v in st.session_state.items()
+                for k, v in gui.session_state.items()
                 if k in page.ResponseModel.__fields__
             }
+            # add extra outputs from the run
             | extra_output
         )
+
         # send outputs to ui
-        realtime_push(channel, output)
+        gui.realtime_push(channel, output)
         # save to db
-        page.dump_state_to_sr(st.session_state | output, sr)
+        page.dump_state_to_sr(gui.session_state | output, sr)
+
+    page = page_cls(
+        user=AppUser.objects.get(id=user_id),
+        query_params=dict(run_id=run_id, uid=uid),
+    )
+    page.setup_sentry()
+    sr = page.current_sr
+    set_current_workspace(page.request.session, int(sr.workspace_id))
+    threadlocal.saved_run = sr
+    gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
 
     try:
-        gen = page.run(st.session_state)
-        save()
-        while True:
-            # record time
-            start_time = time()
-            try:
-                # advance the generator (to further progress of run())
-                yield_val = next_db_safe(gen)
-                # increment total time taken after every iteration
-                run_time += time() - start_time
-                continue
-            # run completed
-            except StopIteration:
-                run_time += time() - start_time
-                sr.transaction, sr.price = page.deduct_credits(st.session_state)
-                break
-            # render errors nicely
-            except Exception as e:
-                run_time += time() - start_time
+        save_on_step()
+        for val in page.main(sr, gui.session_state):
+            save_on_step(val)
 
-                if isinstance(e, HTTPException) and e.status_code == 402:
-                    error_msg = page.generate_credit_error_message(
-                        example_id=query_params.get("example_id"),
-                        run_id=run_id,
-                        uid=uid,
-                    )
-                    try:
-                        raise UserError(error_msg) from e
-                    except UserError as e:
-                        sentry_sdk.capture_exception(e, level=e.sentry_level)
-                        break
+    # render errors nicely
+    except Exception as e:
+        if isinstance(e, UserError):
+            sentry_level = e.sentry_level
+            logger.warning("\n".join(map(str, [e, e.__cause__])))
+        else:
+            sentry_level = "error"
+            traceback.print_exc()
+        sentry_sdk.capture_exception(e, level=sentry_level)
+        error_msg = err_msg_for_exc(e)
+        sr.error_type = type(e).__qualname__
+        sr.error_code = getattr(e, "status_code", None)
 
-                if isinstance(e, UserError):
-                    sentry_level = e.sentry_level
-                else:
-                    sentry_level = "error"
-                    traceback.print_exc()
-                sentry_sdk.capture_exception(e, level=sentry_level)
-                error_msg = err_msg_for_exc(e)
-                break
-            finally:
-                save()
+    # run completed successfully, deduct credits
+    else:
+        if deduct_credits:
+            sr.transaction, sr.price = page.deduct_credits(gui.session_state)
+
+    # save everything, mark run as completed
     finally:
-        save(done=True)
-        if not is_api_call:
-            send_email_on_completion(page, sr)
-        run_low_balance_email_check(uid)
+        save_on_step(done=True)
+        threadlocal.saved_run = None
+
+    post_runner_tasks.delay(sr.id)
+
+
+@app.task
+def post_runner_tasks(saved_run_id: int):
+    sr = SavedRun.objects.get(id=saved_run_id)
+
+    if not sr.is_api_call:
+        send_email_on_completion(sr)
+
+    if should_attempt_auto_recharge(sr.workspace):
+        run_auto_recharge_gracefully(sr.workspace)
+
+    run_low_balance_email_check(sr.workspace)
 
 
 def err_msg_for_exc(e: Exception):
-    if isinstance(e, requests.HTTPError):
+    if isinstance(e, UserError):
+        return e.message
+    elif isinstance(e, HTTPException):
+        return f"(HTTP {e.status_code}) {e.detail})"
+    elif isinstance(e, requests.HTTPError):
         response: requests.Response = e.response
         try:
             err_body = response.json()
@@ -164,24 +171,22 @@ def err_msg_for_exc(e: Exception):
                     return f"(GPU) {err_type}: {err_str}"
             err_str = str(err_body)
         return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    elif isinstance(e, HTTPException):
-        return f"(HTTP {e.status_code}) {e.detail})"
-    elif isinstance(e, UserError):
-        return e.message
     else:
         return f"{type(e).__name__}: {e}"
 
 
-def run_low_balance_email_check(uid: str):
+def run_low_balance_email_check(workspace: "Workspace"):
     # don't send email if feature is disabled
     if not settings.LOW_BALANCE_EMAIL_ENABLED:
         return
-    user = AppUser.objects.get(uid=uid)
     # don't send email if user is not paying or has enough balance
-    if not user.is_paying or user.balance > settings.LOW_BALANCE_EMAIL_CREDITS:
+    if (
+        not workspace.is_paying
+        or workspace.balance > settings.LOW_BALANCE_EMAIL_CREDITS
+    ):
         return
     last_purchase = (
-        AppUserTransaction.objects.filter(user=user, amount__gt=0)
+        AppUserTransaction.objects.filter(workspace=workspace, amount__gt=0)
         .order_by("-created_at")
         .first()
     )
@@ -191,25 +196,32 @@ def run_low_balance_email_check(uid: str):
     # send email if user has not been sent email in last X days or last purchase was after last email sent
     if (
         # user has not been sent any email
-        not user.low_balance_email_sent_at
+        not workspace.low_balance_email_sent_at
         # user was sent email before X days
-        or (user.low_balance_email_sent_at < email_date_cutoff)
+        or (workspace.low_balance_email_sent_at < email_date_cutoff)
         # user has made a purchase after last email sent
-        or (last_purchase and last_purchase.created_at > user.low_balance_email_sent_at)
+        or (
+            last_purchase
+            and last_purchase.created_at > workspace.low_balance_email_sent_at
+        )
     ):
         # calculate total credits consumed in last X days
         total_credits_consumed = abs(
             AppUserTransaction.objects.filter(
-                user=user, amount__lt=0, created_at__gte=email_date_cutoff
+                workspace=workspace,
+                amount__lt=0,
+                created_at__gte=email_date_cutoff,
             ).aggregate(Sum("amount"))["amount__sum"]
             or 0
         )
-        send_low_balance_email(user=user, total_credits_consumed=total_credits_consumed)
-        user.low_balance_email_sent_at = timezone.now()
-        user.save(update_fields=["low_balance_email_sent_at"])
+        send_low_balance_email(
+            workspace=workspace, total_credits_consumed=total_credits_consumed
+        )
+        workspace.low_balance_email_sent_at = timezone.now()
+        workspace.save(update_fields=["low_balance_email_sent_at"])
 
 
-def send_email_on_completion(page: BasePage, sr: SavedRun):
+def send_email_on_completion(sr: SavedRun):
     run_time_sec = sr.run_time.total_seconds()
     if (
         run_time_sec <= settings.SEND_RUN_EMAIL_AFTER_SEC
@@ -221,9 +233,16 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
     )
     if not to_address:
         return
-    prompt = (page.preview_input(sr.state) or "").strip()
-    title = (sr.state.get("__title") or page.title).strip()
-    subject = f"🌻 “{truncate_text_words(prompt, maxlen=50)}” {title} is done"
+
+    workflow = Workflow(sr.workflow)
+    page_cls = workflow.page_cls
+    prompt = (page_cls.preview_input(sr.state) or "").strip().replace("\n", " ")
+    recipe_title = page_cls.get_recipe_title()
+
+    subject = (
+        f"🌻 “{truncate_text_words(prompt, maxlen=50) or 'Run'}” {recipe_title} is done"
+    )
+
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
         to_address=to_address,
@@ -232,7 +251,7 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
             run_time_sec=round(run_time_sec),
             app_url=sr.get_app_url(),
             prompt=prompt,
-            title=title,
+            recipe_title=recipe_title,
         ),
         message_stream="gooey-ai-workflows",
     )
@@ -253,11 +272,3 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
         subject=f"{user.display_name} Attempted to Connect to {platform.label}",
         html_body=html_body,
     )
-
-
-@app.task
-def auto_recharge(*, user_id: int):
-    redis_lock_key = f"gooey/auto_recharge/{user_id}"
-    with redis_lock(redis_lock_key):
-        user = AppUser.objects.get(id=user_id)
-        auto_recharge_user(user)

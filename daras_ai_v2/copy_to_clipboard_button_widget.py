@@ -2,7 +2,7 @@ import json
 import typing
 from html import escape
 
-import gooey_ui as gui
+import gooey_gui as gui
 
 # language="html"
 copy_to_clipboard_scripts = """

@@ -1,6 +1,7 @@
 import json
 
 from django.contrib import admin
+from django.db.models import JSONField
 from django.template import loader
 from django.utils.safestring import mark_safe
 
@@ -11,7 +12,9 @@ from gooeysite.custom_actions import export_to_csv, export_to_excel
 from gooeysite.custom_filters import (
     json_field_nested_lookup_keys,
     related_json_field_summary,
+    JSONBExtractPath,
 )
+from gooeysite.custom_widgets import JSONEditorWidget
 from url_shortener import models
 
 JSON_FIELDS = ["browser", "device", "os", "ip_data"]
@@ -25,6 +28,9 @@ EXCLUDE_KEYS = {
     "code",
     "count",
     "route",
+    "lat",
+    "lon",
+    "zip",
 }
 
 
@@ -104,10 +110,12 @@ def jsonfieldlistfilter(field: str):
             return [
                 (
                     json.dumps([k, v]),
-                    f'{k.split(field + "__")[-1]} = {v}',
+                    f"{'__'.join(k)} = {v}",
                 )
                 for k in lookups
-                for v in qs.values_list(k, flat=True).distinct()
+                for v in qs.values_list(
+                    JSONBExtractPath(field, k), flat=True
+                ).distinct()
             ]
 
         def queryset(self, request, queryset):
@@ -115,7 +123,7 @@ def jsonfieldlistfilter(field: str):
             if val is None:
                 return queryset
             k, v = json.loads(val)
-            return queryset.filter(**{k: v})
+            return queryset.annotate(val=JSONBExtractPath(field, k)).filter(val=v)
 
     return JSONFieldListFilter
 
@@ -140,3 +148,6 @@ class VisitorClickInfoAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
     ]
+    formfield_overrides = {
+        JSONField: {"widget": JSONEditorWidget},
+    }

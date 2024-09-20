@@ -1,9 +1,10 @@
 import pytest
 
-from daras_ai.image_input import storage_blob_for
+from daras_ai.image_input import gcs_blob_for
+from daras_ai_v2 import settings
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
-from tests.test_translation import _test_run_google_translate_one
+from tests.test_translation import google_translate_check
 
 GLOSSARY = [
     {
@@ -26,12 +27,18 @@ GLOSSARY = [
         "pos": "noun",
         "description": "well labs agniastra",
     },
+    {
+        "en-US": "Jalapeño",
+        "hi-IN": "मिर्ची",
+        "pos": "noun",
+        "description": "Jalapeño",
+    },
 ]
 
 TRANSLATION_TESTS_GLOSSARY = [
     (
-        "एक एकड़ भूमि के लिए कितनी अग्निअस्त्र की आवश्यकता होती है",
-        "how many fire extinguishers are required for one acre of land",  # default
+        "एक एकड़ भूमि के लिए कितनी अग्निअस्त्र की आवश्यकता होती है",  # source
+        "how many fire extinguishers are required for one acre of land",  # default translation
         "how many agniastra are required for one acre of land",  # using glossary
     ),
     (
@@ -44,6 +51,11 @@ TRANSLATION_TESTS_GLOSSARY = [
         "What can we do with AI",
         "What can we do with Gooey.AI",
     ),
+    (
+        "मेरे मिर्ची पर लाल धब्बे आ गये हैं",
+        "My chillies have got red spots",
+        "My Jalapeño have got red spots",
+    ),
 ]
 
 
@@ -52,7 +64,7 @@ def glossary_url():
     import pandas as pd
 
     df = pd.DataFrame.from_records(GLOSSARY)
-    blob = storage_blob_for("test glossary.csv")
+    blob = gcs_blob_for("test glossary.csv")
     blob.upload_from_string(df.to_csv(index=False).encode(), content_type="text/csv")
 
     try:
@@ -62,16 +74,16 @@ def glossary_url():
         GlossaryResource.objects.all().delete()
 
 
-@pytest.mark.django_db
-def test_run_google_translate_glossary(glossary_url, threadpool_subtest):
+@pytest.mark.skipif(not settings.GS_BUCKET_NAME, reason="No GCS bucket")
+def test_google_translate_glossary(transactional_db, glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
-            _test_run_google_translate_one,
+            google_translate_check,
             text,
             expected,
         )
         threadpool_subtest(
-            _test_run_google_translate_one,
+            google_translate_check,
             text,
             expected_with_glossary,
             glossary_url=glossary_url,

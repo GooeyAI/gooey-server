@@ -1,7 +1,6 @@
 from loguru import logger
 
-from daras_ai_v2.query_params import gooey_get_query_params
-from daras_ai_v2.query_params_util import extract_query_params
+from celeryapp.tasks import get_running_saved_run
 from usage_costs.models import (
     UsageCost,
     ModelSku,
@@ -10,10 +9,8 @@ from usage_costs.models import (
 
 
 def record_cost_auto(model: str, sku: ModelSku, quantity: int):
-    from bots.models import SavedRun
-
-    _, run_id, uid = extract_query_params(gooey_get_query_params())
-    if not run_id or not uid:
+    sr = get_running_saved_run()
+    if not sr:
         return
 
     try:
@@ -22,10 +19,8 @@ def record_cost_auto(model: str, sku: ModelSku, quantity: int):
         logger.warning(f"Cant find pricing for {model=} {sku=}: {e=}")
         return
 
-    saved_run = SavedRun.objects.get(run_id=run_id, uid=uid)
-
     UsageCost.objects.create(
-        saved_run=saved_run,
+        saved_run=sr,
         pricing=pricing,
         quantity=quantity,
         unit_cost=pricing.unit_cost,

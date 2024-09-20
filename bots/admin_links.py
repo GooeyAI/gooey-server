@@ -10,7 +10,11 @@ from furl import furl
 from daras_ai_v2 import settings
 
 
-def open_in_new_tab(url: str, *, label: str = "", add_related_url: str = None) -> str:
+def open_in_new_tab(
+    url: str | None, *, label: str = "", add_related_url: str = None
+) -> str | None:
+    if not url:
+        return None
     label = re.sub(r"https?://", "", label)
     context = {
         "url": url,

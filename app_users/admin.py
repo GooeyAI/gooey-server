@@ -3,16 +3,22 @@ from django.contrib.admin.models import LogEntry
 from django.db.models import Sum
 
 from app_users import models
-from bots.admin_links import open_in_new_tab, list_related_html_url
-from bots.models import SavedRun
+from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
+from bots.models import SavedRun, PublishedRun
+from embeddings.models import EmbeddedFile
 from usage_costs.models import UsageCost
-
-
-# Register your models here.
+from workspaces.admin import WorkspaceAdmin, WorkspaceMembershipInline
 
 
 @admin.register(models.AppUser)
 class AppUserAdmin(admin.ModelAdmin):
+    deprecated_fields = (
+        "balance",
+        "is_paying",
+        "stripe_customer_id",
+        "subscription",
+        "low_balance_email_sent_at",
+    )
     fieldsets = [
         (
             None,
@@ -20,22 +26,24 @@ class AppUserAdmin(admin.ModelAdmin):
                 "fields": [
                     "uid",
                     ("email", "phone_number"),
-                    "balance",
-                    "subscription",
-                    "stripe_customer_id",
-                    "total_payments",
-                    "total_charged",
-                    "total_usage_cost",
-                    "is_disabled",
-                    "is_anonymous",
-                    "is_paying",
-                    "disable_safety_checker",
-                    "disable_rate_limits",
-                    ("user_runs", "view_transactions"),
-                    "created_at",
-                    "upgraded_from_anonymous_at",
+                    "personal_workspace",
+                    ("total_payments", "total_charged", "total_usage_cost"),
+                    (
+                        "is_disabled",
+                        "is_anonymous",
+                    ),
+                    (
+                        "disable_safety_checker",
+                        "disable_rate_limits",
+                    ),
+                    (
+                        "view_saved_runs",
+                        "view_published_runs",
+                        "view_embedded_files",
+                        "view_transactions",
+                    ),
+                    ("created_at", "updated_at", "upgraded_from_anonymous_at"),
                     ("open_in_firebase", "open_in_stripe"),
-                    "low_balance_email_sent_at",
                 ],
             },
         ),
@@ -53,16 +61,20 @@ class AppUserAdmin(admin.ModelAdmin):
                 ]
             },
         ),
+        (
+            "Deprecated",
+            {
+                "fields": (deprecated_fields,),
+            },
+        ),
     ]
     list_display = [
         "uid",
         "handle",
-        "subscription",
         "display_name",
         "email",
         "phone_number",
-        "balance",
-        "is_paying",
+        "personal_workspace",
         "created_at",
     ]
     search_fields = [
@@ -70,13 +82,11 @@ class AppUserAdmin(admin.ModelAdmin):
         "display_name",
         "email",
         "phone_number",
-        "stripe_customer_id",
         "handle__name",
     ]
     list_filter = [
         "is_anonymous",
         "is_disabled",
-        "is_paying",
         "created_at",
         "upgraded_from_anonymous_at",
     ]
@@ -85,21 +95,43 @@ class AppUserAdmin(admin.ModelAdmin):
         "total_charged",
         "total_usage_cost",
         "created_at",
+        "updated_at",
         "upgraded_from_anonymous_at",
-        "user_runs",
+        "view_saved_runs",
+        "view_published_runs",
+        "view_embedded_files",
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
-        "low_balance_email_sent_at",
+        "personal_workspace",
     ]
-    autocomplete_fields = ["handle", "subscription"]
+    autocomplete_fields = ["handle"]
+    inlines = [WorkspaceMembershipInline]
 
     @admin.display(description="User Runs")
-    def user_runs(self, user: models.AppUser):
+    def view_saved_runs(self, user: models.AppUser):
         return list_related_html_url(
             SavedRun.objects.filter(uid=user.uid),
             query_param="uid",
             instance_id=user.uid,
+            show_add=False,
+        )
+
+    @admin.display(description="Published Runs")
+    def view_published_runs(self, user: models.AppUser):
+        return list_related_html_url(
+            PublishedRun.objects.filter(created_by=user),
+            query_param="created_by",
+            instance_id=user.id,
+            show_add=False,
+        )
+
+    @admin.display(description="Embedded Files")
+    def view_embedded_files(self, user: models.AppUser):
+        return list_related_html_url(
+            EmbeddedFile.objects.filter(created_by=user),
+            query_param="created_by",
+            instance_id=user.id,
             show_add=False,
         )
 
@@ -144,23 +176,23 @@ class AppUserAdmin(admin.ModelAdmin):
 
     open_in_firebase.short_description = "Open in Firebase"
 
+    @admin.display(description="Open in Stripe")
     def open_in_stripe(self, user: models.AppUser):
-        if not user.stripe_customer_id:
-            # Try to find the customer ID.
-            user.search_stripe_customer()
-        if not user.stripe_customer_id:
-            # If we still don't have a customer ID, return None.
-            raise AttributeError("No Stripe customer ID found.")
-        return open_in_new_tab(
-            f"https://dashboard.stripe.com/customers/{user.stripe_customer_id}",
-            label=user.stripe_customer_id,
+        return WorkspaceAdmin.open_in_stripe(
+            self, user.get_or_create_personal_workspace()[0]
         )
-
-    open_in_stripe.short_description = "Open in Stripe"
 
     @admin.display(description="View transactions")
     def view_transactions(self, user: models.AppUser):
         return list_related_html_url(user.transactions, show_add=False)
+
+    @admin.display(description="Personal Account")
+    def personal_workspace(self, user: models.AppUser):
+        workspace = user.get_or_create_personal_workspace()[0]
+        return change_obj_url(
+            workspace,
+            label=f"Bal = {workspace.balance} | Paid = {workspace.is_paying} | Sub = {workspace.subscription}",
+        )
 
 
 class SavedRunInline(admin.StackedInline):
@@ -187,30 +219,44 @@ class SavedRunInline(admin.StackedInline):
 
 @admin.register(models.AppUserTransaction)
 class AppUserTransactionAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["user"]
+    autocomplete_fields = ["user", "workspace"]
     list_display = [
         "invoice_id",
+        "workspace",
         "user",
         "amount",
+        "dollar_amount",
         "end_balance",
         "payment_provider",
-        "dollar_amount",
+        "reason",
+        "plan",
         "created_at",
     ]
-    readonly_fields = ["created_at"]
+    readonly_fields = ["view_payment_provider_url", "created_at"]
     list_filter = [
-        "created_at",
+        "reason",
         ("payment_provider", admin.EmptyFieldListFilter),
         "payment_provider",
+        "plan",
+        "created_at",
     ]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
+    search_fields = ["invoice_id"]
 
     @admin.display(description="Charged Amount")
     def dollar_amount(self, obj: models.AppUserTransaction):
         if not obj.payment_provider:
             return
         return f"${obj.charged_amount / 100}"
+
+    @admin.display(description="Payment Provider URL")
+    def view_payment_provider_url(self, txn: models.AppUserTransaction):
+        url = txn.payment_provider_url()
+        if url:
+            return open_in_new_tab(url, label=url)
+        else:
+            raise txn.DoesNotExist
 
 
 @admin.register(LogEntry)

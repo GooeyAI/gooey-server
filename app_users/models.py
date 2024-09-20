@@ -1,17 +1,20 @@
+import typing
+
 import requests
-import stripe
-from django.db import models, IntegrityError, transaction
-from django.db.models import Sum
+from django.db import models, IntegrityError
 from django.utils import timezone
 from firebase_admin import auth
+from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
-from daras_ai_v2 import settings, db
-from gooeysite.bg_db_conn import db_middleware
+from daras_ai_v2 import settings
 from handles.models import Handle
 from payments.plans import PricingPlan
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -30,7 +33,6 @@ class AppUserQuerySet(models.QuerySet):
             try:
                 user = self.model(**kwargs)
                 user.copy_from_firebase_user(firebase_user)
-                user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -54,7 +56,6 @@ class AppUserQuerySet(models.QuerySet):
             try:
                 user = self.model(**kwargs)
                 user.copy_from_firebase_user(firebase_user)
-                user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -89,26 +90,33 @@ class AppUser(models.Model):
     display_name = models.TextField("name", blank=True)
     email = models.EmailField(null=True, blank=True)
     phone_number = PhoneNumberField(null=True, blank=True)
-    balance = models.IntegerField("bal")
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
     photo_url = CustomURLField(default="", blank=True)
 
-    stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
-    is_paying = models.BooleanField("paid", default=False)
-
-    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+    balance = models.IntegerField(
+        "bal", help_text="[Deprecated]", default=None, null=True, blank=True
+    )
+    stripe_customer_id = models.CharField(
+        max_length=255, default="", blank=True, help_text="[Deprecated]"
+    )
+    is_paying = models.BooleanField("paid", default=False, help_text="[Deprecated]")
+    low_balance_email_sent_at = models.DateTimeField(
+        null=True, blank=True, help_text="[Deprecated]"
+    )
     subscription = models.OneToOneField(
         "payments.Subscription",
         on_delete=models.SET_NULL,
         related_name="user",
         null=True,
         blank=True,
+        help_text="[Deprecated]",
     )
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
     )
+    updated_at = models.DateTimeField(auto_now=True)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
     disable_safety_checker = models.BooleanField(default=False)
@@ -132,61 +140,51 @@ class AppUser(models.Model):
 
     objects = AppUserQuerySet.as_manager()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["email"]),
+        ]
+
     def __str__(self):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"
 
-    def first_name(self):
+    def first_name_possesive(self, fallback: str = "My") -> str:
+        first_name = self.first_name(fallback=fallback)
+        if first_name == "My":
+            return first_name
+        elif first_name.endswith("s"):
+            return first_name + "'"
+        else:
+            return first_name + "'s"
+
+    def first_name(self, *, fallback: str = "Anon") -> str:
+        return self.full_name(fallback=fallback).split(" ")[0]
+
+    def full_name(
+        self,
+        *,
+        current_user: typing.Optional["AppUser"] = None,
+        fallback: str = "Anonymous",
+    ) -> str:
         if self.display_name:
-            return self.display_name.split(" ")[0]
-        if self.email:
-            return self.email.split("@")[0]
-        if self.phone_number:
-            return str(self.phone_number)
-        return "Anon"
-
-    @db_middleware
-    @transaction.atomic
-    def add_balance(
-        self, amount: int, invoice_id: str, **kwargs
-    ) -> "AppUserTransaction":
-        """
-        Used to add/deduct credits when they are bought or consumed.
-
-        When credits are bought with stripe -- invoice_id is the stripe
-        invoice ID.
-        When credits are deducted due to a run -- invoice_id is of the
-        form "gooey_in_{uuid}"
-        """
-        # if an invoice entry exists
-        try:
-            # avoid updating twice for same invoice
-            return AppUserTransaction.objects.get(invoice_id=invoice_id)
-        except AppUserTransaction.DoesNotExist:
-            pass
-
-        # select_for_update() is very important here
-        # transaction.atomic alone is not enough!
-        # It won't lock this row for reads, and multiple threads can update the same row leading incorrect balance
-        #
-        # Also we're not using .update() here because it won't give back the updated end balance
-        user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
-        user.balance += amount
-        user.save(update_fields=["balance"])
-        return AppUserTransaction.objects.create(
-            user=self,
-            invoice_id=invoice_id,
-            amount=amount,
-            end_balance=user.balance,
-            **kwargs,
-        )
+            name = self.display_name
+        elif self.email:
+            name = self.email.split("@")[0]
+        elif self.phone_number:
+            name = str(self.phone_number)
+        else:
+            return fallback
+        if current_user and self == current_user:
+            name += " (You)"
+        return name
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
         # copy data from firebase user
         self.uid = user.uid
         self.is_disabled = user.disabled
         self.display_name = user.display_name or ""
-        self.email = user.email
-        self.phone_number = user.phone_number
+        self.email = str(user.email)
+        self.phone_number = str(user.phone_number)
         provider_list = user.provider_data
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
@@ -213,69 +211,54 @@ class AppUser(models.Model):
         self.is_anonymous = is_anonymous_now
 
         # get existing balance or set free credits
-        default_balance = settings.LOGIN_USER_FREE_CREDITS
         if self.is_anonymous:
-            default_balance = settings.ANON_USER_FREE_CREDITS
+            self.balance = settings.ANON_USER_FREE_CREDITS
         elif (
             "+" in str(self.email) or "@gmail.com" not in str(self.email)
         ) and provider_list[-1].provider_id == "password":
-            default_balance = settings.EMAIL_USER_FREE_CREDITS
-        self.balance = db.get_doc_field(
-            doc_ref=db.get_user_doc_ref(user.uid),
-            field=db.USER_BALANCE_FIELD,
-            default=default_balance,
-        )
+            self.balance = settings.EMAIL_USER_FREE_CREDITS
+        else:
+            self.balance = settings.LOGIN_USER_FREE_CREDITS
+
         if handle := Handle.create_default_for_user(user=self):
             self.handle = handle
 
+        self.save()
+        self.get_or_create_personal_workspace()
+
         return self
 
-    def get_or_create_stripe_customer(self) -> stripe.Customer:
-        customer = self.search_stripe_customer()
-        if not customer:
-            customer = stripe.Customer.create(
-                name=self.display_name,
-                email=self.email,
-                phone=self.phone_number,
-                metadata={"uid": self.uid, "id": self.id},
-            )
-            self.stripe_customer_id = customer.id
-            self.save()
-        return customer
+    def get_or_create_personal_workspace(self) -> tuple["Workspace", bool]:
+        from workspaces.models import Workspace
 
-    def search_stripe_customer(self) -> stripe.Customer | None:
-        if not self.uid:
-            return None
-        if self.stripe_customer_id:
-            try:
-                return stripe.Customer.retrieve(self.stripe_customer_id)
-            except stripe.error.InvalidRequestError as e:
-                if e.http_status != 404:
-                    raise
-        try:
-            customer = stripe.Customer.search(
-                query=f'metadata["uid"]:"{self.uid}"'
-            ).data[0]
-        except IndexError:
-            return None
-        else:
-            self.stripe_customer_id = customer.id
-            self.save()
-            return customer
+        return Workspace.objects.get_or_create_from_user(self)
 
-    def get_dollars_spent_this_month(self) -> float:
-        today = timezone.now()
-        cents_spent = self.transactions.filter(
-            created_at__month=today.month,
-            created_at__year=today.year,
-            amount__gt=0,
-        ).aggregate(total=Sum("charged_amount"))["total"]
-        return (cents_spent or 0) / 100
+
+class TransactionReason(models.IntegerChoices):
+    DEDUCT = 1, "Deduct"
+    ADDON = 2, "Addon"
+
+    SUBSCRIBE = 3, "Subscribe"
+    SUBSCRIPTION_CREATE = 4, "Sub-Create"
+    SUBSCRIPTION_CYCLE = 5, "Sub-Cycle"
+    SUBSCRIPTION_UPDATE = 6, "Sub-Update"
+
+    AUTO_RECHARGE = 7, "Auto-Recharge"
 
 
 class AppUserTransaction(models.Model):
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="transactions",
+    )
     user = models.ForeignKey(
-        "AppUser", on_delete=models.CASCADE, related_name="transactions"
+        "AppUser",
+        on_delete=models.CASCADE,
+        related_name="transactions",
+        null=True,
+        default=None,
+        blank=True,
     )
     invoice_id = models.CharField(
         max_length=255,
@@ -307,45 +290,79 @@ class AppUserTransaction(models.Model):
         default=0,
     )
 
+    reason = models.IntegerField(
+        choices=TransactionReason.choices,
+        help_text="The reason for this transaction.<br><br>"
+        f"{TransactionReason.DEDUCT.label}: Credits deducted due to a run.<br>"
+        f"{TransactionReason.ADDON.label}: User purchased an add-on.<br>"
+        f"{TransactionReason.SUBSCRIBE.label}: Applies to subscriptions where no distinction was made between create, update and cycle.<br>"
+        f"{TransactionReason.SUBSCRIPTION_CREATE.label}: A subscription was created.<br>"
+        f"{TransactionReason.SUBSCRIPTION_CYCLE.label}: A subscription advanced into a new period.<br>"
+        f"{TransactionReason.SUBSCRIPTION_UPDATE.label}: A subscription was updated.<br>"
+        f"{TransactionReason.AUTO_RECHARGE.label}: Credits auto-recharged due to low balance.",
+    )
+    plan = models.IntegerField(
+        choices=PricingPlan.db_choices(),
+        help_text="User's plan at the time of this transaction.",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
         verbose_name = "Transaction"
+        constraints = [
+            models.CheckConstraint(
+                # either user or workspace must be present
+                check=models.Q(user__isnull=False) | models.Q(workspace__isnull=False),
+                name="user_or_workspace_present",
+            )
+        ]
         indexes = [
-            models.Index(fields=["user", "amount", "-created_at"]),
+            models.Index(fields=["workspace", "amount", "-created_at"]),
             models.Index(fields=["-created_at"]),
-            models.Index(fields=["user", "created_at", "amount"]),
         ]
 
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"
 
-    def get_subscription_plan(self) -> PricingPlan | None:
-        """
-        It just so happened that all monthly subscriptions we offered had
-        different amounts from the one-time purchases.
-        This uses that heuristic to determine whether a transaction
-        was a subscription payment or a one-time purchase.
+    def save(self, *args, **kwargs):
+        if self.reason is None:
+            if self.amount <= 0:
+                self.reason = TransactionReason.DEDUCT
+            else:
+                self.reason = TransactionReason.ADDON
+        super().save(*args, **kwargs)
 
-        TODO: Implement this more robustly
-        """
-        if self.amount <= 0:
-            # credits deducted
-            return None
-
-        for plan in PricingPlan:
-            if (
-                self.amount == plan.credits
-                and self.charged_amount == plan.monthly_charge * 100
+    def reason_note(self) -> str:
+        match self.reason:
+            case (
+                TransactionReason.SUBSCRIPTION_CREATE
+                | TransactionReason.SUBSCRIPTION_CYCLE
+                | TransactionReason.SUBSCRIPTION_UPDATE
+                | TransactionReason.SUBSCRIBE
             ):
-                return plan
+                ret = "Subscription payment"
+                if self.plan:
+                    ret += f": {PricingPlan.from_db_value(self.plan).title}"
+                return ret
+            case TransactionReason.AUTO_RECHARGE:
+                return "Auto recharge"
+            case TransactionReason.ADDON:
+                return "Addon purchase"
+            case TransactionReason.DEDUCT:
+                return "Run deduction"
 
-        return None
-
-    def note(self) -> str:
-        if self.amount <= 0:
-            return ""
-        elif plan := self.get_subscription_plan():
-            return f"Subscription payment: {plan.title} (+{self.amount:,} credits)"
-        else:
-            return f"Addon purchase (+{self.amount:,} credits)"
+    def payment_provider_url(self) -> str | None:
+        match self.payment_provider:
+            case PaymentProvider.STRIPE:
+                return str(
+                    furl("https://dashboard.stripe.com/invoices/") / self.invoice_id
+                )
+            case PaymentProvider.PAYPAL:
+                return str(
+                    furl("https://www.paypal.com/unifiedtransactions/details/payment/")
+                    / self.invoice_id
+                )

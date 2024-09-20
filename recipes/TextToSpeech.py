@@ -5,7 +5,7 @@ import typing
 import requests
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -15,18 +15,19 @@ from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
-    UBERDUCK_VOICES,
-    ELEVEN_LABS_MODELS,
-    text_to_speech_settings,
-    TextToSpeechProviders,
-    text_to_speech_provider_selector,
     azure_tts_voices,
-    OPENAI_TTS_MODELS_T,
-    OPENAI_TTS_VOICES_T,
+    ELEVEN_LABS_MODELS,
+    elevenlabs_init_state,
+    GHANA_NLP_TTS_LANGUAGES,
+    OLD_ELEVEN_LABS_VOICES,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
-    OLD_ELEVEN_LABS_VOICES,
+    text_to_speech_provider_selector,
+    text_to_speech_settings,
+    TextToSpeechProviders,
+    UBERDUCK_VOICES,
 )
+from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -43,7 +44,9 @@ class TextToSpeechSettings(BaseModel):
 
     bark_history_prompt: str | None
 
-    elevenlabs_voice_name: str | None
+    elevenlabs_voice_name: str | None = Field(
+        deprecated=True, description="Use `elevenlabs_voice_id` instead"
+    )
     elevenlabs_api_key: str | None
     elevenlabs_voice_id: str | None
     elevenlabs_model: str | None
@@ -54,9 +57,9 @@ class TextToSpeechSettings(BaseModel):
 
     azure_voice_name: str | None
 
-    openai_voice_name: OPENAI_TTS_VOICES_T | None
-    openai_tts_model: OPENAI_TTS_MODELS_T | None
-
+    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
+    openai_tts_model: OpenAI_TTS_Models.api_choices | None
+    ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
@@ -79,11 +82,9 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "openai_voice_name": "alloy",
-        "openai_tts_model": "tts-1",
     }
 
-    class RequestModelBase(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         text_prompt: str
 
     class RequestModel(TextToSpeechSettings, RequestModelBase):
@@ -99,11 +100,26 @@ class TextToSpeechPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["tts_provider"]
 
+    def fields_not_to_save(self):
+        return ["elevenlabs_api_key"]
+
+    def fields_to_save(self):
+        fields = super().fields_to_save()
+        try:
+            fields.remove("elevenlabs_api_key")
+        except ValueError:
+            pass
+        return fields
+
+    def run_as_api_tab(self):
+        elevenlabs_init_state(self)
+        super().run_as_api_tab()
+
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
     def render_description(self):
-        st.write(
+        gui.write(
             """
             *Convert text into audio in the voice of your choice*
 
@@ -116,7 +132,7 @@ class TextToSpeechPage(BasePage):
         )
 
     def render_form_v2(self):
-        st.text_area(
+        gui.text_area(
             """
             #### Prompt
             Enter text you want to convert to speech
@@ -125,18 +141,12 @@ class TextToSpeechPage(BasePage):
         )
         text_to_speech_provider_selector(self)
 
-    def fields_to_save(self):
-        fields = super().fields_to_save()
-        if "elevenlabs_api_key" in fields:
-            fields.remove("elevenlabs_api_key")
-        return fields
-
     def validate_form_v2(self):
-        assert st.session_state.get("text_prompt"), "Text input cannot be empty"
-        assert st.session_state.get("tts_provider"), "Please select a TTS provider"
+        assert gui.session_state.get("text_prompt"), "Text input cannot be empty"
+        assert gui.session_state.get("tts_provider"), "Please select a TTS provider"
 
     def render_settings(self):
-        text_to_speech_settings(self, st.session_state.get("tts_provider"))
+        text_to_speech_settings(self, gui.session_state.get("tts_provider"))
 
     def get_raw_price(self, state: dict):
         tts_provider = self._get_tts_provider(state)
@@ -151,8 +161,8 @@ class TextToSpeechPage(BasePage):
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
-        audio_url = st.session_state.get("audio_url")
-        st.audio(audio_url, show_download_button=True)
+        audio_url = gui.session_state.get("audio_url")
+        gui.audio(audio_url, show_download_button=True)
 
     def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)
@@ -169,9 +179,9 @@ class TextToSpeechPage(BasePage):
         return TextToSpeechProviders[tts_provider]
 
     def get_cost_note(self):
-        tts_provider = st.session_state.get("tts_provider")
+        tts_provider = gui.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
-            _, is_user_provided_key = self._get_elevenlabs_api_key(st.session_state)
+            _, is_user_provided_key = self._get_elevenlabs_api_key(gui.session_state)
             if is_user_provided_key:
                 return "*No additional credit charge given we'll use your API key*"
             else:
@@ -374,12 +384,12 @@ class TextToSpeechPage(BasePage):
                 client = OpenAI()
 
                 model = OpenAI_TTS_Models[
-                    st.session_state.get(
+                    gui.session_state.get(
                         "openai_tts_model", OpenAI_TTS_Models.tts_1.name
                     )
                 ].value
                 voice = OpenAI_TTS_Voices[
-                    st.session_state.get(
+                    gui.session_state.get(
                         "openai_voice_name", OpenAI_TTS_Voices.alloy.name
                     )
                 ].value
@@ -393,6 +403,21 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = upload_file_from_bytes(
                     "openai_tts.mp3", response.content
                 )
+            case TextToSpeechProviders.GHANA_NLP:
+                response = requests.post(
+                    "https://translation-api.ghananlp.org/tts/v1/tts",
+                    headers=GHANA_API_AUTH_HEADERS,
+                    json={
+                        "text": text,
+                        "language": state.get(
+                            "ghana_nlp_tts_language",
+                            GHANA_NLP_TTS_LANGUAGES.tw.name,
+                        ),
+                    },
+                )
+                raise_for_status(response)
+                audio_url = upload_file_from_bytes(f"ghana_gen.wav", response.content)
+                state["audio_url"] = audio_url
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))
@@ -401,16 +426,14 @@ class TextToSpeechPage(BasePage):
         return voice_model
 
     def _get_elevenlabs_voice_id(self, state: dict[str, str]) -> str:
-        try:
-            return state["elevenlabs_voice_id"]
-        except KeyError:
-            # default to first in the mapping
-            default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
-            voice_name = state.get("elevenlabs_voice_name", default_voice_name)
-            assert (
-                voice_name in OLD_ELEVEN_LABS_VOICES
-            ), f"Invalid voice_name: {voice_name}"
-            return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
+        if voice_id := state.get("elevenlabs_voice_id"):
+            return voice_id
+
+        # default to first in the mapping
+        default_voice_name = next(iter(OLD_ELEVEN_LABS_VOICES))
+        voice_name = state.get("elevenlabs_voice_name", default_voice_name)
+        assert voice_name in OLD_ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
+        return OLD_ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
 
     def _get_elevenlabs_api_key(self, state: dict[str, str]) -> tuple[str, bool]:
         """
@@ -436,12 +459,12 @@ class TextToSpeechPage(BasePage):
         ]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             text = state.get("text_prompt")
             if text:
-                st.write(text)
+                gui.write(text)
         with col2:
             audio_url = state.get("audio_url")
             if audio_url:
-                st.audio(audio_url)
+                gui.audio(audio_url)

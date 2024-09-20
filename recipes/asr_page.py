@@ -1,10 +1,9 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
-import gooey_ui as st
+import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai_v2.asr import (
     AsrModels,
@@ -18,16 +17,18 @@ from daras_ai_v2.asr import (
     forced_asr_languages,
     asr_language_selector,
 )
-from daras_ai_v2.field_render import field_title_desc
-from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
+    bulk_documents_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
+from recipes.Translation import TranslationOptions
 
 DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
 
@@ -40,7 +41,7 @@ class AsrPage(BasePage):
 
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
-    class RequestModel(BaseModel):
+    class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
@@ -48,26 +49,23 @@ class AsrPage(BasePage):
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
-        translation_source: str | None = Field(
-            title="Source Translation Language",
-            description="Usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify the source language here.",
-        )
-        translation_target: str | None = Field(
-            title="Target Translation Language",
-        )
+
+        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
+
         google_translate_target: str | None = Field(
-            description="DEPRECATED: use translation_model & translation_target instead."
+            deprecated=True,
+            description="use `translation_model` & `translation_target` instead.",
         )
 
-        glossary_document: FieldHttpUrl | None
-        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
+    class RequestModel(TranslationOptions, RequestModelBase):
+        pass
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
 
-    def load_state_from_sr(self, sr: SavedRun) -> dict:
-        state = super().load_state_from_sr(sr)
+    def current_sr_to_session_state(self) -> dict:
+        state = super().current_sr_to_session_state()
         google_translate_target = state.pop("google_translate_target", None)
         translation_model = state.get("translation_model")
         if google_translate_target and not translation_model:
@@ -91,12 +89,12 @@ class AsrPage(BasePage):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."
 
     def render_description(self):
-        st.markdown(
+        gui.markdown(
             """
             This workflow let's you compare the latest and finest speech recognition models from [OpenAI](https://openai.com/research/whisper), [AI4Bharat](https://ai4bharat.org) and [Bhashini](https://bhashini.gov.in) and Google's USM coming soon.
             """
         )
-        st.markdown(
+        gui.markdown(
             """
             Just upload an audio file (mp3, wav, ogg or aac file) setting its language and then choose a speech recognition engine. You can also translate the output to any language too (using Google's Translation APIs).
             """
@@ -117,11 +115,11 @@ class AsrPage(BasePage):
         ]
 
     def render_form_v2(self):
-        document_uploader(
+        bulk_documents_uploader(
             "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
-        col1, col2 = st.columns(2, responsive=False)
+        col1, col2 = gui.columns(2, responsive=False)
         with col1:
             selected_model = enum_selector(
                 AsrModels,
@@ -133,7 +131,7 @@ class AsrPage(BasePage):
             asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
-        col1, col2 = st.columns(2)
+        col1, col2 = gui.columns(2)
         with col1:
             translation_model = translation_model_selector()
         with col2:
@@ -142,24 +140,37 @@ class AsrPage(BasePage):
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                 key="translation_target",
             )
-        if translation_model and translation_model.supports_glossary():
-            glossary_input()
-        st.write("---")
-        selected_model = st.session_state.get("selected_model")
+        if translation_model and translation_model.supports_glossary:
+            gui.file_uploader(
+                label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                key="glossary_document",
+                accept=SUPPORTED_SPREADSHEET_TYPES,
+            )
+        gui.write("---")
+        selected_model = gui.session_state.get("selected_model")
         if selected_model:
             translation_language_selector(
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
                 key="translation_source",
-                allow_none=True,
+                allow_none=(
+                    translation_model.supports_auto_detect
+                    if translation_model
+                    else True
+                ),
             )
-            st.write("---")
+            gui.caption(
+                "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
+            )
+            gui.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
         )
 
     def validate_form_v2(self):
-        assert st.session_state.get("documents"), "Please provide at least 1 Audio File"
+        assert gui.session_state.get(
+            "documents"
+        ), "Please provide at least 1 Audio File"
 
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)
@@ -169,8 +180,8 @@ class AsrPage(BasePage):
         text_outputs("**Transcription**", value=state.get("output_text"))
 
     def render_steps(self):
-        if st.session_state.get("translation_model"):
-            col1, col2 = st.columns(2)
+        if gui.session_state.get("translation_model"):
+            col1, col2 = gui.columns(2)
             with col1:
                 text_outputs("**Transcription**", key="raw_output_text")
             with col2:
@@ -204,7 +215,7 @@ class AsrPage(BasePage):
                 asr_output,
                 target_language=request.translation_target,
                 source_language=forced_asr_languages.get(
-                    selected_model, request.language or request.translation_source
+                    selected_model, request.translation_source or request.language
                 ),
                 glossary_url=request.glossary_document,
                 model=request.translation_model,

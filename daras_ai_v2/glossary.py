@@ -1,10 +1,5 @@
 from daras_ai_v2.asr import google_translate_target_languages
 
-from daras_ai_v2.doc_search_settings_widgets import (
-    document_uploader,
-    SUPPORTED_SPREADSHEET_TYPES,
-)
-
 
 def validate_glossary_document(document: str):
     """
@@ -38,18 +33,6 @@ def validate_glossary_document(document: str):
                 raise AssertionError(
                     f'Invalid glossary: column header "{col}" is not a valid language code.'
                 )
-
-
-def glossary_input(
-    label: str = "##### Glossary",
-    key: str = "glossary_document",
-) -> str:
-    return document_uploader(
-        label=label,
-        key=key,
-        accept=SUPPORTED_SPREADSHEET_TYPES,
-        accept_multiple_files=False,
-    )  # type: ignore
 
 
 def create_glossary(

@@ -67,6 +67,7 @@ def get_model_choices():
         + [(model.name, model.value) for model in Img2ImgModels]
         + [(model.name, model.value) for model in InpaintingModels]
         + [("wav2lip", "LipSync (wav2lip)")]
+        + [("sadtalker", "LipSync (sadtalker)")]
     )
 
 
@@ -89,7 +90,7 @@ class ModelPricing(models.Model):
     unit_cost = models.DecimalField(
         max_digits=max_digits,
         decimal_places=decimal_places,
-        help_text="The cost per unit.",
+        help_text="The cost per unit (in dollars).",
     )
     unit_quantity = models.PositiveIntegerField(
         help_text="The quantity of the unit. (e.g. 1000 tokens)", default=1

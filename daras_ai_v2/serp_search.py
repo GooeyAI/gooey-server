@@ -54,7 +54,7 @@ def get_links_from_serp_api(
             snippet=item.get("snippet") or "",
         )
         for item in items
-        if (url := item.get("link") or item.get("website"))
+        if item and (url := item.get("link") or item.get("website"))
     ]
     return data, links
 

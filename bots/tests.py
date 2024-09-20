@@ -3,6 +3,8 @@ import uuid
 
 from app_users.models import AppUser
 from daras_ai_v2.functional import map_parallel
+from recipes.VideoBotsStats import get_tabular_data
+from workspaces.models import Workspace
 from .models import (
     Message,
     Conversation,
@@ -16,32 +18,44 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 
 
 def test_add_balance(transactional_db):
-    pk = AppUser.objects.create(balance=0, is_anonymous=False).pk
+    workspace = Workspace(
+        name="myteam",
+        created_by=AppUser.objects.create(is_anonymous=False),
+        is_personal=True,
+    )
+    workspace.create_with_owner()
+    pk = workspace.pk
     amounts = [[random.randint(-100, 10_000) for _ in range(100)] for _ in range(5)]
 
     def worker(amts):
-        user = AppUser.objects.get(pk=pk)
+        workspace = Workspace.objects.get(pk=pk)
         for amt in amts:
-            user.add_balance(amt, invoice_id=(uuid.uuid1()))
+            workspace.add_balance(amt, invoice_id=uuid.uuid1())
 
     map_parallel(worker, amounts)
 
-    assert AppUser.objects.get(pk=pk).balance == sum(map(sum, amounts))
+    assert Workspace.objects.get(pk=pk).balance == sum(map(sum, amounts))
 
 
 def test_add_balance_txn(transactional_db):
-    pk = AppUser.objects.create(balance=0, is_anonymous=False).pk
+    workspace = Workspace(
+        name="myteam",
+        created_by=AppUser.objects.create(is_anonymous=False),
+        is_personal=True,
+    )
+    workspace.create_with_owner()
+    pk = workspace.pk
     amounts = [[random.randint(-100, 10_000) for _ in range(100)] for _ in range(5)]
 
     def worker(amts):
-        user = AppUser.objects.get(pk=pk)
+        workspace = Workspace.objects.get(pk=pk)
         invoice_id = str(uuid.uuid1())
         for amt in amts:
-            user.add_balance(amt, invoice_id=invoice_id)
+            workspace.add_balance(amt, invoice_id=invoice_id)
 
     map_parallel(worker, amounts)
 
-    assert AppUser.objects.get(pk=pk).balance == sum([amt[0] for amt in amounts])
+    assert Workspace.objects.get(pk=pk).balance == sum([amt[0] for amt in amounts])
 
 
 def test_create_bot_integration_conversation_message(transactional_db):
@@ -115,8 +129,12 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     msgs = Message.objects.filter(conversation__in=convos)
 
     # valid option but no data
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Name",
     )
     assert df.shape[0] == 0
     assert "Name" in df.columns
@@ -143,15 +161,23 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     convos = Conversation.objects.filter(bot_integration=bi)
     msgs = Message.objects.filter(conversation__in=convos)
     assert msgs.count() == 2
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Name",
     )
     assert df.shape[0] == 1
     assert "Name" in df.columns
 
     # invalid sort option should be ignored
-    df = page.get_tabular_data(
-        bi, run_url, convos, msgs, "Answered Successfully", "Invalid"
+    df = get_tabular_data(
+        bi=bi,
+        conversations=convos,
+        messages=msgs,
+        details="Answered Successfully",
+        sort_by="Invalid",
     )
     assert df.shape[0] == 1
     assert "Name" in df.columns

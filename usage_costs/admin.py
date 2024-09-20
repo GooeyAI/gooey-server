@@ -1,13 +1,14 @@
 from django.contrib import admin
 
 from bots.admin_links import open_in_new_tab, change_obj_url
+from daras_ai.text_format import format_number_with_suffix
 from usage_costs import models
 
 
 class CostQtyMixin:
     @admin.display(description="Cost / Qty", ordering="unit_cost")
-    def cost_qty(self, obj):
-        return f"${obj.unit_cost.normalize()} / {obj.unit_quantity}"
+    def cost_qty(self, obj: models.ModelPricing | models.UsageCost):
+        return f"${obj.unit_cost.normalize()} / {format_number_with_suffix(obj.unit_quantity)}"
 
 
 @admin.register(models.UsageCost)

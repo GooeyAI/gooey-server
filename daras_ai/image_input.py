@@ -1,10 +1,11 @@
+import math
 import mimetypes
 import os
 import re
+import typing
 import uuid
 from pathlib import Path
 
-import math
 import numpy as np
 import requests
 from PIL import Image, ImageOps
@@ -12,6 +13,9 @@ from furl import furl
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import UserError
+
+if typing.TYPE_CHECKING:
+    from google.cloud.storage import Blob, Bucket
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -57,23 +61,36 @@ def upload_file_from_bytes(
     data: bytes,
     content_type: str = None,
 ) -> str:
-    if not content_type:
-        content_type = mimetypes.guess_type(filename)[0]
-    content_type = content_type or "application/octet-stream"
-    blob = storage_blob_for(filename)
-    blob.upload_from_string(data, content_type=content_type)
+    blob = gcs_blob_for(filename)
+    upload_gcs_blob_from_bytes(blob, data, content_type)
     return blob.public_url
 
 
-def storage_blob_for(filename: str) -> "storage.storage.Blob":
-    from firebase_admin import storage
-
+def gcs_blob_for(filename: str) -> "Blob":
     filename = safe_filename(filename)
-    bucket = storage.bucket(settings.GS_BUCKET_NAME)
+    bucket = gcs_bucket()
     blob = bucket.blob(
         os.path.join(settings.GS_MEDIA_PATH, str(uuid.uuid1()), filename)
     )
     return blob
+
+
+def upload_gcs_blob_from_bytes(
+    blob: "Blob",
+    data: bytes,
+    content_type: str = None,
+) -> str:
+    if not content_type:
+        content_type = mimetypes.guess_type(blob.path)[0]
+    content_type = content_type or "application/octet-stream"
+    blob.upload_from_string(data, content_type=content_type)
+    return blob.public_url
+
+
+def gcs_bucket() -> "Bucket":
+    from firebase_admin import storage
+
+    return storage.bucket(settings.GS_BUCKET_NAME)
 
 
 def cv2_img_to_bytes(img: np.ndarray) -> bytes:

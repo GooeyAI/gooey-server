@@ -19,4 +19,4 @@ dashboard: poetry run streamlit run Home.py --server.port 8501 --server.headless
 
 celery: poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG
 
-ui: cd ../gooey-ui/; PORT=3000 npm run dev
+ui: cd ../gooey-gui/; PORT=3000 npm run dev

@@ -1,11 +1,12 @@
 import json
 import shlex
+import threading
 from textwrap import indent
 
 from furl import furl
 
-import gooey_ui as st
-from auth.token_authentication import auth_keyword
+import gooey_gui as gui
+from auth.token_authentication import auth_scheme
 from daras_ai_v2 import settings
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
@@ -22,10 +23,14 @@ def get_filenames(request_body):
             yield key, furl(item).path.segments[-1]
 
 
+# because black is not thread-safe
+black_import_lock = threading.Lock()
+
+
 def api_example_generator(
     *, api_url: furl, request_body: dict, as_form_data: bool, as_async: bool
 ):
-    js, python, curl = st.tabs(["`node.js`", "`python`", "`curl`"])
+    js, python, curl = gui.tabs(["`node.js`", "`python`", "`curl`"])
 
     filenames = []
     if as_async:
@@ -43,12 +48,12 @@ def api_example_generator(
         if as_form_data:
             curl_code = r"""
 curl %(api_url)s \
-  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
+  -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY" \
   %(files)s \
   -F json=%(json)s
                 """ % dict(
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 files=" \\\n  ".join(
                     f"-F {key}=@{shlex.quote(filename)}" for key, filename in filenames
                 ),
@@ -57,12 +62,12 @@ curl %(api_url)s \
         else:
             curl_code = r"""
 curl %(api_url)s \
-  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
+  -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY" \
   -H 'Content-Type: application/json' \
   -d %(json)s
             """ % dict(
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
         if as_async:
@@ -72,7 +77,7 @@ status_url=$(
 )
 
 while true; do
-    result=$(curl $status_url -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY")
+    result=$(curl $status_url -H "Authorization: %(auth_scheme)s $GOOEY_API_KEY")
     status=$(echo $result | jq -r '.status')
     if [ "$status" = "completed" ]; then
         echo $result
@@ -86,11 +91,11 @@ done
             """ % dict(
                 curl_code=indent(curl_code.strip(), " " * 2),
                 api_url=shlex.quote(api_url),
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
 
-        st.write(
+        gui.write(
             """
 1. Generate an api key [below👇](#api-keys)
 
@@ -123,7 +128,7 @@ payload = %(json)s
 response = requests.post(
     "%(api_url)s",
     headers={
-        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"],
     },
     files=files,
     data={"json": json.dumps(payload)},
@@ -135,7 +140,7 @@ assert response.ok, response.content
                 ),
                 json=repr(request_body),
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             py_code = r"""
@@ -147,14 +152,14 @@ payload = %(json)s
 response = requests.post(
     "%(api_url)s",
     headers={
-        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"],
     },
     json=payload,
 )
 assert response.ok, response.content
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=repr(request_body),
             )
         if as_async:
@@ -163,7 +168,7 @@ from time import sleep
 
 status_url = response.headers["Location"]
 while True:
-    response = requests.get(status_url, headers={"Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"]})
+    response = requests.get(status_url, headers={"Authorization": "%(auth_scheme)s " + os.environ["GOOEY_API_KEY"]})
     assert response.ok, response.content
     result = response.json()
     if result["status"] == "completed":
@@ -176,18 +181,19 @@ while True:
         sleep(3)
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             py_code += r"""
 result = response.json()
 print(response.status_code, result)
 """
-        from black import format_str
-        from black.mode import Mode
+        with black_import_lock:
+            from black import format_str
+            from black.mode import Mode
 
         py_code = format_str(py_code, mode=Mode())
-        st.write(
+        gui.write(
             rf"""
 1. Generate an api key [below👇](#api-keys)
 
@@ -223,7 +229,7 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
     },
     body: formData,
   });
@@ -237,7 +243,7 @@ async function gooeyAPI() {
                     " " * 2,
                 ),
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
 
         else:
@@ -250,14 +256,14 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
             """ % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
                 json=json.dumps(request_body, indent=2),
             )
 
@@ -274,7 +280,7 @@ async function gooeyAPI() {
     const response = await fetch(status_url, {
         method: "GET",
         headers: {
-          "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+          "Authorization": "%(auth_scheme)s " + process.env["GOOEY_API_KEY"],
         },
     });
     if (!response.ok) {
@@ -293,7 +299,7 @@ async function gooeyAPI() {
     }
   }""" % dict(
                 api_url=api_url,
-                auth_keyword=auth_keyword,
+                auth_scheme=auth_scheme,
             )
         else:
             js_code += """
@@ -302,7 +308,7 @@ async function gooeyAPI() {
 
         js_code += "\n}\n\ngooeyAPI();"
 
-        st.write(
+        gui.write(
             r"""
 1. Generate an api key [below👇](#api-keys)
 
@@ -379,7 +385,7 @@ evtSource.onerror = (event) => {
         integration_id=integration_id,
     )
 
-    st.write(
+    gui.write(
         f"""
 Your Integration ID: `{integration_id}`
 
@@ -401,14 +407,14 @@ Note that you do not need the API key for this endpoint and can use it directly 
         )
         / "docs"
     )
-    st.markdown(
+    gui.markdown(
         f"""
 Read our <a href="{api_docs_url}" target="_blank">complete API</a> for features like conversation history, input media files, and more.
         """,
         unsafe_allow_html=True,
     )
 
-    st.js(
+    gui.js(
         """
 document.startStreaming = async function() {
     document.getElementById('stream-output').style.display = 'flex';
@@ -420,7 +426,7 @@ document.startStreaming = async function() {
         ).strip()
     )
 
-    st.html(
+    gui.html(
         f"""
 <br>
 <button class="btn btn-theme btn-secondary" onclick="document.startStreaming()">🏃‍♀️ Preview Streaming</button>

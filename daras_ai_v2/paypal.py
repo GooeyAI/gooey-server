@@ -12,8 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.redis_cache import get_redis_cache
-
+from daras_ai_v2.redis_cache import get_redis_cache, redis_lock
 
 T = TypeVar("T", bound="PaypalResource")
 
@@ -155,6 +154,8 @@ class Subscription(PaypalResource):
     billing_info: BillingInfo | None
 
     def cancel(self, *, reason: str = "cancellation_requested") -> None:
+        if self.status in ["CANCELLED", "EXPIRED"]:
+            return
         r = requests.post(
             str(self.get_resource_url() / "cancel"),
             headers=get_default_headers(),
@@ -304,23 +305,24 @@ def generate_auth_header() -> str:
 
     # to reset token: $ redis-cli --scan --pattern 'gooey/paypal-access-token/*' | xargs redis-cli unlink
     cache_key = f"gooey/paypal-access-token/v1/{auth}"
-    cache_val = redis_cache.get(cache_key)
-    if cache_val:
-        access_token = cache_val.decode()
-    else:
-        s = time()
-        response = requests.post(
-            str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
-            data="grant_type=client_credentials",
-            headers={"Authorization": f"Basic {auth}"},
-        )
-        raise_for_status(response)
-        data = response.json()
-        access_token = data.get("access_token")
-        assert access_token, "Missing access token in response"
-        # expiry with a buffer of the time taken to fetch the token + 5 minutes
-        expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
-        redis_cache.set(cache_key, access_token.encode(), ex=expiry)
+    with redis_lock(cache_key):
+        cache_val = redis_cache.get(cache_key)
+        if cache_val:
+            access_token = cache_val.decode()
+        else:
+            s = time()
+            response = requests.post(
+                str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
+                data="grant_type=client_credentials",
+                headers={"Authorization": f"Basic {auth}"},
+            )
+            raise_for_status(response)
+            data = response.json()
+            access_token = data.get("access_token")
+            assert access_token, "Missing access token in response"
+            # expiry with a buffer of the time taken to fetch the token + 5 minutes
+            expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
+            redis_cache.set(cache_key, access_token.encode(), ex=expiry)
 
     return f"Bearer {access_token}"
 

@@ -55,10 +55,10 @@ class Text2ImgModels(Enum):
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
 
-    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
-    openjourney = "Open Journey (PromptHero) 🐢"
-    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    openjourney = "Open Journey (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
@@ -78,6 +78,8 @@ text2img_model_ids = {
     Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
+}
+dall_e_model_ids = {
     Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.dall_e_3: "dall-e-3",
 }
@@ -211,10 +213,12 @@ def sd_upscale(
     guidance_scale: float,
     seed: int = 42,
 ):
+    from daras_ai_v2.upscaler_models import UpscalerModels
+
     return call_sd_multi(
         "diffusion.upscale",
         pipeline={
-            "model_id": "stabilityai/stable-diffusion-x4-upscaler",
+            "model_id": UpscalerModels.sd_x4.model_id,
             # "scheduler": "UniPCMultistepScheduler",
             "disable_safety_checker": True,
             "seed": seed,
@@ -289,7 +293,7 @@ def text2img(
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=text2img_model_ids[Text2ImgModels[selected_model]],
+                    model=dall_e_model_ids[Text2ImgModels[selected_model]],
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",

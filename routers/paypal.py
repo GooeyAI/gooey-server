@@ -4,7 +4,6 @@ from typing import Literal
 
 import pydantic
 import requests
-from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
@@ -12,19 +11,18 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel
 
-from app_users.models import AppUser, PaymentProvider
+from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_route_url
+from daras_ai_v2.fastapi_tricks import fastapi_request_json, get_app_route_url
 from payments.models import PricingPlan
-from payments.tasks import send_monthly_spending_notification_email
-from routers.account import (
-    paypal_handle_subscription_updated,
-    payment_processing_route,
-    account_route,
-)
+from payments.webhooks import PaypalWebhookHandler, add_balance_for_payment
+from routers.account import payment_processing_route, account_route
+from routers.custom_api_router import CustomAPIRouter
+from workspaces.models import Workspace
+from workspaces.widgets import get_current_workspace
 
-router = APIRouter()
+router = CustomAPIRouter()
 
 
 class SubscriptionPayload(BaseModel):
@@ -66,6 +64,7 @@ class SubscriptionEvent(BaseWebhookEvent):
 def create_order(request: Request, payload: dict = fastapi_request_json):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
+    workspace = get_current_workspace(request.user, request.session)
 
     quantity = payload["quantity"]
     unit_amount = 1 / settings.ADDON_CREDITS_PER_DOLLAR
@@ -82,11 +81,11 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
             # "PayPal-Mock-Response": '{"mock_application_codes": "PERMISSION_DENIED"}'
             # "PayPal-Mock-Response": '{"mock_application_codes": "INTERNAL_SERVER_ERROR"}'
         },
-        json={
-            "intent": "CAPTURE",
-            "purchase_units": [
-                {
-                    "amount": {
+        json=dict(
+            intent="CAPTURE",
+            purchase_units=[
+                dict(
+                    amount={
                         "currency_code": "USD",
                         "value": str(value),
                         "breakdown": {
@@ -96,7 +95,7 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
                             }
                         },
                     },
-                    "items": [
+                    items=[
                         {
                             "name": "Top up Credits",
                             "quantity": str(quantity),
@@ -106,10 +105,10 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
                             },
                         }
                     ],
-                    "custom_id": request.user.uid,
-                },
+                    custom_id=workspace.get_pp_custom_id(),
+                ),
             ],
-        },
+        ),
     )
     raise_for_status(response)
     return JSONResponse(response.json(), response.status_code)
@@ -119,6 +118,7 @@ def create_order(request: Request, payload: dict = fastapi_request_json):
 def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
+    workspace = get_current_workspace(request.user, request.session)
 
     lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
@@ -130,54 +130,23 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     if plan.deprecated:
         return JSONResponse({"error": "Deprecated plan"}, status_code=400)
 
-    if request.user.subscription:
+    if workspace.subscription and workspace.subscription.is_paid():
         return JSONResponse(
             {"error": "User already has an active subscription"}, status_code=400
         )
 
     paypal_plan_info = plan.get_paypal_plan()
-    pp_subscription = paypal.Subscription.create(
+    return paypal.Subscription.create(
         plan_id=paypal_plan_info["plan_id"],
-        custom_id=request.user.uid,
+        custom_id=workspace.get_pp_custom_id(),
         plan=paypal_plan_info.get("plan", {}),
         application_context={
             "brand_name": "Gooey.AI",
             "shipping_preference": "NO_SHIPPING",
-            "return_url": get_route_url(payment_processing_route),
-            "cancel_url": get_route_url(account_route),
+            "return_url": get_app_route_url(payment_processing_route),
+            "cancel_url": get_app_route_url(account_route),
         },
     )
-    return JSONResponse(content=jsonable_encoder(pp_subscription), status_code=200)
-
-
-@router.post("/__/paypal/webhook/")
-def webhook(request: Request, payload: dict = fastapi_request_json):
-    if not paypal.verify_webhook_event(payload, headers=request.headers):
-        logger.error("Invalid PayPal webhook signature")
-        return JSONResponse({"error": "Invalid signature"}, status_code=400)
-
-    try:
-        event = WebhookEvent.parse_obj(payload)
-    except pydantic.ValidationError as e:
-        logger.error(f"Invalid PayPal webhook payload: {json.dumps(e)}")
-        return JSONResponse({"error": "Invalid event type"}, status_code=400)
-
-    logger.info(f"Received event: {event.event_type}")
-
-    match event.event_type:
-        case "PAYMENT.SALE.COMPLETED":
-            event = SaleCompletedEvent.parse_obj(event)
-            _handle_sale_completed(event)
-        case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
-            event = SubscriptionEvent.parse_obj(event)
-            paypal_handle_subscription_updated(event.resource)
-        case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
-            event = SubscriptionEvent.parse_obj(event)
-            _handle_subscription_cancelled(event.resource)
-        case _:
-            logger.error(f"Unhandled PayPal webhook event: {event.event_type}")
-
-    return JSONResponse({}, status_code=200)
 
 
 # Capture payment for the created order to complete the transaction.
@@ -208,64 +177,39 @@ def _handle_invoice_paid(order_id: str):
     raise_for_status(response)
     order = response.json()
     purchase_unit = order["purchase_units"][0]
-    uid = purchase_unit["payments"]["captures"][0]["custom_id"]
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(
-        payment_provider=PaymentProvider.PAYPAL,
-        invoice_id=order_id,
+    payment_capture = purchase_unit["payments"]["captures"][0]
+    add_balance_for_payment(
+        workspace=Workspace.objects.from_pp_custom_id(payment_capture["custom_id"]),
         amount=int(purchase_unit["items"][0]["quantity"]),
+        invoice_id=payment_capture["id"],
+        payment_provider=PaymentProvider.PAYPAL,
         charged_amount=int(float(purchase_unit["amount"]["value"]) * 100),
     )
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])
 
 
-def _handle_sale_completed(event: SaleCompletedEvent):
-    sale = event.resource
-    if not sale.billing_agreement_id:
-        logger.warning(f"Sale {sale.id} is missing subscription ID")
-        return
+@router.post("/__/paypal/webhook")
+def webhook(request: Request, payload: dict = fastapi_request_json):
+    if not paypal.verify_webhook_event(payload, headers=request.headers):
+        logger.error("Invalid PayPal webhook signature")
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
 
-    pp_subscription = paypal.Subscription.retrieve(sale.billing_agreement_id)
-    if not pp_subscription.custom_id:
-        logger.error(f"Subscription {pp_subscription.id} is missing custom ID")
-        return
+    try:
+        event = WebhookEvent.parse_obj(payload)
+    except pydantic.ValidationError as e:
+        logger.error(f"Invalid PayPal webhook payload: {json.dumps(e)}")
+        return JSONResponse({"error": "Invalid event type"}, status_code=400)
 
-    assert pp_subscription.plan_id, "Subscription is missing plan ID"
-    plan = PricingPlan.get_by_paypal_plan_id(pp_subscription.plan_id)
-    if not plan:
-        logger.error(f"Invalid plan ID: {pp_subscription.plan_id}")
-        return
+    logger.info(f"Received event: {event.event_type}")
 
-    if float(sale.amount.total) == float(plan.monthly_charge):
-        new_credits = plan.credits
-    else:
-        new_credits = int(float(sale.amount.total) * settings.ADDON_CREDITS_PER_DOLLAR)
+    match event.event_type:
+        case "PAYMENT.SALE.COMPLETED":
+            sale = SaleCompletedEvent.parse_obj(event).resource
+            PaypalWebhookHandler.handle_sale_completed(sale)
+        case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
+            subscription = SubscriptionEvent.parse_obj(event).resource
+            PaypalWebhookHandler.handle_subscription_updated(subscription)
+        case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
+            subscription = SubscriptionEvent.parse_obj(event).resource
+            PaypalWebhookHandler.handle_subscription_cancelled(subscription)
 
-    user = AppUser.objects.get(uid=pp_subscription.custom_id)
-    user.add_balance(
-        payment_provider=PaymentProvider.PAYPAL,
-        invoice_id=sale.id,
-        amount=new_credits,
-        charged_amount=int(float(sale.amount.total) * 100),
-    )
-    if not user.is_paying:
-        user.is_paying = True
-        user.save(update_fields=["is_paying"])
-    if (
-        user.subscription
-        and user.subscription.should_send_monthly_spending_notification()
-    ):
-        send_monthly_spending_notification_email.delay(user.id)
-
-
-def _handle_subscription_cancelled(subscription: paypal.Subscription):
-    user = AppUser.objects.get(uid=subscription.custom_id)
-    if (
-        user.subscription
-        and user.subscription.payment_provider == PaymentProvider.PAYPAL
-        and user.subscription.external_id == subscription.id
-    ):
-        user.subscription = None
-        user.save()
+    return JSONResponse({})

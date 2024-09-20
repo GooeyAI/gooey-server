@@ -2,6 +2,7 @@ import requests
 from furl import furl
 
 from celeryapp import app
+from daras_ai_v2.exceptions import raise_for_status
 from url_shortener.models import VisitorClickInfo
 
 
@@ -19,18 +20,24 @@ def save_click_info(surl_id: int, ip_address: str, user_agent: str):
         device = None
         os = None
 
-    res = requests.get(str(furl("https://iplist.cc/api/") / ip_address))
-    if res.ok:
+    ip_data = {}
+    try:
+        res = requests.get(
+            str(furl("http://ip-api.com/json") / ip_address),
+        )
+        raise_for_status(res)
         ip_data = res.json()
-    else:
-        ip_data = {}
-
-    VisitorClickInfo.objects.create(
-        shortened_url_id=surl_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        browser=browser,
-        device=device,
-        os=os,
-        ip_data=ip_data,
-    )
+        if ip_data.get("status") == "success":
+            ip_data.pop("status")  # remove success status
+        ip_data.pop("query", None)  # remove the query ip
+    finally:
+        # save the visitor click info irregarless of the IP data being fetched
+        VisitorClickInfo.objects.create(
+            shortened_url_id=surl_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            browser=browser,
+            device=device,
+            os=os,
+            ip_data=ip_data,
+        )

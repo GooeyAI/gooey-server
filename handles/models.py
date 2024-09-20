@@ -27,10 +27,13 @@ BASE_HANDLE_BLACKLIST = [
     "team",
     "about",
     "blog",
-    "contact",
     "sales",
+    "js",
+    "css",
+    "assets",
+    "favicon.ico",
 ]
-COMMON_EMAIL_DOMAINS = [
+COMMON_EMAIL_DOMAINS = {
     "gmail.com",
     "googlemail.com",
     "outlook.com",
@@ -50,7 +53,7 @@ COMMON_EMAIL_DOMAINS = [
     "tuta.io",
     "keemail.me",
     "zohomail.com",
-]
+}
 PRIVATE_EMAIL_DOMAINS = [
     "privaterelay.appleid.com",
 ]
@@ -171,7 +174,7 @@ def _generate_handle_options(user):
     if user.is_anonymous or not user.email:
         return
 
-    email_domain = user.email.split("@")[1]
+    email_domain = user.email.split("@")[-1]
 
     if email_domain in COMMON_EMAIL_DOMAINS:
         # popular mail provider where user set their own email prefix

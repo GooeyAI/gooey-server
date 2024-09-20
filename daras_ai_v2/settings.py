@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-import json
 from pathlib import Path
 
 import sentry_sdk
@@ -54,6 +53,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "safedelete",
     "app_users",
     "files",
     "url_shortener",
@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     "embeddings",
     "handles",
     "payments",
+    "functions",
+    "workspaces",
 ]
 
 MIDDLEWARE = [
@@ -197,7 +199,7 @@ if not DEBUG:
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
-        traces_sample_rate=0.01,
+        traces_sample_rate=0.005,
         send_default_pii=True,
         integrations=[
             ThreadingIntegration(propagate_hub=True),
@@ -227,8 +229,10 @@ os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
 GCP_REGION = config("GCP_REGION", default="us-central1")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
+
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
@@ -262,7 +266,8 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
-SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
+PAYMENT_EMAIL = "Gooey.AI Payments <payment-support@gooey.ai>"
+SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 5)
 
 DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
     # tab names
@@ -275,15 +280,17 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "docs",
 ]
 
-SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
-SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
+SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
+SAFETY_CHECKER_BILLING_EMAIL = config(
+    "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
+FIRST_WORKSPACE_FREE_CREDITS = config("WORKSPACE_FREE_CREDITS", 500, cast=int)
 ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
-
 
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
@@ -293,9 +300,11 @@ LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
 LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
-stripe.api_key = config("STRIPE_SECRET_KEY", None)
-STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+stripe.api_key = STRIPE_SECRET_KEY
+
+STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: str = "subscription_key"
 STRIPE_ADDON_PRODUCT_NAME = config(
     "STRIPE_ADDON_PRODUCT_NAME", "Gooey.AI Add-on Credits"
 )
@@ -312,7 +321,6 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
-SEON_API_KEY = config("SEON_API_KEY", None)
 APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
@@ -352,8 +360,7 @@ AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
 AZURE_SPEECH_REGION = config("AZURE_SPEECH_REGION", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.com"
-
-AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
+AZURE_TTS_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com"
 
 AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
 AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")
@@ -388,3 +395,17 @@ MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
 
 DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
 DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
+
+TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
+TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
+TWILIO_API_KEY_SECRET = config("TWILIO_API_KEY_SECRET", "")
+
+WORKSPACE_INVITE_EXPIRY_DAYS = config("WORKSPACE_INVITE_EXPIRY_DAYS", 10, cast=int)
+WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL = config(
+    "WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL", 60 * 60 * 24, cast=int  # 24 hours
+)
+
+SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
+SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")
+SCRAPING_PROXY_PASSWORD = config("SCRAPING_PROXY_PASSWORD", "")
+SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")

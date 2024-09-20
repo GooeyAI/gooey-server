@@ -1,18 +1,19 @@
+import multiprocessing
 import os.path
 import os.path
 import tempfile
+import typing
 from enum import Enum
 
+import gooey_gui as gui
 import requests
 import typing_extensions
 from django.db.models import F
 from furl import furl
 
-import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
-from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -30,12 +31,14 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
 
 TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
+# https://cloud.google.com/translate/docs/languages#roman
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 
 # https://cloud.google.com/speech-to-text/docs/speech-to-text-supported-languages
@@ -56,15 +59,16 @@ GCP_V1_SUPPORTED = {
 
 # https://cloud.google.com/speech-to-text/v2/docs/speech-to-text-supported-languages
 CHIRP_SUPPORTED = {
-    "af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG",
-    "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "yue-Hant-HK", "zh-TW", "hr-HR", "cs-CZ", "da-DK", "nl-NL",
-    "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE",
-    "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV",
-    "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU",
-    "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "no-NO", "ny-MW", "oc-FR", "ps-AF", "fa-IR",
-    "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI",
-    "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK",
-    "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"
+    'fa-IR', 'sr-RS', 'es-US', 'ur-PK', 'yo-NG', 'te-IN', 'sn-ZW', 'es-ES', 'jv-ID', 'no-NO', 'cmn-Hans-CN', 'ha-NG',
+    'es-419', 'wo-SN', 'rup-BG', 'ceb-PH', 'ms-MY', 'umb-AO', 'ny-MW', 'sw-KE', 'et-EE', 'ga-IE', 'kn-IN', 'sd-IN',
+    'en-GB', 'ml-IN', 'fil-PH', 'my-MM', 'uk-UA', 'lt-LT', 'en-US', 'ff-SN', 'su-ID', 'ru-RU', 'xh-ZA', 'en-IN',
+    'it-IT', 'ky-KG', 'en-AU', 'id-ID', 'ja-JP', 'fr-CA', 'nl-NL', 'fi-FI', 'zu-ZA', 'ar-EG', 'bs-BA', 'gl-ES', 'si-LK',
+    'pa-Guru-IN', 'ast-ES', 'tr-TR', 'mt-MT', 'hy-AM', 'da-DK', 'vi-VN', 'kam-KE', 'hu-HU', 'cs-CZ', 'sl-SI', 'ko-KR',
+    'km-KH', 'kk-KZ', 'nso-ZA', 'mk-MK', 'de-DE', 'mr-IN', 'th-TH', 'as-IN', 'kea-CV', 'bg-BG', 'sk-SK', 'bn-BD',
+    'el-GR', 'cy-GB', 'ro-RO', 'ckb-IQ', 'ca-ES', 'sq-AL', 'af-ZA', 'ig-NG', 'cmn-Hant-TW', 'mi-NZ', 'gu-IN', 'tg-TJ',
+    'oc-FR', 'so-SO', 'be-BY', 'fr-FR', 'luo-KE', 'sv-SE', 'is-IS', 'bn-IN', 'lg-UG', 'uz-UZ', 'iw-IL', 'ps-AF',
+    'ta-IN', 'sw', 'mn-MN', 'ka-GE', 'az-AZ', 'pt-BR', 'hi-IN', 'lo-LA', 'am-ET', 'eu-ES', 'yue-Hant-HK', 'pl-PL',
+    'om-ET', 'hr-HR', 'lv-LV', 'or-IN', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
 WHISPER_SUPPORTED = {
@@ -73,16 +77,15 @@ WHISPER_SUPPORTED = {
     "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
 }  # fmt: skip
 
-# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
+# https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
 # For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
-SEAMLESS_SUPPORTED = {
-    "afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb",
-    "cmn", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "gaz", "gle", "glg", "guj", "heb", "hin",
-    "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kam", "kan", "kat", "kaz", "kea", "khk", "khm",
-    "kir", "kor", "lao", "lit", "ltz", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld",
-    "nno", "nob", "npi", "nya", "oci", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna",
-    "snd", "som", "spa", "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie",
-    "xho", "yor", "yue", "zlm", "zul"
+SEAMLESS_v2_ASR_SUPPORTED = {
+    "afr", "amh", "arb", "ary", "arz", "asm", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb", "cmn",
+    "cmn-Hant", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "fuv", "gaz", "gle", "glg", "guj", "heb",
+    "hin", "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kan", "kat", "kaz", "khk", "khm", "kir",
+    "kor", "lao", "lit", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld", "nno", "nob",
+    "npi", "nya", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna", "snd", "som", "spa",
+    "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "yor", "yue", "zul",
 }  # fmt: skip
 
 AZURE_SUPPORTED = {
@@ -197,8 +200,18 @@ MMS_SUPPORTED = {
 }  # fmt: skip
 
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
-GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
+                       'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
 GHANA_NLP_MAXLEN = 500
+GHANA_API_AUTH_HEADERS = {"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)}
+GHANA_NLP_ASR_V2_SUPPORTED = {
+    "tw": "Twi",
+    "gaa": "Ga",
+    "dag": "Dagbani",
+    "yo": "Yoruba",
+    "ee": "Ewe",
+    "ki": "Kikuyu",
+}
 
 
 class AsrModels(Enum):
@@ -213,11 +226,24 @@ class AsrModels(Enum):
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
-    seamless_m4t = "Seamless M4T (Facebook Research)"
+    seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
+    seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
+    ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
+
     def supports_auto_detect(self) -> bool:
-        return self not in {self.azure, self.gcp_v1, self.mms_1b_all}
+        return self not in {
+            self.azure,
+            self.gcp_v1,
+            self.mms_1b_all,
+            self.seamless_m4t_v2,
+            self.ghana_nlp_asr_v2,
+        }
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.seamless_m4t}
 
 
 asr_model_ids = {
@@ -228,7 +254,7 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
-    AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
+    AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
 }
 
@@ -246,9 +272,10 @@ asr_supported_languages = {
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
-    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
+    AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
+    AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
 }
 
 
@@ -270,15 +297,21 @@ class AsrOutputFormat(Enum):
     vtt = "VTT"
 
 
-class TranslationModels(Enum):
-    google = "Google Translate"
-    ghana_nlp = "Ghana NLP"
+class TranslationModel(typing.NamedTuple):
+    label: str
+    supports_glossary: bool = False
+    supports_auto_detect: bool = False
 
-    def supports_glossary(self) -> bool:
-        return self in {self.google}
 
-    def supports_auto_detect(self) -> bool:
-        return self in {self.google}
+class TranslationModels(TranslationModel, Enum):
+    google = TranslationModel(
+        label="Google Translate",
+        supports_glossary=True,
+        supports_auto_detect=True,
+    )
+    ghana_nlp = TranslationModel(
+        label="Ghana NLP Translate", supports_auto_detect=False
+    )
 
 
 def translation_language_selector(
@@ -289,21 +322,24 @@ def translation_language_selector(
     **kwargs,
 ) -> str | None:
     if not model:
-        st.session_state[key] = None
+        gui.session_state[key] = None
         return
 
     if model == TranslationModels.google:
         languages = google_translate_target_languages()
     elif model == TranslationModels.ghana_nlp:
-        languages = GHANA_NLP_SUPPORTED
+        if not settings.GHANA_NLP_SUBKEY:
+            languages = {}
+        else:
+            languages = ghana_nlp_translate_target_languages()
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: languages[k] if k else BLANK_OPTION,
+        format_func=lang_format_func,
         options=options,
         **kwargs,
     )
@@ -343,7 +379,7 @@ def google_translate_language_selector(
     """
     languages = google_translate_target_languages()
     options = list(languages.keys())
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
@@ -351,6 +387,21 @@ def google_translate_language_selector(
         allow_none=allow_none,
         **kwargs,
     )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def ghana_nlp_translate_target_languages():
+    """
+    Get list of supported languages for Ghana NLP Translation.
+    :return: Dictionary of language codes and display names.
+    Reference: https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+    """
+    r = requests.get(
+        "https://translation-api.ghananlp.org/v1/languages",
+        headers=GHANA_API_AUTH_HEADERS,
+    )
+    raise_for_status(r)
+    return r.json().get("languages") or {}
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -395,26 +446,15 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
-def get_language_in_collection(langcode: str, languages):
-    import langcodes
-
-    for lang in languages:
-        if langcodes.get(lang).language == langcodes.get(langcode).language:
-            return langcode
-    return None
-
-
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
     key="language",
 ):
-    import langcodes
-
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
-        st.session_state[key] = forced_lang
+        gui.session_state[key] = forced_lang
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
@@ -422,18 +462,14 @@ def asr_language_selector(
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_val = st.session_state.get(key)
-    if old_val and old_val not in options:
-        old_val_lang = langcodes.Language.get(old_val).language
-        for opt in options:
-            try:
-                if opt and langcodes.Language.get(opt).language == old_val_lang:
-                    st.session_state[key] = opt
-                    break
-            except langcodes.LanguageTagError:
-                pass
+    old_lang = gui.session_state.get(key)
+    if old_lang:
+        try:
+            gui.session_state[key] = normalised_lang_in_collection(old_lang, options)
+        except UserError:
+            gui.session_state[key] = None
 
-    return st.selectbox(
+    return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
@@ -484,26 +520,17 @@ def run_ghana_nlp_translate(
     target_language: str,
     source_language: str,
 ) -> list[str]:
-    import langcodes
-
     assert (
-        target_language in GHANA_NLP_SUPPORTED
-    ), "Ghana NLP does not support this target language"
-    assert source_language, "Source language is required for Ghana NLP"
-
-    if source_language not in GHANA_NLP_SUPPORTED:
-        src = langcodes.Language.get(source_language).language
-        for lang in GHANA_NLP_SUPPORTED:
-            if src == langcodes.Language.get(lang).language:
-                source_language = lang
-                break
-    assert (
-        source_language in GHANA_NLP_SUPPORTED
-    ), "Ghana NLP does not support this source language"
-
+        source_language and target_language
+    ), "Both Source & Target language is required for Ghana NLP"
+    source_language = normalised_lang_in_collection(
+        source_language, ghana_nlp_translate_target_languages()
+    )
+    target_language = normalised_lang_in_collection(
+        target_language, ghana_nlp_translate_target_languages()
+    )
     if source_language == target_language:
         return texts
-
     return map_parallel(
         lambda doc: _call_ghana_nlp_chunked(doc, source_language, target_language),
         texts,
@@ -526,7 +553,7 @@ def _call_ghana_nlp_chunked(
 def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
     r = requests.post(
         "https://translation-api.ghananlp.org/v1/translate",
-        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        headers=GHANA_API_AUTH_HEADERS,
         json={"in": text, "lang": source_language + "-" + target_language},
     )
     raise_for_status(r)
@@ -550,50 +577,80 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
-    import langcodes
 
-    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    supported_languages = google_translate_target_languages()
     if source_language:
-        source_language = langcodes.Language.get(source_language).to_tag()
-        source_language = get_language_in_collection(
-            source_language, google_translate_source_languages().keys()
-        )  # this will default to autodetect if language is not found as supported
-    target_language = langcodes.Language.get(target_language).to_tag()
-    target_language: str | None = get_language_in_collection(
-        target_language, google_translate_target_languages().keys()
+        try:
+            source_language = normalised_lang_in_collection(
+                source_language, supported_languages
+            )
+        except UserError:
+            source_language = None  # autodetect
+    target_language = normalised_lang_in_collection(
+        target_language, supported_languages
     )
-    if not target_language:
-        raise UserError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
-        language_codes = [source_language] * len(texts)
+        detected_source_languges = [source_language] * len(texts)
     else:
         translate_client = translate.Client()
         detections = flatten(
             translate_client.detect_language(texts[i : i + TRANSLATE_BATCH_SIZE])
             for i in range(0, len(texts), TRANSLATE_BATCH_SIZE)
         )
-        language_codes = [detection["language"] for detection in detections]
+        detected_source_languges = [detection["language"] for detection in detections]
+
+    # fix for when sometimes google might detect a different language than the user provided one
+    if source_language:
+        detected_source_languges = [
+            code if source_language in code.split("-")[0] else source_language
+            for code in detected_source_languges
+        ]
 
     return map_parallel(
-        lambda text, source: _translate_text(
-            text, source, target_language, glossary_url
+        lambda text, src_lang: _translate_text(
+            text, target_language, src_lang, glossary_url
         ),
         texts,
-        language_codes,
+        detected_source_languges,
         max_workers=TRANSLATE_BATCH_SIZE,
     )
 
 
+def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
+    import langcodes
+
+    ERROR = UserError(
+        f"Unsupported language: {target!r} | must be one of {set(collection)}"
+    )
+
+    if target in collection:
+        return target
+
+    try:
+        target_lan = langcodes.Language.get(target).language
+    except langcodes.LanguageTagError:
+        raise ERROR
+
+    for candidate in collection:
+        try:
+            if candidate and langcodes.Language.get(candidate).language == target_lan:
+                return candidate
+        except langcodes.LanguageTagError:
+            pass
+
+    raise ERROR
+
+
 def _translate_text(
     text: str,
-    source_language: str,
     target_language: str,
+    source_language: str,
     glossary_url: str | None,
 ) -> str:
     is_romanized = source_language.endswith("-Latn")
-    source_language = source_language.replace("-Latn", "")
+    source_language = source_language.split("-")[0]
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
@@ -601,9 +658,6 @@ def _translate_text(
     # prevent incorrect API calls
     if not text or source_language == target_language or source_language == "und":
         return text
-
-    if source_language == "wo-SN" or target_language == "wo-SN":
-        return _MinT_translate_one_text(text, source_language, target_language)
 
     config = {
         "target_language_code": target_language,
@@ -614,7 +668,6 @@ def _translate_text(
     if source_language != "auto":
         config["source_language_code"] = source_language
 
-    # glossary does not work with transliteration
     if glossary_url and not enable_transliteration:
         from glossary_resources.models import GlossaryResource
 
@@ -773,15 +826,14 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-    elif selected_model == AsrModels.seamless_m4t:
+    elif selected_model == AsrModels.seamless_m4t_v2:
         data = call_celery_task(
-            "seamless",
+            "seamless.asr",
             pipeline=dict(
-                model_id=asr_model_ids[AsrModels.seamless_m4t],
+                model_id=asr_model_ids[AsrModels.seamless_m4t_v2],
             ),
             inputs=dict(
                 audio=audio_url,
-                task="ASR",
                 src_lang=language,
             ),
         )
@@ -868,6 +920,23 @@ def run_asr(
             ),
             # queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
+    elif selected_model == AsrModels.ghana_nlp_asr_v2:
+        audio_r = requests.get(audio_url)
+        raise_for_status(audio_r, is_user_url=True)
+        r = requests.post(
+            furl(
+                "https://translation-api.ghananlp.org/asr/v2/transcribe",
+                query_params=dict(language=language),
+            ),
+            headers={
+                "Content-Type": "audio/wav",
+                "Cache-Control": "no-cache",
+                **GHANA_API_AUTH_HEADERS,
+            },
+            data=audio_r.content,
+        )
+        raise_for_status(r)
+        data = r.json()
     # call one of the self-hosted models
     else:
         kwargs = {}
@@ -961,20 +1030,30 @@ def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
+_yt_dlp_lock = multiprocessing.Semaphore(1)
+
+
 def download_youtube_to_wav(youtube_url: str) -> bytes:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _yt_dlp_lock, tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
+        proxy_args = []
+        if proxy := SCRAPING_PROXIES.get("https"):
+            proxy_args += ["--proxy", proxy]
+        if cert := get_scraping_proxy_cert_path():
+            proxy_args += ["--client-certificate-key", cert]
         # run yt-dlp to download audio
         call_cmd(
-            "yt-dlp",
+            "yt-dlp", "-v",
             "--no-playlist",
-            "--format",
-            "bestaudio",
-            "--output",
-            infile,
+            "--max-downloads", "1",
+            "--format", "bestaudio",
+            "--output", infile,
+            *proxy_args,
             youtube_url,
-        )
+            # ignore MaxDownloadsReached - https://github.com/ytdl-org/youtube-dl/blob/a452f9437c8a3048f75fc12f75bcfd3eed78430f/youtube_dl/__init__.py#L468
+            ok_returncodes={101},
+        )  # fmt:skip
         # convert audio to single channel wav
         ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory
@@ -985,7 +1064,15 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    raise_for_status(r, is_user_url=True)
+    try:
+        raise_for_status(r, is_user_url=True)
+    except requests.HTTPError:
+        # wait 3 seconds and try again (handles cases where the url has just been uploaded but cache is not updated yet, e.g. for Twilio)
+        from time import sleep
+
+        sleep(3)
+        r = requests.get(audio_url)
+        raise_for_status(r, is_user_url=True)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:
@@ -1054,7 +1141,15 @@ def iterate_subtitles(
         yield segment_start, segment_end, segment_text
 
 
-def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker: str):
+INFINITY_SECONDS = 99 * 3600 + 59 * 60 + 59  # 99:59:59 in seconds
+
+
+def format_timestamp(
+    seconds: float | None, always_include_hours: bool, decimal_marker: str
+):
+    if seconds is None:
+        # treat None as end of time
+        seconds = INFINITY_SECONDS
     assert seconds >= 0, "non-negative timestamp expected"
     milliseconds = round(seconds * 1000.0)
 
@@ -1074,4 +1169,4 @@ def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker:
 
 
 def should_translate_lang(code: str) -> bool:
-    return code and not code.split("-")[0] != "en"
+    return code and code.split("-")[0] != "en"

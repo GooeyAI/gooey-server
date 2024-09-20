@@ -5,7 +5,6 @@ from enum import Enum
 import jinja2
 from typing_extensions import TypedDict
 
-import gooey_ui
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
@@ -292,7 +291,7 @@ def parse_refs(
         yield end_text, {}
 
 
-def render_output_with_refs(state, height):
+def render_output_with_refs(state, height=500):
     output_text = state.get("output_text", [])
     for text in output_text:
         html = render_text_with_refs(text, state.get("references", []))

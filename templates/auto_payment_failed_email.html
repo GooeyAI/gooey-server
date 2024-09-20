@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+<div class="flex-fill">
+
+  <p>Hi {{ user.first_name() }},</p>
+
+  <p>We attempted to process your payment for ${{ dollar_amt }} but your payment method was declined.</p>
+
+  <p>
+    Please <a href="{{ invoice_url }}">make a payment</a> on Gooey.AI for continued service or update
+    your payment method on <a href="{{ account_url }}">your account</a>.
+  </p>
+
+  <p>
+    <a href="{{ invoice_url }}">
+      <button class="btn btn-dark text-light">Make Payment</button>
+    </a>
+  </p>
+
+  <p>
+    Cheers,<br />
+    The Gooey.AI team
+  </p>
+
+</div>
+
+</body>
+
+</html>

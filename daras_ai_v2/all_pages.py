@@ -36,6 +36,7 @@ from recipes.VideoBots import VideoBotsPage
 from recipes.asr_page import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
 from recipes.VideoBotsStats import VideoBotsStatsPage
+from recipes.Translation import TranslationPage
 
 # note: the ordering here matters!
 all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
@@ -66,6 +67,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         TextToSpeechPage,
         AsrPage,
         Text2AudioPage,
+        TranslationPage,
     ],
     "Images": [
         Img2ImgPage,
@@ -110,7 +112,7 @@ page_slug_map: dict[str, typing.Type[BasePage]] = {
     normalize_slug(slug): page
     for page in (all_api_pages + all_hidden_pages)
     for slug in page.slug_versions
-} | {str(page.workflow.value): page for page in (all_api_pages + all_hidden_pages)}
+} | {str(page.workflow.value): page for page in all_api_pages}
 
 workflow_map: dict[Workflow, typing.Type[BasePage]] = {
     page.workflow: page for page in all_api_pages

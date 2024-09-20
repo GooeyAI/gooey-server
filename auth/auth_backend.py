@@ -20,7 +20,7 @@ def force_authentication():
         AppUser.objects.get_or_create(
             email="tests@pytest.org",
             defaults=dict(
-                is_anonymous=True,
+                is_anonymous=False,
                 uid=get_random_doc_id(),
                 balance=10**9,
                 disable_rate_limits=True,

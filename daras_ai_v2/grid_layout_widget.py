@@ -1,6 +1,6 @@
 import typing
 
-import gooey_ui as st
+import gooey_gui as gui
 
 
 def grid_layout(
@@ -24,4 +24,4 @@ def grid_layout(
 
 def infinte_cols(spec):
     while True:
-        yield from st.columns(spec)
+        yield from gui.columns(spec)
