@@ -97,7 +97,11 @@ def account_route(request: Request):
 
 @gui.route(app, "/account/billing/")
 @gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/billing/")
-def billing_route(request: Request, workspace_slug: str, workspace_hashid: str | None):
+def billing_route(
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
+):
     validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
@@ -137,7 +141,9 @@ def saved_shortcut_route():
 @gui.route(app, "/account/saved/")
 @gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/saved/")
 def saved_route(
-    request: Request, workspace_slug: str, workspace_hashid: str | None = None
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
 ):
     validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.saved):
@@ -156,7 +162,11 @@ def saved_route(
 
 @gui.route(app, "/account/api-keys/")
 @gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/api-keys/")
-def api_keys_route(request: Request, workspace_slug: str, workspace_hashid: str | None):
+def api_keys_route(
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
+):
     validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)
@@ -193,7 +203,7 @@ def workspaces_route(
 def workspaces_members_route(
     request: Request,
     workspace_hashid: str,
-    workspace_slug: str | None,
+    workspace_slug: str | None = None,
 ):
     validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.members):
