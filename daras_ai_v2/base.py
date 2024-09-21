@@ -729,6 +729,7 @@ This will also delete all the associated versions.
         if duplicate_button:
             duplicate_pr = pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{pr.title} (Copy)",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -782,6 +783,7 @@ This will also delete all the associated versions.
                 pr = self.current_pr
                 duplicate_pr = pr.duplicate(
                     user=self.request.user,
+                    workspace=self.current_workspace,
                     title=f"{self.request.user.first_name_possesive()} {pr.title}",
                     notes=pr.notes,
                     visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
