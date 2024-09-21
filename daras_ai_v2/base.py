@@ -83,9 +83,7 @@ from payments.auto_recharge import (
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 from workspaces.widgets import get_current_workspace
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.models import Workspace
 
 
 DEFAULT_META_IMG = (
@@ -382,7 +380,7 @@ class BasePage:
                         )
 
                 if is_example:
-                    author = pr.created_by
+                    author = pr.workspace
                 else:
                     author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
@@ -1118,7 +1116,7 @@ This will also delete all the associated versions.
         gui.session_state["is_flagged"] = is_flagged
 
     @cached_property
-    def current_workspace(self) -> "Workspace":
+    def current_workspace(self) -> Workspace:
         assert self.request.user
         return get_current_workspace(self.request.user, self.request.session)
 
@@ -1211,7 +1209,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
-        workspace: "Workspace",
+        workspace: Workspace,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1247,16 +1245,56 @@ This will also delete all the associated versions.
     def validate_form_v2(self):
         pass
 
-    @staticmethod
+    @classmethod
     def render_author(
-        user: AppUser,
+        cls,
+        workspace_or_user: "Workspace | AppUser | None",
         *,
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
     ):
-        if not user or (not user.photo_url and not user.display_name):
+        if not workspace_or_user:
+            return
+
+        link = None
+        if isinstance(workspace_or_user, Workspace):
+            workspace = workspace_or_user
+            photo = workspace.logo
+            if not photo and workspace.is_personal:
+                photo = workspace.created_by.photo_url
+            name = workspace.display_name()
+            if show_as_link and workspace.is_personal and workspace.created_by.handle:
+                link = workspace.created_by.handle.get_app_url()
+        else:
+            user = workspace_or_user
+            photo = user.photo_url
+            name = user.display_name
+            if show_as_link and user.handle:
+                link = user.handle.get_app_url()
+
+        return cls._render_author(
+            photo=photo,
+            name=name,
+            link=link,
+            image_size=image_size,
+            responsive=responsive,
+            text_size=text_size,
+        )
+
+    @classmethod
+    def _render_author(
+        cls,
+        photo: str | None,
+        name: str | None,
+        link: str | None,
+        *,
+        image_size: str,
+        responsive: bool,
+        text_size: str | None,
+    ):
+        if not photo and not name:
             return
 
         responsive_image_size = (
@@ -1268,13 +1306,9 @@ This will also delete all the associated versions.
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link and user and user.handle:
-            linkto = gui.link(to=user.handle.get_app_url())
-        else:
-            linkto = gui.dummy()
-
+        linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
-            if user.photo_url:
+            if photo:
                 gui.html(
                     f"""
                     <style>
@@ -1296,12 +1330,12 @@ This will also delete all the associated versions.
                     </style>
                 """
                 )
-                gui.image(user.photo_url, className=class_name)
+                gui.image(photo, className=class_name)
 
-            if user.display_name:
+            if name:
                 name_style = {"fontSize": text_size} if text_size else {}
                 with gui.tag("span", style=name_style):
-                    gui.html(html.escape(user.display_name))
+                    gui.html(html.escape(name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1962,10 +1996,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        if published_run.created_by:
+        if published_run.workspace:
             with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
-                    published_run.created_by,
+                    published_run.workspace,
                     image_size="20px",
                     text_size="0.9rem",
                 )
