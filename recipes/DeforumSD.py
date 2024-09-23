@@ -182,12 +182,91 @@ def animation_prompts_editor(
                 height=100,
             )
         with col3:
-            gui.number_input(
-                label="",
-                key=frame_key,
-                min_value=0,
-                step=1,
+            zoom_pan_modal = gui.use_confirm_dialog(
+                key="modal-" + fp_key, close_on_confirm=False
             )
+            zoom_dict = get_zoom_pan_dict(gui.session_state.get("zoom", {0: 1.004}))
+            zoom_value = 0.0 if fp["frame"] not in zoom_dict else zoom_dict[fp["frame"]]
+            hpan_dict = get_zoom_pan_dict(
+                gui.session_state.get("translation_x", {0: 1.004})
+            )
+            hpan_value = 0.0 if fp["frame"] not in hpan_dict else hpan_dict[fp["frame"]]
+            vpan_dict = get_zoom_pan_dict(
+                gui.session_state.get("translation_y", {0: 1.004})
+            )
+            vpan_value = 0.0 if fp["frame"] not in vpan_dict else vpan_dict[fp["frame"]]
+            zoom_pan_description = ""
+            if zoom_value:
+                zoom_pan_description = "Out: " if zoom_value > 1 else "In: "
+                zoom_pan_description += f"{round(zoom_value, 3)}\n"
+            if hpan_value:
+                zoom_pan_description += "Right: " if hpan_value > 1 else "Left: "
+                zoom_pan_description += f"{round(hpan_value, 3)}\n"
+            if vpan_value:
+                zoom_pan_description += "Up: " if vpan_value > 1 else "Down: "
+                zoom_pan_description += f"{round(vpan_value, 3)}"
+            if not zoom_pan_description:
+                zoom_pan_description = '<i class="fa-solid fa-camera-movie"></i>'
+            if gui.button(
+                zoom_pan_description,
+                key="button-" + fp_key,
+                type="link",
+            ):
+                zoom_pan_modal.set_open(True)
+            if zoom_pan_modal.is_open:
+                with gui.confirm_dialog(
+                    ref=zoom_pan_modal,
+                    modal_title=f"### Zoom/Pan",
+                    confirm_label="Save",
+                    large=True,
+                ):
+                    gui.write(
+                        f"#### Keyframe second {start} until {end}",
+                    )
+                    gui.caption(
+                        f"Starting at second {start} and until second {end}, how do you want the camera to move? (Reasonable valuables would be ±0.005)"
+                    )
+                    zoom_pan_slider = gui.slider(
+                        label="""
+                        #### Zoom
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.001,
+                        value=0,
+                    )
+                    hpan_slider = gui.slider(
+                        label="""
+                        #### Horizontal Pan
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.001,
+                        value=0,
+                    )
+                    vpan_slider = gui.slider(
+                        label="""
+                        #### Vertical Pan
+                        """,
+                        min_value=-1.5,
+                        max_value=1.5,
+                        step=0.001,
+                        value=0,
+                    )
+                    if zoom_pan_modal.pressed_confirm:
+                        zoom_dict.update({fp["frame"]: 1 + zoom_pan_slider})
+                        hpan_dict.update({fp["frame"]: hpan_slider})
+                        vpan_dict.update({fp["frame"]: vpan_slider})
+                        gui.session_state["zoom"] = get_zoom_pan_string(zoom_dict)
+                        gui.session_state["translation_x"] = get_zoom_pan_string(
+                            hpan_dict
+                        )
+                        gui.session_state["translation_y"] = get_zoom_pan_string(
+                            vpan_dict
+                        )
+                        zoom_pan_modal.set_open(False)
+                        gui.rerun()
+
         updated_st_list.append(
             {
                 "frame": gui.session_state.get(frame_key),
@@ -217,8 +296,19 @@ def seconds_to_frames(seconds: float, fps: int) -> int:
     return int(seconds * int(fps))
 
 
-def zoom_pan_to_string(zoom_dict: dict[int, float]) -> str:
-    return ", ".join([f"{frame}:({zoom})" for frame, zoom in zoom_dict.items()])
+def get_zoom_pan_string(zoom_pan_string: dict[int, float]) -> str:
+    return ", ".join([f"{frame}:({zoom})" for frame, zoom in zoom_pan_string.items()])
+
+
+def get_zoom_pan_dict(zoom_pan_string: str) -> dict[int, float]:
+    zoom_dict = {}
+    pairs = zoom_pan_string.split(", ")
+    for pair in pairs:
+        frame, zoom = pair.split(":(")
+        frame = int(frame.strip())
+        zoom = float(zoom.strip().rstrip(")"))  # Remove the closing parenthesis
+        zoom_dict[frame] = zoom
+    return zoom_dict
 
 
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
@@ -233,7 +323,7 @@ class DeforumSDPage(BasePage):
     sane_defaults = dict(
         zoom="0: (1.004)",
         animation_mode="2D",
-        translation_x="0:(10*sin(2*3.14*t/10))",
+        translation_x="0:(0)",
         translation_y="0:(0)",
         rotation_3d_x="0:(0)",
         rotation_3d_y="0:(0)",
@@ -301,6 +391,22 @@ class DeforumSDPage(BasePage):
             )
         with col2:
             gui.write("*End of Video*")
+
+        gui.write("#### Step 2: Increase Animation Quality")
+        gui.write(
+            "Once you like your keyframes, increase your frames per second for high quality"
+        )
+        fps_options = [2, 10, 24]
+        option_descriptions = ["Draft", "Stop-motion", "Film"]
+        options = {
+            str(fps): f"{label}: {fps} FPS"
+            for fps, label in zip(fps_options, option_descriptions)
+        }
+        gui.radio(
+            """###### FPS (Frames per second)""",
+            options=options,
+            key="fps",
+        )
 
     def get_cost_note(self) -> str | None:
         return f"{gui.session_state.get('max_frames')} frames @ {CREDITS_PER_FRAME} Cr /frame"
@@ -389,16 +495,6 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
                 """,
                 key="rotation_3d_x",
             )
-        gui.slider(
-            """
-###### FPS (Frames per second)
-Choose fps for the video.
-            """,
-            min_value=10,
-            max_value=60,
-            step=1,
-            key="fps",
-        )
 
     #         gui.selectbox(
     #             """
@@ -516,8 +612,8 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        # if not self.request.user.disable_safety_checker:
-        #     safety_checker(text=self.preview_input(state))
+        if not self.request.user.disable_safety_checker:
+            safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
