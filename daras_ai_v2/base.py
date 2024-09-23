@@ -1664,36 +1664,25 @@ This will also delete all the associated versions.
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.request.user and not self.request.user.is_anonymous
 
-        if (
-            self.get_run_state(gui.session_state) == RecipeRunState.starting
-            and self.current_sr_user
-        ):
-            with transaction.atomic():
-                # select_for_update() is important because we need to ensure the
-                # run is not being modified by another thread (e.g. in a different
-                # tab). otherwise, we could end up queueing the run twice.
-                sr = SavedRun.objects.select_for_update().get(id=self.current_sr.id)
-                if self.get_run_state(sr.to_dict()) != RecipeRunState.starting:
-                    # run has already been started in another tab
-                    gui.rerun()
-                if (
-                    sr.uid == self.current_sr_user.uid
-                    and self.current_sr_user.is_anonymous
-                ):
-                    # run belonged to an anonymous user who now logged
-                    # in from an existing account now, so we update the uid
-                    sr.uid = self.request.user.uid
-                    sr.save(update_fields=["uid"])
-                gui.session_state[StateKeys.run_status] = "Starting..."
-                self.dump_state_to_sr(self._get_validated_state(), sr)
-
-            self.call_runner_task(sr)
-        else:
-            sr = self.current_sr
+        updated_count = SavedRun.objects.filter(
+            id=self.current_sr.id,
+            uid=self.current_sr_user.uid,
+            # filter for RecipeRunState.standby
+            run_status="",
+            error_msg="",
+            run_time=datetime.timedelta(),
+        ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
+        if updated_count >= 1:
+            # updated now
+            self.dump_state_to_sr(self._get_validated_state(), self.current_sr)
+            self.call_runner_task(self.current_sr)
+        elif self.get_run_state(self.current_sr.to_dict()) == RecipeRunState.standby:
+            # updated by a different thread, we just refresh_from_db
+            self.current_sr.refresh_from_db()
 
         pr = self.create_published_run(
             published_run_id=get_random_doc_id(),
-            saved_run=sr,
+            saved_run=self.current_sr,
             user=self.request.user,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
