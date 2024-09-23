@@ -493,8 +493,8 @@ class BasePage:
 
     def _render_copy_link_button(
         self, label: str = "", className: str = "mb-0 ms-lg-2"
-    ):
-        copy_to_clipboard_button(
+    ) -> bool:
+        return copy_to_clipboard_button(
             label=f"{icons.link} {label}".strip(),
             value=self.current_app_url(self.tab),
             type="secondary",
@@ -539,12 +539,15 @@ class BasePage:
             )
 
         with gui.div(className="d-flex justify-content-between"):
-            self._render_copy_link_button(label="Copy Link", className="py-2 px-3 m-0")
-            if gui.button(
+            pressed_copy_link = self._render_copy_link_button(
+                label="Copy Link", className="py-2 px-3 m-0"
+            )
+            pressed_done = gui.button(
                 "Done",
                 type="primary",
                 className="py-2 px-5 m-0",
-            ):
+            )
+            if pressed_done or pressed_copy_link:
                 if self.current_pr.visibility != published_run_visibility:
                     self.current_pr.add_version(
                         user=self.request.user,
@@ -553,7 +556,7 @@ class BasePage:
                         notes=self.current_pr.notes,
                         visibility=PublishedRunVisibility(published_run_visibility),
                     )
-
+            if pressed_done:
                 dialog.set_open(False)
                 gui.rerun()
 
