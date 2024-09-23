@@ -463,7 +463,9 @@ class BasePage:
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
         if gui.button(
-            label=icons.more_options, className="mb-0 ms-lg-2", type="tertiary"
+            label=icons.more_options,
+            className="mb-0 ms-lg-2 py-2 px-3",
+            type="tertiary",
         ):
             ref.set_open(True)
         if ref.is_open:
@@ -483,7 +485,9 @@ class BasePage:
             dialog = gui.use_alert_dialog(key="share-modal")
             icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
             if gui.button(
-                f"{icon} Share", className="mb-0 ms-lg-2 px-lg-4", type="secondary"
+                f"{icon} Share",
+                className="mb-0 ms-lg-2 py-2 px-3",
+                type="secondary",
             ):
                 dialog.set_open(True)
 
@@ -589,7 +593,7 @@ class BasePage:
             ref = gui.use_alert_dialog(key="publish-modal")
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">{label}</span>',
-                className="mb-0 ms-lg-2 px-lg-4",
+                className="mb-0 ms-lg-2 py-2 px-3",
                 type="primary",
             ):
                 if not self.request.user or self.request.user.is_anonymous:
