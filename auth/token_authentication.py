@@ -4,12 +4,14 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
+from loguru import logger
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from app_users.models import AppUser
 from auth.auth_backend import authlocal
 from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
+from workspaces.models import Workspace
 
 
 class AuthenticationError(HTTPException):
@@ -26,7 +28,7 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
+def authenticate_credentials(token: str) -> Workspace:
     db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
@@ -40,16 +42,26 @@ def authenticate_credentials(token: str) -> AppUser:
     except IndexError:
         raise AuthorizationError("Invalid API Key.")
 
-    uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    if user.is_disabled:
+    try:
+        workspace_id = doc.get("workspace_id")
+    except KeyError:
+        uid = doc.get("uid")
+        workspace_id = Workspace.objects.get_or_create_from_uid(uid)[0].id
+
+    try:
+        workspace = Workspace.objects.get(id=workspace_id)
+    except Workspace.DoesNotExist:
+        logger.warning(f"Workspace {workspace_id} not found (for API key {doc.id=}).")
+        raise AuthorizationError("Invalid API key.")
+
+    if workspace.is_personal and workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return user
+    return workspace
 
 
 class APIAuth(SecurityBase):
@@ -59,8 +71,8 @@ class APIAuth(SecurityBase):
     ```python
     api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
 
-    @app.get("/api/users")
-    def get_users(authenticated_user: AppUser = Depends(api_auth)):
+    @app.get("/api/runs")
+    def get_runs(current_workspace: Workspace = Depends(api_auth)):
         ...
     ```
     """
@@ -77,7 +89,7 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> AppUser:
+    def __call__(self, request: Request) -> Workspace:
         if authlocal:  # testing only!
             return authlocal[0]
 
