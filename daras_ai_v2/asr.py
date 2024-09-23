@@ -59,16 +59,15 @@ GCP_V1_SUPPORTED = {
 
 # https://cloud.google.com/speech-to-text/v2/docs/speech-to-text-supported-languages
 CHIRP_SUPPORTED = {
-    'fa-IR', 'sr-RS', 'es-US', 'ur-PK', 'yo-NG', 'te-IN', 'sn-ZW', 'es-ES', 'jv-ID', 'no-NO', 'cmn-Hans-CN', 'ha-NG',
-    'es-419', 'wo-SN', 'rup-BG', 'ceb-PH', 'ms-MY', 'umb-AO', 'ny-MW', 'sw-KE', 'et-EE', 'ga-IE', 'kn-IN', 'sd-IN',
-    'en-GB', 'ml-IN', 'fil-PH', 'my-MM', 'uk-UA', 'lt-LT', 'en-US', 'ff-SN', 'su-ID', 'ru-RU', 'xh-ZA', 'en-IN',
-    'it-IT', 'ky-KG', 'en-AU', 'id-ID', 'ja-JP', 'fr-CA', 'nl-NL', 'fi-FI', 'zu-ZA', 'ar-EG', 'bs-BA', 'gl-ES', 'si-LK',
-    'pa-Guru-IN', 'ast-ES', 'tr-TR', 'mt-MT', 'hy-AM', 'da-DK', 'vi-VN', 'kam-KE', 'hu-HU', 'cs-CZ', 'sl-SI', 'ko-KR',
-    'km-KH', 'kk-KZ', 'nso-ZA', 'mk-MK', 'de-DE', 'mr-IN', 'th-TH', 'as-IN', 'kea-CV', 'bg-BG', 'sk-SK', 'bn-BD',
-    'el-GR', 'cy-GB', 'ro-RO', 'ckb-IQ', 'ca-ES', 'sq-AL', 'af-ZA', 'ig-NG', 'cmn-Hant-TW', 'mi-NZ', 'gu-IN', 'tg-TJ',
-    'oc-FR', 'so-SO', 'be-BY', 'fr-FR', 'luo-KE', 'sv-SE', 'is-IS', 'bn-IN', 'lg-UG', 'uz-UZ', 'iw-IL', 'ps-AF',
-    'ta-IN', 'sw', 'mn-MN', 'ka-GE', 'az-AZ', 'pt-BR', 'hi-IN', 'lo-LA', 'am-ET', 'eu-ES', 'yue-Hant-HK', 'pl-PL',
-    'om-ET', 'hr-HR', 'lv-LV', 'or-IN', 'ln-CD', 'ne-NP', 'lb-LU'
+    'fa-IR', 'sr-RS', 'es-US', 'ur-PK', 'yo-NG', 'te-IN', 'sn-ZW', 'es-ES', 'jv-ID', 'cmn-Hans-CN', 'ha-NG', 'no-NO',
+    'wo-SN', 'ceb-PH', 'ms-MY', 'ny-MW', 'et-EE', 'kn-IN', 'sd-IN', 'en-GB', 'ml-IN', 'fil-PH', 'my-MM', 'uk-UA',
+    'lt-LT', 'en-US', 'su-ID', 'ru-RU', 'en-IN', 'it-IT', 'ky-KG', 'en-AU', 'id-ID', 'ja-JP', 'fr-CA', 'nl-NL', 'fi-FI',
+    'zu-ZA', 'ar-EG', 'bs-BA', 'gl-ES', 'si-LK', 'pa-Guru-IN', 'ast-ES', 'tr-TR', 'mt-MT', 'hy-AM', 'da-DK', 'vi-VN',
+    'kam-KE', 'hu-HU', 'cs-CZ', 'sl-SI', 'ko-KR', 'km-KH', 'kk-KZ', 'nso-ZA', 'mk-MK', 'de-DE', 'mr-IN', 'th-TH',
+    'as-IN', 'kea-CV', 'bg-BG', 'sk-SK', 'el-GR', 'cy-GB', 'ro-RO', 'ckb-IQ', 'ca-ES', 'sq-AL', 'af-ZA', 'cmn-Hant-TW',
+    'mi-NZ', 'gu-IN', 'tg-TJ', 'oc-FR', 'so-SO', 'be-BY', 'fr-FR', 'luo-KE', 'sv-SE', 'is-IS', 'uz-UZ', 'iw-IL',
+    'ps-AF', 'ta-IN', 'sw', 'mn-MN', 'ka-GE', 'az-AZ', 'pt-BR', 'hi-IN', 'lo-LA', 'am-ET', 'eu-ES', 'yue-Hant-HK',
+    'pl-PL', 'hr-HR', 'lv-LV', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
 WHISPER_SUPPORTED = {
