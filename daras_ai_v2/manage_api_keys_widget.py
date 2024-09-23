@@ -1,4 +1,5 @@
 import datetime
+import typing
 
 import gooey_gui as gui
 from app_users.models import AppUser
@@ -12,11 +13,14 @@ from daras_ai_v2.crypto import (
     get_random_api_key,
 )
 
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
 
-def manage_api_keys(user: AppUser):
+
+def manage_api_keys(workspace: "Workspace", user: AppUser):
     gui.write(
-        """
-Your secret API keys are listed below.
+        f"""
+{workspace.display_name(current_user=user)} API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
 
 Do not share your API key with others, or expose it in the browser or other client-side code.

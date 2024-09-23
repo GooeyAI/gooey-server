@@ -347,7 +347,7 @@ Authorization: Bearer GOOEY_API_KEY
         )
         return
 
-    manage_api_keys(page.request.user)
+    manage_api_keys(workspace=page.current_workspace, user=page.request.user)
 
 
 @gui.route(
