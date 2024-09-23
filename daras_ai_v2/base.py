@@ -15,7 +15,6 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
@@ -543,11 +542,11 @@ class BasePage:
             )
 
         with gui.div(className="d-flex justify-content-between"):
-            self._render_copy_link_button(label="Copy Link", className="py-2 px-3")
+            self._render_copy_link_button(label="Copy Link", className="py-2 px-3 m-0")
             if gui.button(
                 "Done",
                 type="primary",
-                className="py-2 px-5",
+                className="py-2 px-5 m-0",
             ):
                 if self.current_pr.visibility != published_run_visibility:
                     self.current_pr.add_version(
