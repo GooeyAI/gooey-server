@@ -87,8 +87,11 @@ gooey_rng = Random()
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 PUBLISH_AFTER_LOGIN_Q = "publishafterlogin"
 
+STARTING_STATE = "Starting..."
+
 
 class RecipeRunState(Enum):
+    standby = "standby"
     starting = "starting"
     running = "running"
     completed = "completed"
@@ -322,7 +325,10 @@ class BasePage:
     def render(self):
         self.setup_sentry()
 
-        if self.get_run_state(gui.session_state) == RecipeRunState.running:
+        if self.get_run_state(gui.session_state) in (
+            RecipeRunState.starting,
+            RecipeRunState.running,
+        ):
             self.refresh_state()
         else:
             gui.realtime_clear_subs()
@@ -1217,7 +1223,7 @@ This will also delete all the associated versions.
     def get_sr_from_ids(
         cls,
         run_id: str,
-        uid: str | None,
+        uid: str,
         *,
         create: bool = False,
         defaults: dict = None,
@@ -1553,15 +1559,17 @@ This will also delete all the associated versions.
 
     @classmethod
     def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
-        if state.get(StateKeys.run_status):
-            return RecipeRunState.running
+        if detail := state.get(StateKeys.run_status):
+            if detail.lower().strip(". ") == STARTING_STATE.lower().strip(". "):
+                return RecipeRunState.starting
+            else:
+                return RecipeRunState.running
         elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
         elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
-            # when user is at a recipe root, and not running anything
-            return RecipeRunState.starting
+            return RecipeRunState.standby
 
     def render_deleted_output(self):
         col1, *_ = gui.columns(2)
@@ -1593,9 +1601,9 @@ This will also delete all the associated versions.
                 self._render_completed_output()
             case RecipeRunState.failed:
                 self._render_failed_output()
-            case RecipeRunState.running:
+            case RecipeRunState.running | RecipeRunState.starting:
                 self._render_running_output()
-            case RecipeRunState.starting:
+            case RecipeRunState.standby:
                 pass
 
         # render outputs
@@ -1719,7 +1727,7 @@ This will also delete all the associated versions.
         self,
         *,
         enable_rate_limits: bool = False,
-        run_status: str | None = "Starting...",
+        run_status: str | None = STARTING_STATE,
         **defaults,
     ) -> SavedRun | None:
         try:
@@ -1740,7 +1748,7 @@ This will also delete all the associated versions.
         self,
         *,
         enable_rate_limits: bool = False,
-        run_status: str | None = "Starting...",
+        run_status: str | None = STARTING_STATE,
         **defaults,
     ) -> SavedRun:
         gui.session_state[StateKeys.run_status] = run_status
