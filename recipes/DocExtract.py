@@ -3,7 +3,6 @@ import threading
 import typing
 
 import gooey_gui as gui
-
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
@@ -58,6 +57,7 @@ from daras_ai_v2.vector_search import (
     get_pdf_num_pages,
     doc_url_to_text_pages,
     doc_or_yt_url_to_metadatas,
+    is_yt_dlp_able_url,
 )
 from files.models import FileMetadata
 from recipes.DocSearch import render_documents
@@ -352,7 +352,7 @@ def col_i2a(col: int) -> str:
 
 
 def extract_info(url: str) -> list[dict | None]:
-    if is_yt_url(url):
+    if is_yt_dlp_able_url(url):
         return yt_dlp_get_video_entries(url)
 
     # assume it's a direct link
@@ -449,7 +449,7 @@ def process_source(
     )
 
     content_url = existing_values[Columns.content_url.value]
-    is_yt = is_yt_url(webpage_url)
+    is_yt = is_yt_dlp_able_url(webpage_url)
     is_pdf = doc_meta and "application/pdf" in doc_meta.mime_type
     is_video = doc_meta and (
         "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type
@@ -557,10 +557,6 @@ def update_cell(spreadsheet_id: str, row: int, col: int, value: str):
         body={"values": [[value]]},
         valueInputOption="RAW",
     ).execute()
-
-
-def is_yt_url(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
 
 
 threadlocal = threading.local()

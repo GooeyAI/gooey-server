@@ -1,6 +1,5 @@
 import multiprocessing
 import os.path
-import os.path
 import tempfile
 import typing
 from enum import Enum
@@ -753,12 +752,12 @@ def run_asr(
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
-    from daras_ai_v2.vector_search import is_yt_url
+    from daras_ai_v2.vector_search import is_yt_dlp_able_url
     import langcodes
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
-    if is_yt_url(audio_url):
+    if is_yt_dlp_able_url(audio_url):
         audio_url, size = download_youtube_to_wav_url(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))

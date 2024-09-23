@@ -273,7 +273,7 @@ def get_vespa_app():
 
 
 def doc_or_yt_url_to_metadatas(f_url: str) -> list[tuple[str, FileMetadata]]:
-    if is_yt_url(f_url):
+    if is_yt_dlp_able_url(f_url):
         entries = yt_dlp_get_video_entries(f_url)
         return [
             (
@@ -669,7 +669,7 @@ def doc_url_to_text_pages(
 def download_content_bytes(
     *, f_url: str, mime_type: str, is_user_url: bool = True
 ) -> tuple[bytes, str]:
-    if is_yt_url(f_url):
+    if is_yt_dlp_able_url(f_url):
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
@@ -711,7 +711,7 @@ def any_bytes_to_text_pages_or_df(
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     if mime_type.startswith("audio/") or mime_type.startswith("video/"):
-        if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
+        if is_gdrive_url(furl(f_url)) or is_yt_dlp_able_url(f_url):
             f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
         transcript = run_asr(
             f_url,
@@ -740,9 +740,21 @@ def any_bytes_to_text_pages_or_df(
     return [text]
 
 
-def is_yt_url(url: str) -> bool:
-    origin = furl(url).origin
-    return "youtube.com" in origin or "youtu.be" in origin
+def is_yt_dlp_able_url(url: str) -> bool:
+    f = furl(url)
+    return (
+        "youtube.com" in f.origin
+        or "youtu.be" in f.origin
+        or "fb.watch" in f.origin
+        or (
+            ("facebook.com" in f.origin or "fb.com" in f.origin)
+            and (
+                "videos" in f.path.segments
+                or "/share/v/" in f.pathstr
+                or "v" in f.query.params
+            )
+        )
+    )
 
 
 def pdf_or_tabular_bytes_to_text_pages_or_df(
