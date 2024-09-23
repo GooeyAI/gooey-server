@@ -148,6 +148,11 @@ class Workspace(SafeDeleteModel):
         else:
             return self.display_name()
 
+    def clean(self) -> None:
+        if not self.is_personal and not self.name:
+            raise ValidationError("Team name is required for workspaces")
+        return super().clean()
+
     def get_slug(self):
         return slugify(self.display_name())
 
@@ -306,9 +311,11 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return "Personal Account"
+            return f"{self.created_by.full_name()} (Personal)"
+        elif self.is_personal:
+            return self.created_by.full_name()
         else:
-            return f"{self.created_by.first_name_possesive()} Workspace"
+            return f"{self.created_by.first_name_possessive()} Workspace"
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
         if self.is_personal and self.created_by_id == current_user.id:
