@@ -16,7 +16,6 @@ from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel
 
-from app_users.models import AppUser
 from bots.models import (
     Workflow,
     Platform,
@@ -96,10 +95,7 @@ class VideoBotsStatsPage(BasePage):
                             ),
                         )
 
-                author = (
-                    AppUser.objects.filter(uid=bi.billing_account_uid).first()
-                    or self.request.user
-                )
+                author = bi.workspace or self.request.user
                 VideoBotsPage.render_author(
                     author,
                     show_as_link=self.is_current_user_admin(),
