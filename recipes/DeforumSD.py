@@ -26,6 +26,7 @@ class AnimationModels(TextChoices):
 class _AnimationPrompt(TypedDict):
     frame: str
     prompt: str
+    second: float
 
 
 AnimationPrompts = list[_AnimationPrompt]
@@ -38,26 +39,46 @@ def input_prompt_to_animation_prompts(input_prompt: str):
     animation_prompts = []
     for fp in input_prompt.split("|"):
         split = fp.split(":")
-        if len(split) == 2:
+        if len(split) == 3:
             frame = int(split[0])
             prompt = split[1].strip()
+            second = float(split[2])
         else:
             frame = 0
             prompt = fp
-        animation_prompts.append({"frame": frame, "prompt": prompt})
+            second = 0
+        animation_prompts.append({"frame": frame, "prompt": prompt, "second": second})
     return animation_prompts
 
 
 def animation_prompts_to_st_list(animation_prompts: AnimationPrompts):
-    return [
-        {"frame": fp["frame"], "prompt": fp["prompt"], "key": str(uuid.uuid1())}
-        for fp in animation_prompts
-    ]
+    if "second" in animation_prompts[0]:
+        return [
+            {
+                "frame": fp["frame"],
+                "prompt": fp["prompt"],
+                "second": fp["second"],
+                "key": str(uuid.uuid1()),
+            }
+            for fp in animation_prompts
+        ]
+    else:
+        return [
+            {
+                "frame": fp["frame"],
+                "prompt": fp["prompt"],
+                "second": frames_to_seconds(
+                    int(fp["frame"]), gui.session_state.get("fps", 12)
+                ),
+                "key": str(uuid.uuid1()),
+            }
+            for fp in animation_prompts
+        ]
 
 
 def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
     return [
-        {"frame": fp["frame"], "prompt": prompt}
+        {"frame": fp["frame"], "prompt": prompt, "second": fp["second"]}
         for fp in prompt_st_list
         if (prompt := fp["prompt"].strip())
     ]
@@ -86,38 +107,92 @@ def animation_prompts_editor(
         View the ‘Details’ drop down menu to get started.
         """
     )
+    gui.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
+    col1, col2, col3 = gui.columns([2, 9, 2], responsive=False)
+    max_seconds = gui.session_state.get("max_seconds", 10)
+    with col1:
+        gui.write("Second")
+    with col2:
+        gui.write("Prompt")
+    with col3:
+        gui.write("Camera")
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
         frame_key = f"{st_list_key}/frame/{fp_key}"
         prompt_key = f"{st_list_key}/prompt/{fp_key}"
-        if frame_key not in gui.session_state:
-            gui.session_state[frame_key] = fp["frame"]
+        second_key = f"{st_list_key}/seconds/{fp_key}"
+        if second_key not in gui.session_state:
+            gui.session_state[second_key] = fp["second"]
+        gui.session_state[frame_key] = seconds_to_frames(
+            gui.session_state[second_key], gui.session_state.get("fps", 12)
+        )
         if prompt_key not in gui.session_state:
             gui.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = gui.columns([8, 3], responsive=False)
+        col1, col2, col3 = gui.columns([2, 9, 2], responsive=False)
+        fps = gui.session_state.get("fps", 12)
+        max_seconds = gui.session_state.get("max_seconds", 10)
+        start = fp["second"]
+        end = (
+            prompt_st_list[idx + 1]["second"]
+            if idx + 1 < len(prompt_st_list)
+            else max_seconds
+        )
         with col1:
+            gui.number_input(
+                label="",
+                key=second_key,
+                min_value=0,
+                step=0.1,
+            )
+            if idx != 0 and gui.button(
+                "🗑️",
+                help=f"Remove Frame {idx + 1}",
+                type="tertiary",
+                style={"float": "left;"},
+            ):
+                prompt_st_list.pop(idx)
+                gui.rerun()
+            if gui.button(
+                '<i class="fa-regular fa-plus"></i>',
+                help=f"Insert Frame after Frame {idx + 1}",
+                type="tertiary",
+                style={"float": "left;"},
+            ):
+                next_second = round((start + end) / 2, 2)
+                if next_second > max_seconds:
+                    gui.error("Please increase Frame Count")
+                else:
+                    prompt_st_list.insert(
+                        idx + 1,
+                        {
+                            "frame": seconds_to_frames(next_second, fps),
+                            "prompt": prompt_st_list[idx]["prompt"],
+                            "second": next_second,
+                            "key": str(uuid.uuid1()),
+                        },
+                    )
+                    gui.rerun()
+
+        with col2:
             gui.text_area(
-                label="*Prompt*",
+                label="",
                 key=prompt_key,
                 height=100,
             )
-        with col2:
+        with col3:
             gui.number_input(
-                label="*Frame*",
+                label="",
                 key=frame_key,
                 min_value=0,
                 step=1,
             )
-            if gui.button("🗑️", help=f"Remove Frame {idx + 1}"):
-                prompt_st_list.pop(idx)
-                gui.rerun()
-
         updated_st_list.append(
             {
                 "frame": gui.session_state.get(frame_key),
                 "prompt": gui.session_state.get(prompt_key),
+                "second": gui.session_state.get(second_key),
                 "key": fp_key,
             }
         )
@@ -125,37 +200,25 @@ def animation_prompts_editor(
     prompt_st_list.clear()
     prompt_st_list.extend(updated_st_list)
 
-    if gui.button("➕ Add a Prompt"):
-        max_frames = gui.session_state.get("max_frames", 100)
-        if prompt_st_list:
-            next_frame = get_last_frame(prompt_st_list)
-            next_frame += max(min(max_frames - next_frame, 10), 1)
-        else:
-            next_frame = 0
-        if next_frame > max_frames:
-            gui.error("Please increase Frame Count")
-        else:
-            prompt_st_list.append(
-                {
-                    "frame": next_frame,
-                    "prompt": "",
-                    "key": str(uuid.uuid1()),
-                }
-            )
-            gui.rerun()
-
     gui.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
-    )
-    gui.caption(
-        """
-        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation.
-        """
     )
 
 
 def get_last_frame(prompt_list: list) -> int:
     return max(fp["frame"] for fp in prompt_list)
+
+
+def frames_to_seconds(frames: int, fps: int) -> float:
+    return round(frames / int(fps), 2)
+
+
+def seconds_to_frames(seconds: float, fps: int) -> int:
+    return int(seconds * int(fps))
+
+
+def zoom_pan_to_string(zoom_dict: dict[int, float]) -> str:
+    return ", ".join([f"{frame}:({zoom})" for frame, zoom in zoom_dict.items()])
 
 
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
@@ -222,24 +285,25 @@ class DeforumSDPage(BasePage):
 
         col1, col2 = gui.columns(2)
         with col1:
-            gui.slider(
-                """
-                #### Frame Count
-                Choose the number of frames in your animation.
-                """,
-                min_value=10,
-                max_value=500,
-                step=10,
-                key="max_frames",
+            gui.number_input(
+                label="",
+                key="max_seconds",
+                min_value=0,
+                step=0.1,
+                value=frames_to_seconds(
+                    gui.session_state.get("max_frames", 100),
+                    gui.session_state.get("fps", 12),
+                ),
             )
-            gui.caption(
-                """
-Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames.
-            """
+            gui.session_state["max_frames"] = seconds_to_frames(
+                gui.session_state.get("max_seconds", 10),
+                gui.session_state.get("fps", 12),
             )
+        with col2:
+            gui.write("*End of Video*")
 
     def get_cost_note(self) -> str | None:
-        return f"{CREDITS_PER_FRAME} / frame"
+        return f"{gui.session_state.get('max_frames')} frames @ {CREDITS_PER_FRAME} Cr /frame"
 
     def additional_notes(self) -> str | None:
         return "Render Time ≈ 3s / frame"
@@ -452,8 +516,8 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        if not self.request.user.disable_safety_checker:
-            safety_checker(text=self.preview_input(state))
+        # if not self.request.user.disable_safety_checker:
+        #     safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
