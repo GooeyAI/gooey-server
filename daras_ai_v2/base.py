@@ -401,15 +401,12 @@ class BasePage:
                         """
                     )
 
-                    if self.request.user and self.tab in [
-                        RecipeTabs.run,
-                        RecipeTabs.run_as_api,
-                        RecipeTabs.integrations,
-                    ]:
+                    if self.request.user and self.tab == RecipeTabs.run:
                         self._render_options_button_with_dialog()
-
-                    self._render_share_button()
-                    self._render_save_button()
+                        self._render_share_button()
+                        self._render_save_button()
+                    else:
+                        self._render_copy_link_button(label="Copy Link")
 
         if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
             # only render title here if the above row was not empty
