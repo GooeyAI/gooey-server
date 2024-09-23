@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import OuterRef, Subquery
 
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun, PublishedRun
+from bots.models import BotIntegration, SavedRun, PublishedRun
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 
 BATCH_SIZE = 10_000
@@ -16,8 +16,8 @@ def run():
     migrate_personal_workspaces()
     migrate_txns()
     migrate_saved_runs()
-    ## LATER
-    # migrate_published_runs()
+    migrate_published_runs()
+    migrate_bot_integrations()
 
 
 @transaction.atomic
@@ -88,6 +88,21 @@ def migrate_published_runs():
                 created_by_id=OuterRef("created_by_id"),
             ).values("id")[:1]
         ),
+    )
+
+
+def migrate_bot_integrations():
+    qs = BotIntegration.objects.filter(
+        workspace__isnull=True,
+        billing_account_uid__isnull=False,
+    )
+    print(f"migrating {qs.count()} bot integrations", end=SEP)
+    update_in_batches(
+        qs,
+        workspace_id=Workspace.objects.filter(
+            is_personal=True,
+            created_by__uid=OuterRef("billing_account_uid"),
+        ).values("id")[:1],
     )
 
 
