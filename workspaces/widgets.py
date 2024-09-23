@@ -7,6 +7,10 @@ from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
 from .models import Workspace
 
+if typing.TYPE_CHECKING:
+    from routers.account import AccountTabs
+
+
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 
 
@@ -14,9 +18,9 @@ def workspace_selector(
     user: AppUser,
     session: dict,
     *,
-    route_fn: typing.Callable | None = None,
+    current_tab: "AccountTabs | None" = None,
 ):
-    from routers.account import workspaces_route
+    from routers.account import workspaces_route, account_route
 
     workspaces = Workspace.objects.filter(
         memberships__user=user, memberships__deleted__isnull=True
@@ -54,14 +58,11 @@ def workspace_selector(
         value=session.get(SESSION_SELECTED_WORKSPACE),
     )
     set_current_workspace(session, int(selected_id))
-    if route_fn:
+    if current_tab:
         workspace = next(w for w in workspaces if w.id == int(selected_id))
-        next_route_fn = get_next_route_fn(route_fn, workspace)
-        if route_fn != next_route_fn:
-            # redirect is needed
-            raise gui.RedirectException(
-                get_workspaces_route_path(next_route_fn, workspace)
-            )
+        if not validate_tab_for_workspace(current_tab, workspace):
+            # account_route will redirect to the correct tab
+            raise gui.RedirectException(get_route_path(account_route))
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
@@ -82,32 +83,14 @@ def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
 
 
-def get_next_route_fn(
-    route_fn: typing.Callable, workspace: Workspace
-) -> typing.Callable:
-    """
-    When we need to redirect after user changes the workspace.
-    """
-    from routers.account import (
-        account_route,
-        profile_route,
-        workspaces_route,
-        workspaces_members_route,
-    )
+def validate_tab_for_workspace(tab: "AccountTabs", workspace: Workspace) -> bool:
+    from routers.account import AccountTabs
 
-    if workspace.is_personal and route_fn in (
-        workspaces_members_route,
-        workspaces_route,
-    ):
-        # personal workspaces don't have a members page
-        # account_route does the right redirect instead
-        return account_route
-    elif not workspace.is_personal and route_fn == profile_route:
-        # team workspaces don't have a profile page
-        # workspaces_route does the right redirect instead
-        return workspaces_route
-
-    return route_fn
+    if tab == AccountTabs.members:
+        return not workspace.is_personal
+    if tab == AccountTabs.profile:
+        return workspace.is_personal
+    return True
 
 
 def get_workspaces_route_path(route_fn: typing.Callable, workspace: Workspace):

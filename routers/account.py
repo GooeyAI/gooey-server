@@ -361,7 +361,7 @@ def account_page_wrapper(request: Request, current_tab: AccountTabs):
         redirect_url = furl("/login", query_params={"next": next_url})
         raise gui.RedirectException(str(redirect_url))
 
-    with page_wrapper(request, route_fn=current_tab.route):
+    with page_wrapper(request, current_tab=current_tab):
         if request.url.path != current_tab.get_url_path(request):
             raise gui.RedirectException(current_tab.get_url_path(request))
 
