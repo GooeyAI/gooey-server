@@ -402,6 +402,11 @@ class DeforumSDPage(BasePage):
         gui.radio(
             """###### FPS (Frames per second)""",
             options=options,
+            format_func=lambda x: {
+                "2": "Draft: 2 FPS",
+                "10": "Stop-motion: 10 FPS",
+                "24": "Film: 24 FPS",
+            }[str(x)],
             key="fps",
         )
 
