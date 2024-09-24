@@ -22,7 +22,10 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
+from daras_ai_v2.language_model_settings_widgets import (
+    LanguageModelSettings,
+    language_model_settings,
+)
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
@@ -185,9 +188,9 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             """,
         )
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels if e.supports_json)
+        ] = LargeLanguageModels.gpt_4_turbo.name
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -237,6 +240,13 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
+        gui.selectbox(
+            "##### Language Model",
+            options=[e.name for e in LargeLanguageModels if e.supports_json],
+            key="selected_model",
+            format_func=lambda e: LargeLanguageModels[e].value,
+        )
+
         gui.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
         list_view_editor(
             add_btn_label="Add a Prompt",
@@ -266,8 +276,8 @@ Here's what you uploaded:
             render_inputs=render_agg_inputs,
         )
 
-    # def render_settings(self):
-    #     language_model_settings()
+    def render_settings(self):
+        language_model_settings()
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -354,6 +364,7 @@ def submit(
                 futs.append(
                     pool.submit(
                         _run_language_model,
+                        model=request.selected_model,
                         prompt=prompt,
                         result=TaskResult(
                             llm_output={},
@@ -367,10 +378,10 @@ def submit(
     return futs
 
 
-def _run_language_model(prompt: str, result: TaskResult):
+def _run_language_model(model: LargeLanguageModels, prompt: str, result: TaskResult):
     ret = json.loads(
         run_language_model(
-            model=LargeLanguageModels.gpt_4_turbo.name,
+            model=model.name,
             prompt=prompt,
             response_format_type="json_object",
         )[0]
