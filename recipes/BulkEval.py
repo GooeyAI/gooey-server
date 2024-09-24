@@ -22,10 +22,7 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import (
-    LanguageModelSettings,
-    language_model_settings,
-)
+from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
@@ -276,8 +273,8 @@ Here's what you uploaded:
             render_inputs=render_agg_inputs,
         )
 
-    def render_settings(self):
-        language_model_settings()
+    # def render_settings(self):
+    #     language_model_settings()
 
     def render_example(self, state: dict):
         render_documents(state)
