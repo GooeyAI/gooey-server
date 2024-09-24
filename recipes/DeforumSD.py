@@ -104,7 +104,6 @@ def animation_prompts_editor(
     gui.caption(
         """
         Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next.
-        View the ‘Details’ drop down menu to get started.
         """
     )
     gui.write("#### Step 1: Draft & Refine Keyframes")
@@ -141,10 +140,7 @@ def animation_prompts_editor(
         )
         with col1:
             gui.number_input(
-                label="",
-                key=second_key,
-                min_value=0,
-                step=0.1,
+                label="", key=second_key, min_value=0, step=0.1, style={"width": "56px"}
             )
             if idx != 0 and gui.button(
                 "🗑️",
@@ -384,6 +380,7 @@ class DeforumSDPage(BasePage):
                     gui.session_state.get("max_frames", 100),
                     gui.session_state.get("fps", 12),
                 ),
+                style={"width": "56px"},
             )
             gui.session_state["max_frames"] = seconds_to_frames(
                 gui.session_state.get("max_seconds", 10),
