@@ -363,11 +363,12 @@ class SavedRun(models.Model):
     def submit_api_call(
         self,
         *,
-        current_user: AppUser,
+        workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
         parent_pr: "PublishedRun" = None,
+        current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -386,6 +387,7 @@ class SavedRun(models.Model):
                 kwds=dict(
                     page_cls=page_cls,
                     query_params=query_params,
+                    workspace=workspace,
                     current_user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
@@ -503,6 +505,12 @@ class BotIntegration(models.Model):
     billing_account_uid = models.TextField(
         help_text="The gooey account uid where the credits will be deducted from",
         db_index=True,
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="botintegrations",
+        null=True,
     )
     user_language = models.TextField(
         default="",
@@ -1852,12 +1860,14 @@ class PublishedRun(models.Model):
     def submit_api_call(
         self,
         *,
-        current_user: AppUser,
+        workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
+        current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         return self.saved_run.submit_api_call(
+            workspace=workspace,
             current_user=current_user,
             request_body=request_body,
             enable_rate_limits=enable_rate_limits,

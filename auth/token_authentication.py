@@ -4,12 +4,14 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
+from loguru import logger
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
-from app_users.models import AppUser
+from api_keys.models import ApiKey
 from auth.auth_backend import authlocal
 from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
+from workspaces.models import Workspace
 
 
 class AuthenticationError(HTTPException):
@@ -26,30 +28,53 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+def _authenticate_credentials_from_firebase(token: str) -> Workspace | None:
     hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(token)
+    hash = hasher.encode(token)
+
+    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+    try:
+        doc = db_collection.where("secret_key_hash", "==", hash).limit(1).get()[0]
+    except IndexError:
+        return None
 
     try:
-        doc = (
-            db_collection.where("secret_key_hash", "==", secret_key_hash)
-            .limit(1)
-            .get()[0]
-        )
-    except IndexError:
-        raise AuthorizationError("Invalid API Key.")
+        workspace_id = doc.get("workspace_id")
+    except KeyError:
+        uid = doc.get("uid")
+        return Workspace.objects.get_or_create_from_uid(uid)[0]
 
-    uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    if user.is_disabled:
+    try:
+        return Workspace.objects.get(id=workspace_id)
+    except Workspace.DoesNotExist:
+        logger.warning(f"Workspace {workspace_id} not found (for API key {doc.id=}).")
+        return None
+
+
+def authenticate_credentials(token: str) -> Workspace:
+    api_key = ApiKey.objects.select_related("workspace").get_from_secret_key(token)
+    if not api_key:
+        workspace = _authenticate_credentials_from_firebase(token)
+        if not workspace:
+            raise AuthorizationError("Invalid API key.")
+
+        # firebase was used for API Keys before team workspaces, so we
+        # can assume that api_key.created_by_id = workspace.created_by
+        api_key = ApiKey.objects.create_from_secret_key(
+            token,
+            workspace=workspace,
+            created_by_id=workspace.created_by_id,
+        )
+
+    workspace = api_key.workspace
+    if workspace.is_personal and workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return user
+    return workspace
 
 
 class APIAuth(SecurityBase):
@@ -59,8 +84,8 @@ class APIAuth(SecurityBase):
     ```python
     api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
 
-    @app.get("/api/users")
-    def get_users(authenticated_user: AppUser = Depends(api_auth)):
+    @app.get("/api/runs")
+    def get_runs(current_workspace: Workspace = Depends(api_auth)):
         ...
     ```
     """
@@ -77,7 +102,7 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> AppUser:
+    def __call__(self, request: Request) -> Workspace:
         if authlocal:  # testing only!
             return authlocal[0]
 

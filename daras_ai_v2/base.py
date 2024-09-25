@@ -1484,6 +1484,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,
@@ -1495,6 +1496,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,
@@ -2153,7 +2155,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with gui.tag("a", id="api-keys"):
             gui.write("### 🔐 API keys")
 
-        manage_api_keys(self.current_workspace, self.request.user)
+        manage_api_keys(workspace=self.current_workspace, user=self.request.user)
 
     def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:

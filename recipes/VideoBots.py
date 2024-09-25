@@ -43,7 +43,6 @@ from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
-    get_web_widget_embed_code,
     integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -1157,7 +1156,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
                         name=run_title,
-                        billing_account_uid=self.request.user.uid,
+                        workspace=self.current_workspace,
                         platform=Platform.WEB,
                     )
                     redirect_url = connect_bot_to_published_run(bi, pr)
