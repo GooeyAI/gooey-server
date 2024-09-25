@@ -6,16 +6,18 @@ from pydantic import BaseModel, Field
 import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai_v2.asr import (
+    asr_language_filter_selector,
+    asr_language_selector,
     AsrModels,
-    TranslationModels,
-    translation_model_selector,
-    translation_language_selector,
-    run_translate,
-    run_asr,
     AsrOutputFormat,
     AsrOutputJson,
+    filter_models_by_language,
     forced_asr_languages,
-    asr_language_selector,
+    run_asr,
+    run_translate,
+    translation_language_selector,
+    translation_model_selector,
+    TranslationModels,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -119,16 +121,24 @@ class AsrPage(BasePage):
             "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
+        # drop down to filter models based on the selected language
+        selected_filter_language = asr_language_filter_selector()
+
         col1, col2 = gui.columns(2, responsive=False)
+        supported_models = filter_models_by_language(
+            selected_filter_language, list(AsrModels)
+        )
         with col1:
             selected_model = enum_selector(
-                AsrModels,
-                label="#### ASR Model",
+                supported_models,
+                label="##### Speech-to-Text Provider",
                 key="selected_model",
                 use_selectbox=True,
             )
         with col2:
-            asr_language_selector(AsrModels[selected_model])
+            asr_language_selector(
+                AsrModels[selected_model], filter_by_language=selected_filter_language
+            )
 
     def render_settings(self):
         col1, col2 = gui.columns(2)

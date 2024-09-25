@@ -444,10 +444,104 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
+# Function to filter only languages (without dialects)
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def get_all_languages_without_dialects():
+    import langcodes
+
+    languages = set()
+    for model_languages in asr_supported_languages.values():
+        for lang_code in model_languages:
+            try:
+                # Normalize and strip down to just the language part
+                language = langcodes.standardize_tag(lang_code).split("-")[0]
+                languages.add(language)
+            except langcodes.tag_parser.LanguageTagError:
+                print(f"Skipping invalid language code: {lang_code}")
+    return sorted(languages)
+
+
+def filter_models_by_language(language: str, models: list[AsrModels]) -> Enum:
+    """
+    Filter ASR models by language and return them as an Enum.
+
+    Args:
+    language: Language code.
+    models: List of ASR models.
+
+    Returns:
+    Enum of filtered ASR models.
+    """
+    if not language:
+        # Return all models as an Enum if no language is specified
+        return Enum("AsrModelsEnum", {model.name: model.value for model in models})
+
+    asr_supported = {}
+
+    for model in models:
+        # Get list of supported languages for the model
+        supported_languages = normalised_lang_candidates(
+            language, list(asr_supported_languages.get(model, []))
+        )
+        if supported_languages:
+            asr_supported[model.name] = (
+                model.value
+            )  # Add to the dictionary for Enum creation
+
+    # Create and return an Enum from the filtered ASR models
+    if asr_supported:
+        return Enum("AsrModelsEnum", asr_supported)
+
+    raise ValueError(f"No ASR models support the language: {language}")
+
+
+def asr_language_filter_selector():
+    with gui.div(
+        className="d-flex flex-column flex-md-row align-items-md-center gap-2"
+    ):
+        gui.caption("Filter by Language", className="mr-2 text-muted")
+        with gui.div(style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}):
+            language = gui.selectbox(
+                style=dict(width="100%", maxWidth="300px"),
+                label=None,
+                label_visibility="hidden",
+                key="language_filter",
+                format_func=lambda l: lang_format_func(l, "All Languages"),
+                options=get_all_languages_without_dialects(),
+                allow_none=True,
+            )
+            return language
+
+
+def normalised_lang_candidates(
+    target: str, collection: typing.Iterable[str]
+) -> typing.List[str]:
+    """
+    Returns a list of all matching candidates from the collection whose normalized
+    language matches the target language using the normalised_lang_in_collection function.
+    """
+    matching_candidates = []
+
+    for candidate in collection:
+        try:
+            # If the normalized version of the target matches the candidate, add it to the list
+            if normalised_lang_in_collection(candidate, [target]):
+                matching_candidates.append(candidate)
+        except UserError:
+            pass
+
+    # if not matching_candidates:
+    #     # raise UserError(f"No matching candidates for {target}")
+
+    return matching_candidates
+
+
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
     key="language",
+    *,
+    filter_by_language="",
 ):
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
@@ -456,6 +550,9 @@ def asr_language_selector(
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
+    if filter_by_language:
+        # filter the languages to show dialects only from selected languages
+        options = normalised_lang_candidates(filter_by_language, options)
     if selected_model and selected_model.supports_auto_detect():
         options.insert(0, None)
 
@@ -475,11 +572,11 @@ def asr_language_selector(
     )
 
 
-def lang_format_func(l):
+def lang_format_func(l, default_options_text="Auto Detect"):
     import langcodes
 
     if not l:
-        return "Auto Detect"
+        return default_options_text
     try:
         return f"{langcodes.Language.get(l).display_name()} | {l}"
     except langcodes.LanguageTagError:
