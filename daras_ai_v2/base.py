@@ -604,6 +604,11 @@ class BasePage:
                 key="published_run_notes",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
+            change_notes = gui.text_area(
+                "###### Change Notes",
+                key="published_run_change_notes",
+                value="",
+            )
 
         col1, col2 = gui.columns([1, 3])
         with col1, gui.div(className="mt-2"):
@@ -655,6 +660,7 @@ class BasePage:
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
+                change_notes=change_notes.strip(),
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -881,6 +887,11 @@ This will also delete all the associated versions.
                     f"This will overwrite the contents of {self.app_url()}",
                     className="text-danger",
                 )
+                change_notes = gui.text_area(
+                    "Change Notes",
+                    key="change_notes",
+                    value="",
+                )
                 if gui.button("👌 Yes, Update the Root Workflow"):
                     root_run = self.get_root_pr()
                     root_run.add_version(
@@ -889,6 +900,7 @@ This will also delete all the associated versions.
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
+                        change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
 

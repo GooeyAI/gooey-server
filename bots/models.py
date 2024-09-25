@@ -1683,6 +1683,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
+                change_notes="First Version",
             )
             return pr
 
@@ -1817,6 +1818,7 @@ class PublishedRun(models.Model):
         visibility: PublishedRunVisibility,
         title: str,
         notes: str,
+        change_notes: str,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1829,6 +1831,7 @@ class PublishedRun(models.Model):
                 title=title,
                 notes=notes,
                 visibility=visibility,
+                change_notes=change_notes,
             )
             version.save()
             self.update_fields_to_latest_version()
@@ -1896,6 +1899,7 @@ class PublishedRunVersion(models.Model):
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
+    change_notes = models.TextField(blank=True, default="")
     visibility = models.IntegerField(
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
