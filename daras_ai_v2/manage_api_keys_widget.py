@@ -1,18 +1,11 @@
-import datetime
 import typing
 
-from google.cloud import firestore
-
 import gooey_gui as gui
+from api_keys.models import ApiKey
 from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
-)
-from daras_ai_v2.crypto import (
-    PBKDF2PasswordHasher,
-    safe_preview,
-    get_random_api_key,
 )
 
 if typing.TYPE_CHECKING:
@@ -32,17 +25,12 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
-    api_keys = _load_api_keys(db_collection, workspace)
-
+    api_keys = load_api_keys(workspace)
     table_area = gui.div()
 
     if gui.button("＋ Create new secret key"):
-        doc = _generate_new_key_doc()
-        doc["uid"] = user.uid
-        doc["workspace_id"] = workspace.id
-        api_keys.append(doc)
-        db_collection.add(doc)
+        api_key = generate_new_api_key(workspace=workspace, user=user)
+        api_keys.append(api_key)
 
     with table_area:
         import pandas as pd
@@ -52,8 +40,8 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
                 columns=["Secret Key (Preview)", "Created At"],
                 data=[
                     (
-                        api_key["secret_key_preview"],
-                        api_key["created_at"].strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                        api_key.preview,
+                        api_key.created_at.strftime("%B %d, %Y at %I:%M:%S %p %Z"),
                     )
                     for api_key in api_keys
                 ],
@@ -61,30 +49,53 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         )
 
 
-def _load_api_keys(
-    db_collection: firestore.CollectionReference, workspace: "Workspace"
-):
-    filter = firestore.FieldFilter("workspace_id", "==", workspace.id)
-    if workspace.is_personal:
-        # for backwards compatibility with existing keys
-        filter = firestore.Or(
-            [filter, firestore.FieldFilter("uid", "==", workspace.created_by.uid)]
-        )
-
-    return [
-        snap.to_dict()
-        for snap in db_collection.where(filter=filter).order_by("created_at").get()
+def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
+    db_api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
+    firebase_api_keys = [
+        d
+        for d in _load_api_keys_from_firebase(workspace)
+        if d["secret_key_hash"] not in db_api_keys
     ]
+    if firebase_api_keys:
+        # TODO: also update created_at for migrated keys
+        migrated_api_keys = ApiKey.objects.bulk_create(
+            [
+                ApiKey(
+                    hash=d["secret_key_hash"],
+                    preview=d["secret_key_preview"],
+                    workspace=workspace,
+                    created_by_id=workspace.created_by_id,
+                )
+                for d in firebase_api_keys
+            ],
+            ignore_conflicts=True,
+            batch_size=100,
+        )
+        db_api_keys.update({api_key.hash: api_key for api_key in migrated_api_keys})
+
+    return sorted(
+        db_api_keys.values(), key=lambda api_key: api_key.created_at, reverse=True
+    )
 
 
-def _generate_new_key_doc() -> dict:
-    new_api_key = get_random_api_key()
-    hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(new_api_key)
-    created_at = datetime.datetime.utcnow()
+def _load_api_keys_from_firebase(workspace: "Workspace"):
+    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+    if workspace.is_personal:
+        return [
+            snap.to_dict()
+            for snap in db_collection.where("uid", "==", workspace.created_by.uid)
+            .order_by("created_at")
+            .get()
+        ]
+    else:
+        return []
+
+
+def generate_new_api_key(workspace: "Workspace", user: AppUser) -> ApiKey:
+    api_key, secret_key = ApiKey.objects.create_api_key(workspace, created_by=user)
 
     gui.success(
-        f"""
+        """
 ##### API key generated
 
 Please save this secret key somewhere safe and accessible.
@@ -98,17 +109,13 @@ If you lose this secret key, you'll need to generate a new one.
             "recipe url",
             label_visibility="collapsed",
             disabled=True,
-            value=new_api_key,
+            value=secret_key,
         )
     with col2:
         copy_to_clipboard_button(
             "📎 Copy Secret Key",
-            value=new_api_key,
+            value=secret_key,
             style="height: 3.2rem",
         )
 
-    return {
-        "secret_key_hash": secret_key_hash,
-        "secret_key_preview": safe_preview(new_api_key),
-        "created_at": created_at,
-    }
+    return api_key

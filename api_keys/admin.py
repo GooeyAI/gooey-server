@@ -5,4 +5,4 @@ from .models import ApiKey
 
 @admin.register(ApiKey)
 class ApiKeyAdmin(admin.ModelAdmin):
-    pass
+    list_display = ("preview", "workspace", "created_by", "created_at")

@@ -48,7 +48,9 @@ class ApiKeyQueySet(models.QuerySet):
 class ApiKey(models.Model):
     hash = models.CharField(max_length=128, unique=True)
     preview = models.CharField(max_length=32)
-    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE)
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="api_keys"
+    )
     created_by = models.ForeignKey(
         "app_users.AppUser", on_delete=models.SET_NULL, null=True
     )
