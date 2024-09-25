@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "payments",
     "functions",
     "workspaces",
+    "api_keys",
 ]
 
 MIDDLEWARE = [
