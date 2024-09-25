@@ -588,7 +588,7 @@ class BasePage:
                     checked_by_default=False,
                 )
 
-        with gui.div(className="mt-4"):
+        with gui.div(className="my-4"):
             if is_update_mode:
                 title = pr.title or self.title
             else:
@@ -599,16 +599,22 @@ class BasePage:
                 key="published_run_title",
                 value=title,
             )
-            published_run_notes = gui.text_area(
-                "###### Notes",
+            published_run_notes = gui.text_input(
+                "###### Description",
                 key="published_run_notes",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
-            change_notes = gui.text_area(
-                "###### Change Notes",
-                key="published_run_change_notes",
-                value="",
-            )
+            with gui.div(className="d-flex align-items-start"):
+                with gui.div(className="fs-2 text-muted"):
+                    gui.html(icons.notes)
+                with gui.div(className="flex-grow-1"):
+                    change_notes = gui.text_input(
+                        "",
+                        key="published_run_change_notes",
+                        value="",
+                        className="ms-2",
+                        placeholder="Add change notes",
+                    )
 
         col1, col2 = gui.columns([1, 3])
         with col1, gui.div(className="mt-2"):
