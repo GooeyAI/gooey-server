@@ -660,12 +660,13 @@ class BasePage:
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
-                change_notes=change_notes.strip(),
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
                 return
-            pr.add_version(user=self.request.user, **updates)
+            pr.add_version(
+                user=self.request.user, change_notes=change_notes.strip(), **updates
+            )
         else:
             pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
