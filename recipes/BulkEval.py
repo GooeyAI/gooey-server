@@ -361,7 +361,7 @@ def submit(
                 futs.append(
                     pool.submit(
                         _run_language_model,
-                        model=request.selected_model,
+                        model=LargeLanguageModels[request.selected_model],
                         prompt=prompt,
                         result=TaskResult(
                             llm_output={},
