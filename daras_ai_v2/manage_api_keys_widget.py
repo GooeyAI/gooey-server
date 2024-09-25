@@ -57,21 +57,22 @@ def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
         if d["secret_key_hash"] not in db_api_keys
     ]
     if firebase_api_keys:
+        new_api_keys = [
+            ApiKey(
+                hash=d["secret_key_hash"],
+                preview=d["secret_key_preview"],
+                workspace=workspace,
+                created_by_id=workspace.created_by_id,
+            )
+            for d in firebase_api_keys
+        ]
         # TODO: also update created_at for migrated keys
-        migrated_api_keys = ApiKey.objects.bulk_create(
-            [
-                ApiKey(
-                    hash=d["secret_key_hash"],
-                    preview=d["secret_key_preview"],
-                    workspace=workspace,
-                    created_by_id=workspace.created_by_id,
-                )
-                for d in firebase_api_keys
-            ],
-            ignore_conflicts=True,
-            batch_size=100,
-        )
-        db_api_keys.update({api_key.hash: api_key for api_key in migrated_api_keys})
+        # migrated_api_keys = ApiKey.objects.bulk_create(
+        #     new_api_keys,
+        #     ignore_conflicts=True,
+        #     batch_size=100,
+        # )
+        db_api_keys.update({api_key.hash: api_key for api_key in new_api_keys})
 
     return sorted(
         db_api_keys.values(), key=lambda api_key: api_key.created_at, reverse=True
