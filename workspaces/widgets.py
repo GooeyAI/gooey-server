@@ -20,11 +20,9 @@ def workspace_selector(
     *,
     current_tab: "AccountTabs | None" = None,
 ):
-    from routers.account import workspaces_route, account_route
+    from routers.account import account_route, workspaces_route
 
-    workspaces = Workspace.objects.filter(
-        memberships__user=user, memberships__deleted__isnull=True
-    ).order_by("-is_personal", "-created_at")
+    workspaces = user.get_workspaces().order_by("-is_personal", "-created_at")
     if not workspaces:
         workspaces = [user.get_or_create_personal_workspace()[0]]
 
@@ -38,13 +36,10 @@ def workspace_selector(
     }
 
     if gui.session_state.get(SESSION_SELECTED_WORKSPACE) == "<create>":
-        name = f"{user.first_name_possesive()} Team Workspace"
-        if len(workspaces) > 1:
-            name += f" {len(workspaces) - 1}"
-        workspace = Workspace(name=name, created_by=user)
-        workspace.create_with_owner()
-        gui.session_state[SESSION_SELECTED_WORKSPACE] = workspace.id
-        session[SESSION_SELECTED_WORKSPACE] = workspace.id
+        suffix = f" {len(workspaces) - 1}" if len(workspaces) > 1 else ""
+        name = get_default_name_for_new_workspace(user, suffix=suffix)
+        workspace = create_workspace_with_defaults(user, name=name)
+        set_current_workspace(session, workspace.id)
         raise gui.RedirectException(
             get_workspaces_route_path(workspaces_route, workspace)
         )
@@ -107,3 +102,17 @@ def get_workspaces_route_path(route_fn: typing.Callable, workspace: Workspace):
                 "workspace_slug": workspace.get_slug(),
             },
         )
+
+
+def create_workspace_with_defaults(user: AppUser, name: str | None = None):
+    if not name:
+        workspace_count = user.get_workspaces().count()
+        suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
+        name = get_default_name_for_new_workspace(user, suffix=suffix)
+    workspace = Workspace(name=name, created_by=user)
+    workspace.create_with_owner()
+    return workspace
+
+
+def get_default_name_for_new_workspace(user: AppUser, suffix: str = "") -> str:
+    return f"{user.first_name_possesive()} Team Workspace" + suffix

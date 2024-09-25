@@ -82,7 +82,12 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import (
+    create_workspace_with_defaults,
+    get_current_workspace,
+    set_current_workspace,
+    workspace_selector,
+)
 from workspaces.models import Workspace
 
 
@@ -599,6 +604,31 @@ class BasePage:
                 key="published_run_notes",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
+
+        col1, col2 = gui.columns([1, 3])
+        with col1, gui.div(className="mt-2"):
+            gui.write("###### Workspace")
+        with col2:
+            if self.request.user.get_workspaces().count() > 1:
+                workspace_selector(self.request.user, self.request.session)
+            else:
+                with gui.div(className="p-2 mb-2"):
+                    self.render_author(
+                        self.current_workspace,
+                        show_as_link=False,
+                        current_user=self.request.user,
+                    )
+                with gui.div(className="align-middle alert alert-warning"):
+                    gui.html(icons.company + "&nbsp;")
+                    if gui.button(
+                        "Create a team workspace",
+                        type="link",
+                        className="d-inline m-0",
+                    ):
+                        workspace = create_workspace_with_defaults(self.request.user)
+                        set_current_workspace(self.request.session, workspace.id)
+                        gui.rerun()
+                    gui.html("&nbsp;" + "to edit with others")
 
         self._render_admin_options(sr, pr)
 
@@ -1254,6 +1284,7 @@ This will also delete all the associated versions.
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
+        current_user: AppUser | None = None,
     ):
         if not workspace_or_user:
             return
@@ -1264,7 +1295,7 @@ This will also delete all the associated versions.
             photo = workspace.logo
             if not photo and workspace.is_personal:
                 photo = workspace.created_by.photo_url
-            name = workspace.display_name()
+            name = workspace.display_name(current_user=current_user)
             if show_as_link and workspace.is_personal and workspace.created_by.handle:
                 link = workspace.created_by.handle.get_app_url()
         else:
