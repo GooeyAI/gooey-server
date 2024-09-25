@@ -185,9 +185,9 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             """,
         )
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels if e.supports_json)
+        ] = LargeLanguageModels.gpt_4_turbo.name
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -236,6 +236,13 @@ Here's what you uploaded:
                 ).strip()
             with col2:
                 del_button(del_key)
+
+        gui.selectbox(
+            "##### Language Model",
+            options=[e.name for e in LargeLanguageModels if e.supports_json],
+            key="selected_model",
+            format_func=lambda e: LargeLanguageModels[e].value,
+        )
 
         gui.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
         list_view_editor(
@@ -354,6 +361,7 @@ def submit(
                 futs.append(
                     pool.submit(
                         _run_language_model,
+                        model=request.selected_model,
                         prompt=prompt,
                         result=TaskResult(
                             llm_output={},
@@ -367,10 +375,10 @@ def submit(
     return futs
 
 
-def _run_language_model(prompt: str, result: TaskResult):
+def _run_language_model(model: LargeLanguageModels, prompt: str, result: TaskResult):
     ret = json.loads(
         run_language_model(
-            model=LargeLanguageModels.gpt_4_turbo.name,
+            model=model.name,
             prompt=prompt,
             response_format_type="json_object",
         )[0]
