@@ -788,7 +788,11 @@ This will also delete all the associated versions.
             )
 
         with gui.div(className="mt-4"):
-            gui.write("#### Version History", className="mb-4")
+            gui.write(
+                f"#### {icons.time} Version History",
+                className="mb-4 fw-bold",
+                unsafe_allow_html=True,
+            )
             self._render_version_history()
 
     def _unsaved_options_button_with_dialog(self):
@@ -992,20 +996,16 @@ This will also delete all the associated versions.
             run_id=version.saved_run.run_id,
             uid=version.saved_run.uid,
         )
-        with gui.link(to=url, className="text-decoration-none"):
+        with gui.link(to=url, className="d-block text-decoration-none my-3"):
             with gui.div(
-                className="d-flex mb-4 disable-p-margin",
-                style={"minWidth": "min(100vw, 500px)"},
+                className="d-flex justify-content-between align-items-middle fw-bold"
             ):
-                col1 = gui.div(className="me-4")
-                col2 = gui.div()
-        with col1:
-            with gui.div(className="fs-5 mt-1"):
-                gui.html('<i class="fa-regular fa-clock"></i>')
-        with col2:
-            is_first_version = not older_version
-            with gui.div(className="fs-5 d-flex align-items-center"):
-                with gui.tag("span"):
+                if version.changed_by:
+                    with gui.tag("h6", className="mb-0"):
+                        self.render_author(version.changed_by, responsive=False)
+                else:
+                    gui.write("###### Deleted User", className="disable-p-margin")
+                with gui.tag("h6", className="mb-0"):
                     gui.html(
                         "Loading...",
                         **render_local_dt_attrs(
@@ -1013,18 +1013,19 @@ This will also delete all the associated versions.
                             date_options={"month": "short", "day": "numeric"},
                         ),
                     )
+            with gui.div(className="disable-p-margin"):
+                is_first_version = not older_version
                 if is_first_version:
-                    with gui.tag("span", className="badge bg-secondary px-3 ms-2"):
+                    with gui.tag("span", className="badge bg-secondary px-3"):
                         gui.write("FIRST VERSION")
-            with gui.div(className="text-muted"):
-                if older_version and older_version.title != version.title:
-                    gui.write(f"Renamed: {version.title}")
-                elif not older_version:
-                    gui.write(version.title)
-            with gui.div(className="mt-1", style={"fontSize": "0.85rem"}):
-                self.render_author(
-                    version.changed_by, image_size="18px", responsive=False
-                )
+                elif older_version and older_version.title != version.title:
+                    gui.caption(f"Renamed: {version.title}")
+
+                if version.change_notes:
+                    gui.caption(
+                        f"{icons.notes} {html.escape(version.change_notes)}",
+                        unsafe_allow_html=True,
+                    )
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
