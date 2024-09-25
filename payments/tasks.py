@@ -11,7 +11,7 @@ from daras_ai_v2.settings import templates
 
 @app.task
 def send_monthly_spending_notification_email(workspace_id: int):
-    from routers.account import account_route
+    from routers.account import billing_route
 
     workspace = Workspace.objects.get(id=workspace_id)
     threshold = workspace.subscription.monthly_spending_notification_threshold
@@ -29,7 +29,7 @@ def send_monthly_spending_notification_email(workspace_id: int):
             ).render(
                 user=user,
                 workspace=workspace,
-                account_url=get_app_route_url(account_route),
+                account_url=get_app_route_url(billing_route),
             ),
         )
 
@@ -49,7 +49,7 @@ def send_payment_failed_email_with_invoice(
     dollar_amt: float,
     subject: str,
 ):
-    from routers.account import account_route
+    from routers.account import billing_route
 
     workspace = Workspace.objects.get(id=workspace_id)
     for user in workspace.get_owners():
@@ -65,14 +65,14 @@ def send_payment_failed_email_with_invoice(
                 user=user,
                 dollar_amt=f"{dollar_amt:.2f}",
                 invoice_url=invoice_url,
-                account_url=get_app_route_url(account_route),
+                account_url=get_app_route_url(billing_route),
             ),
             message_stream="billing",
         )
 
 
 def send_monthly_budget_reached_email(workspace: Workspace):
-    from routers.account import account_route
+    from routers.account import billing_route
 
     for user in workspace.get_owners():
         if not user.email:
@@ -81,7 +81,7 @@ def send_monthly_budget_reached_email(workspace: Workspace):
         email_body = templates.get_template("monthly_budget_reached_email.html").render(
             user=user,
             workspace=workspace,
-            account_url=get_app_route_url(account_route),
+            account_url=get_app_route_url(billing_route),
         )
         send_email_via_postmark(
             from_address=settings.SUPPORT_EMAIL,

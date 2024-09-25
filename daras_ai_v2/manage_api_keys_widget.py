@@ -4,9 +4,7 @@ import gooey_gui as gui
 from api_keys.models import ApiKey
 from app_users.models import AppUser
 from daras_ai_v2 import db
-from daras_ai_v2.copy_to_clipboard_button_widget import (
-    copy_to_clipboard_button,
-)
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace

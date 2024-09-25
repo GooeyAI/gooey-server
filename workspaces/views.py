@@ -10,6 +10,7 @@ from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
+from payments.plans import PricingPlan
 from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
 from .widgets import get_current_workspace, set_current_workspace
 
@@ -62,7 +63,12 @@ def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvit
 
 
 def workspaces_page(user: AppUser, session: dict):
+    from routers.account import account_route
+
     workspace = get_current_workspace(user, session)
+    if workspace.is_personal:
+        raise gui.RedirectException(get_route_path(account_route))
+
     membership = workspace.memberships.get(user=user)
     render_workspace_by_membership(membership)
 
@@ -77,7 +83,7 @@ def render_workspace_creation_view(user: AppUser):
         try:
             workspace.create_with_owner()
         except ValidationError as e:
-            gui.write(str(e), className="text-danger")
+            gui.write("\n".join(e.messages), className="text-danger")
         else:
             gui.rerun()
 
@@ -89,32 +95,53 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         - current user
         - current user's role in the workspace (and other metadata)
     """
+    from routers.account import billing_route
+
     workspace = membership.workspace
 
-    with gui.div(
-        className="d-xs-block d-sm-flex flex-row-reverse justify-content-between"
-    ):
-        with gui.div(className="d-flex justify-content-center align-items-center"):
-            edit_workspace_button_with_dialog(membership)
+    with gui.div(className="d-block d-sm-flex justify-content-between"):
+        col1 = gui.div(
+            className="d-block d-md-flex text-center text-sm-start align-items-center"
+        )
+        col2 = gui.div()
 
-        with gui.div(className="d-flex align-items-center"):
-            gui.image(
-                workspace.logo or DEFAULT_WORKSPACE_LOGO,
-                className="my-0 me-4 rounded",
-                style={"width": "128px", "height": "128px", "object-fit": "contain"},
+    with col1:
+        gui.image(
+            workspace.logo or DEFAULT_WORKSPACE_LOGO,
+            className="my-0 me-4 rounded",
+            style={"width": "128px", "height": "128px", "object-fit": "contain"},
+        )
+        with gui.div(className="d-flex flex-column justify-content-end"):
+            plan = (
+                workspace.subscription
+                and PricingPlan.from_sub(workspace.subscription)
+                or PricingPlan.STARTER
             )
-            with gui.div(className="d-flex flex-column justify-content-center"):
-                gui.write(f"# {workspace.display_name(membership.user)}")
-                if workspace.domain_name:
-                    gui.write(
-                        f"Workspace Domain: `@{workspace.domain_name}`",
-                        className="text-muted",
-                    )
+
+            with gui.tag("h1", className="mb-0" if workspace.domain_name else ""):
+                gui.html(html_lib.escape(workspace.display_name(membership.user)))
+            if workspace.domain_name:
+                gui.caption(f"Domain: `@{workspace.domain_name}`")
+
+            billing_info = f"""
+                <span class="text-muted">Credits:</span> {workspace.balance}
+                <span class="text-muted">Plan:</span> {plan.title}
+            """.strip()
+            if membership.can_edit_workspace() and plan in (
+                PricingPlan.STARTER,
+                PricingPlan.CREATOR,
+            ):
+                billing_info += f" [Upgrade]({get_route_path(billing_route)})"
+            gui.write(billing_info, unsafe_allow_html=True)
+
+    if membership.can_edit_workspace():
+        with col2, gui.div(className="mt-2"):
+            edit_workspace_button_with_dialog(membership)
 
     gui.newline()
 
     with gui.div(className="d-flex justify-content-between align-items-center"):
-        gui.write("## Members")
+        gui.write("#### Members")
         member_invite_button_with_dialog(membership)
     render_members_list(workspace=workspace, current_member=membership)
 
@@ -129,12 +156,14 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
     gui.newline()
 
     dialog_ref = gui.use_confirm_dialog(key="leave-workspace", close_on_confirm=False)
-    with gui.div(className="text-end"):
-        if gui.button(
-            label=f"{icons.sign_out} Leave",
-            className="py-2 bg-danger border-danger text-light",
-        ):
-            dialog_ref.set_open(True)
+    with gui.div():
+        gui.write("#### Danger Zone")
+        with gui.div():
+            if gui.button(
+                label=f"{icons.sign_out} Leave",
+                className="py-2 text-danger",
+            ):
+                dialog_ref.set_open(True)
 
     if dialog_ref.is_open:
         new_owner_id = render_workspace_leave_dialog(dialog_ref, membership)
@@ -181,16 +210,13 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
                 defaults=dict(role=role),
             )
         except ValidationError as e:
-            gui.write(str(e), className="text-danger")
+            gui.write("\n".join(e.messages), className="text-danger")
         else:
             ref.set_open(False)
             gui.rerun()
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
-    if not membership.can_edit_workspace_metadata():
-        return
-
     ref = gui.use_confirm_dialog(key="edit-workspace", close_on_confirm=False)
 
     if gui.button(label=f"{icons.edit} Edit"):
@@ -212,7 +238,7 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
             workspace_copy.full_clean()
         except ValidationError as e:
             # newlines in markdown
-            gui.write(str(e), className="text-danger")
+            gui.write("\n".join(e.messages), className="text-danger")
         else:
             workspace_copy.save()
             membership.workspace.refresh_from_db()
@@ -402,7 +428,7 @@ def render_membership_actions(
         gui.button_with_confirm_dialog(
             ref=ref,
             trigger_label=f"{icons.remove_user} Remove",
-            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            trigger_className="btn-sm my-0 py-0 text-danger",
             modal_title="#### Remove a Member",
             modal_content=f"Are you sure you want to remove **{m.user.full_name()}** from **{m.workspace.display_name(m.user)}**?",
             confirm_label="Remove",
@@ -420,7 +446,7 @@ def render_pending_invites_list(
     if not pending_invites:
         return
 
-    gui.write("## Pending")
+    gui.write("#### Pending")
     with gui.tag("table", className="table table-responsive"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
@@ -483,7 +509,7 @@ def render_invitation_actions(
         gui.button_with_confirm_dialog(
             ref=ref,
             trigger_label=f"{icons.cancel} Cancel",
-            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            trigger_className="btn-sm my-0 py-0 text-danger",
             modal_title="#### Cancel Invitation",
             modal_content=f"Are you sure you want to cancel the invitation to **{invite.email}**?",
             cancel_label="No, keep it",

@@ -127,6 +127,8 @@ class Workspace(SafeDeleteModel):
 
     objects = WorkspaceQuerySet.as_manager()
 
+    api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT + "/workspaces")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -181,6 +183,15 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
+            workspace_memberships__deleted__isnull=True,
+        )
+
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -311,7 +322,7 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return f"{self.created_by.full_name()} (Personal)"
+            return f"{current_user.full_name()} (personal)"
         elif self.is_personal:
             return self.created_by.full_name()
         else:
@@ -357,7 +368,7 @@ class WorkspaceMembership(SafeDeleteModel):
                 fields=["workspace", "user"],
                 condition=Q(deleted__isnull=True),
                 name="unique_workspace_user",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["workspace", "role", "deleted"]),
@@ -366,7 +377,13 @@ class WorkspaceMembership(SafeDeleteModel):
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
-    def can_edit_workspace_metadata(self):
+    def clean(self) -> None:
+        if self.workspace.is_personal and self.user_id != self.workspace.created_by_id:
+            raise ValidationError("You cannot add users to a personal workspace")
+        return super().clean()
+
+    def can_edit_workspace(self):
+        # workspace metadata, billing, etc.
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):
@@ -509,6 +526,11 @@ class WorkspaceInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.workspace} ({self.get_status_display()})"
+
+    def clean(self) -> None:
+        if self.workspace.is_personal:
+            raise ValidationError("You cannot invite users to a personal workspace")
+        return super().clean()
 
     @admin.display(description="Expired")
     def has_expired(self):

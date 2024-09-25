@@ -45,6 +45,10 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import workspace_selector
 
+if typing.TYPE_CHECKING:
+    from routers.account import AccountTabs
+
+
 app = CustomAPIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
@@ -704,7 +708,12 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
+def page_wrapper(
+    request: Request,
+    className="",
+    *,
+    current_tab: "AccountTabs | None" = None,
+):
     from daras_ai_v2.base import BasePage
 
     context = {
@@ -730,7 +739,9 @@ def page_wrapper(request: Request, className=""):
                 ),
                 gui.div(style=dict(minWidth="200pt")),
             ):
-                workspace_selector(request.user, request.session)
+                workspace_selector(
+                    request.user, request.session, current_tab=current_tab
+                )
 
         with gui.div(id="main-content", className="container-xxl " + className):
             yield

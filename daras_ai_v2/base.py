@@ -82,10 +82,13 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.widgets import get_current_workspace
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.widgets import (
+    create_workspace_with_defaults,
+    get_current_workspace,
+    set_current_workspace,
+    workspace_selector,
+)
+from workspaces.models import Workspace
 
 
 DEFAULT_META_IMG = (
@@ -382,7 +385,7 @@ class BasePage:
                         )
 
                 if is_example:
-                    author = pr.created_by
+                    author = pr.workspace
                 else:
                     author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
@@ -441,11 +444,9 @@ class BasePage:
         )
 
     def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and published_run.created_by_id
-            and published_run.created_by_id == self.request.user.id
+        return (
+            self.is_current_user_admin()
+            or published_run.workspace == self.current_workspace
         )
 
     def _render_title(self, title: str):
@@ -552,14 +553,17 @@ class BasePage:
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
-                if self.request.user and self.request.user.handle:
+                if not self.current_workspace.is_personal:
+                    # TODO: implement with workspace handles
+                    pass
+                elif self.request.user and self.request.user.handle:
                     profile_url = self.request.user.handle.get_app_url()
                     pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
                     options[
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
                 elif self.request.user and not self.request.user.is_anonymous:
-                    edit_profile_url = AccountTabs.profile.url_path
+                    edit_profile_url = AccountTabs.profile.get_url_path(self.request)
                     options[
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
@@ -601,6 +605,31 @@ class BasePage:
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
 
+        col1, col2 = gui.columns([1, 3])
+        with col1, gui.div(className="mt-2"):
+            gui.write("###### Workspace")
+        with col2:
+            if self.request.user.get_workspaces().count() > 1:
+                workspace_selector(self.request.user, self.request.session)
+            else:
+                with gui.div(className="p-2 mb-2"):
+                    self.render_author(
+                        self.current_workspace,
+                        show_as_link=False,
+                        current_user=self.request.user,
+                    )
+                with gui.div(className="align-middle alert alert-warning"):
+                    gui.html(icons.company + "&nbsp;")
+                    if gui.button(
+                        "Create a team workspace",
+                        type="link",
+                        className="d-inline m-0",
+                    ):
+                        workspace = create_workspace_with_defaults(self.request.user)
+                        set_current_workspace(self.request.session, workspace.id)
+                        gui.rerun()
+                    gui.html("&nbsp;" + "to edit with others")
+
         self._render_admin_options(sr, pr)
 
         if not dialog.pressed_confirm:
@@ -636,6 +665,7 @@ class BasePage:
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
@@ -727,6 +757,7 @@ This will also delete all the associated versions.
         if duplicate_button:
             duplicate_pr = pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{pr.title} (Copy)",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -740,6 +771,7 @@ This will also delete all the associated versions.
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{pr.title} (Copy)",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -779,6 +811,7 @@ This will also delete all the associated versions.
                 pr = self.current_pr
                 duplicate_pr = pr.duplicate(
                     user=self.request.user,
+                    workspace=self.current_workspace,
                     title=f"{self.request.user.first_name_possesive()} {pr.title}",
                     notes=pr.notes,
                     visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1113,7 +1146,7 @@ This will also delete all the associated versions.
         gui.session_state["is_flagged"] = is_flagged
 
     @cached_property
-    def current_workspace(self) -> "Workspace":
+    def current_workspace(self) -> Workspace:
         assert self.request.user
         return get_current_workspace(self.request.user, self.request.session)
 
@@ -1193,6 +1226,7 @@ This will also delete all the associated versions.
                 defaults=dict(state=cls.load_state_defaults({})),
             )[0],
             user=None,
+            workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
             visibility=PublishedRunVisibility.PUBLIC,
@@ -1205,6 +1239,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: Workspace,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1214,6 +1249,7 @@ This will also delete all the associated versions.
             published_run_id=published_run_id,
             saved_run=saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
@@ -1239,16 +1275,57 @@ This will also delete all the associated versions.
     def validate_form_v2(self):
         pass
 
-    @staticmethod
+    @classmethod
     def render_author(
-        user: AppUser,
+        cls,
+        workspace_or_user: "Workspace | AppUser | None",
         *,
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
+        current_user: AppUser | None = None,
     ):
-        if not user or (not user.photo_url and not user.display_name):
+        if not workspace_or_user:
+            return
+
+        link = None
+        if isinstance(workspace_or_user, Workspace):
+            workspace = workspace_or_user
+            photo = workspace.logo
+            if not photo and workspace.is_personal:
+                photo = workspace.created_by.photo_url
+            name = workspace.display_name(current_user=current_user)
+            if show_as_link and workspace.is_personal and workspace.created_by.handle:
+                link = workspace.created_by.handle.get_app_url()
+        else:
+            user = workspace_or_user
+            photo = user.photo_url
+            name = user.display_name
+            if show_as_link and user.handle:
+                link = user.handle.get_app_url()
+
+        return cls._render_author(
+            photo=photo,
+            name=name,
+            link=link,
+            image_size=image_size,
+            responsive=responsive,
+            text_size=text_size,
+        )
+
+    @classmethod
+    def _render_author(
+        cls,
+        photo: str | None,
+        name: str | None,
+        link: str | None,
+        *,
+        image_size: str,
+        responsive: bool,
+        text_size: str | None,
+    ):
+        if not photo and not name:
             return
 
         responsive_image_size = (
@@ -1260,13 +1337,9 @@ This will also delete all the associated versions.
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link and user and user.handle:
-            linkto = gui.link(to=user.handle.get_app_url())
-        else:
-            linkto = gui.dummy()
-
+        linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
-            if user.photo_url:
+            if photo:
                 gui.html(
                     f"""
                     <style>
@@ -1288,12 +1361,12 @@ This will also delete all the associated versions.
                     </style>
                 """
                 )
-                gui.image(user.photo_url, className=class_name)
+                gui.image(photo, className=class_name)
 
-            if user.display_name:
+            if name:
                 name_style = {"fontSize": text_size} if text_size else {}
                 with gui.tag("span", style=name_style):
-                    gui.html(html.escape(user.display_name))
+                    gui.html(html.escape(name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1845,9 +1918,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
+        workspace_id = self.current_workspace.id
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
+            workspace_id = self.request.query_params.get("workspace_id", workspace_id)
 
         before = self.request.query_params.get("updated_at__lt", None)
         if before:
@@ -1857,8 +1932,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         run_history = list(
             SavedRun.objects.filter(
                 workflow=self.workflow,
-                uid=uid,
                 updated_at__lt=before,
+                uid=uid,
+                workspace_id=workspace_id,
             )[:25]
         )
         if not run_history:
@@ -1953,10 +2029,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        if published_run.created_by:
+        if published_run.workspace:
             with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
-                    published_run.created_by,
+                    published_run.workspace,
                     image_size="20px",
                     text_size="0.9rem",
                 )
