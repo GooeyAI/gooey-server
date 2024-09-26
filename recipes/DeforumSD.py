@@ -625,8 +625,8 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        # if not self.request.user.disable_safety_checker:
-        #     safety_checker(text=self.preview_input(state))
+        if not self.request.user.disable_safety_checker:
+            safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
