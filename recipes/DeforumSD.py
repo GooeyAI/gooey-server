@@ -373,7 +373,7 @@ class DeforumSDPage(BasePage):
     def render_form_v2(self):
         animation_prompts_editor()
 
-        col1, col2 = gui.columns(2)
+        col1, col2 = gui.columns([1, 11], responsive=False)
         with col1:
             gui.text_input(
                 label="",
