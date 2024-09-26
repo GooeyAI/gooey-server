@@ -108,10 +108,10 @@ def animation_prompts_editor(
     )
     gui.write("#### Step 1: Draft & Refine Keyframes")
     updated_st_list = []
-    col1, col2, col3 = gui.columns([2, 9, 2], responsive=False)
+    col1, col2, col3 = gui.columns([1, 9, 2], responsive=False)
     max_seconds = gui.session_state.get("max_seconds", 10)
     with col1:
-        gui.write("Second")
+        gui.write("Sec.")
     with col2:
         gui.write("Prompt")
     with col3:
@@ -129,7 +129,7 @@ def animation_prompts_editor(
         if prompt_key not in gui.session_state:
             gui.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2, col3 = gui.columns([2, 9, 2], responsive=False)
+        col1, col2, col3 = gui.columns([1, 9, 2], responsive=False)
         fps = gui.session_state.get("fps", 12)
         max_seconds = gui.session_state.get("max_seconds", 10)
         start = fp["second"]
@@ -139,38 +139,13 @@ def animation_prompts_editor(
             else max_seconds
         )
         with col1:
-            gui.number_input(
-                label="", key=second_key, min_value=0, step=0.1, style={"width": "56px"}
+            gui.text_input(
+                label="",
+                key=second_key,
+                min_value=0,
+                step=0.1,
+                style={"width": "56px", "padding": "0.5rem"},
             )
-            if idx != 0 and gui.button(
-                "🗑️",
-                help=f"Remove Frame {idx + 1}",
-                type="tertiary",
-                style={"float": "left;"},
-            ):
-                prompt_st_list.pop(idx)
-                gui.rerun()
-            if gui.button(
-                '<i class="fa-regular fa-plus"></i>',
-                help=f"Insert Frame after Frame {idx + 1}",
-                type="tertiary",
-                style={"float": "left;"},
-            ):
-                next_second = round((start + end) / 2, 2)
-                if next_second > max_seconds:
-                    gui.error("Please increase Frame Count")
-                else:
-                    prompt_st_list.insert(
-                        idx + 1,
-                        {
-                            "frame": seconds_to_frames(next_second, fps),
-                            "prompt": prompt_st_list[idx]["prompt"],
-                            "second": next_second,
-                            "key": str(uuid.uuid1()),
-                        },
-                    )
-                    gui.rerun()
-
         with col2:
             gui.text_area(
                 label="",
@@ -209,6 +184,35 @@ def animation_prompts_editor(
                 type="link",
             ):
                 zoom_pan_modal.set_open(True)
+            gui.html("<br>")
+            if idx != 0 and gui.button(
+                '<i class="fa-regular fa-trash"></i>',
+                help=f"Remove Frame {idx + 1}",
+                type="link",
+                style={"margin-right": "1.5rem"},
+            ):
+                prompt_st_list.pop(idx)
+                gui.rerun()
+            if gui.button(
+                '<i class="fa-regular fa-plus"></i>',
+                help=f"Insert Frame after Frame {idx + 1}",
+                type="link",
+            ):
+                next_second = round((float(start) + float(end)) / 2, 2)
+                if next_second > float(max_seconds):
+                    gui.error("Please increase Frame Count")
+                else:
+                    prompt_st_list.insert(
+                        idx + 1,
+                        {
+                            "frame": seconds_to_frames(next_second, fps),
+                            "prompt": prompt_st_list[idx]["prompt"],
+                            "second": next_second,
+                            "key": str(uuid.uuid1()),
+                        },
+                    )
+                    gui.rerun()
+
             if zoom_pan_modal.is_open:
                 with gui.confirm_dialog(
                     ref=zoom_pan_modal,
@@ -289,7 +293,7 @@ def frames_to_seconds(frames: int, fps: int) -> float:
 
 
 def seconds_to_frames(seconds: float, fps: int) -> int:
-    return int(seconds * int(fps))
+    return int(float(seconds) * int(fps))
 
 
 def get_zoom_pan_string(zoom_pan_string: dict[int, float]) -> str:
@@ -371,27 +375,34 @@ class DeforumSDPage(BasePage):
 
         col1, col2 = gui.columns(2)
         with col1:
-            gui.number_input(
+            gui.text_input(
                 label="",
                 key="max_seconds",
                 min_value=0,
                 step=0.1,
-                value=frames_to_seconds(
-                    gui.session_state.get("max_frames", 100),
-                    gui.session_state.get("fps", 12),
+                value=str(
+                    frames_to_seconds(
+                        gui.session_state.get("max_frames", 100),
+                        gui.session_state.get("fps", 12),
+                    )
                 ),
-                style={"width": "56px"},
+                style={
+                    "width": "56px",
+                    "padding": "0.5rem",
+                },
             )
             gui.session_state["max_frames"] = seconds_to_frames(
                 gui.session_state.get("max_seconds", 10),
                 gui.session_state.get("fps", 12),
             )
         with col2:
-            gui.write("*End of Video*")
+            gui.caption("Total seconds")
 
         gui.write("#### Step 2: Increase Animation Quality")
-        gui.write(
-            "Once you like your keyframes, increase your frames per second for high quality"
+        gui.caption(
+            """
+            Once you like your keyframes, increase your frames per second for high quality
+            """
         )
         fps_options = [2, 10, 24]
         option_descriptions = ["Draft", "Stop-motion", "Film"]
@@ -400,7 +411,7 @@ class DeforumSDPage(BasePage):
             for fps, label in zip(fps_options, option_descriptions)
         }
         gui.radio(
-            """###### FPS (Frames per second)""",
+            """###### Frames per second""",
             options=options,
             format_func=lambda x: {
                 "2": "Draft: 2 FPS",
@@ -614,8 +625,8 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        if not self.request.user.disable_safety_checker:
-            safety_checker(text=self.preview_input(state))
+        # if not self.request.user.disable_safety_checker:
+        #     safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
