@@ -711,6 +711,7 @@ def page_wrapper(request: Request, className=""):
         "request": request,
         "settings": settings,
         "block_incognito": True,
+        "current_year": datetime.datetime.now().year,
     }
     if request.user and request.user.is_anonymous:
         context["anonymous_user_token"] = auth.create_custom_token(
@@ -735,7 +736,6 @@ def page_wrapper(request: Request, className=""):
         with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
-        context["current_year"] = datetime.datetime.now().year
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
