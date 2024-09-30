@@ -140,39 +140,45 @@ class AsrPage(BasePage):
                 AsrModels[selected_model], filter_by_language=selected_filter_language
             )
 
-    def render_settings(self):
-        col1, col2 = gui.columns(2)
-        with col1:
-            translation_model = translation_model_selector()
-        with col2:
-            translation_language_selector(
-                model=translation_model,
-                label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
-                key="translation_target",
-            )
-        if translation_model and translation_model.supports_glossary:
-            gui.file_uploader(
-                label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-                key="glossary_document",
-                accept=SUPPORTED_SPREADSHEET_TYPES,
-            )
+        gui.session_state["translation_model"] = None
+        # Translation options
         gui.write("---")
-        selected_model = gui.session_state.get("selected_model")
-        if selected_model:
-            translation_language_selector(
-                model=translation_model,
-                label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
-                key="translation_source",
-                allow_none=(
-                    translation_model.supports_auto_detect
-                    if translation_model
-                    else True
-                ),
-            )
-            gui.caption(
-                "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
-            )
-            gui.write("---")
+        if gui.checkbox(
+            "##### Translate to & from English",
+            value=bool(gui.session_state.get("translation_model")),
+        ):
+            col1, col2 = gui.columns(2)
+            with col1:
+                translation_model = translation_model_selector(allow_none=False)
+            with col2:
+                translation_language_selector(
+                    model=translation_model,
+                    label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
+                    key="translation_target",
+                )
+            if translation_model and translation_model.supports_glossary:
+                gui.file_uploader(
+                    label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                    key="glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
+                )
+            if selected_model and translation_model:
+                gui.write("---")
+                translation_language_selector(
+                    model=translation_model,
+                    label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
+                    key="translation_source",
+                    allow_none=(
+                        translation_model.supports_auto_detect
+                        if translation_model
+                        else True
+                    ),
+                )
+                gui.caption(
+                    "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
+                )
+
+    def render_settings(self):
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
         )
