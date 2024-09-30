@@ -704,7 +704,12 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
+def page_wrapper(
+    request: Request,
+    className="",
+    show_header: bool = True,
+    show_footer: bool = True,
+):
     from daras_ai_v2.base import BasePage
 
     context = {
@@ -719,7 +724,8 @@ def page_wrapper(request: Request, className=""):
 
     with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
-        gui.html(templates.get_template("header.html").render(**context))
+        if show_header:
+            gui.html(templates.get_template("header.html").render(**context))
         gui.html(copy_to_clipboard_scripts)
 
         if request.user and BasePage.is_user_admin(request.user):
@@ -735,7 +741,8 @@ def page_wrapper(request: Request, className=""):
         with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
-        gui.html(templates.get_template("footer.html").render(**context))
+        if show_footer:
+            gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
 

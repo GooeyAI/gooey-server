@@ -4,11 +4,12 @@ from copy import copy
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
+from django.utils.translation import ngettext
 
 from app_users.models import AppUser
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
 from .widgets import get_current_workspace, set_current_workspace
@@ -19,46 +20,107 @@ DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvite):
-    from routers.account import workspaces_route
-
-    workspaces_page_path = get_route_path(workspaces_route)
-
-    with gui.div(className="text-center my-5"):
-        gui.write(
-            f"# Invitation to join {invite.workspace.display_name(current_user)}",
-            className="d-block mb-5",
+def invitation_page(
+    current_user: AppUser | None, session: dict, invite: WorkspaceInvite
+):
+    with gui.center(
+        className="position-absolute top-0 start-0 w-100 min-vw-100 min-vh-100 bg-black pb-5"
+    ):
+        gui.image(
+            src=settings.GOOEY_LOGO_IMG_WHITE,
+            className="my-2",
+            style={
+                "width": "min(400px, 75vw)",
+                "height": "auto",
+                "object-fit": "cover",
+                "aspect-ratio": "8/3",
+            },
         )
-
-        if invite.workspace.memberships.filter(user=current_user).exists():
-            # redirect to workspace page
-            raise gui.RedirectException(workspaces_page_path)
-
-        if invite.email != current_user.email:
-            gui.write(
-                f"Doh! This invitation is for **{invite.email}**, not you. Please log in with the correct email address.",
-            )
-            return
-
-        if invite.status != WorkspaceInvite.Status.PENDING:
-            gui.write(f"This invitation has been {invite.get_status_display()}.")
-            return
-
-        gui.write(f"You've been invited by **{invite.created_by.full_name()}**")
-        gui.newline()
-
         with gui.div(
-            className="d-flex justify-content-center align-items-center mx-auto",
-            style={"max-width": "600px"},
+            className="d-flex flex-column justify-content-center align-items-center bg-white p-5 rounded-3",
+            style={"width": "min(500px, 90vw)"},
         ):
-            if gui.button("Decline", className="w-50"):
-                invite.reject(current_user)
-                gui.rerun()
+            if invite.status != WorkspaceInvite.Status.PENDING:
+                gui.write(
+                    f"This invitation has been {invite.get_status_display().lower()}.",
+                    className="mt-4 d-block",
+                )
+                return
 
-            if gui.button("Accept", type="primary", className="w-50"):
-                invite.accept(current_user, updated_by=current_user)
-                set_current_workspace(session, int(invite.workspace_id))
-                raise gui.RedirectException(workspaces_page_path)
+            gui.image(
+                src=invite.created_by.photo_url,
+                className="rounded-circle m-0",
+                style={"width": "150px", "height": "150px", "object-fit": "cover"},
+            )
+
+            invite_creator = invite.created_by.full_name()
+            if invite.created_by.email:
+                invite_creator += f" ({invite.created_by.email})"
+            gui.write(
+                f"{invite_creator} has invited you to join",
+                className="d-block text-muted mt-4",
+            )
+            with gui.div(
+                className="d-block d-md-flex align-items-center justify-content-center mb-4"
+            ):
+                gui.image(
+                    src=invite.workspace.logo or DEFAULT_WORKSPACE_LOGO,
+                    className="rounded",
+                    style={"height": "70px", "width": "70px", "object-fit": "contain"},
+                )
+                with gui.tag("h1", className="my-0 ms-md-2 text-center text-md-start"):
+                    gui.html(html_lib.escape(invite.workspace.display_name()))
+
+            members_count = invite.workspace.memberships.count()
+            members_text = ngettext("member", "members", members_count)
+            gui.caption(f"{members_count} {members_text}")
+
+            if gui.button(
+                "Join Workspace",
+                className="my-2 w-100",
+                type="primary",
+                style={"max-width": "400px"},
+            ):
+                with gui.div(className="text-start"):
+                    # reset text alignment from center
+                    _handle_invite_accepted(
+                        invite, session=session, current_user=current_user
+                    )
+
+
+def _handle_invite_accepted(
+    invite: WorkspaceInvite, session: dict, current_user: AppUser | None
+):
+    from routers.account import account_route
+    from routers.root import login, logout
+
+    workspace_redirect_url = get_route_path(account_route)
+    if not current_user or current_user.is_anonymous:
+        login_url = get_app_route_url(
+            login, query_params={"next": invite.get_invite_url()}
+        )
+        raise gui.RedirectException(login_url)
+
+    if invite.email != current_user.email:
+        # logout current user, and redirect to login
+        login_url = get_app_route_url(
+            login, query_params={"next": invite.get_invite_url()}
+        )
+        logout_url = get_app_route_url(logout, query_params={"next": login_url})
+        gui.error(
+            f"Doh! This invitation is for **{invite.email}**, not you. "
+            f"Please [log in]({logout_url}) with the correct email address.",
+        )
+        return
+
+    if invite.workspace.memberships.filter(user=current_user).exists():
+        # already a member, redirect to workspace page
+        set_current_workspace(session, int(invite.workspace_id))
+        raise gui.RedirectException(workspace_redirect_url)
+
+    invite.accept(current_user, updated_by=current_user)
+    set_current_workspace(session, int(invite.workspace_id))
+    raise gui.RedirectException(workspace_redirect_url)
 
 
 def workspaces_page(user: AppUser, session: dict):
