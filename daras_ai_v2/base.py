@@ -1333,7 +1333,7 @@ This will also delete all the associated versions.
 
     def render_run_cost(self):
         url = self.get_credits_click_url()
-        if self.current_sr.price:
+        if self.current_sr.price and not self._has_request_changed():
             run_cost = self.current_sr.price
         else:
             run_cost = self.get_price_roundoff(gui.session_state)
