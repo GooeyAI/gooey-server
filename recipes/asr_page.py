@@ -35,6 +35,13 @@ from recipes.Translation import TranslationOptions
 DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
 
 
+def render_translation_description():
+    with gui.div(style=dict(marginTop="-0.9rem")):
+        gui.caption(
+            "Choose a model, source and target languages to translate recognized audio",
+        )
+
+
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
@@ -121,6 +128,7 @@ class AsrPage(BasePage):
             "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
+        gui.markdown("#### Speech Recognition")
         # drop down to filter models based on the selected language
         selected_filter_language = asr_language_filter_selector()
 
@@ -131,7 +139,7 @@ class AsrPage(BasePage):
         with col1:
             selected_model = enum_selector(
                 supported_models,
-                label="##### Speech-to-Text Provider",
+                label="###### Speech Recognition Model",
                 key="selected_model",
                 use_selectbox=True,
             )
@@ -141,12 +149,13 @@ class AsrPage(BasePage):
             )
 
         # Translation options
-        gui.write("---")
+
         if gui.checkbox(
-            "##### Translate to & from English",
+            "#### Translate",
             value=bool(gui.session_state.get("translation_model")),
         ):
-            col1, col2 = gui.columns(2)
+            render_translation_description()
+            col1, col2 = gui.columns(2, responsive=True)
             with col1:
                 translation_model = translation_model_selector(allow_none=False)
             with col2:
@@ -178,6 +187,7 @@ class AsrPage(BasePage):
                 )
         else:
             gui.session_state["translation_model"] = None
+            render_translation_description()
 
     def render_settings(self):
         enum_selector(

@@ -495,11 +495,12 @@ def filter_models_by_language(language: str, models: list[AsrModels]) -> Enum:
     raise ValueError(f"No ASR models support the language: {language}")
 
 
-def asr_language_filter_selector():
-    with gui.div(
-        className="d-flex flex-column flex-md-row align-items-md-center gap-2"
-    ):
-        gui.caption("Filter by Language", className="mr-2 text-muted")
+def asr_language_filter_selector(label="Filter by Language"):
+    col1, col2 = gui.columns(2, column_props=dict(style=dict(display="flex", alignItems="center")))
+    with col1:
+        if label:
+            gui.caption(label, className="mr-2 text-muted")
+    with col2:
         with gui.div(style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}):
             language = gui.selectbox(
                 style=dict(width="100%", maxWidth="300px"),
@@ -538,7 +539,7 @@ def normalised_lang_candidates(
 
 def asr_language_selector(
     selected_model: AsrModels,
-    label="##### Spoken Language",
+    label="###### Spoken Language",
     key="language",
     *,
     filter_by_language="",
