@@ -21,6 +21,8 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
+    asr_language_filter_selector,
+    filter_models_by_language,
     translation_model_selector,
     translation_language_selector,
     run_translate,
@@ -383,46 +385,54 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state.pop("lipsync_model", None)
 
         if gui.checkbox(
-            "##### 🔠 Translation & Speech Recognition",
+            "##### 🔠 Speech Recognition & Translation",
             value=bool(
                 gui.session_state.get("user_language")
                 or gui.session_state.get("asr_model")
             ),
         ):
-            gui.caption(field_desc(self.RequestModel, "user_language"))
-            col1, col2 = gui.columns(2)
-            with col1:
-                translation_model = translation_model_selector(allow_none=False)
-            with col2:
-                translation_language_selector(
-                    model=translation_model,
-                    label=f"###### {field_title(self.RequestModel, 'user_language')}",
-                    key="user_language",
-                )
-            gui.write("---")
-
+            # gui.caption(field_desc(self.RequestModel, "user_language"))
+            # drop down to filter models based on the selected language
+            selected_filter_language = asr_language_filter_selector()
+            supported_models = filter_models_by_language(
+                selected_filter_language, list(AsrModels)
+            )
             col1, col2 = gui.columns(2, responsive=False)
             with col1:
                 selected_model = enum_selector(
-                    AsrModels,
+                    supported_models,
                     label=f"###### {field_title(self.RequestModel, 'asr_model')}",
                     key="asr_model",
                     use_selectbox=True,
-                    allow_none=True,
                     format_func=lambda x: AsrModels[x].value if x else "Auto Select",
                 )
-            if selected_model:
-                with col2:
+            with col2:
+                if selected_model:
                     asr_language_selector(
                         AsrModels[selected_model],
+                        filter_by_language=selected_filter_language,
                         label=f"###### {field_title(self.RequestModel, 'asr_language')}",
                         key="asr_language",
                     )
-            else:
-                gui.caption(
-                    f"We'll automatically select an [ASR](https://gooey.ai/asr) model for you based on the {field_title(self.RequestModel, 'user_language')}."
-                )
             gui.write("---")
+            with gui.div(style=dict(paddingLeft="0.5rem")):
+                if gui.checkbox(
+                    "**Translate to & from English**",
+                    value=bool(gui.session_state.get("translation_model")),
+                ):
+                    gui.caption(
+                        "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages"
+                    )
+                    col1, col2 = gui.columns(2)
+                    with col1:
+                        translation_model = translation_model_selector(allow_none=False)
+                    with col2:
+                        translation_language_selector(
+                            model=translation_model,
+                            label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                            key="user_language",
+                        )
+            gui.html("<br />")
         else:
             gui.session_state["translation_model"] = None
             gui.session_state["asr_model"] = None
