@@ -4,7 +4,6 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
-from loguru import logger
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from api_keys.models import ApiKey
@@ -29,6 +28,7 @@ class AuthorizationError(HTTPException):
 
 
 def _authenticate_credentials_from_firebase(token: str) -> Workspace | None:
+    """Legacy method to authenticate API keys stored in Firebase."""
     hasher = PBKDF2PasswordHasher()
     hash = hasher.encode(token)
 
@@ -38,17 +38,8 @@ def _authenticate_credentials_from_firebase(token: str) -> Workspace | None:
     except IndexError:
         return None
 
-    try:
-        workspace_id = doc.get("workspace_id")
-    except KeyError:
-        uid = doc.get("uid")
-        return Workspace.objects.get_or_create_from_uid(uid)[0]
-
-    try:
-        return Workspace.objects.get(id=workspace_id)
-    except Workspace.DoesNotExist:
-        logger.warning(f"Workspace {workspace_id} not found (for API key {doc.id=}).")
-        return None
+    uid = doc.get("uid")
+    return Workspace.objects.get_or_create_from_uid(uid)[0]
 
 
 def authenticate_credentials(token: str) -> Workspace:
@@ -57,14 +48,6 @@ def authenticate_credentials(token: str) -> Workspace:
         workspace = _authenticate_credentials_from_firebase(token)
         if not workspace:
             raise AuthorizationError("Invalid API key.")
-
-        # firebase was used for API Keys before team workspaces, so we
-        # can assume that api_key.created_by_id = workspace.created_by
-        api_key = ApiKey.objects.create_from_secret_key(
-            token,
-            workspace=workspace,
-            created_by_id=workspace.created_by_id,
-        )
 
     workspace = api_key.workspace
     if workspace.is_personal and workspace.created_by.is_disabled:
