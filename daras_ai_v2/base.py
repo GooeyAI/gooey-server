@@ -1662,7 +1662,7 @@ This will also delete all the associated versions.
 
         updated_count = SavedRun.objects.filter(
             id=self.current_sr.id,
-            uid=self.current_sr_user.uid,
+            uid=self.current_sr.uid,
             # filter for RecipeRunState.standby
             run_status="",
             error_msg="",
