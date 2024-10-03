@@ -1,3 +1,4 @@
+import json
 import typing
 from html import escape
 
@@ -22,25 +23,20 @@ def copy_to_clipboard_button(
     label: str,
     *,
     value: str,
-    style: dict[str, str] | None = None,
+    style: str = "",
     className: str = "",
     type: typing.Literal["primary", "secondary", "tertiary", "link"] = "primary",
-    key: str | None = None,
-) -> bool:
-    key = key or "copy-to-clipboard-btn"
-    pressed = gui.button(
-        label,
-        id=key,
-        className=className,
-        style=style,
-        type=type,
-        **{"data-clipboard-text": value},
+):
+    return gui.html(
+        # language="html"
+        f"""
+<button
+    type="button"
+    class="btn btn-theme btn-{type} {className}"
+    onclick="copyToClipboard(this);"
+    style="{style}"
+    data-clipboard-text="{escape(value)}">
+    {label}
+</button>
+        """,
     )
-    if pressed:
-        gui.js(
-            # language="javascript"
-            f"""
-            copyToClipboard(document.getElementById("{escape(key)}"));
-            """
-        )
-    return pressed
