@@ -140,7 +140,6 @@ class AsrPage(BasePage):
                 AsrModels[selected_model], filter_by_language=selected_filter_language
             )
 
-        gui.session_state["translation_model"] = None
         # Translation options
         gui.write("---")
         if gui.checkbox(
@@ -177,6 +176,8 @@ class AsrPage(BasePage):
                 gui.caption(
                     "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
                 )
+        else:
+            gui.session_state["translation_model"] = None
 
     def render_settings(self):
         enum_selector(
