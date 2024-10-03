@@ -34,14 +34,6 @@ from recipes.Translation import TranslationOptions
 
 DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
 
-
-def render_translation_description():
-    with gui.div(style=dict(marginTop="-0.9rem")):
-        gui.caption(
-            "Choose a model, source and target languages to translate recognized audio",
-        )
-
-
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
@@ -154,7 +146,10 @@ class AsrPage(BasePage):
             "#### Translate",
             value=bool(gui.session_state.get("translation_model")),
         ):
-            render_translation_description()
+            with gui.div(style=dict(marginTop="-0.9rem")):
+                gui.caption(
+                    "Choose a model, source and target languages to translate recognized audio",
+                )
             col1, col2 = gui.columns(2, responsive=True)
             with col1:
                 translation_model = translation_model_selector(allow_none=False)
@@ -187,7 +182,6 @@ class AsrPage(BasePage):
                 )
         else:
             gui.session_state["translation_model"] = None
-            render_translation_description()
 
     def render_settings(self):
         enum_selector(
