@@ -39,7 +39,10 @@ from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
-from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+from daras_ai_v2.copy_to_clipboard_button_widget import (
+    copy_to_clipboard_button,
+    copy_to_clipboard_button_with_return,
+)
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
@@ -539,12 +542,19 @@ class BasePage:
             )
 
         with gui.div(className="d-flex justify-content-between"):
-            self._render_copy_link_button(label="Copy Link", className="py-2 px-3 m-0")
-            if gui.button(
+            pressed_copy = copy_to_clipboard_button_with_return(
+                label="Copy Link",
+                key="copy-link-in-share-modal",
+                className="py-2 px-3 m-0",
+                value=self.current_app_url(self.tab),
+                type="secondary",
+            )
+            pressed_done = gui.button(
                 "Done",
                 type="primary",
                 className="py-2 px-5 m-0",
-            ):
+            )
+            if pressed_copy or pressed_done:
                 if self.current_pr.visibility != published_run_visibility:
                     self.current_pr.add_version(
                         user=self.request.user,
