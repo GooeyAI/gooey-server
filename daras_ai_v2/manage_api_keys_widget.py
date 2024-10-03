@@ -48,36 +48,25 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 
 
 def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
-    db_api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
-    firebase_api_keys = [
-        d
-        for d in _load_api_keys_from_firebase(workspace)
-        if d["secret_key_hash"] not in db_api_keys
-    ]
-    if firebase_api_keys:
-        new_api_keys = [
-            ApiKey(
-                hash=d["secret_key_hash"],
-                preview=d["secret_key_preview"],
-                workspace=workspace,
-                created_by_id=workspace.created_by_id,
-            )
-            for d in firebase_api_keys
-        ]
-        # TODO: also update created_at for migrated keys
-        # migrated_api_keys = ApiKey.objects.bulk_create(
-        #     new_api_keys,
-        #     ignore_conflicts=True,
-        #     batch_size=100,
-        # )
-        db_api_keys.update({api_key.hash: api_key for api_key in new_api_keys})
+    api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
+    for legacy_key in _load_api_keys_from_firebase(workspace):
+        hash = legacy_key["secret_key_hash"]
+        api_keys[hash] = ApiKey(
+            workspace=workspace,
+            hash=hash,
+            preview=legacy_key["secret_key_preview"],
+            created_at=legacy_key["created_at"],
+            created_by_id=workspace.created_by_id,
+        )
 
     return sorted(
-        db_api_keys.values(), key=lambda api_key: api_key.created_at, reverse=True
+        api_keys.values(),
+        key=lambda api_key: api_key.created_at,
+        reverse=True,
     )
 
 
-def _load_api_keys_from_firebase(workspace: "Workspace"):
+def _load_api_keys_from_firebase(workspace: "Workspace") -> list[dict]:
     db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     if workspace.is_personal:
         return [
