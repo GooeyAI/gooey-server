@@ -234,7 +234,7 @@ class VideoBotsPage(BasePage):
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
         user_language: str | None = Field(
-            title="User Language",
+            title="Translated Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
@@ -391,7 +391,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 or gui.session_state.get("asr_model")
             ),
         ):
-            # gui.caption(field_desc(self.RequestModel, "user_language"))
+            gui.caption(field_desc(self.RequestModel, "user_language"))
             # drop down to filter models based on the selected language
             selected_filter_language = asr_language_filter_selector()
             supported_models = filter_models_by_language(
@@ -427,8 +427,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     with col1:
                         translation_model = translation_model_selector(allow_none=False)
                     with col2:
+                        if selected_filter_language:
+                            gui.session_state["user_language"] = (
+                                selected_filter_language or "en"
+                            )
                         translation_language_selector(
                             model=translation_model,
+                            default_language="en",
                             label=f"###### {field_title(self.RequestModel, 'user_language')}",
                             key="user_language",
                         )

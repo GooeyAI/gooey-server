@@ -154,16 +154,12 @@ class AsrPage(BasePage):
             with col1:
                 translation_model = translation_model_selector(allow_none=False)
             with col2:
+                if selected_filter_language:
+                    gui.session_state["translation_target"] = selected_filter_language
                 translation_language_selector(
                     model=translation_model,
                     label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                     key="translation_target",
-                )
-            if translation_model and translation_model.supports_glossary:
-                gui.file_uploader(
-                    label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-                    key="glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
                 )
             if selected_model and translation_model:
                 gui.write("---")
@@ -171,12 +167,25 @@ class AsrPage(BasePage):
                     model=translation_model,
                     label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
                     key="translation_source",
+                    default_language="en",
+                    filter_by_language=selected_filter_language,
                     allow_none=(
-                        translation_model.supports_auto_detect
-                        if translation_model
-                        else True
+                        False
+                        if selected_filter_language
+                        else (
+                            translation_model.supports_auto_detect
+                            if translation_model
+                            else True
+                        )
                     ),
                 )
+            if translation_model and translation_model.supports_glossary:
+                gui.file_uploader(
+                    label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                    key="glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
+                )
+
                 gui.caption(
                     "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
                 )

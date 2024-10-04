@@ -317,6 +317,8 @@ def translation_language_selector(
     model: TranslationModels | None,
     label: str,
     key: str,
+    filter_by_language="",
+    default_language="",
     **kwargs,
 ) -> str | None:
     if not model:
@@ -334,6 +336,13 @@ def translation_language_selector(
         raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
+    if filter_by_language:
+        filtered_list = normalised_lang_candidates(filter_by_language, options)
+        options = filtered_list if filtered_list else options
+    if default_language and default_language in options:
+        options.remove(default_language)
+        options.insert(0, default_language)
+
     return gui.selectbox(
         label=label,
         key=key,
@@ -528,11 +537,8 @@ def normalised_lang_candidates(
             # If the normalized version of the target matches the candidate, add it to the list
             if normalised_lang_in_collection(candidate, [target]):
                 matching_candidates.append(candidate)
-        except UserError:
+        except:
             pass
-
-    # if not matching_candidates:
-    #     # raise UserError(f"No matching candidates for {target}")
 
     return matching_candidates
 
@@ -554,7 +560,11 @@ def asr_language_selector(
     if filter_by_language:
         # filter the languages to show dialects only from selected languages
         options = normalised_lang_candidates(filter_by_language, options)
-    if selected_model and selected_model.supports_auto_detect():
+    if (
+        selected_model
+        and selected_model.supports_auto_detect()
+        and not filter_by_language
+    ):
         options.insert(0, None)
 
     # handle non-canonical language codes

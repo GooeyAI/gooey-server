@@ -199,8 +199,13 @@ If not specified or invalid, no glossary will be used. Read about the expected f
                 with col1:
                     translation_model = translation_model_selector(allow_none=False)
                 with col2:
+                    if selected_filter_language:
+                        gui.session_state["translation_target"] = (
+                            selected_filter_language
+                        )
                     translation_language_selector(
                         model=translation_model,
+                        default_language="en",
                         label=f"###### Target Translation Language",
                         key="translation_target",
                     )
@@ -210,10 +215,15 @@ If not specified or invalid, no glossary will be used. Read about the expected f
                         model=translation_model,
                         label=f"###### Source Translation Language",
                         key="translation_source",
+                        filter_by_language=selected_filter_language,
                         allow_none=(
-                            translation_model.supports_auto_detect
-                            if translation_model
-                            else True
+                            False
+                            if selected_filter_language
+                            else (
+                                translation_model.supports_auto_detect
+                                if translation_model
+                                else True
+                            )
                         ),
                     )
                     gui.caption(
