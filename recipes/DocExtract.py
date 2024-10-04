@@ -13,12 +13,17 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
-    google_translate_language_selector,
+    run_translate,
     AsrModels,
     run_asr,
     download_youtube_to_wav_url,
-    run_google_translate,
     audio_url_to_wav,
+    filter_models_by_language,
+    asr_language_filter_selector,
+    asr_language_selector,
+    translation_language_selector,
+    translation_model_selector,
+    TranslationModels,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -61,6 +66,7 @@ from daras_ai_v2.vector_search import (
 )
 from files.models import FileMetadata
 from recipes.DocSearch import render_documents
+from recipes.Translation import TranslationOptions
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
@@ -94,7 +100,10 @@ class DocExtractPage(BasePage):
         sheet_url: FieldHttpUrl | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        # language: str | None
+        language: str | None
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        )
         google_translate_target: str | None
         glossary_document: FieldHttpUrl | None = Field(
             title="Translation Glossary",
@@ -108,7 +117,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
 
-    class RequestModel(LanguageModelSettings, RequestModelBase):
+    class RequestModel(LanguageModelSettings, RequestModelBase, TranslationOptions):
         pass
 
     class ResponseModel(BaseModel):
@@ -154,20 +163,68 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
-        enum_selector(
-            AsrModels,
-            label="##### ASR Model",
-            key="selected_asr_model",
-            use_selectbox=True,
+        gui.markdown("#### 🦻 Speech Recognition & Translation")
+        gui.caption(
+            "Recognize speech and translate for audio and video files.",
         )
-        gui.write("---")
+        selected_filter_language = asr_language_filter_selector()
 
-        google_translate_language_selector()
-        gui.file_uploader(
-            label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-            key="glossary_document",
-            accept=SUPPORTED_SPREADSHEET_TYPES,
+        col1, col2 = gui.columns(2, responsive=False)
+        supported_models = filter_models_by_language(
+            selected_filter_language, list(AsrModels)
         )
+        with col1:
+            selected_model = enum_selector(
+                supported_models,
+                label="###### Speech Recognition Model",
+                key="selected_asr_model",
+                use_selectbox=True,
+            )
+        with col2:
+            asr_language_selector(
+                AsrModels[selected_model],
+                filter_by_language=selected_filter_language,
+                key="asr_language",
+            )
+        with gui.div(style=dict(paddingLeft="0.5rem")):
+            if gui.checkbox(
+                "**Translate to another language**",
+                value=bool(gui.session_state.get("translation_model")),
+            ):
+                with gui.div(style=dict(marginTop="-0.9rem")):
+                    gui.caption(
+                        "Choose a model, source and target languages to translate recognized audio.",
+                    )
+                col1, col2 = gui.columns(2)
+                with col1:
+                    translation_model = translation_model_selector(allow_none=False)
+                with col2:
+                    translation_language_selector(
+                        model=translation_model,
+                        label=f"###### Target Translation Language",
+                        key="translation_target",
+                    )
+                if selected_model and translation_model:
+                    gui.write("---")
+                    translation_language_selector(
+                        model=translation_model,
+                        label=f"###### Source Translation Language",
+                        key="translation_source",
+                        allow_none=(
+                            translation_model.supports_auto_detect
+                            if translation_model
+                            else True
+                        ),
+                    )
+                    gui.caption(
+                        "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
+                    )
+                if translation_model and translation_model.supports_glossary:
+                    gui.file_uploader(
+                        label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                        key="glossary_document",
+                        accept=SUPPORTED_SPREADSHEET_TYPES,
+                    )
         gui.write("---")
 
     def related_workflows(self) -> list:
@@ -478,7 +535,9 @@ def process_source(
     if not transcript:
         if is_yt or is_video:
             yield "Transcribing"
-            transcript = run_asr(content_url, request.selected_asr_model)
+            transcript = run_asr(
+                content_url, request.selected_asr_model, language=request.asr_language
+            )
         elif is_pdf:
             yield "Extracting PDF"
             transcript = azure_doc_extract_page_num(content_url, entry.get("page_num"))
@@ -494,14 +553,15 @@ def process_source(
         final_col_name = "snippet"
     final_value = transcript
 
-    if request.google_translate_target:
+    if request.translation_model:
         translation = existing_values[Columns.translation.value]
         if not translation:
             yield "Translating"
-            translation = run_google_translate(
+            translation = run_translate(
                 texts=[transcript],
-                target_language=request.google_translate_target,
-                # source_language=request.language,
+                target_language=request.translation_target,
+                source_language=request.translation_source,
+                model=request.translation_model,
                 glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)

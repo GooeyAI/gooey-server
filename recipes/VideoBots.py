@@ -421,7 +421,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     value=bool(gui.session_state.get("translation_model")),
                 ):
                     gui.caption(
-                        "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages"
+                        "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
                     )
                     col1, col2 = gui.columns(2)
                     with col1:
