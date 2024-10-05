@@ -233,6 +233,9 @@ class AppUser(models.Model):
 
         return Workspace.objects.get_or_create_from_user(self)
 
+    def get_anonymous_token(self):
+        return auth.create_custom_token(self.uid).decode()
+
 
 class TransactionReason(models.IntegerChoices):
     DEDUCT = 1, "Deduct"

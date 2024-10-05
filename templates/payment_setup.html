@@ -81,7 +81,6 @@ function setupToggleShowElement() {
 
 document.addEventListener("DOMContentLoaded", function () {
     const observer = new MutationObserver((mutationsList, observer) => {
-        console.log("mutation observed");
         renderPaypalSubscriptionButtons();
         setupToggleShowElement();
     });

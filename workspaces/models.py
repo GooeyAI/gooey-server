@@ -95,7 +95,7 @@ class Workspace(SafeDeleteModel):
         related_name="created_workspaces",
     )
 
-    logo = CustomURLField(null=True, blank=True)
+    photo_url = CustomURLField(null=True, blank=True)
     domain_name = models.CharField(
         max_length=30,
         blank=True,
@@ -312,9 +312,12 @@ class Workspace(SafeDeleteModel):
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
         if self.is_personal and self.created_by_id == current_user.id:
-            return icons.home
-        elif self.logo:
-            return f'<img src="{self.logo}" style="height: 25px; width: auto; border-radius: 5px">'
+            if self.created_by.photo_url:
+                return f'<img src="{self.created_by.photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
+            else:
+                return icons.home
+        elif self.photo_url:
+            return f'<img src="{self.photo_url}" style="height: 25px; width: auto; border-radius: 5px">'
         else:
             return icons.company
 

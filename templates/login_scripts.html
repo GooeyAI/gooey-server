@@ -1,10 +1,10 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
 
-{% if not request.user or anonymous_user_token %}
+{% if not request.user or request.user.is_anonymous %}
     <script>
-        {% if anonymous_user_token %}
-            window._anonymous_user_token = {{ anonymous_user_token | tojson }};
+        {% if request.user and request.user.is_anonymous %}
+            window._anonymous_user_token = {{ request.user.get_anonymous_token() | tojson }};
         {% endif %}
         window.GOOGLE_CLIENT_ID = {{ settings.GOOGLE_CLIENT_ID | tojson }};
         window.FIREBASE_CONFIG = JSON.parse({{ settings.FIREBASE_CONFIG | tojson }});

@@ -223,6 +223,15 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+HEADER_LINKS = [
+    ("/explore/", "Explore"),
+    ("https://docs.gooey.ai", "Docs"),
+    ("/api/", "API"),
+    ("https://blog.gooey.ai", "Blog"),
+    ("https://gooey.ai/pricing", "Pricing"),
+    ("https://www.help.gooey.ai/contact", "Contact"),
+]
+
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 

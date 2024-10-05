@@ -107,10 +107,6 @@ def login(request: Request):
         "request": request,
         "settings": settings,
     }
-    if request.user and request.user.is_anonymous:
-        context["anonymous_user_token"] = auth.create_custom_token(
-            request.user.uid
-        ).decode()
     return templates.TemplateResponse(
         "login_options.html",
         context=context,
@@ -705,39 +701,89 @@ def get_og_url_path(request) -> str:
 
 @contextmanager
 def page_wrapper(request: Request, className=""):
-    from daras_ai_v2.base import BasePage
-
     context = {
         "request": request,
         "settings": settings,
         "block_incognito": True,
         "current_year": datetime.datetime.now().year,
     }
-    if request.user and request.user.is_anonymous:
-        context["anonymous_user_token"] = auth.create_custom_token(
-            request.user.uid
-        ).decode()
 
     with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
-        gui.html(templates.get_template("header.html").render(**context))
-        gui.html(copy_to_clipboard_scripts)
 
-        if request.user and BasePage.is_user_admin(request.user):
-            with (
-                gui.div(
-                    className="container justify-content-center text-center d-flex",
-                    style=dict(marginBottom="-20pt"),
-                ),
-                gui.div(style=dict(minWidth="200pt")),
+        with (
+            gui.div(className="header"),
+            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
+            gui.div(className="container-xxl my-2"),
+        ):
+            gui.image(
+                settings.GOOEY_LOGO_IMG,
+                width="300",
+                height="142",
+                className="img-fluid logo",
+            )
+            with gui.div(
+                className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
             ):
-                workspace_selector(request.user, request.session)
+                for url, label in settings.HEADER_LINKS:
+                    with gui.link(to=url, className="pe-2 d-none d-lg-block"):
+                        gui.html(label)
+
+                if request.user and not request.user.is_anonymous:
+                    workspace_selector(request.user, request.session)
+                else:
+                    anonymous_login_container(context)
+
+        gui.html(copy_to_clipboard_scripts)
 
         with gui.div(id="main-content", className="container-xxl " + className):
             yield
 
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
+
+
+def anonymous_login_container(context: dict):
+    with gui.tag("a", href="/login/", className="pe-2 d-none d-lg-block"):
+        gui.html("Sign In")
+
+    popover, content = gui.popover(interactive=True)
+
+    with popover, gui.div(className="d-flex align-items-center"):
+        gui.html(
+            templates.get_template("google_one_tap_button.html").render(**context)
+            + '<i class="ps-2 fa-regular fa-chevron-down d-lg-none"></i>'
+        )
+
+    with content, gui.div(
+        className="d-flex flex-column bg-white border border-dark rounded shadow",
+        style=dict(minWidth="200px"),
+    ):
+        row_height = "2.2rem"
+
+        with gui.tag(
+            "a",
+            href="/login/",
+            className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
+            style=dict(height=row_height),
+        ):
+            with gui.div(className="row align-items-center"):
+                with gui.div(className="col-2 d-flex justify-content-center"):
+                    gui.html('<i class="fa-regular fa-circle-user"></i>')
+                with gui.div(className="col-10"):
+                    gui.html("Sign In")
+
+        gui.html('<hr class="my-1"/>')
+
+        for url, label in settings.HEADER_LINKS:
+            with gui.link(
+                to=url,
+                className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
+                style=dict(height=row_height),
+            ):
+                col1, col2 = gui.columns([2, 10], responsive=False)
+                with col2:
+                    gui.html(label)
 
 
 class TabData(typing.NamedTuple):
