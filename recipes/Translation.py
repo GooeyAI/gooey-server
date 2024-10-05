@@ -113,6 +113,7 @@ class TranslationPage(BasePage):
                 gui.session_state["translation_source"] = selected_filter_language
             translation_language_selector(
                 model=translation_model,
+                filter_by_language=selected_filter_language,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
                 key="translation_source",
                 allow_none=translation_model.supports_auto_detect,
@@ -122,6 +123,7 @@ class TranslationPage(BasePage):
                 gui.session_state["translation_target"] = selected_filter_language
             translation_language_selector(
                 model=translation_model,
+                filter_by_language=selected_filter_language,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                 key="translation_target",
             )
