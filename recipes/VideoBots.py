@@ -21,7 +21,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
-    asr_language_filter_selector,
+    language_filter_selector,
     filter_models_by_language,
     translation_model_selector,
     translation_language_selector,
@@ -393,9 +393,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         ):
             gui.caption(field_desc(self.RequestModel, "user_language"))
             # drop down to filter models based on the selected language
-            selected_filter_language = asr_language_filter_selector()
+            selected_filter_language = language_filter_selector()
             supported_models = filter_models_by_language(
-                selected_filter_language, list(AsrModels)
+                selected_filter_language, AsrModels
             )
             col1, col2 = gui.columns(2, responsive=False)
             with col1:

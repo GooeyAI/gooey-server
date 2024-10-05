@@ -9,6 +9,8 @@ from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
     run_translate,
+    language_filter_selector,
+    translation_languages_without_dialects,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import SUPPORTED_SPREADSHEET_TYPES
@@ -95,13 +97,20 @@ class TranslationPage(BasePage):
             render_inputs=render_text_input,
             flatten_dict_key="text",
         )
+        selected_filter_language = language_filter_selector(
+            options=translation_languages_without_dialects(),
+        )
 
         translation_model = translation_model_selector(
             key="selected_model",
             allow_none=False,
+            filter_by_language=selected_filter_language,
         )
+
         col1, col2 = gui.columns(2)
         with col1:
+            if selected_filter_language:
+                gui.session_state["translation_source"] = selected_filter_language
             translation_language_selector(
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
@@ -109,6 +118,8 @@ class TranslationPage(BasePage):
                 allow_none=translation_model.supports_auto_detect,
             )
         with col2:
+            if selected_filter_language:
+                gui.session_state["translation_target"] = selected_filter_language
             translation_language_selector(
                 model=translation_model,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",

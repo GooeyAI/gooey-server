@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 import gooey_gui as gui
 from bots.models import Workflow, SavedRun
 from daras_ai_v2.asr import (
-    asr_language_filter_selector,
+    language_filter_selector,
     asr_language_selector,
     AsrModels,
     AsrOutputFormat,
@@ -122,12 +122,13 @@ class AsrPage(BasePage):
         )
         gui.markdown("#### Speech Recognition")
         # drop down to filter models based on the selected language
-        selected_filter_language = asr_language_filter_selector()
+        selected_filter_language = language_filter_selector()
 
         col1, col2 = gui.columns(2, responsive=False)
         supported_models = filter_models_by_language(
-            selected_filter_language, list(AsrModels)
+            selected_filter_language, AsrModels
         )
+        print(supported_models, ">>")
         with col1:
             selected_model = enum_selector(
                 supported_models,

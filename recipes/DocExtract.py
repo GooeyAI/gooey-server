@@ -19,7 +19,7 @@ from daras_ai_v2.asr import (
     download_youtube_to_wav_url,
     audio_url_to_wav,
     filter_models_by_language,
-    asr_language_filter_selector,
+    language_filter_selector,
     asr_language_selector,
     translation_language_selector,
     translation_model_selector,
@@ -167,11 +167,11 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         gui.caption(
             "Recognize speech and translate for audio and video files.",
         )
-        selected_filter_language = asr_language_filter_selector()
+        selected_filter_language = language_filter_selector()
 
         col1, col2 = gui.columns(2, responsive=False)
         supported_models = filter_models_by_language(
-            selected_filter_language, list(AsrModels)
+            selected_filter_language, AsrModels
         )
         with col1:
             selected_model = enum_selector(
