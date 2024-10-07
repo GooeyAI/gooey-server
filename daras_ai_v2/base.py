@@ -1387,7 +1387,7 @@ class BasePage:
         else:
             user = workspace_or_user
             photo = user.photo_url
-            name = user.display_name
+            name = user.full_name()
             if show_as_link and user.handle:
                 link = user.handle.get_app_url()
 
