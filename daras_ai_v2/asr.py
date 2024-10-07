@@ -1046,7 +1046,7 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
             "yt-dlp", "-v",
             "--no-playlist",
             "--max-downloads", "1",
-            "--format", "bestaudio",
+            "--format", "bestaudio/best",
             "--output", infile,
             *proxy_args,
             youtube_url,
