@@ -673,8 +673,8 @@ class BasePage:
                 key="published_run_notes",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
-            with gui.div(className="d-flex align-items-start"):
-                with gui.div(className="fs-2 text-muted"):
+            with gui.div(className="d-flex align-items-center"):
+                with gui.div(className="fs-3 text-muted mb-3"):
                     gui.html(icons.notes)
                 with gui.div(className="flex-grow-1"):
                     change_notes = gui.text_input(
