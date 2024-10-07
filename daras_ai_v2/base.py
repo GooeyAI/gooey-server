@@ -825,35 +825,38 @@ class BasePage:
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
-        duplicate_button = None
-        save_as_new_button = None
-        if is_latest_version:
-            duplicate_button = gui.button(f"{icons.fork} Duplicate", className="w-100")
-        else:
-            save_as_new_button = gui.button(
-                f"{icons.fork} Save as New", className="w-100"
-            )
+        with gui.div(className="mb-3 d-flex justify-content-around align-items-center"):
+            duplicate_button = None
+            save_as_new_button = None
+            if is_latest_version:
+                duplicate_button = gui.button(
+                    f"{icons.fork} Duplicate", className="w-100"
+                )
+            else:
+                save_as_new_button = gui.button(
+                    f"{icons.fork} Save as New", className="w-100"
+                )
 
-        if not self.current_pr.is_root():
-            ref = gui.use_confirm_dialog(key="--delete-run-modal")
-            gui.button_with_confirm_dialog(
-                ref=ref,
-                trigger_label='<i class="fa-regular fa-trash"></i> Delete',
-                trigger_className="w-100 text-danger",
-                modal_title="#### Are you sure?",
-                modal_content=f"""
-Are you sure you want to delete this published run? 
+            if not self.current_pr.is_root():
+                ref = gui.use_confirm_dialog(key="--delete-run-modal")
+                gui.button_with_confirm_dialog(
+                    ref=ref,
+                    trigger_label='<i class="fa-regular fa-trash"></i> Delete',
+                    trigger_className="w-100 text-danger",
+                    modal_title="#### Are you sure?",
+                    modal_content=f"""
+    Are you sure you want to delete this published run?
 
-**{self.current_pr.title}**
+    **{self.current_pr.title}**
 
-This will also delete all the associated versions.          
-                """,
-                confirm_label="Delete",
-                confirm_className="border-danger bg-danger text-white",
-            )
-            if ref.pressed_confirm:
-                self.current_pr.delete()
-                raise gui.RedirectException(self.app_url())
+    This will also delete all the associated versions.
+                    """,
+                    confirm_label="Delete",
+                    confirm_className="border-danger bg-danger text-white",
+                )
+                if ref.pressed_confirm:
+                    self.current_pr.delete()
+                    raise gui.RedirectException(self.app_url())
 
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
