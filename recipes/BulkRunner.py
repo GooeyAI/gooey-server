@@ -3,6 +3,7 @@ import typing
 import uuid
 
 import gooey_gui as gui
+import pandas as pd
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -103,6 +104,25 @@ List of URLs to the evaluation runs that you requested.
             render_inputs=self.render_run_url_inputs,
             flatten_dict_key="url",
         )
+
+        # add button to generate questions and answers
+        if gui.button("Generate Golden QnA", key="--generate-golden-qna"):
+            gui.write(gui.session_state["run_urls"])
+            # get the session state based on the run url
+            for url in gui.session_state["run_urls"]:
+                page_cls, sr, _ = url_to_runs(url)
+                gui.write(sr.state)
+                # in the sr.state get the documents and run rag on the to generate 5 questions and answers
+                documents = sr.state["documents"]
+                for doc in documents:
+                    f = doc_url_to_file_metadata(doc)
+                    f_bytes, mime_type = download_content_bytes(
+                        f_url=doc, mime_type=f.mime_type
+                    )
+                    # df = tabular_bytes_to_any_df(
+                    #     f_name=f.name, f_bytes=f_bytes, mime_type=mime_type
+                    # )
+                    gui.write(f_bytes)
 
         files = bulk_documents_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
