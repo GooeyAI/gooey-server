@@ -426,9 +426,8 @@ def translation_model_selector(
     supported_models = filter_models_by_language(
         filter_by_language, TranslationModels, model_type="translation"
     )
-    print(supported_models, ">>")
     model = enum_selector(
-        supported_models,
+        supported_models or TranslationModels,
         "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
@@ -541,8 +540,6 @@ def filter_models_by_language(
                 else {model.name: model.value for model in supported_models}
             ),
         )
-
-    raise ValueError(f"No {model_type} models support the language: {language}")
 
 
 def language_filter_selector(

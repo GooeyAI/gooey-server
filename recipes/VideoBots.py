@@ -425,7 +425,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                     col1, col2 = gui.columns(2)
                     with col1:
-                        translation_model = translation_model_selector(allow_none=False)
+                        translation_model = translation_model_selector(
+                            allow_none=False,
+                            filter_by_language=selected_filter_language,
+                        )
                     with col2:
                         if selected_filter_language:
                             gui.session_state["user_language"] = (

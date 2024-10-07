@@ -128,7 +128,6 @@ class AsrPage(BasePage):
         supported_models = filter_models_by_language(
             selected_filter_language, AsrModels
         )
-        print(supported_models, ">>")
         with col1:
             selected_model = enum_selector(
                 supported_models,
@@ -142,7 +141,6 @@ class AsrPage(BasePage):
             )
 
         # Translation options
-
         if gui.checkbox(
             "#### Translate",
             value=bool(gui.session_state.get("translation_model")),

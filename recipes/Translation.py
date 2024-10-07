@@ -119,10 +119,9 @@ class TranslationPage(BasePage):
                 allow_none=translation_model.supports_auto_detect,
             )
         with col2:
-            if selected_filter_language:
-                gui.session_state["translation_target"] = selected_filter_language
             translation_language_selector(
                 model=translation_model,
+                default_language="en",
                 filter_by_language=selected_filter_language,
                 label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                 key="translation_target",
