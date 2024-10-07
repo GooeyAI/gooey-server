@@ -459,8 +459,7 @@ class WorkspaceInvite(models.Model):
     class Status(models.IntegerChoices):
         PENDING = 1
         ACCEPTED = 2
-        REJECTED = 3
-        CANCELED = 4
+        CANCELED = 3
 
     workspace = models.ForeignKey(
         Workspace, on_delete=models.CASCADE, related_name="invites"
@@ -579,11 +578,6 @@ class WorkspaceInvite(models.Model):
         self.save()
 
         return membership, created
-
-    def reject(self, current_user: "AppUser"):
-        self.status = self.Status.REJECTED
-        self.updated_by = current_user
-        self.save()
 
     def cancel(self, user: "AppUser"):
         self.status = self.Status.CANCELED

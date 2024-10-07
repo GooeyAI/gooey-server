@@ -13,17 +13,19 @@ from starlette.responses import Response
 from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
+from daras_ai_v2 import settings
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.settings import templates
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import page_wrapper, get_og_url_path
 from workspaces.models import WorkspaceInvite
-from workspaces.views import invitation_page, workspaces_page
+from workspaces.views import DEFAULT_WORKSPACE_LOGO, invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace
 
 app = CustomAPIRouter()
@@ -167,20 +169,13 @@ def invitation_route(
     workspace_slug: str | None,
     email: str | None,
 ):
-    from routers.root import login
-
-    if not request.user or request.user.is_anonymous:
-        next_url = request.url.path
-        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
-        raise RedirectException(redirect_url)
-
     try:
         invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
-        invite = WorkspaceInvite.objects.get(id=invite_id)
+        invite = WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
     except (IndexError, WorkspaceInvite.DoesNotExist):
         return Response(status_code=404)
 
-    with page_wrapper(request):
+    with page_wrapper(request, show_header=False, show_footer=False):
         invitation_page(
             current_user=request.user, session=request.session, invite=invite
         )
@@ -190,6 +185,7 @@ def invitation_route(
             url=str(request.url),
             title=f"Join {invite.workspace.display_name()} • Gooey.AI",
             description=f"Invitation to join {invite.workspace.display_name()}",
+            image=invite.workspace.logo or DEFAULT_WORKSPACE_LOGO,
             robots="noindex,nofollow",
         )
     )
