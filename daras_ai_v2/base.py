@@ -404,7 +404,7 @@ class BasePage:
                         """
                     )
 
-                    if self.request.user and self.tab == RecipeTabs.run:
+                    if self.tab == RecipeTabs.run:
                         self._render_options_button_with_dialog()
                         self._render_share_button()
                         self._render_save_button()
