@@ -1681,7 +1681,6 @@ This will also delete all the associated versions.
         ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
         if updated_count >= 1:
             # updated now
-            self.dump_state_to_sr(self._get_validated_state(), self.current_sr)
             self.call_runner_task(self.current_sr)
         elif self.get_run_state(self.current_sr.to_dict()) == RecipeRunState.standby:
             # updated by a different thread, we just refresh_from_db
