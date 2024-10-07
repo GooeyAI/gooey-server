@@ -720,6 +720,7 @@ def page_wrapper(
         "request": request,
         "settings": settings,
         "block_incognito": True,
+        "current_year": datetime.datetime.now().year,
     }
     if request.user and request.user.is_anonymous:
         context["anonymous_user_token"] = auth.create_custom_token(
