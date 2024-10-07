@@ -518,7 +518,7 @@ class BasePage:
                     str(PublishedRunVisibility.PUBLIC.value)
                 ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
             elif self.request.user and not self.request.user.is_anonymous:
-                edit_profile_url = AccountTabs.profile.url_path
+                edit_profile_url = AccountTabs.profile.get_url_path(self.request)
                 options[
                     str(PublishedRunVisibility.PUBLIC.value)
                 ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
@@ -558,12 +558,14 @@ class BasePage:
             )
             if pressed_copy or pressed_done:
                 if self.current_pr.visibility != published_run_visibility:
+                    visibility = PublishedRunVisibility(published_run_visibility)
                     self.current_pr.add_version(
                         user=self.request.user,
                         saved_run=self.current_pr.saved_run,
                         title=self.current_pr.title,
                         notes=self.current_pr.notes,
-                        visibility=PublishedRunVisibility(published_run_visibility),
+                        visibility=visibility,
+                        change_notes=f"Visibility changed to {visibility.name.title()}",
                     )
 
                 dialog.set_open(False)
