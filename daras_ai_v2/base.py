@@ -1091,14 +1091,13 @@ class BasePage:
                 if is_first_version:
                     with gui.tag("span", className="badge bg-secondary px-3"):
                         gui.write("FIRST VERSION")
-                elif older_version and older_version.title != version.title:
-                    gui.caption(f"Renamed: {version.title}")
-
-                if version.change_notes:
+                elif version.change_notes:
                     gui.caption(
                         f"{icons.notes} {html.escape(version.change_notes)}",
                         unsafe_allow_html=True,
                     )
+                elif older_version and older_version.title != version.title:
+                    gui.caption(f"Renamed: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
