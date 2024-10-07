@@ -405,7 +405,8 @@ class BasePage:
                     )
 
                     if self.tab == RecipeTabs.run:
-                        self._render_options_button_with_dialog()
+                        if self.request.user and not self.request.user.is_anonymous:
+                            self._render_options_button_with_dialog()
                         self._render_share_button()
                         self._render_save_button()
                     else:
@@ -778,7 +779,7 @@ class BasePage:
             return False
 
     def _saved_options_modal(self):
-        assert self.request.user
+        assert self.request.user and not self.request.user.is_anonymous
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
@@ -841,7 +842,7 @@ This will also delete all the associated versions.
             self._render_version_history()
 
     def _unsaved_options_modal(self):
-        assert self.request.user
+        assert self.request.user and not self.request.user.is_anonymous
 
         gui.write(
             "Like this AI workflow? Duplicate and then customize it for your use case."
@@ -1680,7 +1681,6 @@ This will also delete all the associated versions.
         ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
         if updated_count >= 1:
             # updated now
-            self.dump_state_to_sr(self._get_validated_state(), self.current_sr)
             self.call_runner_task(self.current_sr)
         elif self.get_run_state(self.current_sr.to_dict()) == RecipeRunState.standby:
             # updated by a different thread, we just refresh_from_db
