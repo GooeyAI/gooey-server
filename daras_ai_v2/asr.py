@@ -369,12 +369,6 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
-translation_supported_languages = {
-    TranslationModels.google: google_translate_target_languages(),
-    TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
-}
-
-
 def translation_language_selector(
     *,
     model: TranslationModels | None,
@@ -423,11 +417,21 @@ def translation_model_selector(
 ) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
+    translation_supported_languages = {
+        TranslationModels.google: google_translate_target_languages(),
+        TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
+    }
+
     supported_models = filter_models_by_language(
-        filter_by_language, TranslationModels, model_type="translation"
+        filter_by_language, TranslationModels, translation_supported_languages
     )
+    SupportedTranslationModels = Enum(
+        "SupportedTranslationModels",
+        {model.name: model.value.label for model in supported_models},
+    )
+
     model = enum_selector(
-        supported_models or TranslationModels,
+        SupportedTranslationModels,
         "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
@@ -465,21 +469,25 @@ def google_translate_language_selector(
     )
 
 
-def normalize_and_add_languages(model_languages, languages):
+def normalize_and_add_languages(model_languages: list, languages: set[str]):
     import langcodes
 
     for lang_code in model_languages:
         try:
             # Normalize and strip down to just the language part
             language = langcodes.Language.get(lang_code).language
-            if not language in languages:
-                languages.add(language)
+            languages.add(language)
         except langcodes.tag_parser.LanguageTagError:
             print(f"Skipping invalid language code: {lang_code}")
 
 
 def translation_languages_without_dialects() -> list[str]:
     languages = set()
+    translation_supported_languages = {
+        TranslationModels.google: google_translate_target_languages(),
+        TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
+    }
+
     for model_languages in translation_supported_languages.values():
         normalize_and_add_languages(model_languages, languages)
     return sorted(languages)
@@ -494,52 +502,48 @@ def asr_languages_without_dialects() -> list[str]:
     return sorted(languages)
 
 
-def filter_models_by_language(
-    language: str, models: Enum, model_type: str = "asr"
-) -> Enum:
+def are_languages_same(lang1: str, lang2: str) -> bool:
+    import langcodes
+
     """
-    Filter ASR or Translation models by language and return them as a list of Enum members.
+    Check if two language codes represent the same language.
+    """
+    try:
+        return (
+            langcodes.Language.get(lang1).language
+            == langcodes.Language.get(lang2).language
+        )
+    except langcodes.LanguageTagError:
+        return False
 
-    Args:
-    language: Language code.
-    models: Enum class of ASR or Translation models.
-    model_type: Either "asr" or "translation".
 
-    Returns:
-    List of filtered model Enum members.
+def normalised_lang_candidates(
+    target: str, collection: typing.Iterable[str]
+) -> typing.List[str]:
+    """
+    Returns a list of all matching candidates from the collection whose normalized
+    language matches the target language.
+    """
+    return list(filter(lambda c: are_languages_same(c, target), collection))
+
+
+def filter_models_by_language(
+    language: str, models: Enum, supported_languages: dict[Enum, list[str]]
+) -> list[Enum]:
+    """
+    Filter models by language and return them as a list of Enum members.
     """
     if not language:
-        return models
+        return list(models)
 
-    supported_models = []
-
-    for model in list(models):
-        # Get list of supported languages for the model
-        if model_type == "asr":
-            supported_languages = normalised_lang_candidates(
-                language, list(asr_supported_languages.get(model, []))
-            )
-        elif model_type == "translation":
-            supported_languages = normalised_lang_candidates(
-                language, list(translation_supported_languages.get(model, []))
-            )
-        else:
-            raise ValueError(
-                f"Invalid model_type: {model_type}. Must be 'asr' or 'translation'."
-            )
-
-        if supported_languages:
-            supported_models.append(model)
-
-    if supported_models:
-        return Enum(
-            f"{model_type.capitalize()}Models",
-            (
-                {model.name: model.value.label for model in supported_models}
-                if model_type == "translation"
-                else {model.name: model.value for model in supported_models}
+    return list(
+        filter(
+            lambda model: normalised_lang_candidates(
+                language, supported_languages.get(model, [])
             ),
+            models,
         )
+    )
 
 
 def language_filter_selector(
@@ -567,26 +571,6 @@ def language_filter_selector(
             return language
 
 
-def normalised_lang_candidates(
-    target: str, collection: typing.Iterable[str]
-) -> typing.List[str]:
-    """
-    Returns a list of all matching candidates from the collection whose normalized
-    language matches the target language using the normalised_lang_in_collection function.
-    """
-    matching_candidates = []
-
-    for candidate in collection:
-        try:
-            # If the normalized version of the target matches the candidate, add it to the list
-            if normalised_lang_in_collection(candidate, [target]):
-                matching_candidates.append(candidate)
-        except:
-            pass
-
-    return matching_candidates
-
-
 def asr_language_selector(
     selected_model: AsrModels,
     label="###### Spoken Language",
@@ -604,11 +588,7 @@ def asr_language_selector(
     if filter_by_language:
         # filter the languages to show dialects only from selected languages
         options = normalised_lang_candidates(filter_by_language, options)
-    if (
-        selected_model
-        and selected_model.supports_auto_detect()
-        and not filter_by_language
-    ):
+    elif selected_model and selected_model.supports_auto_detect():
         options.insert(0, None)
 
     # handle non-canonical language codes

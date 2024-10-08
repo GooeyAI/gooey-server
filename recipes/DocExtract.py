@@ -24,6 +24,7 @@ from daras_ai_v2.asr import (
     translation_language_selector,
     translation_model_selector,
     TranslationModels,
+    asr_supported_languages,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -171,7 +172,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
 
         col1, col2 = gui.columns(2, responsive=False)
         supported_models = filter_models_by_language(
-            selected_filter_language, AsrModels
+            selected_filter_language, AsrModels, asr_supported_languages
         )
         with col1:
             selected_model = enum_selector(

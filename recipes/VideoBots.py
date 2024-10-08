@@ -31,6 +31,7 @@ from daras_ai_v2.asr import (
     asr_language_selector,
     run_asr,
     should_translate_lang,
+    asr_supported_languages,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -395,7 +396,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # drop down to filter models based on the selected language
             selected_filter_language = language_filter_selector()
             supported_models = filter_models_by_language(
-                selected_filter_language, AsrModels
+                selected_filter_language, AsrModels, asr_supported_languages
             )
             col1, col2 = gui.columns(2, responsive=False)
             with col1:

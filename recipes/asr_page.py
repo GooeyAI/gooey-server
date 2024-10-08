@@ -1,4 +1,5 @@
 import typing
+from enum import Enum
 
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ from daras_ai_v2.asr import (
     AsrOutputJson,
     filter_models_by_language,
     forced_asr_languages,
+    asr_supported_languages,
     run_asr,
     run_translate,
     translation_language_selector,
@@ -33,6 +35,7 @@ from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
 
 DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
+
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
@@ -126,11 +129,17 @@ class AsrPage(BasePage):
 
         col1, col2 = gui.columns(2, responsive=False)
         supported_models = filter_models_by_language(
-            selected_filter_language, AsrModels
+            selected_filter_language, AsrModels, asr_supported_languages
         )
+        # Create a new Enum from the supported_models list
+        SupportedAsrModels = Enum(
+            "SupportedAsrModels",
+            {model.name: model.value for model in supported_models},
+        )
+
         with col1:
             selected_model = enum_selector(
-                supported_models,
+                SupportedAsrModels,  # Use the new Enum here
                 label="###### Speech Recognition Model",
                 key="selected_model",
                 use_selectbox=True,
