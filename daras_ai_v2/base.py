@@ -652,7 +652,7 @@ class BasePage:
                     "###### You're about to update the root workflow as an admin. "
                 )
             gui.html(
-                f'If you want to create a new example, press {icons.more_options} and "{icons.fork} Duplicate" instead.'
+                f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
         with gui.div(className="mt-4"):
