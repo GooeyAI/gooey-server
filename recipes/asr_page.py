@@ -12,9 +12,8 @@ from daras_ai_v2.asr import (
     AsrModels,
     AsrOutputFormat,
     AsrOutputJson,
-    filter_models_by_language,
     forced_asr_languages,
-    asr_supported_languages,
+    asr_model_selector,
     run_asr,
     run_translate,
     translation_language_selector,
@@ -124,25 +123,16 @@ class AsrPage(BasePage):
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
         gui.markdown("#### Speech Recognition")
+
         # drop down to filter models based on the selected language
         selected_filter_language = language_filter_selector()
 
         col1, col2 = gui.columns(2, responsive=False)
-        supported_models = filter_models_by_language(
-            selected_filter_language, AsrModels, asr_supported_languages
-        )
-        # Create a new Enum from the supported_models list
-        SupportedAsrModels = Enum(
-            "SupportedAsrModels",
-            {model.name: model.value for model in supported_models},
-        )
-
         with col1:
-            selected_model = enum_selector(
-                SupportedAsrModels,  # Use the new Enum here
+            selected_model = asr_model_selector(
                 label="###### Speech Recognition Model",
                 key="selected_model",
-                use_selectbox=True,
+                filter_by_language=selected_filter_language,
             )
         with col2:
             asr_language_selector(
@@ -160,7 +150,9 @@ class AsrPage(BasePage):
                 )
             col1, col2 = gui.columns(2, responsive=True)
             with col1:
-                translation_model = translation_model_selector(allow_none=False)
+                translation_model = translation_model_selector(
+                    allow_none=False, filter_by_language=selected_filter_language
+                )
             with col2:
                 if selected_filter_language:
                     gui.session_state["translation_target"] = selected_filter_language

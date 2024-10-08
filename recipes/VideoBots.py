@@ -22,7 +22,6 @@ from daras_ai.image_input import (
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     language_filter_selector,
-    filter_models_by_language,
     translation_model_selector,
     translation_language_selector,
     run_translate,
@@ -31,7 +30,7 @@ from daras_ai_v2.asr import (
     asr_language_selector,
     run_asr,
     should_translate_lang,
-    asr_supported_languages,
+    asr_model_selector,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -393,18 +392,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ),
         ):
             gui.caption(field_desc(self.RequestModel, "user_language"))
+
             # drop down to filter models based on the selected language
             selected_filter_language = language_filter_selector()
-            supported_models = filter_models_by_language(
-                selected_filter_language, AsrModels, asr_supported_languages
-            )
+
             col1, col2 = gui.columns(2, responsive=False)
             with col1:
-                selected_model = enum_selector(
-                    supported_models,
-                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
+                selected_model = asr_model_selector(
                     key="asr_model",
-                    use_selectbox=True,
+                    filter_by_language=selected_filter_language,
+                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
                     format_func=lambda x: AsrModels[x].value if x else "Auto Select",
                 )
             with col2:

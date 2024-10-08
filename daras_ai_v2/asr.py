@@ -32,6 +32,7 @@ from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
+from daras_ai_v2.enum_selector_widget import enum_selector
 
 TRANSLATE_BATCH_SIZE = 8
 
@@ -425,9 +426,13 @@ def translation_model_selector(
     supported_models = filter_models_by_language(
         filter_by_language, TranslationModels, translation_supported_languages
     )
-    SupportedTranslationModels = Enum(
-        "SupportedTranslationModels",
-        {model.name: model.value.label for model in supported_models},
+    SupportedTranslationModels = (
+        Enum(
+            "SupportedTranslationModels",
+            {model.name: model.value.label for model in supported_models},
+        )
+        if supported_models
+        else TranslationModels
     )
 
     model = enum_selector(
@@ -534,7 +539,7 @@ def filter_models_by_language(
     Filter models by language and return them as a list of Enum members.
     """
     if not language:
-        return list(models)
+        return ()
 
     return list(
         filter(
@@ -569,6 +574,36 @@ def language_filter_selector(
                 allow_none=True,
             )
             return language
+
+
+def asr_model_selector(
+    key="asr_model",
+    *,
+    filter_by_language="",
+    label="###### Speech Recognition Model",
+    use_selectbox=True,
+    **kwargs,
+) -> AsrModels | None:
+    supported_models = filter_models_by_language(
+        filter_by_language, AsrModels, asr_supported_languages
+    )
+    # Create a new Enum from the supported_models list
+    SupportedAsrModels = (
+        Enum(
+            "SupportedAsrModels",
+            {model.name: model.value for model in supported_models},
+        )
+        if supported_models
+        else AsrModels
+    )
+
+    return enum_selector(
+        SupportedAsrModels,
+        label=label,
+        key=key,
+        use_selectbox=use_selectbox,
+        **kwargs,
+    )
 
 
 def asr_language_selector(

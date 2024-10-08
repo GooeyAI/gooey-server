@@ -18,13 +18,12 @@ from daras_ai_v2.asr import (
     run_asr,
     download_youtube_to_wav_url,
     audio_url_to_wav,
-    filter_models_by_language,
     language_filter_selector,
     asr_language_selector,
     translation_language_selector,
     translation_model_selector,
     TranslationModels,
-    asr_supported_languages,
+    asr_model_selector,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -168,18 +167,16 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         gui.caption(
             "Recognize speech and translate for audio and video files.",
         )
+
+        # drop down to filter models based on the selected language
         selected_filter_language = language_filter_selector()
 
         col1, col2 = gui.columns(2, responsive=False)
-        supported_models = filter_models_by_language(
-            selected_filter_language, AsrModels, asr_supported_languages
-        )
         with col1:
-            selected_model = enum_selector(
-                supported_models,
+            selected_model = asr_model_selector(
                 label="###### Speech Recognition Model",
                 key="selected_asr_model",
-                use_selectbox=True,
+                filter_by_language=selected_filter_language,
             )
         with col2:
             asr_language_selector(
