@@ -1673,7 +1673,6 @@ This will also delete all the associated versions.
 
         updated_count = SavedRun.objects.filter(
             id=self.current_sr.id,
-            uid=self.current_sr.uid,
             # filter for RecipeRunState.standby
             run_status="",
             error_msg="",
@@ -1681,10 +1680,8 @@ This will also delete all the associated versions.
         ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
         if updated_count >= 1:
             # updated now
-            self.call_runner_task(self.current_sr)
-        elif self.get_run_state(self.current_sr.to_dict()) == RecipeRunState.standby:
-            # updated by a different thread, we just refresh_from_db
             self.current_sr.refresh_from_db()
+            self.call_runner_task(self.current_sr)
 
         pr = self.create_published_run(
             published_run_id=get_random_doc_id(),
