@@ -231,7 +231,7 @@ HEADER_LINKS = [
     ("https://docs.gooey.ai", "Docs"),
     ("/api/", "API"),
     ("https://blog.gooey.ai", "Blog"),
-    ("https://gooey.ai/pricing", "Pricing"),
+    ("/pricing", "Pricing"),
     ("https://www.help.gooey.ai/contact", "Contact"),
 ]
 

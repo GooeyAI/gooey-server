@@ -723,7 +723,7 @@ def page_wrapper(request: Request, className=""):
                 className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
             ):
                 for url, label in settings.HEADER_LINKS:
-                    with gui.link(to=url, className="pe-2 d-none d-lg-block"):
+                    with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
@@ -773,8 +773,9 @@ def anonymous_login_container(context: dict):
         gui.html('<hr class="my-1"/>')
 
         for url, label in settings.HEADER_LINKS:
-            with gui.link(
-                to=url,
+            with gui.tag(
+                "a",
+                href=url,
                 className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):

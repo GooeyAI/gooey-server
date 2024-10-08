@@ -135,8 +135,9 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
 
         with gui.div(className="d-lg-none d-inline-block"):
             for url, label in settings.HEADER_LINKS:
-                with gui.link(
-                    to=url,
+                with gui.tag(
+                    "a",
+                    href=url,
                     className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
                     style=dict(height=row_height),
                 ):
@@ -144,8 +145,9 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
                     with col2:
                         gui.html(label)
 
-        with gui.link(
-            to="/logout/",
+        with gui.tag(
+            "a",
+            href="/logout/",
             className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
             style=dict(height=row_height),
         ):
