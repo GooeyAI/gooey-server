@@ -123,6 +123,15 @@ If not specified or invalid, no glossary will be used. Read about the expected f
     class ResponseModel(BaseModel):
         output_documents: list[FieldHttpUrl] | None
 
+    def current_sr_to_session_state(self) -> dict:
+        state = super().current_sr_to_session_state()
+        google_translate_target = state.pop("google_translate_target", None)
+        translation_model = state.get("translation_model")
+        if google_translate_target and not translation_model:
+            state["translation_model"] = TranslationModels.google.name
+            state["translation_target"] = google_translate_target
+        return state
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_YOUTUBE_BOT_META_IMG
 
