@@ -1694,7 +1694,7 @@ This will also delete all the associated versions.
         raise gui.RedirectException(pr.get_app_url())
 
     def on_submit(self):
-        sr = self.create_and_validate_new_run()
+        sr = self.create_and_validate_new_run(enable_rate_limits=True)
         if not sr:
             return
 
