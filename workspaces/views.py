@@ -147,7 +147,8 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
     gui.newline()
 
-    render_pending_invites_list(workspace=workspace, current_member=membership)
+    if membership.can_invite():
+        render_pending_invites_list(workspace=workspace, current_member=membership)
 
     can_leave = membership.can_leave_workspace()
     if not can_leave:
