@@ -105,7 +105,6 @@ def login(request: Request):
         )
     context = {
         "request": request,
-        "settings": settings,
     }
     return templates.TemplateResponse(
         "login_options.html",
@@ -703,9 +702,7 @@ def get_og_url_path(request) -> str:
 def page_wrapper(request: Request, className=""):
     context = {
         "request": request,
-        "settings": settings,
         "block_incognito": True,
-        "current_year": datetime.datetime.now().year,
     }
 
     with gui.div(className="d-flex flex-column min-vh-100"):

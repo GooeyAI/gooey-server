@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import datetime
 import os
 from pathlib import Path
 
@@ -97,7 +98,9 @@ TEMPLATES = [
 ]
 
 templates = Jinja2Templates(directory="templates")
-templates.env.globals["humanize"] = humanize
+templates.env.globals.update(
+    dict(humanize=humanize, datetime=datetime, settings=globals())
+)
 
 
 # needed to override django admin templates
