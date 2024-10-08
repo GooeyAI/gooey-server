@@ -315,6 +315,8 @@ class TranslationModels(TranslationModel, Enum):
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def ghana_nlp_translate_target_languages():
+    if not settings.GHANA_NLP_SUBKEY:
+        return {}
     """
     Get list of supported languages for Ghana NLP Translation.
     :return: Dictionary of language codes and display names.
@@ -384,12 +386,12 @@ def translation_language_selector(
         return
 
     if model == TranslationModels.google:
-        languages = google_translate_target_languages()
+        languages = get_translation_supported_languages(TranslationModels.google)
     elif model == TranslationModels.ghana_nlp:
         if not settings.GHANA_NLP_SUBKEY:
             languages = {}
         else:
-            languages = ghana_nlp_translate_target_languages()
+            languages = get_translation_supported_languages(TranslationModels.ghana_nlp)
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -410,6 +412,22 @@ def translation_language_selector(
     )
 
 
+def get_translation_supported_languages(
+    model: TranslationModel = None,
+) -> dict[str, str] | dict[TranslationModels, dict[str, str]]:
+    # Get supported languages for a specific model
+    if model == TranslationModels.google:
+        return google_translate_target_languages()
+    elif model == TranslationModels.ghana_nlp:
+        return ghana_nlp_translate_target_languages()
+    # Get supported languages for all models
+    else:
+        return {
+            TranslationModels.google: google_translate_target_languages(),
+            TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
+        }
+
+
 def translation_model_selector(
     key="translation_model",
     allow_none=True,
@@ -418,14 +436,14 @@ def translation_model_selector(
 ) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
-    translation_supported_languages = {
-        TranslationModels.google: google_translate_target_languages(),
-        TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
-    }
-
-    supported_models = filter_models_by_language(
-        filter_by_language, TranslationModels, translation_supported_languages
+    supported_models = (
+        filter_models_by_language(
+            filter_by_language, TranslationModels, get_translation_supported_languages()
+        )
+        if filter_by_language
+        else None
     )
+
     SupportedTranslationModels = (
         Enum(
             "SupportedTranslationModels",
@@ -488,12 +506,8 @@ def normalize_and_add_languages(model_languages: list, languages: set[str]):
 
 def translation_languages_without_dialects() -> list[str]:
     languages = set()
-    translation_supported_languages = {
-        TranslationModels.google: google_translate_target_languages(),
-        TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
-    }
 
-    for model_languages in translation_supported_languages.values():
+    for model_languages in get_translation_supported_languages().values():
         normalize_and_add_languages(model_languages, languages)
     return sorted(languages)
 
@@ -584,8 +598,12 @@ def asr_model_selector(
     use_selectbox=True,
     **kwargs,
 ) -> AsrModels | None:
-    supported_models = filter_models_by_language(
-        filter_by_language, AsrModels, asr_supported_languages
+    supported_models = (
+        filter_models_by_language(
+            filter_by_language, AsrModels, asr_supported_languages
+        )
+        if filter_by_language
+        else None
     )
     # Create a new Enum from the supported_models list
     SupportedAsrModels = (
