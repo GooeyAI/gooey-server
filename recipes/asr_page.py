@@ -154,8 +154,6 @@ class AsrPage(BasePage):
                     allow_none=False, filter_by_language=selected_filter_language
                 )
             with col2:
-                if selected_filter_language:
-                    gui.session_state["translation_target"] = selected_filter_language
                 translation_language_selector(
                     model=translation_model,
                     label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",

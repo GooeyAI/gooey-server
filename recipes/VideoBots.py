@@ -428,10 +428,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             filter_by_language=selected_filter_language,
                         )
                     with col2:
-                        if selected_filter_language:
-                            gui.session_state["user_language"] = (
-                                selected_filter_language or "en"
-                            )
                         translation_language_selector(
                             model=translation_model,
                             default_language="en",
