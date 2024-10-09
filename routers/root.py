@@ -713,12 +713,14 @@ def page_wrapper(request: Request, className=""):
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
         ):
-            gui.image(
-                settings.GOOEY_LOGO_IMG,
-                width="300",
-                height="142",
-                className="img-fluid logo",
-            )
+            with gui.tag("a", href="/"):
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_IMG,
+                    width="300",
+                    height="142",
+                    className="img-fluid logo",
+                )
             with gui.div(
                 className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
             ):
