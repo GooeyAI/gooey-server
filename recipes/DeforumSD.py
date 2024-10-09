@@ -511,60 +511,6 @@ class DeforumSDPage(BasePage):
                 use_selectbox=True,
             )
 
-            animation_mode = gui.selectbox(
-                "Animation Mode", key="animation_mode", options=["2D", "3D"]
-            )
-
-        gui.text_input(
-            """
-###### Zoom
-How should the camera zoom in or out? This setting scales the canvas size, multiplicatively.
-1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out).
-            """,
-            key="zoom",
-        )
-        gui.caption(
-            """
-            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end.
-            """
-        )
-        gui.text_input(
-            """
-###### Horizontal Pan
-How should the camera pan horizontally? This parameter uses positive values to move right and negative values to move left.
-            """,
-            key="translation_x",
-        )
-        gui.text_input(
-            """
-###### Vertical Pan
-How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down.
-            """,
-            key="translation_y",
-        )
-        if animation_mode == "3D":
-            gui.text_input(
-                """
-###### Roll Clockwise/Counterclockwise
-Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise. E.g. use `0:(-1), 20:(0)` to roll the camera 1 degree clockwise for the first 20 frames.
-                """,
-                key="rotation_3d_z",
-            )
-            gui.text_input(
-                """
-###### Pan Left/Right
-Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.
-                """,
-                key="rotation_3d_y",
-            )
-            gui.text_input(
-                """
-###### Tilt Up/Down
-Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.
-                """,
-                key="rotation_3d_x",
-            )
-
     #         gui.selectbox(
     #             """
     # ###### Sampler
