@@ -132,6 +132,15 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             state["translation_target"] = google_translate_target
         return state
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return [
+            "selected_model",
+            "language",
+            "translation_model",
+            "translation_target",
+        ]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_YOUTUBE_BOT_META_IMG
 
@@ -191,7 +200,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             asr_language_selector(
                 AsrModels[selected_model],
                 filter_by_language=selected_filter_language,
-                key="asr_language",
+                key="language",
             )
         with gui.div(style=dict(paddingLeft="0.5rem")):
             if gui.checkbox(
