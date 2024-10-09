@@ -52,7 +52,7 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
         )
 
     with content, gui.div(
-        className="d-flex flex-column bg-white border border-dark rounded shadow"
+        className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
     ):
         row_height = "2.2rem"
 
@@ -127,11 +127,17 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
             with gui.div(className="row align-items-center"):
                 with gui.div(className="col-2 d-flex justify-content-center"):
                     gui.html(icons.profile)
-                with gui.div(className="col-10 d-flex justify-content-between"):
-                    with gui.div(className="pe-3"):
-                        gui.html("Profile")
-                    with gui.div(className="text-muted small"):
-                        gui.html(user.email or user.phone_number)
+                with gui.div(
+                    className="col-10 d-flex justify-content-between align-items-end"
+                ):
+                    gui.html(
+                        "Profile",
+                        className="d-inline-block",
+                    )
+                    gui.html(
+                        user.email or user.phone_number,
+                        className="d-inline-block text-muted small",
+                    )
 
         with gui.div(className="d-lg-none d-inline-block"):
             for url, label in settings.HEADER_LINKS:

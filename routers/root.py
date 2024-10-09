@@ -753,7 +753,7 @@ def anonymous_login_container(context: dict):
         )
 
     with content, gui.div(
-        className="d-flex flex-column bg-white border border-dark rounded shadow",
+        className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
         style=dict(minWidth="200px"),
     ):
         row_height = "2.2rem"
