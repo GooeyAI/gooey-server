@@ -177,20 +177,27 @@ class AsrPage(BasePage):
                         )
                     ),
                 )
-            if translation_model and translation_model.supports_glossary:
-                gui.file_uploader(
-                    label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-                    key="glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
-                )
 
-                gui.caption(
-                    "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
-                )
         else:
             gui.session_state["translation_model"] = None
 
     def render_settings(self):
+        try:
+            translation_model = TranslationModels[
+                gui.session_state.get("translation_model")
+            ]
+        except KeyError:
+            translation_model = None
+        if translation_model and translation_model.supports_glossary:
+            gui.file_uploader(
+                label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                key="glossary_document",
+                accept=SUPPORTED_SPREADSHEET_TYPES,
+            )
+
+            gui.caption(
+                "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
+            )
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
         )
