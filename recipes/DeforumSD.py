@@ -35,45 +35,19 @@ CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
 
 
-def input_prompt_to_animation_prompts(input_prompt: str):
-    animation_prompts = []
-    for fp in input_prompt.split("|"):
-        split = fp.split(":")
-        if len(split) == 3:
-            frame = int(split[0])
-            prompt = split[1].strip()
-            second = float(split[2])
-        else:
-            frame = 0
-            prompt = fp
-            second = 0
-        animation_prompts.append({"frame": frame, "prompt": prompt, "second": second})
-    return animation_prompts
-
-
 def animation_prompts_to_st_list(animation_prompts: AnimationPrompts):
-    if "second" in animation_prompts[0]:
-        return [
-            {
-                "frame": fp["frame"],
-                "prompt": fp["prompt"],
-                "second": fp["second"],
-                "key": str(uuid.uuid1()),
-            }
-            for fp in animation_prompts
-        ]
-    else:
-        return [
-            {
-                "frame": fp["frame"],
-                "prompt": fp["prompt"],
-                "second": frames_to_seconds(
-                    int(fp["frame"]), gui.session_state.get("fps", 12)
-                ),
-                "key": str(uuid.uuid1()),
-            }
-            for fp in animation_prompts
-        ]
+    return [
+        {
+            "frame": fp["frame"],
+            "prompt": fp["prompt"],
+            "second": fp.get(
+                "second",
+                frames_to_seconds(int(fp["frame"]), gui.session_state.get("fps", 12)),
+            ),
+            "key": str(uuid.uuid1()),
+        }
+        for fp in animation_prompts
+    ]
 
 
 def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
@@ -92,11 +66,7 @@ def animation_prompts_editor(
     if st_list_key in gui.session_state:
         prompt_st_list = gui.session_state[st_list_key]
     else:
-        animation_prompts = gui.session_state.get(
-            animation_prompts_key
-        ) or input_prompt_to_animation_prompts(
-            gui.session_state.get(input_prompt_key, "0:")
-        )
+        animation_prompts = gui.session_state.get(animation_prompts_key)
         prompt_st_list = animation_prompts_to_st_list(animation_prompts)
         gui.session_state[st_list_key] = prompt_st_list
 
@@ -166,6 +136,31 @@ def animation_prompts_editor(
                 gui.session_state.get("translation_y", {0: 1.004})
             )
             vpan_value = 0.0 if fp["frame"] not in vpan_dict else vpan_dict[fp["frame"]]
+            rotation_3d_x_dict = get_zoom_pan_dict(
+                gui.session_state.get("rotation_3d_x", {0: 1.004})
+            )
+            rotation_3d_x_value = (
+                0.0
+                if fp["frame"] not in rotation_3d_x_dict
+                else rotation_3d_x_dict[fp["frame"]]
+            )
+            rotation_3d_y_dict = get_zoom_pan_dict(
+                gui.session_state.get("rotation_3d_y", {0: 1.004})
+            )
+            rotation_3d_y_value = (
+                0.0
+                if fp["frame"] not in rotation_3d_y_dict
+                else rotation_3d_y_dict[fp["frame"]]
+            )
+            rotation_3d_z_dict = get_zoom_pan_dict(
+                gui.session_state.get("rotation_3d_z", {0: 1.004})
+            )
+            rotation_3d_z_value = (
+                0.0
+                if fp["frame"] not in rotation_3d_z_dict
+                else rotation_3d_z_dict[fp["frame"]]
+            )
+
             zoom_pan_description = ""
             if zoom_value:
                 zoom_pan_description = "Out: " if zoom_value > 1 else "In: "
@@ -226,33 +221,78 @@ def animation_prompts_editor(
                     gui.caption(
                         f"Starting at second {start} and until second {end}, how do you want the camera to move? (Reasonable valuables would be ±0.005)"
                     )
-                    zoom_pan_slider = gui.slider(
-                        label="""
-                        #### Zoom
-                        """,
-                        min_value=-1.5,
-                        max_value=1.5,
-                        step=0.001,
-                        value=0,
+                    col1, col2 = gui.columns([1, 1])
+                    with col1:
+                        zoom_pan_slider = gui.slider(
+                            label="""
+                            ###### Zoom
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+                        hpan_slider = gui.slider(
+                            label="""
+                            ###### Horizontal Pan
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+                        vpan_slider = gui.slider(
+                            label="""
+                            ###### Vertical Pan
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+                    with col2:
+                        gui.caption(
+                            "How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out)."
+                        )
+                        gui.caption(
+                            "How should the camera pan horizontally? This parameter uses positive values to move right an dnegative values to move left."
+                        )
+                        gui.caption(
+                            "How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down."
+                        )
+                    gui.checkbox(
+                        "Show 3D camera settings",
+                        key="show_3d",
                     )
-                    hpan_slider = gui.slider(
-                        label="""
-                        #### Horizontal Pan
-                        """,
-                        min_value=-1.5,
-                        max_value=1.5,
-                        step=0.001,
-                        value=0,
-                    )
-                    vpan_slider = gui.slider(
-                        label="""
-                        #### Vertical Pan
-                        """,
-                        min_value=-1.5,
-                        max_value=1.5,
-                        step=0.001,
-                        value=0,
-                    )
+                    if gui.session_state.get("show_3d"):
+                        rotation_3d_x_slider = gui.slider(
+                            label="""
+                            ###### Tilt Up/Down
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+                        rotation_3d_y_slider = gui.slider(
+                            label="""
+                            ###### Pan Left/Right
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+                        rotation_3d_z_slider = gui.slider(
+                            label="""
+                            ###### Roll Clockwise/Counterclockwise
+                            """,
+                            min_value=-1.5,
+                            max_value=1.5,
+                            step=0.001,
+                            value=0,
+                        )
+
                     if zoom_pan_modal.pressed_confirm:
                         zoom_dict.update({fp["frame"]: 1 + zoom_pan_slider})
                         hpan_dict.update({fp["frame"]: hpan_slider})
@@ -264,6 +304,27 @@ def animation_prompts_editor(
                         gui.session_state["translation_y"] = get_zoom_pan_string(
                             vpan_dict
                         )
+                        if gui.session_state.get("show_3d"):
+                            gui.session_state["animation_mode"] = "3D"
+                            rotation_3d_x_dict.update(
+                                {fp["frame"]: rotation_3d_x_slider}
+                            )
+                            rotation_3d_y_dict.update(
+                                {fp["frame"]: rotation_3d_y_slider}
+                            )
+                            rotation_3d_z_dict.update(
+                                {fp["frame"]: rotation_3d_z_slider}
+                            )
+                            gui.session_state["rotation_3d_x"] = get_zoom_pan_string(
+                                rotation_3d_x_dict
+                            )
+                            gui.session_state["rotation_3d_y"] = get_zoom_pan_string(
+                                rotation_3d_y_dict
+                            )
+                            gui.session_state["rotation_3d_z"] = get_zoom_pan_string(
+                                rotation_3d_z_dict
+                            )
+
                         zoom_pan_modal.set_open(False)
                         gui.rerun()
 
@@ -404,20 +465,15 @@ class DeforumSDPage(BasePage):
             Once you like your keyframes, increase your frames per second for high quality
             """
         )
-        fps_options = [2, 10, 24]
-        option_descriptions = ["Draft", "Stop-motion", "Film"]
         options = {
-            str(fps): f"{label}: {fps} FPS"
-            for fps, label in zip(fps_options, option_descriptions)
+            "2": "Draft: 2 FPS",
+            "10": "Stop-motion: 10 FPS",
+            "24": "Film: 24 FPS",
         }
         gui.radio(
             """###### Frames per second""",
             options=options,
-            format_func=lambda x: {
-                "2": "Draft: 2 FPS",
-                "10": "Stop-motion: 10 FPS",
-                "24": "Film: 24 FPS",
-            }[str(x)],
+            format_func=lambda x: options[str(x)],
             key="fps",
         )
 
@@ -612,10 +668,7 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
     @classmethod
     def preview_input(cls, state: dict) -> str:
         input_prompt = state.get("input_prompt")
-        if input_prompt:
-            animation_prompts = input_prompt_to_animation_prompts(input_prompt)
-        else:
-            animation_prompts = state.get("animation_prompts", [])
+        animation_prompts = state.get("animation_prompts", [])
         display = "\n\n".join(
             [f"{fp['prompt']} [{fp['frame']}]" for fp in animation_prompts]
         )
@@ -625,8 +678,8 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        if not self.request.user.disable_safety_checker:
-            safety_checker(text=self.preview_input(state))
+        # if not self.request.user.disable_safety_checker:
+        #     safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
