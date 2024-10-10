@@ -655,7 +655,7 @@ class BasePage:
                     "###### You're about to update the root workflow as an admin. "
                 )
             gui.html(
-                f'If you want to create a new example, press {icons.more_options} and "{icons.fork} Duplicate" instead.'
+                f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
         with gui.div(className="my-4"):
@@ -689,7 +689,7 @@ class BasePage:
         with col1, gui.div(className="mt-2"):
             gui.write("###### Workspace")
         with col2:
-            if self.request.user.get_workspaces().count() > 1:
+            if self.request.user and self.request.user.get_workspaces().count() > 1:
                 workspace_selector(self.request.user, self.request.session)
             else:
                 with gui.div(className="p-2 mb-2"):
@@ -1768,7 +1768,6 @@ class BasePage:
 
         updated_count = SavedRun.objects.filter(
             id=self.current_sr.id,
-            uid=self.current_sr.uid,
             # filter for RecipeRunState.standby
             run_status="",
             error_msg="",
@@ -1776,10 +1775,8 @@ class BasePage:
         ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
         if updated_count >= 1:
             # updated now
-            self.call_runner_task(self.current_sr)
-        elif self.get_run_state(self.current_sr.to_dict()) == RecipeRunState.standby:
-            # updated by a different thread, we just refresh_from_db
             self.current_sr.refresh_from_db()
+            self.call_runner_task(self.current_sr)
 
         pr = self.create_published_run(
             published_run_id=get_random_doc_id(),
@@ -1792,7 +1789,7 @@ class BasePage:
         raise gui.RedirectException(pr.get_app_url())
 
     def on_submit(self):
-        sr = self.create_and_validate_new_run()
+        sr = self.create_and_validate_new_run(enable_rate_limits=True)
         if not sr:
             return
 

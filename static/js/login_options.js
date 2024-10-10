@@ -1,10 +1,11 @@
-window.addEventListener("DOMContentLoaded", async () => {
+(async () => {
+  await window.waitUntilHydrated;
   // load anonymous user before initializing FirebaseUI
   await loadAnonymousUser();
   // Initialize the FirebaseUI Widget using Firebase.
   const ui = new firebaseui.auth.AuthUI(firebase.auth());
   ui.start("#firebaseui-auth-container", uiConfig);
-});
+})();
 
 const uiConfig = {
   // Whether to upgrade anonymous users should be explicitly provided.

@@ -86,7 +86,7 @@ anthropic = "^0.34.1"
 azure-cognitiveservices-speech = "^1.37.0"
 twilio = "^9.2.3"
 sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
-gooey-gui = "^0.2.0"
+gooey-gui = "^0.3.0"
 django-safedelete = "^1.4.0"
 
 [tool.poetry.group.dev.dependencies]

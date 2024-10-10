@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import datetime
 import os
 from pathlib import Path
 
@@ -98,7 +99,9 @@ TEMPLATES = [
 ]
 
 templates = Jinja2Templates(directory="templates")
-templates.env.globals["humanize"] = humanize
+templates.env.globals.update(
+    dict(humanize=humanize, datetime=datetime, settings=globals())
+)
 
 
 # needed to override django admin templates
@@ -224,6 +227,15 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+HEADER_LINKS = [
+    ("/explore/", "Explore"),
+    ("https://docs.gooey.ai", "Docs"),
+    ("/api/", "API"),
+    ("https://blog.gooey.ai", "Blog"),
+    ("/pricing", "Pricing"),
+    ("https://www.help.gooey.ai/contact", "Contact"),
+]
+
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 

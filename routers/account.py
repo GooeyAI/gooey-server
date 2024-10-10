@@ -85,6 +85,10 @@ def payment_processing_route(
 @gui.route(app, "/account/")
 def account_route(request: Request):
     from daras_ai_v2.base import BasePage
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        raise gui.RedirectException(get_route_path(login))
 
     workspace = get_current_workspace(request.user, request.session)
     if not BasePage.is_user_admin(request.user) or workspace.is_personal:

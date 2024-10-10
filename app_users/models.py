@@ -240,6 +240,9 @@ class AppUser(models.Model):
             memberships__user=self, memberships__deleted__isnull=True
         )
 
+    def get_anonymous_token(self):
+        return auth.create_custom_token(self.uid).decode()
+
 
 class TransactionReason(models.IntegerChoices):
     DEDUCT = 1, "Deduct"

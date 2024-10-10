@@ -7,15 +7,21 @@
                      class="img-fluid logo" alt="img">
             </a>
             <div class="mt-2 gap-2 d-flex justify-content-md-end flex-grow-1 justify-content-evenly flex-wrap align-items-center">
-                <a data-internal-link class="pe-2" href="/explore/">Explore</a>
-                <a class="pe-2" href="/docs/">Docs</a>
-                <a class="pe-2" href="/api/">API</a>
-                <a class="pe-2" href="/blog/">Blog</a>
-                {% if not request.user %}
-                <a class="pe-2" href="https://help.gooey.ai/pricing/">Pricing</a>
+                {% for url, label in settings.HEADER_LINKS %}
+                    <a class="pe-2" href="{{ url }}">{{ label }}</a>
+                {% endfor %}
+                {% if request.user and not request.user.is_anonymous %}
+                    <a class="pe-2" href="/account">
+                        Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number or "Anon" }}
+                    </a>
+                {% else %}
+                    {% if not request.url.path.startswith("/login") %}
+                        <a class="pe-2" href="/login/?next={{ request.path }}">
+                            Sign in
+                        </a>
+                    {% endif %}
+                    {% include 'google_one_tap_button.html' %}
                 {% endif %}
-                <a class="pe-2" href="https://help.gooey.ai/contact/">Contact</a>
-                {% include 'login_container.html' %}
             </div>
         </div>
     </nav>

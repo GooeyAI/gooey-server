@@ -107,7 +107,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
     with col1:
         gui.image(
-            workspace.logo or DEFAULT_WORKSPACE_LOGO,
+            workspace.photo_url or DEFAULT_WORKSPACE_LOGO,
             className="my-0 me-4 rounded",
             style={"width": "128px", "height": "128px", "object-fit": "contain"},
         )
@@ -552,11 +552,11 @@ def render_workspace_create_or_edit_form(
         gui.caption(
             f"We'll automatically add any user with an `@{workspace.domain_name}` email to this workspace."
         )
-    workspace.logo = gui.file_uploader(
+    workspace.photo_url = gui.file_uploader(
         "###### Logo",
         accept=["image/*"],
         key="workspace-logo",
-        value=workspace.logo,
+        value=workspace.photo_url,
     )
 
 
