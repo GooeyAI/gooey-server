@@ -1377,7 +1377,7 @@ class BasePage:
         link = None
         if isinstance(workspace_or_user, Workspace):
             workspace = workspace_or_user
-            photo = workspace.logo
+            photo = workspace.photo_url
             if not photo and workspace.is_personal:
                 photo = workspace.created_by.photo_url
             name = workspace.display_name(current_user=current_user)
