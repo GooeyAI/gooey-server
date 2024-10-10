@@ -658,8 +658,10 @@ class BasePage:
         with gui.div(className="mt-4"):
             if is_update_mode:
                 title = pr.title or self.title
+                notes = pr.notes
             else:
                 title = self._get_default_pr_title()
+                notes = ""
             published_run_title = gui.text_input(
                 "###### Title",
                 key="published_run_title",
@@ -668,7 +670,7 @@ class BasePage:
             published_run_notes = gui.text_area(
                 "###### Notes",
                 key="published_run_notes",
-                value=(pr.notes or self.preview_description(gui.session_state) or ""),
+                value=notes,
             )
 
         self._render_admin_options(sr, pr)
@@ -712,7 +714,7 @@ class BasePage:
                 user=self.request.user,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
-                visibility=PublishedRunVisibility(pr.visibility),
+                visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
             updates = dict(
@@ -813,12 +815,18 @@ This will also delete all the associated versions.
                 self.current_pr.delete()
                 raise gui.RedirectException(self.app_url())
 
+        title = f"{self.current_pr.title} (Copy)"
+        if self.current_pr.is_root():
+            notes = ""
+        else:
+            notes = self.current_pr.notes
+
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
                 user=self.request.user,
-                title=f"{self.current_pr.title} (Copy)",
-                notes=self.current_pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                title=title,
+                notes=notes,
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -829,9 +837,9 @@ This will also delete all the associated versions.
                 published_run_id=get_random_doc_id(),
                 saved_run=self.current_sr,
                 user=self.request.user,
-                title=f"{self.current_pr.title} (Copy)",
-                notes=self.current_pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                title=title,
+                notes=notes,
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=new_pr.published_run_id)
