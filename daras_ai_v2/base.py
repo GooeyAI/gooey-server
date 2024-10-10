@@ -668,9 +668,9 @@ class BasePage:
                 key="published_run_title",
                 value=title,
             )
-            published_run_notes = gui.text_input(
+            published_run_description = gui.text_input(
                 "###### Description",
-                key="published_run_notes",
+                key="published_run_description",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
             with gui.div(className="d-flex align-items-center"):
@@ -751,14 +751,14 @@ class BasePage:
                 user=self.request.user,
                 workspace=self.current_workspace,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
+                notes=published_run_description.strip(),
                 visibility=PublishedRunVisibility(pr.visibility),
             )
         else:
             updates = dict(
                 saved_run=sr,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
+                notes=published_run_description.strip(),
                 visibility=published_run_visibility,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
