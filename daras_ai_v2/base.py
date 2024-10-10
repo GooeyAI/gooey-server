@@ -759,7 +759,7 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=published_run_visibility,
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -1782,6 +1782,7 @@ class BasePage:
             published_run_id=get_random_doc_id(),
             saved_run=self.current_sr,
             user=self.request.user,
+            workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
             visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
