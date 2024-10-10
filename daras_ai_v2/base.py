@@ -658,7 +658,7 @@ class BasePage:
                 f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
-        with gui.div(className="my-4"):
+        with gui.div():
             if is_update_mode:
                 title = pr.title or self.title
             else:
@@ -674,19 +674,18 @@ class BasePage:
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
             with gui.div(className="d-flex align-items-center"):
-                with gui.div(className="fs-3 text-muted mb-3"):
+                with gui.div(className="fs-3 text-muted mb-3 me-2"):
                     gui.html(icons.notes)
                 with gui.div(className="flex-grow-1"):
                     change_notes = gui.text_input(
                         "",
                         key="published_run_change_notes",
                         value="",
-                        className="ms-2",
                         placeholder="Add change notes",
                     )
 
         col1, col2 = gui.columns([1, 3])
-        with col1, gui.div(className="mt-2"):
+        with col1:
             gui.write("###### Workspace")
         with col2:
             if self.request.user and self.request.user.get_workspaces().count() > 1:
