@@ -6,10 +6,11 @@ from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
-from app_users.models import AppUser
+from api_keys.models import ApiKey
 from auth.auth_backend import authlocal
 from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
+from workspaces.models import Workspace
 
 
 class AuthenticationError(HTTPException):
@@ -26,30 +27,37 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+def _authenticate_credentials_from_firebase(token: str) -> Workspace | None:
+    """Legacy method to authenticate API keys stored in Firebase."""
     hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(token)
+    hash = hasher.encode(token)
 
+    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     try:
-        doc = (
-            db_collection.where("secret_key_hash", "==", secret_key_hash)
-            .limit(1)
-            .get()[0]
-        )
+        doc = db_collection.where("secret_key_hash", "==", hash).limit(1).get()[0]
     except IndexError:
-        raise AuthorizationError("Invalid API Key.")
+        return None
 
     uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    if user.is_disabled:
+    return Workspace.objects.get_or_create_from_uid(uid)[0]
+
+
+def authenticate_credentials(token: str) -> Workspace:
+    api_key = ApiKey.objects.select_related("workspace").get_from_secret_key(token)
+    if not api_key:
+        workspace = _authenticate_credentials_from_firebase(token)
+        if not workspace:
+            raise AuthorizationError("Invalid API key.")
+
+    workspace = api_key.workspace
+    if workspace.is_personal and workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return user
+    return workspace
 
 
 class APIAuth(SecurityBase):
@@ -59,8 +67,8 @@ class APIAuth(SecurityBase):
     ```python
     api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
 
-    @app.get("/api/users")
-    def get_users(authenticated_user: AppUser = Depends(api_auth)):
+    @app.get("/api/runs")
+    def get_runs(current_workspace: Workspace = Depends(api_auth)):
         ...
     ```
     """
@@ -77,7 +85,7 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> AppUser:
+    def __call__(self, request: Request) -> Workspace:
         if authlocal:  # testing only!
             return authlocal[0]
 

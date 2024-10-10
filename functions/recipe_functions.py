@@ -15,11 +15,13 @@ from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
+    from workspaces.models import Workspace
 
 
 def call_recipe_functions(
     *,
     saved_run: "SavedRun",
+    workspace: "Workspace",
     current_user: AppUser,
     request_model: typing.Type[BaseModel],
     response_model: typing.Type[BaseModel],
@@ -48,6 +50,7 @@ def call_recipe_functions(
         # run the function
         page_cls, sr, pr = url_to_runs(fun.url)
         result, sr = sr.submit_api_call(
+            workspace=workspace,
             current_user=current_user,
             parent_pr=pr,
             request_body=dict(

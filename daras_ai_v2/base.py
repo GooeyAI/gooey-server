@@ -70,10 +70,13 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.widgets import get_current_workspace
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.widgets import (
+    create_workspace_with_defaults,
+    get_current_workspace,
+    set_current_workspace,
+    workspace_selector,
+)
+from workspaces.models import Workspace
 
 
 DEFAULT_META_IMG = (
@@ -382,7 +385,7 @@ class BasePage:
                         )
 
                 if is_example:
-                    author = pr.created_by
+                    author = pr.workspace
                 else:
                     author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
@@ -443,11 +446,9 @@ class BasePage:
         )
 
     def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and published_run.created_by_id
-            and published_run.created_by_id == self.request.user.id
+        return bool(self.request.user) and (
+            self.is_current_user_admin()
+            or published_run.workspace_id == self.current_workspace.id
         )
 
     def _render_title(self, title: str):
@@ -517,7 +518,7 @@ class BasePage:
                     str(PublishedRunVisibility.PUBLIC.value)
                 ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
             elif self.request.user and not self.request.user.is_anonymous:
-                edit_profile_url = AccountTabs.profile.url_path
+                edit_profile_url = AccountTabs.profile.get_url_path(self.request)
                 options[
                     str(PublishedRunVisibility.PUBLIC.value)
                 ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
@@ -557,12 +558,14 @@ class BasePage:
             )
             if pressed_copy or pressed_done:
                 if self.current_pr.visibility != published_run_visibility:
+                    visibility = PublishedRunVisibility(published_run_visibility)
                     self.current_pr.add_version(
                         user=self.request.user,
                         saved_run=self.current_pr.saved_run,
                         title=self.current_pr.title,
                         notes=self.current_pr.notes,
-                        visibility=PublishedRunVisibility(published_run_visibility),
+                        visibility=visibility,
+                        change_notes=f"Visibility changed to {visibility.name.title()}",
                     )
 
                 dialog.set_open(False)
@@ -655,7 +658,7 @@ class BasePage:
                 f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
-        with gui.div(className="mt-4"):
+        with gui.div():
             if is_update_mode:
                 title = pr.title or self.title
             else:
@@ -665,11 +668,46 @@ class BasePage:
                 key="published_run_title",
                 value=title,
             )
-            published_run_notes = gui.text_area(
-                "###### Notes",
-                key="published_run_notes",
+            published_run_description = gui.text_input(
+                "###### Description",
+                key="published_run_description",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
+            with gui.div(className="d-flex align-items-center"):
+                with gui.div(className="fs-3 text-muted mb-3 me-2"):
+                    gui.html(icons.notes)
+                with gui.div(className="flex-grow-1"):
+                    change_notes = gui.text_input(
+                        "",
+                        key="published_run_change_notes",
+                        value="",
+                        placeholder="Add change notes",
+                    )
+
+        col1, col2 = gui.columns([1, 3])
+        with col1:
+            gui.write("###### Workspace")
+        with col2:
+            if self.request.user and self.request.user.get_workspaces().count() > 1:
+                workspace_selector(self.request.user, self.request.session)
+            else:
+                with gui.div(className="p-2 mb-2"):
+                    self.render_author(
+                        self.current_workspace,
+                        show_as_link=False,
+                        current_user=self.request.user,
+                    )
+                with gui.div(className="align-middle alert alert-warning"):
+                    gui.html(icons.company + "&nbsp;")
+                    if gui.button(
+                        "Create a team workspace",
+                        type="link",
+                        className="d-inline m-0",
+                    ):
+                        workspace = create_workspace_with_defaults(self.request.user)
+                        set_current_workspace(self.request.session, workspace.id)
+                        gui.rerun()
+                    gui.html("&nbsp;" + "to edit with others")
 
         self._render_admin_options(sr, pr)
 
@@ -710,21 +748,24 @@ class BasePage:
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
+                notes=published_run_description.strip(),
                 visibility=PublishedRunVisibility(pr.visibility),
             )
         else:
             updates = dict(
                 saved_run=sr,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
-                visibility=PublishedRunVisibility(pr.visibility),
+                notes=published_run_description.strip(),
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
                 return
-            pr.add_version(user=self.request.user, **updates)
+            pr.add_version(
+                user=self.request.user, change_notes=change_notes.strip(), **updates
+            )
         raise gui.RedirectException(pr.get_app_url())
 
     def _get_default_pr_title(self):
@@ -783,39 +824,43 @@ class BasePage:
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
-        duplicate_button = None
-        save_as_new_button = None
-        if is_latest_version:
-            duplicate_button = gui.button(f"{icons.fork} Duplicate", className="w-100")
-        else:
-            save_as_new_button = gui.button(
-                f"{icons.fork} Save as New", className="w-100"
-            )
+        with gui.div(className="mb-3 d-flex justify-content-around align-items-center"):
+            duplicate_button = None
+            save_as_new_button = None
+            if is_latest_version:
+                duplicate_button = gui.button(
+                    f"{icons.fork} Duplicate", className="w-100"
+                )
+            else:
+                save_as_new_button = gui.button(
+                    f"{icons.fork} Save as New", className="w-100"
+                )
 
-        if not self.current_pr.is_root():
-            ref = gui.use_confirm_dialog(key="--delete-run-modal")
-            gui.button_with_confirm_dialog(
-                ref=ref,
-                trigger_label='<i class="fa-regular fa-trash"></i> Delete',
-                trigger_className="w-100 text-danger",
-                modal_title="#### Are you sure?",
-                modal_content=f"""
-Are you sure you want to delete this published run? 
+            if not self.current_pr.is_root():
+                ref = gui.use_confirm_dialog(key="--delete-run-modal")
+                gui.button_with_confirm_dialog(
+                    ref=ref,
+                    trigger_label='<i class="fa-regular fa-trash"></i> Delete',
+                    trigger_className="w-100 text-danger",
+                    modal_title="#### Are you sure?",
+                    modal_content=f"""
+    Are you sure you want to delete this published run?
 
-**{self.current_pr.title}**
+    **{self.current_pr.title}**
 
-This will also delete all the associated versions.          
-                """,
-                confirm_label="Delete",
-                confirm_className="border-danger bg-danger text-white",
-            )
-            if ref.pressed_confirm:
-                self.current_pr.delete()
-                raise gui.RedirectException(self.app_url())
+    This will also delete all the associated versions.
+                    """,
+                    confirm_label="Delete",
+                    confirm_className="border-danger bg-danger text-white",
+                )
+                if ref.pressed_confirm:
+                    self.current_pr.delete()
+                    raise gui.RedirectException(self.app_url())
 
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.current_pr.title} (Copy)",
                 notes=self.current_pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -829,6 +874,7 @@ This will also delete all the associated versions.
                 published_run_id=get_random_doc_id(),
                 saved_run=self.current_sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.current_pr.title} (Copy)",
                 notes=self.current_pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -838,7 +884,11 @@ This will also delete all the associated versions.
             )
 
         with gui.div(className="mt-4"):
-            gui.write("#### Version History", className="mb-4")
+            gui.write(
+                f"#### {icons.time} Version History",
+                className="mb-4 fw-bold",
+                unsafe_allow_html=True,
+            )
             self._render_version_history()
 
     def _unsaved_options_modal(self):
@@ -914,6 +964,11 @@ This will also delete all the associated versions.
                     f"This will overwrite the contents of {self.app_url()}",
                     className="text-danger",
                 )
+                change_notes = gui.text_area(
+                    "Change Notes",
+                    key="change_notes",
+                    value="",
+                )
                 if gui.button("👌 Yes, Update the Root Workflow"):
                     root_run = self.get_root_pr()
                     root_run.add_version(
@@ -922,6 +977,7 @@ This will also delete all the associated versions.
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
+                        change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
 
@@ -1012,20 +1068,16 @@ This will also delete all the associated versions.
             run_id=version.saved_run.run_id,
             uid=version.saved_run.uid,
         )
-        with gui.link(to=url, className="text-decoration-none"):
+        with gui.link(to=url, className="d-block text-decoration-none my-3"):
             with gui.div(
-                className="d-flex mb-4 disable-p-margin",
-                style={"minWidth": "min(100vw, 500px)"},
+                className="d-flex justify-content-between align-items-middle fw-bold"
             ):
-                col1 = gui.div(className="me-4")
-                col2 = gui.div()
-        with col1:
-            with gui.div(className="fs-5 mt-1"):
-                gui.html('<i class="fa-regular fa-clock"></i>')
-        with col2:
-            is_first_version = not older_version
-            with gui.div(className="fs-5 d-flex align-items-center"):
-                with gui.tag("span"):
+                if version.changed_by:
+                    with gui.tag("h6", className="mb-0"):
+                        self.render_author(version.changed_by, responsive=False)
+                else:
+                    gui.write("###### Deleted User", className="disable-p-margin")
+                with gui.tag("h6", className="mb-0"):
                     gui.html(
                         "Loading...",
                         **render_local_dt_attrs(
@@ -1033,18 +1085,18 @@ This will also delete all the associated versions.
                             date_options={"month": "short", "day": "numeric"},
                         ),
                     )
+            with gui.div(className="disable-p-margin"):
+                is_first_version = not older_version
                 if is_first_version:
-                    with gui.tag("span", className="badge bg-secondary px-3 ms-2"):
+                    with gui.tag("span", className="badge bg-secondary px-3"):
                         gui.write("FIRST VERSION")
-            with gui.div(className="text-muted"):
-                if older_version and older_version.title != version.title:
-                    gui.write(f"Renamed: {version.title}")
-                elif not older_version:
-                    gui.write(version.title)
-            with gui.div(className="mt-1", style={"fontSize": "0.85rem"}):
-                self.render_author(
-                    version.changed_by, image_size="18px", responsive=False
-                )
+                elif version.change_notes:
+                    gui.caption(
+                        f"{icons.notes} {html.escape(version.change_notes)}",
+                        unsafe_allow_html=True,
+                    )
+                elif older_version and older_version.title != version.title:
+                    gui.caption(f"Renamed: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1179,7 +1231,7 @@ This will also delete all the associated versions.
         gui.session_state["is_flagged"] = is_flagged
 
     @cached_property
-    def current_workspace(self) -> "Workspace":
+    def current_workspace(self) -> Workspace:
         assert self.request.user
         return get_current_workspace(self.request.user, self.request.session)
 
@@ -1259,6 +1311,7 @@ This will also delete all the associated versions.
                 defaults=dict(state=cls.load_state_defaults({})),
             )[0],
             user=None,
+            workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
             visibility=PublishedRunVisibility.PUBLIC,
@@ -1271,6 +1324,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: Workspace,
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1280,6 +1334,7 @@ This will also delete all the associated versions.
             published_run_id=published_run_id,
             saved_run=saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
@@ -1305,16 +1360,57 @@ This will also delete all the associated versions.
     def validate_form_v2(self):
         pass
 
-    @staticmethod
+    @classmethod
     def render_author(
-        user: AppUser,
+        cls,
+        workspace_or_user: "Workspace | AppUser | None",
         *,
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
+        current_user: AppUser | None = None,
     ):
-        if not user or (not user.photo_url and not user.display_name):
+        if not workspace_or_user:
+            return
+
+        link = None
+        if isinstance(workspace_or_user, Workspace):
+            workspace = workspace_or_user
+            photo = workspace.logo
+            if not photo and workspace.is_personal:
+                photo = workspace.created_by.photo_url
+            name = workspace.display_name(current_user=current_user)
+            if show_as_link and workspace.is_personal and workspace.created_by.handle:
+                link = workspace.created_by.handle.get_app_url()
+        else:
+            user = workspace_or_user
+            photo = user.photo_url
+            name = user.full_name()
+            if show_as_link and user.handle:
+                link = user.handle.get_app_url()
+
+        return cls._render_author(
+            photo=photo,
+            name=name,
+            link=link,
+            image_size=image_size,
+            responsive=responsive,
+            text_size=text_size,
+        )
+
+    @classmethod
+    def _render_author(
+        cls,
+        photo: str | None,
+        name: str | None,
+        link: str | None,
+        *,
+        image_size: str,
+        responsive: bool,
+        text_size: str | None,
+    ):
+        if not photo and not name:
             return
 
         responsive_image_size = (
@@ -1326,13 +1422,9 @@ This will also delete all the associated versions.
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link and user and user.handle:
-            linkto = gui.link(to=user.handle.get_app_url())
-        else:
-            linkto = gui.dummy()
-
+        linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
-            if user.photo_url:
+            if photo:
                 gui.html(
                     f"""
                     <style>
@@ -1354,12 +1446,12 @@ This will also delete all the associated versions.
                     </style>
                 """
                 )
-                gui.image(user.photo_url, className=class_name)
+                gui.image(photo, className=class_name)
 
-            if user.display_name:
+            if name:
                 name_style = {"fontSize": text_size} if text_size else {}
                 with gui.tag("span", style=name_style):
-                    gui.html(html.escape(user.display_name))
+                    gui.html(html.escape(name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1477,6 +1569,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,
@@ -1488,6 +1581,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,
@@ -1687,6 +1781,7 @@ This will also delete all the associated versions.
             published_run_id=get_random_doc_id(),
             saved_run=self.current_sr,
             user=self.request.user,
+            workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
             visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1964,9 +2059,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
+        workspace_id = self.current_workspace.id
         uid = self.request.user.uid
         if self.is_current_user_admin():
             uid = self.request.query_params.get("uid", uid)
+            workspace_id = self.request.query_params.get("workspace_id", workspace_id)
 
         before = self.request.query_params.get("updated_at__lt", None)
         if before:
@@ -1976,8 +2073,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         run_history = list(
             SavedRun.objects.filter(
                 workflow=self.workflow,
-                uid=uid,
                 updated_at__lt=before,
+                uid=uid,
+                workspace_id=workspace_id,
             )[:25]
         )
         if not run_history:
@@ -2072,10 +2170,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        if published_run.created_by:
+        if published_run.workspace:
             with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
-                    published_run.created_by,
+                    published_run.workspace,
                     image_size="20px",
                     text_size="0.9rem",
                 )
@@ -2198,7 +2296,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with gui.tag("a", id="api-keys"):
             gui.write("### 🔐 API keys")
 
-        manage_api_keys(self.request.user)
+        manage_api_keys(workspace=self.current_workspace, user=self.request.user)
 
     def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:
