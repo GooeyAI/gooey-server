@@ -250,7 +250,6 @@ class AsrModels(Enum):
         return self in {
             self.seamless_m4t_v2,
             self.whisper_large_v2,
-            self.whisper_large_v3,
         }
 
     @classmethod
@@ -330,7 +329,6 @@ class TranslationModels(TranslationModel, Enum):
         label="Ghana NLP Translate", supports_auto_detect=False
     )
     whisper_large_v2 = TranslationModel(label="Whisper Large v2")
-    whisper_large_v3 = TranslationModel(label="Whisper Large v3")
     seamless_m4t_v2 = TranslationModel(label="Seamless M4T v2")
 
     @classmethod
@@ -375,10 +373,6 @@ def translation_language_selector(
         languages = get_translation_supported_languages(
             TranslationModels.whisper_large_v2
         )
-    elif model == TranslationModels.whisper_large_v3:
-        languages = get_translation_supported_languages(
-            TranslationModels.whisper_large_v2
-        )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -409,6 +403,7 @@ def translation_model_selector(
     allow_none: bool = True,
     *,
     language_filter: str = "",
+    asr_model: AsrModels | None = None,
 ) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
@@ -424,13 +419,22 @@ def translation_model_selector(
         gui.error("No translation model available for the selected language.", icon="⚠️")
         return
 
+    exclude_models = list()
+    if asr_model != AsrModels.seamless_m4t_v2.name:
+        exclude_models.append(TranslationModels.seamless_m4t_v2.name)
+    if asr_model != AsrModels.whisper_large_v2.name:
+        exclude_models.append(TranslationModels.whisper_large_v2.name)
+
+    # Select the model using enum_selector
     model = enum_selector(
         supported_models,
         "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
         key=key,
+        exclude=exclude_models,
     )
+
     if model:
         return TranslationModels[model]
     else:
@@ -666,18 +670,6 @@ def run_translate(
             texts=texts,
             target_language=target_language,
             source_language=source_language,
-        )
-    elif model == TranslationModels.seamless_m4t_v2.name:
-        return call_celery_task(
-            "seamless.t2tt",
-            pipeline=dict(
-                model_id=asr_model_ids[AsrModels.seamless_m4t_v2],
-            ),
-            inputs=dict(
-                text=texts,
-                src_lang=source_language,
-                tgt_lang=target_language,
-            ),
         )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
@@ -934,8 +926,6 @@ def run_asr(
         if language:
             config["language"] = language
 
-        if translation_model == TranslationModels.whisper_large_v3.name:
-            config["task"] = "translate"
         data = replicate.run(
             asr_model_ids[AsrModels.whisper_large_v3],
             input=config,

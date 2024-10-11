@@ -159,6 +159,7 @@ class AsrPage(BasePage):
                 translation_model = translation_model_selector(
                     allow_none=False,
                     language_filter=selected_filter_language,
+                    asr_model=asr_model,
                 )
             with col2:
                 translation_language_selector(
@@ -184,13 +185,25 @@ class AsrPage(BasePage):
             return
         if not translation_model:
             return
-        translation_language_selector(
-            model=translation_model,
-            label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
-            key="translation_source",
-            language_filter=gui.session_state.get("language_filter"),
-            allow_none=True,
+        selected_model = gui.session_state.get('selected_model')
+        is_inbuilt_translation = (
+            False
+            if not selected_model
+            else (
+                AsrModels[selected_model].supports_built_in_translation()
+                and selected_model == translation_model.name
+            )
         )
+        if translation_model and not is_inbuilt_translation:
+            gui.write("---")
+            translation_language_selector(
+                model=translation_model,
+                label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
+                key="translation_source",
+                language_filter=gui.session_state.get("language_filter"),
+                allow_none=True,
+            )
+
         if translation_model.supports_glossary:
             gui.file_uploader(
                 label=f"###### {field_title_desc(cls.RequestModel, 'glossary_document')}",
