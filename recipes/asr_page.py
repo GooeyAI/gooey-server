@@ -153,6 +153,7 @@ class AsrPage(BasePage):
                 translation_model = translation_model_selector(
                     allow_none=False,
                     filter_by_language=selected_filter_language,
+                    asr_model=selected_model,
                 )
             with col2:
                 translation_language_selector(
@@ -160,7 +161,15 @@ class AsrPage(BasePage):
                     label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                     key="translation_target",
                 )
-            if selected_model and translation_model:
+            is_inbuilt_translation = (
+                False
+                if not selected_model
+                else (
+                    AsrModels[selected_model].supports_built_in_translation()
+                    and selected_model == translation_model.name
+                )
+            )
+            if selected_model and translation_model and not is_inbuilt_translation:
                 gui.write("---")
                 translation_language_selector(
                     model=translation_model,
