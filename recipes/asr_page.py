@@ -151,7 +151,9 @@ class AsrPage(BasePage):
             col1, col2 = gui.columns(2, responsive=True)
             with col1:
                 translation_model = translation_model_selector(
-                    allow_none=False, filter_by_language=selected_filter_language
+                    allow_none=False,
+                    filter_by_language=selected_filter_language,
+                    asr_model=selected_model,
                 )
             with col2:
                 translation_language_selector(
@@ -159,7 +161,15 @@ class AsrPage(BasePage):
                     label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
                     key="translation_target",
                 )
-            if selected_model and translation_model:
+            is_inbuilt_translation = (
+                False
+                if not selected_model
+                else (
+                    AsrModels[selected_model].supports_built_in_translation()
+                    and selected_model == translation_model.name
+                )
+            )
+            if selected_model and translation_model and not is_inbuilt_translation:
                 gui.write("---")
                 translation_language_selector(
                     model=translation_model,
@@ -237,26 +247,34 @@ class AsrPage(BasePage):
                 selected_model=request.selected_model,
                 language=request.language,
                 output_format=request.output_format,
+                translation_model=request.translation_model,
+                translation_target=request.translation_target,
             ),
             request.documents,
             max_workers=4,
         )
-
-        # Save the raw ASR text for details view
-        state["raw_output_text"] = asr_output
-        # Run Translation
-        if request.translation_model and request.translation_target:
-            state["output_text"] = run_translate(
-                asr_output,
-                target_language=request.translation_target,
-                source_language=forced_asr_languages.get(
-                    selected_model, request.translation_source or request.language
-                ),
-                glossary_url=request.glossary_document,
-                model=request.translation_model,
-            )
+        is_inbuilt_translation = (
+            selected_model.supports_built_in_translation()
+            and selected_model.name == TranslationModels[request.translation_model].name
+        )
+        if not is_inbuilt_translation:
+            # Save the raw ASR text for details view
+            state["raw_output_text"] = asr_output
+            # Run Translation
+            if request.translation_model and request.translation_target:
+                state["output_text"] = run_translate(
+                    asr_output,
+                    target_language=request.translation_target,
+                    source_language=forced_asr_languages.get(
+                        selected_model, request.translation_source or request.language
+                    ),
+                    glossary_url=request.glossary_document,
+                    model=request.translation_model,
+                )
+            else:
+                state["raw_output_text"] = None
+                state["output_text"] = asr_output
         else:
-            state["raw_output_text"] = None
             state["output_text"] = asr_output
 
     def get_cost_note(self) -> str | None:

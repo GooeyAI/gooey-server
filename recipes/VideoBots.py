@@ -426,6 +426,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         translation_model = translation_model_selector(
                             allow_none=False,
                             filter_by_language=selected_filter_language,
+                            asr_model=selected_model,
                         )
                     with col2:
                         translation_language_selector(

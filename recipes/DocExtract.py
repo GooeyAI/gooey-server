@@ -214,7 +214,9 @@ If not specified or invalid, no glossary will be used. Read about the expected f
                 col1, col2 = gui.columns(2)
                 with col1:
                     translation_model = translation_model_selector(
-                        allow_none=False, filter_by_language=selected_filter_language
+                        allow_none=False,
+                        filter_by_language=selected_filter_language,
+                        asr_model=selected_model,
                     )
                 with col2:
                     translation_language_selector(

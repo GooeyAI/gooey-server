@@ -240,6 +240,12 @@ class AsrModels(Enum):
             self.ghana_nlp_asr_v2,
         }
 
+    def supports_built_in_translation(self) -> bool:
+        return self in {
+            self.seamless_m4t_v2,
+            self.whisper_large_v2,
+        }
+
     @classmethod
     def _deprecated(cls):
         return {cls.seamless_m4t}
@@ -311,6 +317,8 @@ class TranslationModels(TranslationModel, Enum):
     ghana_nlp = TranslationModel(
         label="Ghana NLP Translate", supports_auto_detect=False
     )
+    whisper_large_v2 = TranslationModel(label="Whisper Large v2")
+    seamless_m4t_v2 = TranslationModel(label="Seamless M4T v2")
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -392,6 +400,14 @@ def translation_language_selector(
             languages = {}
         else:
             languages = get_translation_supported_languages(TranslationModels.ghana_nlp)
+    elif model == TranslationModels.seamless_m4t_v2:
+        languages = get_translation_supported_languages(
+            TranslationModels.seamless_m4t_v2
+        )
+    elif model == TranslationModels.whisper_large_v2:
+        languages = get_translation_supported_languages(
+            TranslationModels.whisper_large_v2
+        )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -420,11 +436,18 @@ def get_translation_supported_languages(
         return google_translate_target_languages()
     elif model == TranslationModels.ghana_nlp:
         return ghana_nlp_translate_target_languages()
-    # Get supported languages for all models
+    elif model == TranslationModels.whisper_large_v2:
+        return {"en": "English"}
+    elif model == TranslationModels.seamless_m4t_v2:
+        return {lang: lang for lang in SEAMLESS_v2_ASR_SUPPORTED}
     else:
         return {
             TranslationModels.google: google_translate_target_languages(),
             TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
+            TranslationModels.whisper_large_v2: {"en": "English"},
+            TranslationModels.seamless_m4t_v2: {
+                lang: lang for lang in SEAMLESS_v2_ASR_SUPPORTED
+            },
         }
 
 
@@ -433,6 +456,7 @@ def translation_model_selector(
     allow_none=True,
     *,
     filter_by_language="",
+    asr_model: AsrModels | None = None,
 ) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
@@ -453,13 +477,22 @@ def translation_model_selector(
         else TranslationModels
     )
 
+    exclude_models = list()
+    if asr_model != AsrModels.seamless_m4t_v2.name:
+        exclude_models.append(TranslationModels.seamless_m4t_v2.name)
+    if asr_model != AsrModels.whisper_large_v2.name:
+        exclude_models.append(TranslationModels.whisper_large_v2.name)
+
+    # Select the model using enum_selector
     model = enum_selector(
         SupportedTranslationModels,
         "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
         key=key,
+        exclude=exclude_models,
     )
+
     if model:
         return TranslationModels[model]
     else:
@@ -700,8 +733,8 @@ def run_translate(
 
 def run_ghana_nlp_translate(
     texts: list[str],
-    target_language: str,
-    source_language: str,
+    target_language: str | None = None,
+    source_language: str | None = None,
 ) -> list[str]:
     assert (
         source_language and target_language
@@ -922,6 +955,8 @@ def run_asr(
     selected_model: str,
     language: str = None,
     output_format: str = "text",
+    translation_target: str | None = None,
+    translation_model: str | None = None,
 ) -> str | AsrOutputJson:
     """
     Run ASR on audio.
@@ -930,6 +965,8 @@ def run_asr(
         selected_model (str): ASR model to use.
         language: language of the audio
         output_format: format of the output
+        translation_target: target language for translation
+        translation_model: model for translation
     Returns:
         str: Transcribed text.
     """
@@ -969,6 +1006,7 @@ def run_asr(
         }
         if language:
             config["language"] = language
+
         data = replicate.run(
             asr_model_ids[AsrModels.whisper_large_v3],
             input=config,
@@ -1018,6 +1056,12 @@ def run_asr(
             inputs=dict(
                 audio=audio_url,
                 src_lang=language,
+                tgt_lang=(
+                    translation_target
+                    if translation_target
+                    and translation_model == TranslationModels.seamless_m4t_v2.name
+                    else None
+                ),
             ),
         )
     elif selected_model == AsrModels.gcp_v1:
@@ -1144,7 +1188,11 @@ def run_asr(
             ),
             inputs=dict(
                 audio=audio_url,
-                task="transcribe",
+                task=(
+                    "translate"
+                    if translation_model == TranslationModels.whisper_large_v2.name
+                    else "transcribe"
+                ),
                 return_timestamps=output_format != AsrOutputFormat.text,
                 **kwargs,
             ),
