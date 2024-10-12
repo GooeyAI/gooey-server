@@ -14,6 +14,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
+from daras_ai_v2.grid_layout_widget import grid_layout
 
 DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
 
@@ -56,6 +57,22 @@ def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
         for fp in prompt_st_list
         if (prompt := fp["prompt"].strip())
     ]
+
+
+def camera_grid(slider_label: str, caption: str):
+    with gui.div():
+        col1, col2 = gui.columns([1, 1])
+        with col1:
+            slider_value = gui.slider(
+                label=slider_label,
+                min_value=-1.5,
+                max_value=1.5,
+                step=0.001,
+                value=0,
+            )
+        with col2:
+            gui.caption(caption)
+    return slider_value
 
 
 def animation_prompts_editor(
@@ -139,26 +156,11 @@ def animation_prompts_editor(
             rotation_3d_x_dict = get_zoom_pan_dict(
                 gui.session_state.get("rotation_3d_x", {0: 1.004})
             )
-            rotation_3d_x_value = (
-                0.0
-                if fp["frame"] not in rotation_3d_x_dict
-                else rotation_3d_x_dict[fp["frame"]]
-            )
             rotation_3d_y_dict = get_zoom_pan_dict(
                 gui.session_state.get("rotation_3d_y", {0: 1.004})
             )
-            rotation_3d_y_value = (
-                0.0
-                if fp["frame"] not in rotation_3d_y_dict
-                else rotation_3d_y_dict[fp["frame"]]
-            )
             rotation_3d_z_dict = get_zoom_pan_dict(
                 gui.session_state.get("rotation_3d_z", {0: 1.004})
-            )
-            rotation_3d_z_value = (
-                0.0
-                if fp["frame"] not in rotation_3d_z_dict
-                else rotation_3d_z_dict[fp["frame"]]
             )
 
             zoom_pan_description = ""
@@ -209,9 +211,11 @@ def animation_prompts_editor(
                     gui.rerun()
 
             if zoom_pan_modal.is_open:
-                with gui.confirm_dialog(
+                with gui.camera_dialog(
                     ref=zoom_pan_modal,
                     modal_title=f"### Zoom/Pan",
+                    cancel_className="py-2 px-5 m-0",
+                    confirm_className="py-2 px-5 m-0",
                     confirm_label="Save",
                     large=True,
                 ):
@@ -221,76 +225,30 @@ def animation_prompts_editor(
                     gui.caption(
                         f"Starting at second {start} and until second {end}, how do you want the camera to move? (Reasonable valuables would be ±0.005)"
                     )
-                    col1, col2 = gui.columns([1, 1])
-                    with col1:
-                        zoom_pan_slider = gui.slider(
-                            label="""
-                            ###### Zoom
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
-                        )
-                        hpan_slider = gui.slider(
-                            label="""
-                            ###### Horizontal Pan
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
-                        )
-                        vpan_slider = gui.slider(
-                            label="""
-                            ###### Vertical Pan
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
-                        )
-                    with col2:
-                        gui.caption(
-                            "How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out)."
-                        )
-                        gui.caption(
-                            "How should the camera pan horizontally? This parameter uses positive values to move right an dnegative values to move left."
-                        )
-                        gui.caption(
-                            "How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down."
-                        )
-                    gui.checkbox(
-                        "Show 3D camera settings",
-                        key="show_3d",
+                    camera_grid(
+                        """###### Zoom""",
+                        "How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out).",
+                    )
+                    camera_grid(
+                        """###### Horizontal Pan""",
+                        "How should the camera pan horizontally? This parameter uses positive values to move right an dnegative values to move left.",
+                    )
+                    camera_grid(
+                        """###### Vertical Pan""",
+                        "How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down.",
                     )
                     if gui.session_state.get("show_3d"):
-                        rotation_3d_x_slider = gui.slider(
-                            label="""
-                            ###### Tilt Up/Down
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
+                        camera_grid(
+                            """###### Tilt Up/Down""",
+                            "Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise.",
                         )
-                        rotation_3d_y_slider = gui.slider(
-                            label="""
-                            ###### Pan Left/Right
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
+                        camera_grid(
+                            """###### Pan Left/Right""",
+                            "Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.",
                         )
-                        rotation_3d_z_slider = gui.slider(
-                            label="""
-                            ###### Roll Clockwise/Counterclockwise
-                            """,
-                            min_value=-1.5,
-                            max_value=1.5,
-                            step=0.001,
-                            value=0,
+                        camera_grid(
+                            """###### Roll Clockwise/Counterclockwise""",
+                            "Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.",
                         )
 
                     if zoom_pan_modal.pressed_confirm:
