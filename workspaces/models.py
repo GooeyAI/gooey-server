@@ -322,7 +322,7 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return f"{current_user.full_name()} (personal)"
+            return f"{current_user.full_name()} (Personal)"
         elif self.is_personal:
             return self.created_by.full_name()
         else:
