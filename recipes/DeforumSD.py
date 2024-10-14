@@ -225,28 +225,28 @@ def animation_prompts_editor(
                     gui.caption(
                         f"Starting at second {start} and until second {end}, how do you want the camera to move? (Reasonable valuables would be ±0.005)"
                     )
-                    camera_grid(
+                    zoom_pan_slider = camera_grid(
                         """###### Zoom""",
                         "How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out).",
                     )
-                    camera_grid(
+                    hpan_slider = camera_grid(
                         """###### Horizontal Pan""",
                         "How should the camera pan horizontally? This parameter uses positive values to move right an dnegative values to move left.",
                     )
-                    camera_grid(
+                    vpan_slider = camera_grid(
                         """###### Vertical Pan""",
                         "How should the camera pan vertically? This parameter uses positive values to move up and negative values to move down.",
                     )
                     if gui.session_state.get("show_3d"):
-                        camera_grid(
+                        rotation_3d_x_slider = camera_grid(
                             """###### Tilt Up/Down""",
                             "Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise.",
                         )
-                        camera_grid(
+                        rotation_3d_y_slider = camera_grid(
                             """###### Pan Left/Right""",
                             "Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.",
                         )
-                        camera_grid(
+                        rotation_3d_z_slider = camera_grid(
                             """###### Roll Clockwise/Counterclockwise""",
                             "Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.",
                         )
