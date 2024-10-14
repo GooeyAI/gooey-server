@@ -392,25 +392,7 @@ class BasePage:
                 if request_changed or (can_save and not is_example):
                     self._render_unpublished_changes_indicator()
 
-                with gui.div(className="d-flex align-items-start right-action-icons"):
-                    gui.html(
-                        # styling for buttons in this div
-                        """
-                        <style>
-                        .right-action-icons .btn {
-                            padding: 6px;
-                        }
-                        </style>
-                        """
-                    )
-
-                    if self.tab == RecipeTabs.run:
-                        if self.request.user and not self.request.user.is_anonymous:
-                            self._render_options_button_with_dialog()
-                        self._render_share_button()
-                        self._render_save_button()
-                    else:
-                        self._render_copy_link_button(label="Copy Link")
+                self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
             # only render title here if the above row was not empty
@@ -472,6 +454,27 @@ class BasePage:
                     self._saved_options_modal()
                 else:
                     self._unsaved_options_modal()
+
+    def render_social_buttons(self):
+        with gui.div(className="d-flex align-items-start right-action-icons"):
+            gui.html(
+                # styling for buttons in this div
+                """
+                <style>
+                .right-action-icons .btn {
+                    padding: 6px;
+                }
+                </style>
+                """
+            )
+
+            if self.tab == RecipeTabs.run:
+                if self.request.user and not self.request.user.is_anonymous:
+                    self._render_options_button_with_dialog()
+                self._render_share_button()
+                self._render_save_button()
+            else:
+                self._render_copy_link_button(label="Copy Link")
 
     def _render_share_button(self):
         if (
