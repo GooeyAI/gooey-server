@@ -63,6 +63,7 @@ from functions.recipe_functions import (
     call_recipe_functions,
     is_functions_enabled,
     render_called_functions,
+    LLMTool,
 )
 from payments.auto_recharge import (
     should_attempt_auto_recharge,
@@ -1178,6 +1179,18 @@ This will also delete all the associated versions.
         sr.save(update_fields=["is_flagged"])
         gui.session_state["is_flagged"] = is_flagged
 
+    def get_current_llm_tools(self) -> dict[str, LLMTool]:
+        return dict(
+            call_recipe_functions(
+                saved_run=self.current_sr,
+                current_user=self.request.user,
+                request_model=self.RequestModel,
+                response_model=self.ResponseModel,
+                state=gui.session_state,
+                trigger=FunctionTrigger.prompt,
+            )
+        )
+
     @cached_property
     def current_workspace(self) -> "Workspace":
         assert self.request.user
@@ -1427,6 +1440,9 @@ This will also delete all the associated versions.
                 placeholder = gui.div()
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                )
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.prompt
                 )
                 try:
                     self.render_steps()

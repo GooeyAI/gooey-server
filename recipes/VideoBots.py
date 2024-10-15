@@ -2,6 +2,7 @@ import json
 import math
 import mimetypes
 import typing
+from itertools import zip_longest
 
 import gooey_gui as gui
 from django.db.models import QuerySet, Q
@@ -43,7 +44,6 @@ from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
-    get_web_widget_embed_code,
     integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -56,7 +56,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
@@ -76,8 +75,8 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
-    language_model_selector,
     LanguageModelSettings,
+    language_model_selector,
 )
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -99,7 +98,12 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     elevenlabs_init_state,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
-from functions.recipe_functions import LLMTools
+from functions.models import FunctionTrigger
+from functions.recipe_functions import (
+    LLMTool,
+    render_called_functions,
+    call_recipe_functions,
+)
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -113,14 +117,6 @@ DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.co
 GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
-
-
-def exec_tool_call(call: dict):
-    tool_name = call["function"]["name"]
-    tool = LLMTools[tool_name]
-    yield f"🛠 {tool.label}..."
-    kwargs = json.loads(call["function"]["arguments"])
-    return tool.fn(**kwargs)
 
 
 class ReplyButton(typing.TypedDict):
@@ -188,7 +184,7 @@ class VideoBotsPage(BasePage):
         )
 
         # conversation history/context
-        messages: list[ConversationEntry] | None
+        messages: list[dict] | None
 
         bot_script: str | None
 
@@ -253,9 +249,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
             LipsyncModel.Wav2Lip.name
         )
 
-        tools: list[LLMTools] | None = Field(
+        tools: list[str] | None = Field(
             title="🛠️ Tools",
-            description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
+            description="Use `functions` instead.",
+            deprecated=True,
         )
 
     class RequestModel(
@@ -541,14 +538,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.write("##### 🔠 Language Model Settings")
         language_model_settings(gui.session_state.get("selected_model"))
 
-        gui.write("---")
-
-        enum_multiselect(
-            enum_cls=LLMTools,
-            label="##### " + field_title_desc(self.RequestModel, "tools"),
-            key="tools",
-        )
-
     def fields_not_to_save(self):
         return ["elevenlabs_api_key"]
 
@@ -586,7 +575,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_output(self):
         # chat window
         with gui.div(className="pb-3"):
-            chat_list_view()
+            self.render_chat_list_view()
             pressed_send, new_inputs = chat_input_view()
 
         if pressed_send:
@@ -695,19 +684,36 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             if isinstance(final_prompt, str):
                 text_output("###### `final_prompt`", value=final_prompt, height=300)
             else:
-                gui.write("###### `final_prompt`")
-                gui.json(final_prompt)
+                gui.write(
+                    '###### <i class="fa-sharp fa-light fa-rectangle-terminal"></i> `final_prompt`',
+                    unsafe_allow_html=True,
+                )
+                gui.json(final_prompt, depth=5)
+
+        if gui.session_state.get("functions"):
+            prompt_funcs = call_recipe_functions(
+                saved_run=self.current_sr,
+                current_user=self.request.user,
+                request_model=self.RequestModel,
+                response_model=self.ResponseModel,
+                state=gui.session_state,
+                trigger=FunctionTrigger.prompt,
+            )
+            if prompt_funcs:
+                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+                for name, tool in prompt_funcs:
+                    gui.json(tool.spec.get("function", tool.spec), depth=3)
 
         for k in ["raw_output_text", "output_text", "raw_tts_text"]:
             for idx, text in enumerate(gui.session_state.get(k) or []):
                 gui.text_area(
-                    f"###### `{k}[{idx}]`",
+                    f"###### 📜 `{k}[{idx}]`",
                     value=text,
                     disabled=True,
                 )
 
         for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
-            gui.write(f"###### `output_audio[{idx}]`")
+            gui.write(f"###### 🔉 `output_audio[{idx}]`")
             gui.audio(audio_url)
 
     def get_raw_price(self, state: dict):
@@ -757,7 +763,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 """
             )
 
-        model = LargeLanguageModels[request.selected_model]
+        llm_model = LargeLanguageModels[request.selected_model]
         user_input = request.input_prompt.strip()
         if not (
             user_input
@@ -767,6 +773,35 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         ):
             return
 
+        asr_msg, user_input = yield from self.asr_step(
+            request=request, response=response, user_input=user_input
+        )
+
+        ocr_texts = yield from self.ocr_step(request=request)
+
+        request.translation_model = (
+            request.translation_model or TranslationModels.google.name
+        )
+        user_input = yield from self.input_translation_step(
+            request=request, user_input=user_input, ocr_texts=ocr_texts
+        )
+
+        yield from self.build_final_prompt(
+            request=request, response=response, user_input=user_input, model=llm_model
+        )
+
+        yield from self.llm_loop(
+            request=request,
+            response=response,
+            model=llm_model,
+            asr_msg=asr_msg,
+        )
+
+        yield from self.tts_step(request, response)
+
+        yield from self.lipsync_step(request, response)
+
+    def ocr_step(self, request):
         ocr_texts = []
         if request.document_model and (request.input_images or request.input_documents):
             yield "Running Azure Form Recognizer..."
@@ -779,7 +814,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if not ocr_text:
                     continue
                 ocr_texts.append(ocr_text)
+        return ocr_texts
 
+    def asr_step(self, request, response, user_input):
         if request.input_audio:
             if not request.asr_model:
                 request.asr_model, request.asr_language = infer_asr_model_and_language(
@@ -797,9 +834,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             user_input = f"{asr_output}\n\n{user_input}".strip()
         else:
             asr_msg = None
+        return asr_msg, user_input
 
+    def input_translation_step(self, request, user_input, ocr_texts):
         # translate input text
-        translation_model = request.translation_model or TranslationModels.google.name
         if should_translate_lang(request.user_language):
             yield "Translating Input to English..."
             user_input = run_translate(
@@ -807,9 +845,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 source_language=request.user_language,
                 target_language="en",
                 glossary_url=request.input_glossary_document,
-                model=translation_model,
+                model=request.translation_model,
             )[0]
-
         if ocr_texts:
             yield "Translating Image Text to English..."
             ocr_texts = run_translate(
@@ -819,7 +856,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
             for text in ocr_texts:
                 user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+        return user_input
 
+    def build_final_prompt(self, request, response, user_input, model):
         # consturct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
@@ -828,10 +867,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
         else:
             system_prompt = None
-
         # save raw input for reference
         response.raw_input_text = user_input
+        user_input = yield from self.search_step(request, response, user_input, model)
+        # construct user prompt
+        user_prompt = format_chat_entry(
+            role=CHATML_ROLE_USER, content=user_input, images=request.input_images
+        )
+        # truncate the history to fit the model's max tokens
+        max_history_tokens = (
+            model.context_window
+            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
+            - request.max_tokens
+            - SAFETY_BUFFER
+        )
+        clip_idx = convo_window_clipper(
+            request.messages,
+            max_history_tokens,
+        )
+        history_prompt = request.messages[clip_idx:]
+        response.final_prompt = list(
+            filter(None, [system_prompt, *history_prompt, user_prompt])
+        )
+        # ensure input script is not too big
+        max_allowed_tokens = model.context_window - calc_gpt_tokens(
+            response.final_prompt
+        )
+        if max_allowed_tokens < 0:
+            raise UserError("Input Script is too long! Please reduce the script size.")
+        request.max_tokens = min(max_allowed_tokens, request.max_tokens)
 
+    def search_step(self, request, response, user_input, model):
         # if documents are provided, run doc search on the saved msgs and get back the references
         if request.documents:
             # formulate the search query as a history of all the messages
@@ -874,7 +940,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if keyword_query and isinstance(keyword_query, dict):
                     keyword_query = list(keyword_query.values())[0]
                 response.final_keyword_query = keyword_query
-            # return
 
             # perform doc search
             response.references = yield from get_top_k_references(
@@ -905,132 +970,150 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_input
             )
+        return user_input
 
-        # construct user prompt
-        user_prompt = format_chat_entry(
-            role=CHATML_ROLE_USER, content=user_input, images=request.input_images
-        )
-
-        # truncate the history to fit the model's max tokens
-        max_history_tokens = (
-            model.context_window
-            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
-            - request.max_tokens
-            - SAFETY_BUFFER
-        )
-        clip_idx = convo_window_clipper(
-            request.messages,
-            max_history_tokens,
-        )
-        history_prompt = request.messages[clip_idx:]
-        response.final_prompt = list(
-            filter(None, [system_prompt, *history_prompt, user_prompt])
-        )
-
-        # ensure input script is not too big
-        max_allowed_tokens = model.context_window - calc_gpt_tokens(
-            response.final_prompt
-        )
-        max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
-        if max_allowed_tokens < 0:
-            raise UserError("Input Script is too long! Please reduce the script size.")
-
+    def llm_loop(
+        self,
+        *,
+        request: "VideoBotsPage.RequestModel",
+        response: "VideoBotsPage.ResponseModel",
+        model: LargeLanguageModels,
+        asr_msg: str | None = None,
+        prev_output_text: list[str] | None = None,
+    ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.value}..."
-        chunks = run_language_model(
+
+        tools = self.get_current_llm_tools()
+
+        chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
-            messages=[
-                {"role": entry["role"], "content": entry["content"]}
-                for entry in response.final_prompt
-            ],
-            max_tokens=max_allowed_tokens,
+            messages=response.final_prompt,
+            max_tokens=request.max_tokens,
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
-            tools=request.tools,
+            tools=list(tools.values()),
             stream=True,
         )
-        citation_style = (
-            request.citation_style and CitationStyles[request.citation_style]
-        ) or None
-        for i, entries in enumerate(chunks):
-            if not entries:
-                continue
-            output_text = [entry["content"] for entry in entries]
-            if request.tools:
-                # output_text, tool_call_choices = output_text
-                response.output_documents = output_documents = []
-                for call in entries[0].get("tool_calls") or []:
-                    result = yield from exec_tool_call(call)
-                    output_documents.append(result)
 
-            # save model response without citations
+        tool_calls = None
+        output_text = None
+
+        for i, choices in enumerate(chunks):
+            if not choices:
+                continue
+
+            tool_calls = choices[0].get("tool_calls")
+            output_text = [
+                (prev_text + "\n\n" + entry["content"]).strip()
+                for prev_text, entry in zip_longest(
+                    (prev_output_text or []), choices, fillvalue=""
+                )
+            ]
+
+            # save raw model response without citations and translation for history
             response.raw_output_text = [
                 "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
 
-            # translate response text
-            if should_translate_lang(request.user_language):
-                yield f"Translating response to {request.user_language}..."
-                output_text = run_translate(
-                    texts=output_text,
-                    source_language="en",
-                    target_language=request.user_language,
-                    glossary_url=request.output_glossary_document,
-                    model=translation_model,
-                )
-                # save translated response for tts
-                response.raw_tts_text = [
-                    "".join(
-                        snippet for snippet, _ in parse_refs(text, response.references)
-                    )
-                    for text in output_text
-                ]
+            output_text = yield from self.output_translation_step(
+                request, response, output_text
+            )
 
             if response.references:
+                citation_style = (
+                    request.citation_style and CitationStyles[request.citation_style]
+                ) or None
                 all_refs_list = apply_response_formattings_prefix(
                     output_text, response.references, citation_style
                 )
             else:
+                citation_style = None
                 all_refs_list = None
 
             if asr_msg:
                 output_text = [asr_msg + "\n\n" + text for text in output_text]
+
             response.output_text = output_text
-            finish_reasons = [entry.get("finish_reason") for entry in entries]
-            if all(finish_reasons):
+
+            finish_reason = [entry.get("finish_reason") for entry in choices]
+            if all(finish_reason):
                 if all_refs_list:
                     apply_response_formattings_suffix(
                         all_refs_list, response.output_text, citation_style
                     )
-                response.finish_reason = finish_reasons
+                response.finish_reason = finish_reason
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
-        if not request.tts_provider:
+        if not tool_calls:
             return
-        response.output_audio = []
-        for text in response.raw_tts_text or response.raw_output_text:
-            tts_state = TextToSpeechPage.RequestModel.parse_obj(
-                {**gui.session_state, "text_prompt": text}
-            ).dict()
-            yield from TextToSpeechPage(request=self.request).run(tts_state)
-            response.output_audio.append(tts_state["audio_url"])
+        response.final_prompt.append(
+            dict(
+                role=choices[0]["role"],
+                content=choices[0]["content"],
+                tool_calls=tool_calls,
+            )
+        )
+        for call in tool_calls:
+            result = yield from exec_tool_call(call, tools)
+            response.final_prompt.append(
+                dict(
+                    role="tool",
+                    content=json.dumps(result),
+                    tool_call_id=call["id"],
+                ),
+            )
+        yield from self.llm_loop(
+            request=request,
+            response=response,
+            model=model,
+            prev_output_text=output_text,
+        )
 
-        if not request.input_face:
-            return
-        response.output_video = []
-        for audio_url in response.output_audio:
-            lip_state = LipsyncPage.RequestModel.parse_obj(
-                {
-                    **gui.session_state,
-                    "input_audio": audio_url,
-                    "selected_model": request.lipsync_model,
-                }
-            ).dict()
-            yield from LipsyncPage(request=self.request).run(lip_state)
-            response.output_video.append(lip_state["output_video"])
+    def output_translation_step(self, request, response, output_text):
+        # translate response text
+        if should_translate_lang(request.user_language):
+            yield f"Translating response to {request.user_language}..."
+            output_text = run_translate(
+                texts=output_text,
+                source_language="en",
+                target_language=request.user_language,
+                glossary_url=request.output_glossary_document,
+                model=request.translation_model,
+            )
+            # save translated response for tts
+            response.raw_tts_text = [
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
+                for text in output_text
+            ]
+        return output_text
+
+    def tts_step(self, request, response):
+        if request.tts_provider:
+            response.output_audio = []
+            for text in response.raw_tts_text or response.raw_output_text:
+                tts_state = TextToSpeechPage.RequestModel.parse_obj(
+                    {**gui.session_state, "text_prompt": text}
+                ).dict()
+                yield from TextToSpeechPage(request=self.request).run(tts_state)
+                response.output_audio.append(tts_state["audio_url"])
+
+    def lipsync_step(self, request, response):
+        if request.input_face and response.output_audio:
+            response.output_video = []
+            for audio_url in response.output_audio:
+                lip_state = LipsyncPage.RequestModel.parse_obj(
+                    {
+                        **gui.session_state,
+                        "input_audio": audio_url,
+                        "selected_model": request.lipsync_model,
+                    }
+                ).dict()
+                yield from LipsyncPage(request=self.request).run(lip_state)
+                response.output_video.append(lip_state["output_video"])
 
     def get_tabs(self):
         tabs = super().get_tabs()
@@ -1388,6 +1471,80 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.save()
                         gui.rerun()
 
+    def render_chat_list_view(self):
+        # render a reversed list view
+        with gui.div(
+            className="pb-1",
+            style=dict(
+                maxHeight="80vh",
+                overflowY="scroll",
+                display="flex",
+                flexDirection="column-reverse",
+                border="1px solid #c9c9c9",
+            ),
+        ):
+            with gui.div(className="px-3"):
+                show_raw_msgs = gui.checkbox("_Show Raw Output_")
+            # render the last output
+            with msg_container_widget(CHATML_ROLE_ASSISTANT):
+                if show_raw_msgs:
+                    output_text = gui.session_state.get("raw_output_text", [])
+                else:
+                    output_text = gui.session_state.get("output_text", [])
+                output_video = gui.session_state.get("output_video", [])
+                output_audio = gui.session_state.get("output_audio", [])
+                if output_text:
+                    gui.write("**Assistant**")
+                    render_called_functions(
+                        saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                    )
+                    render_called_functions(
+                        saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+                    )
+                    for idx, text in enumerate(output_text):
+                        gui.write(text)
+                        try:
+                            gui.video(output_video[idx])
+                        except IndexError:
+                            try:
+                                gui.audio(output_audio[idx])
+                            except IndexError:
+                                pass
+                    render_called_functions(
+                        saved_run=self.current_sr, trigger=FunctionTrigger.post
+                    )
+                output_documents = gui.session_state.get("output_documents", [])
+                if output_documents:
+                    for doc in output_documents:
+                        gui.write(doc)
+            messages = gui.session_state.get("messages", []).copy()
+            # add last input to history if present
+            if show_raw_msgs:
+                input_prompt = gui.session_state.get("raw_input_text")
+            else:
+                input_prompt = gui.session_state.get("input_prompt")
+            input_images = gui.session_state.get("input_images")
+            input_audio = gui.session_state.get("input_audio")
+            if input_prompt or input_images or input_audio:
+                messages += [
+                    format_chat_entry(
+                        role=CHATML_ROLE_USER, content=input_prompt, images=input_images
+                    ),
+                ]
+            # render history
+            for entry in reversed(messages):
+                with msg_container_widget(entry["role"]):
+                    images = get_entry_images(entry)
+                    text = get_entry_text(entry)
+                    if text or images or input_audio:
+                        gui.write(f"**{entry['role'].capitalize()}**  \n{text}")
+                    if images:
+                        for im in images:
+                            gui.image(im, style={"maxHeight": "200px"})
+                    if input_audio:
+                        gui.audio(input_audio)
+                        input_audio = None
+
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
     return "\n".join(
@@ -1415,72 +1572,6 @@ def infer_asr_model_and_language(
     else:
         asr_model = default
     return asr_model.name, asr_lang
-
-
-def chat_list_view():
-    # render a reversed list view
-    with gui.div(
-        className="pb-1",
-        style=dict(
-            maxHeight="80vh",
-            overflowY="scroll",
-            display="flex",
-            flexDirection="column-reverse",
-            border="1px solid #c9c9c9",
-        ),
-    ):
-        with gui.div(className="px-3"):
-            show_raw_msgs = gui.checkbox("_Show Raw Output_")
-        # render the last output
-        with msg_container_widget(CHATML_ROLE_ASSISTANT):
-            if show_raw_msgs:
-                output_text = gui.session_state.get("raw_output_text", [])
-            else:
-                output_text = gui.session_state.get("output_text", [])
-            output_video = gui.session_state.get("output_video", [])
-            output_audio = gui.session_state.get("output_audio", [])
-            if output_text:
-                gui.write("**Assistant**")
-                for idx, text in enumerate(output_text):
-                    gui.write(text)
-                    try:
-                        gui.video(output_video[idx])
-                    except IndexError:
-                        try:
-                            gui.audio(output_audio[idx])
-                        except IndexError:
-                            pass
-            output_documents = gui.session_state.get("output_documents", [])
-            if output_documents:
-                for doc in output_documents:
-                    gui.write(doc)
-        messages = gui.session_state.get("messages", []).copy()
-        # add last input to history if present
-        if show_raw_msgs:
-            input_prompt = gui.session_state.get("raw_input_text")
-        else:
-            input_prompt = gui.session_state.get("input_prompt")
-        input_images = gui.session_state.get("input_images")
-        input_audio = gui.session_state.get("input_audio")
-        if input_prompt or input_images or input_audio:
-            messages += [
-                format_chat_entry(
-                    role=CHATML_ROLE_USER, content=input_prompt, images=input_images
-                ),
-            ]
-        # render history
-        for entry in reversed(messages):
-            with msg_container_widget(entry["role"]):
-                images = get_entry_images(entry)
-                text = get_entry_text(entry)
-                if text or images or input_audio:
-                    gui.write(f"**{entry['role'].capitalize()}**  \n{text}")
-                if images:
-                    for im in images:
-                        gui.image(im, style={"maxHeight": "200px"})
-                if input_audio:
-                    gui.audio(input_audio)
-                    input_audio = None
 
 
 def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
@@ -1552,6 +1643,14 @@ def convo_window_clipper(
         if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
+
+
+def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
+    tool_name = call["function"]["name"]
+    tool = tools[tool_name]
+    yield f"🛠 {tool.label}..."
+    kwargs = json.loads(call["function"]["arguments"])
+    return tool.fn(**kwargs)
 
 
 class ConnectChoice(typing.NamedTuple):
