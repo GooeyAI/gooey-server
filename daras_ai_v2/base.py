@@ -36,7 +36,7 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, urls, icons
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -68,13 +68,11 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
-from routers.account import AccountTabs
 from routers.root import RecipeTabs
 from workspaces.widgets import (
     create_workspace_with_defaults,
     get_current_workspace,
     set_current_workspace,
-    workspace_selector,
 )
 from workspaces.models import Workspace
 
@@ -490,7 +488,8 @@ class BasePage:
 
             if dialog.is_open:
                 with gui.alert_dialog(
-                    ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
+                    ref=dialog,
+                    modal_title=f"#### Share: {self.current_pr.title}",
                 ):
                     self._render_share_modal(dialog=dialog)
         else:
@@ -507,43 +506,53 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        with gui.div(className="visibility-radio mb-5"):
-            options = {
-                str(enum.value): enum.help_text() for enum in PublishedRunVisibility
-            }
-            if self.request.user and self.request.user.handle:
-                profile_url = self.request.user.handle.get_app_url()
-                pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
-            elif self.request.user and not self.request.user.is_anonymous:
-                edit_profile_url = AccountTabs.profile.get_url_path(self.request)
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+        if not self.current_pr.workspace.is_personal:
+            with gui.div(className="mb-4"):
+                self._render_workspace_with_invite_button(self.current_pr.workspace)
 
-            published_run_visibility = PublishedRunVisibility(
-                int(
-                    gui.radio(
-                        "",
-                        options=options,
-                        format_func=options.__getitem__,
-                        key="published_run_visibility",
-                        value=str(self.current_pr.visibility),
-                    )
+        options = {
+            str(enum.value): enum.help_text(self.current_pr.workspace)
+            for enum in PublishedRunVisibility.for_workspace(self.current_pr.workspace)
+        }
+        published_run_visibility = PublishedRunVisibility(
+            int(
+                gui.radio(
+                    "",
+                    options=options,
+                    format_func=options.__getitem__,
+                    key="published_run_visibility",
+                    value=str(self.current_pr.visibility),
                 )
             )
-            gui.radio(
-                "",
-                options=[
-                    '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
-                ],
-                disabled=True,
-                checked_by_default=False,
-            )
+        )
 
-        with gui.div(className="d-flex justify-content-between"):
+        if (
+            self.current_workspace.is_personal
+            and self.request.user.get_workspaces().count() > 1
+        ):
+            with gui.div(className="alert alert-warning mb-0 mt-4"):
+                duplicate = gui.button(
+                    f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
+                )
+                gui.html(" this workflow to edit with others")
+                ref = gui.use_alert_dialog(key="publish-modal")
+                if duplicate:
+                    self.clear_publish_form()
+                    ref.set_open(True)
+                if ref.is_open:
+                    gui.session_state["published_run_workspace"] = (
+                        self.request.user.get_workspaces()
+                        .filter(is_personal=False)
+                        .first()
+                        .id
+                    )
+                    return self._render_publish_dialog(ref=ref)
+
+        elif self.current_workspace.is_personal:
+            with gui.div(className="alert alert-warning mb-0 mt-4"):
+                gui.html(f"{icons.company} Create a team workspace to edit with others")
+
+        with gui.div(className="d-flex justify-content-between pt-4"):
             pressed_copy = copy_to_clipboard_button_with_return(
                 label="Copy Link",
                 key="copy-link-in-share-modal",
@@ -571,17 +580,29 @@ class BasePage:
                 dialog.set_open(False)
                 gui.rerun()
 
-    def _render_save_button(self):
-        can_edit = self.can_user_edit_published_run(self.current_pr)
+    def _render_workspace_with_invite_button(self, workspace: Workspace):
+        from workspaces.views import member_invite_button_with_dialog
 
+        col1, col2 = gui.columns([9, 3])
+        with col1:
+            with gui.tag("p", className="mb-1 text-muted"):
+                gui.html("WORKSPACE")
+            self.render_author(workspace, current_user=self.request.user)
+        with col2:
+            membership = workspace.memberships.get(user_id=self.request.user.id)
+            member_invite_button_with_dialog(
+                membership,
+                close_on_confirm=False,
+                type="tertiary",
+                className="mb-0",
+            )
+
+    def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
             gui.html(
                 """
                 <style>
                     .save-button-menu .gui-input label p { color: black; }
-                    .visibility-radio .gui-input {
-                        margin-bottom: 0;
-                    }
                     .published-options-menu {
                         z-index: 1;
                     }
@@ -589,7 +610,7 @@ class BasePage:
                 """
             )
 
-            if can_edit:
+            if self.can_user_edit_published_run(self.current_pr):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
                 icon, label = icons.save, "Save and Run"
@@ -610,17 +631,7 @@ class BasePage:
 
             if not ref.is_open:
                 return
-            with gui.alert_dialog(
-                ref=ref,
-                modal_title=f"#### {label} Workflow",
-                large=True,
-            ):
-                self._render_publish_form(
-                    sr=self.current_sr,
-                    pr=self.current_pr,
-                    dialog=ref,
-                    is_update_mode=can_edit,
-                )
+            self._render_publish_dialog(ref=ref)
 
     def _publish_for_anonymous_user(self):
         query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
@@ -641,14 +652,43 @@ class BasePage:
         for k in keys:
             gui.session_state.pop(k, None)
 
+    def _render_publish_dialog(self, *, ref: gui.AlertDialogRef):
+        """
+        Note: all input keys in this method should start with `published_run_*`
+        (see: method clear_publish_form)
+        """
+        assert self.request.user and not self.request.user.is_anonymous
+
+        sr = self.current_sr
+        pr = self.current_pr
+
+        if self.can_user_edit_published_run(self.current_pr):
+            label = "Update"
+        elif self._has_request_changed():
+            label = "Save and Run"
+        else:
+            label = "Save as New"
+
+        with gui.alert_dialog(
+            ref=ref,
+            modal_title=f"#### {label} Workflow",
+            large=True,
+        ):
+            self._render_publish_form(sr=sr, pr=pr)
+
     def _render_publish_form(
         self,
-        *,
         sr: SavedRun,
         pr: PublishedRun,
-        dialog: gui.AlertDialogRef,
-        is_update_mode: bool = False,
     ):
+        selected_workspace_id = gui.session_state.get("published_run_workspace")
+        if not selected_workspace_id:
+            if self.can_user_edit_published_run(self.current_pr):
+                selected_workspace_id = self.current_pr.workspace_id
+            else:
+                selected_workspace_id = self.current_workspace.id
+        is_update_mode = selected_workspace_id == self.current_pr.workspace_id
+
         if pr.is_root() and self.is_current_user_admin():
             with gui.div(className="text-danger"):
                 gui.write(
@@ -664,17 +704,17 @@ class BasePage:
             else:
                 title = self._get_default_pr_title()
             published_run_title = gui.text_input(
-                "###### Title",
+                "##### Title",
                 key="published_run_title",
                 value=title,
             )
             published_run_description = gui.text_input(
-                "###### Description",
+                "##### Description",
                 key="published_run_description",
                 value=(pr.notes or self.preview_description(gui.session_state) or ""),
             )
             with gui.div(className="d-flex align-items-center"):
-                with gui.div(className="fs-3 text-muted mb-3 me-2"):
+                with gui.tag("h5", className="text-muted mb-3 me-2"):
                     gui.html(icons.notes)
                 with gui.div(className="flex-grow-1"):
                     change_notes = gui.text_input(
@@ -686,10 +726,31 @@ class BasePage:
 
         col1, col2 = gui.columns([1, 3])
         with col1:
-            gui.write("###### Workspace")
+            gui.write("##### Workspace", className="d-block mt-2")
+
         with col2:
-            if self.request.user and self.request.user.get_workspaces().count() > 1:
-                workspace_selector(self.request.user, self.request.session)
+            workspaces = list(
+                self.request.user.get_workspaces().order_by(
+                    "is_personal", "-created_at"
+                )
+            )
+            if (
+                self.can_user_edit_published_run(self.current_pr)
+                and self.current_pr.workspace not in workspaces
+            ):
+                workspaces.insert(0, self.current_pr.workspace)
+
+            workspace_options = {w.id: w for w in workspaces}
+            if len(workspace_options) > 1:
+                selected_workspace_id = gui.selectbox(
+                    "",
+                    key="published_run_workspace",
+                    options=workspace_options,
+                    format_func=lambda w_id: workspace_options[w_id].display_html(
+                        self.request.user
+                    ),
+                    value=selected_workspace_id,
+                )
             else:
                 with gui.div(className="p-2 mb-2"):
                     self.render_author(
@@ -709,8 +770,6 @@ class BasePage:
                         gui.rerun()
                     gui.html("&nbsp;" + "to edit with others")
 
-        self._render_admin_options(sr, pr)
-
         with gui.div(className="d-flex justify-content-end mt-4"):
             if is_update_mode:
                 pressed_save_as_new = gui.button(
@@ -718,12 +777,20 @@ class BasePage:
                     type="secondary",
                     className="mb-0 ms-2 py-2 px-4",
                 )
+                pressed_save = gui.button(
+                    f"{icons.save} Save",
+                    type="primary",
+                    className="mb-0 ms-2 py-2 px-4",
+                )
             else:
-                pressed_save_as_new = False
+                pressed_save_as_new = gui.button(
+                    f"{icons.fork} Save as New",
+                    type="primary",
+                    className="mb-0 ms-2 py-2 px-4",
+                )
+                pressed_save = False
 
-            pressed_save = gui.button(
-                f"{icons.save} Save", type="primary", className="mb-0 ms-2 py-2 px-4"
-            )
+        self._render_admin_options(sr, pr)
 
         if not pressed_save and not pressed_save_as_new:
             # neither action was taken - nothing to do now
@@ -743,15 +810,21 @@ class BasePage:
                 dialog.set_open(False)
                 raise gui.RerunException()
 
-        if pressed_save_as_new or not is_update_mode:
+        selected_workspace = workspace_options[selected_workspace_id]
+        if pressed_save_as_new:
+            if (
+                selected_workspace != self.current_workspace
+                and selected_workspace in self.request.user.get_workspaces()
+            ):
+                set_current_workspace(self.request.session, selected_workspace.id)
             pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
-                workspace=self.current_workspace,
+                workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility(pr.visibility),
+                visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
             updates = dict(
@@ -885,7 +958,7 @@ class BasePage:
 
         with gui.div(className="mt-4"):
             gui.write(
-                f"#### {icons.time} Version History",
+                f"##### {icons.time} Version History",
                 className="mb-4 fw-bold",
                 unsafe_allow_html=True,
             )
@@ -927,6 +1000,7 @@ class BasePage:
         ):
             return
 
+        gui.caption("---")
         with gui.expander("🛠️ Admin Options"):
             gui.write(
                 f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
@@ -1377,9 +1451,7 @@ class BasePage:
         link = None
         if isinstance(workspace_or_user, Workspace):
             workspace = workspace_or_user
-            photo = workspace.photo_url
-            if not photo and workspace.is_personal:
-                photo = workspace.created_by.photo_url
+            photo = workspace.get_photo()
             name = workspace.display_name(current_user=current_user)
             if show_as_link and workspace.is_personal and workspace.created_by.handle:
                 link = workspace.created_by.handle.get_app_url()
@@ -1474,9 +1546,10 @@ class BasePage:
                 self.render_run_cost()
             with col2:
                 submitted = gui.button(
-                    "🏃 Run",
+                    f"{icons.run} Run",
                     key=key,
                     type="primary",
+                    unsafe_allow_html=True,
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
             if not submitted:
@@ -2038,7 +2111,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         published_runs = PublishedRun.objects.filter(
             workflow=self.workflow,
-            created_by=self.request.user,
+            workspace=self.current_workspace,
         )[:50]
         if not published_runs:
             gui.write("No published runs yet")

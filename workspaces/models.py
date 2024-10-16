@@ -29,6 +29,9 @@ if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
 
 
+DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+
+
 def validate_workspace_domain_name(value: str):
     if value in COMMON_EMAIL_DOMAINS:
         raise ValidationError("This domain name is reserved")
@@ -157,6 +160,14 @@ class Workspace(SafeDeleteModel):
 
     def get_slug(self):
         return slugify(self.display_name())
+
+    def get_photo(self) -> str:
+        if self.photo_url:
+            return self.photo_url
+        elif self.is_personal:
+            return self.created_by.photo_url
+        else:
+            return DEFAULT_WORKSPACE_PHOTO_URL
 
     @transaction.atomic()
     def create_with_owner(self):
@@ -337,7 +348,10 @@ class Workspace(SafeDeleteModel):
         elif self.photo_url:
             return f'<img src="{self.photo_url}" style="height: 25px; width: auto; border-radius: 5px">'
         else:
-            return icons.company
+            return icons.company_fw
+
+    def display_html(self, current_user: AppUser | None = None) -> str:
+        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
 
 
 class WorkspaceMembership(SafeDeleteModel):
@@ -420,7 +434,10 @@ class WorkspaceMembership(SafeDeleteModel):
         return self.role == WorkspaceRole.OWNER
 
     def can_invite(self):
-        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+        return (
+            self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+            and not self.workspace.is_personal
+        )
 
 
 class WorkspaceInviteQuerySet(models.QuerySet):

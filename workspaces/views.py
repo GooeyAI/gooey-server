@@ -11,10 +11,14 @@ from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
-from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
+from .models import (
+    DEFAULT_WORKSPACE_PHOTO_URL,
+    Workspace,
+    WorkspaceInvite,
+    WorkspaceMembership,
+    WorkspaceRole,
+)
 from .widgets import get_current_workspace, set_current_workspace
-
-DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
 
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
@@ -107,7 +111,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
     with col1:
         gui.image(
-            workspace.photo_url or DEFAULT_WORKSPACE_LOGO,
+            workspace.photo_url or DEFAULT_WORKSPACE_PHOTO_URL,
             className="my-0 me-4 rounded",
             style={"width": "128px", "height": "128px", "object-fit": "contain"},
         )
@@ -182,13 +186,18 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         gui.rerun()
 
 
-def member_invite_button_with_dialog(membership: WorkspaceMembership):
+def member_invite_button_with_dialog(
+    membership: WorkspaceMembership,
+    *,
+    close_on_confirm: bool = True,
+    **props,
+):
     if not membership.can_invite():
         return
 
     ref = gui.use_confirm_dialog(key="invite-member", close_on_confirm=False)
 
-    if gui.button(label=f"{icons.add_user} Invite"):
+    if gui.button(label=f"{icons.add_user} Invite", **props):
         clear_invite_creation_form()
         ref.set_open(True)
     if not ref.is_open:
@@ -200,9 +209,9 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
         confirm_label=f"{icons.send} Send Invite",
     ):
         role, email = render_invite_creation_form(membership.workspace)
-
         if not ref.pressed_confirm:
             return
+
         try:
             WorkspaceInvite.objects.create_and_send_invite(
                 workspace=membership.workspace,
@@ -213,8 +222,11 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
         except ValidationError as e:
             gui.write("\n".join(e.messages), className="text-danger")
         else:
-            ref.set_open(False)
-            gui.rerun()
+            if close_on_confirm:
+                ref.set_open(False)
+                gui.rerun()
+            else:
+                gui.success("Invite sent successfully!")
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
@@ -257,7 +269,7 @@ def render_workspace_edit_view_by_membership(
 
 
 def clear_invite_creation_form():
-    keys = {k for k in gui.session_state.keys() if k.startswith("invite-")}
+    keys = {k for k in gui.session_state.keys() if k.startswith("invite-form-")}
     for k in keys:
         gui.session_state.pop(k, None)
 
@@ -267,17 +279,17 @@ def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
 
     choices = dict(WorkspaceRole.choices)
     role = gui.selectbox(
-        "######  Role",
+        "###### Role",
         options=choices.keys(),
         format_func=choices.get,
         value=WorkspaceRole.MEMBER.value,
-        key="invite-role",
+        key="invite-form-role",
     )
 
     email = gui.text_input(
         "###### Email",
         style=dict(minWidth="300px"),
-        key="invite-email",
+        key="invite-form-email",
     ).strip()
 
     if workspace.domain_name:

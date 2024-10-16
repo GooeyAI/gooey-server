@@ -15,12 +15,14 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, urls
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
+from workspaces.widgets import get_route_path_for_workspace
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -36,13 +38,40 @@ EPOCH = datetime.datetime.utcfromtimestamp(0)
 class PublishedRunVisibility(models.IntegerChoices):
     UNLISTED = 1
     PUBLIC = 2
+    INTERNAL = 3
 
-    def help_text(self):
+    @classmethod
+    def for_workspace(
+        cls, workspace: "Workspace"
+    ) -> typing.Iterable["PublishedRunVisibility"]:
+        if workspace.is_personal:
+            return [cls.UNLISTED, cls.PUBLIC]
+        else:
+            # TODO: Add cls.PUBLIC when team-handles are added
+            return [cls.UNLISTED, cls.INTERNAL]
+
+    def help_text(self, workspace: "Workspace | None" = None):
+        from routers.account import profile_route, saved_route
+
         match self:
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Only me + people with a link"
+            case PublishedRunVisibility.PUBLIC if workspace and workspace.is_personal:
+                user = workspace.created_by
+                if user.handle:
+                    profile_url = user.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    return f'{self.get_icon()} Public on <a href="{pretty_profile_url}" target="_blank">{profile_url}</a>'
+                else:
+                    edit_profile_url = get_route_path(profile_route)
+                    return f'{self.get_icon()} Public on <a href="{edit_profile_url}" target="_blank">my profile page</a>'
             case PublishedRunVisibility.PUBLIC:
                 return f"{self.get_icon()} Public"
+            case PublishedRunVisibility.INTERNAL if workspace:
+                saved_route_url = get_route_path_for_workspace(saved_route, workspace)
+                return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
+            case PublishedRunVisibility.INTERNAL:
+                return f"{self.get_icon()} Members can find and edit"
 
     def get_icon(self):
         match self:
@@ -50,6 +79,8 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return icons.lock
             case PublishedRunVisibility.PUBLIC:
                 return icons.globe
+            case PublishedRunVisibility.INTERNAL:
+                return icons.company_solid
 
     def get_badge_html(self):
         match self:

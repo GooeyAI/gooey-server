@@ -25,7 +25,7 @@ from workspaces.models import Workspace, WorkspaceInvite, WorkspaceMembership
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import (
     get_current_workspace,
-    get_workspaces_route_path,
+    get_route_path_for_workspace,
     set_current_workspace,
 )
 
@@ -95,7 +95,7 @@ def account_route(request: Request):
         raise gui.RedirectException(get_route_path(profile_route))
     else:
         raise gui.RedirectException(
-            get_workspaces_route_path(workspaces_route, workspace)
+            get_route_path_for_workspace(workspaces_route, workspace)
         )
 
 
@@ -293,7 +293,7 @@ class AccountTabs(TabData, Enum):
         if workspace.is_personal or self == AccountTabs.profile:
             return get_route_path(self.route)
         else:
-            return get_workspaces_route_path(self.route, workspace)
+            return get_route_path_for_workspace(self.route, workspace)
 
 
 def billing_tab(request: Request):

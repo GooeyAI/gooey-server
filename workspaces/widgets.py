@@ -111,7 +111,7 @@ def workspace_selector(
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_workspaces_route_path(workspaces_route, workspace=current),
+                to=get_route_path_for_workspace(workspaces_route, workspace=current),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
@@ -206,7 +206,7 @@ def validate_tab_for_workspace(tab: "AccountTabs", workspace: Workspace) -> bool
     return True
 
 
-def get_workspaces_route_path(route_fn: typing.Callable, workspace: Workspace):
+def get_route_path_for_workspace(route_fn: typing.Callable, workspace: Workspace):
     """
     For routes like /workspaces/{workspace_slug}-{workspace_hashid}/...
     """
