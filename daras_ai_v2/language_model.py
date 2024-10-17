@@ -21,6 +21,7 @@ from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
     ChatCompletion,
+    ChatCompletionMessageToolCallParam,
 )
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
@@ -31,7 +32,7 @@ from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
 )
-from functions.recipe_functions import LLMTools
+from functions.recipe_functions import LLMTool
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
@@ -450,9 +451,13 @@ def calc_gpt_tokens(
     return default_length_function(combined)
 
 
-class ConversationEntry(typing_extensions.TypedDict):
-    role: typing.Literal["user", "system", "assistant"]
+class ConversationEntry(typing_extensions.TypedDict, total=False):
+    role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
+
+    tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
+    tool_call_id: typing_extensions.NotRequired[str]
+
     display_name: typing_extensions.NotRequired[str]
 
 
@@ -488,7 +493,7 @@ def run_language_model(
     temperature: float = 0.7,
     stop: list[str] = None,
     avoid_repetition: bool = False,
-    tools: list[LLMTools] = None,
+    tools: list[LLMTool] = None,
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
 ) -> (
@@ -529,7 +534,7 @@ def run_language_model(
                 messages[0]["content"] = "\n\n".join(
                     [get_entry_text(messages[0]), DEFAULT_JSON_PROMPT]
                 )
-        entries = _run_chat_model(
+        result = _run_chat_model(
             api=model.llm_api,
             model=model.model_id,
             messages=messages,  # type: ignore
@@ -541,12 +546,12 @@ def run_language_model(
             tools=tools,
             response_format_type=response_format_type,
             # we can't stream with tools or json yet
-            stream=stream and not (tools or response_format_type),
+            stream=stream and not response_format_type,
         )
         if stream:
-            return _stream_llm_outputs(entries)
+            return output_stream_generator(result)
         else:
-            return _parse_entries(entries, tools)
+            return [get_entry_text(entry).strip() for entry in result]
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -588,23 +593,15 @@ def run_language_model(
         return ret
 
 
-def _stream_llm_outputs(
+def output_stream_generator(
     result: list | typing.Generator[list[ConversationEntry], None, None],
 ):
     if isinstance(result, list):  # compatibility with non-streaming apis
         result = [result]
     for entries in result:
         for i, entry in enumerate(entries):
-            entries[i]["content"] = entry.get("content") or ""
+            entries[i]["content"] = entry.get("content") or ""  # null safety
         yield entries
-
-
-def _parse_entries(entries: list[dict], tools: list[dict] | None):
-    ret = [get_entry_text(entry).strip() for entry in entries]
-    if tools:
-        return ret, [(entry.get("tool_calls") or []) for entry in entries]
-    else:
-        return ret
 
 
 def _run_text_model(
@@ -676,7 +673,7 @@ def _run_chat_model(
     temperature: float,
     stop: list[str] | None,
     avoid_repetition: bool,
-    tools: list[LLMTools] | None,
+    tools: list[LLMTool] | None,
     response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
@@ -913,7 +910,7 @@ def _run_anthropic_chat(
             )
         if response.stop_reason != "tool_use":
             raise UserError(
-                f"Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
+                "Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
             ) from anthropic.AnthropicError(
                 f"Failed to generate JSON response: {response.stop_reason=} {response.content}"
             )
@@ -947,7 +944,7 @@ def _run_openai_chat(
     temperature: float,
     stop: list[str] | None,
     avoid_repetition: bool,
-    tools: list[LLMTools] | None,
+    tools: list[LLMTool] | None,
     response_format_type: ResponseFormatType | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
@@ -1025,10 +1022,20 @@ def _stream_openai_chunked(
                 entry = ret[choice.index]
             except IndexError:
                 # initialize the entry
-                entry = delta.dict() | {"content": "", "chunk": ""}
+                entry = dict(role=delta.role, content="", chunk="")
                 ret.append(entry)
             # this is to mark the end of streaming
             entry["finish_reason"] = choice.finish_reason
+
+            if delta.tool_calls:
+                for tc_delta in delta.tool_calls:
+                    try:
+                        tc = entry["tool_calls"][tc_delta.index]
+                    except (KeyError, IndexError):
+                        tc = tc_delta.dict()
+                        entry.setdefault("tool_calls", []).append(tc)
+                    else:
+                        tc["function"]["arguments"] += tc_delta.function.arguments
 
             # append the delta to the current chunk
             if not delta.content:

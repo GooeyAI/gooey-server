@@ -102,8 +102,7 @@ class VideoBotsStatsPage(BasePage):
                 )
 
             with gui.div(className="d-flex align-items-center"):
-                with gui.div(className="d-flex align-items-start right-action-icons"):
-                    self._render_social_buttons(show_button_text=True)
+                self.render_social_buttons()
 
         gui.markdown("# " + self.get_dynamic_meta_title())
 
