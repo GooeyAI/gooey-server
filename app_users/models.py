@@ -236,6 +236,13 @@ class AppUser(models.Model):
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
 
+    def get_workspaces(self):
+        from workspaces.models import Workspace
+
+        return Workspace.objects.filter(
+            memberships__user=self, memberships__deleted__isnull=True
+        )
+
 
 class TransactionReason(models.IntegerChoices):
     DEDUCT = 1, "Deduct"
