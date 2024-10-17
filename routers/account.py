@@ -36,6 +36,14 @@ app = CustomAPIRouter()
 def payment_processing_route(
     request: Request, provider: str | None = None, subscription_id: str | None = None
 ):
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        redirect_url = furl(
+            get_route_path(login), query_params={"next": request.url.path}
+        )
+        raise gui.RedirectException(redirect_url)
+
     waiting_time_sec = 3
     subtext = None
 
