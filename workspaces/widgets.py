@@ -220,17 +220,3 @@ def get_route_path_for_workspace(route_fn: typing.Callable, workspace: Workspace
                 "workspace_slug": workspace.get_slug(),
             },
         )
-
-
-def create_workspace_with_defaults(user: AppUser, name: str | None = None):
-    if not name:
-        workspace_count = user.get_workspaces().count()
-        suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
-        name = get_default_name_for_new_workspace(user, suffix=suffix)
-    workspace = Workspace(name=name, created_by=user)
-    workspace.create_with_owner()
-    return workspace
-
-
-def get_default_name_for_new_workspace(user: AppUser, suffix: str = "") -> str:
-    return f"{user.first_name_possesive()} Team Workspace" + suffix
