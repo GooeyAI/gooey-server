@@ -709,8 +709,6 @@ def page_wrapper(
     *,
     current_tab: "AccountTabs | None" = None,
 ):
-    from daras_ai_v2.base import BasePage
-
     context = {
         "request": request,
         "block_incognito": True,
