@@ -15,7 +15,7 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -1968,9 +1968,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _saved_tab(self):
         self.ensure_authentication()
 
+        pr_filter = Q(workspace=self.current_workspace)
+        if self.current_workspace.is_personal:
+            pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         published_runs = PublishedRun.objects.filter(
-            workflow=self.workflow,
-            created_by=self.request.user,
+            Q(workflow=self.workflow) & pr_filter
         )[:50]
         if not published_runs:
             gui.write("No published runs yet")
