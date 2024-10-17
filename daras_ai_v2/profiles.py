@@ -94,7 +94,7 @@ def user_profile_header(request, user: AppUser):
                 from routers.account import AccountTabs
 
                 with gui.link(
-                    to=AccountTabs.profile.url_path,
+                    to=AccountTabs.profile.get_url_path(request),
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
                     gui.html(f"{icons.edit} Edit Profile")

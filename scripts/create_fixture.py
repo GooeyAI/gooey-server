@@ -55,9 +55,14 @@ def get_objects(*args):
     if "bots" not in args:
         return
     for obj in BotIntegration.objects.all():
+        # TODO: deprecate billing_account_uid
         user = AppUser.objects.get(uid=obj.billing_account_uid)
         yield user.handle
         yield export(user, only_include=USER_FIELDS)
+
+        if obj.workspace:
+            yield export(obj.workspace.created_by, only_include=USER_FIELDS)
+            yield export(obj.workspace, include_fks=("created_by",))
 
         if obj.saved_run_id:
             yield export(obj.saved_run)
