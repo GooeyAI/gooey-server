@@ -23,8 +23,9 @@ from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
-    from daras_ai_v2.base import BasePage
     import celery.result
+    from daras_ai_v2.base import BasePage
+    from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
@@ -1631,6 +1632,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: "Workspace | None",
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1643,6 +1645,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 **kwargs,
                 saved_run=saved_run,
                 user=user,
+                workspace=workspace,
                 title=title,
                 notes=notes,
                 visibility=visibility,
@@ -1656,6 +1659,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: "Workspace | None",
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1666,6 +1670,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 published_run_id=published_run_id,
                 created_by=user,
                 last_edited_by=user,
+                workspace=workspace,
                 title=title,
             )
             pr.add_version(
@@ -1715,6 +1720,12 @@ class PublishedRun(models.Model):
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
         null=True,
     )
 
@@ -1773,6 +1784,7 @@ class PublishedRun(models.Model):
         self,
         *,
         user: AppUser,
+        workspace: "Workspace",
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1782,6 +1794,7 @@ class PublishedRun(models.Model):
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
