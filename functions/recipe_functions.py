@@ -185,7 +185,7 @@ def functions_input(current_user: AppUser, key="functions"):
             )
         col2.node.children[0].props["className"] += " col-12"
 
-    if gui.checkbox(
+    if gui.switch(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
         key=f"--enable-{key}",
         value=key in gui.session_state,

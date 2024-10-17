@@ -346,14 +346,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         gui.markdown("#### 💪 Capabilities")
-        if gui.checkbox(
+        if gui.switch(
             "##### 🗣️ Text to Speech & Lipsync",
             value=bool(gui.session_state.get("tts_provider")),
         ):
             text_to_speech_provider_selector(self)
             gui.write("---")
 
-            enable_video = gui.checkbox(
+            enable_video = gui.switch(
                 "##### 🫦 Add Lipsync Video",
                 value=bool(gui.session_state.get("input_face")),
             )
@@ -379,12 +379,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["input_face"] = None
             gui.session_state.pop("lipsync_model", None)
 
-        if gui.checkbox(
-            "##### 🔠 Translation & Speech Recognition",
+        if gui.switch(
+            label="##### 🔠 Translation & Speech Recognition",
             value=bool(
                 gui.session_state.get("user_language")
                 or gui.session_state.get("asr_model")
             ),
+            key="translation_speech_recognition_switch",
         ):
             gui.caption(field_desc(self.RequestModel, "user_language"))
             col1, col2 = gui.columns(2)
@@ -425,7 +426,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["asr_model"] = None
             gui.session_state["user_language"] = None
 
-        if gui.checkbox(
+        if gui.switch(
             "##### 🩻 Photo & Document Intelligence",
             value=bool(gui.session_state.get("document_model")),
         ):
