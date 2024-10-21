@@ -180,7 +180,8 @@ class Workspace(SafeDeleteModel):
         ):
             self.balance = settings.FIRST_WORKSPACE_FREE_CREDITS
         self.id = None
-        self.full_clean()
+        # in a transaction, let the database handle constraints
+        self.full_clean(validate_unique=False, validate_constraints=False)
         self.save()
         WorkspaceMembership.objects.create(
             workspace=self,
