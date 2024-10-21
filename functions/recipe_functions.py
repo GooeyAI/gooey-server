@@ -84,7 +84,7 @@ def call_recipe_functions(
         return return_value
 
     for fun in functions:
-        _, sr, pr = url_to_runs(fun.url)
+        _, sr, pr = url_to_runs(fun.get("url"))
         if trigger != FunctionTrigger.prompt:
             run(sr, pr)
         else:
