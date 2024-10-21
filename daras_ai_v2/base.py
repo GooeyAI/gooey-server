@@ -1152,7 +1152,9 @@ class BasePage:
             ):
                 if version.changed_by:
                     with gui.tag("h6", className="mb-0"):
-                        self.render_author(version.changed_by, responsive=False)
+                        self.render_author(
+                            version.changed_by, responsive=False, show_as_link=False
+                        )
                 else:
                     gui.write("###### Deleted User", className="disable-p-margin")
                 with gui.tag("h6", className="mb-0"):
