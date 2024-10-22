@@ -13,12 +13,12 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
-    google_translate_language_selector,
+    run_translate,
     AsrModels,
     run_asr,
     download_youtube_to_wav_url,
-    run_google_translate,
     audio_url_to_wav,
+    TranslationModels,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -26,12 +26,9 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
-    SUPPORTED_SPREADSHEET_TYPES,
     is_user_uploaded_url,
 )
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
@@ -61,6 +58,8 @@ from daras_ai_v2.vector_search import (
 )
 from files.models import FileMetadata
 from recipes.DocSearch import render_documents
+from recipes.Translation import TranslationOptions
+from recipes.asr_page import AsrPage
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
@@ -94,12 +93,15 @@ class DocExtractPage(BasePage):
         sheet_url: FieldHttpUrl | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        # language: str | None
-        google_translate_target: str | None
-        glossary_document: FieldHttpUrl | None = Field(
-            title="Translation Glossary",
-            description="""Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).""",
+        language: str | None
+
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        )
+
+        google_translate_target: str | None = Field(
+            deprecated=True,
+            description="use `translation_model` & `translation_target` instead.",
         )
 
         task_instructions: str | None
@@ -108,11 +110,29 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
 
-    class RequestModel(LanguageModelSettings, RequestModelBase):
+    class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
         output_documents: list[FieldHttpUrl] | None
+
+    def current_sr_to_session_state(self) -> dict:
+        state = super().current_sr_to_session_state()
+        google_translate_target = state.pop("google_translate_target", None)
+        translation_model = state.get("translation_model")
+        if google_translate_target and not translation_model:
+            state["translation_model"] = TranslationModels.google.name
+            state["translation_target"] = google_translate_target
+        return state
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return [
+            "selected_model",
+            "language",
+            "translation_model",
+            "translation_target",
+        ]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_YOUTUBE_BOT_META_IMG
@@ -154,20 +174,14 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
-        enum_selector(
-            AsrModels,
-            label="##### ASR Model",
-            key="selected_asr_model",
-            use_selectbox=True,
-        )
         gui.write("---")
 
-        google_translate_language_selector()
-        gui.file_uploader(
-            label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-            key="glossary_document",
-            accept=SUPPORTED_SPREADSHEET_TYPES,
-        )
+        gui.markdown("#### 🦻 Speech Recognition & Translation")
+        gui.caption("Recognize speech and translate for audio and video files.")
+
+        AsrPage.render_speech_and_translation_inputs(asr_model_key="selected_asr_model")
+        AsrPage.render_translation_advanced_settings()
+
         gui.write("---")
 
     def related_workflows(self) -> list:
@@ -478,7 +492,9 @@ def process_source(
     if not transcript:
         if is_yt or is_video:
             yield "Transcribing"
-            transcript = run_asr(content_url, request.selected_asr_model)
+            transcript = run_asr(
+                content_url, request.selected_asr_model, language=request.language
+            )
         elif is_pdf:
             yield "Extracting PDF"
             transcript = azure_doc_extract_page_num(content_url, entry.get("page_num"))
@@ -494,14 +510,15 @@ def process_source(
         final_col_name = "snippet"
     final_value = transcript
 
-    if request.google_translate_target:
+    if request.translation_model:
         translation = existing_values[Columns.translation.value]
         if not translation:
             yield "Translating"
-            translation = run_google_translate(
+            translation = run_translate(
                 texts=[transcript],
-                target_language=request.google_translate_target,
-                # source_language=request.language,
+                target_language=request.translation_target,
+                source_language=request.translation_source,
+                model=request.translation_model,
                 glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
