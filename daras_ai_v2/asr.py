@@ -324,8 +324,10 @@ class TranslationModels(TranslationModel, Enum):
             cls.google: list(
                 google_translate_target_languages().keys(),
             ),
-            cls.ghana_nlp: list(
-                ghana_nlp_translate_target_languages().keys(),
+            cls.ghana_nlp: (
+                list(ghana_nlp_translate_target_languages().keys())
+                if settings.GHANA_NLP_SUBKEY
+                else []
             ),
         }
 
