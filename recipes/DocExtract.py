@@ -94,14 +94,14 @@ class DocExtractPage(BasePage):
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
+
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
-        google_translate_target: str | None
-        glossary_document: FieldHttpUrl | None = Field(
-            title="Translation Glossary",
-            description="""Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).""",
+
+        google_translate_target: str | None = Field(
+            deprecated=True,
+            description="use `translation_model` & `translation_target` instead.",
         )
 
         task_instructions: str | None
@@ -110,7 +110,7 @@ If not specified or invalid, no glossary will be used. Read about the expected f
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
 
-    class RequestModel(LanguageModelSettings, RequestModelBase, TranslationOptions):
+    class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
