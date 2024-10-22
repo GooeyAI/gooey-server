@@ -18,12 +18,7 @@ from daras_ai_v2.asr import (
     run_asr,
     download_youtube_to_wav_url,
     audio_url_to_wav,
-    language_filter_selector,
-    asr_language_selector,
-    translation_language_selector,
-    translation_model_selector,
     TranslationModels,
-    asr_model_selector,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -31,12 +26,9 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
-    SUPPORTED_SPREADSHEET_TYPES,
     is_user_uploaded_url,
 )
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
@@ -67,6 +59,7 @@ from daras_ai_v2.vector_search import (
 from files.models import FileMetadata
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
+from recipes.asr_page import AsrPage
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
@@ -181,74 +174,14 @@ If not specified or invalid, no glossary will be used. Read about the expected f
         selected_model = language_model_selector()
         language_model_settings(selected_model)
 
+        gui.write("---")
+
         gui.markdown("#### 🦻 Speech Recognition & Translation")
-        gui.caption(
-            "Recognize speech and translate for audio and video files.",
-        )
+        gui.caption("Recognize speech and translate for audio and video files.")
 
-        # drop down to filter models based on the selected language
-        selected_filter_language = language_filter_selector()
+        AsrPage.render_speech_and_translation_inputs(asr_model_key="selected_asr_model")
+        AsrPage.render_translation_advanced_settings()
 
-        col1, col2 = gui.columns(2, responsive=False)
-        with col1:
-            selected_model = asr_model_selector(
-                label="###### Speech Recognition Model",
-                key="selected_asr_model",
-                filter_by_language=selected_filter_language,
-            )
-        with col2:
-            asr_language_selector(
-                AsrModels[selected_model],
-                filter_by_language=selected_filter_language,
-                key="language",
-            )
-        with gui.div(style=dict(paddingLeft="0.5rem")):
-            if gui.checkbox(
-                "**Translate to another language**",
-                value=bool(gui.session_state.get("translation_model")),
-            ):
-                with gui.div(style=dict(marginTop="-0.9rem")):
-                    gui.caption(
-                        "Choose a model, source and target languages to translate recognized audio.",
-                    )
-                col1, col2 = gui.columns(2)
-                with col1:
-                    translation_model = translation_model_selector(
-                        allow_none=False, filter_by_language=selected_filter_language
-                    )
-                with col2:
-                    translation_language_selector(
-                        model=translation_model,
-                        default_language="en",
-                        label=f"###### Target Translation Language",
-                        key="translation_target",
-                    )
-                if selected_model and translation_model:
-                    gui.write("---")
-                    translation_language_selector(
-                        model=translation_model,
-                        label=f"###### Source Translation Language",
-                        key="translation_source",
-                        filter_by_language=selected_filter_language,
-                        allow_none=(
-                            False
-                            if selected_filter_language
-                            else (
-                                translation_model.supports_auto_detect
-                                if translation_model
-                                else True
-                            )
-                        ),
-                    )
-                    gui.caption(
-                        "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
-                    )
-                if translation_model and translation_model.supports_glossary:
-                    gui.file_uploader(
-                        label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
-                        key="glossary_document",
-                        accept=SUPPORTED_SPREADSHEET_TYPES,
-                    )
         gui.write("---")
 
     def related_workflows(self) -> list:
@@ -560,7 +493,7 @@ def process_source(
         if is_yt or is_video:
             yield "Transcribing"
             transcript = run_asr(
-                content_url, request.selected_asr_model, language=request.asr_language
+                content_url, request.selected_asr_model, language=request.language
             )
         elif is_pdf:
             yield "Extracting PDF"

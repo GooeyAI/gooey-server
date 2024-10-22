@@ -45,7 +45,6 @@ from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     get_bot_test_link,
     web_widget_config,
-    get_web_widget_embed_code,
     integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -63,6 +62,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.glossary import validate_glossary_document
+from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -234,7 +234,7 @@ class VideoBotsPage(BasePage):
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
         user_language: str | None = Field(
-            title="Translated Language",
+            title="Translation Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
@@ -351,71 +351,46 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         gui.markdown("#### 💪 Capabilities")
-        if gui.checkbox(
-            "##### 🗣️ Text to Speech & Lipsync",
-            value=bool(gui.session_state.get("tts_provider")),
-        ):
-            text_to_speech_provider_selector(self)
-            gui.write("---")
-
-            enable_video = gui.checkbox(
-                "##### 🫦 Add Lipsync Video",
-                value=bool(gui.session_state.get("input_face")),
-            )
-        else:
-            gui.session_state["tts_provider"] = None
-            enable_video = False
-        if enable_video:
-            gui.file_uploader(
-                """
-                ###### 👩‍🦰 Input Face
-                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
-                """,
-                key="input_face",
-            )
-            enum_selector(
-                LipsyncModel,
-                label="###### Lipsync Model",
-                key="lipsync_model",
-                use_selectbox=True,
-            )
-            gui.write("---")
-        else:
-            gui.session_state["input_face"] = None
-            gui.session_state.pop("lipsync_model", None)
 
         if gui.checkbox(
-            "##### 🔠 Speech Recognition & Translation",
+            "##### 🦻 Speech Recognition & Translation",
             value=bool(
                 gui.session_state.get("user_language")
                 or gui.session_state.get("asr_model")
             ),
         ):
-            gui.caption(field_desc(self.RequestModel, "user_language"))
+            with gui.div(className="ms-4 ps-1"):
+                gui.caption(field_desc(self.RequestModel, "user_language"))
 
-            # drop down to filter models based on the selected language
-            selected_filter_language = language_filter_selector()
-
-            col1, col2 = gui.columns(2, responsive=False)
-            with col1:
-                selected_model = asr_model_selector(
-                    key="asr_model",
-                    filter_by_language=selected_filter_language,
-                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                    format_func=lambda x: AsrModels[x].value if x else "Auto Select",
+                # drop down to filter models based on the selected language
+                selected_filter_language, did_change = language_filter_selector(
+                    options=asr_languages_without_dialects()
                 )
-            with col2:
-                if selected_model:
-                    asr_language_selector(
-                        AsrModels[selected_model],
-                        filter_by_language=selected_filter_language,
-                        label=f"###### {field_title(self.RequestModel, 'asr_language')}",
-                        key="asr_language",
+                if did_change:
+                    gui.session_state["asr_language"] = None
+                    gui.session_state["user_language"] = None
+
+                col1, col2 = gui.columns(2, responsive=False)
+                with col1:
+                    asr_model = asr_model_selector(
+                        key="asr_model",
+                        language_filter=selected_filter_language,
+                        label=f"###### {field_title(self.RequestModel, 'asr_model')}",
+                        format_func=lambda x: (
+                            AsrModels[x].value if x else "Auto Select"
+                        ),
                     )
-            gui.write("---")
-            with gui.div(style=dict(paddingLeft="0.5rem")):
+                with col2:
+                    if asr_model:
+                        asr_language_selector(
+                            asr_model,
+                            language_filter=selected_filter_language,
+                            label=f"###### {field_title(self.RequestModel, 'asr_language')}",
+                            key="asr_language",
+                        )
+                gui.newline()
                 if gui.checkbox(
-                    "**Translate to & from English**",
+                    "🔠 **Translate to & from English**",
                     value=bool(gui.session_state.get("translation_model")),
                 ):
                     gui.caption(
@@ -425,36 +400,73 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     with col1:
                         translation_model = translation_model_selector(
                             allow_none=False,
-                            filter_by_language=selected_filter_language,
+                            language_filter=selected_filter_language,
                         )
                     with col2:
                         translation_language_selector(
                             model=translation_model,
-                            default_language="en",
+                            language_filter=selected_filter_language,
                             label=f"###### {field_title(self.RequestModel, 'user_language')}",
                             key="user_language",
                         )
-            gui.html("<br />")
+                gui.newline()
         else:
             gui.session_state["translation_model"] = None
             gui.session_state["asr_model"] = None
             gui.session_state["user_language"] = None
 
         if gui.checkbox(
+            "##### 🗣️ Text to Speech & Lipsync",
+            value=bool(gui.session_state.get("tts_provider")),
+        ):
+            with gui.div(className="ms-4 ps-1"):
+                text_to_speech_provider_selector(self)
+
+            gui.newline()
+
+            enable_video = gui.checkbox(
+                "##### 🫦 Add Lipsync Video",
+                value=bool(gui.session_state.get("input_face")),
+            )
+        else:
+            gui.session_state["tts_provider"] = None
+            enable_video = False
+        if enable_video:
+            with gui.div(className="ms-4 ps-1"):
+                gui.file_uploader(
+                    """
+                    ###### 👩‍🦰 Input Face
+                    Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
+                    """,
+                    key="input_face",
+                )
+                enum_selector(
+                    LipsyncModel,
+                    label="###### Lipsync Model",
+                    key="lipsync_model",
+                    use_selectbox=True,
+                )
+            gui.newline()
+        else:
+            gui.session_state["input_face"] = None
+            gui.session_state.pop("lipsync_model", None)
+
+        if gui.checkbox(
             "##### 🩻 Photo & Document Intelligence",
             value=bool(gui.session_state.get("document_model")),
         ):
-            if settings.AZURE_FORM_RECOGNIZER_KEY:
-                doc_model_descriptions = azure_form_recognizer_models()
-            else:
-                doc_model_descriptions = {}
-            gui.selectbox(
-                f"{field_desc(self.RequestModel, 'document_model')}",
-                key="document_model",
-                options=doc_model_descriptions,
-                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
-            )
-            gui.write("---")
+            with gui.div(className="ms-4 ps-1"):
+                if settings.AZURE_FORM_RECOGNIZER_KEY:
+                    doc_model_descriptions = azure_form_recognizer_models()
+                else:
+                    doc_model_descriptions = {}
+                gui.selectbox(
+                    f"{field_desc(self.RequestModel, 'document_model')}",
+                    key="document_model",
+                    options=doc_model_descriptions,
+                    format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
+                )
+            gui.newline()
         else:
             gui.session_state["document_model"] = None
 

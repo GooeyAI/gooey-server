@@ -13,6 +13,7 @@ from furl import furl
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -29,10 +30,15 @@ from daras_ai_v2.gdrive_downloader import (
 )
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
+from daras_ai_v2.language_filters import (
+    filter_languages,
+    filter_models_by_language,
+    normalised_lang_in_collection,
+    are_languages_same,
+)
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
-from daras_ai_v2.enum_selector_widget import enum_selector
 
 TRANSLATE_BATCH_SIZE = 8
 
@@ -312,11 +318,124 @@ class TranslationModels(TranslationModel, Enum):
         label="Ghana NLP Translate", supports_auto_detect=False
     )
 
+    @classmethod
+    def target_languages_by_model(cls) -> dict[TranslationModel, list[str]]:
+        return {
+            cls.google: list(
+                google_translate_target_languages().keys(),
+            ),
+            cls.ghana_nlp: list(
+                ghana_nlp_translate_target_languages().keys(),
+            ),
+        }
+
+
+def translation_language_selector(
+    *,
+    model: TranslationModels | None,
+    label: str,
+    key: str,
+    language_filter: str = "",
+    sort_by: str | None = None,
+    **kwargs,
+) -> str | None:
+    if not model:
+        gui.session_state[key] = None
+        return
+
+    if model == TranslationModels.google:
+        languages = google_translate_target_languages()
+    elif model == TranslationModels.ghana_nlp:
+        if not settings.GHANA_NLP_SUBKEY:
+            languages = {}
+        else:
+            languages = ghana_nlp_translate_target_languages()
+    else:
+        raise ValueError("Unsupported translation model: " + str(model))
+
+    allow_none = (
+        kwargs.pop("allow_none", None)
+        and model.supports_auto_detect
+        and not language_filter
+    )
+
+    options = list(languages.keys())
+    if language_filter:
+        options = filter_languages(language_filter, options)
+    else:
+        sort_language_options(options, sort_by)
+
+    return gui.selectbox(
+        label=label,
+        key=key,
+        format_func=lang_format_func,
+        options=options,
+        allow_none=allow_none,
+        **kwargs,
+    )
+
+
+def translation_model_selector(
+    key: str = "translation_model",
+    allow_none: bool = True,
+    *,
+    language_filter: str = "",
+) -> TranslationModels | None:
+    from daras_ai_v2.enum_selector_widget import enum_selector
+
+    if language_filter:
+        supported_models = filter_models_by_language(
+            language_filter, TranslationModels.target_languages_by_model()
+        )
+    else:
+        supported_models = TranslationModels
+
+    if not supported_models:
+        gui.session_state[key] = None
+        gui.error("No translation model available for the selected language.", icon="⚠️")
+        return
+
+    model = enum_selector(
+        supported_models,
+        "###### Translation Model",
+        allow_none=allow_none,
+        use_selectbox=True,
+        key=key,
+    )
+    if model:
+        return TranslationModels[model]
+    else:
+        return None
+
+
+def google_translate_language_selector(
+    label="""
+    ###### Google Translate (*optional*)
+    """,
+    key="google_translate_target",
+    allow_none=True,
+    **kwargs,
+):
+    """
+    Streamlit widget for selecting a language for Google Translate.
+    Args:
+        label: the label to display
+        key: the key to save the selected language to in the session state
+    """
+    languages = google_translate_target_languages()
+    options = list(languages.keys())
+    return gui.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k] if k else "———",
+        options=options,
+        allow_none=allow_none,
+        **kwargs,
+    )
+
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def ghana_nlp_translate_target_languages():
-    if not settings.GHANA_NLP_SUBKEY:
-        return {}
     """
     Get list of supported languages for Ghana NLP Translation.
     :return: Dictionary of language codes and display names.
@@ -372,264 +491,40 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
-def translation_language_selector(
-    *,
-    model: TranslationModels | None,
-    label: str,
-    key: str,
-    filter_by_language="",
-    default_language="",
-    **kwargs,
-) -> str | None:
-    if not model:
-        gui.session_state[key] = None
-        return
-
-    if model == TranslationModels.google:
-        languages = get_translation_supported_languages(TranslationModels.google)
-    elif model == TranslationModels.ghana_nlp:
-        if not settings.GHANA_NLP_SUBKEY:
-            languages = {}
-        else:
-            languages = get_translation_supported_languages(TranslationModels.ghana_nlp)
-    else:
-        raise ValueError("Unsupported translation model: " + str(model))
-
-    options = list(languages.keys())
-    if filter_by_language:
-        filtered_list = normalised_lang_candidates(filter_by_language, options)
-        options = filtered_list if filtered_list else options
-    if default_language and default_language in options:
-        options.remove(default_language)
-        options.insert(0, default_language)
-
-    return gui.selectbox(
-        label=label,
-        key=key,
-        format_func=lang_format_func,
-        options=options,
-        **kwargs,
-    )
-
-
-def get_translation_supported_languages(
-    model: TranslationModel = None,
-) -> dict[str, str] | dict[TranslationModels, dict[str, str]]:
-    # Get supported languages for a specific model
-    if model == TranslationModels.google:
-        return google_translate_target_languages()
-    elif model == TranslationModels.ghana_nlp:
-        return ghana_nlp_translate_target_languages()
-    # Get supported languages for all models
-    else:
-        return {
-            TranslationModels.google: google_translate_target_languages(),
-            TranslationModels.ghana_nlp: ghana_nlp_translate_target_languages(),
-        }
-
-
-def translation_model_selector(
-    key="translation_model",
-    allow_none=True,
-    *,
-    filter_by_language="",
-) -> TranslationModels | None:
-    from daras_ai_v2.enum_selector_widget import enum_selector
-
-    supported_models = (
-        filter_models_by_language(
-            filter_by_language, TranslationModels, get_translation_supported_languages()
-        )
-        if filter_by_language
-        else None
-    )
-
-    SupportedTranslationModels = (
-        Enum(
-            "SupportedTranslationModels",
-            {model.name: model.value.label for model in supported_models},
-        )
-        if supported_models
-        else TranslationModels
-    )
-
-    model = enum_selector(
-        SupportedTranslationModels,
-        "###### Translation Model",
-        allow_none=allow_none,
-        use_selectbox=True,
-        key=key,
-    )
-    if model:
-        return TranslationModels[model]
-    else:
-        return None
-
-
-def google_translate_language_selector(
-    label="""
-    ###### Google Translate (*optional*)
-    """,
-    key="google_translate_target",
-    allow_none=True,
-    **kwargs,
-):
-    """
-    Streamlit widget for selecting a language for Google Translate.
-    Args:
-        label: the label to display
-        key: the key to save the selected language to in the session state
-    """
-    languages = google_translate_target_languages()
-    options = list(languages.keys())
-    return gui.selectbox(
-        label=label,
-        key=key,
-        format_func=lambda k: languages[k] if k else "———",
-        options=options,
-        allow_none=allow_none,
-        **kwargs,
-    )
-
-
-def normalize_and_add_languages(model_languages: list, languages: set[str]):
-    import langcodes
-
-    for lang_code in model_languages:
-        try:
-            # Normalize and strip down to just the language part
-            language = langcodes.Language.get(lang_code).language
-            languages.add(language)
-        except langcodes.tag_parser.LanguageTagError:
-            print(f"Skipping invalid language code: {lang_code}")
-
-
-def translation_languages_without_dialects() -> list[str]:
-    languages = set()
-
-    for model_languages in get_translation_supported_languages().values():
-        normalize_and_add_languages(model_languages, languages)
-    return sorted(languages)
-
-
-# Function to filter only languages (without dialects)
-@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
-def asr_languages_without_dialects() -> list[str]:
-    languages = set()
-    for model_languages in asr_supported_languages.values():
-        normalize_and_add_languages(model_languages, languages)
-    return sorted(languages)
-
-
-def are_languages_same(lang1: str, lang2: str) -> bool:
-    import langcodes
-
-    """
-    Check if two language codes represent the same language.
-    """
-    try:
-        return (
-            langcodes.Language.get(lang1).language
-            == langcodes.Language.get(lang2).language
-        )
-    except langcodes.LanguageTagError:
-        return False
-
-
-def normalised_lang_candidates(
-    target: str, collection: typing.Iterable[str]
-) -> typing.List[str]:
-    """
-    Returns a list of all matching candidates from the collection whose normalized
-    language matches the target language.
-    """
-    return list(filter(lambda c: are_languages_same(c, target), collection))
-
-
-def filter_models_by_language(
-    language: str, models: Enum, supported_languages: dict[Enum, list[str]]
-) -> list[Enum]:
-    """
-    Filter models by language and return them as a list of Enum members.
-    """
-    if not language:
-        return ()
-
-    return list(
-        filter(
-            lambda model: normalised_lang_candidates(
-                language, supported_languages.get(model, [])
-            ),
-            models,
-        )
-    )
-
-
-def language_filter_selector(
-    label="Filter by Language", key="language_filter", *, options: list[str] = None
-):
-    col1, col2 = gui.columns(
-        2, column_props=dict(style=dict(display="flex", alignItems="center"))
-    )
-    if not options:
-        options = asr_languages_without_dialects()
-    with col1:
-        if label:
-            gui.caption(label, className="mr-2 text-muted")
-    with col2:
-        with gui.div(style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}):
-            language = gui.selectbox(
-                style=dict(width="100%", maxWidth="300px"),
-                label=None,
-                label_visibility="hidden",
-                key=key,
-                format_func=lambda l: lang_format_func(l, "All Languages"),
-                options=options,
-                allow_none=True,
-            )
-            return language
-
-
 def asr_model_selector(
-    key="asr_model",
+    key: str = "asr_model",
     *,
-    filter_by_language="",
-    label="###### Speech Recognition Model",
-    use_selectbox=True,
+    language_filter: str = "",
+    label: str = "###### Speech Recognition Model",
+    use_selectbox: bool = True,
     **kwargs,
 ) -> AsrModels | None:
-    supported_models = (
-        filter_models_by_language(
-            filter_by_language, AsrModels, asr_supported_languages
+    if language_filter:
+        supported_models = filter_models_by_language(
+            language_filter, asr_supported_languages
         )
-        if filter_by_language
-        else None
-    )
-    # Create a new Enum from the supported_models list
-    SupportedAsrModels = (
-        Enum(
-            "SupportedAsrModels",
-            {model.name: model.value for model in supported_models},
-        )
-        if supported_models
-        else AsrModels
-    )
-
-    return enum_selector(
-        SupportedAsrModels,
+    else:
+        supported_models = AsrModels
+    model = enum_selector(
+        supported_models,
         label=label,
         key=key,
         use_selectbox=use_selectbox,
         **kwargs,
     )
+    if model:
+        return AsrModels[model]
+    else:
+        return None
 
 
 def asr_language_selector(
     selected_model: AsrModels,
-    label="###### Spoken Language",
-    key="language",
+    label: str = "###### Spoken Language",
+    key: str = "language",
     *,
-    filter_by_language="",
+    language_filter: str = "",
+    sort_by: str | None = None,
 ):
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
@@ -637,12 +532,16 @@ def asr_language_selector(
         gui.session_state[key] = forced_lang
         return forced_lang
 
+    allow_none = (
+        selected_model and selected_model.supports_auto_detect() and not language_filter
+    )
+
     options = list(asr_supported_languages.get(selected_model, []))
-    if filter_by_language:
+    if language_filter:
         # filter the languages to show dialects only from selected languages
-        options = normalised_lang_candidates(filter_by_language, options)
-    elif selected_model and selected_model.supports_auto_detect():
-        options.insert(0, None)
+        options = filter_languages(language_filter, options)
+    else:
+        sort_language_options(options, sort_by)
 
     # handle non-canonical language codes
     old_lang = gui.session_state.get(key)
@@ -657,7 +556,52 @@ def asr_language_selector(
         key=key,
         format_func=lang_format_func,
         options=options,
+        allow_none=allow_none,
     )
+
+
+def sort_language_options(options: list[str | None], sort_by: str | None):
+    sort_by = sort_by or "en"
+    options.sort(key=lambda tag: tag and are_languages_same(tag, sort_by), reverse=True)
+
+
+def language_filter_selector(
+    *,
+    options: list[str],
+    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter by Language',
+    key: str = "language_filter",
+) -> tuple[str, bool]:
+    clear_key = key + ":clear"
+    if gui.session_state.pop(clear_key, None):
+        gui.session_state[key] = None
+
+    with gui.div(className="d-flex align-items-center"):
+        if label:
+            with gui.div(className="me-3 text-muted"):
+                gui.caption(label, unsafe_allow_html=True)
+
+        with gui.div(style=dict(minWidth="200px")):
+            prev_key = key + ":prev"
+            prev_value = gui.session_state.get(prev_key)
+            language_filter = gui.session_state[prev_key] = gui.selectbox(
+                label="",
+                label_visibility="collapsed",
+                key=key,
+                format_func=lambda l: lang_format_func(l, ""),
+                options=options,
+                allow_none=True,
+            )
+            did_change = prev_value != language_filter
+
+        if language_filter:
+            gui.button(
+                '<i class="fa-solid fa-circle-xmark"></i>',
+                type="tertiary",
+                key=clear_key,
+                className="px-2 py-1 ms-1",
+            )
+
+    return language_filter, did_change
 
 
 def lang_format_func(l, default_options_text="Auto Detect"):
@@ -799,31 +743,6 @@ def run_google_translate(
         detected_source_languges,
         max_workers=TRANSLATE_BATCH_SIZE,
     )
-
-
-def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
-    import langcodes
-
-    ERROR = UserError(
-        f"Unsupported language: {target!r} | must be one of {set(collection)}"
-    )
-
-    if target in collection:
-        return target
-
-    try:
-        target_lan = langcodes.Language.get(target).language
-    except langcodes.LanguageTagError:
-        raise ERROR
-
-    for candidate in collection:
-        try:
-            if candidate and langcodes.Language.get(candidate).language == target_lan:
-                return candidate
-        except langcodes.LanguageTagError:
-            pass
-
-    raise ERROR
 
 
 def _translate_text(

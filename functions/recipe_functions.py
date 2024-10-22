@@ -27,7 +27,6 @@ def call_recipe_functions(
     trigger: FunctionTrigger,
 ):
     from daras_ai_v2.workflow_url_input import url_to_runs
-    from gooeysite.bg_db_conn import get_celery_result_db_safe
 
     request = request_model.parse_obj(state)
 
@@ -142,19 +141,20 @@ def functions_input(current_user: AppUser, key="functions"):
         key=f"--enable-{key}",
         value=key in gui.session_state,
     ):
-        gui.session_state.setdefault(key, [{}])
-        with gui.div(className="d-flex align-items-center"):
-            gui.write("###### Functions")
-        gui.caption(
-            "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
-            unsafe_allow_html=True,
-        )
-        list_view_editor(
-            add_btn_label="Add Function",
-            add_btn_type="tertiary",
-            key=key,
-            render_inputs=render_function_input,
-        )
+        with gui.div(className="ms-4 ps-1"):
+            gui.session_state.setdefault(key, [{}])
+            with gui.div(className="d-flex align-items-center"):
+                gui.write("###### Functions")
+            gui.caption(
+                "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
+                unsafe_allow_html=True,
+            )
+            list_view_editor(
+                add_btn_label="Add Function",
+                add_btn_type="tertiary",
+                key=key,
+                render_inputs=render_function_input,
+            )
     else:
         gui.session_state.pop(key, None)
 

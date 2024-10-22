@@ -1,11 +1,10 @@
 import typing
-from enum import Enum
 
+import gooey_gui as gui
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
-from bots.models import Workflow, SavedRun
+from bots.models import Workflow
 from daras_ai_v2.asr import (
     language_filter_selector,
     asr_language_selector,
@@ -26,8 +25,9 @@ from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.field_render import field_title_desc, field_title
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
@@ -46,7 +46,10 @@ class AsrPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
-        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            title="Speech-to-Text Provider",
+            description="Choose a model to transcribe incoming audio messages to text.",
+        )
         language: str | None
 
         translation_model: (
@@ -119,88 +122,80 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         bulk_documents_uploader(
-            "#### Audio Files",
+            "###### 🎙️ Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
-        gui.markdown("#### Speech Recognition")
 
-        # drop down to filter models based on the selected language
-        selected_filter_language = language_filter_selector()
+        self.render_speech_and_translation_inputs(asr_model_key="selected_model")
 
-        col1, col2 = gui.columns(2, responsive=False)
+    @classmethod
+    def render_speech_and_translation_inputs(cls, *, asr_model_key: str):
+        selected_filter_language, did_change = language_filter_selector(
+            options=asr_languages_without_dialects(),
+        )
+        if did_change:
+            gui.session_state["language"] = None
+            gui.session_state["translation_source"] = None
+
+        col1, col2 = gui.columns(2)
         with col1:
-            selected_model = asr_model_selector(
-                label="###### Speech Recognition Model",
-                key="selected_model",
-                filter_by_language=selected_filter_language,
+            asr_model = asr_model_selector(
+                label=f"###### {field_title(cls.RequestModel, 'selected_model')}",
+                key=asr_model_key,
+                language_filter=selected_filter_language,
             )
         with col2:
-            asr_language_selector(
-                AsrModels[selected_model], filter_by_language=selected_filter_language
-            )
+            asr_language_selector(asr_model, language_filter=selected_filter_language)
 
-        # Translation options
-        if gui.checkbox(
-            "#### Translate",
+        if not gui.checkbox(
+            "🔠 **Translate**",
             value=bool(gui.session_state.get("translation_model")),
         ):
-            with gui.div(style=dict(marginTop="-0.9rem")):
-                gui.caption(
-                    "Choose a model, source and target languages to translate recognized audio",
-                )
-            col1, col2 = gui.columns(2, responsive=True)
+            gui.session_state["translation_model"] = None
+        else:
+            gui.caption("Choose a model and language to translate recognized audio")
+            col1, col2 = gui.columns(2)
             with col1:
                 translation_model = translation_model_selector(
-                    allow_none=False, filter_by_language=selected_filter_language
+                    allow_none=False, language_filter=selected_filter_language
                 )
             with col2:
                 translation_language_selector(
                     model=translation_model,
-                    label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
+                    label=f"###### {field_title_desc(cls.RequestModel, 'translation_target')}",
                     key="translation_target",
                 )
-            if selected_model and translation_model:
-                gui.write("---")
-                translation_language_selector(
-                    model=translation_model,
-                    label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
-                    key="translation_source",
-                    default_language="en",
-                    filter_by_language=selected_filter_language,
-                    allow_none=(
-                        False
-                        if selected_filter_language
-                        else (
-                            translation_model.supports_auto_detect
-                            if translation_model
-                            else True
-                        )
-                    ),
-                )
-
-        else:
-            gui.session_state["translation_model"] = None
 
     def render_settings(self):
+        self.render_translation_advanced_settings()
+
+        enum_selector(
+            AsrOutputFormat, label="###### Output Format", key="output_format"
+        )
+
+    @classmethod
+    def render_translation_advanced_settings(cls):
         try:
             translation_model = TranslationModels[
                 gui.session_state.get("translation_model")
             ]
         except KeyError:
-            translation_model = None
-        if translation_model and translation_model.supports_glossary:
+            return
+        if not translation_model:
+            return
+        translation_language_selector(
+            model=translation_model,
+            label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
+            key="translation_source",
+            language_filter=gui.session_state.get("language_filter"),
+            allow_none=True,
+        )
+        if translation_model.supports_glossary:
             gui.file_uploader(
-                label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",
+                label=f"###### {field_title_desc(cls.RequestModel, 'glossary_document')}",
                 key="glossary_document",
                 accept=SUPPORTED_SPREADSHEET_TYPES,
             )
-
-            gui.caption(
-                "This is usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify one explicitly.",
-            )
-        enum_selector(
-            AsrOutputFormat, label="###### Output Format", key="output_format"
-        )
 
     def validate_form_v2(self):
         assert gui.session_state.get(
