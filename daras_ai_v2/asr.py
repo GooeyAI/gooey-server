@@ -589,7 +589,7 @@ def language_filter_selector(
                 label="",
                 label_visibility="collapsed",
                 key=key,
-                format_func=lambda l: lang_format_func(l, ""),
+                format_func=lambda l: lang_format_func(l, "All Languages"),
                 options=options,
                 allow_none=True,
             )
