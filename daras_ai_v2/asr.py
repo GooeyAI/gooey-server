@@ -274,6 +274,11 @@ forced_asr_languages = {
 asr_supported_languages = {
     AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
+    AsrModels.whisper_telugu_large_v2: {"te"},
+    AsrModels.whisper_hindi_large_v2: {"hi"},
+    AsrModels.vakyansh_bhojpuri: {"bho"},
+    AsrModels.nemo_english: {"en"},
+    AsrModels.nemo_hindi: {"hi"},
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
