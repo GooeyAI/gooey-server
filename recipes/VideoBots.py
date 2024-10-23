@@ -718,6 +718,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if gui.session_state.get("functions"):
             prompt_funcs = call_recipe_functions(
                 saved_run=self.current_sr,
+                workspace=self.current_workspace,
                 current_user=self.request.user,
                 request_model=self.RequestModel,
                 response_model=self.ResponseModel,
@@ -1255,6 +1256,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
                 pr = pr.duplicate(
                     user=self.request.user,
+                    workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
                     visibility=PublishedRunVisibility.UNLISTED,
@@ -1264,7 +1266,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
                         name=run_title,
-                        billing_account_uid=self.request.user.uid,
+                        workspace=self.current_workspace,
                         platform=Platform.WEB,
                     )
                     redirect_url = connect_bot_to_published_run(bi, pr)

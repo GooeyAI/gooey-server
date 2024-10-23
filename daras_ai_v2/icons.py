@@ -11,6 +11,10 @@ cancel = '<i class="fa-regular fa-xmark-large"></i>'
 edit = '<i class="fa-regular fa-pencil"></i>'
 link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
+company_fw = (
+    '<i class="fa-regular fa-buildings fa-fw" style="width:25px; height: 25px;"></i>'
+)
+company_solid = '<i class="fa-solid fa-buildings"></i>'
 copy_solid = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
 add = '<i class="fa-regular fa-add"></i>'
@@ -27,6 +31,7 @@ admin = '<i class="fa-solid fa-shield-halved"></i>'
 remove_user = '<i class="fa-solid fa-user-minus"></i>'
 add_user = '<i class="fa-solid fa-user-plus"></i>'
 home = '<i class="fa-regular fa-home"></i>'
+notes = '<i class="fa-regular fa-money-check-pen"></i>'
 lock = '<i class="fa-solid fa-lock"></i>'
 globe = '<i class="fa-regular fa-globe"></i>'
 

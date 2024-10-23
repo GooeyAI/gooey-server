@@ -29,6 +29,9 @@ if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
 
 
+DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+
+
 def validate_workspace_domain_name(value: str):
     if value in COMMON_EMAIL_DOMAINS:
         raise ValidationError("This domain name is reserved")
@@ -127,6 +130,8 @@ class Workspace(SafeDeleteModel):
 
     objects = WorkspaceQuerySet.as_manager()
 
+    api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT + "/workspaces")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -148,8 +153,21 @@ class Workspace(SafeDeleteModel):
         else:
             return self.display_name()
 
+    def clean(self) -> None:
+        if not self.is_personal and not self.name:
+            raise ValidationError("Team name is required for workspaces")
+        return super().clean()
+
     def get_slug(self):
         return slugify(self.display_name())
+
+    def get_photo(self) -> str:
+        if self.photo_url:
+            return self.photo_url
+        elif self.is_personal:
+            return self.created_by.photo_url
+        else:
+            return DEFAULT_WORKSPACE_PHOTO_URL
 
     @transaction.atomic()
     def create_with_owner(self):
@@ -162,7 +180,8 @@ class Workspace(SafeDeleteModel):
         ):
             self.balance = settings.FIRST_WORKSPACE_FREE_CREDITS
         self.id = None
-        self.full_clean()
+        # in a transaction, let the database handle constraints
+        self.full_clean(validate_unique=False, validate_constraints=False)
         self.save()
         WorkspaceMembership.objects.create(
             workspace=self,
@@ -176,6 +195,15 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
+            workspace_memberships__deleted__isnull=True,
+        )
+
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -306,9 +334,11 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return "Personal Account"
+            return f"{current_user.full_name()} (Personal)"
+        elif self.is_personal:
+            return self.created_by.full_name()
         else:
-            return f"{self.created_by.first_name_possesive()} Workspace"
+            return f"{self.created_by.first_name_possessive()} Workspace"
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
         if self.is_personal and self.created_by_id == current_user.id:
@@ -319,7 +349,10 @@ class Workspace(SafeDeleteModel):
         elif self.photo_url:
             return f'<img src="{self.photo_url}" style="height: 25px; width: auto; border-radius: 5px">'
         else:
-            return icons.company
+            return icons.company_fw
+
+    def display_html(self, current_user: AppUser | None = None) -> str:
+        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
 
 
 class WorkspaceMembership(SafeDeleteModel):
@@ -353,7 +386,7 @@ class WorkspaceMembership(SafeDeleteModel):
                 fields=["workspace", "user"],
                 condition=Q(deleted__isnull=True),
                 name="unique_workspace_user",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["workspace", "role", "deleted"]),
@@ -362,7 +395,13 @@ class WorkspaceMembership(SafeDeleteModel):
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
-    def can_edit_workspace_metadata(self):
+    def clean(self) -> None:
+        if self.workspace.is_personal and self.user_id != self.workspace.created_by_id:
+            raise ValidationError("You cannot add users to a personal workspace")
+        return super().clean()
+
+    def can_edit_workspace(self):
+        # workspace metadata, billing, etc.
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):
@@ -396,7 +435,10 @@ class WorkspaceMembership(SafeDeleteModel):
         return self.role == WorkspaceRole.OWNER
 
     def can_invite(self):
-        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+        return (
+            self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+            and not self.workspace.is_personal
+        )
 
 
 class WorkspaceInviteQuerySet(models.QuerySet):
@@ -505,6 +547,11 @@ class WorkspaceInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.workspace} ({self.get_status_display()})"
+
+    def clean(self) -> None:
+        if self.workspace.is_personal:
+            raise ValidationError("You cannot invite users to a personal workspace")
+        return super().clean()
 
     @admin.display(description="Expired")
     def has_expired(self):

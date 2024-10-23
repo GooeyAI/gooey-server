@@ -17,11 +17,13 @@ from functions.models import CalledFunction, FunctionTrigger
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
     from daras_ai_v2.base import BasePage
+    from workspaces.models import Workspace
 
 
 def call_recipe_functions(
     *,
     saved_run: "SavedRun",
+    workspace: "Workspace",
     current_user: AppUser,
     request_model: typing.Type["BasePage.RequestModel"],
     response_model: typing.Type["BasePage.ResponseModel"],
@@ -48,6 +50,7 @@ def call_recipe_functions(
 
     def run(sr, pr, /, **kwargs):
         result, sr = sr.submit_api_call(
+            workspace=workspace,
             current_user=current_user,
             parent_pr=pr,
             request_body=dict(

@@ -318,6 +318,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     result, sr = sr.submit_api_call(
+                        workspace=self.current_workspace,
                         current_user=self.request.user,
                         request_body=request_body,
                         parent_pr=pr,
@@ -389,6 +390,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 documents=response.output_documents
             ).dict(exclude_unset=True)
             result, sr = sr.submit_api_call(
+                workspace=self.current_workspace,
                 current_user=self.request.user,
                 request_body=request_body,
                 parent_pr=pr,

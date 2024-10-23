@@ -5,12 +5,13 @@ from fastapi import Depends
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import BotIntegration
 from bots.tasks import send_broadcast_msgs_chunked
 from recipes.VideoBots import ReplyButton, VideoBotsPage
 from routers.custom_api_router import CustomAPIRouter
+from workspaces.models import Workspace
+
 
 app = CustomAPIRouter()
 
@@ -58,18 +59,18 @@ R = typing.TypeVar("R", bound=BotBroadcastRequestModel)
 )
 def broadcast_api_json(
     bot_request: BotBroadcastRequestModel,
-    user: AppUser = Depends(api_auth_header),
+    workspace: Workspace = Depends(api_auth_header),
     example_id: str | None = None,
     run_id: str | None = None,
 ):
-    bi_qs = BotIntegration.objects.filter(billing_account_uid=user.uid)
+    bi_qs = BotIntegration.objects.filter(workspace=workspace)
     if example_id:
         bi_qs = bi_qs.filter(
             Q(published_run__published_run_id=example_id)
             | Q(saved_run__example_id=example_id)
         )
     elif run_id:
-        bi_qs = bi_qs.filter(saved_run__run_id=run_id, saved_run__uid=user.uid)
+        bi_qs = bi_qs.filter(saved_run__run_id=run_id, saved_run__workspace=workspace)
     else:
         return HTTPException(
             status_code=400,
