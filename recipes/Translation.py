@@ -99,11 +99,9 @@ class TranslationPage(BasePage):
             flatten_dict_key="text",
         )
 
-        selected_filter_language, did_change = language_filter_selector(
+        selected_filter_language = language_filter_selector(
             options=translation_languages_without_dialects(),
         )
-        if did_change:
-            gui.session_state["translation_source"] = None
 
         col1, col2 = gui.columns(2)
         with col1:
@@ -130,12 +128,9 @@ class TranslationPage(BasePage):
             )
 
     def render_settings(self):
-        try:
-            translation_model = TranslationModels[
-                gui.session_state.get("selected_model")
-            ]
-        except KeyError:
-            translation_model = None
+        translation_model = TranslationModels.get(
+            gui.session_state.get("selected_model")
+        )
         if translation_model and translation_model.supports_glossary:
             gui.file_uploader(
                 label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",

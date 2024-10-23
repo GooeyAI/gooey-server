@@ -118,6 +118,7 @@ from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
 GRAYCOLOR = "#00000073"
+DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 
 SAFETY_BUFFER = 100
 
@@ -172,7 +173,7 @@ class VideoBotsPage(BasePage):
         "scroll_jump": 5,
         "use_url_shortener": False,
         "dense_weight": 1.0,
-        "translation_model": TranslationModels.google.name,
+        "translation_model": DEFAULT_TRANSLATION_MODEL,
     }
 
     class RequestModelBase(BasePage.RequestModel):
@@ -225,6 +226,10 @@ class VideoBotsPage(BasePage):
         asr_language: str | None = Field(
             title="Spoken Language",
             description="Choose a language to transcribe incoming audio messages to text.",
+        )
+        asr_task: typing.Literal["translate", "transcribe"] | None = Field(
+            title="ASR Model Task",
+            description="Use **{asr_model}** for speech translation from **{asr_language}** to **English**",
         )
 
         translation_model: (
@@ -361,12 +366,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.caption(field_desc(self.RequestModel, "user_language"))
 
                 # drop down to filter models based on the selected language
-                selected_filter_language, did_change = language_filter_selector(
+                selected_filter_language = language_filter_selector(
                     options=asr_languages_without_dialects()
                 )
-                if did_change:
-                    gui.session_state["asr_language"] = None
-                    gui.session_state["user_language"] = None
 
                 col1, col2 = gui.columns(2, responsive=False)
                 with col1:
@@ -380,12 +382,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                 with col2:
                     if asr_model:
-                        asr_language_selector(
+                        asr_language = asr_language_selector(
                             asr_model,
                             language_filter=selected_filter_language,
                             label=f"###### {field_title(self.RequestModel, 'asr_language')}",
                             key="asr_language",
                         )
+                    else:
+                        asr_language = None
+
                 gui.newline()
                 if gui.checkbox(
                     "🔠 **Translate to & from English**",
@@ -407,6 +412,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             label=f"###### {field_title(self.RequestModel, 'user_language')}",
                             key="user_language",
                         )
+
+                    if asr_model and asr_model.supports_speech_translation():
+                        with gui.div(className="text-muted"):
+                            if gui.checkbox(
+                                label=field_desc(self.RequestModel, "asr_task").format(
+                                    asr_model=asr_model.value,
+                                    asr_language=asr_language or "Detected Language",
+                                ),
+                                value=gui.session_state.get("asr_task") == "translate",
+                            ):
+                                gui.session_state["asr_task"] = "translate"
+                            else:
+                                gui.session_state.pop("asr_task", None)
+
                 gui.newline()
         else:
             gui.session_state["translation_model"] = None
@@ -491,7 +510,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.write("---")
 
         translation_model = gui.session_state.get(
-            "translation_model", TranslationModels.google.name
+            "translation_model", DEFAULT_TRANSLATION_MODEL
         )
         if (
             gui.session_state.get("user_language")
@@ -805,7 +824,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         ocr_texts = yield from self.ocr_step(request=request)
 
         request.translation_model = (
-            request.translation_model or TranslationModels.google.name
+            request.translation_model or DEFAULT_TRANSLATION_MODEL
         )
         user_input = yield from self.input_translation_step(
             request=request, user_input=user_input, ocr_texts=ocr_texts
@@ -853,6 +872,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 audio_url=request.input_audio,
                 selected_model=request.asr_model,
                 language=request.asr_language,
+                speech_translation_target=(
+                    "en" if request.asr_task == "translate" else None
+                ),
             )
             asr_msg = f"🎧 I heard: “{asr_output}”"
             response.output_text = [asr_msg] * request.num_outputs
@@ -863,7 +885,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def input_translation_step(self, request, user_input, ocr_texts):
         # translate input text
-        if should_translate_lang(request.user_language):
+        if (
+            should_translate_lang(request.user_language)
+            and not request.asr_task == "translate"
+        ):
             yield "Translating Input to English..."
             user_input = run_translate(
                 texts=[user_input],

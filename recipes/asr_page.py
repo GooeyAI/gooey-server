@@ -130,12 +130,9 @@ class AsrPage(BasePage):
 
     @classmethod
     def render_speech_and_translation_inputs(cls, *, asr_model_key: str):
-        selected_filter_language, did_change = language_filter_selector(
+        selected_filter_language = language_filter_selector(
             options=asr_languages_without_dialects(),
         )
-        if did_change:
-            gui.session_state["language"] = None
-            gui.session_state["translation_source"] = None
 
         col1, col2 = gui.columns(2)
         with col1:
@@ -157,7 +154,9 @@ class AsrPage(BasePage):
             col1, col2 = gui.columns(2)
             with col1:
                 translation_model = translation_model_selector(
-                    allow_none=False, language_filter=selected_filter_language
+                    allow_none=False,
+                    language_filter=selected_filter_language,
+                    asr_model=asr_model,
                 )
             with col2:
                 translation_language_selector(
@@ -175,21 +174,20 @@ class AsrPage(BasePage):
 
     @classmethod
     def render_translation_advanced_settings(cls):
-        try:
-            translation_model = TranslationModels[
-                gui.session_state.get("translation_model")
-            ]
-        except KeyError:
-            return
+        asr_model = AsrModels.get(gui.session_state.get("selected_model"))
+        translation_model = TranslationModels.get(
+            gui.session_state.get("translation_model")
+        )
         if not translation_model:
             return
-        translation_language_selector(
-            model=translation_model,
-            label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
-            key="translation_source",
-            language_filter=gui.session_state.get("language_filter"),
-            allow_none=True,
-        )
+        # dont run translation if already translated using speech translation model
+        if not (asr_model and asr_model.name == translation_model.name):
+            translation_language_selector(
+                model=translation_model,
+                label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
+                key="translation_source",
+                allow_none=True,
+            )
         if translation_model.supports_glossary:
             gui.file_uploader(
                 label=f"###### {field_title_desc(cls.RequestModel, 'glossary_document')}",
@@ -223,8 +221,16 @@ class AsrPage(BasePage):
         # Parse Request
         request: AsrPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        # Run ASR
         selected_model = AsrModels[request.selected_model]
+        translation_model = TranslationModels.get(request.translation_model)
+
+        should_translate = translation_model and request.translation_target
+        use_asr_speech_translation = (
+            should_translate
+            and translation_model.is_asr_model
+            and selected_model.name == translation_model.name
+        )
+
         yield f"Running {selected_model.value}..."
         asr_output = map_parallel(
             lambda audio: run_asr(
@@ -232,15 +238,19 @@ class AsrPage(BasePage):
                 selected_model=request.selected_model,
                 language=request.language,
                 output_format=request.output_format,
+                speech_translation_target=(
+                    request.translation_target if use_asr_speech_translation else None
+                ),
             ),
             request.documents,
             max_workers=4,
         )
 
-        # Save the raw ASR text for details view
-        state["raw_output_text"] = asr_output
-        # Run Translation
-        if request.translation_model and request.translation_target:
+        if should_translate and not use_asr_speech_translation:
+            # Save the raw ASR text for details view
+            state["raw_output_text"] = asr_output
+            # Run Translation
+            yield f"Translating to {request.translation_target} using {translation_model.label}..."
             state["output_text"] = run_translate(
                 asr_output,
                 target_language=request.translation_target,
@@ -251,7 +261,6 @@ class AsrPage(BasePage):
                 model=request.translation_model,
             )
         else:
-            state["raw_output_text"] = None
             state["output_text"] = asr_output
 
     def get_cost_note(self) -> str | None:
