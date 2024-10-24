@@ -362,7 +362,7 @@ class TranslationModels(TranslationModel, Enum):
 
     @classmethod
     def target_languages_by_model(cls) -> dict[TranslationModel, typing.Iterable[str]]:
-        return {e: e.supported_target_languages() for e in cls}
+        return {e: e.supported_target_languages() for e in cls if not e.is_asr_model}
 
     def supported_target_languages(self) -> typing.Iterable[str]:
         match self:
@@ -429,19 +429,24 @@ def translation_model_selector(
             language_filter, TranslationModels.target_languages_by_model()
         )
     else:
-        supported_models = TranslationModels
+        supported_models = [
+            model for model in TranslationModels if not model.is_asr_model
+        ]
+
+    # insert in-built model if available
+    in_built_option = TranslationModels.get(asr_model.name) if asr_model else None
+    if in_built_option and in_built_option not in supported_models:
+        supported_models.append(in_built_option)
+
+    # @TODO set state to inbuilt model if some other value is set
+    # prev_model = gui.session_state.get(key)
+    # if in_built_option and prev_model != in_built_option:
+    #     gui.session_state[key] = in_built_option
 
     if not supported_models:
         gui.session_state[key] = None
         gui.error("No translation model available for the selected language.", icon="⚠️")
         return
-
-    # exclude asr inbuilt translation unless the asr model is selected
-    exclude_models = [
-        model
-        for model in supported_models
-        if model.is_asr_model and model.name != (asr_model and asr_model.name)
-    ]
 
     # Select the model using enum_selector
     model = enum_selector(
@@ -450,7 +455,6 @@ def translation_model_selector(
         allow_none=allow_none,
         use_selectbox=True,
         key=key,
-        exclude=exclude_models,
     )
     if model:
         return TranslationModels[model]
