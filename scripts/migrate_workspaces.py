@@ -97,6 +97,8 @@ def migrate_published_runs():
 
 
 def migrate_api_keys():
+    print("migrating API keys", end=SEP)
+
     firebase_stream = db.get_client().collection(db.API_KEYS_COLLECTION).stream()
 
     total = 0
@@ -133,7 +135,7 @@ def migrate_api_keys():
                 ignore_conflicts=True,
                 unique_fields=("hash",),
             )
-            print(total, f"({len(migrated_keys)}/{len(batch)})", end=SEP)
+            print(total, end=SEP)
             total += len(migrated_keys)
 
 
