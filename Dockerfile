@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
 # because https://github.com/Azure-Samples/cognitive-services-speech-sdk/issues/2204
-RUN wget -qO libssl.deb http://security.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.22_amd64.deb \
+RUN wget -qO libssl.deb http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb \
     && dpkg -i libssl.deb \
     && rm libssl.deb
 
