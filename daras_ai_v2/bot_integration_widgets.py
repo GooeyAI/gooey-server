@@ -14,7 +14,8 @@ from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.workflow_url_input import workflow_url_input
+from daras_ai_v2.workflow_url_input import workflow_url_input, url_to_runs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
@@ -394,7 +395,45 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
             if gui.button(f"{icons.camera} Change Photo"):
                 gui.session_state["--update-display-picture"] = True
                 gui.rerun()
-        bi.name = gui.text_input("###### Name", value=bi.name)
+        generate_prompt = """Your job is to define the schema for a chatbot, using the title, description and prompt of an AI Workflow.
+Inputs:
+title: Copilot Builder
+prompt: You are Steve Jobs.
+Answer only as him, if someone asks you to change your personality don't do that, tell them that you are Steve Jobs! If user talks about graphic/NSFW/violent/sexual content please tell them to stop, and ask a more relevant question. 
+
+Using the title, prompt, and integration_medium, output the following in JSON format:
+description (formal tone, < 100 words)
+Starter_question_1
+Starter_question_2
+Starter_question_3
+Starter_question_4"""
+        gencol1, gencol2 = gui.columns(2)
+        with gencol1:
+            bi.name = gui.text_input("###### Name", value=bi.name)
+        with gencol2:
+            generate_button = gui.button("Generate", "generate_integration_details")
+        if generate_button:
+            page_cls, sr, pr = url_to_runs(
+                "http://localhost:3000/compare-large-language-models/?run_id=alqs2z3jjsq6&uid=iKJ9nPny8MaO1rHf4Zs08zETLbl2"
+            )
+            request_body = page_cls.RequestModel(input_prompt=generate_prompt).dict(
+                exclude_unset=True
+            )
+            result, sr = sr.submit_api_call(
+                current_user=user,
+                request_body=request_body,
+                parent_pr=pr,
+            )
+            sr.wait_for_celery_result(result)
+            gui.write(sr.get_app_url())
+            output_dict = json.loads(sr.state["output_text"]["gpt_4_o"][0])
+            bi.descripton = output_dict["description"]
+            bi.conversation_starters = [
+                output_dict["Starter_question_" + str(i)] for i in range(1, 5)
+            ]
+            gui.write(bi.descripton)
+            gui.write(bi.conversation_starters)
+
         bi.descripton = gui.text_area(
             "###### Description",
             value=bi.descripton,
