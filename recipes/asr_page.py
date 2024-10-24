@@ -180,13 +180,16 @@ class AsrPage(BasePage):
         )
         if not translation_model:
             return
+
         # dont run translation if already translated using speech translation model
         if not (asr_model and asr_model.name == translation_model.name):
+            selected_filter_language = gui.session_state.get("language_filter")
             translation_language_selector(
                 model=translation_model,
                 label=f"###### {field_title_desc(cls.RequestModel, 'translation_source')}",
                 key="translation_source",
                 allow_none=True,
+                language_filter=selected_filter_language,
             )
         if translation_model.supports_glossary:
             gui.file_uploader(
