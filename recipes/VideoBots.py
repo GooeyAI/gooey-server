@@ -345,16 +345,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """,
             key="bot_script",
             height=300,
+            help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
         )
 
         language_model_selector(label="#### 🧠 Language Model")
 
         bulk_documents_uploader(
-            """
-            #### 📄 Knowledge
-            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
-            """,
+            "#### 📄 Knowledge",
             accept=["audio/*", "application/*", "video/*", "text/*"],
+            help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
         )
 
         gui.markdown("#### 💪 Capabilities")
@@ -538,6 +537,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     gui.session_state.get("input_glossary_document")
                     or gui.session_state.get("output_glossary_document")
                 ),
+                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!",
             )
             if enable_glossary:
                 gui.caption(
