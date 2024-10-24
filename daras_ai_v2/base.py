@@ -15,7 +15,7 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -714,6 +714,7 @@ class BasePage:
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=PublishedRunVisibility(pr.visibility),
@@ -820,6 +821,7 @@ This will also delete all the associated versions.
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.current_pr.title} (Copy)",
                 notes=self.current_pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -833,6 +835,7 @@ This will also delete all the associated versions.
                 published_run_id=get_random_doc_id(),
                 saved_run=self.current_sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.current_pr.title} (Copy)",
                 notes=self.current_pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -856,6 +859,7 @@ This will also delete all the associated versions.
             pr = self.current_pr
             duplicate_pr = pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1275,6 +1279,7 @@ This will also delete all the associated versions.
                 defaults=dict(state=cls.load_state_defaults({})),
             )[0],
             user=None,
+            workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
             visibility=PublishedRunVisibility.PUBLIC,
@@ -1287,6 +1292,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1296,6 +1302,7 @@ This will also delete all the associated versions.
             published_run_id=published_run_id,
             saved_run=saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
@@ -1706,6 +1713,7 @@ This will also delete all the associated versions.
             published_run_id=get_random_doc_id(),
             saved_run=self.current_sr,
             user=self.request.user,
+            workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
             visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1960,9 +1968,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _saved_tab(self):
         self.ensure_authentication()
 
+        pr_filter = Q(workspace=self.current_workspace)
+        if self.current_workspace.is_personal:
+            pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         published_runs = PublishedRun.objects.filter(
-            workflow=self.workflow,
-            created_by=self.request.user,
+            Q(workflow=self.workflow) & pr_filter
         )[:50]
         if not published_runs:
             gui.write("No published runs yet")

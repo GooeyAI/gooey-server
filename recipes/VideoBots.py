@@ -1280,6 +1280,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
                 pr = pr.duplicate(
                     user=self.request.user,
+                    workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
                     visibility=PublishedRunVisibility.UNLISTED,
