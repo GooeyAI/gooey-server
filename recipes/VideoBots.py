@@ -359,14 +359,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         gui.markdown("#### 💪 Capabilities")
 
-        if gui.checkbox(
+        if gui.switch(
             "##### 🦻 Speech Recognition & Translation",
             value=bool(
                 gui.session_state.get("user_language")
                 or gui.session_state.get("asr_model")
             ),
         ):
-            with gui.div(className="ms-4 ps-1"):
+            with gui.div(className="pt-2 ps-1"):
                 gui.caption(field_desc(self.RequestModel, "user_language"))
 
                 # drop down to filter models based on the selected language
@@ -447,16 +447,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["asr_model"] = None
             gui.session_state["user_language"] = None
 
-        if gui.checkbox(
+        if gui.switch(
             "##### 🗣️ Text to Speech & Lipsync",
             value=bool(gui.session_state.get("tts_provider")),
         ):
-            with gui.div(className="ms-4 ps-1"):
+            with gui.div(className="pt-2 ps-1"):
                 text_to_speech_provider_selector(self)
 
             gui.newline()
 
-            enable_video = gui.checkbox(
+            enable_video = gui.switch(
                 "##### 🫦 Add Lipsync Video",
                 value=bool(gui.session_state.get("input_face")),
             )
@@ -464,7 +464,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["tts_provider"] = None
             enable_video = False
         if enable_video:
-            with gui.div(className="ms-4 ps-1"):
+            with gui.div(className="pt-2 ps-1"):
                 gui.file_uploader(
                     """
                     ###### 👩‍🦰 Input Face
@@ -483,11 +483,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["input_face"] = None
             gui.session_state.pop("lipsync_model", None)
 
-        if gui.checkbox(
+        if gui.switch(
             "##### 🩻 Photo & Document Intelligence",
             value=bool(gui.session_state.get("document_model")),
         ):
-            with gui.div(className="ms-4 ps-1"):
+            with gui.div(className="pt-2 ps-1"):
                 if settings.AZURE_FORM_RECOGNIZER_KEY:
                     doc_model_descriptions = azure_form_recognizer_models()
                 else:
