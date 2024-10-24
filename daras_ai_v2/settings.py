@@ -265,6 +265,7 @@ API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
+CSRF_TRUSTED_ORIGINS = [ADMIN_BASE_URL]
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
