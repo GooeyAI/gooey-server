@@ -7,7 +7,7 @@ from django.db.models import OuterRef, Subquery
 
 from api_keys.models import ApiKey
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import BotIntegration, SavedRun, PublishedRun
+from bots.models import SavedRun, PublishedRun
 from daras_ai_v2 import db
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 
