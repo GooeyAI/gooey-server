@@ -719,7 +719,14 @@ def page_wrapper(request: Request, className=""):
                     src=settings.GOOEY_LOGO_IMG,
                     width="300",
                     height="142",
-                    className="img-fluid logo",
+                    className="img-fluid logo d-none d-sm-block",
+                )
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_RECT,
+                    width="145",
+                    height="40",
+                    className="img-fluid logo d-sm-none",
                 )
             with gui.div(
                 className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
