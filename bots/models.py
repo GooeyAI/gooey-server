@@ -70,9 +70,9 @@ class Platform(models.IntegerChoices):
     def get_icon(self):
         match self:
             case Platform.WEB:
-                return f'<i class="fa-regular fa-globe"></i>'
+                return '<i class="fa-regular fa-globe"></i>'
             case Platform.TWILIO:
-                return f'<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
+                return '<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
             case _:
                 return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
 
@@ -1632,7 +1632,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
-        workspace: "Workspace | None",
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1659,7 +1659,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
-        workspace: "Workspace | None",
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,

@@ -1292,7 +1292,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
-        workspace: "Workspace | None",
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
