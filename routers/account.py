@@ -11,11 +11,10 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
 
-from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
-from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -23,9 +22,13 @@ from daras_ai_v2.profiles import edit_user_profile_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import page_wrapper, get_og_url_path
-from workspaces.models import WorkspaceInvite
+from workspaces.models import Workspace, WorkspaceInvite, WorkspaceMembership
 from workspaces.views import invitation_page, workspaces_page
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import (
+    get_current_workspace,
+    get_route_path_for_workspace,
+    set_current_workspace,
+)
 
 app = CustomAPIRouter()
 
@@ -34,6 +37,14 @@ app = CustomAPIRouter()
 def payment_processing_route(
     request: Request, provider: str | None = None, subscription_id: str | None = None
 ):
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        redirect_url = furl(
+            get_route_path(login), query_params={"next": request.url.path}
+        )
+        raise gui.RedirectException(redirect_url)
+
     waiting_time_sec = 3
     subtext = None
 
@@ -64,6 +75,7 @@ def payment_processing_route(
             if subtext:
                 gui.caption(subtext)
 
+    workspace = get_current_workspace(request.user, request.session)
     gui.js(
         # language=JavaScript
         """
@@ -72,7 +84,7 @@ def payment_processing_route(
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
-        redirectUrl=get_app_route_url(account_route),
+        redirectUrl=get_route_path_for_workspace(billing_route, workspace=workspace),
     )
 
     return dict(
@@ -82,6 +94,29 @@ def payment_processing_route(
 
 @gui.route(app, "/account/")
 def account_route(request: Request):
+    from daras_ai_v2.base import BasePage
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        raise gui.RedirectException(get_route_path(login))
+
+    workspace = get_current_workspace(request.user, request.session)
+    if not BasePage.is_user_admin(request.user) or workspace.is_personal:
+        raise gui.RedirectException(get_route_path(profile_route))
+    else:
+        raise gui.RedirectException(
+            get_route_path_for_workspace(workspaces_route, workspace)
+        )
+
+
+@gui.route(app, "/account/billing/")
+@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/billing/")
+def billing_route(
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
+):
+    validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.billing):
         billing_tab(request)
     url = get_og_url_path(request)
@@ -113,7 +148,18 @@ def profile_route(request: Request):
 
 
 @gui.route(app, "/saved/")
-def saved_route(request: Request):
+def saved_shortcut_route():
+    raise RedirectException(get_route_path(saved_route))
+
+
+@gui.route(app, "/account/saved/")
+@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/saved/")
+def saved_route(
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
+):
+    validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.saved):
         all_saved_runs_tab(request)
     url = get_og_url_path(request)
@@ -129,7 +175,13 @@ def saved_route(request: Request):
 
 
 @gui.route(app, "/account/api-keys/")
-def api_keys_route(request: Request):
+@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/api-keys/")
+def api_keys_route(
+    request: Request,
+    workspace_slug: str | None = None,
+    workspace_hashid: str | None = None,
+):
+    validate_and_set_current_workspace(request, workspace_hashid)
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)
     url = get_og_url_path(request)
@@ -144,9 +196,31 @@ def api_keys_route(request: Request):
     )
 
 
-@gui.route(app, "/workspaces/")
-def workspaces_route(request: Request):
-    with account_page_wrapper(request, AccountTabs.workspaces):
+@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/")
+def workspaces_route(
+    request: Request,
+    workspace_hashid: str,
+    workspace_slug: str | None,
+):
+    raise RedirectException(
+        get_route_path(
+            workspaces_members_route,
+            path_params={
+                "workspace_slug": workspace_slug,
+                "workspace_hashid": workspace_hashid,
+            },
+        )
+    )
+
+
+@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/members/")
+def workspaces_members_route(
+    request: Request,
+    workspace_hashid: str,
+    workspace_slug: str | None = None,
+):
+    validate_and_set_current_workspace(request, workspace_hashid)
+    with account_page_wrapper(request, AccountTabs.members):
         workspaces_page(request.user, request.session)
 
     url = get_og_url_path(request)
@@ -154,7 +228,7 @@ def workspaces_route(request: Request):
         meta=raw_build_meta_tags(
             url=url,
             canonical_url=url,
-            title="Teams • Gooey.AI",
+            title="Members • Gooey.AI",
             description="Your teams.",
             robots="noindex,nofollow",
         )
@@ -202,33 +276,50 @@ class TabData(typing.NamedTuple):
 
 
 class AccountTabs(TabData, Enum):
-    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
+    members = TabData(title=f"{icons.company} Members", route=workspaces_members_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
-    workspaces = TabData(title=f"{icons.company} Teams", route=workspaces_route)
-
-    @property
-    def url_path(self) -> str:
-        return get_route_path(self.route)
+    billing = TabData(title=f"{icons.billing} Billing", route=billing_route)
 
     @classmethod
-    def get_tabs_for_user(cls, user: AppUser | None) -> list["AccountTabs"]:
+    def get_tabs_for_request(cls, request: Request) -> list["AccountTabs"]:
         from daras_ai_v2.base import BasePage
 
         ret = list(cls)
-        if not BasePage.is_user_admin(user):
-            ret.remove(cls.workspaces)
+        workspace = get_current_workspace(request.user, request.session)
+        if not BasePage.is_user_admin(request.user) or workspace.is_personal:
+            ret.remove(cls.members)
+
+        if not workspace.is_personal:
+            ret.remove(cls.profile)
+            if not workspace.memberships.get(user=request.user).can_edit_workspace():
+                ret.remove(cls.billing)
 
         return ret
+
+    def get_url_path(self, request: Request) -> str:
+        workspace = get_current_workspace(request.user, request.session)
+        if workspace.is_personal or self == AccountTabs.profile:
+            return get_route_path(self.route)
+        else:
+            return get_route_path_for_workspace(self.route, workspace)
 
 
 def billing_tab(request: Request):
     workspace = get_current_workspace(request.user, request.session)
+    if (
+        not workspace.is_personal
+        and not workspace.memberships.get(user=request.user).can_edit_workspace()
+    ):
+        raise gui.RedirectException(get_route_path(account_route))
     return billing_page(workspace)
 
 
 def profile_tab(request: Request):
+    workspace = get_current_workspace(request.user, request.session)
+    if not workspace.is_personal:
+        raise gui.RedirectException(get_route_path(account_route))
     return edit_user_profile_page(user=request.user)
 
 
@@ -262,7 +353,7 @@ def all_saved_runs_tab(request: Request):
                 f"profile page at {request.user.handle.get_app_url()}."
             )
         else:
-            edit_profile_url = AccountTabs.profile.url_path
+            edit_profile_url = AccountTabs.profile.get_url_path(request)
             gui.caption(
                 "All your Saved workflows are here. Public ones will be listed on your "
                 f"profile page if you [create a username]({edit_profile_url})."
@@ -280,17 +371,20 @@ def api_keys_tab(request: Request):
 
 
 @contextmanager
-def account_page_wrapper(request: Request, current_tab: TabData):
+def account_page_wrapper(request: Request, current_tab: AccountTabs):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
         raise gui.RedirectException(str(redirect_url))
 
-    with page_wrapper(request):
+    with page_wrapper(request, current_tab=current_tab):
+        if request.url.path != current_tab.get_url_path(request):
+            raise gui.RedirectException(current_tab.get_url_path(request))
+
         gui.div(className="mt-5")
         with gui.nav_tabs():
-            for tab in AccountTabs.get_tabs_for_user(request.user):
-                with gui.nav_item(tab.url_path, active=tab == current_tab):
+            for tab in AccountTabs.get_tabs_for_request(request):
+                with gui.nav_item(tab.get_url_path(request), active=tab == current_tab):
                     gui.html(tab.title)
 
         with gui.nav_tab_content():
@@ -308,3 +402,26 @@ def threaded_paypal_handle_subscription_updated(subscription_id: str) -> bool:
         logger.exception(f"Unexpected PayPal error for sub: {subscription_id}")
         return False
     return True
+
+
+def validate_and_set_current_workspace(request: Request, workspace_hashid: str | None):
+    from routers.root import login
+
+    if not request.user or request.user.is_anonymous:
+        next_url = request.url.path
+        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
+        raise gui.RedirectException(redirect_url)
+
+    if not workspace_hashid:
+        # not a workspace URL, we set the current workspace to user's personal workspace
+        workspace, _ = request.user.get_or_create_personal_workspace()
+        set_current_workspace(request.session, workspace.id)
+        return
+
+    try:
+        workspace_id = Workspace.api_hashids.decode(workspace_hashid)[0]
+        WorkspaceMembership.objects.get(workspace_id=workspace_id, user=request.user)
+    except (IndexError, WorkspaceMembership.DoesNotExist):
+        return Response(status_code=404)
+    else:
+        set_current_workspace(request.session, workspace_id)
