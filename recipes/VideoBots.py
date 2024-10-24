@@ -399,19 +399,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     gui.caption(
                         "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
                     )
-                    col1, col2 = gui.columns(2)
-                    with col1:
-                        translation_model = translation_model_selector(
-                            allow_none=False,
-                            language_filter=selected_filter_language,
-                        )
-                    with col2:
-                        translation_language_selector(
-                            model=translation_model,
-                            language_filter=selected_filter_language,
-                            label=f"###### {field_title(self.RequestModel, 'user_language')}",
-                            key="user_language",
-                        )
 
                     if asr_model and asr_model.supports_speech_translation():
                         with gui.div(className="text-muted"):
@@ -425,6 +412,22 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                                 gui.session_state["asr_task"] = "translate"
                             else:
                                 gui.session_state.pop("asr_task", None)
+                    else:
+                        gui.session_state.pop("asr_task", None)
+
+                    col1, col2 = gui.columns(2)
+                    with col1:
+                        translation_model = translation_model_selector(
+                            allow_none=False,
+                            language_filter=selected_filter_language,
+                        )
+                    with col2:
+                        translation_language_selector(
+                            model=translation_model,
+                            language_filter=selected_filter_language,
+                            label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                            key="user_language",
+                        )
 
                 gui.newline()
         else:
