@@ -21,8 +21,7 @@ def run():
     migrate_personal_workspaces()
     migrate_txns()
     migrate_saved_runs()
-    ## LATER
-    # migrate_published_runs()
+    migrate_published_runs()
     migrate_api_keys()
 
 

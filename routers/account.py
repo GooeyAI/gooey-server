@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
+from django.db.models import Q
 from fastapi.requests import Request
 from furl import furl
 from gooey_gui.core import RedirectException
@@ -232,9 +233,11 @@ def profile_tab(request: Request):
 
 
 def all_saved_runs_tab(request: Request):
-    prs = PublishedRun.objects.filter(
-        created_by=request.user,
-    ).order_by("-updated_at")
+    workspace = get_current_workspace(request.user, request.session)
+    pr_filter = Q(workspace=workspace)
+    if workspace.is_personal:
+        pr_filter |= Q(created_by=request.user, workspace__isnull=True)
+    prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)

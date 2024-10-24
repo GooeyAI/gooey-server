@@ -73,10 +73,10 @@ def model_selector(
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
-        Img2ImgModels.instruct_pix2pix.name,
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.jack_qiao.name,
-        Img2ImgModels.sd_2.name,
+        Img2ImgModels.instruct_pix2pix,
+        Img2ImgModels.dall_e,
+        Img2ImgModels.jack_qiao,
+        Img2ImgModels.sd_2,
     ]
     col1, col2 = gui.columns(2)
     with col1:
