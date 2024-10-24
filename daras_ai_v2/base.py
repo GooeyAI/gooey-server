@@ -2227,7 +2227,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with gui.tag("a", id="api-keys"):
             gui.write("### 🔐 API keys")
 
-        manage_api_keys(self.request.user)
+        manage_api_keys(workspace=self.current_workspace, user=self.request.user)
 
     def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:
