@@ -311,6 +311,16 @@ class Workspace(SafeDeleteModel):
         else:
             return f"{self.created_by.first_name_possesive()} Workspace"
 
+    def display_name_possessive(self, current_user: AppUser | None = None) -> str:
+        if self.is_personal and current_user and self.created_by_id == current_user.id:
+            return "Your Personal"
+
+        display_name = self.display_name()
+        if display_name.endswith("s"):
+            return f"{display_name}'"
+        else:
+            return f"{display_name}'s"
+
     def html_icon(self, current_user: AppUser | None = None) -> str:
         if self.is_personal and self.created_by_id == current_user.id:
             if self.created_by.photo_url:
