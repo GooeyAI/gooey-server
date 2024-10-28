@@ -23,26 +23,10 @@ class ApiKeyQueySet(models.QuerySet):
         )
         return api_key, secret_key
 
-    def create_from_secret_key(
-        self, secret_key: str, workspace: "Workspace", **kwargs
-    ) -> "ApiKey":
-        """
-        `key` must be a valid plain-text key.
-        """
-        hasher = PBKDF2PasswordHasher()
-        return self.get_or_create(
-            hash=hasher.encode(secret_key),
-            defaults=dict(
-                preview=safe_preview(secret_key),
-                workspace=workspace,
-                **kwargs,
-            ),
-        )[0]
-
-    def get_from_secret_key(self, secret_key: str) -> "ApiKey | None":
+    def get_from_secret_key(self, secret_key: str) -> "ApiKey":
         hasher = PBKDF2PasswordHasher()
         hash = hasher.encode(secret_key)
-        return self.filter(hash=hash).first()
+        return self.get(hash=hash)
 
 
 class ApiKey(models.Model):
