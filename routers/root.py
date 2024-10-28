@@ -45,6 +45,10 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import workspace_selector
 
+if typing.TYPE_CHECKING:
+    from routers.account import AccountTabs
+
+
 app = CustomAPIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
@@ -699,7 +703,12 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
+def page_wrapper(
+    request: Request,
+    className="",
+    *,
+    current_tab: "AccountTabs | None" = None,
+):
     context = {
         "request": request,
         "block_incognito": True,
@@ -729,7 +738,9 @@ def page_wrapper(request: Request, className=""):
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
-                    workspace_selector(request.user, request.session)
+                    workspace_selector(
+                        request.user, request.session, current_tab=current_tab
+                    )
                 else:
                     anonymous_login_container(request, context)
 

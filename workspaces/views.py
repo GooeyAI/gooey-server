@@ -10,10 +10,14 @@ from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
+from .models import (
+    DEFAULT_WORKSPACE_PHOTO_URL,
+    Workspace,
+    WorkspaceInvite,
+    WorkspaceMembership,
+    WorkspaceRole,
+)
 from .widgets import get_current_workspace, set_current_workspace
-
-DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
 
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
@@ -99,7 +103,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
         with gui.div(className="d-flex align-items-center"):
             gui.image(
-                workspace.photo_url or DEFAULT_WORKSPACE_LOGO,
+                workspace.photo_url or DEFAULT_WORKSPACE_PHOTO_URL,
                 className="my-0 me-4 rounded",
                 style={"width": "128px", "height": "128px", "object-fit": "contain"},
             )
@@ -188,7 +192,7 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
-    if not membership.can_edit_workspace_metadata():
+    if not membership.can_edit_workspace():
         return
 
     ref = gui.use_confirm_dialog(key="edit-workspace", close_on_confirm=False)

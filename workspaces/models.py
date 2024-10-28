@@ -29,6 +29,9 @@ if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
 
 
+DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+
+
 def validate_workspace_domain_name(value: str):
     if value in COMMON_EMAIL_DOMAINS:
         raise ValidationError("This domain name is reserved")
@@ -126,6 +129,8 @@ class Workspace(SafeDeleteModel):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = WorkspaceQuerySet.as_manager()
+
+    api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT + "/workspaces")
 
     class Meta:
         constraints = [
@@ -363,7 +368,8 @@ class WorkspaceMembership(SafeDeleteModel):
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
-    def can_edit_workspace_metadata(self):
+    def can_edit_workspace(self):
+        # workspace metadata, billing, etc.
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):
@@ -397,7 +403,10 @@ class WorkspaceMembership(SafeDeleteModel):
         return self.role == WorkspaceRole.OWNER
 
     def can_invite(self):
-        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+        return (
+            self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+            and not self.workspace.is_personal
+        )
 
 
 class WorkspaceInviteQuerySet(models.QuerySet):
