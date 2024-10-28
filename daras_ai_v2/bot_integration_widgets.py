@@ -16,7 +16,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.workflow_url_input import workflow_url_input, url_to_runs
+from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
@@ -410,20 +410,23 @@ User_question_0
 User_question_1
 User_question_2
 User_question_3"""
-
-                generate_button = gui.button(
+                gui.session_state["improve-icon"] = (
+                    '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
+                )
+                improve_button = gui.button(
                     '<i class="fa-regular fa-sparkles" aria-hidden="true"></i> Improve',
                     "generate_integration_details",
                     style={"float": "right"},
                     type="tertiary",
                 )
 
-                if generate_button:
+                if improve_button:
+                    gui.session_state["improve-icon"] = (
+                        '<i class="fa-regular fa-sparkles fa-beat"></i>'
+                    )
                     result, sr = (
                         CompareLLMPage()
-                        .get_pr_from_example_id(
-                            example_id=settings.WEB_INTEGRATION_EXAMPLE_ID
-                        )
+                        .get_pr_from_example_id(example_id="i2klupxjhjeo")
                         .submit_api_call(
                             current_user=user,
                             request_body=dict(
@@ -439,6 +442,9 @@ User_question_3"""
                         gui.session_state[f"--question-{i}"] = output_dict[
                             "User_question_" + str(i)
                         ]
+                    gui.session_state["improve-icon"] = (
+                        '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
+                    )
         bi.name = gui.text_input(
             "###### Name",
             value=bi.name,
