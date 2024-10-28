@@ -35,11 +35,12 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 
         gui.table(
             pd.DataFrame.from_records(
-                columns=["Secret Key (Preview)", "Created At"],
+                columns=["Secret Key (Preview)", "Created At", "Created By"],
                 data=[
                     (
                         api_key.preview,
                         api_key.created_at.strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                        api_key.created_by and api_key.created_by.full_name() or "",
                     )
                     for api_key in api_keys
                 ],
