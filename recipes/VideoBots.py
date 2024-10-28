@@ -231,6 +231,10 @@ class VideoBotsPage(BasePage):
             title="ASR Model Task",
             description="Use **{asr_model}** for speech translation from **{asr_language}** to **English**",
         )
+        asr_prompt: str | None = Field(
+            title="👩‍💻 Prompt",
+            description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
+        )
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
@@ -390,6 +394,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         )
                     else:
                         asr_language = None
+
+                if asr_model.supports_input_prompt():
+                    gui.text_area(
+                        f'###### {field_title_desc(self.RequestModel, "asr_prompt")}',
+                        key="asr_prompt",
+                        value="Transcribe the recording as accurately as possible.",
+                        height=300,
+                    )
 
                 gui.newline()
                 if gui.checkbox(
@@ -878,6 +890,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 speech_translation_target=(
                     "en" if request.asr_task == "translate" else None
                 ),
+                input_prompt=request.asr_prompt,
             )
             asr_msg = f"🎧 I heard: “{asr_output}”"
             response.output_text = [asr_msg] * request.num_outputs

@@ -52,6 +52,11 @@ class AsrPage(BasePage):
         )
         language: str | None
 
+        input_prompt: str | None = Field(
+            title="👩‍💻 Prompt",
+            description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
+        )
+
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
@@ -143,6 +148,14 @@ class AsrPage(BasePage):
             )
         with col2:
             asr_language_selector(asr_model, language_filter=selected_filter_language)
+
+        if asr_model.supports_input_prompt():
+            gui.text_area(
+                f'###### {field_title_desc(cls.RequestModel, "input_prompt")}',
+                key="input_prompt",
+                value="Transcribe the recording as accurately as possible.",
+                height=300,
+            )
 
         if not gui.checkbox(
             "🔠 **Translate**",
@@ -244,6 +257,7 @@ class AsrPage(BasePage):
                 speech_translation_target=(
                     request.translation_target if use_asr_speech_translation else None
                 ),
+                input_prompt=request.input_prompt,
             ),
             request.documents,
             max_workers=4,

@@ -1,3 +1,4 @@
+import base64
 import multiprocessing
 import os.path
 import tempfile
@@ -232,6 +233,7 @@ class AsrModels(Enum):
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
+    gpt_4_o_audio = "GPT-4o Audio (openai)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
@@ -272,8 +274,12 @@ class AsrModels(Enum):
             self.whisper_large_v3,
         }
 
+    def supports_input_prompt(self) -> bool:
+        return self in {self.gpt_4_o_audio}
+
 
 asr_model_ids = {
+    AsrModels.gpt_4_o_audio: "gpt-4o-audio-preview",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
@@ -294,6 +300,7 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.gpt_4_o_audio: {},
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_telugu_large_v2: {"te"},
@@ -891,6 +898,7 @@ def run_asr(
     language: str = None,
     output_format: str = "text",
     speech_translation_target: str | None = None,
+    input_prompt: str | None = None,
 ) -> str | AsrOutputJson:
     """
     Run ASR on audio.
@@ -1099,6 +1107,36 @@ def run_asr(
         )
         raise_for_status(r)
         data = r.json()
+    elif selected_model == AsrModels.gpt_4_o_audio:
+        from daras_ai_v2.language_model import _run_openai_chat
+
+        audio_r = requests.get(audio_url)
+        raise_for_status(audio_r, is_user_url=True)
+
+        return _run_openai_chat(
+            model=asr_model_ids[selected_model],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": input_prompt,
+                        },
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64.b64encode(audio_r.content).decode(),
+                                "format": "wav",
+                            },
+                        },
+                    ],
+                },
+            ],
+            max_tokens=4096,
+            num_outputs=1,
+            temperature=1,
+        )[0]["content"]
     # call one of the self-hosted models
     else:
         kwargs = {}
