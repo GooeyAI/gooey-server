@@ -11,6 +11,8 @@ from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
+from recipes.CompareLLM import CompareLLMPage
+from daras_ai_v2 import settings
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -397,10 +399,10 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: 
                     gui.session_state["--update-display-picture"] = True
                     gui.rerun()
             with gencol2:
-                generate_prompt = f"""Your job is to define the schema for a chatbot, using the title, description and prompt of an AI Workflow.
+                generate_prompt = """Your job is to define the schema for a chatbot, using the title, description and prompt of an AI Workflow.
 Inputs:
-title: {bi.name}
-prompt: {copilot_prompt}
+title: {{ title }}
+prompt: {{ prompt }}
 
 Using the title and prompt, output the following:
 description (formal tone, < 100 words)
@@ -417,30 +419,31 @@ User_question_3"""
                 )
 
                 if generate_button:
-                    page_cls, sr, pr = url_to_runs(
-                        "http://localhost:3000/compare-large-language-models/?run_id=alqs2z3jjsq6&uid=iKJ9nPny8MaO1rHf4Zs08zETLbl2"
-                    )
-                    request_body = page_cls.RequestModel(
-                        input_prompt=generate_prompt
-                    ).dict(exclude_unset=True)
-                    result, sr = sr.submit_api_call(
-                        current_user=user,
-                        request_body=request_body,
-                        parent_pr=pr,
+                    result, sr = (
+                        CompareLLMPage()
+                        .get_pr_from_example_id(
+                            example_id=settings.WEB_INTEGRATION_EXAMPLE_ID
+                        )
+                        .submit_api_call(
+                            current_user=user,
+                            request_body=dict(
+                                variables={"title": bi.name, "prompt": copilot_prompt},
+                                input_prompt=generate_prompt,
+                            ),
+                        )
                     )
                     sr.wait_for_celery_result(result)
                     output_dict = json.loads(sr.state["output_text"]["gpt_4_o"][0])
-                    bi.descripton = output_dict["description"]
-                    bi.conversation_starters = [
-                        output_dict["User_question_" + str(i)] for i in range(4)
-                    ]
-                    gui.session_state["--update-bi"] = True
+                    gui.session_state["bi-description"] = output_dict["description"]
+                    for i in range(4):
+                        gui.session_state[f"--question-{i}"] = output_dict[
+                            "User_question_" + str(i)
+                        ]
         bi.name = gui.text_input(
             "###### Name",
             value=bi.name,
         )
-        if gui.session_state.get("--update-bi"):
-            gui.text_area("###### Description", value=bi.descripton)
+        bi.descripton = gui.text_area("###### Description", key="bi-description")
         scol1, scol2 = gui.columns(2)
         with scol1:
             bi.by_line = gui.text_input(
@@ -454,16 +457,15 @@ User_question_3"""
             )
 
         gui.write("###### Conversation Starters")
-        if gui.session_state.get("--update-bi"):
-            bi.conversation_starters = list(
-                filter(
-                    None,
-                    [
-                        gui.text_input("", key=f"--question-{i}", value=value)
-                        for i, value in zip_longest(range(4), bi.conversation_starters)
-                    ],
-                )
+        bi.conversation_starters = list(
+            filter(
+                None,
+                [
+                    gui.text_input("", key=f"--question-{i}", value=value)
+                    for i, value in zip_longest(range(4), bi.conversation_starters)
+                ],
             )
+        )
 
         config = (
             dict(
