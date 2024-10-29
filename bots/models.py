@@ -510,6 +510,12 @@ class BotIntegration(models.Model):
         help_text="The gooey account uid where the credits will be deducted from",
         db_index=True,
     )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="botintegrations",
+        null=True,
+    )
     user_language = models.TextField(
         default="",
         help_text="The response language (same as user language in video bots)",
