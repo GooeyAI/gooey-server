@@ -118,14 +118,12 @@ def migrate_api_keys():
                 ApiKey(
                     hash=snap.get("secret_key_hash"),
                     preview=snap.get("secret_key_preview"),
-                    workspace_id=cached_workspaces_by_uid[snap.get("uid")].id,
-                    created_by_id=cached_workspaces_by_uid[
-                        snap.get("uid")
-                    ].created_by.id,
+                    workspace_id=workspace.id,
+                    created_by_id=workspace.created_by.id,
                     created_at=snap.get("created_at"),
                 )
                 for snap in batch
-                if snap.get("uid") in cached_workspaces_by_uid
+                if (workspace := cached_workspaces_by_uid.get(snap.get("uid")))
             ],
             ignore_conflicts=True,
             unique_fields=("hash",),
