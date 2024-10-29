@@ -9,8 +9,8 @@ from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from api_keys.models import ApiKey
 from app_users.models import AppUser
 from auth.auth_backend import authlocal
-from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
+from workspaces.models import Workspace
 
 
 class AuthenticationError(HTTPException):
@@ -27,27 +27,6 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def _authenticate_credentials_from_firebase(token: str) -> AppUser | None:
-    """Legacy method to authenticate API keys stored in Firebase."""
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
-    hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(token)
-
-    try:
-        doc = (
-            db_collection.where("secret_key_hash", "==", secret_key_hash)
-            .limit(1)
-            .get()[0]
-        )
-    except IndexError:
-        raise AuthorizationError("Invalid API Key.")
-
-    uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-
-    return user
-
-
 def authenticate_credentials(token: str) -> AppUser:
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
@@ -56,23 +35,18 @@ def authenticate_credentials(token: str) -> AppUser:
         api_key = ApiKey.objects.select_related("workspace__created_by").get(
             hash=secret_key_hash
         )
-        if not api_key.workspace.is_personal:
-            # TODO: Add support for team workspaces
-            raise AuthorizationError(
-                "API access is not yet supported for team workspaces."
-            )
-        user = api_key.workspace.created_by
+        workspace = api_key.workspace
     except ApiKey.DoesNotExist:
-        user = _authenticate_credentials_from_firebase(token)
+        raise AuthorizationError("Invalid API Key.")
 
-    if user.is_disabled:
+    if workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return user
+    return workspace
 
 
 class APIAuth(SecurityBase):
@@ -100,7 +74,7 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> AppUser:
+    def __call__(self, request: Request) -> Workspace:
         if authlocal:  # testing only!
             return authlocal[0]
 
