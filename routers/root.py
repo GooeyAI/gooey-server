@@ -733,6 +733,7 @@ def page_wrapper(request: Request, className=""):
                         request.user, request.session
                     )
                 else:
+                    current_workspace = None
                     anonymous_login_container(request, context)
 
         gui.html(copy_to_clipboard_scripts)
