@@ -263,7 +263,7 @@ def resp_say_or_tts_play(
                 {**bot.saved_run.state, "text_prompt": text}
             ).dict()
             result, sr = TextToSpeechPage.get_root_pr().submit_api_call(
-                current_user=AppUser.objects.get(uid=bot.billing_account_uid),
+                workspace=bot.workspace,
                 request_body=tts_state,
             )
             # wait for the TTS to finish

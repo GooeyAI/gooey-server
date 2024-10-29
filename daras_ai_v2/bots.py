@@ -1,7 +1,6 @@
 import mimetypes
 import typing
 from datetime import datetime
-from types import SimpleNamespace
 
 import gooey_gui as gui
 from django.db import transaction
@@ -10,7 +9,6 @@ from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 
-from app_users.models import AppUser
 from bots.models import (
     Platform,
     Message,
@@ -26,9 +24,13 @@ from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
-from gooeysite.bg_db_conn import db_middleware, get_celery_result_db_safe
+from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -87,7 +89,7 @@ class BotInterface:
     page_cls: typing.Type[BasePage] = None
     query_params: dict
     user_language: str = None
-    billing_account_uid: str
+    workspace: "Workspace"
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
     input_glossary: str | None = None
@@ -131,7 +133,7 @@ class BotInterface:
         elif should_translate_lang(user_language):
             self.user_language = user_language
 
-        self.billing_account_uid = self.bi.billing_account_uid
+        self.workspace = self.bi.workspace
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
 
@@ -252,9 +254,7 @@ def _msg_handler(bot: BotInterface):
         # mark message as read
         bot.mark_read()
     # get the attached billing account
-    billing_account_user = AppUser.objects.get_or_create_from_uid(
-        bot.billing_account_uid
-    )[0]
+    workspace = bot.workspace
     # get the user's input
     # print("input type:", bot.input_type)
     input_text = (bot.get_input_text() or "").strip()
@@ -311,7 +311,7 @@ def _msg_handler(bot: BotInterface):
         _handle_feedback_msg(bot, input_text)
     else:
         _process_and_send_msg(
-            billing_account_user=billing_account_user,
+            workspace=workspace,
             bot=bot,
             input_images=input_images,
             input_documents=input_documents,
@@ -345,7 +345,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
 
 def _process_and_send_msg(
     *,
-    billing_account_user: AppUser,
+    workspace: "Workspace",
     bot: BotInterface,
     input_images: list[str] | None,
     input_audio: str | None,
@@ -378,7 +378,7 @@ def _process_and_send_msg(
     result, sr = submit_api_call(
         page_cls=bot.page_cls,
         query_params=bot.query_params,
-        current_user=billing_account_user,
+        workspace=workspace,
         request_body=body,
     )
     bot.on_run_created(sr)
