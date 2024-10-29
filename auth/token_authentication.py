@@ -6,6 +6,7 @@ from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
+from api_keys.models import ApiKey
 from app_users.models import AppUser
 from auth.auth_backend import authlocal
 from daras_ai_v2 import db
@@ -26,22 +27,36 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+def _authenticate_credentials_from_firebase(token: str) -> AppUser | None:
+    """Legacy method to authenticate API keys stored in Firebase."""
     hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(token)
+    hash = hasher.encode(token)
 
+    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     try:
-        doc = (
-            db_collection.where("secret_key_hash", "==", secret_key_hash)
-            .limit(1)
-            .get()[0]
-        )
+        doc = db_collection.where("secret_key_hash", "==", hash).limit(1).get()[0]
     except IndexError:
-        raise AuthorizationError("Invalid API Key.")
+        return None
 
     uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    return AppUser.objects.get_or_create_from_uid(uid)[0]
+
+
+def authenticate_credentials(token: str) -> AppUser:
+    api_key = ApiKey.objects.select_related(
+        "workspace__created_by"
+    ).get_from_secret_key(token)
+    if api_key and not api_key.workspace.is_personal:
+        # TODO: Add support for team workspaces
+        raise AuthorizationError("API access is not yet supported for team workspaces.")
+
+    if api_key:
+        user = api_key.workspace.created_by
+    else:
+        user = _authenticate_credentials_from_firebase(token)
+        if not user:
+            raise AuthorizationError("Invalid API key.")
+
     if user.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
@@ -59,8 +74,8 @@ class APIAuth(SecurityBase):
     ```python
     api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
 
-    @app.get("/api/users")
-    def get_users(authenticated_user: AppUser = Depends(api_auth)):
+    @app.get("/api/runs")
+    def get_runs(current_workspace: Workspace = Depends(api_auth)):
         ...
     ```
     """
