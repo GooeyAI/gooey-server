@@ -113,30 +113,25 @@ def migrate_api_keys():
         )
         cached_workspaces_by_uid = {w.created_by.uid: w for w in cached_workspaces}
 
-        with (
-            disable_auto_now_add(ApiKey, "created_at"),
-            disable_auto_now(ApiKey, "updated_at"),
-        ):
-            migrated_keys = ApiKey.objects.bulk_create(
-                [
-                    ApiKey(
-                        hash=snap.get("secret_key_hash"),
-                        preview=snap.get("secret_key_preview"),
-                        workspace_id=cached_workspaces_by_uid[snap.get("uid")].id,
-                        created_by_id=cached_workspaces_by_uid[
-                            snap.get("uid")
-                        ].created_by.id,
-                        created_at=snap.get("created_at"),
-                        updated_at=snap.get("created_at"),
-                    )
-                    for snap in batch
-                    if snap.get("uid") in cached_workspaces_by_uid
-                ],
-                ignore_conflicts=True,
-                unique_fields=("hash",),
-            )
-            print(total, end=SEP)
-            total += len(migrated_keys)
+        migrated_keys = ApiKey.objects.bulk_create(
+            [
+                ApiKey(
+                    hash=snap.get("secret_key_hash"),
+                    preview=snap.get("secret_key_preview"),
+                    workspace_id=cached_workspaces_by_uid[snap.get("uid")].id,
+                    created_by_id=cached_workspaces_by_uid[
+                        snap.get("uid")
+                    ].created_by.id,
+                    created_at=snap.get("created_at"),
+                )
+                for snap in batch
+                if snap.get("uid") in cached_workspaces_by_uid
+            ],
+            ignore_conflicts=True,
+            unique_fields=("hash",),
+        )
+        print(total, end=SEP)
+        total += len(migrated_keys)
 
 
 def update_in_batches(qs, **kwargs):
@@ -149,23 +144,3 @@ def update_in_batches(qs, **kwargs):
             break
         total += rows
         print(total, end=SEP)
-
-
-@contextmanager
-def disable_auto_now(model, field_name):
-    for field in model._meta.local_fields:
-        if field.name == field_name:
-            field.auto_now = False
-            yield
-            field.auto_now = True
-            break
-
-
-@contextmanager
-def disable_auto_now_add(model, field_name):
-    for field in model._meta.local_fields:
-        if field.name == field_name:
-            field.auto_now_add = False
-            yield
-            field.auto_now_add = True
-            break

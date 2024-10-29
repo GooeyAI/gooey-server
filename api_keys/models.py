@@ -1,6 +1,7 @@
 import typing
 
 from django.db import models
+from django.utils import timezone
 
 from daras_ai_v2.crypto import PBKDF2PasswordHasher, get_random_api_key, safe_preview
 
@@ -38,7 +39,7 @@ class ApiKey(models.Model):
     created_by = models.ForeignKey(
         "app_users.AppUser", on_delete=models.SET_NULL, null=True
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = ApiKeyQueySet.as_manager()
