@@ -1,3 +1,4 @@
+import base64
 import multiprocessing
 import os.path
 import tempfile
@@ -13,6 +14,7 @@ from furl import furl
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_asr import azure_asr
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -29,6 +31,12 @@ from daras_ai_v2.gdrive_downloader import (
 )
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
+from daras_ai_v2.language_filters import (
+    filter_languages,
+    filter_models_by_language,
+    normalised_lang_in_collection,
+    are_languages_same,
+)
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
@@ -69,10 +77,18 @@ CHIRP_SUPPORTED = {
     'pl-PL', 'hr-HR', 'lv-LV', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
-WHISPER_SUPPORTED = {
+WHISPER_LARGE_V2_SUPPORTED = {
     "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
     "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
     "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
+}  # fmt: skip
+WHISPER_LARGE_V3_SUPPORTED = {
+    'mt', 'sn', 'lv', 'el', 'fa', 'sd', 'eu', 'no', 'pa', 'br', 'es', 'mk', 'ht', 'lb', 'hu', 'mi', 'ba', 'oc', 'sl',
+    'ru', 'si', 'it', 'su', 'az', 'pl', 'hr', 'ko', 'ur', 'vi', 'hy', 'ar', 'lo', 'cs', 'be', 'tg', 'lt', 'ms', 'mn',
+    'th', 'so', 'ml', 'ca', 'as', 'fr', 'fi', 'ja', 'pt', 'bs', 'tr', 'nl', 'mg', 'tl', 'te', 'ha', 'fo', 'en', 'sw',
+    'yue', 'ps', 'bn', 'is', 'gu', 'ta', 'af', 'sq', 'cy', 'sr', 'uk', 'de', 'am', 'sv', 'nn', 'ka', 'kk', 'yi', 'tk',
+    'yo', 'sk', 'kn', 'ln', 'id', 'bo', 'jv', 'mr', 'et', 'ne', 'km', 'gl', 'da', 'he', 'la', 'hi', 'ro', 'bg', 'my',
+    'uz', 'tt', 'zh', 'haw', 'sa'
 }  # fmt: skip
 
 # https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
@@ -214,9 +230,10 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
-    whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
+    whisper_large_v3 = "Whisper Large v3 (openai)"
+    gpt_4_o_audio = "GPT-4o Audio (openai)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
@@ -243,9 +260,27 @@ class AsrModels(Enum):
     def _deprecated(cls):
         return {cls.seamless_m4t}
 
+    @classmethod
+    def get(cls, key, default=None):
+        try:
+            return cls[key]
+        except KeyError:
+            return default
+
+    def supports_speech_translation(self) -> bool:
+        return self in {
+            self.seamless_m4t_v2,
+            self.whisper_large_v2,
+            self.whisper_large_v3,
+        }
+
+    def supports_input_prompt(self) -> bool:
+        return self in {self.gpt_4_o_audio}
+
 
 asr_model_ids = {
-    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:37dfc0d6a7eb43ff84e230f74a24dab84e6bb7756c9b457dbdcceca3de7a4a04",
+    AsrModels.gpt_4_o_audio: "gpt-4o-audio-preview",
+    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
@@ -265,8 +300,14 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
-    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
-    AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
+    AsrModels.gpt_4_o_audio: {},
+    AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
+    AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
+    AsrModels.whisper_telugu_large_v2: {"te"},
+    AsrModels.whisper_hindi_large_v2: {"hi"},
+    AsrModels.vakyansh_bhojpuri: {"bho"},
+    AsrModels.nemo_english: {"en"},
+    AsrModels.nemo_hindi: {"hi"},
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
@@ -299,6 +340,7 @@ class TranslationModel(typing.NamedTuple):
     label: str
     supports_glossary: bool = False
     supports_auto_detect: bool = False
+    is_asr_model: bool = False
 
 
 class TranslationModels(TranslationModel, Enum):
@@ -307,9 +349,42 @@ class TranslationModels(TranslationModel, Enum):
         supports_glossary=True,
         supports_auto_detect=True,
     )
-    ghana_nlp = TranslationModel(
-        label="Ghana NLP Translate", supports_auto_detect=False
+    ghana_nlp = TranslationModel(label="Ghana NLP Translate")
+    whisper_large_v2 = TranslationModel(
+        label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
+    whisper_large_v3 = TranslationModel(
+        label="Whisper Large v3 (inbuilt)", is_asr_model=True
+    )
+    seamless_m4t_v2 = TranslationModel(
+        label="Seamless M4T v2 (inbuilt)", is_asr_model=True
+    )
+
+    @classmethod
+    def get(cls, key, default=None):
+        try:
+            return cls[key]
+        except KeyError:
+            return default
+
+    @classmethod
+    def target_languages_by_model(cls) -> dict[TranslationModel, typing.Iterable[str]]:
+        return {e: e.supported_target_languages() for e in cls if not e.is_asr_model}
+
+    def supported_target_languages(self) -> typing.Iterable[str]:
+        match self:
+            case self.google:
+                return google_translate_target_languages().keys()
+            case self.ghana_nlp:
+                return (
+                    ghana_nlp_translate_target_languages().keys()
+                    if settings.GHANA_NLP_SUBKEY
+                    else []
+                )
+            case self.seamless_m4t_v2:
+                return SEAMLESS_v2_ASR_SUPPORTED
+            case _:
+                return ["en"]
 
 
 def translation_language_selector(
@@ -317,39 +392,72 @@ def translation_language_selector(
     model: TranslationModels | None,
     label: str,
     key: str,
+    language_filter: str = "",
+    sort_by: str | None = None,
     **kwargs,
 ) -> str | None:
     if not model:
         gui.session_state[key] = None
         return
 
-    if model == TranslationModels.google:
-        languages = google_translate_target_languages()
-    elif model == TranslationModels.ghana_nlp:
-        if not settings.GHANA_NLP_SUBKEY:
-            languages = {}
-        else:
-            languages = ghana_nlp_translate_target_languages()
-    else:
-        raise ValueError("Unsupported translation model: " + str(model))
+    allow_none = (
+        kwargs.pop("allow_none", None)
+        and model.supports_auto_detect
+        and not language_filter
+    )
 
-    options = list(languages.keys())
+    options = list(model.supported_target_languages())
+    if language_filter:
+        options = filter_languages(language_filter, options)
+    else:
+        sort_language_options(options, sort_by)
+
     return gui.selectbox(
         label=label,
         key=key,
         format_func=lang_format_func,
         options=options,
+        allow_none=allow_none,
         **kwargs,
     )
 
 
 def translation_model_selector(
-    key="translation_model", allow_none=True
+    key: str = "translation_model",
+    allow_none: bool = True,
+    *,
+    language_filter: str = "",
+    asr_model: AsrModels | None = None,
 ) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
+    if language_filter:
+        supported_models = filter_models_by_language(
+            language_filter, TranslationModels.target_languages_by_model()
+        )
+    else:
+        supported_models = [
+            model for model in TranslationModels if not model.is_asr_model
+        ]
+
+    # insert in-built model if available
+    in_built_option = TranslationModels.get(asr_model.name) if asr_model else None
+    if in_built_option and in_built_option not in supported_models:
+        supported_models.append(in_built_option)
+
+    # @TODO set state to inbuilt model if some other value is set
+    # prev_model = gui.session_state.get(key)
+    # if in_built_option and prev_model != in_built_option:
+    #     gui.session_state[key] = in_built_option
+
+    if not supported_models:
+        gui.session_state[key] = None
+        gui.error("No translation model available for the selected language.", icon="⚠️")
+        return
+
+    # Select the model using enum_selector
     model = enum_selector(
-        TranslationModels,
+        supported_models,
         "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
@@ -444,10 +552,40 @@ def google_translate_source_languages() -> dict[str, str]:
     }
 
 
+def asr_model_selector(
+    key: str = "asr_model",
+    *,
+    language_filter: str = "",
+    label: str = "###### Speech Recognition Model",
+    use_selectbox: bool = True,
+    **kwargs,
+) -> AsrModels | None:
+    if language_filter:
+        supported_models = filter_models_by_language(
+            language_filter, asr_supported_languages
+        )
+    else:
+        supported_models = AsrModels
+    model = enum_selector(
+        supported_models,
+        label=label,
+        key=key,
+        use_selectbox=use_selectbox,
+        **kwargs,
+    )
+    if model:
+        return AsrModels[model]
+    else:
+        return None
+
+
 def asr_language_selector(
     selected_model: AsrModels,
-    label="##### Spoken Language",
-    key="language",
+    label: str = "###### Spoken Language",
+    key: str = "language",
+    *,
+    language_filter: str = "",
+    sort_by: str | None = None,
 ):
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
@@ -455,9 +593,16 @@ def asr_language_selector(
         gui.session_state[key] = forced_lang
         return forced_lang
 
+    allow_none = (
+        selected_model and selected_model.supports_auto_detect() and not language_filter
+    )
+
     options = list(asr_supported_languages.get(selected_model, []))
-    if selected_model and selected_model.supports_auto_detect():
-        options.insert(0, None)
+    if language_filter:
+        # filter the languages to show dialects only from selected languages
+        options = filter_languages(language_filter, options)
+    else:
+        sort_language_options(options, sort_by)
 
     # handle non-canonical language codes
     old_lang = gui.session_state.get(key)
@@ -472,18 +617,60 @@ def asr_language_selector(
         key=key,
         format_func=lang_format_func,
         options=options,
+        allow_none=allow_none,
     )
 
 
-def lang_format_func(l):
+def sort_language_options(options: list[str | None], sort_by: str | None):
+    sort_by = sort_by or "en"
+    options.sort(key=lambda tag: tag and are_languages_same(tag, sort_by), reverse=True)
+
+
+def language_filter_selector(
+    *,
+    options: list[str],
+    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter by Language',
+    key: str = "language_filter",
+) -> str:
+    clear_key = key + ":clear"
+    if gui.session_state.pop(clear_key, None):
+        gui.session_state[key] = None
+
+    with gui.div(className="d-flex align-items-center"):
+        if label:
+            with gui.div(className="me-3 text-muted"):
+                gui.caption(label, unsafe_allow_html=True)
+
+        with gui.div(style=dict(minWidth="200px")):
+            language_filter = gui.selectbox(
+                label="",
+                label_visibility="collapsed",
+                key=key,
+                format_func=lambda tag: lang_format_func(tag, default="All Languages"),
+                options=options,
+                allow_none=True,
+            )
+
+        if language_filter:
+            gui.button(
+                '<i class="fa-solid fa-circle-xmark"></i>',
+                type="tertiary",
+                key=clear_key,
+                className="px-2 py-1 ms-1",
+            )
+
+    return language_filter
+
+
+def lang_format_func(tag: str, *, default: str = "Auto Detect") -> str:
     import langcodes
 
-    if not l:
-        return "Auto Detect"
+    if not tag:
+        return default
     try:
-        return f"{langcodes.Language.get(l).display_name()} | {l}"
+        return f"{langcodes.Language.get(tag).display_name()} | {tag}"
     except langcodes.LanguageTagError:
-        return l
+        return tag
 
 
 def run_translate(
@@ -514,9 +701,7 @@ def run_translate(
 
 
 def run_ghana_nlp_translate(
-    texts: list[str],
-    target_language: str,
-    source_language: str,
+    texts: list[str], target_language: str, source_language: str
 ) -> list[str]:
     assert (
         source_language and target_language
@@ -616,31 +801,6 @@ def run_google_translate(
     )
 
 
-def normalised_lang_in_collection(target: str, collection: typing.Iterable[str]) -> str:
-    import langcodes
-
-    ERROR = UserError(
-        f"Unsupported language: {target!r} | must be one of {set(collection)}"
-    )
-
-    if target in collection:
-        return target
-
-    try:
-        target_lan = langcodes.Language.get(target).language
-    except langcodes.LanguageTagError:
-        raise ERROR
-
-    for candidate in collection:
-        try:
-            if candidate and langcodes.Language.get(candidate).language == target_lan:
-                return candidate
-        except langcodes.LanguageTagError:
-            pass
-
-    raise ERROR
-
-
 def _translate_text(
     text: str,
     target_language: str,
@@ -737,6 +897,8 @@ def run_asr(
     selected_model: str,
     language: str = None,
     output_format: str = "text",
+    speech_translation_target: str | None = None,
+    input_prompt: str | None = None,
 ) -> str | AsrOutputJson:
     """
     Run ASR on audio.
@@ -745,6 +907,7 @@ def run_asr(
         selected_model (str): ASR model to use.
         language: language of the audio
         output_format: format of the output
+        speech_translation_target: Speech Translation
     Returns:
         str: Transcribed text.
     """
@@ -781,9 +944,12 @@ def run_asr(
         config = {
             "audio": audio_url,
             "return_timestamps": output_format != AsrOutputFormat.text,
+            "task": "translate" if speech_translation_target else "transcribe",
         }
         if language:
-            config["language"] = language
+            config["language"] = (
+                langcodes.Language.get(language).language_name().lower()
+            )
         data = replicate.run(
             asr_model_ids[AsrModels.whisper_large_v3],
             input=config,
@@ -833,6 +999,12 @@ def run_asr(
             inputs=dict(
                 audio=audio_url,
                 src_lang=language,
+                tgt_lang=(
+                    speech_translation_target
+                    and normalised_lang_in_collection(
+                        speech_translation_target, SEAMLESS_v2_ASR_SUPPORTED
+                    )
+                ),
             ),
         )
     elif selected_model == AsrModels.gcp_v1:
@@ -935,6 +1107,36 @@ def run_asr(
         )
         raise_for_status(r)
         data = r.json()
+    elif selected_model == AsrModels.gpt_4_o_audio:
+        from daras_ai_v2.language_model import _run_openai_chat
+
+        audio_r = requests.get(audio_url)
+        raise_for_status(audio_r, is_user_url=True)
+
+        return _run_openai_chat(
+            model=asr_model_ids[selected_model],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": input_prompt,
+                        },
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64.b64encode(audio_r.content).decode(),
+                                "format": "wav",
+                            },
+                        },
+                    ],
+                },
+            ],
+            max_tokens=4096,
+            num_outputs=1,
+            temperature=1,
+        )[0]["content"]
     # call one of the self-hosted models
     else:
         kwargs = {}
@@ -959,7 +1161,7 @@ def run_asr(
             ),
             inputs=dict(
                 audio=audio_url,
-                task="transcribe",
+                task="translate" if speech_translation_target else "transcribe",
                 return_timestamps=output_format != AsrOutputFormat.text,
                 **kwargs,
             ),
@@ -1166,5 +1368,5 @@ def format_timestamp(
     )
 
 
-def should_translate_lang(code: str) -> bool:
-    return code and code.split("-")[0] != "en"
+def should_translate_lang(tag: str) -> bool:
+    return tag and tag.split("-")[0] not in {"en", "eng"}

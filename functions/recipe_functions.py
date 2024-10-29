@@ -2,10 +2,11 @@ import json
 import tempfile
 import typing
 from enum import Enum
-
-from pydantic import BaseModel
+from functools import partial
 
 import gooey_gui as gui
+from django.utils.text import slugify
+
 from app_users.models import AppUser
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -15,26 +16,26 @@ from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
+    from daras_ai_v2.base import BasePage
 
 
 def call_recipe_functions(
     *,
     saved_run: "SavedRun",
     current_user: AppUser,
-    request_model: typing.Type[BaseModel],
-    response_model: typing.Type[BaseModel],
+    request_model: typing.Type["BasePage.RequestModel"],
+    response_model: typing.Type["BasePage.ResponseModel"],
     state: dict,
     trigger: FunctionTrigger,
-):
+) -> typing.Generator[typing.Union[str, tuple[str, "LLMTool"]], None, None]:
     from daras_ai_v2.workflow_url_input import url_to_runs
-    from gooeysite.bg_db_conn import get_celery_result_db_safe
 
-    request = request_model.parse_obj(state)
-
-    functions = getattr(request, "functions", None) or []
-    functions = [fun for fun in functions if fun.trigger == trigger.name]
+    functions = state.get("functions") or []
+    functions = [fun for fun in functions if fun.get("trigger") == trigger.name]
     if not functions:
         return
+
+    request = request_model.parse_obj(state)
     variables = state.setdefault("variables", {})
     fn_vars = dict(
         web_url=saved_run.get_app_url(),
@@ -42,16 +43,15 @@ def call_recipe_functions(
         response={k: v for k, v in state.items() if k in response_model.__fields__},
     )
 
-    yield f"Running {trigger.name} hooks..."
+    if trigger != FunctionTrigger.prompt:
+        yield f"Running {trigger.name} hooks..."
 
-    for fun in functions:
-        # run the function
-        page_cls, sr, pr = url_to_runs(fun.url)
+    def run(sr, pr, /, **kwargs):
         result, sr = sr.submit_api_call(
             current_user=current_user,
             parent_pr=pr,
             request_body=dict(
-                variables=sr.state.get("variables", {}) | variables | fn_vars,
+                variables=sr.state.get("variables", {}) | variables | fn_vars | kwargs,
             ),
             deduct_credits=False,
         )
@@ -62,7 +62,7 @@ def call_recipe_functions(
 
         # wait for the result if its a pre request function
         if trigger == FunctionTrigger.post:
-            continue
+            return
         sr.wait_for_celery_result(result)
         # if failed, raise error
         if sr.error_msg:
@@ -71,7 +71,7 @@ def call_recipe_functions(
         # save the output from the function
         return_value = sr.state.get("return_value")
         if return_value is None:
-            continue
+            return
         if isinstance(return_value, dict):
             for k, v in return_value.items():
                 if k in request_model.__fields__ or k in response_model.__fields__:
@@ -80,6 +80,47 @@ def call_recipe_functions(
                     variables[k] = v
         else:
             variables["return_value"] = return_value
+
+        return return_value
+
+    for fun in functions:
+        _, sr, pr = url_to_runs(fun.get("url"))
+        if trigger != FunctionTrigger.prompt:
+            run(sr, pr)
+        else:
+            fn_name = slugify(pr.title).replace("-", "_")
+            yield fn_name, LLMTool(
+                fn=partial(run, sr, pr),
+                label=pr.title,
+                spec={
+                    "type": "function",
+                    "function": {
+                        "name": fn_name,
+                        "description": pr.notes,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                key: {"type": get_json_type(value)}
+                                for key, value in sr.state.get("variables", {}).items()
+                            },
+                        },
+                    },
+                },
+            )
+
+
+def get_json_type(val) -> str:
+    match val:
+        case list() | tuple() | set():
+            return "array"
+        case str():
+            return "string"
+        case int() | float() | complex():
+            return "number"
+        case bool():
+            return "boolean"
+        case _:
+            return "object"
 
 
 def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
@@ -98,11 +139,18 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
             called_fn.function_run.parent_published_run(),
         )
         title = (tb.published_title and tb.published_title.title) or tb.h1_title
-        gui.write(f"###### 🧩 Called [{title}]({called_fn.function_run.get_app_url()})")
-        return_value = called_fn.function_run.state.get("return_value")
-        if return_value is not None:
-            gui.json(return_value)
-            gui.newline()
+        key = f"fn-call-details-{called_fn.id}"
+        with gui.expander(f"🧩 Called `{title}`", key=key):
+            if not gui.session_state.get(key):
+                continue
+            gui.html(
+                f'<i class="fa-regular fa-external-link-square"></i> <a target="_blank" href="{called_fn.function_run.get_app_url()}">'
+                "Inspect Function Call"
+                "</a>"
+            )
+            return_value = called_fn.function_run.state.get("return_value")
+            if return_value is not None:
+                gui.json(return_value, expanded=True)
 
 
 def is_functions_enabled(key="functions") -> bool:
@@ -142,19 +190,20 @@ def functions_input(current_user: AppUser, key="functions"):
         key=f"--enable-{key}",
         value=key in gui.session_state,
     ):
-        gui.session_state.setdefault(key, [{}])
-        with gui.div(className="d-flex align-items-center"):
-            gui.write("###### Functions")
-        gui.caption(
-            "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
-            unsafe_allow_html=True,
-        )
-        list_view_editor(
-            add_btn_label="Add Function",
-            add_btn_type="tertiary",
-            key=key,
-            render_inputs=render_function_input,
-        )
+        with gui.div(className="ms-4 ps-1"):
+            gui.session_state.setdefault(key, [{}])
+            with gui.div(className="d-flex align-items-center"):
+                gui.write("###### Functions")
+            gui.caption(
+                "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
+                unsafe_allow_html=True,
+            )
+            list_view_editor(
+                add_btn_label="Add Function",
+                add_btn_type="tertiary",
+                key=key,
+                render_inputs=render_function_input,
+            )
     else:
         gui.session_state.pop(key, None)
 
@@ -182,11 +231,17 @@ def html_to_pdf(html: str) -> bytes:
     return ret
 
 
-class LLMTools(Enum):
-    json_to_pdf = (
-        json_to_pdf,
-        "Save JSON as PDF",
-        {
+class LLMTool(typing.NamedTuple):
+    fn: typing.Callable
+    label: str
+    spec: dict
+
+
+class LLMTools(LLMTool, Enum):
+    json_to_pdf = LLMTool(
+        fn=json_to_pdf,
+        label="Save JSON as PDF",
+        spec={
             "type": "function",
             "function": {
                 "name": json_to_pdf.__name__,
@@ -208,15 +263,3 @@ class LLMTools(Enum):
             },
         },
     )
-    # send_reply_buttons = (print, "Send back reply buttons to the user.", {})
-
-    def __new__(cls, fn: typing.Callable, label: str, spec: dict):
-        obj = object.__new__(cls)
-        obj._value_ = fn.__name__
-        obj.fn = fn
-        obj.label = label
-        obj.spec = spec
-        return obj
-
-    # def __init__(self, *args, **kwargs):
-    #     self._value_ = self.name

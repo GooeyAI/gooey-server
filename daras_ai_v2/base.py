@@ -15,7 +15,7 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -63,6 +63,7 @@ from functions.recipe_functions import (
     call_recipe_functions,
     is_functions_enabled,
     render_called_functions,
+    LLMTool,
 )
 from payments.auto_recharge import (
     should_attempt_auto_recharge,
@@ -392,25 +393,7 @@ class BasePage:
                 if request_changed or (can_save and not is_example):
                     self._render_unpublished_changes_indicator()
 
-                with gui.div(className="d-flex align-items-start right-action-icons"):
-                    gui.html(
-                        # styling for buttons in this div
-                        """
-                        <style>
-                        .right-action-icons .btn {
-                            padding: 6px;
-                        }
-                        </style>
-                        """
-                    )
-
-                    if self.tab == RecipeTabs.run:
-                        if self.request.user and not self.request.user.is_anonymous:
-                            self._render_options_button_with_dialog()
-                        self._render_share_button()
-                        self._render_save_button()
-                    else:
-                        self._render_copy_link_button(label="Copy Link")
+                self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
             # only render title here if the above row was not empty
@@ -472,6 +455,27 @@ class BasePage:
                     self._saved_options_modal()
                 else:
                     self._unsaved_options_modal()
+
+    def render_social_buttons(self):
+        with gui.div(className="d-flex align-items-start right-action-icons"):
+            gui.html(
+                # styling for buttons in this div
+                """
+                <style>
+                .right-action-icons .btn {
+                    padding: 6px;
+                }
+                </style>
+                """
+            )
+
+            if self.tab == RecipeTabs.run:
+                if self.request.user and not self.request.user.is_anonymous:
+                    self._render_options_button_with_dialog()
+                self._render_share_button()
+                self._render_save_button()
+            else:
+                self._render_copy_link_button(label="Copy Link")
 
     def _render_share_button(self):
         if (
@@ -712,6 +716,7 @@ class BasePage:
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_notes.strip(),
                 visibility=PublishedRunVisibility.UNLISTED,
@@ -824,6 +829,7 @@ This will also delete all the associated versions.
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=title,
                 notes=notes,
                 visibility=PublishedRunVisibility.UNLISTED,
@@ -837,6 +843,7 @@ This will also delete all the associated versions.
                 published_run_id=get_random_doc_id(),
                 saved_run=self.current_sr,
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=title,
                 notes=notes,
                 visibility=PublishedRunVisibility.UNLISTED,
@@ -860,6 +867,7 @@ This will also delete all the associated versions.
             pr = self.current_pr
             duplicate_pr = pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1186,6 +1194,18 @@ This will also delete all the associated versions.
         sr.save(update_fields=["is_flagged"])
         gui.session_state["is_flagged"] = is_flagged
 
+    def get_current_llm_tools(self) -> dict[str, LLMTool]:
+        return dict(
+            call_recipe_functions(
+                saved_run=self.current_sr,
+                current_user=self.request.user,
+                request_model=self.RequestModel,
+                response_model=self.ResponseModel,
+                state=gui.session_state,
+                trigger=FunctionTrigger.prompt,
+            )
+        )
+
     @cached_property
     def current_workspace(self) -> "Workspace":
         assert self.request.user
@@ -1267,6 +1287,7 @@ This will also delete all the associated versions.
                 defaults=dict(state=cls.load_state_defaults({})),
             )[0],
             user=None,
+            workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
             visibility=PublishedRunVisibility.PUBLIC,
@@ -1279,6 +1300,7 @@ This will also delete all the associated versions.
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1288,6 +1310,7 @@ This will also delete all the associated versions.
             published_run_id=published_run_id,
             saved_run=saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
@@ -1435,6 +1458,9 @@ This will also delete all the associated versions.
                 placeholder = gui.div()
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                )
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.prompt
                 )
                 try:
                     self.render_steps()
@@ -1695,6 +1721,7 @@ This will also delete all the associated versions.
             published_run_id=get_random_doc_id(),
             saved_run=self.current_sr,
             user=self.request.user,
+            workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
             visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1949,9 +1976,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _saved_tab(self):
         self.ensure_authentication()
 
+        pr_filter = Q(workspace=self.current_workspace)
+        if self.current_workspace.is_personal:
+            pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         published_runs = PublishedRun.objects.filter(
-            workflow=self.workflow,
-            created_by=self.request.user,
+            Q(workflow=self.workflow) & pr_filter
         )[:50]
         if not published_runs:
             gui.write("No published runs yet")

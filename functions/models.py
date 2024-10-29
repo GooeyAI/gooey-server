@@ -13,8 +13,9 @@ class _TriggerData(typing.NamedTuple):
 
 
 class FunctionTrigger(_TriggerData, GooeyEnum):
-    pre = _TriggerData(label="Before", db_value=1)
-    post = _TriggerData(label="After", db_value=2)
+    pre = _TriggerData(label="⏪ Before", db_value=1)
+    prompt = _TriggerData(label="✨ Prompt", db_value=3)
+    post = _TriggerData(label="⏩ After", db_value=2)
 
 
 class RecipeFunction(BaseModel):

@@ -132,6 +132,7 @@ def url_to_runs(
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
+    assert url, "URL is required"
     match = resolve_url(url)
     assert match, "Not a valid Gooey.AI URL"
     page_cls = page_slug_map[normalize_slug(match.matched_params["page_slug"])]
