@@ -1190,6 +1190,7 @@ This will also delete all the associated versions.
         return dict(
             call_recipe_functions(
                 saved_run=self.current_sr,
+                workspace=self.current_workspace,
                 current_user=self.request.user,
                 request_model=self.RequestModel,
                 response_model=self.ResponseModel,
@@ -1503,6 +1504,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,
@@ -1514,6 +1516,7 @@ This will also delete all the associated versions.
 
         yield from call_recipe_functions(
             saved_run=sr,
+            workspace=self.current_workspace,
             current_user=self.request.user,
             request_model=self.RequestModel,
             response_model=self.ResponseModel,

@@ -27,9 +27,7 @@ from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.models import Workspace
 
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -133,7 +131,13 @@ class BotInterface:
         elif should_translate_lang(user_language):
             self.user_language = user_language
 
-        self.workspace = self.bi.workspace
+        if self.bi.workspace:
+            self.workspace = self.bi.workspace
+        else:
+            # TODO: remove this once all bots have been migrated to workspaces
+            self.workspace = Workspace.objects.get_or_create_from_uid(
+                self.bi.billing_account_uid
+            )[0]
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
 
