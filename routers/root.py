@@ -729,14 +729,16 @@ def page_wrapper(request: Request, className=""):
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
-                    workspace_selector(request.user, request.session)
+                    current_workspace = workspace_selector(
+                        request.user, request.session
+                    )
                 else:
                     anonymous_login_container(request, context)
 
         gui.html(copy_to_clipboard_scripts)
 
         with gui.div(id="main-content", className="container-xxl " + className):
-            yield
+            yield current_workspace
 
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))

@@ -363,7 +363,7 @@ class WorkspaceMembership(SafeDeleteModel):
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
-    def can_edit_workspace_metadata(self):
+    def can_edit_workspace(self):
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):
@@ -397,7 +397,10 @@ class WorkspaceMembership(SafeDeleteModel):
         return self.role == WorkspaceRole.OWNER
 
     def can_invite(self):
-        return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+        return (
+            self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+            and not self.workspace.is_personal
+        )
 
 
 class WorkspaceInviteQuerySet(models.QuerySet):

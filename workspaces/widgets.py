@@ -10,7 +10,7 @@ SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 
 def workspace_selector(user: AppUser, session: dict, key: str = "global-selector"):
     from daras_ai_v2.base import BasePage
-    from routers.account import workspaces_route
+    from routers.account import members_route
 
     workspaces = Workspace.objects.filter(
         memberships__user=user, memberships__deleted__isnull=True
@@ -97,7 +97,7 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to="/workspaces/",
+                to=get_route_path(members_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
@@ -115,7 +115,7 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
             workspace.create_with_owner()
             gui.session_state[key] = workspace.id
             session[SESSION_SELECTED_WORKSPACE] = workspace.id
-            raise gui.RedirectException(get_route_path(workspaces_route))
+            raise gui.RedirectException(get_route_path(members_route))
 
         gui.html('<hr class="my-1"/>')
 
@@ -162,6 +162,8 @@ def workspace_selector(user: AppUser, session: dict, key: str = "global-selector
                     gui.html(icons.sign_out)
                 with gui.div(className="col-10"):
                     gui.html("Log out")
+
+    return current
 
 
 def get_current_workspace(user: AppUser, session: dict) -> "Workspace":

@@ -20,9 +20,9 @@ rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
 def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvite):
-    from routers.account import workspaces_route
+    from routers.account import members_route
 
-    workspaces_page_path = get_route_path(workspaces_route)
+    workspaces_page_path = get_route_path(members_route)
 
     with gui.div(className="text-center my-5"):
         gui.write(
@@ -188,7 +188,7 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
-    if not membership.can_edit_workspace_metadata():
+    if not membership.can_edit_workspace():
         return
 
     ref = gui.use_confirm_dialog(key="edit-workspace", close_on_confirm=False)
@@ -447,7 +447,7 @@ def render_pending_invites_list(
                         )
                     with gui.tag("td"):
                         last_invited_at = invite.last_email_sent_at or invite.created_at
-                        gui.html(naturaltime(last_invited_at))
+                        gui.html(str(naturaltime(last_invited_at)))
                     with gui.tag("td", className="text-end"):
                         render_invitation_actions(invite, current_member=current_member)
 
