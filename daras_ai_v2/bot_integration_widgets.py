@@ -426,7 +426,9 @@ User_question_3"""
                     )
                     result, sr = (
                         CompareLLMPage()
-                        .get_pr_from_example_id(example_id="i2klupxjhjeo")
+                        .get_pr_from_example_id(
+                            example_id=settings.WEB_INTEGRATION_EXAMPLE_ID
+                        )
                         .submit_api_call(
                             current_user=user,
                             request_body=dict(
