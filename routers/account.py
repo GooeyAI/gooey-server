@@ -82,7 +82,13 @@ def payment_processing_route(
 
 @gui.route(app, "/account")
 def old_account_route(request: Request):
-    raise gui.RedirectException(get_route_path(account_route))
+    if next_url := request.query_params.get("next"):
+        query_params = dict(next=next_url)
+    else:
+        query_params = None
+    raise gui.RedirectException(
+        furl(get_route_path(account_route), query_params=query_params)
+    )
 
 
 @gui.route(app, "/account/billing")
