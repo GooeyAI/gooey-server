@@ -49,7 +49,7 @@ google-cloud-translate = "^3.12.0"
 google-cloud-speech = "^2.21.0"
 yt-dlp = "^2024.8.6"
 Jinja2 = "^3.1.2"
-Django = "^5.1.1"
+Django = "^5.1.2"
 django-phonenumber-field = { extras = ["phonenumberslite"], version = "^7.0.2" }
 gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.6"

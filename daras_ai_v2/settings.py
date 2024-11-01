@@ -130,6 +130,10 @@ try:
             "CONN_MAX_AGE": None,
         }
     }
+    # https://docs.djangoproject.com/en/5.1/ref/databases/#server-side-cursors
+    DISABLE_SERVER_SIDE_CURSORS = config(
+        "DISABLE_SERVER_SIDE_CURSORS", cast=bool, default=False
+    )
 except UndefinedValueError:
     DATABASES = {
         "default": {
@@ -199,9 +203,11 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {
         "console": {
-            "level": "INFO",
             "class": "logging.StreamHandler",
         },
+    },
+    "root": {
+        "handlers": ["console"],
     },
 }
 
