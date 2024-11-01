@@ -399,17 +399,6 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: 
                     gui.session_state["--update-display-picture"] = True
                     gui.rerun()
             with gencol2:
-                generate_prompt = """Your job is to define the schema for a chatbot, using the title, description and prompt of an AI Workflow.
-Inputs:
-title: {{ title }}
-prompt: {{ prompt }}
-
-Using the title and prompt, output the following:
-description (formal tone, < 100 words)
-User_question_0
-User_question_1
-User_question_2
-User_question_3"""
                 gui.session_state["improve-icon"] = (
                     '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
                 )
@@ -433,7 +422,6 @@ User_question_3"""
                             current_user=user,
                             request_body=dict(
                                 variables={"title": bi.name, "prompt": copilot_prompt},
-                                input_prompt=generate_prompt,
                             ),
                         )
                     )
