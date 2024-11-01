@@ -277,6 +277,7 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
+ADMINS = [("Devs", "devs+django@gooey.ai")]
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
 PAYMENT_EMAIL = "Gooey.AI Payments <payment-support@gooey.ai>"
