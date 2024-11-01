@@ -51,10 +51,10 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
     api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
     for legacy_key in _load_api_keys_from_firebase(workspace):
-        hash = legacy_key["secret_key_hash"]
-        api_keys[hash] = ApiKey(
+        secret_key_hash = legacy_key["secret_key_hash"]
+        api_keys[secret_key_hash] = ApiKey(
             workspace=workspace,
-            hash=hash,
+            hash=secret_key_hash,
             preview=legacy_key["secret_key_preview"],
             created_at=legacy_key["created_at"],
             created_by_id=workspace.created_by_id,

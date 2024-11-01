@@ -24,11 +24,6 @@ class ApiKeyQueySet(models.QuerySet):
         )
         return api_key, secret_key
 
-    def get_from_secret_key(self, secret_key: str) -> "ApiKey":
-        hasher = PBKDF2PasswordHasher()
-        hash = hasher.encode(secret_key)
-        return self.get(hash=hash)
-
 
 class ApiKey(models.Model):
     hash = models.CharField(max_length=128, unique=True)

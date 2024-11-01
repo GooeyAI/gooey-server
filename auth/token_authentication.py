@@ -29,33 +29,41 @@ class AuthorizationError(HTTPException):
 
 def _authenticate_credentials_from_firebase(token: str) -> AppUser | None:
     """Legacy method to authenticate API keys stored in Firebase."""
-    hasher = PBKDF2PasswordHasher()
-    hash = hasher.encode(token)
-
     db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+    hasher = PBKDF2PasswordHasher()
+    secret_key_hash = hasher.encode(token)
+
     try:
-        doc = db_collection.where("secret_key_hash", "==", hash).limit(1).get()[0]
+        doc = (
+            db_collection.where("secret_key_hash", "==", secret_key_hash)
+            .limit(1)
+            .get()[0]
+        )
     except IndexError:
-        return None
+        raise AuthorizationError("Invalid API Key.")
 
     uid = doc.get("uid")
-    return AppUser.objects.get_or_create_from_uid(uid)[0]
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+
+    return user
 
 
 def authenticate_credentials(token: str) -> AppUser:
-    api_key = ApiKey.objects.select_related(
-        "workspace__created_by"
-    ).get_from_secret_key(token)
-    if api_key and not api_key.workspace.is_personal:
-        # TODO: Add support for team workspaces
-        raise AuthorizationError("API access is not yet supported for team workspaces.")
+    hasher = PBKDF2PasswordHasher()
+    secret_key_hash = hasher.encode(token)
 
-    if api_key:
+    try:
+        api_key = ApiKey.objects.select_related("workspace__created_by").get(
+            hash=secret_key_hash
+        )
+        if not api_key.workspace.is_personal:
+            # TODO: Add support for team workspaces
+            raise AuthorizationError(
+                "API access is not yet supported for team workspaces."
+            )
         user = api_key.workspace.created_by
-    else:
+    except ApiKey.DoesNotExist:
         user = _authenticate_credentials_from_firebase(token)
-        if not user:
-            raise AuthorizationError("Invalid API key.")
 
     if user.is_disabled:
         msg = (
@@ -74,8 +82,8 @@ class APIAuth(SecurityBase):
     ```python
     api_auth = APIAuth(scheme_name="bearer", description="Bearer $GOOEY_API_KEY")
 
-    @app.get("/api/runs")
-    def get_runs(current_workspace: Workspace = Depends(api_auth)):
+    @app.get("/api/users")
+    def get_users(authenticated_user: AppUser = Depends(api_auth)):
         ...
     ```
     """
