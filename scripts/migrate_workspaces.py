@@ -1,13 +1,18 @@
+from contextlib import contextmanager
+from itertools import islice
 from time import sleep
 
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
 
+from api_keys.models import ApiKey
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun, PublishedRun
+from daras_ai_v2 import db
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 
 BATCH_SIZE = 10_000
+FIREBASE_BATCH_SIZE = 100
 DELAY = 0.1
 SEP = " ... "
 
@@ -17,6 +22,7 @@ def run():
     migrate_txns()
     migrate_saved_runs()
     migrate_published_runs()
+    migrate_api_keys()
 
 
 @transaction.atomic
@@ -88,6 +94,42 @@ def migrate_published_runs():
             ).values("id")[:1]
         ),
     )
+
+
+def migrate_api_keys():
+    print("migrating API keys", end=SEP)
+
+    firebase_stream = db.get_client().collection(db.API_KEYS_COLLECTION).stream()
+
+    total = 0
+    while True:
+        batch = list(islice(firebase_stream, FIREBASE_BATCH_SIZE))
+        if not batch:
+            print("Done!")
+            break
+        cached_workspaces = Workspace.objects.select_related("created_by").filter(
+            is_personal=True,
+            created_by__uid__in=[snap.get("uid") for snap in batch],
+        )
+        cached_workspaces_by_uid = {w.created_by.uid: w for w in cached_workspaces}
+
+        migrated_keys = ApiKey.objects.bulk_create(
+            [
+                ApiKey(
+                    hash=snap.get("secret_key_hash"),
+                    preview=snap.get("secret_key_preview"),
+                    workspace_id=workspace.id,
+                    created_by_id=workspace.created_by.id,
+                    created_at=snap.get("created_at"),
+                )
+                for snap in batch
+                if (workspace := cached_workspaces_by_uid.get(snap.get("uid")))
+            ],
+            ignore_conflicts=True,
+            unique_fields=("hash",),
+        )
+        print(total, end=SEP)
+        total += len(migrated_keys)
 
 
 def update_in_batches(qs, **kwargs):
