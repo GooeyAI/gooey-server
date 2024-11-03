@@ -12,7 +12,8 @@ client = TestClient(app)
 def test_send_msg_streaming(transactional_db, mock_celery_tasks, force_authentication):
     bi = BotIntegration.objects.create(
         platform=Platform.WEB,
-        billing_account_uid=force_authentication.uid,
+        workspace=force_authentication.get_or_create_personal_workspace()[0],
+        created_by=force_authentication,
         saved_run=SavedRun.objects.create(
             workflow=Workflow.VIDEO_BOTS,
             uid=force_authentication.uid,

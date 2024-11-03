@@ -19,6 +19,7 @@ from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
 from routers.custom_api_router import CustomAPIRouter
+from workspaces.widgets import get_current_workspace
 
 app = CustomAPIRouter()
 
@@ -77,7 +78,8 @@ def fb_connect_whatsapp_redirect(request: Request):
         phone_number_id = phone_number["id"]
 
         options = dict(
-            billing_account_uid=request.user.uid,
+            created_by=request.user,
+            workspace=get_current_workspace(request.user, request.session),
             platform=Platform.WHATSAPP,
             name=f"{business_name} - {account_name}",
             wa_phone_number=display_phone_number,
@@ -149,13 +151,15 @@ def fb_connect_redirect(request: Request):
     fb_pages = get_currently_connected_fb_pages(user_access_token)
     if not fb_pages:
         return HTMLResponse(
-            f"<p>Please connect with at least one facebook page!</p>" + retry_button,
+            "<p>Please connect with at least one facebook page!</p>" + retry_button,
             status_code=400,
         )
 
     map_parallel(_subscribe_to_page, fb_pages)
     integrations = BotIntegration.objects.add_fb_pages_for_user(
-        request.user.uid, fb_pages
+        created_by=request.user,
+        workspace=get_current_workspace(request.user, request.session),
+        fb_pages=fb_pages,
     )
 
     redirect_url = None

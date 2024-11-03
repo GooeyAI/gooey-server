@@ -7,10 +7,8 @@ from fastapi.security.base import SecurityBase
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from api_keys.models import ApiKey
-from app_users.models import AppUser
 from auth.auth_backend import authlocal
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
-from workspaces.models import Workspace
 
 
 class AuthenticationError(HTTPException):
@@ -27,7 +25,7 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
+def authenticate_credentials(token: str) -> ApiKey:
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
 
@@ -35,18 +33,17 @@ def authenticate_credentials(token: str) -> AppUser:
         api_key = ApiKey.objects.select_related("workspace__created_by").get(
             hash=secret_key_hash
         )
-        workspace = api_key.workspace
     except ApiKey.DoesNotExist:
         raise AuthorizationError("Invalid API Key.")
 
-    if workspace.created_by.is_disabled:
+    if api_key.workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return workspace
+    return api_key
 
 
 class APIAuth(SecurityBase):
@@ -74,9 +71,12 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> Workspace:
+    def __call__(self, request: Request) -> ApiKey:
         if authlocal:  # testing only!
-            return authlocal[0]
+            return ApiKey(
+                created_by=authlocal[0],
+                workspace=authlocal[0].get_or_create_personal_workspace()[0],
+            )
 
         auth = request.headers.get("Authorization", "").split()
         if not auth or auth[0].lower() != self.scheme_name.lower():
