@@ -3,7 +3,6 @@ import typing
 import gooey_gui as gui
 from api_keys.models import ApiKey
 from app_users.models import AppUser
-from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
 if typing.TYPE_CHECKING:
@@ -23,7 +22,8 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    api_keys = load_api_keys(workspace)
+    api_keys = list(workspace.api_keys.order_by("-created_at"))
+
     table_area = gui.div()
 
     if gui.button("＋ Create new secret key"):
@@ -46,38 +46,6 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
                 ],
             ),
         )
-
-
-def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
-    api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
-    for legacy_key in _load_api_keys_from_firebase(workspace):
-        secret_key_hash = legacy_key["secret_key_hash"]
-        api_keys[secret_key_hash] = ApiKey(
-            workspace=workspace,
-            hash=secret_key_hash,
-            preview=legacy_key["secret_key_preview"],
-            created_at=legacy_key["created_at"],
-            created_by_id=workspace.created_by_id,
-        )
-
-    return sorted(
-        api_keys.values(),
-        key=lambda api_key: api_key.created_at,
-        reverse=True,
-    )
-
-
-def _load_api_keys_from_firebase(workspace: "Workspace") -> list[dict]:
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
-    if workspace.is_personal:
-        return [
-            snap.to_dict()
-            for snap in db_collection.where("uid", "==", workspace.created_by.uid)
-            .order_by("created_at")
-            .get()
-        ]
-    else:
-        return []
 
 
 def generate_new_api_key(workspace: "Workspace", user: AppUser) -> ApiKey:
