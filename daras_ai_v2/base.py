@@ -542,14 +542,14 @@ class BasePage:
                 ref = gui.use_alert_dialog(key="publish-modal")
                 if duplicate:
                     self.clear_publish_form()
-                    ref.set_open(True)
-                if ref.is_open:
                     gui.session_state["published_run_workspace"] = (
                         self.request.user.get_workspaces()
                         .filter(is_personal=False)
                         .first()
                         .id
                     )
+                    ref.set_open(True)
+                if ref.is_open:
                     return self._render_publish_dialog(ref=ref)
 
         elif self.current_workspace.is_personal:
