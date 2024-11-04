@@ -718,17 +718,20 @@ class BasePage:
                 "##### Description",
                 key="published_run_description",
                 value=notes,
+                placeholder="An excellent but one line description",
             )
-            with gui.div(className="d-flex align-items-center"):
-                with gui.tag("h5", className="text-muted mb-3 me-2"):
-                    gui.html(icons.notes)
-                with gui.div(className="flex-grow-1"):
-                    change_notes = gui.text_input(
-                        "",
-                        key="published_run_change_notes",
-                        value="",
-                        placeholder="Add change notes",
-                    )
+            if is_update_mode:
+                with gui.div(className="d-flex align-items-center"):
+                    with gui.tag("h5", className="text-muted mb-3 me-2"):
+                        gui.html(icons.notes)
+                    with gui.div(className="flex-grow-1"):
+                        change_notes = gui.text_input(
+                            "",
+                            key="published_run_change_notes",
+                            placeholder="Add change notes",
+                        )
+            else:
+                change_notes = ""
 
         col1, col2 = gui.columns([1, 3])
         with col1:
