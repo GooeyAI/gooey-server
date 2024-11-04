@@ -45,8 +45,8 @@ from workspaces.models import Workspace
 from workspaces.widgets import set_current_workspace
 
 if typing.TYPE_CHECKING:
-    import celery.result
     from bots.models import SavedRun
+    import celery.result
 
 app = CustomAPIRouter()
 
