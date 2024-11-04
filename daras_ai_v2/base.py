@@ -705,8 +705,10 @@ class BasePage:
         with gui.div():
             if is_update_mode:
                 title = pr.title or self.title
+                notes = pr.notes
             else:
                 title = self._get_default_pr_title()
+                notes = ""
             published_run_title = gui.text_input(
                 "##### Title",
                 key="published_run_title",
@@ -715,7 +717,7 @@ class BasePage:
             published_run_description = gui.text_input(
                 "##### Description",
                 key="published_run_description",
-                value=(pr.notes or self.preview_description(gui.session_state) or ""),
+                value=notes,
             )
             with gui.div(className="d-flex align-items-center"):
                 with gui.tag("h5", className="text-muted mb-3 me-2"):
@@ -935,13 +937,19 @@ class BasePage:
                     self.current_pr.delete()
                     raise gui.RedirectException(self.app_url())
 
+        title = f"{self.current_pr.title} (Copy)"
+        if self.current_pr.is_root():
+            notes = ""
+        else:
+            notes = self.current_pr.notes
+
         if duplicate_button:
             duplicate_pr = self.current_pr.duplicate(
                 user=self.request.user,
                 workspace=self.current_workspace,
-                title=f"{self.current_pr.title} (Copy)",
-                notes=self.current_pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                title=title,
+                notes=notes,
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -953,9 +961,9 @@ class BasePage:
                 saved_run=self.current_sr,
                 user=self.request.user,
                 workspace=self.current_workspace,
-                title=f"{self.current_pr.title} (Copy)",
-                notes=self.current_pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                title=title,
+                notes=notes,
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=new_pr.published_run_id)
