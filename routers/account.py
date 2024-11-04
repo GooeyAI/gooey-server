@@ -24,7 +24,7 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.root import page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
-from workspaces.widgets import get_current_workspace, get_route_path_for_workspace
+from workspaces.widgets import get_current_workspace
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -249,13 +249,6 @@ class AccountTabs(TabData, Enum):
                 ret.remove(cls.billing)
 
         return ret
-
-    def get_url_path(self, request: Request) -> str:
-        workspace = get_current_workspace(request.user, request.session)
-        if workspace.is_personal or self == AccountTabs.profile:
-            return get_route_path(self.route)
-        else:
-            return get_route_path_for_workspace(self.route, workspace)
 
 
 def billing_tab(request: Request, workspace: Workspace):

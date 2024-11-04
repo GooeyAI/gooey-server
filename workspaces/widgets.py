@@ -7,20 +7,11 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
 from .models import Workspace
 
-if typing.TYPE_CHECKING:
-    from routers.account import AccountTabs
-
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 
 
-def workspace_selector(
-    user: AppUser,
-    session: dict,
-    *,
-    key: str = "global-selector",
-    current_tab: "AccountTabs | None" = None,
-):
+def workspace_selector(user: AppUser, session: dict, *, key: str = "global-selector"):
     from daras_ai_v2.base import BasePage
     from routers.account import members_route
 
@@ -192,22 +183,6 @@ def get_current_workspace(user: AppUser, session: dict) -> Workspace:
 
 def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
-
-
-def get_route_path_for_workspace(route_fn: typing.Callable, workspace: Workspace):
-    """
-    For routes like /workspaces/{workspace_slug}-{workspace_hashid}/...
-    """
-    if workspace.is_personal:
-        return get_route_path(route_fn)
-    else:
-        return get_route_path(
-            route_fn,
-            path_params={
-                "workspace_hashid": Workspace.api_hashids.encode(workspace.id),
-                "workspace_slug": workspace.get_slug(),
-            },
-        )
 
 
 def create_workspace_with_defaults(user: AppUser, name: str | None = None):
