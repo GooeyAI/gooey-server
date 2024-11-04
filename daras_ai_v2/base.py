@@ -741,7 +741,8 @@ class BasePage:
                 )
             )
             if (
-                self.can_user_edit_published_run(self.current_pr)
+                self.current_pr.workspace
+                and self.can_user_edit_published_run(self.current_pr)
                 and self.current_pr.workspace not in workspaces
             ):
                 workspaces.insert(0, self.current_pr.workspace)

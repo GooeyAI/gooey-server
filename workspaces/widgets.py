@@ -41,10 +41,6 @@ def workspace_selector(
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    if current_tab and not validate_tab_for_workspace(current_tab, current):
-        # account_route will redirect to the correct tab
-        raise gui.RedirectException(get_route_path(account_route))
-
     popover, content = gui.popover(interactive=True)
 
     with popover:
@@ -196,16 +192,6 @@ def get_current_workspace(user: AppUser, session: dict) -> Workspace:
 
 def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
-
-
-def validate_tab_for_workspace(tab: "AccountTabs", workspace: Workspace) -> bool:
-    from routers.account import AccountTabs
-
-    if tab == AccountTabs.members:
-        return not workspace.is_personal
-    if tab == AccountTabs.profile:
-        return workspace.is_personal
-    return True
 
 
 def get_route_path_for_workspace(route_fn: typing.Callable, workspace: Workspace):

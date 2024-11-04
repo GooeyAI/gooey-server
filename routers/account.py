@@ -22,13 +22,9 @@ from daras_ai_v2.profiles import edit_user_profile_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import page_wrapper, get_og_url_path
-from workspaces.models import Workspace, WorkspaceInvite, WorkspaceMembership
+from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
-from workspaces.widgets import (
-    get_current_workspace,
-    get_route_path_for_workspace,
-    set_current_workspace,
-)
+from workspaces.widgets import get_current_workspace, get_route_path_for_workspace
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -152,14 +148,8 @@ def saved_route(request: Request):
     )
 
 
-@gui.route(app, "/account/api-keys")
-@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/api-keys/")
-def api_keys_route(
-    request: Request,
-    workspace_slug: str | None = None,
-    workspace_hashid: str | None = None,
-):
-    validate_and_set_current_workspace(request, workspace_hashid)
+@gui.route(app, "/account/api-keys/")
+def api_keys_route(request: Request):
     with account_page_wrapper(request, AccountTabs.api_keys):
         api_keys_tab(request)
     url = get_og_url_path(request)
@@ -275,9 +265,6 @@ def billing_tab(request: Request, workspace: Workspace):
 
 
 def profile_tab(request: Request):
-    workspace = get_current_workspace(request.user, request.session)
-    if not workspace.is_personal:
-        raise gui.RedirectException(get_route_path(account_route))
     return edit_user_profile_page(user=request.user)
 
 
@@ -311,7 +298,7 @@ def all_saved_runs_tab(request: Request):
                 f"profile page at {request.user.handle.get_app_url()}."
             )
         else:
-            edit_profile_url = AccountTabs.profile.get_url_path(request)
+            edit_profile_url = AccountTabs.profile.url_path
             gui.caption(
                 "All your Saved workflows are here. Public ones will be listed on your "
                 f"profile page if you [create a username]({edit_profile_url})."
@@ -330,7 +317,7 @@ def api_keys_tab(request: Request):
 
 
 @contextmanager
-def account_page_wrapper(request: Request, current_tab: AccountTabs):
+def account_page_wrapper(request: Request, current_tab: TabData):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
@@ -358,26 +345,3 @@ def threaded_paypal_handle_subscription_updated(subscription_id: str) -> bool:
         logger.exception(f"Unexpected PayPal error for sub: {subscription_id}")
         return False
     return True
-
-
-def validate_and_set_current_workspace(request: Request, workspace_hashid: str | None):
-    from routers.root import login
-
-    if not request.user or request.user.is_anonymous:
-        next_url = request.url.path
-        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
-        raise gui.RedirectException(redirect_url)
-
-    if not workspace_hashid:
-        # not a workspace URL, we set the current workspace to user's personal workspace
-        workspace, _ = request.user.get_or_create_personal_workspace()
-        set_current_workspace(request.session, workspace.id)
-        return
-
-    try:
-        workspace_id = Workspace.api_hashids.decode(workspace_hashid)[0]
-        WorkspaceMembership.objects.get(workspace_id=workspace_id, user=request.user)
-    except (IndexError, WorkspaceMembership.DoesNotExist):
-        return Response(status_code=404)
-    else:
-        set_current_workspace(request.session, workspace_id)
