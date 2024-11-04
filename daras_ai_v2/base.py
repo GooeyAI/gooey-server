@@ -2018,6 +2018,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 workflow=self.workflow,
                 uid=uid,
                 updated_at__lt=before,
+                workspace=self.current_workspace,
             )[:25]
         )
         if not run_history:
