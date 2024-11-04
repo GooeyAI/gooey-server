@@ -740,23 +740,26 @@ def page_wrapper(
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
-                    workspace_selector(
-                        request.user, request.session, current_tab=current_tab
+                    current_workspace = workspace_selector(
+                        request.user, request.session
                     )
                 else:
-                    anonymous_login_container(context)
+                    current_workspace = None
+                    anonymous_login_container(request, context)
 
         gui.html(copy_to_clipboard_scripts)
 
         with gui.div(id="main-content", className="container-xxl " + className):
-            yield
+            yield current_workspace
 
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
-def anonymous_login_container(context: dict):
-    with gui.tag("a", href="/login/", className="pe-2 d-none d-lg-block"):
+def anonymous_login_container(request: Request, context: dict):
+    login_url = str(furl("/login/", query_params=dict(next=request.url.path)))
+
+    with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
         gui.html("Sign In")
 
     popover, content = gui.popover(interactive=True)
@@ -775,7 +778,7 @@ def anonymous_login_container(context: dict):
 
         with gui.tag(
             "a",
-            href="/login/",
+            href=login_url,
             className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
             style=dict(height=row_height),
         ):

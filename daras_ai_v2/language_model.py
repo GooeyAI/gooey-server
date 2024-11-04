@@ -942,10 +942,10 @@ def _run_openai_chat(
     max_tokens: int,
     num_outputs: int,
     temperature: float,
-    stop: list[str] | None,
-    avoid_repetition: bool,
-    tools: list[LLMTool] | None,
-    response_format_type: ResponseFormatType | None,
+    stop: list[str] | None = None,
+    avoid_repetition: bool = False,
+    tools: list[LLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN

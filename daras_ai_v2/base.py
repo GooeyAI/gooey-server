@@ -15,7 +15,7 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -821,6 +821,7 @@ class BasePage:
                 and selected_workspace in self.request.user.get_workspaces()
             ):
                 set_current_workspace(self.request.session, selected_workspace.id)
+
             pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
@@ -979,6 +980,7 @@ class BasePage:
             pr = self.current_pr
             duplicate_pr = pr.duplicate(
                 user=self.request.user,
+                workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
                 visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
@@ -1417,7 +1419,7 @@ class BasePage:
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
-        workspace: Workspace,
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -2131,9 +2133,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _saved_tab(self):
         self.ensure_authentication()
 
+        pr_filter = Q(workspace=self.current_workspace)
+        if self.current_workspace.is_personal:
+            pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         published_runs = PublishedRun.objects.filter(
-            workflow=self.workflow,
-            workspace=self.current_workspace,
+            Q(workflow=self.workflow) & pr_filter
         )[:50]
         if not published_runs:
             gui.write("No published runs yet")

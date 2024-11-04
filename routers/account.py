@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
+from django.db.models import Q
 from fastapi.requests import Request
 from furl import furl
 from gooey_gui.core import RedirectException
@@ -82,33 +83,21 @@ def payment_processing_route(
     )
 
 
-@gui.route(app, "/account/")
-def account_route(request: Request):
-    from daras_ai_v2.base import BasePage
-    from routers.root import login
-
-    if not request.user or request.user.is_anonymous:
-        raise gui.RedirectException(get_route_path(login))
-
-    workspace = get_current_workspace(request.user, request.session)
-    if not BasePage.is_user_admin(request.user) or workspace.is_personal:
-        raise gui.RedirectException(get_route_path(profile_route))
+@gui.route(app, "/account")
+def old_account_route(request: Request):
+    if next_url := request.query_params.get("next"):
+        query_params = dict(next=next_url)
     else:
-        raise gui.RedirectException(
-            get_route_path_for_workspace(workspaces_route, workspace)
-        )
+        query_params = None
+    raise gui.RedirectException(
+        furl(get_route_path(account_route), query_params=query_params)
+    )
 
 
-@gui.route(app, "/account/billing/")
-@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/billing/")
-def billing_route(
-    request: Request,
-    workspace_slug: str | None = None,
-    workspace_hashid: str | None = None,
-):
-    validate_and_set_current_workspace(request, workspace_hashid)
-    with account_page_wrapper(request, AccountTabs.billing):
-        billing_tab(request)
+@gui.route(app, "/account/billing")
+def account_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.billing) as current_workspace:
+        billing_tab(request, current_workspace)
     url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
@@ -123,7 +112,9 @@ def billing_route(
 
 @gui.route(app, "/account/profile/")
 def profile_route(request: Request):
-    with account_page_wrapper(request, AccountTabs.profile):
+    with account_page_wrapper(request, AccountTabs.profile) as current_workspace:
+        if not current_workspace.is_personal:
+            raise gui.RedirectException(get_route_path(members_route))
         profile_tab(request)
     url = get_og_url_path(request)
     return dict(
@@ -137,19 +128,13 @@ def profile_route(request: Request):
     )
 
 
-@gui.route(app, "/saved/")
-def saved_shortcut_route():
-    raise RedirectException(get_route_path(saved_route))
+@gui.route(app, "/saved")
+def old_saved_route(request: Request):
+    raise gui.RedirectException(get_route_path(saved_route))
 
 
-@gui.route(app, "/account/saved/")
-@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/saved/")
-def saved_route(
-    request: Request,
-    workspace_slug: str | None = None,
-    workspace_hashid: str | None = None,
-):
-    validate_and_set_current_workspace(request, workspace_hashid)
+@gui.route(app, "/account/saved")
+def saved_route(request: Request):
     with account_page_wrapper(request, AccountTabs.saved):
         all_saved_runs_tab(request)
     url = get_og_url_path(request)
@@ -164,7 +149,7 @@ def saved_route(
     )
 
 
-@gui.route(app, "/account/api-keys/")
+@gui.route(app, "/account/api-keys")
 @gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/api-keys/")
 def api_keys_route(
     request: Request,
@@ -186,31 +171,11 @@ def api_keys_route(
     )
 
 
-@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/")
-def workspaces_route(
-    request: Request,
-    workspace_hashid: str,
-    workspace_slug: str | None,
-):
-    raise RedirectException(
-        get_route_path(
-            workspaces_members_route,
-            path_params={
-                "workspace_slug": workspace_slug,
-                "workspace_hashid": workspace_hashid,
-            },
-        )
-    )
-
-
-@gui.route(app, "/workspaces/{workspace_slug}-{workspace_hashid}/members/")
-def workspaces_members_route(
-    request: Request,
-    workspace_hashid: str,
-    workspace_slug: str | None = None,
-):
-    validate_and_set_current_workspace(request, workspace_hashid)
-    with account_page_wrapper(request, AccountTabs.members):
+@gui.route(app, "/workspaces/members/")
+def members_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.members) as current_workspace:
+        if current_workspace.is_personal:
+            raise gui.RedirectException(get_route_path(profile_route))
         workspaces_page(request.user, request.session)
 
     url = get_og_url_path(request)
@@ -267,23 +232,27 @@ class TabData(typing.NamedTuple):
 
 class AccountTabs(TabData, Enum):
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
-    members = TabData(title=f"{icons.company} Members", route=workspaces_members_route)
+    members = TabData(title=f"{icons.company} Members", route=members_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
-    billing = TabData(title=f"{icons.billing} Billing", route=billing_route)
+    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+
+    @property
+    def url_path(self) -> str:
+        return get_route_path(self.route)
 
     @classmethod
-    def get_tabs_for_request(cls, request: Request) -> list["AccountTabs"]:
-        from daras_ai_v2.base import BasePage
+    def get_tabs_for_user(
+        cls, user: AppUser | None, workspace: Workspace | None
+    ) -> list["AccountTabs"]:
 
         ret = list(cls)
-        workspace = get_current_workspace(request.user, request.session)
-        if not BasePage.is_user_admin(request.user) or workspace.is_personal:
-            ret.remove(cls.members)
 
-        if not workspace.is_personal:
+        if workspace.is_personal:
+            ret.remove(cls.members)
+        else:
             ret.remove(cls.profile)
-            if not workspace.memberships.get(user=request.user).can_edit_workspace():
+            if not workspace.memberships.get(user=user).can_edit_workspace():
                 ret.remove(cls.billing)
 
         return ret
@@ -296,13 +265,9 @@ class AccountTabs(TabData, Enum):
             return get_route_path_for_workspace(self.route, workspace)
 
 
-def billing_tab(request: Request):
-    workspace = get_current_workspace(request.user, request.session)
-    if (
-        not workspace.is_personal
-        and not workspace.memberships.get(user=request.user).can_edit_workspace()
-    ):
-        raise gui.RedirectException(get_route_path(account_route))
+def billing_tab(request: Request, workspace: Workspace):
+    if not workspace.memberships.get(user=request.user).can_edit_workspace():
+        raise gui.RedirectException(get_route_path(members_route))
     return billing_page(workspace)
 
 
@@ -315,7 +280,10 @@ def profile_tab(request: Request):
 
 def all_saved_runs_tab(request: Request):
     workspace = get_current_workspace(request.user, request.session)
-    prs = PublishedRun.objects.filter(workspace=workspace).order_by("-updated_at")
+    pr_filter = Q(workspace=workspace)
+    if workspace.is_personal:
+        pr_filter |= Q(created_by=request.user, workspace__isnull=True)
+    prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
@@ -365,18 +333,15 @@ def account_page_wrapper(request: Request, current_tab: AccountTabs):
         redirect_url = furl("/login", query_params={"next": next_url})
         raise gui.RedirectException(str(redirect_url))
 
-    with page_wrapper(request, current_tab=current_tab):
-        if request.url.path != current_tab.get_url_path(request):
-            raise gui.RedirectException(current_tab.get_url_path(request))
-
+    with page_wrapper(request) as current_workspace:
         gui.div(className="mt-5")
         with gui.nav_tabs():
-            for tab in AccountTabs.get_tabs_for_request(request):
-                with gui.nav_item(tab.get_url_path(request), active=tab == current_tab):
+            for tab in AccountTabs.get_tabs_for_user(request.user, current_workspace):
+                with gui.nav_item(tab.url_path, active=tab == current_tab):
                     gui.html(tab.title)
 
         with gui.nav_tab_content():
-            yield
+            yield current_workspace
 
 
 def threaded_paypal_handle_subscription_updated(subscription_id: str) -> bool:

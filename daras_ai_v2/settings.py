@@ -128,6 +128,10 @@ try:
             "PORT": PGPORT,
             "CONN_HEALTH_CHECKS": True,
             "CONN_MAX_AGE": None,
+            # https://docs.djangoproject.com/en/5.1/ref/databases/#server-side-cursors
+            "DISABLE_SERVER_SIDE_CURSORS": config(
+                "DISABLE_SERVER_SIDE_CURSORS", cast=bool, default=False
+            ),
         }
     }
 except UndefinedValueError:
@@ -193,6 +197,19 @@ STORAGES = {
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+    },
+}
 
 # Gooey settings
 #
@@ -277,6 +294,7 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
+ADMINS = [("Devs", "devs+django@gooey.ai")]
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
 PAYMENT_EMAIL = "Gooey.AI Payments <payment-support@gooey.ai>"

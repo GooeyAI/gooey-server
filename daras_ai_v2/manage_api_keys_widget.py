@@ -13,7 +13,7 @@ if typing.TYPE_CHECKING:
 def manage_api_keys(workspace: "Workspace", user: AppUser):
     gui.write(
         f"""
-{workspace.display_name()} API keys are listed below.
+{workspace.display_name(current_user=user)} API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
 
 Do not share your API key with others, or expose it in the browser or other client-side code.
@@ -28,18 +28,19 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 
     if gui.button("＋ Create new secret key"):
         api_key = generate_new_api_key(workspace=workspace, user=user)
-        api_keys.append(api_key)
+        api_keys.insert(0, api_key)
 
     with table_area:
         import pandas as pd
 
         gui.table(
             pd.DataFrame.from_records(
-                columns=["Secret Key (Preview)", "Created At"],
+                columns=["Secret Key (Preview)", "Created At", "Created By"],
                 data=[
                     (
                         api_key.preview,
                         api_key.created_at.strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                        api_key.created_by and api_key.created_by.full_name() or "",
                     )
                     for api_key in api_keys
                 ],
@@ -50,10 +51,10 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 def load_api_keys(workspace: "Workspace") -> list[ApiKey]:
     api_keys = {api_key.hash: api_key for api_key in workspace.api_keys.all()}
     for legacy_key in _load_api_keys_from_firebase(workspace):
-        hash = legacy_key["secret_key_hash"]
-        api_keys[hash] = ApiKey(
+        secret_key_hash = legacy_key["secret_key_hash"]
+        api_keys[secret_key_hash] = ApiKey(
             workspace=workspace,
-            hash=hash,
+            hash=secret_key_hash,
             preview=legacy_key["secret_key_preview"],
             created_at=legacy_key["created_at"],
             created_by_id=workspace.created_by_id,

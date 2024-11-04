@@ -1,6 +1,7 @@
 import typing
 
 from django.db import models
+from django.utils import timezone
 
 from daras_ai_v2.crypto import PBKDF2PasswordHasher, get_random_api_key, safe_preview
 
@@ -23,27 +24,6 @@ class ApiKeyQueySet(models.QuerySet):
         )
         return api_key, secret_key
 
-    def create_from_secret_key(
-        self, secret_key: str, workspace: "Workspace", **kwargs
-    ) -> "ApiKey":
-        """
-        `key` must be a valid plain-text key.
-        """
-        hasher = PBKDF2PasswordHasher()
-        return self.get_or_create(
-            hash=hasher.encode(secret_key),
-            defaults=dict(
-                preview=safe_preview(secret_key),
-                workspace=workspace,
-                **kwargs,
-            ),
-        )[0]
-
-    def get_from_secret_key(self, secret_key: str) -> "ApiKey | None":
-        hasher = PBKDF2PasswordHasher()
-        hash = hasher.encode(secret_key)
-        return self.filter(hash=hash).first()
-
 
 class ApiKey(models.Model):
     hash = models.CharField(max_length=128, unique=True)
@@ -54,7 +34,7 @@ class ApiKey(models.Model):
     created_by = models.ForeignKey(
         "app_users.AppUser", on_delete=models.SET_NULL, null=True
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = ApiKeyQueySet.as_manager()

@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from django.db.models import Sum
 
+from api_keys.models import ApiKey
 from app_users import models
 from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
 from bots.models import SavedRun, PublishedRun
@@ -39,6 +40,7 @@ class AppUserAdmin(admin.ModelAdmin):
                     (
                         "view_saved_runs",
                         "view_published_runs",
+                        "view_api_keys",
                         "view_embedded_files",
                         "view_transactions",
                     ),
@@ -99,6 +101,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "upgraded_from_anonymous_at",
         "view_saved_runs",
         "view_published_runs",
+        "view_api_keys",
         "view_embedded_files",
         "view_transactions",
         "open_in_firebase",
@@ -121,6 +124,15 @@ class AppUserAdmin(admin.ModelAdmin):
     def view_published_runs(self, user: models.AppUser):
         return list_related_html_url(
             PublishedRun.objects.filter(created_by=user),
+            query_param="created_by",
+            instance_id=user.id,
+            show_add=False,
+        )
+
+    @admin.display(description="API Keys")
+    def view_api_keys(self, user: models.AppUser):
+        return list_related_html_url(
+            ApiKey.objects.filter(created_by=user),
             query_param="created_by",
             instance_id=user.id,
             show_add=False,

@@ -9,10 +9,12 @@ from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
     run_translate,
+    language_filter_selector,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import SUPPORTED_SPREADSHEET_TYPES
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.field_render import field_title_desc, field_title
+from daras_ai_v2.language_filters import translation_languages_without_dialects
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_output_widget import text_outputs
 from daras_ai_v2.workflow_url_input import del_button
@@ -22,6 +24,7 @@ from recipes.BulkRunner import list_view_editor
 class TranslationOptions(BaseModel):
     translation_source: str | None = Field(
         title="Source Translation Language",
+        description="This is usually inferred from the spoken language, but in case that is set to Auto detect, you can specify one explicitly.",
     )
     translation_target: str | None = Field(
         "en",
@@ -96,17 +99,26 @@ class TranslationPage(BasePage):
             flatten_dict_key="text",
         )
 
-        translation_model = translation_model_selector(
-            key="selected_model",
-            allow_none=False,
+        selected_filter_language = language_filter_selector(
+            options=translation_languages_without_dialects(),
         )
+
+        col1, col2 = gui.columns(2)
+        with col1:
+            translation_model = translation_model_selector(
+                key="selected_model",
+                allow_none=False,
+                language_filter=selected_filter_language,
+            )
+
         col1, col2 = gui.columns(2)
         with col1:
             translation_language_selector(
                 model=translation_model,
-                label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
+                label=f"###### {field_title(self.RequestModel, 'translation_source')}",
                 key="translation_source",
-                allow_none=translation_model.supports_auto_detect,
+                allow_none=not selected_filter_language,
+                sort_by=selected_filter_language,
             )
         with col2:
             translation_language_selector(
@@ -116,12 +128,9 @@ class TranslationPage(BasePage):
             )
 
     def render_settings(self):
-        try:
-            translation_model = TranslationModels[
-                gui.session_state.get("selected_model")
-            ]
-        except KeyError:
-            translation_model = None
+        translation_model = TranslationModels.get(
+            gui.session_state.get("selected_model")
+        )
         if translation_model and translation_model.supports_glossary:
             gui.file_uploader(
                 label=f"###### {field_title_desc(self.RequestModel, 'glossary_document')}",

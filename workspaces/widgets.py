@@ -22,7 +22,7 @@ def workspace_selector(
     current_tab: "AccountTabs | None" = None,
 ):
     from daras_ai_v2.base import BasePage
-    from routers.account import account_route, workspaces_route
+    from routers.account import members_route
 
     workspaces = user.get_workspaces().order_by("-is_personal", "-created_at")
     if not workspaces:
@@ -111,7 +111,7 @@ def workspace_selector(
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_route_path_for_workspace(workspaces_route, workspace=current),
+                to=get_route_path(members_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
@@ -129,7 +129,7 @@ def workspace_selector(
             workspace.create_with_owner()
             gui.session_state[key] = workspace.id
             session[SESSION_SELECTED_WORKSPACE] = workspace.id
-            raise gui.RedirectException(get_route_path(workspaces_route))
+            raise gui.RedirectException(get_route_path(members_route))
 
         gui.html('<hr class="my-1"/>')
 
@@ -176,6 +176,8 @@ def workspace_selector(
                     gui.html(icons.sign_out)
                 with gui.div(className="col-10"):
                     gui.html("Log out")
+
+    return current
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
