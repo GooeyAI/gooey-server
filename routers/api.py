@@ -343,15 +343,10 @@ def submit_api_call(
     request_body: dict,
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
-    current_user: AppUser | None = None,
 ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
-    # TODO: current_user doesn't make sense for API calls
-    current_user = current_user or workspace.created_by
-
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
     page = page_cls(user=current_user, query_params=query_params)
-    set_current_workspace(page.request.session, workspace.id)
 
     set_current_workspace(page.request.session, workspace.id)
 
