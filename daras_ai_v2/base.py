@@ -650,12 +650,6 @@ class BasePage:
             self.get_auth_url(next_url=sr.get_app_url(query_params=query_params))
         )
 
-    @staticmethod
-    def clear_publish_form():
-        keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
-        for k in keys:
-            gui.session_state.pop(k, None)
-
     def _render_publish_dialog(self, *, ref: gui.AlertDialogRef):
         """
         Note: all input keys in this method should start with `published_run_*`
@@ -679,6 +673,12 @@ class BasePage:
             large=True,
         ):
             self._render_publish_form(sr=sr, pr=pr)
+
+    @staticmethod
+    def clear_publish_form():
+        keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
+        for k in keys:
+            gui.session_state.pop(k, None)
 
     def _render_publish_form(
         self,
