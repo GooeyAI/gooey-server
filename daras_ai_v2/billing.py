@@ -309,13 +309,13 @@ def fmt_price(plan: PricingPlan) -> str:
 
 
 def change_subscription(workspace: "Workspace", new_plan: PricingPlan, **kwargs):
-    from routers.account import billing_route
+    from routers.account import account_route
     from routers.account import payment_processing_route
 
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
     if new_plan == current_plan:
-        raise gui.RedirectException(get_app_route_url(billing_route), status_code=303)
+        raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
         workspace.subscription.cancel()
@@ -491,7 +491,7 @@ This is a one-time purchase and your account will be credited once the payment i
 def stripe_addon_checkout_redirect(
     workspace: "Workspace", dollat_amt: int, save_pm: bool
 ):
-    from routers.account import billing_route
+    from routers.account import account_route
     from routers.account import payment_processing_route
 
     line_item = available_subscriptions["addon"]["stripe"].copy()
@@ -505,7 +505,7 @@ def stripe_addon_checkout_redirect(
         line_items=[line_item],
         mode="payment",
         success_url=get_app_route_url(payment_processing_route),
-        cancel_url=get_app_route_url(billing_route),
+        cancel_url=get_app_route_url(account_route),
         customer=workspace.get_or_create_stripe_customer(),
         invoice_creation={"enabled": True},
         allow_promotion_codes=True,
@@ -553,7 +553,7 @@ This will charge you the full amount today, and every month thereafter.
 
 
 def stripe_subscription_create(workspace: "Workspace", plan: PricingPlan):
-    from routers.account import billing_route
+    from routers.account import account_route
     from routers.account import payment_processing_route
 
     if workspace.subscription and workspace.subscription.is_paid():
@@ -595,7 +595,7 @@ def stripe_subscription_create(workspace: "Workspace", plan: PricingPlan):
     checkout_session = stripe.checkout.Session.create(
         mode="subscription",
         success_url=get_app_route_url(payment_processing_route),
-        cancel_url=get_app_route_url(billing_route),
+        cancel_url=get_app_route_url(account_route),
         allow_promotion_codes=True,
         customer=customer,
         line_items=line_items,
@@ -715,7 +715,7 @@ This will cancel your subscription and remove your saved payment method.
 
 def change_payment_method(workspace: "Workspace"):
     from routers.account import payment_processing_route
-    from routers.account import billing_route
+    from routers.account import account_route
 
     match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:
@@ -727,7 +727,7 @@ def change_payment_method(workspace: "Workspace"):
                     "metadata": {"subscription_id": workspace.subscription.external_id},
                 },
                 success_url=get_app_route_url(payment_processing_route),
-                cancel_url=get_app_route_url(billing_route),
+                cancel_url=get_app_route_url(account_route),
             )
             raise gui.RedirectException(session.url, status_code=303)
         case _:

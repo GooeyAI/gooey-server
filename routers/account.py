@@ -30,6 +30,9 @@ from workspaces.widgets import (
     set_current_workspace,
 )
 
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+
 app = CustomAPIRouter()
 
 
@@ -75,7 +78,7 @@ def payment_processing_route(
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
-        redirectUrl=get_app_route_url(billing_route),
+        redirectUrl=get_app_route_url(account_route),
     )
 
     return dict(
@@ -243,7 +246,7 @@ class AccountTabs(TabData, Enum):
 
     @classmethod
     def get_tabs_for_user(
-        cls, user: AppUser | None, workspace: Workspace | None
+        cls, user: typing.Optional["AppUser"], workspace: Workspace | None
     ) -> list["AccountTabs"]:
 
         ret = list(cls)

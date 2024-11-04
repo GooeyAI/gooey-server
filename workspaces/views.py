@@ -99,7 +99,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         - current user
         - current user's role in the workspace (and other metadata)
     """
-    from routers.account import billing_route
+    from routers.account import account_route
 
     workspace = membership.workspace
 
@@ -135,7 +135,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                 PricingPlan.STARTER,
                 PricingPlan.CREATOR,
             ):
-                billing_info += f" [Upgrade]({get_route_path(billing_route)})"
+                billing_info += f" [Upgrade]({get_route_path(account_route)})"
             gui.write(billing_info, unsafe_allow_html=True)
 
     if membership.can_edit_workspace():

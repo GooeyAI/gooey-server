@@ -703,14 +703,7 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(
-    request: Request,
-    className="",
-    *,
-    current_tab: "AccountTabs | None" = None,
-):
-    from daras_ai_v2.base import BasePage
-
+def page_wrapper(request: Request, className=""):
     context = {
         "request": request,
         "block_incognito": True,
