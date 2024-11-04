@@ -34,6 +34,7 @@ from daras_ai_v2.search_ref import (
     CitationStyles,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
+    generate_text_fragment,
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -177,6 +178,10 @@ class DocSearchPage(BasePage):
             ),
             current_user=self.request.user,
         )
+        
+        
+        for ref in response.references:
+            ref["fragment"] = generate_text_fragment(ref["snippet"])
 
         # empty search result, abort!
         if not response.references:
