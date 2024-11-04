@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 
+from app_users.models import AppUser
 from bots.models import (
     Platform,
     Message,
@@ -28,6 +29,7 @@ from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
+
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -87,6 +89,7 @@ class BotInterface:
     query_params: dict
     user_language: str = None
     workspace: Workspace
+    current_user: AppUser
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
     input_glossary: str | None = None
@@ -130,7 +133,16 @@ class BotInterface:
         elif should_translate_lang(user_language):
             self.user_language = user_language
 
-        self.workspace = self.bi.workspace
+        if self.bi.workspace:
+            self.workspace = self.bi.workspace
+            self.current_user = self.bi.created_by
+        else:
+            # TODO: remove this once all bots have been migrated to workspaces
+            self.workspace = Workspace.objects.get_or_create_from_uid(
+                self.bi.billing_account_uid
+            )[0]
+            self.current_user = self.workspace.created_by
+
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
 
@@ -250,8 +262,6 @@ def _msg_handler(bot: BotInterface):
     if bot.input_type != "interactive":
         # mark message as read
         bot.mark_read()
-    # get the attached billing account
-    workspace = bot.workspace
     # get the user's input
     # print("input type:", bot.input_type)
     input_text = (bot.get_input_text() or "").strip()
@@ -308,7 +318,8 @@ def _msg_handler(bot: BotInterface):
         _handle_feedback_msg(bot, input_text)
     else:
         _process_and_send_msg(
-            workspace=workspace,
+            workspace=bot.workspace,
+            current_user=bot.current_user,
             bot=bot,
             input_images=input_images,
             input_documents=input_documents,
@@ -343,6 +354,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
 def _process_and_send_msg(
     *,
     workspace: Workspace,
+    current_user: AppUser,
     bot: BotInterface,
     input_images: list[str] | None,
     input_audio: str | None,
@@ -376,6 +388,7 @@ def _process_and_send_msg(
         page_cls=bot.page_cls,
         query_params=bot.query_params,
         workspace=workspace,
+        current_user=current_user,
         request_body=body,
     )
     bot.on_run_created(sr)

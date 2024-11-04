@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from itertools import islice
 from time import sleep
 
@@ -7,7 +6,7 @@ from django.db.models import OuterRef, Subquery
 
 from api_keys.models import ApiKey
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun, PublishedRun
+from bots.models import BotIntegration, SavedRun, PublishedRun
 from daras_ai_v2 import db
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 
@@ -22,7 +21,8 @@ def run():
     migrate_txns()
     migrate_saved_runs()
     migrate_published_runs()
-    migrate_api_keys()
+    # migrate_api_keys()
+    migrate_bot_integrations()
 
 
 @transaction.atomic
@@ -130,6 +130,25 @@ def migrate_api_keys():
         )
         print(total, end=SEP)
         total += len(migrated_keys)
+
+
+def migrate_bot_integrations():
+    qs = BotIntegration.objects.filter(
+        workspace__isnull=True,
+    ).exclude(
+        billing_account_uid="",
+    )
+    print(f"migrating {qs.count()} bot integrations", end=SEP)
+    update_in_batches(
+        qs,
+        created_by_id=AppUser.objects.filter(
+            uid=OuterRef("billing_account_uid"),
+        ).values("id")[:1],
+        workspace_id=Workspace.objects.filter(
+            is_personal=True,
+            created_by__uid=OuterRef("billing_account_uid"),
+        ).values("id")[:1],
+    )
 
 
 def update_in_batches(qs, **kwargs):

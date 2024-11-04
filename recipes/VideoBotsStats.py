@@ -95,9 +95,8 @@ class VideoBotsStatsPage(BasePage):
                             ),
                         )
 
-                author = bi.workspace or self.request.user
                 VideoBotsPage.render_author(
-                    author,
+                    bi.created_by,
                     show_as_link=self.is_current_user_admin(),
                 )
 
@@ -119,7 +118,8 @@ class VideoBotsStatsPage(BasePage):
             bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
         else:
             bi_qs = BotIntegration.objects.filter(
-                billing_account_uid=self.request.user.uid
+                workspace__memberships__user=self.request.user,
+                workspace__memberships__deleted__isnull=True,
             ).order_by("platform", "-created_at")
 
         if not bi_qs.exists():

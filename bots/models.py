@@ -22,7 +22,6 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
-from workspaces.widgets import get_route_path_for_workspace
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -50,7 +49,7 @@ class PublishedRunVisibility(models.IntegerChoices):
             # TODO: Add cls.PUBLIC when team-handles are added
             return [cls.UNLISTED, cls.INTERNAL]
 
-    def help_text(self, workspace: "Workspace | None" = None):
+    def help_text(self, workspace: typing.Optional["Workspace"] = None):
         from routers.account import profile_route, saved_route
 
         match self:
@@ -68,7 +67,7 @@ class PublishedRunVisibility(models.IntegerChoices):
             case PublishedRunVisibility.PUBLIC:
                 return f"{self.get_icon()} Public"
             case PublishedRunVisibility.INTERNAL if workspace:
-                saved_route_url = get_route_path_for_workspace(saved_route, workspace)
+                saved_route_url = get_route_path(saved_route)
                 return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
             case PublishedRunVisibility.INTERNAL:
                 return f"{self.get_icon()} Members can find and edit"
@@ -324,7 +323,7 @@ class SavedRun(models.Model):
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "hidden"]),
-            models.Index(fields=["workflow", "uid", "updated_at"]),
+            models.Index(fields=["workflow", "uid", "updated_at", "workspace"]),
         ]
 
     def __str__(self):
@@ -465,7 +464,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def add_fb_pages_for_user(
-        self, uid: str, fb_pages: list[dict]
+        self, created_by: AppUser, workspace: "Workspace", fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
@@ -480,7 +479,8 @@ class BotIntegrationQuerySet(models.QuerySet):
                 )
             except BotIntegration.DoesNotExist:
                 bi = BotIntegration(fb_page_id=fb_page_id)
-            bi.billing_account_uid = uid
+            bi.created_by = created_by
+            bi.workspace = workspace
             bi.fb_page_name = fb_page["name"]
             # bi.fb_user_access_token = user_access_token
             bi.fb_page_access_token = fb_page["access_token"]
@@ -497,13 +497,6 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.name = bi.fb_page_name
             bi.save()
             saved.append(bi)
-        # # delete pages that are no longer connected for this user
-        # self.filter(
-        #     Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-        #     billing_account_uid=uid,
-        # ).exclude(
-        #     id__in=[bi.id for bi in saved],
-        # ).delete()
         return saved
 
 
@@ -538,8 +531,19 @@ class BotIntegration(models.Model):
         help_text="The saved run that the bot is based on",
     )
     billing_account_uid = models.TextField(
-        help_text="The gooey account uid where the credits will be deducted from",
-        db_index=True,
+        help_text="(Deprecated)", db_index=True, blank=True, default=""
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="botintegrations",
+        null=True,
+    )
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        related_name="botintegrations",
+        null=True,
     )
     workspace = models.ForeignKey(
         "workspaces.Workspace",
@@ -767,7 +771,7 @@ class BotIntegration(models.Model):
             ("twilio_phone_number", "twilio_account_sid"),
         ]
         indexes = [
-            models.Index(fields=["billing_account_uid", "platform"]),
+            models.Index(fields=["workspace", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 

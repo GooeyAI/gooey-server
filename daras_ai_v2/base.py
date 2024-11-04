@@ -2181,8 +2181,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             SavedRun.objects.filter(
                 workflow=self.workflow,
                 updated_at__lt=before,
-                uid=uid,
-                workspace_id=workspace_id,
+                workspace=self.current_workspace,
             )[:25]
         )
         if not run_history:

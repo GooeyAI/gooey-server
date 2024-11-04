@@ -37,6 +37,7 @@ from daras_ai_v2.slack_bot import (
     parse_slack_response,
 )
 from routers.custom_api_router import CustomAPIRouter
+from workspaces.widgets import get_current_workspace
 
 router = CustomAPIRouter()
 
@@ -129,7 +130,8 @@ def slack_connect_redirect(request: Request):
     config = dict(
         slack_access_token=slack_access_token,
         slack_channel_hook_url=slack_channel_hook_url,
-        billing_account_uid=request.user.uid,
+        created_by=request.user,
+        workspace=get_current_workspace(request.user, request.session),
         slack_team_name=slack_team_name,
         slack_channel_name=slack_channel_name,
     )
@@ -364,7 +366,7 @@ slack_shortcuts_connect_url = furl(
 def slack_auth_header(
     authorization: str = Header(
         alias="Authorization",
-        description=f"Bearer $SLACK_AUTH_TOKEN",
+        description="Bearer $SLACK_AUTH_TOKEN",
     ),
 ) -> dict:
     r = requests.post(

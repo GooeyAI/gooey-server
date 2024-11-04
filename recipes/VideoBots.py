@@ -1223,7 +1223,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             saved_run__example_id=pr.published_run_id
         )
         if not self.is_current_user_admin():
-            integrations_q &= Q(billing_account_uid=self.request.user.uid)
+            integrations_q &= Q(workspace=self.current_workspace)
 
         integrations_qs: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             integrations_q
@@ -1307,6 +1307,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
                         name=run_title,
+                        created_by=self.request.user,
                         workspace=self.current_workspace,
                         platform=Platform.WEB,
                     )
