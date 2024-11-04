@@ -267,7 +267,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user = api_key.created_by
         # init a new page for every request
         self = page_cls(user=user, query_params=dict(run_id=run_id, uid=user.uid))
-        set_current_workspace(self.request.session, workspace.id)
         sr = self.current_sr
         web_url = str(furl(self.app_url(run_id=run_id, uid=user.uid)))
         ret = {
@@ -347,7 +346,6 @@ def submit_api_call(
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
     page = page_cls(user=current_user, query_params=query_params)
-
     set_current_workspace(page.request.session, workspace.id)
 
     # get saved state from db
