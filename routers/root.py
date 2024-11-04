@@ -45,9 +45,6 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import workspace_selector
 
-if typing.TYPE_CHECKING:
-    from routers.account import AccountTabs
-
 
 app = CustomAPIRouter()
 
