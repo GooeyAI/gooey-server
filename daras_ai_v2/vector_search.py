@@ -918,9 +918,10 @@ def render_sources_widget(refs: list[SearchReference]):
         return
     with gui.expander("💁‍♀️ Sources"):
         for idx, ref in enumerate(refs):
+            fragment = ref.get("fragment", "")
             gui.html(
                 # language=HTML
-                f"""<p>{idx + 1}. <a href="{ref['url']}" target="_blank">{ref['title']}</a></p>""",
+                f"""<p>{idx + 1}. <a href="{ref['url']}{fragment}" target="_blank">{ref['title']}</a></p>""",
             )
             gui.text(ref["snippet"], style={"maxHeight": "200px"})
         gui.write(

@@ -3,14 +3,17 @@ import typing
 from enum import Enum
 
 import jinja2
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, NotRequired
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 
+from urllib.parse import quote
+
 class SearchReference(TypedDict):
     url: str
+    fragment: NotRequired[str]
     title: str
     snippet: str
     score: float
@@ -49,7 +52,7 @@ def render_text_with_refs(text: str, references: list[SearchReference]):
         if not refs:
             continue
         ref_html = ", ".join(
-            html_link(str(ref_num), ref["url"]) for ref_num, ref in refs.items()
+            html_link(str(ref_num), ref["url"],ref.get("fragment", "")) for ref_num, ref in refs.items()
         )
         html += f"<sup>[{ref_html}]</sup>"
     # convert newlines to <br> and paragraphs
@@ -241,7 +244,7 @@ def ref_to_markdown(ref: SearchReference) -> str:
 
 
 def ref_to_html(ref: SearchReference) -> str:
-    return html_link(ref["title"], ref["url"])
+    return html_link(ref["title"], ref["url"],ref.get("fragment",""))
 
 
 def ref_to_slack_mrkdwn(ref: SearchReference) -> str:
@@ -252,8 +255,8 @@ def markdown_link(title: str, url: str) -> str:
     return f"[{title}]({url})"
 
 
-def html_link(title: str, url: str) -> str:
-    return f'<a target="_blank" href="{url}">{title}</a>'
+def html_link(title: str, url: str,fragment:str = "") -> str:
+    return f'<a target="_blank" href="{url}{fragment}">{title}</a>'
 
 
 def slack_mrkdwn_link(title: str, url: str) -> str:
@@ -302,3 +305,44 @@ FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "�
 def generate_footnote_symbol(idx: int) -> str:
     quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
+
+def generate_text_fragment(text, min_len=0, max_len=30):
+    # Step 1: Split text by lines and find the longest line
+    lines = text.splitlines()
+    longest_line = max(lines, key=len)
+    
+
+    # Step 2: Extract Prefix and Suffix from the longest line
+    # Ensure prefix and suffix do not overlap
+    prefix_len = min(max_len, len(longest_line) // 2)
+    suffix_len = min(max_len, len(longest_line) - prefix_len)
+
+    # Find the nearest word boundary for prefix
+    prefix_end = longest_line[:prefix_len].rfind(' ')
+    if prefix_end == -1:
+        prefix_end = prefix_len
+    prefix = longest_line[:prefix_end].strip()
+
+    # Find the nearest word boundary for suffix
+    suffix_start = len(longest_line) - suffix_len
+    suffix_start = longest_line[suffix_start:].find(' ')
+    if suffix_start == -1:
+        suffix_start = len(longest_line) - suffix_len
+    else:
+        suffix_start += len(longest_line) - suffix_len
+    suffix = longest_line[suffix_start:].strip()
+
+    # Step 3: Ensure prefix and suffix meet minimum length requirements
+    if len(prefix) < min_len:
+        prefix = longest_line[:min_len].strip()
+    if len(suffix) < min_len:
+        suffix = longest_line[-min_len:].strip()
+
+    # Step 4: Truncate prefix and suffix to maximum length constraints
+    prefix = prefix[:max_len]
+    suffix = suffix[:max_len]
+
+    # Encode the text fragment
+    text_fragment = f"#:~:text={quote(prefix)},{quote(suffix)}"
+
+    return text_fragment
