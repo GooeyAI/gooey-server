@@ -383,12 +383,19 @@ class BasePage:
                             is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
 
-                if is_example:
-                    author = pr.workspace
-                else:
-                    author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
-                    self.render_author(author)
+                    if is_example:
+                        self.render_author(pr.workspace)
+                    else:
+                        author = self.current_sr_user or sr.get_creator()
+                        self.render_author(author)
+                        if (
+                            self.current_sr.workspace
+                            and not self.current_sr.workspace.is_personal
+                        ):
+                            gui.caption(
+                                f"in {self.current_sr.workspace.display_name()}"
+                            )
 
             with gui.div(className="d-flex align-items-center"):
                 if request_changed or (can_save and not is_example):
