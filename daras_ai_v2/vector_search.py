@@ -64,6 +64,7 @@ from daras_ai_v2.scraping_proxy import (
 from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
+    generate_text_fragment,
 )
 from daras_ai_v2.text_splitter import text_splitter, Document
 from embeddings.models import EmbeddedFile, EmbeddingsReference
@@ -197,17 +198,25 @@ def get_top_k_references(
     references = vespa_search_results_to_refs(search_result)
     logger.debug(f"Search returned {len(references)} references in {time() - s:.2f}s")
 
-    # merge duplicate references
+    # build fragments and merge duplicate references
+    
+    #incase of multiple relevant chunk from the same document use the fragment from the most relevant
     uniques: dict[str, SearchReference] = {}
     for ref in references:
         key = ref["url"]
         try:
             existing = uniques[key]
+            
         except KeyError:
+            ref["fragment"] = generate_text_fragment(ref["snippet"])
             uniques[key] = ref
+            
         else:
             existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
             existing["score"] = (existing["score"] + ref["score"]) / 2
+    logger.debug("test fragment")        
+    # logger.debug(uniques.values())
+    print(uniques.values())
     return list(uniques.values())
 
 
@@ -217,6 +226,7 @@ def vespa_search_results_to_refs(search_result: dict) -> list[SearchReference]:
             url=ref.url,
             title=ref.title,
             snippet=ref.snippet,
+            fragment="",
             score=hit["relevance"],
         )
         for hit in search_result["root"].get("children", [])

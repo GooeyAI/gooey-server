@@ -27,7 +27,7 @@ from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
-    generate_text_fragment,
+    
 )
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
@@ -259,13 +259,12 @@ class GoogleGPTPage(BasePage):
         )   
         
         
-        # add citation and pretty titles to references
+                
         for ref in response.references:
             key = furl(ref["url"]).remove(fragment=True).url
-            ref["fragment"] = generate_text_fragment(ref["snippet"])
             ref["title"] = link_titles.get(key, "")
             
-
+            
         # empty search result, abort!
         if not response.references:
             raise EmptySearchResults(request.search_query)
