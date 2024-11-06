@@ -199,24 +199,19 @@ def get_top_k_references(
     logger.debug(f"Search returned {len(references)} references in {time() - s:.2f}s")
 
     # build fragments and merge duplicate references
-    
-    #incase of multiple relevant chunk from the same document use the fragment from the most relevant
     uniques: dict[str, SearchReference] = {}
     for ref in references:
         key = ref["url"]
         try:
+            ref["url"] += generate_text_fragment(ref["snippet"])
             existing = uniques[key]
             
         except KeyError:
-            ref["fragment"] = generate_text_fragment(ref["snippet"])
             uniques[key] = ref
             
-        else:
+        else:  
             existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
             existing["score"] = (existing["score"] + ref["score"]) / 2
-    logger.debug("test fragment")        
-    # logger.debug(uniques.values())
-    print(uniques.values())
     return list(uniques.values())
 
 
@@ -226,7 +221,6 @@ def vespa_search_results_to_refs(search_result: dict) -> list[SearchReference]:
             url=ref.url,
             title=ref.title,
             snippet=ref.snippet,
-            fragment="",
             score=hit["relevance"],
         )
         for hit in search_result["root"].get("children", [])
@@ -928,10 +922,9 @@ def render_sources_widget(refs: list[SearchReference]):
         return
     with gui.expander("💁‍♀️ Sources"):
         for idx, ref in enumerate(refs):
-            fragment = ref.get("fragment", "")
             gui.html(
                 # language=HTML
-                f"""<p>{idx + 1}. <a href="{ref['url']}{fragment}" target="_blank">{ref['title']}</a></p>""",
+                f"""<p>{idx + 1}. <a href="{ref['url']}" target="_blank">{ref['title']}</a></p>""",
             )
             gui.text(ref["snippet"], style={"maxHeight": "200px"})
         gui.write(

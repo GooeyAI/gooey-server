@@ -662,7 +662,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             if not gui.session_state.get(key):
                 return
             for idx, ref in enumerate(references):
-                gui.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']}{ref.get('fragment', '')})")
+                gui.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
                     "Source Document",
                     value=ref["snippet"],

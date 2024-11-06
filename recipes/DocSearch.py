@@ -179,7 +179,6 @@ class DocSearchPage(BasePage):
             current_user=self.request.user,
         )
         
-        
 
         # empty search result, abort!
         if not response.references:
