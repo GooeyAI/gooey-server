@@ -304,67 +304,10 @@ def render_output_with_refs(state, height=500):
         html = render_text_with_refs(text, state.get("references", []))
         scrollable_html(html, height=height)
 
-
 FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "♣", "✠", "☮", "☯", "✡"]  # fmt: skip
 def generate_footnote_symbol(idx: int) -> str:
     quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
-
-
-# def generate_text_fragment(text, min_len=0, max_len=30):
-#     """
-#     Generate a text fragment for a given text.
-
-#     Args:
-#         text (str): The input text to generate a fragment from.
-#         min_len (int): The minimum length for the prefix and suffix.
-#         max_len (int): The maximum length for the prefix and suffix.
-
-#     Returns:
-#         str: The encoded text fragment.
-#     """
-
-#     def find_alphanumeric_window(s, window_size, reverse=False):
-#         range_func = (
-#             range(len(s) - window_size + 1, 0, -1)
-#             if reverse
-#             else range(len(s) - window_size + 1)
-#         )
-#         for i in range_func:
-#             window = s[i : i + window_size]
-#             # Skip windows containing newline characters
-#             if "\n" in window:
-#                 continue
-#             print(window)
-#             # Updated regex to include allowed symbols and exclude '[', ']', and '.'
-#             if re.match(r'^[a-zA-Z0-9\s"\'.,?:;()&^*$@!#]+$', window) and not re.search(
-#                 r"[\[\].]", window
-#             ):
-#                 words = window.strip().split()
-#                 if (
-#                     words
-#                     and re.match(r"^[a-zA-Z0-9]+$", words[0])
-#                     and re.match(r"^[a-zA-Z0-9]+$", words[-1])
-#                 ):
-#                     return window.strip()
-#         # Fallback if no suitable window is found
-#         return re.sub(r"[\[\].]", "", s[:window_size]).strip()
-
-#     prefix = find_alphanumeric_window(text, max_len)
-#     suffix = find_alphanumeric_window(text, max_len, reverse=True)
-
-#     # Ensure prefix and suffix meet minimum length requirements
-#     if len(prefix) < min_len:
-#         prefix = find_alphanumeric_window(text, min_len)
-#     if len(suffix) < min_len:
-#         suffix = find_alphanumeric_window(text, min_len, reverse=True)
-#     prefix = " ".join(prefix.split()[:-1])
-#     suffix = " ".join(suffix.split()[1:])
-#     # Assemble and encode the fragment
-#     text_fragment = f"#:~:text={quote(prefix, safe='')},{quote(suffix, safe='')}"
-
-#     return text_fragment
-
 
 def find_alphanumeric_window(s, window_size, reverse=False):
     range_func = (
