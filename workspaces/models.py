@@ -38,9 +38,22 @@ def validate_workspace_domain_name(value: str):
 
 
 class WorkspaceRole(models.IntegerChoices):
-    OWNER = (1, "🏆 Owner")
-    ADMIN = (2, "🔧 Admin")
-    MEMBER = (3, "👥 Member")
+    OWNER = (1, "Owner")
+    ADMIN = (2, "Admin")
+    MEMBER = (3, "Member")
+
+    @classmethod
+    def display_html(cls, role: WorkspaceRole | int) -> str:
+        if isinstance(role, int):
+            role = WorkspaceRole(role)
+
+        match role:
+            case WorkspaceRole.OWNER:
+                return f"{icons.owner} {role.label}"
+            case WorkspaceRole.ADMIN:
+                return f"{icons.admin} {role.label}"
+            case WorkspaceRole.MEMBER:
+                return f"{icons.member} {role.label}"
 
 
 class WorkspaceQuerySet(SafeDeleteQueryset):

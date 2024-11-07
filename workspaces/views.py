@@ -398,7 +398,7 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                         else:
                             gui.html(html_lib.escape(name))
                     with gui.tag("td", className="text-nowrap"):
-                        gui.html(m.get_role_display())
+                        gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
                         gui.html("...", **render_local_date_attrs(m.created_at))
                     with gui.tag("td", className="text-end"):
