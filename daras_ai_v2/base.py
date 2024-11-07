@@ -386,16 +386,25 @@ class BasePage:
                 if not is_root_example:
                     if is_example:
                         self.render_author(pr.workspace)
-                    else:
-                        author = self.current_sr_user or sr.get_creator()
-                        self.render_author(author)
-                        if (
-                            self.current_sr.workspace
-                            and not self.current_sr.workspace.is_personal
+                    elif (
+                        self.current_sr.workspace
+                        and not self.current_sr.workspace.is_personal
+                    ):
+                        with gui.div(
+                            className="d-flex align-items-center container-margin-reset"
                         ):
-                            gui.caption(
-                                f"in {self.current_sr.workspace.display_name()}"
+                            self.render_author(self.current_sr.workspace)
+                            gui.write(
+                                '<i class="fa-light fa-chevron-right"></i>',
+                                className="text-muted d-block mx-2",
+                                unsafe_allow_html=True,
                             )
+                            gui.write(
+                                self.current_sr_user.full_name(),
+                                className="d-block text-muted me-2",
+                            )
+                    else:
+                        self.render_author(self.current_sr_user)
 
             with gui.div(className="d-flex align-items-center"):
                 if request_changed or (can_save and not is_example):
