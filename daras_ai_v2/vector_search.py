@@ -203,13 +203,18 @@ def get_top_k_references(
     for ref in references:
         key = ref["url"]
         try:
-            ref["url"] += generate_text_fragment(ref["snippet"])
+            embedded_file = EmbeddedFile.objects.filter(url=ref["url"]).first()
+            if embedded_file and embedded_file.metadata.mime_type == "text/html":
+
+                # logger.debug(f"Generating fragments {ref['url']} as it is a HTML file")
+                ref["url"] = generate_text_fragment(ref["url"], ref["snippet"])
+
             existing = uniques[key]
-            
+
         except KeyError:
             uniques[key] = ref
-            
-        else:  
+
+        else:
             existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
             existing["score"] = (existing["score"] + ref["score"]) / 2
     return list(uniques.values())

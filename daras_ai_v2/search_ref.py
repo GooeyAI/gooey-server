@@ -8,7 +8,8 @@ from typing_extensions import TypedDict
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
-
+from loguru import logger
+from furl import furl
 from urllib.parse import quote
 import re
 
@@ -304,62 +305,63 @@ def render_output_with_refs(state, height=500):
         html = render_text_with_refs(text, state.get("references", []))
         scrollable_html(html, height=height)
 
+
 FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "♣", "✠", "☮", "☯", "✡"]  # fmt: skip
 def generate_footnote_symbol(idx: int) -> str:
     quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
 
-def find_alphanumeric_window(s, window_size, reverse=False):
-    range_func = (
-        range(len(s) - window_size + 1, 0, -1)
-        if reverse
-        else range(len(s) - window_size + 1)
-    )
-    for i in range_func:
-        window = s[i : i + window_size]
-        # Skip windows containing newline characters
-        if "\n" in window:
-            continue
-        print(window)
-        # Updated regex to include allowed symbols and exclude '[', ']', and '.'
-        if re.match(r'^[a-zA-Z0-9\s"\'.,?:;()&^*$@!#]+$', window) and not re.search(
-            r"[\[\].]", window
-        ):
-            words = window.strip().split()
-            if (
-                words
-                and re.match(r"^[a-zA-Z0-9]+$", words[0])
-                and re.match(r"^[a-zA-Z0-9]+$", words[-1])
+
+def extract_alpha_segments(text, min_length=20, max_length=30):
+    """Extracts alphanumeric segments from text that fall within the specified length range."""
+    if not text:
+        logger.debug("Citation: Input text is empty.")
+        return []
+
+    lines = text.splitlines()
+    segment_pattern = r"[A-Za-z0-9\s,'\’]+"
+    segments = []
+
+    for line in lines:
+        found_segments = re.findall(segment_pattern, line)
+        for segment in found_segments:
+
+            segment = segment.strip()
+            if min_length <= len(segment) <= max_length and re.search(
+                r"[A-Za-z0-9]", segment
             ):
-                return window.strip()
-    # Fallback if no suitable window is found
-    return re.sub(r"[\[\].]", "", s[:window_size]).strip()
+                segments.append(segment)
+
+    if not segments:
+        logger.debug(
+            "Citation: No valid segments found within the specified length range."
+        )
+
+    return segments
 
 
-def generate_text_fragment(text, min_len=0, max_len=30):
+def generate_text_fragment(url, text, min_len=10, max_len=30):
     """
-    Generate a text fragment for a given text.
+    Generates a URL with text fragments based on extracted segments from the provided text.
 
-    Args:
-        text (str): The input text to generate a fragment from.
-        min_len (int): The minimum length for the prefix and suffix.
-        max_len (int): The maximum length for the prefix and suffix.
+    Parameters:
+        url (str): The base URL to append the text fragment to.
+        text (str): The input text to extract segments from.
+        min_len (int): The minimum length for each extracted segment.
+        max_len (int): The maximum length for each extracted segment.
 
     Returns:
-        str: The encoded text fragment.
+        str: A URL with appended text fragments.
     """
+    if not url:
+        raise ValueError("URL cannot be empty.")
 
-    prefix = find_alphanumeric_window(text, max_len)
-    suffix = find_alphanumeric_window(text, max_len, reverse=True)
+    segments = extract_alpha_segments(text, min_len, max_len)
 
-    # Ensure prefix and suffix meet minimum length requirements
-    if len(prefix) < min_len:
-        prefix = find_alphanumeric_window(text, min_len)
-    if len(suffix) < min_len:
-        suffix = find_alphanumeric_window(text, min_len, reverse=True)
-    prefix = " ".join(prefix.split()[:-1])
-    suffix = " ".join(suffix.split()[1:])
-    # Assemble and encode the fragment
-    text_fragment = f"#:~:text={quote(prefix, safe='')},{quote(suffix, safe='')}"
+    if not segments:
+        logger.debug("Citation: No segments extracted. Returning the original URL.")
+        return url  # Return the original URL if no segments are found
 
-    return text_fragment
+    text_fragment = "#:~:text=" + "&text=".join(quote(segment) for segment in segments)
+
+    return f"{url}{text_fragment}"
