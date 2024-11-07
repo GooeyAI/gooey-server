@@ -71,8 +71,8 @@ from payments.auto_recharge import (
 )
 from routers.root import RecipeTabs
 from workspaces.widgets import (
-    create_workspace_with_defaults,
     get_current_workspace,
+    render_workspace_creation_dialog,
     set_current_workspace,
 )
 from workspaces.models import Workspace
@@ -517,13 +517,26 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        if not self.current_pr.workspace.is_personal:
+        workspace_creation_dialog = gui.use_confirm_dialog(
+            key="--create-workspace-modal",
+            close_on_confirm=False,
+        )
+        if workspace_creation_dialog.is_open:
+            render_workspace_creation_dialog(
+                workspace_creation_dialog,
+                user=self.request.user,
+                session=self.request.session,
+            )
+
+        if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
             with gui.div(className="mb-4"):
                 self._render_workspace_with_invite_button(self.current_pr.workspace)
 
         options = {
             str(enum.value): enum.help_text(self.current_pr.workspace)
-            for enum in PublishedRunVisibility.for_workspace(self.current_pr.workspace)
+            for enum in PublishedRunVisibility.choices_for_workspace(
+                self.current_pr.workspace
+            )
         }
         published_run_visibility = PublishedRunVisibility(
             int(
@@ -559,9 +572,9 @@ class BasePage:
                 if ref.is_open:
                     return self._render_publish_dialog(ref=ref)
 
-        elif self.current_workspace.is_personal:
-            with gui.div(className="alert alert-warning mb-0 mt-4"):
-                gui.html(f"{icons.company} Create a team workspace to edit with others")
+        elif self.current_workspace.is_personal and self.can_user_see_workspaces():
+            with gui.div(className="mb-0 mt-4"):
+                self._render_cta_to_create_team_workspace(workspace_creation_dialog)
 
         with gui.div(className="d-flex justify-content-between pt-4"):
             pressed_copy = copy_to_clipboard_button_with_return(
@@ -692,14 +705,6 @@ class BasePage:
         sr: SavedRun,
         pr: PublishedRun,
     ):
-        selected_workspace_id = gui.session_state.get("published_run_workspace")
-        if not selected_workspace_id:
-            if self.can_user_edit_published_run(self.current_pr):
-                selected_workspace_id = self.current_pr.workspace_id
-            else:
-                selected_workspace_id = self.current_workspace.id
-        is_update_mode = selected_workspace_id == self.current_pr.workspace_id
-
         if pr.is_root() and self.is_current_user_admin():
             with gui.div(className="text-danger"):
                 gui.write(
@@ -709,7 +714,14 @@ class BasePage:
                 f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
-        with gui.div():
+        form_container = gui.div()
+
+        selected_workspace = self._render_workspace_selector(
+            key="published_run_workspace"
+        )
+        is_update_mode = selected_workspace.id == self.current_pr.workspace_id
+
+        with form_container:
             if is_update_mode:
                 title = pr.title or self.title
                 notes = pr.notes
@@ -727,65 +739,15 @@ class BasePage:
                 value=notes,
                 placeholder="An excellent but one line description",
             )
-            if is_update_mode:
-                with gui.div(className="d-flex align-items-center"):
-                    with gui.tag("h5", className="text-muted mb-3 me-2"):
-                        gui.html(icons.notes)
-                    with gui.div(className="flex-grow-1"):
-                        change_notes = gui.text_input(
-                            "",
-                            key="published_run_change_notes",
-                            placeholder="Add change notes",
-                        )
-            else:
-                change_notes = ""
-
-        col1, col2 = gui.columns([1, 3])
-        with col1:
-            gui.write("##### Workspace", className="d-block mt-2")
-
-        with col2:
-            workspaces = list(
-                self.request.user.get_workspaces().order_by(
-                    "is_personal", "-created_at"
-                )
-            )
-            if (
-                self.current_pr.workspace
-                and self.can_user_edit_published_run(self.current_pr)
-                and self.current_pr.workspace not in workspaces
-            ):
-                workspaces.insert(0, self.current_pr.workspace)
-
-            workspace_options = {w.id: w for w in workspaces}
-            if len(workspace_options) > 1:
-                selected_workspace_id = gui.selectbox(
-                    "",
-                    key="published_run_workspace",
-                    options=workspace_options,
-                    format_func=lambda w_id: workspace_options[w_id].display_html(
-                        self.request.user
-                    ),
-                    value=selected_workspace_id,
-                )
-            else:
-                with gui.div(className="p-2 mb-2"):
-                    self.render_author(
-                        self.current_workspace,
-                        show_as_link=False,
-                        current_user=self.request.user,
+            with gui.div(className="d-flex align-items-center"):
+                with gui.tag("h5", className="text-muted mb-3 me-2"):
+                    gui.html(icons.notes)
+                with gui.div(className="flex-grow-1"):
+                    change_notes = gui.text_input(
+                        "",
+                        key="published_run_change_notes",
+                        placeholder="Add change notes",
                     )
-                with gui.div(className="align-middle alert alert-warning"):
-                    gui.html(icons.company + "&nbsp;")
-                    if gui.button(
-                        "Create a team workspace",
-                        type="link",
-                        className="d-inline m-0",
-                    ):
-                        workspace = create_workspace_with_defaults(self.request.user)
-                        set_current_workspace(self.request.session, workspace.id)
-                        gui.rerun()
-                    gui.html("&nbsp;" + "to edit with others")
 
         with gui.div(className="d-flex justify-content-end mt-4"):
             if is_update_mode:
@@ -827,11 +789,10 @@ class BasePage:
                 dialog.set_open(False)
                 raise gui.RerunException()
 
-        selected_workspace = workspace_options[selected_workspace_id]
         if pressed_save_as_new:
             if (
                 selected_workspace != self.current_workspace
-                and selected_workspace in self.request.user.get_workspaces()
+                and selected_workspace in set(self.request.user.get_workspaces())
             ):
                 set_current_workspace(self.request.session, selected_workspace.id)
 
@@ -858,6 +819,72 @@ class BasePage:
                 user=self.request.user, change_notes=change_notes.strip(), **updates
             )
         raise gui.RedirectException(pr.get_app_url())
+
+    def _render_workspace_selector(self, key: str) -> Workspace:
+        if not self.can_user_see_workspaces():
+            return self.current_workspace
+
+        workspace_creation_dialog = gui.use_confirm_dialog(
+            key="--create-workspace-modal",
+            close_on_confirm=False,
+        )
+        if workspace_creation_dialog.is_open:
+            if workspace := render_workspace_creation_dialog(
+                workspace_creation_dialog,
+                user=self.request.user,
+                session=self.request.session,
+            ):
+                # set to newly created workspace and rerun
+                gui.session_state[key] = workspace.id
+                raise gui.RerunException()
+
+        workspace_options = {w.id: w for w in self.request.user.get_workspaces()}
+        if self.current_pr.workspace_id and self.can_user_edit_published_run(
+            self.current_pr
+        ):
+            # make current_pr.workspace the first option
+            workspace_options = {
+                self.current_pr.workspace_id: self.current_pr.workspace
+            } | workspace_options
+
+        col1, col2 = gui.columns([1, 3])
+        with col1:
+            gui.write("##### Workspace", className="d-block mt-2")
+
+        with col2:
+            if len(workspace_options) > 1:
+                workspace_id = gui.selectbox(
+                    "",
+                    key=key,
+                    options=workspace_options,
+                    format_func=lambda w_id: workspace_options[w_id].display_html(
+                        self.request.user
+                    ),
+                )
+                return workspace_options[workspace_id]
+            else:
+                with gui.div(className="p-2 mb-2"):
+                    self.render_author(
+                        self.current_workspace,
+                        show_as_link=False,
+                        current_user=self.request.user,
+                    )
+                self._render_cta_to_create_team_workspace(workspace_creation_dialog)
+                return self.current_workspace
+
+    def _render_cta_to_create_team_workspace(
+        self, workspace_creation_dialog: gui.ConfirmDialogRef
+    ):
+        with gui.div(className="d-flex align-items-baseline alert alert-warning"):
+            gui.html(icons.company + "&nbsp;")
+            if gui.button(
+                "Create a team workspace",
+                type="link",
+                className="d-inline m-0",
+            ):
+                workspace_creation_dialog.set_open(True)
+                gui.rerun()
+            gui.html("&nbsp;" + "to edit with others")
 
     def _get_default_pr_title(self):
         recipe_title = self.get_root_pr().title or self.title
@@ -2532,6 +2559,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)
+
+    def can_user_see_workspaces(self) -> bool:
+        return bool(self.request.user) and (
+            self.is_current_user_admin()
+            or self.request.user.get_workspaces().count() > 1
+        )
 
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:
