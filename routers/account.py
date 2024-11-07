@@ -21,7 +21,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import page_wrapper, get_og_url_path
+from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace
@@ -283,24 +283,53 @@ def all_saved_runs_tab(request: Request):
         workflow.page_cls().render_published_run_preview(pr)
 
     gui.write("# Saved Workflows")
+    explore_path = get_route_path(explore_page)
 
-    if prs:
-        if request.user.handle:
+    if not prs:
+        # empty state
+        explore_path = get_route_path(explore_page)
+        if workspace.is_personal:
             gui.caption(
-                "All your Saved workflows are here, with public ones listed on your "
-                f"profile page at {request.user.handle.get_app_url()}."
+                f"""
+                You haven't saved any workflows yet. To get started, \
+                [Explore our workflows]({explore_path}) and tap **Save** \
+                to make one your own.
+                """
             )
         else:
+            gui.caption(
+                f"""
+                Your team hasn't shared any saved workflows yet. To get started, \
+                [Explore our workflows]({explore_path}) and tap **Save** to \
+                collaborate together.
+                """
+            )
+        return
+
+    if workspace.is_personal:
+        if request.user.handle:
             edit_profile_url = AccountTabs.profile.url_path
             gui.caption(
-                "All your Saved workflows are here. Public ones will be listed on your "
-                f"profile page if you [create a username]({edit_profile_url})."
+                f"""
+                All your Saved workflows are here. Public ones will be listed on \
+                your profile page if you [create a username]({edit_profile_url}).
+                """
             )
-
-        with gui.div(className="mt-4"):
-            grid_layout(3, prs, _render_run)
+        else:
+            gui.caption(
+                f"""
+                All your Saved workflows are here, with public ones listed on your \
+                profile page at {request.user.handle.get_app_url()}.
+                """
+            )
     else:
-        gui.write("No saved runs yet", className="text-muted")
+        workspace_name = workspace.display_name(request.user)
+        gui.caption(
+            f"Saved workflows of **{workspace_name}** are here and visible & editable by other workspace members."
+        )
+
+    with gui.div(className="mt-4"):
+        grid_layout(3, prs, _render_run)
 
 
 def api_keys_tab(request: Request):
