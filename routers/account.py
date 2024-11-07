@@ -254,7 +254,7 @@ class AccountTabs(TabData, Enum):
 def billing_tab(request: Request, workspace: Workspace):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
-    return billing_page(workspace)
+    return billing_page(workspace=workspace, user=request.user)
 
 
 def profile_tab(request: Request):
