@@ -565,7 +565,7 @@ class BasePage:
 
         with gui.div(className="d-flex justify-content-between pt-4"):
             pressed_copy = copy_to_clipboard_button_with_return(
-                label="Copy Link",
+                label=f"{icons.link} Copy Link",
                 key="copy-link-in-share-modal",
                 className="py-2 px-3 m-0",
                 value=self.current_app_url(self.tab),
