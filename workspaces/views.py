@@ -469,7 +469,7 @@ def render_pending_invites_list(
                 gui.html("Email")
             with gui.tag("th", scope="col"):
                 gui.html("Invited By")
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col", className="text-nowrap"):
                 gui.html(f"{icons.time} Invite Sent")
             with gui.tag("th", scope="col"):
                 pass
