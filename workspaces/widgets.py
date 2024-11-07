@@ -1,10 +1,9 @@
-import typing
-
 import gooey_gui as gui
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
+from handles.models import COMMON_EMAIL_DOMAINS
 from .models import Workspace
 
 
@@ -196,4 +195,13 @@ def create_workspace_with_defaults(user: AppUser, name: str | None = None):
 
 
 def get_default_name_for_new_workspace(user: AppUser, suffix: str = "") -> str:
+    email_domain = user.email and user.email.split("@", maxsplit=1)[1] or ""
+    if (
+        email_domain
+        and email_domain not in COMMON_EMAIL_DOMAINS
+        and user.get_workspaces().count() <= 1
+    ):
+        email_domain_prefix = email_domain.split(".")[0].title()
+        return f"{email_domain_prefix} Team"
+
     return f"{user.first_name_possesive()} Team Workspace" + suffix
