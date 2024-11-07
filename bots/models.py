@@ -40,10 +40,10 @@ class PublishedRunVisibility(models.IntegerChoices):
     INTERNAL = 3
 
     @classmethod
-    def for_workspace(
-        cls, workspace: "Workspace"
+    def choices_for_workspace(
+        cls, workspace: typing.Optional["Workspace"]
     ) -> typing.Iterable["PublishedRunVisibility"]:
-        if workspace.is_personal:
+        if not workspace or workspace.is_personal:
             return [cls.UNLISTED, cls.PUBLIC]
         else:
             # TODO: Add cls.PUBLIC when team-handles are added
@@ -81,12 +81,14 @@ class PublishedRunVisibility(models.IntegerChoices):
             case PublishedRunVisibility.INTERNAL:
                 return icons.company_solid
 
-    def get_badge_html(self):
+    def get_badge_html(self) -> str:
         match self:
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Private"
             case PublishedRunVisibility.PUBLIC:
                 return f"{self.get_icon()} Public"
+            case PublishedRunVisibility.INTERNAL:
+                return f"{self.get_icon()} Internal"
 
 
 class Platform(models.IntegerChoices):
