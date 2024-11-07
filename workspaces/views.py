@@ -382,8 +382,8 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                 gui.html("Name")
             with gui.tag("th", scope="col"):
                 gui.html("Role")
-            with gui.tag("th", scope="col"):
-                gui.html(f"{icons.time} Since")
+            with gui.tag("th", scope="col", className="text-nowrap"):
+                gui.html(f"{icons.time}&nbsp;Since")
             with gui.tag("th", scope="col"):
                 gui.html("")
 
@@ -397,7 +397,7 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                                 gui.html(html_lib.escape(name))
                         else:
                             gui.html(html_lib.escape(name))
-                    with gui.tag("td"):
+                    with gui.tag("td", className="text-nowrap"):
                         gui.html(m.get_role_display())
                     with gui.tag("td"):
                         gui.html("...", **render_local_date_attrs(m.created_at))
