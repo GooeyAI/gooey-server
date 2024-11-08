@@ -278,22 +278,21 @@ def clear_invite_creation_form():
 
 
 def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
-    gui.write("Invite a new member to this workspace.")
-
-    choices = dict(WorkspaceRole.choices)
-    role = gui.selectbox(
-        "###### Role",
-        options=choices.keys(),
-        format_func=choices.get,
-        value=WorkspaceRole.MEMBER.value,
-        key="invite-form-role",
-    )
+    gui.write(f"Invite to **{workspace.display_name()}**.")
 
     email = gui.text_input(
         "###### Email",
         style=dict(minWidth="300px"),
         key="invite-form-email",
     ).strip()
+
+    role = gui.selectbox(
+        "###### Role",
+        options=WorkspaceRole,
+        format_func=WorkspaceRole.display_html,
+        value=WorkspaceRole.ADMIN.value,
+        key="invite-form-role",
+    )
 
     if workspace.domain_name:
         gui.caption(
