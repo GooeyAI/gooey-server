@@ -36,7 +36,7 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, icons
+from daras_ai_v2 import settings, icons, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -70,6 +70,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
 )
 from routers.root import RecipeTabs
+from routers.account import AccountTabs
 from workspaces.widgets import get_current_workspace
 from workspaces.models import Workspace
 
