@@ -36,7 +36,7 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, urls, icons
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -69,12 +69,9 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
-from routers.account import AccountTabs
 from routers.root import RecipeTabs
 from workspaces.widgets import get_current_workspace
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.models import Workspace
 
 
 DEFAULT_META_IMG = (
@@ -426,11 +423,9 @@ class BasePage:
         )
 
     def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and published_run.created_by_id
-            and published_run.created_by_id == self.request.user.id
+        return bool(self.request.user) and (
+            self.is_current_user_admin()
+            or published_run.workspace_id == self.current_workspace.id
         )
 
     def _render_title(self, title: str):
@@ -667,17 +662,25 @@ class BasePage:
                 title = self._get_default_pr_title()
                 notes = ""
             published_run_title = gui.text_input(
-                "###### Title",
+                "##### Title",
                 key="published_run_title",
                 value=title,
             )
-            published_run_notes = gui.text_area(
-                "###### Notes",
-                key="published_run_notes",
+            published_run_description = gui.text_input(
+                "##### Description",
+                key="published_run_description",
                 value=notes,
+                placeholder="An excellent but one line description",
             )
-
-        self._render_admin_options(sr, pr)
+            with gui.div(className="d-flex align-items-center"):
+                with gui.tag("h5", className="text-muted mb-3 me-2"):
+                    gui.html(icons.notes)
+                with gui.div(className="flex-grow-1"):
+                    change_notes = gui.text_input(
+                        "",
+                        key="published_run_change_notes",
+                        placeholder="Add change notes",
+                    )
 
         with gui.div(className="d-flex justify-content-end mt-4"):
             if is_update_mode:
@@ -692,6 +695,7 @@ class BasePage:
             pressed_save = gui.button(
                 f"{icons.save} Save", type="primary", className="mb-0 ms-2 py-2 px-4"
             )
+        self._render_admin_options(sr, pr)
 
         if not pressed_save and not pressed_save_as_new:
             # neither action was taken - nothing to do now
@@ -718,20 +722,22 @@ class BasePage:
                 user=self.request.user,
                 workspace=self.current_workspace,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
+                notes=published_run_description.strip(),
                 visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
             updates = dict(
                 saved_run=sr,
                 title=published_run_title.strip(),
-                notes=published_run_notes.strip(),
-                visibility=PublishedRunVisibility(pr.visibility),
+                notes=published_run_description.strip(),
+                visibility=PublishedRunVisibility.UNLISTED,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
                 return
-            pr.add_version(user=self.request.user, **updates)
+            pr.add_version(
+                user=self.request.user, change_notes=change_notes.strip(), **updates
+            )
         raise gui.RedirectException(pr.get_app_url())
 
     def _get_default_pr_title(self):
@@ -893,6 +899,7 @@ This will also delete all the associated versions.
         ):
             return
 
+        gui.caption("---")
         with gui.expander("🛠️ Admin Options"):
             gui.write(
                 f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
@@ -930,6 +937,11 @@ This will also delete all the associated versions.
                     f"This will overwrite the contents of {self.app_url()}",
                     className="text-danger",
                 )
+                change_notes = gui.text_area(
+                    "Change Notes",
+                    key="change_notes",
+                    value="",
+                )
                 if gui.button("👌 Yes, Update the Root Workflow"):
                     root_run = self.get_root_pr()
                     root_run.add_version(
@@ -938,6 +950,7 @@ This will also delete all the associated versions.
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
                         visibility=PublishedRunVisibility.PUBLIC,
+                        change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
 
