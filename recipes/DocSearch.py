@@ -34,7 +34,6 @@ from daras_ai_v2.search_ref import (
     CitationStyles,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
-    
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -178,7 +177,6 @@ class DocSearchPage(BasePage):
             ),
             current_user=self.request.user,
         )
-        
 
         # empty search result, abort!
         if not response.references:
