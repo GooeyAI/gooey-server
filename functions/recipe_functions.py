@@ -12,10 +12,10 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.settings import templates
-from functions.models import CalledFunction, FunctionTrigger
+from functions.models import CalledFunction, FunctionTrigger, RecipeFunction
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun
+    from bots.models import SavedRun, PublishedRun
     from daras_ai_v2.base import BasePage
     from workspaces.models import Workspace
 
@@ -30,14 +30,15 @@ def call_recipe_functions(
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Generator[typing.Union[str, tuple[str, "LLMTool"]], None, None]:
-    from daras_ai_v2.workflow_url_input import url_to_runs
+    request = request_model.parse_obj(state)
 
-    functions = state.get("functions") or []
-    functions = [fun for fun in functions if fun.get("trigger") == trigger.name]
+    if not request.functions:
+        return
+
+    functions = [fun for fun in request.functions if fun.trigger == trigger]
     if not functions:
         return
 
-    request = request_model.parse_obj(state)
     variables = state.setdefault("variables", {})
     fn_vars = dict(
         web_url=saved_run.get_app_url(),
@@ -87,29 +88,12 @@ def call_recipe_functions(
         return return_value
 
     for fun in functions:
-        _, sr, pr = url_to_runs(fun.get("url"))
+        runner = partial(run, fun.sr, fun.pr)
         if trigger != FunctionTrigger.prompt:
-            run(sr, pr)
+            runner()
         else:
-            fn_name = slugify(pr.title).replace("-", "_")
-            yield fn_name, LLMTool(
-                fn=partial(run, sr, pr),
-                label=pr.title,
-                spec={
-                    "type": "function",
-                    "function": {
-                        "name": fn_name,
-                        "description": pr.notes,
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                key: {"type": get_json_type(value)}
-                                for key, value in sr.state.get("variables", {}).items()
-                            },
-                        },
-                    },
-                },
-            )
+            fn_name, llm_tool = LLMTool.from_recipe_function(fun, fn=runner)
+            yield fn_name, llm_tool
 
 
 def get_json_type(val) -> str:
@@ -238,6 +222,37 @@ class LLMTool(typing.NamedTuple):
     fn: typing.Callable
     label: str
     spec: dict
+
+    @classmethod
+    def from_recipe_function(
+        cls, fun: RecipeFunction, *, fn: typing.Callable
+    ) -> tuple[str, "LLMTool"]:
+        fn_name = slugify(fun.pr.title)
+        tool = cls(
+            fn=fn,
+            label=fun.pr.title,
+            spec=cls.make_spec(fn_name, sr=fun.sr, pr=fun.pr),
+        )
+        return fn_name, tool
+
+    @classmethod
+    def make_spec(
+        cls, name: str, sr: "SavedRun", pr: "PublishedRun"
+    ) -> dict[str, typing.Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": pr.notes,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        key: {"type": get_json_type(value)}
+                        for key, value in sr.state.get("variables", {}).items()
+                    },
+                },
+            },
+        }
 
 
 class LLMTools(LLMTool, Enum):

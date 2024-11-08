@@ -1,10 +1,14 @@
 import typing
+from functools import cached_property
 
 from django.db import models
 from pydantic import BaseModel, Field
 
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
+
+if typing.TYPE_CHECKING:
+    from bots.models import SavedRun, PublishedRun
 
 
 class _TriggerData(typing.NamedTuple):
@@ -27,6 +31,21 @@ class RecipeFunction(BaseModel):
         title="Trigger",
         description="When to run this function. `pre` runs before the recipe, `post` runs after the recipe.",
     )
+
+    @cached_property
+    def _runs(self) -> tuple["SavedRun", "PublishedRun"]:
+        from daras_ai_v2.workflow_url_input import url_to_runs
+
+        _, sr, pr = url_to_runs(self.url)
+        return sr, pr
+
+    @property
+    def sr(self) -> "SavedRun":
+        return self._runs[0]
+
+    @property
+    def pr(self) -> "PublishedRun":
+        return self._runs[1]
 
 
 class CalledFunctionResponse(BaseModel):

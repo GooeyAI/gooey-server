@@ -1208,10 +1208,9 @@ This will also delete all the associated versions.
         )
 
     @cached_property
-    def current_workspace(self) -> typing.Optional["Workspace"]:
-        return self.request.user and get_current_workspace(
-            self.request.user, self.request.session
-        )
+    def current_workspace(self) -> "Workspace":
+        assert self.request.user, "User must be logged in to get their workspace"
+        return get_current_workspace(self.request.user, self.request.session)
 
     @cached_property
     def current_sr_user(self) -> AppUser | None:
