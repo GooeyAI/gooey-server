@@ -101,12 +101,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     elevenlabs_init_state,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
-from functions.models import FunctionTrigger
-from functions.recipe_functions import (
-    LLMTool,
-    render_called_functions,
-    call_recipe_functions,
-)
+from functions.models import FunctionTrigger, RecipeFunction
+from functions.recipe_functions import LLMTool, render_called_functions
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -750,18 +746,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.json(final_prompt, depth=5)
 
         if gui.session_state.get("functions"):
-            prompt_funcs = call_recipe_functions(
-                saved_run=self.current_sr,
-                workspace=self.current_workspace,
-                current_user=self.request.user,
-                request_model=self.RequestModel,
-                response_model=self.ResponseModel,
-                state=gui.session_state,
-                trigger=FunctionTrigger.prompt,
-            )
+            prompt_funcs = [
+                RecipeFunction.parse_obj(fun)
+                for fun in gui.session_state["functions"]
+                if fun["trigger"] == FunctionTrigger.prompt.name
+            ]
             if prompt_funcs:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                for name, tool in prompt_funcs:
+                for fun in prompt_funcs:
+                    _, tool = LLMTool.from_recipe_function(fun, fn=lambda: None)
                     gui.json(tool.spec.get("function", tool.spec), depth=3)
 
         for k in ["raw_output_text", "output_text", "raw_tts_text"]:
