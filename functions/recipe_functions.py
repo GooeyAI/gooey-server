@@ -31,11 +31,9 @@ def call_recipe_functions(
     trigger: FunctionTrigger,
 ) -> typing.Generator[typing.Union[str, tuple[str, "LLMTool"]], None, None]:
     request = request_model.parse_obj(state)
-
-    if not request.functions:
-        return
-
-    functions = [fun for fun in request.functions if fun.trigger == trigger]
+    functions = request.functions and [
+        fun for fun in request.functions if fun.trigger == trigger
+    ]
     if not functions:
         return
 
