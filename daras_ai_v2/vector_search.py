@@ -205,7 +205,6 @@ def get_top_k_references(
         try:
             embedded_file = EmbeddedFile.objects.filter(url=ref["url"]).first()
             if embedded_file and embedded_file.metadata.mime_type == "text/html":
-
                 # logger.debug(f"Generating fragments {ref['url']} as it is a HTML file")
                 ref["url"] = generate_text_fragment(ref["url"], ref["snippet"])
 
