@@ -11,16 +11,16 @@ from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
-from recipes.CompareLLM import CompareLLMPage
+from daras_ai_v2 import icons
 from daras_ai_v2 import settings
-from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url
+from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import RecipeTabs, chat_route, chat_lib_route
-from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
 
 def integrations_welcome_screen(title: str):
@@ -381,7 +381,7 @@ def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str
     ).strip()
 
 
-def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: str):
+def web_widget_config(bi: BotIntegration, user: AppUser | None):
     with gui.div(style={"width": "100%", "textAlign": "left"}):
         col1, col2 = gui.columns(2)
     with col1:
@@ -399,56 +399,29 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: 
                     gui.session_state["--update-display-picture"] = True
                     gui.rerun()
             with gencol2:
-                gui.session_state["improve-icon"] = (
-                    '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
-                )
-                improve_button = gui.button(
-                    '<i class="fa-regular fa-sparkles" aria-hidden="true"></i> Improve',
-                    "generate_integration_details",
-                    style={"float": "right"},
-                    type="tertiary",
-                )
+                integration_details_generator(bi, user)
 
-                if improve_button:
-                    gui.session_state["improve-icon"] = (
-                        '<i class="fa-regular fa-sparkles fa-beat"></i>'
-                    )
-                    result, sr = (
-                        CompareLLMPage()
-                        .get_pr_from_example_id(
-                            example_id=settings.WEB_INTEGRATION_EXAMPLE_ID
-                        )
-                        .submit_api_call(
-                            current_user=user,
-                            request_body=dict(
-                                variables={"title": bi.name, "prompt": copilot_prompt},
-                            ),
-                        )
-                    )
-                    sr.wait_for_celery_result(result)
-                    output_dict = json.loads(sr.state["output_text"]["gpt_4_o"][0])
-                    gui.session_state["bi-description"] = output_dict["description"]
-                    for i in range(4):
-                        gui.session_state[f"--question-{i}"] = output_dict[
-                            "User_question_" + str(i)
-                        ]
-                    gui.session_state["improve-icon"] = (
-                        '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
-                    )
         bi.name = gui.text_input(
             "###### Name",
+            key=f"_bi_name_{bi.id}",
             value=bi.name,
         )
-        bi.descripton = gui.text_area("###### Description", key="bi-description")
+        bi.descripton = gui.text_area(
+            "###### Description",
+            key=f"_bi_descripton_{bi.id}",
+            value=bi.descripton,
+        )
         scol1, scol2 = gui.columns(2)
         with scol1:
             bi.by_line = gui.text_input(
                 "###### By Line",
+                key=f"_bi_by_line_{bi.id}",
                 value=bi.by_line or (user and f"By {user.display_name}"),
             )
         with scol2:
             bi.website_url = gui.text_input(
                 "###### Website Link",
+                key=f"_bi_website_url_{bi.id}",
                 value=bi.website_url or (user and user.website_url),
             )
 
@@ -457,7 +430,9 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: 
             filter(
                 None,
                 [
-                    gui.text_input("", key=f"--question-{i}", value=value)
+                    gui.text_input(
+                        "", key=f"_bi_convo_starter_{bi.id}_{i}", value=value
+                    )
                     for i, value in zip_longest(range(4), bi.conversation_starters)
                 ],
             )
@@ -568,3 +543,52 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, copilot_prompt: 
             )
         else:
             bot_api_example_generator(bi.api_integration_id())
+
+
+def integration_details_generator(bi: BotIntegration, user: AppUser | None):
+    from bots.tasks import fill_req_vars_from_state
+
+    if gui.session_state.get("details_generated_once"):
+        return
+
+    if gui.session_state.pop("generate_details_btn", None):
+        llm_gen_pr = CompareLLMPage.get_pr_from_example_id(
+            example_id=settings.INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID
+        )
+        variables = llm_gen_pr.saved_run.state.get("variables") or {}
+        fill_req_vars_from_state(bi.get_active_saved_run().state, variables)
+        variables |= dict(bi_name=bi.name)
+
+        result, sr = llm_gen_pr.submit_api_call(
+            workspace=bi.workspace,
+            current_user=user,
+            request_body=dict(variables=variables),
+        )
+        sr.wait_for_celery_result(result)
+        # if failed, show error and abort
+        if sr.error_msg:
+            gui.error(sr.error_msg)
+            return
+
+        for text in flatten(sr.state["output_text"].values()):
+            output = json.loads(text)
+            gui.session_state[f"_bi_descripton_{bi.id}"] = (
+                output.get("description") or ""
+            )
+            bi.conversation_starters = output.get("conversation_starters") or []
+            prev_keys = {
+                k
+                for k in gui.session_state.keys()
+                if k.startswith("_bi_convo_starter_")
+            }
+            for k in prev_keys:
+                gui.session_state.pop(k, None)
+            gui.session_state["details_generated_once"] = True
+            return
+
+    gui.button(
+        '<i class="fa-regular fa-sparkles" aria-hidden="true"></i> Improve',
+        style=dict(float="right"),
+        type="tertiary",
+        key="generate_details_btn",
+    )
