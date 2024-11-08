@@ -27,6 +27,7 @@ admin = '<i class="fa-solid fa-shield-halved"></i>'
 remove_user = '<i class="fa-solid fa-user-minus"></i>'
 add_user = '<i class="fa-solid fa-user-plus"></i>'
 home = '<i class="fa-regular fa-home"></i>'
+notes = '<i class="fa-regular fa-money-check-pen"></i>'
 lock = '<i class="fa-solid fa-lock"></i>'
 globe = '<i class="fa-regular fa-globe"></i>'
 
