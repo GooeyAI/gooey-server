@@ -21,11 +21,11 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
-from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
     import celery.result
     from daras_ai_v2.base import BasePage
+    from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
@@ -434,7 +434,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def add_fb_pages_for_user(
-        self, created_by: AppUser, workspace: Workspace, fb_pages: list[dict]
+        self, created_by: AppUser, workspace: "Workspace", fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
@@ -1686,6 +1686,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
+                change_notes="First Version",
             )
             return pr
 
@@ -1820,6 +1821,7 @@ class PublishedRun(models.Model):
         visibility: PublishedRunVisibility,
         title: str,
         notes: str,
+        change_notes: str,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1832,6 +1834,7 @@ class PublishedRun(models.Model):
                 title=title,
                 notes=notes,
                 visibility=visibility,
+                change_notes=change_notes,
             )
             version.save()
             self.update_fields_to_latest_version()
@@ -1899,6 +1902,7 @@ class PublishedRunVersion(models.Model):
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
+    change_notes = models.TextField(blank=True, default="")
     visibility = models.IntegerField(
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
