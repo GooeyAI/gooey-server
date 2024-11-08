@@ -312,25 +312,27 @@ def generate_footnote_symbol(idx: int) -> str:
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
 
 
-def extract_alpha_segments(text, min_length=20, max_length=30):
-    """Extracts alphanumeric segments from text that fall within the specified length range."""
+def extract_alpha_segments(text, min_length=20, max_length=300, max_segments=25):
+    """Extracts up to a maximum number of alphanumeric segments from text within a specified length range."""
     if not text:
-        logger.debug("Citation: Input text is empty.")
+        # logger.debug("Citation: Input text is empty.")
         return []
 
-    lines = text.splitlines()
-    segment_pattern = r"[A-Za-z0-9\s,'\’]+"
+    # Regex pattern to match sentences after newlines or punctuation marks
+    segment_pattern = r"(?<=[\n.!?\-])\s*([A-Za-z0-9\s,'\’]+)"
     segments = []
 
-    for line in lines:
-        found_segments = re.findall(segment_pattern, line)
-        for segment in found_segments:
+    found_segments = re.findall(segment_pattern, text)
+    logger.debug(f"Found Possible : {len(found_segments)}")
+    for segment_cnt, segment in enumerate(found_segments):
+        if segment_cnt >= max_segments:  # Limit the number of segments to max_segments
+            break
 
-            segment = segment.strip()
-            if min_length <= len(segment) <= max_length and re.search(
-                r"[A-Za-z0-9]", segment
-            ):
-                segments.append(segment)
+        segment = segment.strip()
+        if min_length <= len(segment) <= max_length and re.search(
+            r"[A-Za-z0-9]", segment
+        ):
+            segments.append(segment)
 
     if not segments:
         logger.debug(
@@ -340,7 +342,17 @@ def extract_alpha_segments(text, min_length=20, max_length=30):
     return segments
 
 
-def generate_text_fragment(url, text, min_len=10, max_len=30):
+def truncate_to_nearest_space(segment):
+    if " " in segment:
+        # logger.debug("Citation: Truncating segment to nearest space. segment=%s", segment)
+        return segment[: segment.rfind(" ")]
+
+    return segment
+
+
+def generate_text_fragment(
+    url, text, min_len=20, max_len=300, max_segments=25, display_char=30
+):
     """
     Generates a URL with text fragments based on extracted segments from the provided text.
 
@@ -356,12 +368,13 @@ def generate_text_fragment(url, text, min_len=10, max_len=30):
     if not url:
         raise ValueError("URL cannot be empty.")
 
-    segments = extract_alpha_segments(text, min_len, max_len)
+    segments = extract_alpha_segments(text, min_len, max_len, max_segments)
 
     if not segments:
-        logger.debug("Citation: No segments extracted. Returning the original URL.")
+        # logger.debug("Citation: No segments extracted. Returning the original URL.")
         return url  # Return the original URL if no segments are found
 
-    text_fragment = "#:~:text=" + "&text=".join(quote(segment) for segment in segments)
-
+    text_fragment = "#:~:text=" + "&text=".join(
+        quote(truncate_to_nearest_space(segment[:display_char])) for segment in segments
+    )
     return f"{url}{text_fragment}"
