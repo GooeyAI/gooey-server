@@ -319,19 +319,22 @@ def extract_alpha_segments(text, min_length=20, max_length=200, max_segments=25)
         return []
 
     # Regex pattern to match sentences after newlines or punctuation marks
-    segment_pattern = r"(?<=[\n.!?\-])\s*([A-Za-z0-9\s,'\’]+)"
+    segment_pattern = r"(?<=[\n.!?\-\"\'])\s*([A-Za-z0-9\s,'\’]+)"
     segments = []
 
     found_segments = re.findall(segment_pattern, text)
     logger.debug(f"Found Possible : {len(found_segments)}")
-    for segment_cnt, segment in enumerate(found_segments):
+    
+    segment_cnt = 0
+    for segment in found_segments:
         if segment_cnt >= max_segments:  # Limit the number of segments to max_segments
             break
 
         segment = segment.strip()
         if min_length <= len(segment) <= max_length and re.search(
-            r"[A-Za-z0-9]", segment
+            r"[A-Za-z0-9,\’]", segment
         ):
+            segment_cnt += 1
             segments.append(segment)
 
     if not segments:
