@@ -8,6 +8,7 @@ from typing_extensions import TypedDict
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
+from furl import furl
 from loguru import logger
 from urllib.parse import quote
 import re
@@ -376,4 +377,4 @@ def generate_text_fragment(
     text_fragment = "#:~:text=" + "&text=".join(
         quote(truncate_to_nearest_space(segment[:display_char])) for segment in segments
     )
-    return f"{url}{text_fragment}"
+    return str(furl(url).remove(fragment=True))+text_fragment
