@@ -9,7 +9,6 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 from loguru import logger
-from furl import furl
 from urllib.parse import quote
 import re
 
@@ -312,7 +311,7 @@ def generate_footnote_symbol(idx: int) -> str:
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
 
 
-def extract_alpha_segments(text, min_length=20, max_length=300, max_segments=25):
+def extract_alpha_segments(text, min_length=20, max_length=200, max_segments=25):
     """Extracts up to a maximum number of alphanumeric segments from text within a specified length range."""
     if not text:
         # logger.debug("Citation: Input text is empty.")
@@ -351,7 +350,7 @@ def truncate_to_nearest_space(segment):
 
 
 def generate_text_fragment(
-    url, text, min_len=20, max_len=300, max_segments=25, display_char=30
+    url, text, min_len=20, max_len=200, max_segments=25, display_char=30
 ):
     """
     Generates a URL with text fragments based on extracted segments from the provided text.
