@@ -448,7 +448,7 @@ class BasePage:
         ):
             ref.set_open(True)
         if ref.is_open:
-            with gui.alert_dialog(ref=ref, modal_title="#### Options"):
+            with gui.alert_dialog(ref=ref, modal_title="### Options"):
                 if self.can_user_edit_published_run(self.current_pr):
                     self._saved_options_modal()
                 else:
@@ -659,33 +659,31 @@ class BasePage:
                 f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
-        with gui.div(className="mt-4"):
-            if is_update_mode:
-                title = pr.title or self.title
-                notes = pr.notes
-            else:
-                title = self._get_default_pr_title()
-                notes = ""
-            published_run_title = gui.text_input(
-                "##### Title",
-                key="published_run_title",
-                value=title,
-            )
-            published_run_description = gui.text_input(
-                "##### Description",
-                key="published_run_description",
-                value=notes,
-                placeholder="An excellent but one line description",
-            )
-            with gui.div(className="d-flex align-items-center"):
-                with gui.tag("h5", className="text-muted mb-3 me-2"):
-                    gui.html(icons.notes)
-                with gui.div(className="flex-grow-1"):
-                    change_notes = gui.text_input(
-                        "",
-                        key="published_run_change_notes",
-                        placeholder="Add change notes",
-                    )
+        if is_update_mode:
+            title = pr.title or self.title
+            notes = pr.notes
+        else:
+            title = self._get_default_pr_title()
+            notes = ""
+        published_run_title = gui.text_input(
+            "###### Title",
+            key="published_run_title",
+            value=title,
+        )
+        published_run_description = gui.text_input(
+            "###### Description",
+            key="published_run_description",
+            value=notes,
+            placeholder="An excellent but one line description",
+        )
+        with gui.div(className="d-flex align-items-center gap-2"):
+            gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
+            with gui.div(className="flex-grow-1"):
+                change_notes = gui.text_input(
+                    "",
+                    key="published_run_change_notes",
+                    placeholder="Add change notes",
+                )
 
         with gui.div(className="d-flex justify-content-end mt-4"):
             if is_update_mode:
@@ -801,7 +799,9 @@ class BasePage:
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
-        with gui.div(className="mb-3 d-flex justify-content-around align-items-center"):
+        with gui.div(
+            className="mb-3 d-flex justify-content-around align-items-center gap-3"
+        ):
             duplicate_button = None
             save_as_new_button = None
             if is_latest_version:
@@ -867,11 +867,11 @@ class BasePage:
             )
 
         with gui.div(className="mt-4"):
-            gui.write(
-                f"##### {icons.time} Version History",
-                className="mb-4 fw-bold",
-                unsafe_allow_html=True,
-            )
+            with gui.div(className="mb-4"):
+                gui.write(
+                    f"#### {icons.time} Version History",
+                    unsafe_allow_html=True,
+                )
             self._render_version_history()
 
     def _unsaved_options_modal(self):
@@ -911,7 +911,7 @@ class BasePage:
         ):
             return
 
-        gui.caption("---")
+        gui.newline()
         with gui.expander("🛠️ Admin Options"):
             gui.write(
                 f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
@@ -1058,7 +1058,7 @@ class BasePage:
                 className="d-flex justify-content-between align-items-middle fw-bold"
             ):
                 if version.changed_by:
-                    with gui.tag("h6", className="mb-0"):
+                    with gui.tag("h6"):
                         self.render_author(
                             version.changed_by, responsive=False, show_as_link=False
                         )
@@ -1083,7 +1083,7 @@ class BasePage:
                         unsafe_allow_html=True,
                     )
                 elif older_version and older_version.title != version.title:
-                    gui.caption(f"Renamed: {version.title}")
+                    gui.caption(f"Renamed to: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
