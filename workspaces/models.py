@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import typing
 from datetime import timedelta
@@ -27,6 +28,9 @@ from .tasks import send_added_to_workspace_email, send_invitation_email
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
+
+
+DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
 
 
 def validate_workspace_domain_name(value: str):
@@ -150,6 +154,12 @@ class Workspace(SafeDeleteModel):
 
     def get_slug(self):
         return slugify(self.display_name())
+
+    def get_photo(self) -> str | None:
+        if self.is_personal:
+            return self.created_by and self.created_by.photo_url
+        else:
+            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
     @transaction.atomic()
     def create_with_owner(self):
@@ -312,15 +322,23 @@ class Workspace(SafeDeleteModel):
             return f"{self.created_by.first_name_possesive()} Workspace"
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
-        if self.is_personal and self.created_by_id == current_user.id:
-            if self.created_by.photo_url:
-                return f'<img src="{self.created_by.photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
-            else:
+        def _html_img(src: str) -> str:
+            return f"""
+            <img src="{html.escape(src)}"
+                 style="height: 25px; min-width: 25px; max-width: 25px;
+                        object-fit: cover; border-radius: 12.5px;">
+            """
+
+        if photo_url := self.get_photo():
+            return _html_img(photo_url)
+
+        if self.is_personal:
+            if current_user and current_user.id == self.created_by_id:
                 return icons.home
-        elif self.photo_url:
-            return f'<img src="{self.photo_url}" style="height: 25px; width: auto; border-radius: 5px">'
+            else:
+                return icons.user
         else:
-            return icons.company
+            return _html_img(DEFAULT_WORKSPACE_PHOTO_URL)
 
 
 class WorkspaceMembership(SafeDeleteModel):

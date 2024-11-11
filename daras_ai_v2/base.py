@@ -72,9 +72,7 @@ from payments.auto_recharge import (
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 from workspaces.widgets import get_current_workspace
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.models import Workspace
 
 
 DEFAULT_META_IMG = (
@@ -382,12 +380,8 @@ class BasePage:
                             is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
 
-                if is_example:
-                    author = pr.created_by
-                else:
-                    author = self.current_sr_user or sr.get_creator()
                 if not is_root_example:
-                    self.render_author(author)
+                    self._render_author_as_breadcrumb()
 
             with gui.div(className="d-flex align-items-center"):
                 if request_changed or (can_save and not is_example):
@@ -405,6 +399,39 @@ class BasePage:
             gui.write(pr.notes, line_clamp=2)
         elif is_root_example and self.tab != RecipeTabs.integrations:
             gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+
+    def _render_author_as_breadcrumb(self):
+        sr, pr = self.current_sr_pr
+        is_example = pr.saved_run == sr
+
+        if is_example:
+            self.render_author(pr.workspace)
+            return
+
+        if not self.current_sr.workspace or self.current_sr.workspace.is_personal:
+            # no workspace or a personal workspace
+            self.render_author(self.current_sr_user)
+            return
+
+        # team workspace
+        with gui.div(className="d-flex align-items-center container-margin-reset"):
+            self.render_author(self.current_sr.workspace)
+
+            if user := self.current_sr_user:
+                full_name = user.full_name()
+            else:
+                full_name = "Deleted User"
+
+            if handle := (self.current_sr_user and self.current_sr_user.handle):
+                linkto = gui.link(to=handle.get_app_url())
+            else:
+                linkto = gui.dummy()
+
+            with linkto, gui.div(className="ms-1"):
+                gui.caption(
+                    f'<i class="fa-light fa-chevron-right"></i>&nbsp;{html.escape(full_name)}',
+                    unsafe_allow_html=True,
+                )
 
     def can_user_save_run(
         self,
@@ -1361,16 +1388,55 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    @staticmethod
+    @classmethod
     def render_author(
-        user: AppUser,
+        cls,
+        workspace_or_user: Workspace | AppUser | None,
         *,
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
+        current_user: AppUser | None = None,
     ):
-        if not user or (not user.photo_url and not user.display_name):
+        if not workspace_or_user:
+            return
+
+        link = None
+        if isinstance(workspace_or_user, Workspace):
+            workspace = workspace_or_user
+            photo = workspace.get_photo()
+            name = workspace.display_name(current_user=current_user)
+            if show_as_link and workspace.is_personal and workspace.created_by.handle:
+                link = workspace.created_by.handle.get_app_url()
+        else:
+            user = workspace_or_user
+            photo = user.photo_url
+            name = user.full_name()
+            if show_as_link and user.handle:
+                link = user.handle.get_app_url()
+
+        return cls._render_author(
+            photo=photo,
+            name=name,
+            link=link,
+            image_size=image_size,
+            responsive=responsive,
+            text_size=text_size,
+        )
+
+    @classmethod
+    def _render_author(
+        cls,
+        photo: str | None,
+        name: str | None,
+        link: str | None,
+        *,
+        image_size: str,
+        responsive: bool,
+        text_size: str | None,
+    ):
+        if not photo and not name:
             return
 
         responsive_image_size = (
@@ -1382,13 +1448,9 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link and user and user.handle:
-            linkto = gui.link(to=user.handle.get_app_url())
-        else:
-            linkto = gui.dummy()
-
+        linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
-            if user.photo_url:
+            if photo:
                 gui.html(
                     f"""
                     <style>
@@ -1410,12 +1472,12 @@ class BasePage:
                     </style>
                 """
                 )
-                gui.image(user.photo_url, className=class_name)
+                gui.image(photo, className=class_name)
 
-            if user.display_name:
+            if name:
                 name_style = {"fontSize": text_size} if text_size else {}
                 with gui.tag("span", style=name_style):
-                    gui.html(html.escape(user.display_name))
+                    gui.html(html.escape(name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -2137,10 +2199,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        if published_run.created_by:
+        if published_run.workspace:
             with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
-                    published_run.created_by,
+                    published_run.workspace,
                     image_size="20px",
                     text_size="0.9rem",
                 )
