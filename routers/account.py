@@ -285,7 +285,6 @@ def all_saved_runs_tab(request: Request):
 
     if not prs:
         # empty state
-        explore_path = get_route_path(explore_page)
         if workspace.is_personal:
             gui.caption(
                 f"""
