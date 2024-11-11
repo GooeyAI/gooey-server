@@ -1686,7 +1686,6 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
-                change_notes="First Version",
             )
             return pr
 
@@ -1819,9 +1818,9 @@ class PublishedRun(models.Model):
         user: AppUser | None,
         saved_run: SavedRun,
         visibility: PublishedRunVisibility,
-        title: str,
-        notes: str,
-        change_notes: str,
+        title: str = "",
+        notes: str = "",
+        change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
