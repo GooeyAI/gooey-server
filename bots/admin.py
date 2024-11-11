@@ -131,7 +131,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
         "name",
         "workspace__name",
-        "created_by__name",
+        "created_by__display_name",
         "user_language",
         "fb_page_id",
         "fb_page_name",
