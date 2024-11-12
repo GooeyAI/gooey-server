@@ -245,6 +245,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
 HEADER_LINKS = [
     ("/explore/", "Explore"),
     ("https://docs.gooey.ai", "Docs"),
