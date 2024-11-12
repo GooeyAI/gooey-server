@@ -198,18 +198,19 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
+if not DEBUG:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+            },
         },
-    },
-    "root": {
-        "handlers": ["console"],
-    },
-}
+        "root": {
+            "handlers": ["console"],
+        },
+    }
 
 # Gooey settings
 #
@@ -314,6 +315,10 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
 SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
 SAFETY_CHECKER_BILLING_EMAIL = config(
     "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
+
+INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID = config(
+    "INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID", "59yem9i3iet5"
 )
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)

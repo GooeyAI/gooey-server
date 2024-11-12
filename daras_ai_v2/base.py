@@ -70,11 +70,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
 )
 from routers.root import RecipeTabs
-from workspaces.widgets import (
-    get_current_workspace,
-    render_workspace_creation_dialog,
-    set_current_workspace,
-)
+from workspaces.widgets import get_current_workspace, set_current_workspace
 from workspaces.models import Workspace
 
 
@@ -465,7 +461,7 @@ class BasePage:
         ):
             ref.set_open(True)
         if ref.is_open:
-            with gui.alert_dialog(ref=ref, modal_title="#### Options"):
+            with gui.alert_dialog(ref=ref, modal_title="### Options"):
                 if self.can_user_edit_published_run(self.current_pr):
                     self._saved_options_modal()
                 else:
@@ -526,17 +522,6 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        workspace_creation_dialog = gui.use_confirm_dialog(
-            key="--create-workspace-modal",
-            close_on_confirm=False,
-        )
-        if workspace_creation_dialog.is_open:
-            render_workspace_creation_dialog(
-                workspace_creation_dialog,
-                user=self.request.user,
-                session=self.request.session,
-            )
-
         if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
             with gui.div(className="mb-4"):
                 self._render_workspace_with_invite_button(self.current_pr.workspace)
@@ -580,10 +565,6 @@ class BasePage:
                     ref.set_open(True)
                 if ref.is_open:
                     return self._render_publish_dialog(ref=ref)
-
-        elif self.current_workspace.is_personal and self.can_user_see_workspaces():
-            with gui.div(className="mb-0 mt-4"):
-                self._render_cta_to_create_team_workspace(workspace_creation_dialog)
 
         with gui.div(className="d-flex justify-content-between pt-4"):
             pressed_copy = copy_to_clipboard_button_with_return(
@@ -738,19 +719,18 @@ class BasePage:
                 title = self._get_default_pr_title()
                 notes = ""
             published_run_title = gui.text_input(
-                "##### Title",
+                "###### Title",
                 key="published_run_title",
                 value=title,
             )
             published_run_description = gui.text_input(
-                "##### Description",
+                "###### Description",
                 key="published_run_description",
                 value=notes,
                 placeholder="An excellent but one line description",
             )
-            with gui.div(className="d-flex align-items-center"):
-                with gui.tag("h5", className="text-muted mb-3 me-2"):
-                    gui.html(icons.notes)
+            with gui.div(className="d-flex align-items-center gap-2"):
+                gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
                 with gui.div(className="flex-grow-1"):
                     change_notes = gui.text_input(
                         "",
@@ -833,20 +813,6 @@ class BasePage:
         if not self.can_user_see_workspaces():
             return self.current_workspace
 
-        workspace_creation_dialog = gui.use_confirm_dialog(
-            key="--create-workspace-modal",
-            close_on_confirm=False,
-        )
-        if workspace_creation_dialog.is_open:
-            if workspace := render_workspace_creation_dialog(
-                workspace_creation_dialog,
-                user=self.request.user,
-                session=self.request.session,
-            ):
-                # set to newly created workspace and rerun
-                gui.session_state[key] = workspace.id
-                raise gui.RerunException()
-
         workspace_options = {w.id: w for w in self.request.user.get_workspaces()}
         if self.current_pr.workspace_id and self.can_user_edit_published_run(
             self.current_pr
@@ -878,22 +844,7 @@ class BasePage:
                         show_as_link=False,
                         current_user=self.request.user,
                     )
-                self._render_cta_to_create_team_workspace(workspace_creation_dialog)
                 return self.current_workspace
-
-    def _render_cta_to_create_team_workspace(
-        self, workspace_creation_dialog: gui.ConfirmDialogRef
-    ):
-        with gui.div(className="d-flex align-items-baseline alert alert-warning"):
-            gui.html(icons.company + "&nbsp;")
-            if gui.button(
-                "Create a team workspace",
-                type="link",
-                className="d-inline m-0",
-            ):
-                workspace_creation_dialog.set_open(True)
-                gui.rerun()
-            gui.html("&nbsp;" + "to edit with others")
 
     def _get_default_pr_title(self):
         recipe_title = self.get_root_pr().title or self.title
@@ -951,7 +902,9 @@ class BasePage:
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
-        with gui.div(className="mb-3 d-flex justify-content-around align-items-center"):
+        with gui.div(
+            className="mb-3 d-flex justify-content-around align-items-center gap-3"
+        ):
             duplicate_button = None
             save_as_new_button = None
             if is_latest_version:
@@ -1017,11 +970,11 @@ class BasePage:
             )
 
         with gui.div(className="mt-4"):
-            gui.write(
-                f"##### {icons.time} Version History",
-                className="mb-4 fw-bold",
-                unsafe_allow_html=True,
-            )
+            with gui.div(className="mb-4"):
+                gui.write(
+                    f"#### {icons.time} Version History",
+                    unsafe_allow_html=True,
+                )
             self._render_version_history()
 
     def _unsaved_options_modal(self):
@@ -1061,7 +1014,7 @@ class BasePage:
         ):
             return
 
-        gui.caption("---")
+        gui.newline()
         with gui.expander("🛠️ Admin Options"):
             gui.write(
                 f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
@@ -1208,7 +1161,7 @@ class BasePage:
                 className="d-flex justify-content-between align-items-middle fw-bold"
             ):
                 if version.changed_by:
-                    with gui.tag("h6", className="mb-0"):
+                    with gui.tag("h6"):
                         self.render_author(
                             version.changed_by, responsive=False, show_as_link=False
                         )
@@ -1233,7 +1186,7 @@ class BasePage:
                         unsafe_allow_html=True,
                     )
                 elif older_version and older_version.title != version.title:
-                    gui.caption(f"Renamed: {version.title}")
+                    gui.caption(f"Renamed to: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1381,9 +1334,10 @@ class BasePage:
         )
 
     @cached_property
-    def current_workspace(self) -> Workspace:
-        assert self.request.user
-        return get_current_workspace(self.request.user, self.request.session)
+    def current_workspace(self) -> typing.Optional["Workspace"]:
+        return self.request.user and get_current_workspace(
+            self.request.user, self.request.session
+        )
 
     @cached_property
     def current_sr_user(self) -> AppUser | None:
