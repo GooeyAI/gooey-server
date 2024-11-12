@@ -246,15 +246,6 @@ if not firebase_admin._apps:
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
-HEADER_LINKS = [
-    ("/explore/", "Explore"),
-    ("https://docs.gooey.ai", "Docs"),
-    ("/api/", "API"),
-    ("https://blog.gooey.ai", "Blog"),
-    ("/pricing", "Pricing"),
-    ("https://www.help.gooey.ai/contact", "Contact"),
-]
-
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
@@ -285,6 +276,18 @@ API_BASE_URL = config("API_BASE_URL", "/")
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
+DOCS_URL = config("DOCS_URL", "https://docs.gooey.ai")
+BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
+CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
+
+HEADER_LINKS = [
+    ("/explore/", "Explore"),
+    (DOCS_URL, "Docs"),
+    ("/api/", "API"),
+    (BLOG_URL, "Blog"),
+    ("/pricing", "Pricing"),
+    (CONTACT_URL, "Contact"),
+]
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 

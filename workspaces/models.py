@@ -454,7 +454,7 @@ class WorkspaceInviteQuerySet(models.QuerySet):
                     f"User {invitee} auto-accepted invitation to workspace {invite.workspace}"
                 )
                 send_added_to_workspace_email.delay(
-                    workspace_id=invite.workspace_id, user_id=invitee.id
+                    invite_id=invite.id, user_id=invitee.id
                 )
         else:
             invite.send_email()
