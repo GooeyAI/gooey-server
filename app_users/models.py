@@ -233,6 +233,13 @@ class AppUser(models.Model):
 
         return Workspace.objects.get_or_create_from_user(self)
 
+    def get_workspaces(self) -> models.QuerySet["Workspace"]:
+        from workspaces.models import Workspace
+
+        return Workspace.objects.filter(
+            memberships__user=self, memberships__deleted__isnull=True
+        )
+
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
 
