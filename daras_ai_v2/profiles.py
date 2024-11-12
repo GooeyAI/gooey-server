@@ -267,14 +267,7 @@ def edit_user_profile_page(user: AppUser):
 
 
 def _edit_user_profile_header(user: AppUser):
-    with gui.div(
-        className="d-block d-md-flex flex-row-reverse justify-content-between align-items-center"
-    ):
-        with gui.tag(
-            "a", href="/logout/", className="btn btn-theme btn-secondary d-inline-block"
-        ):
-            gui.write("Sign out")
-        gui.write("# Update your Profile")
+    gui.write("# Update your Profile")
 
     with gui.div(className="mb-3"):
         with gui.tag("span"):
