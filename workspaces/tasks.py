@@ -23,7 +23,7 @@ def send_invitation_email(invitation_pk: int):
     send_email_via_postmark(
         to_address=invite.email,
         from_address=settings.SUPPORT_EMAIL,
-        subject=f"[Gooey.AI] Invitation to join {invite.workspace.display_name()}",
+        subject=f"{invite.created_by.first_name()} invited you to join {invite.workspace.display_name()}",
         html_body=templates.get_template("workspace_invitation_email.html").render(
             settings=settings,
             invite=invite,
