@@ -304,6 +304,9 @@ class Workspace(SafeDeleteModel):
     def get_pp_custom_id(self) -> str:
         return json.dumps(dict(workspace_id=self.id))
 
+    def display_html(self, current_user: AppUser | None = None) -> str:
+        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
+
     def display_name(self, current_user: AppUser | None = None) -> str:
         if self.name:
             return self.name

@@ -72,7 +72,7 @@ from payments.auto_recharge import (
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
 from workspaces.models import Workspace
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
     # Small
@@ -569,7 +569,29 @@ class BasePage:
                 checked_by_default=False,
             )
 
-        with gui.div(className="d-flex justify-content-between"):
+        if (
+            self.current_workspace.is_personal
+            and self.request.user.get_workspaces().count() > 1
+        ):
+            with gui.div(className="alert alert-warning mb-0 mt-4"):
+                duplicate = gui.button(
+                    f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
+                )
+                gui.html(" this workflow to edit with others")
+                ref = gui.use_alert_dialog(key="publish-modal")
+                if duplicate:
+                    self.clear_publish_form()
+                    gui.session_state["published_run_workspace"] = (
+                        self.request.user.get_workspaces()
+                        .filter(is_personal=False)
+                        .first()
+                        .id
+                    )
+                    ref.set_open(True)
+                if ref.is_open:
+                    return self._render_publish_dialog(ref=ref)
+
+        with gui.div(className="d-flex justify-content-between pt-4"):
             pressed_copy = copy_to_clipboard_button_with_return(
                 label="Copy Link",
                 key="copy-link-in-share-modal",
@@ -636,17 +658,7 @@ class BasePage:
 
             if not ref.is_open:
                 return
-            with gui.alert_dialog(
-                ref=ref,
-                modal_title=f"#### {label} Workflow",
-                large=True,
-            ):
-                self._render_publish_form(
-                    sr=self.current_sr,
-                    pr=self.current_pr,
-                    dialog=ref,
-                    is_update_mode=can_edit,
-                )
+            self._render_publish_dialog(ref=ref)
 
     def _publish_for_anonymous_user(self):
         query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
@@ -661,6 +673,30 @@ class BasePage:
             self.get_auth_url(next_url=sr.get_app_url(query_params=query_params))
         )
 
+    def _render_publish_dialog(self, *, ref: gui.AlertDialogRef):
+        """
+        Note: all input keys in this method should start with `published_run_*`
+        (see: method clear_publish_form)
+        """
+        assert self.request.user and not self.request.user.is_anonymous
+
+        sr = self.current_sr
+        pr = self.current_pr
+
+        if self.can_user_edit_published_run(self.current_pr):
+            label = "Update"
+        elif self._has_request_changed():
+            label = "Save and Run"
+        else:
+            label = "Save as New"
+
+        with gui.alert_dialog(
+            ref=ref,
+            modal_title=f"#### {label} Workflow",
+            large=True,
+        ):
+            self._render_publish_form(sr=sr, pr=pr)
+
     @staticmethod
     def clear_publish_form():
         keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
@@ -669,11 +705,8 @@ class BasePage:
 
     def _render_publish_form(
         self,
-        *,
         sr: SavedRun,
         pr: PublishedRun,
-        dialog: gui.AlertDialogRef,
-        is_update_mode: bool = False,
     ):
         if pr.is_root() and self.is_current_user_admin():
             with gui.div(className="text-danger"):
@@ -684,31 +717,39 @@ class BasePage:
                 f'If you want to create a new example, press "{icons.fork} Save as New".'
             )
 
-        if is_update_mode:
-            title = pr.title or self.title
-            notes = pr.notes
-        else:
-            title = self._get_default_pr_title()
-            notes = ""
-        published_run_title = gui.text_input(
-            "###### Title",
-            key="published_run_title",
-            value=title,
+        form_container = gui.div()
+
+        selected_workspace = self._render_workspace_selector(
+            key="published_run_workspace"
         )
-        published_run_description = gui.text_input(
-            "###### Description",
-            key="published_run_description",
-            value=notes,
-            placeholder="An excellent but one line description",
-        )
-        with gui.div(className="d-flex align-items-center gap-2"):
-            gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
-            with gui.div(className="flex-grow-1"):
-                change_notes = gui.text_input(
-                    "",
-                    key="published_run_change_notes",
-                    placeholder="Add change notes",
-                )
+        is_update_mode = selected_workspace.id == self.current_pr.workspace_id
+
+        with form_container:
+            if is_update_mode:
+                title = pr.title or self.title
+                notes = pr.notes
+            else:
+                title = self._get_default_pr_title()
+                notes = ""
+            published_run_title = gui.text_input(
+                "###### Title",
+                key="published_run_title",
+                value=title,
+            )
+            published_run_description = gui.text_input(
+                "###### Description",
+                key="published_run_description",
+                value=notes,
+                placeholder="An excellent but one line description",
+            )
+            with gui.div(className="d-flex align-items-center gap-2"):
+                gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
+                with gui.div(className="flex-grow-1"):
+                    change_notes = gui.text_input(
+                        "",
+                        key="published_run_change_notes",
+                        placeholder="Add change notes",
+                    )
 
         with gui.div(className="d-flex justify-content-end mt-4"):
             if is_update_mode:
@@ -717,12 +758,19 @@ class BasePage:
                     type="secondary",
                     className="mb-0 ms-2 py-2 px-4",
                 )
+                pressed_save = gui.button(
+                    f"{icons.save} Save",
+                    type="primary",
+                    className="mb-0 ms-2 py-2 px-4",
+                )
             else:
-                pressed_save_as_new = False
+                pressed_save_as_new = gui.button(
+                    f"{icons.fork} Save as New",
+                    type="primary",
+                    className="mb-0 ms-2 py-2 px-4",
+                )
+                pressed_save = False
 
-            pressed_save = gui.button(
-                f"{icons.save} Save", type="primary", className="mb-0 ms-2 py-2 px-4"
-            )
         self._render_admin_options(sr, pr)
 
         if not pressed_save and not pressed_save_as_new:
@@ -743,12 +791,18 @@ class BasePage:
                 dialog.set_open(False)
                 raise gui.RerunException()
 
-        if pressed_save_as_new or not is_update_mode:
+        if pressed_save_as_new:
+            if (
+                selected_workspace != self.current_workspace
+                and selected_workspace in set(self.request.user.get_workspaces())
+            ):
+                set_current_workspace(self.request.session, selected_workspace.id)
+
             pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
                 saved_run=sr,
                 user=self.request.user,
-                workspace=self.current_workspace,
+                workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
                 visibility=PublishedRunVisibility.UNLISTED,
@@ -767,6 +821,42 @@ class BasePage:
                 user=self.request.user, change_notes=change_notes.strip(), **updates
             )
         raise gui.RedirectException(pr.get_app_url())
+
+    def _render_workspace_selector(self, key: str) -> "Workspace":
+        if not self.can_user_see_workspaces():
+            return self.current_workspace
+
+        workspace_options = {w.id: w for w in self.request.user.get_workspaces()}
+        if self.current_pr.workspace_id and self.can_user_edit_published_run(
+            self.current_pr
+        ):
+            # make current_pr.workspace the first option
+            workspace_options = {
+                self.current_pr.workspace_id: self.current_pr.workspace
+            } | workspace_options
+
+        col1, col2 = gui.columns([1, 3])
+        with col1:
+            gui.write("#### Workspace", className="d-block mt-2")
+
+        with col2:
+            if len(workspace_options) > 1:
+                workspace_id = gui.selectbox(
+                    "",
+                    key=key,
+                    options=workspace_options,
+                    format_func=lambda w_id: workspace_options[w_id].display_html(
+                        self.request.user
+                    ),
+                )
+                return workspace_options[workspace_id]
+            else:
+                with gui.div(className="p-2 mb-2"):
+                    self.render_author(
+                        self.current_workspace,
+                        show_as_link=False,
+                    )
+                return self.current_workspace
 
     def _get_default_pr_title(self):
         recipe_title = self.get_root_pr().title or self.title
@@ -2468,6 +2558,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)
+
+    def can_user_see_workspaces(self) -> bool:
+        return bool(self.request.user) and (
+            self.is_current_user_admin()
+            or self.request.user.get_workspaces().count() > 1
+        )
 
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:
