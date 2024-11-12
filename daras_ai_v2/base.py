@@ -426,7 +426,7 @@ class BasePage:
                     linkto = user.handle and gui.link(to=user.handle.get_app_url())
                     full_name = user.full_name()
                 else:
-                    linkto = None
+                    linkto = gui.dummy()
                     full_name = "Deleted User"
                 with linkto:
                     gui.caption(full_name)
