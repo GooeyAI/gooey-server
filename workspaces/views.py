@@ -77,21 +77,6 @@ def workspaces_page(user: AppUser, session: dict):
     render_workspace_by_membership(membership)
 
 
-def render_workspace_creation_view(user: AppUser):
-    gui.write(f"# {icons.company} Create an Workspace", unsafe_allow_html=True)
-
-    workspace = Workspace(created_by=user)
-    render_workspace_create_or_edit_form(workspace, user)
-
-    if gui.button("Create"):
-        try:
-            workspace.create_with_owner()
-        except ValidationError as e:
-            gui.write("\n".join(e.messages), className="text-danger")
-        else:
-            gui.rerun()
-
-
 def render_workspace_by_membership(membership: WorkspaceMembership):
     """
     membership object has all the information we need:
