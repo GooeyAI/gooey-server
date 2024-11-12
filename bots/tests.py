@@ -63,7 +63,6 @@ def test_create_bot_integration_conversation_message(transactional_db):
     bot_integration = BotIntegration.objects.create(
         name="My Bot Integration",
         saved_run=None,
-        billing_account_uid="asdf1234",
         user_language="en",
         show_feedback_buttons=True,
         platform=Platform.WHATSAPP,
@@ -118,7 +117,6 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     bi = BotIntegration.objects.create(
         name="My Bot Integration",
         saved_run=None,
-        billing_account_uid="fdnacsFSBQNKVW8z6tzhBLHKpAm1",  # digital green's account id
         user_language="en",
         show_feedback_buttons=True,
         platform=Platform.WHATSAPP,

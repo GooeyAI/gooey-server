@@ -6,9 +6,8 @@ from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
-from app_users.models import AppUser
+from api_keys.models import ApiKey
 from auth.auth_backend import authlocal
-from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
 
 
@@ -26,30 +25,25 @@ class AuthorizationError(HTTPException):
         super().__init__(status_code=self.status_code, detail={"error": msg})
 
 
-def authenticate_credentials(token: str) -> AppUser:
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
+def authenticate_credentials(token: str) -> ApiKey:
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
 
     try:
-        doc = (
-            db_collection.where("secret_key_hash", "==", secret_key_hash)
-            .limit(1)
-            .get()[0]
+        api_key = ApiKey.objects.select_related("workspace__created_by").get(
+            hash=secret_key_hash
         )
-    except IndexError:
+    except ApiKey.DoesNotExist:
         raise AuthorizationError("Invalid API Key.")
 
-    uid = doc.get("uid")
-    user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    if user.is_disabled:
+    if api_key.workspace.created_by.is_disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise AuthenticationError(msg)
 
-    return user
+    return api_key
 
 
 class APIAuth(SecurityBase):
@@ -77,9 +71,12 @@ class APIAuth(SecurityBase):
         self.scheme_name = scheme_name
         self.description = description
 
-    def __call__(self, request: Request) -> AppUser:
+    def __call__(self, request: Request) -> ApiKey:
         if authlocal:  # testing only!
-            return authlocal[0]
+            return ApiKey(
+                created_by=authlocal[0],
+                workspace=authlocal[0].get_or_create_personal_workspace()[0],
+            )
 
         auth = request.headers.get("Authorization", "").split()
         if not auth or auth[0].lower() != self.scheme_name.lower():

@@ -1,10 +1,12 @@
-window.addEventListener("DOMContentLoaded", async function () {
+(async () => {
+  await window.waitUntilHydrated;
+
   // Initialize Firebase
   const app = firebase.initializeApp(window.FIREBASE_CONFIG);
 
   // As httpOnly cookies are to be used, do not persist any state client side.
   firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
-});
+})();
 
 async function handleCredentialResponse(response) {
   showLoginProgress();

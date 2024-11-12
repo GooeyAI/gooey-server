@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import datetime
 import os
 from pathlib import Path
 
@@ -64,6 +65,7 @@ INSTALLED_APPS = [
     "payments",
     "functions",
     "workspaces",
+    "api_keys",
 ]
 
 MIDDLEWARE = [
@@ -97,7 +99,9 @@ TEMPLATES = [
 ]
 
 templates = Jinja2Templates(directory="templates")
-templates.env.globals["humanize"] = humanize
+templates.env.globals.update(
+    dict(humanize=humanize, datetime=datetime, settings=globals())
+)
 
 
 # needed to override django admin templates
@@ -124,6 +128,10 @@ try:
             "PORT": PGPORT,
             "CONN_HEALTH_CHECKS": True,
             "CONN_MAX_AGE": None,
+            # https://docs.djangoproject.com/en/5.1/ref/databases/#server-side-cursors
+            "DISABLE_SERVER_SIDE_CURSORS": config(
+                "DISABLE_SERVER_SIDE_CURSORS", cast=bool, default=False
+            ),
         }
     }
 except UndefinedValueError:
@@ -190,6 +198,20 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+if not DEBUG:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+        },
+    }
+
 # Gooey settings
 #
 
@@ -224,6 +246,15 @@ if not firebase_admin._apps:
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
+GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
+HEADER_LINKS = [
+    ("/explore/", "Explore"),
+    ("https://docs.gooey.ai", "Docs"),
+    ("/api/", "API"),
+    ("https://blog.gooey.ai", "Blog"),
+    ("/pricing", "Pricing"),
+    ("https://www.help.gooey.ai/contact", "Contact"),
+]
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
@@ -265,6 +296,7 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")
+ADMINS = [("Devs", "devs+django@gooey.ai")]
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SALES_EMAIL = "Gooey.AI Sales <sales@gooey.ai>"
 PAYMENT_EMAIL = "Gooey.AI Payments <payment-support@gooey.ai>"
@@ -284,6 +316,10 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
 SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
 SAFETY_CHECKER_BILLING_EMAIL = config(
     "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
+)
+
+INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID = config(
+    "INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID", "59yem9i3iet5"
 )
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)

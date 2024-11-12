@@ -38,7 +38,7 @@ def send_invitation_email(invitation_pk: int):
 
 @app.task
 def send_added_to_workspace_email(workspace_id: int, user_id: int):
-    from routers.account import workspaces_route
+    from routers.account import members_route
     from workspaces.models import Workspace
 
     workspace = Workspace.objects.get(id=workspace_id)
@@ -50,12 +50,12 @@ def send_added_to_workspace_email(workspace_id: int, user_id: int):
     send_email_via_postmark(
         to_address=user.email,
         from_address=settings.SUPPORT_EMAIL,
-        subject=f"[Gooey.AI] You've been added to a new Workspace!",
+        subject="[Gooey.AI] You've been added to a new Workspace!",
         html_body=templates.get_template("auto_added_to_workspace_email.html").render(
             settings=settings,
             user=user,
             workspace=workspace,
-            workspaces_url=get_app_route_url(workspaces_route),
+            workspaces_url=get_app_route_url(members_route),
         ),
         message_stream="outbound",
     )

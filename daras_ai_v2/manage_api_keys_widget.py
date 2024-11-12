@@ -1,22 +1,18 @@
-import datetime
+import typing
 
 import gooey_gui as gui
+from api_keys.models import ApiKey
 from app_users.models import AppUser
-from daras_ai_v2 import db
-from daras_ai_v2.copy_to_clipboard_button_widget import (
-    copy_to_clipboard_button,
-)
-from daras_ai_v2.crypto import (
-    PBKDF2PasswordHasher,
-    safe_preview,
-    get_random_api_key,
-)
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
 
 
-def manage_api_keys(user: AppUser):
+def manage_api_keys(workspace: "Workspace", user: AppUser):
     gui.write(
-        """
-Your secret API keys are listed below.
+        f"""
+{workspace.display_name(current_user=user)} API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
 
 Do not share your API key with others, or expose it in the browser or other client-side code.
@@ -26,27 +22,25 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
-    api_keys = _load_api_keys(db_collection, user)
+    api_keys = list(workspace.api_keys.order_by("-created_at"))
 
     table_area = gui.div()
 
     if gui.button("＋ Create new secret key"):
-        doc = _generate_new_key_doc()
-        doc["uid"] = user.uid
-        api_keys.append(doc)
-        db_collection.add(doc)
+        api_key = generate_new_api_key(workspace=workspace, user=user)
+        api_keys.insert(0, api_key)
 
     with table_area:
         import pandas as pd
 
         gui.table(
             pd.DataFrame.from_records(
-                columns=["Secret Key (Preview)", "Created At"],
+                columns=["Secret Key (Preview)", "Created At", "Created By"],
                 data=[
                     (
-                        api_key["secret_key_preview"],
-                        api_key["created_at"].strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                        api_key.preview,
+                        api_key.created_at.strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                        api_key.created_by and api_key.created_by.full_name() or "",
                     )
                     for api_key in api_keys
                 ],
@@ -54,23 +48,11 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         )
 
 
-def _load_api_keys(db_collection, user):
-    return [
-        snap.to_dict()
-        for snap in db_collection.where("uid", "==", user.uid)
-        .order_by("created_at")
-        .get()
-    ]
-
-
-def _generate_new_key_doc() -> dict:
-    new_api_key = get_random_api_key()
-    hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(new_api_key)
-    created_at = datetime.datetime.utcnow()
+def generate_new_api_key(workspace: "Workspace", user: AppUser) -> ApiKey:
+    api_key, secret_key = ApiKey.objects.create_api_key(workspace, created_by=user)
 
     gui.success(
-        f"""
+        """
 ##### API key generated
 
 Please save this secret key somewhere safe and accessible.
@@ -84,17 +66,13 @@ If you lose this secret key, you'll need to generate a new one.
             "recipe url",
             label_visibility="collapsed",
             disabled=True,
-            value=new_api_key,
+            value=secret_key,
         )
     with col2:
         copy_to_clipboard_button(
             "📎 Copy Secret Key",
-            value=new_api_key,
+            value=secret_key,
             style="height: 3.2rem",
         )
 
-    return {
-        "secret_key_hash": secret_key_hash,
-        "secret_key_preview": safe_preview(new_api_key),
-        "created_at": created_at,
-    }
+    return api_key

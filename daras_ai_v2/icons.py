@@ -16,7 +16,8 @@ preview = '<i class="fa-solid fa-eye"></i>'
 add = '<i class="fa-regular fa-add"></i>'
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'
-fork_lg = '<i class="fa fa-code-fork fa-lg"></i>'
+more_options = '<i class="fa-solid fa-ellipsis"></i>'
+fork = '<i class="fa-regular fa-code-fork"></i>'
 delete = '<i class="fa-solid fa-trash-can"></i>'
 time = '<i class="fa-regular fa-clock"></i>'
 email = '<i class="fa-solid fa-envelope"></i>'
@@ -26,9 +27,13 @@ admin = '<i class="fa-solid fa-shield-halved"></i>'
 remove_user = '<i class="fa-solid fa-user-minus"></i>'
 add_user = '<i class="fa-solid fa-user-plus"></i>'
 home = '<i class="fa-regular fa-home"></i>'
+notes = '<i class="fa-regular fa-money-check-pen"></i>'
+lock = '<i class="fa-solid fa-lock"></i>'
+globe = '<i class="fa-regular fa-globe"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
+github_alt = '<i class="fa-brands fa-github-alt"></i>'
 
 # cards
 card_icons = {

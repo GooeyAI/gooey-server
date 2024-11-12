@@ -29,26 +29,27 @@ def billing_page(workspace: "Workspace"):
     render_payments_setup()
 
     if workspace.subscription and workspace.subscription.is_paid():
-        render_current_plan(workspace)
+        with gui.div(className="mb-5"):
+            render_current_plan(workspace)
 
-    with gui.div(className="my-5"):
+    with gui.div(className="mb-5"):
         render_credit_balance(workspace)
 
-    with gui.div(className="my-5"):
+    with gui.div(className="mb-5"):
         selected_payment_provider = render_all_plans(workspace)
 
-    with gui.div(className="my-5"):
+    with gui.div(className="mb-5"):
         render_addon_section(workspace, selected_payment_provider)
 
     if workspace.subscription:
         if workspace.subscription.payment_provider == PaymentProvider.STRIPE:
-            with gui.div(className="my-5"):
+            with gui.div(className="mb-5"):
                 render_auto_recharge_section(workspace)
 
-        with gui.div(className="my-5"):
+        with gui.div(className="mb-5"):
             render_payment_information(workspace)
 
-    with gui.div(className="my-5"):
+    with gui.div(className="mb-5"):
         render_billing_history(workspace)
 
 

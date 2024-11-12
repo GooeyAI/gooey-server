@@ -1,11 +1,24 @@
-import traceback
+__import__("gooeysite.wsgi")  # Note: this must always be at the top
 
+import logging
+import traceback
+from time import time
+
+import anyio
+from decouple import config
+from fastapi import FastAPI
 from fastapi.exception_handlers import (
     http_exception_handler,
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
+from starlette._utils import is_async_callable
 from starlette.exceptions import HTTPException
+from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.status import (
@@ -13,36 +26,15 @@ from starlette.status import (
     HTTP_405_METHOD_NOT_ALLOWED,
 )
 
-from daras_ai_v2.github_tools import github_url_for_exc
-from daras_ai_v2.pydantic_validation import convert_errors
-from daras_ai_v2.settings import templates
-from gooeysite import wsgi
-
-assert wsgi
-
-import logging
-
-import anyio
-from decouple import config
-
-
-from time import time
-
-from fastapi.routing import APIRoute
-from starlette._utils import is_async_callable
-
-from gooeysite.bg_db_conn import db_middleware
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
+import url_shortener.routers as url_shortener
 from auth.auth_backend import (
     SessionAuthBackend,
 )
 from daras_ai_v2 import settings
+from daras_ai_v2.github_tools import github_url_for_exc
+from daras_ai_v2.pydantic_validation import convert_errors
+from daras_ai_v2.settings import templates
+from gooeysite.bg_db_conn import db_middleware
 from routers import (
     account,
     facebook_api,
@@ -56,7 +48,6 @@ from routers import (
     twilio_api,
     static_pages,
 )
-import url_shortener.routers as url_shortener
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 

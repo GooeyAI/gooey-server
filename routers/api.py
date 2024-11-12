@@ -1,7 +1,6 @@
 import json
 import os
 import os.path
-import os.path
 import typing
 
 import gooey_gui as gui
@@ -28,6 +27,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 
+from api_keys.models import ApiKey
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
 from bots.models import RetentionPolicy, Workflow
@@ -41,6 +41,8 @@ from daras_ai_v2.base import (
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
 from routers.custom_api_router import CustomAPIRouter
+from workspaces.models import Workspace
+from workspaces.widgets import set_current_workspace
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
@@ -156,13 +158,14 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     def run_api_json(
         request: Request,
         page_request: request_model,
-        user: AppUser = Depends(api_auth_header),
+        api_key: ApiKey = Depends(api_auth_header),
     ):
         result, sr = submit_api_call(
             page_cls=page_cls,
             query_params=dict(request.query_params),
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
-            current_user=user,
+            current_user=api_key.created_by,
+            workspace=api_key.workspace,
             request_body=page_request.dict(exclude_unset=True),
             enable_rate_limits=True,
         )
@@ -180,14 +183,14 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_form(
         request: Request,
-        user: AppUser = Depends(api_auth_header),
+        api_key: ApiKey = Depends(api_auth_header),
         form_data=fastapi_request_form,
         page_request_json: str = Form(alias="json"),
     ):
         # parse form data
         page_request = _parse_form_data(request_model, form_data, page_request_json)
         # call regular json api
-        return run_api_json(request, page_request=page_request, user=user)
+        return run_api_json(request, page_request=page_request, api_key=api_key)
 
     endpoint = endpoint.replace("v2", "v3")
     response_model = AsyncApiResponseModelV3
@@ -205,13 +208,14 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request: Request,
         response: Response,
         page_request: request_model,
-        user: AppUser = Depends(api_auth_header),
+        api_key: ApiKey = Depends(api_auth_header),
     ):
         result, sr = submit_api_call(
             page_cls=page_cls,
             query_params=dict(request.query_params),
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
-            current_user=user,
+            current_user=api_key.created_by,
+            workspace=api_key.workspace,
             request_body=page_request.dict(exclude_unset=True),
             enable_rate_limits=True,
         )
@@ -232,7 +236,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     def run_api_form_async(
         request: Request,
         response: Response,
-        user: AppUser = Depends(api_auth_header),
+        api_key: ApiKey = Depends(api_auth_header),
         form_data=fastapi_request_form,
         page_request_json: str = Form(alias="json"),
     ):
@@ -240,7 +244,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request = _parse_form_data(request_model, form_data, page_request_json)
         # call regular json api
         return run_api_json_async(
-            request, response=response, page_request=page_request, user=user
+            request, response=response, page_request=page_request, api_key=api_key
         )
 
     response_model = create_model(
@@ -258,8 +262,9 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def get_run_status(
         run_id: str,
-        user: AppUser = Depends(api_auth_header),
+        api_key: ApiKey = Depends(api_auth_header),
     ):
+        user = api_key.created_by
         # init a new page for every request
         self = page_cls(user=user, query_params=dict(run_id=run_id, uid=user.uid))
         sr = self.current_sr
@@ -333,6 +338,7 @@ def submit_api_call(
     query_params: dict,
     retention_policy: RetentionPolicy = None,
     current_user: AppUser,
+    workspace: Workspace,
     request_body: dict,
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
@@ -340,6 +346,7 @@ def submit_api_call(
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
     page = page_cls(user=current_user, query_params=query_params)
+    set_current_workspace(page.request.session, workspace.id)
 
     # get saved state from db
     state = page.current_sr_to_session_state()
@@ -427,9 +434,8 @@ class BalanceResponse(BaseModel):
 
 
 @app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
-def get_balance(user: AppUser = Depends(api_auth_header)):
-    workspace = user.get_or_create_personal_workspace()[0]
-    return BalanceResponse(balance=workspace.balance)
+def get_balance(api_key: ApiKey = Depends(api_auth_header)):
+    return BalanceResponse(balance=api_key.workspace.balance)
 
 
 @app.get("/status")

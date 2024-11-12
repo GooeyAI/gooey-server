@@ -164,9 +164,8 @@ def render_title_breadcrumb_share(
                         ),
                     )
 
-            author = AppUser.objects.filter(uid=bi.billing_account_uid).first()
             VideoBotsPage.render_author(
-                author,
+                bi.created_by,
                 show_as_link=current_user and VideoBotsPage.is_user_admin(current_user),
             )
 

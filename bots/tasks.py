@@ -7,7 +7,6 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from loguru import logger
 
-from app_users.models import AppUser
 from bots.models import (
     Message,
     CHATML_ROLE_ASSISSTANT,
@@ -25,7 +24,6 @@ from daras_ai_v2.slack_bot import (
 )
 from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton, messages_as_prompt
 
 MAX_PROMPT_LEN = 100_000
@@ -61,9 +59,6 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         msg.role == CHATML_ROLE_ASSISSTANT
     ), f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
 
-    billing_account = AppUser.objects.get(
-        uid=msg.conversation.bot_integration.billing_account_uid
-    )
     analysis_sr = anal.get_active_saved_run()
     variables = analysis_sr.state.get("variables", {})
 
@@ -89,7 +84,8 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
 
     # make the api call
     result, sr = analysis_sr.submit_api_call(
-        current_user=billing_account,
+        workspace=msg.conversation.bot_integration.workspace,
+        current_user=msg.conversation.bot_integration.created_by,
         request_body=dict(variables=variables),
         parent_pr=anal.published_run,
     )

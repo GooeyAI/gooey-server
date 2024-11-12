@@ -10,7 +10,6 @@ from twilio.twiml import TwiML
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
-from app_users.models import AppUser
 from bots.models import Conversation, BotIntegration
 from daras_ai_v2.asr import normalised_lang_in_collection
 from daras_ai_v2.bots import msg_handler
@@ -21,7 +20,6 @@ from daras_ai_v2.fastapi_tricks import (
 )
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.twilio_bot import TwilioVoice
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.custom_api_router import CustomAPIRouter
 
@@ -263,7 +261,8 @@ def resp_say_or_tts_play(
                 {**bot.saved_run.state, "text_prompt": text}
             ).dict()
             result, sr = TextToSpeechPage.get_root_pr().submit_api_call(
-                current_user=AppUser.objects.get(uid=bot.billing_account_uid),
+                current_user=bot.current_user,
+                workspace=bot.workspace,
                 request_body=tts_state,
             )
             # wait for the TTS to finish

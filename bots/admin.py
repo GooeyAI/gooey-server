@@ -130,7 +130,8 @@ class BotIntegrationQuerySetInline(admin.TabularInline):
 class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
         "name",
-        "billing_account_uid",
+        "workspace__name",
+        "created_by__display_name",
         "user_language",
         "fb_page_id",
         "fb_page_name",
@@ -150,12 +151,13 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "get_display_name",
+        "workspace",
+        "created_by",
         "platform",
         "wa_phone_number",
         "twilio_phone_number",
         "created_at",
         "updated_at",
-        "billing_account_uid",
         "saved_run",
         "published_run",
         "has_analysis_runs",
@@ -164,7 +166,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     form = BotIntegrationAdminForm
 
-    autocomplete_fields = ["saved_run", "published_run"]
+    autocomplete_fields = ["saved_run", "published_run", "workspace", "created_by"]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
@@ -192,9 +194,11 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "name",
                     "saved_run",
                     "published_run",
-                    "billing_account_uid",
+                    "workspace",
+                    "created_by",
                     "user_language",
                     "api_integration_stats_url",
+                    "billing_account_uid",
                 ],
             },
         ),

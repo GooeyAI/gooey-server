@@ -15,15 +15,17 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from daras_ai_v2 import icons
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
-from functions.models import CalledFunction, CalledFunctionResponse
+from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
-    from daras_ai_v2.base import BasePage
     import celery.result
+    from daras_ai_v2.base import BasePage
+    from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
@@ -38,20 +40,23 @@ class PublishedRunVisibility(models.IntegerChoices):
     def help_text(self):
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return "Only me + people with a link"
+                return f"{self.get_icon()} Only me + people with a link"
             case PublishedRunVisibility.PUBLIC:
-                return "Public"
-            case _:
-                return self.label
+                return f"{self.get_icon()} Public"
+
+    def get_icon(self):
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return icons.lock
+            case PublishedRunVisibility.PUBLIC:
+                return icons.globe
 
     def get_badge_html(self):
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return '<i class="fa-regular fa-lock"></i> Private'
+                return f"{self.get_icon()} Private"
             case PublishedRunVisibility.PUBLIC:
-                return '<i class="fa-regular fa-globe"></i> Public'
-            case _:
-                raise NotImplementedError(self)
+                return f"{self.get_icon()} Public"
 
 
 class Platform(models.IntegerChoices):
@@ -65,9 +70,9 @@ class Platform(models.IntegerChoices):
     def get_icon(self):
         match self:
             case Platform.WEB:
-                return f'<i class="fa-regular fa-globe"></i>'
+                return '<i class="fa-regular fa-globe"></i>'
             case Platform.TWILIO:
-                return f'<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
+                return '<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
             case _:
                 return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
 
@@ -288,7 +293,7 @@ class SavedRun(models.Model):
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "hidden"]),
-            models.Index(fields=["workflow", "uid", "updated_at"]),
+            models.Index(fields=["workflow", "uid", "updated_at", "workspace"]),
         ]
 
     def __str__(self):
@@ -362,11 +367,12 @@ class SavedRun(models.Model):
     def submit_api_call(
         self,
         *,
-        current_user: AppUser,
+        workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
         parent_pr: "PublishedRun" = None,
+        current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -385,6 +391,7 @@ class SavedRun(models.Model):
                 kwds=dict(
                     page_cls=page_cls,
                     query_params=query_params,
+                    workspace=workspace,
                     current_user=current_user,
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
@@ -427,7 +434,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def add_fb_pages_for_user(
-        self, uid: str, fb_pages: list[dict]
+        self, created_by: AppUser, workspace: "Workspace", fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
@@ -442,7 +449,8 @@ class BotIntegrationQuerySet(models.QuerySet):
                 )
             except BotIntegration.DoesNotExist:
                 bi = BotIntegration(fb_page_id=fb_page_id)
-            bi.billing_account_uid = uid
+            bi.created_by = created_by
+            bi.workspace = workspace
             bi.fb_page_name = fb_page["name"]
             # bi.fb_user_access_token = user_access_token
             bi.fb_page_access_token = fb_page["access_token"]
@@ -459,13 +467,6 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.name = bi.fb_page_name
             bi.save()
             saved.append(bi)
-        # # delete pages that are no longer connected for this user
-        # self.filter(
-        #     Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-        #     billing_account_uid=uid,
-        # ).exclude(
-        #     id__in=[bi.id for bi in saved],
-        # ).delete()
         return saved
 
 
@@ -500,8 +501,19 @@ class BotIntegration(models.Model):
         help_text="The saved run that the bot is based on",
     )
     billing_account_uid = models.TextField(
-        help_text="The gooey account uid where the credits will be deducted from",
-        db_index=True,
+        help_text="(Deprecated)", db_index=True, blank=True, default=""
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="botintegrations",
+        null=True,
+    )
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        related_name="botintegrations",
+        null=True,
     )
     user_language = models.TextField(
         default="",
@@ -723,7 +735,7 @@ class BotIntegration(models.Model):
             ("twilio_phone_number", "twilio_account_sid"),
         ]
         indexes = [
-            models.Index(fields=["billing_account_uid", "platform"]),
+            models.Index(fields=["workspace", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 
@@ -1627,6 +1639,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1639,6 +1652,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 **kwargs,
                 saved_run=saved_run,
                 user=user,
+                workspace=workspace,
                 title=title,
                 notes=notes,
                 visibility=visibility,
@@ -1652,6 +1666,7 @@ class PublishedRunQuerySet(models.QuerySet):
         published_run_id: str,
         saved_run: SavedRun,
         user: AppUser | None,
+        workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1662,6 +1677,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 published_run_id=published_run_id,
                 created_by=user,
                 last_edited_by=user,
+                workspace=workspace,
                 title=title,
             )
             pr.add_version(
@@ -1711,6 +1727,12 @@ class PublishedRun(models.Model):
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
         null=True,
     )
 
@@ -1769,6 +1791,7 @@ class PublishedRun(models.Model):
         self,
         *,
         user: AppUser,
+        workspace: "Workspace",
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
@@ -1778,6 +1801,7 @@ class PublishedRun(models.Model):
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
             user=user,
+            workspace=workspace,
             title=title,
             notes=notes,
             visibility=visibility,
@@ -1794,8 +1818,9 @@ class PublishedRun(models.Model):
         user: AppUser | None,
         saved_run: SavedRun,
         visibility: PublishedRunVisibility,
-        title: str,
-        notes: str,
+        title: str = "",
+        notes: str = "",
+        change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1808,6 +1833,7 @@ class PublishedRun(models.Model):
                 title=title,
                 notes=notes,
                 visibility=visibility,
+                change_notes=change_notes,
             )
             version.save()
             self.update_fields_to_latest_version()
@@ -1839,12 +1865,14 @@ class PublishedRun(models.Model):
     def submit_api_call(
         self,
         *,
-        current_user: AppUser,
+        workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
+        current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         return self.saved_run.submit_api_call(
+            workspace=workspace,
             current_user=current_user,
             request_body=request_body,
             enable_rate_limits=enable_rate_limits,
@@ -1873,6 +1901,7 @@ class PublishedRunVersion(models.Model):
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
+    change_notes = models.TextField(blank=True, default="")
     visibility = models.IntegerField(
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
