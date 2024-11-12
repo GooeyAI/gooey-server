@@ -62,7 +62,7 @@ def invitation_page(
                 className="d-block d-md-flex align-items-center justify-content-center mb-4"
             ):
                 gui.image(
-                    src=invite.workspace.logo or DEFAULT_WORKSPACE_LOGO,
+                    src=invite.workspace.get_photo(),
                     className="rounded",
                     style={"height": "70px", "width": "70px", "object-fit": "contain"},
                 )
@@ -159,7 +159,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
         with gui.div(className="d-flex align-items-center"):
             gui.image(
-                workspace.photo_url or DEFAULT_WORKSPACE_LOGO,
+                workspace.get_photo(),
                 className="my-0 me-4 rounded",
                 style={"width": "128px", "height": "128px", "object-fit": "contain"},
             )

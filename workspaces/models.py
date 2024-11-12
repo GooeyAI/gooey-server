@@ -29,6 +29,9 @@ if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
 
 
+DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
+
+
 def validate_workspace_domain_name(value: str):
     if value in COMMON_EMAIL_DOMAINS:
         raise ValidationError("This domain name is reserved")
@@ -150,6 +153,12 @@ class Workspace(SafeDeleteModel):
 
     def get_slug(self):
         return slugify(self.display_name())
+
+    def get_photo(self) -> str | None:
+        if self.is_personal:
+            return self.created_by and self.created_by.photo_url
+        else:
+            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
     @transaction.atomic()
     def create_with_owner(self):

@@ -23,7 +23,7 @@ from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
-from workspaces.views import DEFAULT_WORKSPACE_LOGO, invitation_page, workspaces_page
+from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace
 
 app = CustomAPIRouter()
@@ -203,7 +203,7 @@ def invitation_route(
             url=str(request.url),
             title=f"Join {invite.workspace.display_name()} • Gooey.AI",
             description=f"Invitation to join {invite.workspace.display_name()}",
-            image=invite.workspace.logo or DEFAULT_WORKSPACE_LOGO,
+            image=invite.workspace.get_photo(),
             robots="noindex,nofollow",
         )
     )
