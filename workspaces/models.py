@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import json
 import typing
 from datetime import timedelta
@@ -154,12 +153,6 @@ class Workspace(SafeDeleteModel):
 
     def get_slug(self):
         return slugify(self.display_name())
-
-    def get_photo(self) -> str | None:
-        if self.is_personal:
-            return self.created_by and self.created_by.photo_url
-        else:
-            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
     @transaction.atomic()
     def create_with_owner(self):
@@ -322,23 +315,18 @@ class Workspace(SafeDeleteModel):
             return f"{self.created_by.first_name_possesive()} Workspace"
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
-        def _html_img(src: str) -> str:
-            return f"""
-            <img src="{html.escape(src)}"
-                 style="height: 25px; min-width: 25px; max-width: 25px;
-                        object-fit: cover; border-radius: 12.5px;">
-            """
-
         if photo_url := self.get_photo():
-            return _html_img(photo_url)
-
+            return f'<img src="{photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
         if self.is_personal:
-            if current_user and current_user.id == self.created_by_id:
-                return icons.home
-            else:
-                return icons.user
+            return icons.home
         else:
-            return _html_img(DEFAULT_WORKSPACE_PHOTO_URL)
+            return icons.company
+
+    def get_photo(self) -> str | None:
+        if self.is_personal:
+            return self.created_by and self.created_by.photo_url
+        else:
+            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
 
 class WorkspaceMembership(SafeDeleteModel):

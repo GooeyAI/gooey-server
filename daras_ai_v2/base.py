@@ -71,9 +71,8 @@ from payments.auto_recharge import (
 )
 from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.widgets import get_current_workspace
 from workspaces.models import Workspace
-
+from workspaces.widgets import get_current_workspace
 
 DEFAULT_META_IMG = (
     # Small
@@ -380,8 +379,9 @@ class BasePage:
                             is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
 
-                if not is_root_example:
-                    self._render_author_as_breadcrumb()
+                self._render_author_as_breadcrumb(
+                    is_example=is_example, is_root_example=is_root_example
+                )
 
             with gui.div(className="d-flex align-items-center"):
                 if request_changed or (can_save and not is_example):
@@ -400,38 +400,36 @@ class BasePage:
         elif is_root_example and self.tab != RecipeTabs.integrations:
             gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
 
-    def _render_author_as_breadcrumb(self):
-        sr, pr = self.current_sr_pr
-        is_example = pr.saved_run == sr
-
+    def _render_author_as_breadcrumb(self, *, is_example: bool, is_root_example: bool):
+        if is_root_example:
+            return
         if is_example:
-            self.render_author(pr.workspace)
+            workspace = self.current_pr.workspace
+        else:
+            workspace = self.current_sr.workspace
+        if not workspace:
             return
 
-        if not self.current_sr.workspace or self.current_sr.workspace.is_personal:
-            # no workspace or a personal workspace
-            self.render_author(self.current_sr_user)
-            return
+        with gui.breadcrumbs(divider="▶"):
+            with gui.tag("li", className="breadcrumb-item"):
+                self.render_workspace_author(workspace)
 
-        # team workspace
-        with gui.div(className="d-flex align-items-center container-margin-reset"):
-            self.render_author(self.current_sr.workspace)
+            # don't render the user's name for examples and personal workspaces
+            if is_example or workspace.is_personal:
+                return
 
-            if user := self.current_sr_user:
-                full_name = user.full_name()
-            else:
-                full_name = "Deleted User"
-
-            if handle := (self.current_sr_user and self.current_sr_user.handle):
-                linkto = gui.link(to=handle.get_app_url())
-            else:
-                linkto = gui.dummy()
-
-            with linkto, gui.div(className="ms-1"):
-                gui.caption(
-                    f'<i class="fa-light fa-chevron-right"></i>&nbsp;{html.escape(full_name)}',
-                    unsafe_allow_html=True,
-                )
+            with gui.tag(
+                "li",
+                className="breadcrumb-item d-flex align-items-center container-margin-reset",
+            ):
+                if user := self.current_sr_user:
+                    linkto = user.handle and gui.link(to=user.handle.get_app_url())
+                    full_name = user.full_name()
+                else:
+                    linkto = None
+                    full_name = "Deleted User"
+                with linkto:
+                    gui.caption(full_name)
 
     def can_user_save_run(
         self,
@@ -1389,33 +1387,53 @@ class BasePage:
         pass
 
     @classmethod
-    def render_author(
+    def render_workspace_author(
         cls,
-        workspace_or_user: Workspace | AppUser | None,
+        workspace: Workspace | None,
         *,
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
-        current_user: AppUser | None = None,
     ):
-        if not workspace_or_user:
+        if not workspace:
             return
-
-        link = None
-        if isinstance(workspace_or_user, Workspace):
-            workspace = workspace_or_user
-            photo = workspace.get_photo()
-            name = workspace.display_name(current_user=current_user)
-            if show_as_link and workspace.is_personal and workspace.created_by.handle:
-                link = workspace.created_by.handle.get_app_url()
+        photo = workspace.get_photo()
+        if workspace.is_personal:
+            name = workspace.created_by.display_name
         else:
-            user = workspace_or_user
-            photo = user.photo_url
-            name = user.full_name()
-            if show_as_link and user.handle:
-                link = user.handle.get_app_url()
+            name = workspace.display_name()
+        if show_as_link and workspace.is_personal and workspace.created_by.handle:
+            link = workspace.created_by.handle.get_app_url()
+        else:
+            link = None
+        return cls._render_author(
+            photo=photo,
+            name=name,
+            link=link,
+            image_size=image_size,
+            responsive=responsive,
+            text_size=text_size,
+        )
 
+    @classmethod
+    def render_author(
+        cls,
+        user: AppUser | None,
+        *,
+        image_size: str = "30px",
+        responsive: bool = True,
+        show_as_link: bool = True,
+        text_size: str | None = None,
+    ):
+        if not user:
+            return
+        photo = user.photo_url
+        name = user.full_name()
+        if show_as_link and user.handle:
+            link = user.handle.get_app_url()
+        else:
+            link = None
         return cls._render_author(
             photo=photo,
             name=name,
@@ -2201,7 +2219,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if published_run.workspace:
             with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                self.render_author(
+                self.render_workspace_author(
                     published_run.workspace,
                     image_size="20px",
                     text_size="0.9rem",
