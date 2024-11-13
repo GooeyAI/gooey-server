@@ -569,10 +569,8 @@ class BasePage:
                 checked_by_default=False,
             )
 
-        if (
-            self.current_workspace.is_personal
-            and self.request.user.get_workspaces().count() > 1
-        ):
+        workspaces = self.request.user.cached_workspaces
+        if workspaces and self.current_pr.workspace not in workspaces:
             with gui.div(className="alert alert-warning mb-0 mt-4"):
                 duplicate = gui.button(
                     f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
@@ -581,14 +579,9 @@ class BasePage:
                 ref = gui.use_alert_dialog(key="publish-modal")
                 if duplicate:
                     self.clear_publish_form()
-                    gui.session_state["published_run_workspace"] = (
-                        self.request.user.get_workspaces()
-                        .filter(is_personal=False)
-                        .first()
-                        .id
-                    )
                     ref.set_open(True)
                 if ref.is_open:
+                    gui.session_state["published_run_workspace"] = workspaces[-1].id
                     return self._render_publish_dialog(ref=ref)
 
         with gui.div(className="d-flex justify-content-between pt-4"):
@@ -695,7 +688,7 @@ class BasePage:
             modal_title=f"#### {label} Workflow",
             large=True,
         ):
-            self._render_publish_form(sr=sr, pr=pr)
+            self._render_publish_form(sr=sr, pr=pr, dialog=ref)
 
     @staticmethod
     def clear_publish_form():
@@ -705,8 +698,10 @@ class BasePage:
 
     def _render_publish_form(
         self,
+        *,
         sr: SavedRun,
         pr: PublishedRun,
+        dialog: gui.AlertDialogRef,
     ):
         if pr.is_root() and self.is_current_user_admin():
             with gui.div(className="text-danger"):
@@ -722,10 +717,10 @@ class BasePage:
         selected_workspace = self._render_workspace_selector(
             key="published_run_workspace"
         )
-        is_update_mode = selected_workspace.id == self.current_pr.workspace_id
+        user_can_edit = selected_workspace.id == self.current_pr.workspace_id
 
         with form_container:
-            if is_update_mode:
+            if user_can_edit:
                 title = pr.title or self.title
                 notes = pr.notes
             else:
@@ -752,7 +747,7 @@ class BasePage:
                     )
 
         with gui.div(className="d-flex justify-content-end mt-4"):
-            if is_update_mode:
+            if user_can_edit:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
                     type="secondary",
@@ -777,7 +772,7 @@ class BasePage:
             # neither action was taken - nothing to do now
             return
 
-        is_root_published_run = is_update_mode and pr.is_root()
+        is_root_published_run = user_can_edit and pr.is_root()
         if not is_root_published_run:
             try:
                 self._validate_published_run_title(published_run_title)
@@ -794,7 +789,7 @@ class BasePage:
         if pressed_save_as_new:
             if (
                 selected_workspace != self.current_workspace
-                and selected_workspace in set(self.request.user.get_workspaces())
+                and selected_workspace in self.request.user.cached_workspaces
             ):
                 set_current_workspace(self.request.session, selected_workspace.id)
 
@@ -808,6 +803,9 @@ class BasePage:
                 visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
+            if not self.can_user_edit_published_run(self.current_pr):
+                gui.error("You don't have permission to update this workflow")
+                return
             updates = dict(
                 saved_run=sr,
                 title=published_run_title.strip(),
@@ -822,11 +820,12 @@ class BasePage:
             )
         raise gui.RedirectException(pr.get_app_url())
 
-    def _render_workspace_selector(self, key: str) -> "Workspace":
+    def _render_workspace_selector(self, *, key: str) -> "Workspace":
         if not self.can_user_see_workspaces():
             return self.current_workspace
 
-        workspace_options = {w.id: w for w in self.request.user.get_workspaces()}
+        workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
+
         if self.current_pr.workspace_id and self.can_user_edit_published_run(
             self.current_pr
         ):
@@ -2556,14 +2555,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_cost_note(self) -> str | None:
         pass
 
-    def is_current_user_admin(self) -> bool:
-        return self.is_user_admin(self.request.user)
-
     def can_user_see_workspaces(self) -> bool:
         return bool(self.request.user) and (
-            self.is_current_user_admin()
-            or self.request.user.get_workspaces().count() > 1
+            self.is_current_user_admin() or len(self.request.user.cached_workspaces) > 1
         )
+
+    def is_current_user_admin(self) -> bool:
+        return self.is_user_admin(self.request.user)
 
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:

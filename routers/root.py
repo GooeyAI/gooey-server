@@ -43,7 +43,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from workspaces.widgets import workspace_selector
+from workspaces.widgets import global_workspace_selector
 
 app = CustomAPIRouter()
 
@@ -736,7 +736,7 @@ def page_wrapper(request: Request, className=""):
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
-                    current_workspace = workspace_selector(
+                    current_workspace = global_workspace_selector(
                         request.user, request.session
                     )
                 else:
