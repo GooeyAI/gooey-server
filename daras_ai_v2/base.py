@@ -367,31 +367,31 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        with gui.div(className="d-flex justify-content-between mt-4"):
-            with gui.div(className="d-lg-flex d-block align-items-center"):
-                if not tbreadcrumbs.has_breadcrumbs() and not self.current_sr_user:
-                    self._render_title(tbreadcrumbs.h1_title)
+        with gui.div(className="d-flex justify-content-between align-items-start mt-4"):
+            with gui.div():
+                if tbreadcrumbs.has_breadcrumbs():
+                    with gui.div(
+                        className="d-block d-lg-flex align-items-center pt-2 mb-2"
+                    ):
+                        with gui.div(className="me-3 mb-1 mb-lg-0"):
+                            render_breadcrumbs(
+                                tbreadcrumbs,
+                                is_api_call=(
+                                    sr.is_api_call and self.tab == RecipeTabs.run
+                                ),
+                            )
 
-                if tbreadcrumbs:
-                    with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(
-                            tbreadcrumbs,
-                            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
+                        self._render_author_as_breadcrumb(
+                            is_example=is_example, is_root_example=is_root_example
                         )
 
-                self._render_author_as_breadcrumb(
-                    is_example=is_example, is_root_example=is_root_example
-                )
+                self._render_title(tbreadcrumbs.h1_title)
 
             with gui.div(className="d-flex align-items-center"):
                 if request_changed or (can_save and not is_example):
                     self._render_unpublished_changes_indicator()
 
                 self.render_social_buttons()
-
-        if tbreadcrumbs.has_breadcrumbs() or self.current_sr_user:
-            # only render title here if the above row was not empty
-            self._render_title(tbreadcrumbs.h1_title)
 
         if self.tab != RecipeTabs.run:
             return
@@ -462,11 +462,8 @@ class BasePage:
         gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
-        with gui.div(
-            className="d-none d-lg-flex h-100 align-items-center text-muted ms-2"
-        ):
-            with gui.tag("span", className="d-inline-block"):
-                gui.html("Unpublished changes")
+        with gui.tag("span", className="d-none d-sm-inline-block text-muted"):
+            gui.html("Unpublished changes")
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
