@@ -687,7 +687,7 @@ class BasePage:
 
         with gui.alert_dialog(
             ref=ref,
-            modal_title=f"#### {label} Workflow",
+            modal_title=f"### {label} Workflow",
             large=True,
         ):
             self._render_publish_form(sr=sr, pr=pr, dialog=ref)
@@ -716,6 +716,7 @@ class BasePage:
 
         form_container = gui.div()
 
+        gui.newline()
         selected_workspace = self._render_workspace_selector(
             key="published_run_workspace"
         )
@@ -728,16 +729,20 @@ class BasePage:
             else:
                 title = self._get_default_pr_title()
                 notes = ""
+            gui.write("Title", className="fs-5 container-margin-reset")
             published_run_title = gui.text_input(
-                "###### Title",
+                "",
                 key="published_run_title",
                 value=title,
+                className="mt-1",
             )
+            gui.write("Description", className="fs-5 container-margin-reset")
             published_run_description = gui.text_input(
-                "###### Description",
+                "",
                 key="published_run_description",
                 value=notes,
                 placeholder="An excellent but one line description",
+                className="mt-1",
             )
             with gui.div(className="d-flex align-items-center gap-2"):
                 gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
@@ -836,21 +841,21 @@ class BasePage:
                 self.current_pr.workspace_id: self.current_pr.workspace
             } | workspace_options
 
-        col1, col2 = gui.columns([1, 3])
-        with col1:
-            gui.write("#### Workspace", className="d-block mt-2")
+        with gui.div(className="d-flex gap-3"):
+            with gui.div(className="mt-2"):
+                gui.write("Workspace")
 
-        with col2:
             if len(workspace_options) > 1:
-                workspace_id = gui.selectbox(
-                    "",
-                    key=key,
-                    options=workspace_options,
-                    format_func=lambda w_id: workspace_options[w_id].display_html(
-                        self.request.user
-                    ),
-                )
-                return workspace_options[workspace_id]
+                with gui.div(style=dict(minWidth="300px")):
+                    workspace_id = gui.selectbox(
+                        "",
+                        key=key,
+                        options=workspace_options,
+                        format_func=lambda w_id: workspace_options[w_id].display_html(
+                            self.request.user
+                        ),
+                    )
+                    return workspace_options[workspace_id]
             else:
                 with gui.div(className="p-2 mb-2"):
                     self.render_author(
