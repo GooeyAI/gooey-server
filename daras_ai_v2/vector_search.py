@@ -52,6 +52,7 @@ from daras_ai_v2.functional import (
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
+    is_gdrive_presentation_url,
     url_to_gdrive_file_id,
     gdrive_metadata,
 )
@@ -967,6 +968,11 @@ def get_pdf_num_pages(f_bytes: bytes) -> int:
 
 
 def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
+    
+    # if it's a google drive presentation, add the slide number to the fragment
+    if is_gdrive_presentation_url(furl(url)):      
+        return furl(url).set(fragment_args={"slide": page_num} if page_num else {})
+
     return furl(url).set(fragment_args={"page": page_num} if page_num else {})
 
 
