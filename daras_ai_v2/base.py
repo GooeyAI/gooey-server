@@ -423,7 +423,11 @@ class BasePage:
                 className="breadcrumb-item d-flex align-items-center container-margin-reset",
             ):
                 if user := self.current_sr_user:
-                    linkto = user.handle and gui.link(to=user.handle.get_app_url())
+                    linkto = (
+                        user.handle
+                        and gui.link(to=user.handle.get_app_url())
+                        or gui.dummy()
+                    )
                     full_name = user.full_name()
                 else:
                     linkto = gui.dummy()
