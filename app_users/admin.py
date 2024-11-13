@@ -108,7 +108,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_stripe",
         "personal_workspace",
     ]
-    autocomplete_fields = ["handle"]
+    autocomplete_fields = ["handle", "subscription"]
     inlines = [WorkspaceMembershipInline]
 
     @admin.display(description="User Runs")
