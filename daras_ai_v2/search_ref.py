@@ -1,17 +1,15 @@
 import re
 import typing
 from enum import Enum
+from urllib.parse import quote
 
 import jinja2
+from furl import furl
+from loguru import logger
 from typing_extensions import TypedDict
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
-
-from furl import furl
-from loguru import logger
-from urllib.parse import quote
-import re
 
 
 class SearchReference(TypedDict):
@@ -257,10 +255,7 @@ def markdown_link(title: str, url: str) -> str:
     return f"[{title}]({url})"
 
 
-def html_link(
-    title: str,
-    url: str,
-) -> str:
+def html_link(title: str, url: str) -> str:
     return f'<a target="_blank" href="{url}">{title}</a>'
 
 
@@ -324,7 +319,7 @@ def extract_alpha_segments(text, min_length=20, max_length=200, max_segments=25)
 
     found_segments = re.findall(segment_pattern, text)
     logger.debug(f"Found Possible : {len(found_segments)}")
-    
+
     segment_cnt = 0
     for segment in found_segments:
         if segment_cnt >= max_segments:  # Limit the number of segments to max_segments
@@ -353,9 +348,15 @@ def truncate_to_nearest_space(segment):
     return segment
 
 
-def generate_text_fragment(
-    url, text, min_len=20, max_len=200, max_segments=25, display_char=30
-):
+def generate_text_fragment_url(
+    *,
+    url: str,
+    text: str,
+    min_len: int = 20,
+    max_len: int = 200,
+    max_segments: int = 25,
+    display_char: int = 30,
+) -> str:
     """
     Generates a URL with text fragments based on extracted segments from the provided text.
 
@@ -380,4 +381,4 @@ def generate_text_fragment(
     text_fragment = "#:~:text=" + "&text=".join(
         quote(truncate_to_nearest_space(segment[:display_char])) for segment in segments
     )
-    return str(furl(url).remove(fragment=True))+text_fragment
+    return str(furl(url).remove(fragment=True)) + text_fragment
