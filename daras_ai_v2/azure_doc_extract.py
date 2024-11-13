@@ -12,16 +12,19 @@ from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function
+from loguru import logger
 
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_page_num(pdf_url: str, page_num: int) -> str:
+def azure_doc_extract_page_num(
+    url: str, page_num: int, model_id="prebuilt-layout"
+) -> str:
     if page_num:
         params = dict(pages=str(page_num))
     else:
         params = None
-    pages = azure_doc_extract_pages(pdf_url, params=params)
+    pages = azure_doc_extract_pages(url, params=params, model_id=model_id)
     if pages and pages[0]:
         return str(pages[0])
     else:

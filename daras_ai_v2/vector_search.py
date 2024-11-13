@@ -767,6 +767,12 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
             df = pdf_to_form_reco_df(f_url, f_name, f_bytes, mime_type)
         else:
             return pdf_to_text_pages(f=io.BytesIO(f_bytes))
+    elif (
+        mime_type
+        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ):
+        return pptx_to_text_pages(f=io.BytesIO(f_bytes))
+
     else:
         df = tabular_bytes_to_str_df(
             f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
@@ -817,6 +823,99 @@ def tabular_bytes_to_any_df(
                 f"Unsupported document {mime_type=} ({f_name})"
             )
     return df
+
+
+def pptx_to_text_pages(f: typing.BinaryIO) -> list[str]:
+    """
+    Extracts and converts text, tables, charts, and grouped shapes from a PPTX file into Markdown format.
+    """
+    from pptx import Presentation
+
+    prs = Presentation(f)
+    slides_text = []
+
+    for slide_idx, slide in enumerate(prs.slides, start=1):
+        slide_content = [f"### Slide {slide_idx}:"]  # Markdown heading for slide
+        for shape in slide.shapes:
+            try:
+                if shape.has_text_frame:
+                    text = shape.text.strip()
+                    if text:
+                        slide_content.append(f"  {text}")
+                if shape.has_table:
+                    table_text = pptx_format_table(shape.table)
+                    slide_content.extend(table_text)
+                if shape.has_chart:
+                    chart = shape.chart
+                    chart_title = (
+                        chart.chart_title.text_frame.text
+                        if chart.has_title
+                        else "Chart"
+                    )
+                    chart_text = [f"  {chart_title}:"]
+                    for series in chart.series:
+                        series_text = f"    Series '{series.name}'"
+                        chart_text.append(series_text)
+                    slide_content.extend(chart_text)
+                if shape.shape_type == 6:
+                    group_text = pptx_format_grouped_shape(shape)
+                    slide_content.extend(group_text)
+            except Exception as e:
+                slide_content.append(f"  Error processing shape: {e}")
+
+        slide_text = "\n".join(slide_content)
+        slides_text.append(slide_text)
+
+    return slides_text
+
+
+def pptx_format_table(table) -> list[str]:
+    """
+    Formats a Shape-table into Markdown.
+    """
+    table_text = []
+    if len(table.rows) == 0:
+        return table_text
+
+    header_row = [cell.text.strip() for cell in table.rows[0].cells]
+    num_columns = len(header_row)
+
+    table_text.append(pptx_gen_table_row(header_row))
+    table_text.append(pptx_gen_table_row([":-:" for _ in header_row]))
+
+    for row_idx in range(1, len(table.rows)):
+        row = table.rows[row_idx]
+        row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+        if row_text:
+            table_text.append(pptx_gen_table_row(row_text))
+
+    return table_text
+
+
+def pptx_gen_table_row(row: list[str]) -> str:
+    """
+    Generates a formatted table row for Markdown.
+    """
+    return "| " + " | ".join([c.replace("\n", "<br />") for c in row]) + " |"
+
+
+def pptx_format_grouped_shape(group_shape) -> list[str]:
+    """
+    Iteratively formats grouped shapes, extracting text from each.
+    """
+    group_text = []
+    stack = [group_shape]
+
+    while stack:
+        current_shape = stack.pop()
+        if current_shape.has_text_frame:
+            text = current_shape.text.strip()
+            if text:
+                group_text.append(f"    {text}")
+        if current_shape.shape_type == 6:  # Group shape type
+            stack.extend(reversed(current_shape.shapes))
+
+    return group_text
 
 
 class UnsupportedDocumentError(UserError):
