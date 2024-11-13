@@ -1690,6 +1690,19 @@ class PublishedRunQuerySet(models.QuerySet):
             return pr
 
 
+def get_default_published_run_workspace():
+    from workspaces.models import Workspace
+
+    return Workspace.objects.get_or_create(
+        domain_name="dara.network",
+        defaults=dict(
+            name="Gooey.AI (Dara.network Inc)",
+            created_by=AppUser.objects.filter(email__contains="dara.network").first(),
+            is_paying=True,
+        ),
+    )[0].id
+
+
 class PublishedRun(models.Model):
     # published_run_id was earlier SavedRun.example_id
     published_run_id = models.CharField(
@@ -1732,8 +1745,8 @@ class PublishedRun(models.Model):
 
     workspace = models.ForeignKey(
         "workspaces.Workspace",
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
+        default=get_default_published_run_workspace,
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
