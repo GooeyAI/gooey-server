@@ -462,7 +462,9 @@ class BasePage:
         gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
-        with gui.tag("span", className="d-none d-sm-inline-block text-muted"):
+        with gui.tag(
+            "span", className="d-none d-sm-inline-block text-muted text-nowrap"
+        ):
             gui.html("Unpublished changes")
 
     def _render_options_button_with_dialog(self):
@@ -488,7 +490,7 @@ class BasePage:
                     padding: 6px;
                 }
                 </style>
-                """
+                """.strip()
             )
 
             if self.tab == RecipeTabs.run:
