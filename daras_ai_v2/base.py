@@ -507,7 +507,6 @@ class BasePage:
             not self.current_pr.is_root()
             and self.current_pr.saved_run_id == self.current_sr.id
             and self.can_user_edit_published_run(self.current_pr)
-            and not self._has_request_changed()
         ):
             dialog = gui.use_alert_dialog(key="share-modal")
             icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
