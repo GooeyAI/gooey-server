@@ -1,15 +1,16 @@
 import re
 import typing
 from enum import Enum
+from textwrap import shorten
 from urllib.parse import quote
 
 import jinja2
 from furl import furl
-from loguru import logger
 from typing_extensions import TypedDict
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
+from daras_ai_v2.text_splitter import line_break
 
 
 class SearchReference(TypedDict):
@@ -307,78 +308,31 @@ def generate_footnote_symbol(idx: int) -> str:
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
 
 
-def extract_alpha_segments(text, min_length=20, max_length=200, max_segments=25):
-    """Extracts up to a maximum number of alphanumeric segments from text within a specified length range."""
-    if not text:
-        # logger.debug("Citation: Input text is empty.")
-        return []
-
-    # Regex pattern to match sentences after newlines or punctuation marks
-    segment_pattern = r"(?<=[\n.!?\-\"\'])\s*([A-Za-z0-9\s,'\’]+)"
-    segments = []
-
-    found_segments = re.findall(segment_pattern, text)
-    logger.debug(f"Found Possible : {len(found_segments)}")
-
-    segment_cnt = 0
-    for segment in found_segments:
-        if segment_cnt >= max_segments:  # Limit the number of segments to max_segments
-            break
-
-        segment = segment.strip()
-        if min_length <= len(segment) <= max_length and re.search(
-            r"[A-Za-z0-9,\’]", segment
-        ):
-            segment_cnt += 1
-            segments.append(segment)
-
-    if not segments:
-        logger.debug(
-            "Citation: No valid segments found within the specified length range."
-        )
-
-    return segments
-
-
-def truncate_to_nearest_space(segment):
-    if " " in segment:
-        # logger.debug("Citation: Truncating segment to nearest space. segment=%s", segment)
-        return segment[: segment.rfind(" ")]
-
-    return segment
-
-
 def generate_text_fragment_url(
     *,
     url: str,
     text: str,
-    min_len: int = 20,
-    max_len: int = 200,
-    max_segments: int = 25,
-    display_char: int = 30,
+    min_len: int = 10,
+    max_len: int = 30,
+    max_framents: int = 10,
 ) -> str:
     """
     Generates a URL with text fragments based on extracted segments from the provided text.
-
-    Parameters:
-        url (str): The base URL to append the text fragment to.
-        text (str): The input text to extract segments from.
-        min_len (int): The minimum length for each extracted segment.
-        max_len (int): The maximum length for each extracted segment.
-
-    Returns:
-        str: A URL with appended text fragments.
     """
-    if not url:
-        raise ValueError("URL cannot be empty.")
+    assert url, "URL cannot be empty."
 
-    segments = extract_alpha_segments(text, min_len, max_len, max_segments)
+    # find sentences with at least min_len characters that start with a letter
+    pat = r"([A-z].{%i,})" % min_len + line_break
 
+    segments = [match.group(1) for match in re.finditer(pat, text)]
     if not segments:
-        # logger.debug("Citation: No segments extracted. Returning the original URL.")
-        return url  # Return the original URL if no segments are found
+        # Return the original URL if no segments are found
+        return url
 
-    text_fragment = "#:~:text=" + "&text=".join(
-        quote(truncate_to_nearest_space(segment[:display_char])) for segment in segments
-    )
-    return str(furl(url).remove(fragment=True)) + text_fragment
+    # pick evenly spaced segments, truncate to max_len and url-quote them
+    segments = [
+        quote(shorten(segments[i], width=max_len, placeholder=""))
+        for i in range(0, len(segments), max(1, len(segments) // max_framents))
+    ]
+
+    return str(furl(url).remove(fragment=True)) + "#:~:text=" + "&text=".join(segments)
