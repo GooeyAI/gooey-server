@@ -510,7 +510,9 @@ class BasePage:
             dialog = gui.use_alert_dialog(key="share-modal")
             icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
             if gui.button(
-                f"{icon} Share", className="mb-0 ms-lg-2 px-lg-4", type="secondary"
+                f'{icon} <span class="d-none d-lg-inline">Share</span>',
+                className="mb-0 ms-lg-2 px-lg-4",
+                type="secondary",
             ):
                 dialog.set_open(True)
 
