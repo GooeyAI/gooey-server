@@ -414,7 +414,7 @@ class BasePage:
         if not workspace:
             return
 
-        with gui.breadcrumbs(divider="▶"):
+        with gui.breadcrumbs(divider=""):
             with gui.tag("li", className="breadcrumb-item"):
                 self.render_workspace_author(workspace)
 
@@ -426,6 +426,9 @@ class BasePage:
                 "li",
                 className="breadcrumb-item d-flex align-items-center container-margin-reset",
             ):
+                with gui.tag("small", className="text-muted pe-2"):
+                    gui.html(icons.chevron_right)
+
                 if user := self.current_sr_user:
                     full_name = user.full_name()
                     link = user.handle and user.handle.get_app_url()
