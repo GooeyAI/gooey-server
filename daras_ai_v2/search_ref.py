@@ -322,7 +322,7 @@ def generate_text_fragment_url(
     assert url, "URL cannot be empty."
 
     # find sentences with at least min_len characters that start with a letter
-    pat = r"([A-z].{%i,})" % min_len + line_break
+    pat = r"([a-zA-Z].{%i,})" % min_len + line_break
 
     segments = [match.group(1) for match in re.finditer(pat, text)]
     if not segments:
