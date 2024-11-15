@@ -3,7 +3,7 @@
 </p>
 
 <p>
-  {{ invite.created_by.display_name() }}
+  {{ invite.created_by.display_name }}
   {% if invite.created_by.email %}
   ({{ invite.created_by.email }})
   {% endif %}
@@ -17,7 +17,7 @@
 
 <p>
   Through your Workspace above, you can run the top
-  private and Opensource AI models and collaborate on your
+  private and open source AI models and collaborate on your
   team's <a href="{{ saved_url }}">saved workflows.</a>
   Check out <a href="{{ settings.DOCS_URL }}">{{ settings.DOCS_URL }}</a> too for a
   great set of tutorials and guides.
