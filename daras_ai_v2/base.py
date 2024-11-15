@@ -367,29 +367,24 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        with gui.div(className="d-flex justify-content-between align-items-start mt-4"):
-            left, right = gui.div(), gui.div()
-
-            with left:
-                if tbreadcrumbs.has_breadcrumbs():
-                    with gui.div(
-                        className="d-block d-lg-flex align-items-center pt-2 mb-2"
-                    ):
-                        with gui.div(className="me-3 mb-1 mb-lg-0"):
-                            render_breadcrumbs(
-                                tbreadcrumbs,
-                                is_api_call=(
-                                    sr.is_api_call and self.tab == RecipeTabs.run
-                                ),
-                            )
-
-                        self._render_author_as_breadcrumb(
-                            is_example=is_example, is_root_example=is_root_example
+        with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
+            if tbreadcrumbs.has_breadcrumbs():
+                with gui.div(
+                    className="d-block d-lg-flex align-items-center pt-2 mb-2"
+                ):
+                    with gui.div(className="me-3 mb-1 mb-lg-0"):
+                        render_breadcrumbs(
+                            tbreadcrumbs,
+                            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
-                else:
-                    self._render_title(tbreadcrumbs.h1_title)
 
-            with right, gui.div(className="d-flex align-items-center"):
+                    self._render_author_as_breadcrumb(
+                        is_example=is_example, is_root_example=is_root_example
+                    )
+            else:
+                self._render_title(tbreadcrumbs.h1_title)
+
+            with gui.div(className="d-flex align-items-center my-auto"):
                 if request_changed or (can_save and not is_example):
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
@@ -414,21 +409,21 @@ class BasePage:
         if not workspace:
             return
 
-        with gui.breadcrumbs(divider=""):
-            with gui.tag("li", className="breadcrumb-item"):
+        with gui.div(
+            className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
+        ):
+            with gui.tag("li"):
                 self.render_workspace_author(workspace)
 
             # don't render the user's name for examples and personal workspaces
             if is_example or workspace.is_personal:
                 return
 
-            with gui.tag(
-                "li",
-                className="breadcrumb-item d-flex align-items-center container-margin-reset",
-            ):
-                with gui.tag("small", className="text-muted pe-2"):
-                    gui.html(icons.chevron_right)
+            gui.html(icons.chevron_right)
 
+            with gui.tag(
+                "li", className="d-flex align-items-center container-margin-reset"
+            ):
                 if user := self.current_sr_user:
                     full_name = user.full_name()
                     link = user.handle and user.handle.get_app_url()

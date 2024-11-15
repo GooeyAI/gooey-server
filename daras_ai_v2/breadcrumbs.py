@@ -36,15 +36,8 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
         """
         <style>
         @media (min-width: 1024px) {
-            .breadcrumb-item-large {
+            .fs-lg-5 {
                 font-size: 1.25rem !important;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .breadcrumb-item-large {
-                font-size: 0.85rem !important;
-                padding-top: 6px;
             }
         }
         </style>
@@ -60,13 +53,13 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
             gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
                 link_to=breadcrumbs.root_title.url,
-                className="text-muted breadcrumb-item-large",
+                className="text-muted fs-lg-5",
             )
         if breadcrumbs.published_title:
             gui.breadcrumb_item(
                 breadcrumbs.published_title.title,
                 link_to=breadcrumbs.published_title.url,
-                className="breadcrumb-item-large",
+                className="fs-lg-5",
             )
 
         if is_api_call:
