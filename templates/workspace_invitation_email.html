@@ -10,7 +10,16 @@
 </p>
 
 <p>
+    {% set invite_url = invite.get_invite_url() %}
     Join the workspace here: <a href="{{ invite_url }}">{{ invite_url }}</a>
+</p>
+
+<p>
+  Through your Workspace above, you can run the top
+  private and open source AI models and collaborate on your
+  team's saved workflows.
+  Check out <a href="{{ settings.DOCS_URL }}">{{ settings.DOCS_URL }}</a> too for a
+  great set of tutorials and guides.
 </p>
 
 <p>
