@@ -465,15 +465,13 @@ class BasePage:
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
-            "span", className="d-none d-sm-inline-block text-muted text-nowrap"
+            "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2"
         ):
             gui.html("Unpublished changes")
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
-        if gui.button(
-            label=icons.more_options, className="mb-0 ms-lg-2", type="tertiary"
-        ):
+        if gui.button(label=icons.more_options, className="mb-0", type="tertiary"):
             ref.set_open(True)
         if ref.is_open:
             with gui.alert_dialog(ref=ref, modal_title="### Options"):
@@ -483,7 +481,9 @@ class BasePage:
                     self._unsaved_options_modal()
 
     def render_social_buttons(self):
-        with gui.div(className="d-flex align-items-start right-action-icons"):
+        with gui.div(
+            className="d-flex align-items-start right-action-icons gap-lg-2 gap-1"
+        ):
             gui.html(
                 # styling for buttons in this div
                 """
@@ -514,8 +514,7 @@ class BasePage:
             icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">Share</span>',
-                className="mb-0 ms-lg-2 px-lg-4",
-                type="secondary",
+                className="mb-0 px-2 px-lg-4",
             ):
                 dialog.set_open(True)
 
@@ -527,14 +526,12 @@ class BasePage:
         else:
             self._render_copy_link_button()
 
-    def _render_copy_link_button(
-        self, label: str = "", className: str = "mb-0 ms-lg-2"
-    ):
+    def _render_copy_link_button(self, label: str = ""):
         copy_to_clipboard_button(
             label=f"{icons.link} {label}".strip(),
             value=self.current_app_url(self.tab),
             type="secondary",
-            className=className,
+            className="mb-0 px-2",
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
@@ -645,7 +642,7 @@ class BasePage:
             ref = gui.use_alert_dialog(key="publish-modal")
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">{label}</span>',
-                className="mb-0 ms-lg-2 px-lg-4",
+                className="mb-0 px-3 px-lg-4",
                 type="primary",
             ):
                 if not self.request.user or self.request.user.is_anonymous:
@@ -761,18 +758,18 @@ class BasePage:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
                     type="secondary",
-                    className="mb-0 ms-2 py-2 px-4",
+                    className="mb-0 py-2 px-4",
                 )
                 pressed_save = gui.button(
                     f"{icons.save} Save",
                     type="primary",
-                    className="mb-0 ms-2 py-2 px-4",
+                    className="mb-0 py-2 px-4",
                 )
             else:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
                     type="primary",
-                    className="mb-0 ms-2 py-2 px-4",
+                    className="mb-0 py-2 px-4",
                 )
                 pressed_save = False
 
