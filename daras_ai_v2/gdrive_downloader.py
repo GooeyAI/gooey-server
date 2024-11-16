@@ -10,7 +10,7 @@ def is_gdrive_url(f: furl) -> bool:
     return f.host in ["drive.google.com", "docs.google.com"]
 
 def is_gdrive_presentation_url(f: furl) -> bool:
-    return is_gdrive_url(f) and "presentation" in f.path.segments
+    return  f.host == "docs.google.com" and "presentation" in f.path.segments
 
 def url_to_gdrive_file_id(f: furl) -> str:
     # extract google drive file ID

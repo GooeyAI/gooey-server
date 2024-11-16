@@ -12,18 +12,16 @@ from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function
-from loguru import logger
 
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_page_num(
-    url: str, page_num: int, model_id="prebuilt-layout"
-) -> str:
+def azure_doc_extract_page_num(url: str, page_num: int, model_id="prebuilt-layout") -> str:
     if page_num:
         params = dict(pages=str(page_num))
     else:
         params = None
+        
     pages = azure_doc_extract_pages(url, params=params, model_id=model_id)
     if pages and pages[0]:
         return str(pages[0])
@@ -34,20 +32,12 @@ def azure_doc_extract_page_num(
 def azure_doc_extract_pages(
     pdf_url: str, model_id: str = "prebuilt-layout", params: dict = None
 ) -> list[str]:
-    
-    if model_id == "prebuilt-read":
-        result = azure_form_recognizer(pdf_url, model_id, params, azure_service="documentintelligence", api_version="2024-07-31-preview")
-        return [
-            records_to_text(extract_records_prebuilt_read(result, page["pageNumber"]))
-            for page in result["pages"]
-        ]
-    else:
-        
-        result = azure_form_recognizer(pdf_url, model_id, params, azure_service="formrecognizer")
-        return [
-            records_to_text(extract_records(result, page["pageNumber"]))
-            for page in result["pages"]
-        ]
+
+    result = azure_form_recognizer(pdf_url, model_id, params)
+    return [
+        records_to_text(extract_records(result, page["pageNumber"]))
+        for page in result["pages"]
+    ]
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -65,13 +55,13 @@ def azure_form_recognizer_models() -> dict[str, str]:
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
-def azure_form_recognizer(url: str, model_id: str, params: dict = None,azure_service:str ="formrecognizer",api_version:str ="2023-07-31") -> dict:
+def azure_form_recognizer(url: str, model_id: str, params: dict = None) -> dict:
     r = requests.post(
         str(
             furl(settings.AZURE_FORM_RECOGNIZER_ENDPOINT)
-            / f"{azure_service}/documentModels/{model_id}:analyze"
+            / f"formrecognizer/documentModels/{model_id}:analyze"
         ),
-        params={"api-version": {api_version}} | (params or {}),
+        params={"api-version": "2023-07-31"} | (params or {}),
         headers=auth_headers,
         json={"urlSource": url},
     )
@@ -89,37 +79,32 @@ def azure_form_recognizer(url: str, model_id: str, params: dict = None,azure_ser
             case _:
                 sleep(1)
 
-def extract_records_prebuilt_read(result: dict, page_num: int) -> list[dict]:
-    records=[]
-    for para in result.get("paragraphs", []):        
-        records.append(
-            {
-                "role": para.get("role", ""),
-                "content": strip_content(para["content"]),
-            }
-        )
-    logger.debug(f" azure records : {records}")
-    return records
-
 
 def extract_records(result: dict, page_num: int) -> list[dict]:
+    from loguru import logger
     table_polys = extract_tables(result, page_num)
     records = []
     for para in result.get("paragraphs", []):
+        
+        
         try:
             if para["boundingRegions"][0]["pageNumber"] != page_num:
+                logger.debug(f"skipping para: {para}")
                 continue
         except (KeyError, IndexError):
+            logger.debug(f"skipping para: {para}")
             continue
         for table in table_polys:
             if rect_contains(
                 outer=table["polygon"], inner=para["boundingRegions"][0]["polygon"]
             ):
                 if not table.get("added"):
+                    
                     records.append({"role": "csv", "content": table["content"]})
                     table["added"] = True
                 break
         else:
+            logger.debug(f"adding para: {para}  text ")
             records.append(
                 {
                     "role": para.get("role", ""),
@@ -154,7 +139,7 @@ def rect_contains(*, outer: list[int], inner: list[int]):
 
 def extract_tables(result, page):
     table_polys = []
-    for table in result["tables"]:
+    for table in result.get('tables', []):
         try:
             if table["boundingRegions"][0]["pageNumber"] != page:
                 continue
@@ -168,6 +153,8 @@ def extract_tables(result, page):
                 "added": False,
             }
         )
+    from loguru import logger
+    logger.debug(f"extracted tables: {table_polys}")
     return table_polys
 
 

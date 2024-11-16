@@ -773,6 +773,7 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "application/vnd.ms-powerpoint",
     ]:
+        use_form_reco=True
         if use_form_reco:
             return pptx_to_form_reco(f_url, f_name, f_bytes, mime_type)
         else:
@@ -839,8 +840,8 @@ def pptx_to_text_pages(f: typing.BinaryIO) -> list[str]:
     prs = Presentation(f)
     slides_text = []
 
-    for slide_idx, slide in enumerate(prs.slides, start=1):
-        slide_content = [f"Slide {slide_idx}:"]  # Markdown heading for slide
+    for slide_num, slide in enumerate(prs.slides, start=1):
+        slide_content = [f"Slide {slide_num}:"]  # Markdown heading for slide
         for shape in slide.shapes:
             try:
                 if shape.has_text_frame:
@@ -850,13 +851,14 @@ def pptx_to_text_pages(f: typing.BinaryIO) -> list[str]:
                 if shape.has_table:
                     slide_content.extend(pptx_format_table(shape.table))
                 if shape.has_chart:
+                    # check this shape is a chart
                     chart = shape.chart
                     chart_title = (
                         chart.chart_title.text_frame.text
                         if chart.has_title
                         else "Chart"
                     )
-                    chart_text = [f"  {chart_title}:"]
+                    chart_text = [f" {chart_title}:"]
                     for series in chart.series:
                         series_text = f"Series '{series.name}'"
                         chart_text.append(series_text)
@@ -867,7 +869,7 @@ def pptx_to_text_pages(f: typing.BinaryIO) -> list[str]:
                 # Catch any exceptions and append to slide content which should be handled better
                 slide_content.append(f"  Error processing shape: {e}")
                 
-        slides_text.append("\n".join(slide_content))
+        slides_text.append("\n".join(slide_content)+"\n")
     return slides_text
 
 
@@ -937,9 +939,7 @@ def pptx_to_form_reco(f_url: str, f_name: str, f_bytes: bytes, mime_type: str) -
     if is_gdrive_url(furl(f_url)):
         f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
     num_slides = get_pptx_num_slides(f_bytes)
-
-    # logger.debug(f"pptx_to_form_reco: {f_url} {num_slides}")
-
+    
     return list(map_parallel(
         lambda slide_num: 
         azure_doc_extract_page_num(f_url, slide_num, model_id="prebuilt-read"),
@@ -996,12 +996,12 @@ def get_pdf_num_pages(f_bytes: bytes) -> int:
 
 
 def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
-
-    # if it's a google drive presentation, add the slide number to the fragment
     if is_gdrive_presentation_url(furl(url)):
-        return furl(url).set(fragment_args={"slide": page_num} if page_num else {})
-
-    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
+        param="slide"
+    else:
+        param= "page"
+        
+    return furl(url).set(fragment_args={param: page_num} if page_num else {})
 
 
 # dont use more than 1GB of memory for pandoc in total
