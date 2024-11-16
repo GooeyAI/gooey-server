@@ -81,18 +81,25 @@ def azure_form_recognizer(url: str, model_id: str, params: dict = None) -> dict:
 
 
 def extract_records(result: dict, page_num: int) -> list[dict]:
-    from loguru import logger
+
     table_polys = extract_tables(result, page_num)
     records = []
     for para in result.get("paragraphs", []):
-        
-        
+        #indirectly check if the para is in the current page
+        bounding_regions = para.get("boundingRegions")
+        if not bounding_regions:
+            records.append({
+                "role": para.get("role", ""),
+                "content": strip_content(para["content"]),
+            })
+            continue
+
         try:
             if para["boundingRegions"][0]["pageNumber"] != page_num:
-                logger.debug(f"skipping para: {para}")
+
                 continue
         except (KeyError, IndexError):
-            logger.debug(f"skipping para: {para}")
+
             continue
         for table in table_polys:
             if rect_contains(
@@ -104,7 +111,6 @@ def extract_records(result: dict, page_num: int) -> list[dict]:
                     table["added"] = True
                 break
         else:
-            logger.debug(f"adding para: {para}  text ")
             records.append(
                 {
                     "role": para.get("role", ""),
@@ -153,8 +159,6 @@ def extract_tables(result, page):
                 "added": False,
             }
         )
-    from loguru import logger
-    logger.debug(f"extracted tables: {table_polys}")
     return table_polys
 
 
