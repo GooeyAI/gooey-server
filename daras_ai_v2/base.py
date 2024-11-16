@@ -705,15 +705,6 @@ class BasePage:
         pr: PublishedRun,
         dialog: gui.AlertDialogRef,
     ):
-        if pr.is_root() and self.is_current_user_admin():
-            with gui.div(className="text-danger"):
-                gui.write(
-                    "###### You're about to update the root workflow as an admin. "
-                )
-            gui.html(
-                f'If you want to create a new example, press "{icons.fork} Save as New".'
-            )
-
         form_container = gui.div()
 
         gui.newline()
@@ -753,7 +744,7 @@ class BasePage:
                         placeholder="Add change notes",
                     )
 
-        with gui.div(className="d-flex justify-content-end mt-4"):
+        with gui.div(className="d-flex justify-content-end mt-4 gap-2"):
             if user_can_edit:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
@@ -774,6 +765,25 @@ class BasePage:
                 pressed_save = False
 
         self._render_admin_options(sr, pr)
+
+        # add friction for saving root workflows
+        if pr.is_root() and self.is_current_user_admin():
+            ref = gui.use_confirm_dialog("confirm-save-root")
+            if pressed_save:
+                ref.set_open(True)
+            pressed_save = ref.pressed_confirm
+            if ref.is_open:
+                with gui.confirm_dialog(
+                    ref=ref,
+                    modal_title="### ⚠️ Are you sure?",
+                    confirm_label=f"{icons.save} Save",
+                    confirm_className="bg-danger border-danger text-light",
+                ):
+                    gui.write(
+                        "You're about to update the root workflow as an admin.\n\n"
+                        f'If you want to create a new example, press "{icons.fork} Save as New".',
+                        unsafe_allow_html=True,
+                    )
 
         if not pressed_save and not pressed_save_as_new:
             # neither action was taken - nothing to do now
