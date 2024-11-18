@@ -76,7 +76,6 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
-
 # monkey patch to make django db work with fastapi
 for route in app.routes:
     if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
@@ -148,3 +147,9 @@ async def _exc_handler(request: Request, exc: Exception, template_name: str):
             ),
             status_code=500,
         )
+
+
+if __name__ == "__main__":
+    from gooey_gui.core.reloader import runserver
+
+    runserver("server:app", port=8080, reload=True, reload_excludes=["models.py"])

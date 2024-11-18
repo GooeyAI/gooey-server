@@ -145,9 +145,7 @@ class WorkspaceMembershipAdmin(SafeDeleteAdmin):
         "created_at",
         "updated_at",
     ] + list(SafeDeleteAdmin.list_display)
-    list_filter = ["workspace", "role", SafeDeleteAdminFilter] + list(
-        SafeDeleteAdmin.list_filter
-    )
+    list_filter = ["role", SafeDeleteAdminFilter] + list(SafeDeleteAdmin.list_filter)
 
     def get_readonly_fields(
         self, request: "HttpRequest", obj: models.WorkspaceMembership | None = None

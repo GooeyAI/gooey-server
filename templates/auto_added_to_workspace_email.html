@@ -3,17 +3,34 @@
 </p>
 
 <p>
-  You have been added to the team <strong>{{ workspace.display_name(user) }}</strong> on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
-  Visit the <a href="{{ workspaces_url }}">teams page</a> to see your team.
+  {{ invite.created_by.display_name }}
+  {% if invite.created_by.email %}
+  ({{ invite.created_by.email }})
+  {% endif %}
+  added you to {{ invite.workspace.display_name() }}
+  on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
 </p>
 
 <p>
-  Your invite was automatically accepted because your email domain matches the workspace's configured email domain.
-  If you think this shouldn't have happened, you can leave this workspace from the
-  <a href="{{ workspaces_url }}">teams page</a>.
+  <a href="{{ workspaces_url }}">Explore {{ invite.workspace.display_name() }}.</a>
 </p>
 
 <p>
-  Cheers,<br/>
+  Through your Workspace above, you can run the top
+  private and open source AI models and collaborate on your
+  team's <a href="{{ saved_url }}">saved workflows.</a>
+  Check out <a href="{{ settings.DOCS_URL }}">{{ settings.DOCS_URL }}</a> too for a
+  great set of tutorials and guides.
+</p>
+
+<p>
+  Happy building!<br/>
   Gooey.AI team
+</p>
+
+<p>
+  PS. You were automatically added to {{ invite.workspace.display_name() }} because
+  your email address matches the workspace's domain - <strong>{{ invite.workspace.domain_name }}</strong>.
+  If you'd like, you can leave this workspace via the
+  <a href="{{ workspaces_url }}">Members page</a>.
 </p>
