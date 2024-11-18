@@ -773,7 +773,6 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "application/vnd.ms-powerpoint",
     ]:
-        use_form_reco=True
         if use_form_reco:
             return pptx_to_form_reco(f_url, f_name, f_bytes, mime_type)
         else:
