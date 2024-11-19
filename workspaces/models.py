@@ -173,14 +173,6 @@ class Workspace(SafeDeleteModel):
     def get_slug(self):
         return slugify(self.display_name())
 
-    def get_photo(self) -> str:
-        if self.photo_url:
-            return self.photo_url
-        elif self.is_personal:
-            return self.created_by.photo_url
-        else:
-            return DEFAULT_WORKSPACE_PHOTO_URL
-
     @transaction.atomic()
     def create_with_owner(self):
         # free credits for first team created by a user
@@ -207,15 +199,6 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
-            workspace_memberships__deleted__isnull=True,
-        )
-
-    def get_admins(self) -> models.QuerySet[AppUser]:
-        from app_users.models import AppUser
-
-        return AppUser.objects.filter(
-            workspace_memberships__workspace=self,
-            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -341,7 +324,7 @@ class Workspace(SafeDeleteModel):
         return json.dumps(dict(workspace_id=self.id))
 
     def display_html(self, current_user: AppUser | None = None) -> str:
-        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
+        return f"{self.html_icon()}&nbsp;&nbsp;{self.display_name(current_user)}"
 
     def display_name(self, current_user: AppUser | None = None) -> str:
         if self.name:
@@ -355,16 +338,13 @@ class Workspace(SafeDeleteModel):
         else:
             return f"{self.created_by.first_name_possesive()} Workspace"
 
-    def html_icon(self, current_user: AppUser | None = None) -> str:
+    def html_icon(self) -> str:
         if photo_url := self.get_photo():
             return f'<img src="{photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
         if self.is_personal:
             return icons.home
         else:
             return icons.company_fw
-
-    def display_html(self, current_user: AppUser | None = None) -> str:
-        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
 
     def get_photo(self) -> str | None:
         if self.is_personal:
@@ -404,7 +384,7 @@ class WorkspaceMembership(SafeDeleteModel):
                 fields=["workspace", "user"],
                 condition=Q(deleted__isnull=True),
                 name="unique_workspace_user",
-            ),
+            )
         ]
         indexes = [
             models.Index(fields=["workspace", "role", "deleted"]),
