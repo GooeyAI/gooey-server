@@ -533,6 +533,9 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
+        # modal is only valid for logged in users
+        assert self.request.user and self.current_workspace
+
         if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
             with gui.div(className="mb-4"):
                 self._render_workspace_with_invite_button(self.current_pr.workspace)
@@ -556,16 +559,14 @@ class BasePage:
         )
 
         workspaces = self.request.user.cached_workspaces
-        if (
-            self.current_workspace
-            and self.current_workspace.is_personal
-            and len(workspaces) > 1
-        ):
-            with gui.div(className="alert alert-warning mb-0 mt-4"):
+        if self.current_workspace.is_personal and len(workspaces) > 1:
+            with gui.div(
+                className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
+            ):
                 duplicate = gui.button(
                     f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
                 )
-                gui.html(" this workflow to edit with others")
+                gui.html("&nbsp;" + "this workflow to edit with others")
                 ref = gui.use_alert_dialog(key="publish-modal")
                 if duplicate:
                     self.clear_publish_form()
