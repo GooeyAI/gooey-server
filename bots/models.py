@@ -1703,13 +1703,18 @@ class PublishedRunQuerySet(models.QuerySet):
         notes: str,
         visibility: PublishedRunVisibility,
     ):
+        workspace_id = (
+            workspace
+            and workspace.id
+            or PublishedRun._meta.get_field("workspace").get_default()
+        )
         with transaction.atomic():
             pr = self.create(
                 workflow=workflow,
                 published_run_id=published_run_id,
                 created_by=user,
                 last_edited_by=user,
-                workspace=workspace,
+                workspace_id=workspace_id,
                 title=title,
             )
             pr.add_version(
@@ -1721,6 +1726,26 @@ class PublishedRunQuerySet(models.QuerySet):
                 change_notes="First Version",
             )
             return pr
+
+
+def get_default_published_run_workspace():
+    from workspaces.models import Workspace
+
+    created_by, _ = AppUser.objects.filter(
+        email__endswith="dara.network",
+    )[:1].get_or_create(
+        defaults=dict(
+            email="support@dara.network", is_anonymous=False, balance=0, uid="<_blank>"
+        ),
+    )
+    return Workspace.objects.get_or_create(
+        domain_name="dara.network",
+        defaults=dict(
+            name="Gooey.AI (Dara.network Inc)",
+            created_by=created_by,
+            is_paying=True,
+        ),
+    )[0].id
 
 
 class PublishedRun(models.Model):
@@ -1765,8 +1790,8 @@ class PublishedRun(models.Model):
 
     workspace = models.ForeignKey(
         "workspaces.Workspace",
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
+        default=get_default_published_run_workspace,
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -64,6 +64,7 @@ from daras_ai_v2.scraping_proxy import (
 from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
+    generate_text_fragment_url,
 )
 from daras_ai_v2.text_splitter import text_splitter, Document
 from embeddings.models import EmbeddedFile, EmbeddingsReference
@@ -194,7 +195,7 @@ def get_top_k_references(
             request.dense_weight if request.dense_weight is not None else 1.0
         ),
     )
-    references = vespa_search_results_to_refs(search_result)
+    references = list(vespa_search_results_to_refs(search_result))
     logger.debug(f"Search returned {len(references)} references in {time() - s:.2f}s")
 
     # merge duplicate references
@@ -211,26 +212,20 @@ def get_top_k_references(
     return list(uniques.values())
 
 
-def vespa_search_results_to_refs(search_result: dict) -> list[SearchReference]:
-    return [
-        SearchReference(
-            url=ref.url,
-            title=ref.title,
-            snippet=ref.snippet,
-            score=hit["relevance"],
+def vespa_search_results_to_refs(
+    search_result: dict,
+) -> typing.Iterable[SearchReference]:
+    for hit in search_result["root"].get("children", []):
+        try:
+            ref = EmbeddingsReference.objects.get(vespa_doc_id=hit["fields"]["id"])
+        except EmbeddingsReference.DoesNotExist:
+            continue
+        if "text/html" in ref.embedded_file.metadata.mime_type:
+            # logger.debug(f"Generating fragments {ref['url']} as it is a HTML file")
+            ref.url = generate_text_fragment_url(url=ref.url, text=ref.snippet)
+        yield SearchReference(
+            url=ref.url, title=ref.title, snippet=ref.snippet, score=hit["relevance"]
         )
-        for hit in search_result["root"].get("children", [])
-        if (
-            ref := EmbeddingsReference.objects.filter(
-                vespa_doc_id=hit["fields"]["id"]
-            ).first()
-            # or EmbeddingsReference(
-            #     url=hit["fields"]["url"].encode().decode("unicode-escape"),
-            #     title=hit["fields"]["title"].encode().decode("unicode-escape"),
-            #     snippet=hit["fields"]["snippet"].encode().decode("unicode-escape"),
-            # ),
-        )
-    ]
 
 
 def query_vespa(

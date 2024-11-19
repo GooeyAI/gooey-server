@@ -1,12 +1,16 @@
 import re
 import typing
 from enum import Enum
+from textwrap import shorten
+from urllib.parse import quote
 
 import jinja2
+from furl import furl
 from typing_extensions import TypedDict
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
+from daras_ai_v2.text_splitter import line_break
 
 
 class SearchReference(TypedDict):
@@ -302,3 +306,33 @@ FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "�
 def generate_footnote_symbol(idx: int) -> str:
     quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)
+
+
+def generate_text_fragment_url(
+    *,
+    url: str,
+    text: str,
+    min_len: int = 10,
+    max_len: int = 30,
+    max_framents: int = 10,
+) -> str:
+    """
+    Generates a URL with text fragments based on extracted segments from the provided text.
+    """
+    assert url, "URL cannot be empty."
+
+    # find sentences with at least min_len characters that start with a letter
+    pat = r"([a-zA-Z].{%i,})" % min_len + line_break
+
+    segments = [match.group(1) for match in re.finditer(pat, text)]
+    if not segments:
+        # Return the original URL if no segments are found
+        return url
+
+    # pick evenly spaced segments, truncate to max_len and url-quote them
+    segments = [
+        quote(shorten(segments[i], width=max_len, placeholder=""))
+        for i in range(0, len(segments), max(1, len(segments) // max_framents))
+    ]
+
+    return str(furl(url).remove(fragment=True)) + "#:~:text=" + "&text=".join(segments)

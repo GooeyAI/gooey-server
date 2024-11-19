@@ -43,7 +43,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from workspaces.widgets import workspace_selector
+from workspaces.widgets import global_workspace_selector
 
 app = CustomAPIRouter()
 
@@ -719,7 +719,14 @@ def page_wrapper(request: Request, className=""):
                     src=settings.GOOEY_LOGO_IMG,
                     width="300",
                     height="142",
-                    className="img-fluid logo",
+                    className="img-fluid logo d-none d-sm-block",
+                )
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_RECT,
+                    width="145",
+                    height="40",
+                    className="img-fluid logo d-sm-none",
                 )
             with gui.div(
                 className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
@@ -729,7 +736,7 @@ def page_wrapper(request: Request, className=""):
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
-                    current_workspace = workspace_selector(
+                    current_workspace = global_workspace_selector(
                         request.user, request.session
                     )
                 else:

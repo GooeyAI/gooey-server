@@ -36,6 +36,7 @@ globe = '<i class="fa-regular fa-globe"></i>'
 owner = '<i class="fa-solid fa-crown"></i>'
 admin = '<i class="fa-solid fa-shield-halved"></i>'
 member = '<i class="fa-solid fa-user"></i>'
+chevron_right = '<i class="fa-sharp-duotone fa-solid fa-sm fa-chevron-right"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

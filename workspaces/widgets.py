@@ -11,16 +11,15 @@ from .models import Workspace, WorkspaceInvite, WorkspaceRole
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 
 
-def workspace_selector(user: AppUser, session: dict, *, key: str = "global-selector"):
+def global_workspace_selector(user: AppUser, session: dict):
     from daras_ai_v2.base import BasePage
     from routers.account import members_route
 
-    workspaces = user.get_workspaces().order_by("-is_personal", "-created_at")
-    if not workspaces:
-        workspaces = [user.get_or_create_personal_workspace()[0]]
-
-    if str(gui.session_state.get(key)).startswith("__url:"):
-        raise gui.RedirectException(gui.session_state[key].removeprefix("__url:"))
+    try:
+        del user.cached_workspaces  # invalidate cache on every re-render
+    except AttributeError:
+        pass
+    workspaces = user.cached_workspaces
 
     if switch_workspace_id := gui.session_state.pop("--switch-workspace", None):
         set_current_workspace(session, int(switch_workspace_id))
@@ -109,12 +108,9 @@ def workspace_selector(user: AppUser, session: dict, *, key: str = "global-selec
                         gui.html("Manage Workspace")
 
         if gui.session_state.pop("--create-workspace", None):
-            name = f"{user.first_name_possesive()} Team Workspace"
-            if len(workspaces) > 1:
-                name += f" {len(workspaces) - 1}"
+            name = get_default_workspace_name_for_user(user)
             workspace = Workspace(name=name, created_by=user)
             workspace.create_with_owner()
-            gui.session_state[key] = workspace.id
             session[SESSION_SELECTED_WORKSPACE] = workspace.id
             raise gui.RedirectException(get_route_path(members_route))
 
@@ -136,8 +132,9 @@ def workspace_selector(user: AppUser, session: dict, *, key: str = "global-selec
                         className="d-inline-block",
                     )
                     gui.html(
-                        user.email or user.phone_number,
-                        className="d-inline-block text-muted small",
+                        str(user.email or user.phone_number),
+                        className="d-inline-block text-muted small ms-2",
+                        style=dict(marginBottom="0.1rem"),
                     )
 
         with gui.div(className="d-lg-none d-inline-block"):
@@ -185,24 +182,16 @@ def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
 
 
-def create_workspace_with_defaults(user: AppUser, name: str | None = None):
-    if not name:
-        workspace_count = user.get_workspaces().count()
-        suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
-        name = get_default_name_for_new_workspace(user, suffix=suffix)
-    workspace = Workspace(name=name, created_by=user)
-    workspace.create_with_owner()
-    return workspace
-
-
-def get_default_name_for_new_workspace(user: AppUser, suffix: str = "") -> str:
+def get_default_workspace_name_for_user(user: AppUser) -> str:
+    workspace_count = len(user.cached_workspaces)
     email_domain = user.email and user.email.split("@", maxsplit=1)[1] or ""
     if (
         email_domain
         and email_domain not in COMMON_EMAIL_DOMAINS
-        and user.get_workspaces().count() <= 1
+        and workspace_count <= 1
     ):
         email_domain_prefix = email_domain.split(".")[0].title()
         return f"{email_domain_prefix} Team"
 
+    suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
     return f"{user.first_name_possesive()} Team Workspace" + suffix

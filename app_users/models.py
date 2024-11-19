@@ -1,4 +1,5 @@
 import typing
+from functools import cached_property
 
 import requests
 from django.db import models, IntegrityError
@@ -239,6 +240,16 @@ class AppUser(models.Model):
         return Workspace.objects.filter(
             memberships__user=self, memberships__deleted__isnull=True
         )
+
+    @cached_property
+    def cached_workspaces(self) -> list["Workspace"]:
+        from workspaces.models import Workspace
+
+        return list(
+            Workspace.objects.filter(
+                memberships__user=self, memberships__deleted__isnull=True
+            ).order_by("-is_personal", "-created_at")
+        ) or [self.get_or_create_personal_workspace()[0]]
 
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
