@@ -79,15 +79,15 @@ function setupToggleShowElement() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+(async () => {
+    await window.waitUntilHydrated;
+    // Start observing the target node for configured mutations
     const observer = new MutationObserver((mutationsList, observer) => {
         renderPaypalSubscriptionButtons();
         setupToggleShowElement();
     });
-
-    // Start observing the target node for configured mutations
     observer.observe(document.body, { childList: true, subtree: true });
-});
+})();
 
 // -- Setup: PayPal One-time --
 
