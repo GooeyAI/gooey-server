@@ -2193,6 +2193,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         pr_filter = Q(workspace=self.current_workspace)
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
+        else:
+            pr_filter &= Q(
+                visibility__in=(
+                    PublishedRunVisibility.PUBLIC,
+                    PublishedRunVisibility.INTERNAL,
+                )
+            ) | Q(created_by=self.request.user)
         published_runs = PublishedRun.objects.filter(
             Q(workflow=self.workflow) & pr_filter
         )[:50]

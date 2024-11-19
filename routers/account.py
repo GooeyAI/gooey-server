@@ -266,6 +266,13 @@ def all_saved_runs_tab(request: Request):
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
+    else:
+        pr_filter &= Q(
+            visibility__in=(
+                PublishedRunVisibility.PUBLIC,
+                PublishedRunVisibility.INTERNAL,
+            )
+        ) | Q(created_by=self.request.user)
     prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):
