@@ -1723,7 +1723,6 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
-                change_notes="First Version",
             )
             return pr
 

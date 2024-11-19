@@ -518,8 +518,7 @@ class BasePage:
 
             if dialog.is_open:
                 with gui.alert_dialog(
-                    ref=dialog,
-                    modal_title=f"#### Share: {self.current_pr.title}",
+                    ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
                 ):
                     self._render_share_modal(dialog=dialog)
         else:
