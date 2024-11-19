@@ -610,7 +610,7 @@ class BasePage:
         with col1:
             with gui.tag("p", className="mb-1 text-muted"):
                 gui.html("WORKSPACE")
-            self.render_workspace_author(workspace, current_user=self.request.user)
+            self.render_workspace_author(workspace)
         with col2:
             membership = workspace.memberships.get(user_id=self.request.user.id)
             member_invite_button_with_dialog(
