@@ -44,7 +44,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         gui.html(
             " ".join(
                 [
-                    current.html_icon(user),
+                    current.html_icon(),
                     display_name,
                     '<i class="ps-1 fa-regular fa-chevron-down"></i>',
                 ],
@@ -67,7 +67,7 @@ def global_workspace_selector(user: AppUser, session: dict):
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html(workspace.html_icon(user))
+                        gui.html(workspace.html_icon())
                     with gui.div(
                         className="col-10 d-flex justify-content-between align-items-center"
                     ):
