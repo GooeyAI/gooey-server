@@ -272,7 +272,7 @@ def all_saved_runs_tab(request: Request):
                 PublishedRunVisibility.PUBLIC,
                 PublishedRunVisibility.INTERNAL,
             )
-        ) | Q(created_by=self.request.user)
+        ) | Q(created_by=request.user)
     prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):
