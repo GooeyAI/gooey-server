@@ -367,7 +367,7 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
             with gui.tag("th", scope="col"):
                 gui.html("Role")
             with gui.tag("th", scope="col", className="text-nowrap"):
-                gui.html(f"{icons.time}&nbsp;Since")
+                gui.html(f"{icons.time} Since")
             with gui.tag("th", scope="col"):
                 gui.html("")
 
