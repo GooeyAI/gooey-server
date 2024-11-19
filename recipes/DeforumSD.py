@@ -15,6 +15,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.safety_checker import safety_checker
 from recipes.BulkRunner import list_view_editor
 
 DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
@@ -283,8 +284,8 @@ class DeforumSDPage(BasePage):
 
         yield f"Running {model.label}..."
 
-        # if not self.request.user.disable_safety_checker:
-        #     safety_checker(text=self.preview_input(state))
+        if not self.request.user.disable_safety_checker:
+            safety_checker(text=self.preview_input(state))
 
         try:
             state["output_video"] = call_celery_task_outfile(
