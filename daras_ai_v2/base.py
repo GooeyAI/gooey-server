@@ -1501,7 +1501,6 @@ class BasePage:
         responsive: bool = True,
         show_as_link: bool = True,
         text_size: str | None = None,
-        current_user: AppUser | None = None,
     ):
         if not workspace:
             return
