@@ -344,7 +344,7 @@ class Workspace(SafeDeleteModel):
         if self.is_personal:
             return icons.home
         else:
-            return icons.company_fw
+            return icons.company
 
     def get_photo(self) -> str | None:
         if self.is_personal:

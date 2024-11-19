@@ -11,9 +11,6 @@ cancel = '<i class="fa-regular fa-xmark-large"></i>'
 edit = '<i class="fa-regular fa-pencil"></i>'
 link = '<i class="fa-regular fa-link"></i>'
 company = '<i class="fa-regular fa-buildings"></i>'
-company_fw = (
-    '<i class="fa-regular fa-buildings fa-fw" style="width:25px; height: 25px;"></i>'
-)
 company_solid = '<i class="fa-solid fa-buildings"></i>'
 copy_solid = '<i class="fa-solid fa-copy"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
