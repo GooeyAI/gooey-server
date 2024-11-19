@@ -31,7 +31,7 @@ def billing_page(workspace: "Workspace", user: "AppUser"):
 
     render_payments_setup()
 
-    if user.get_workspaces().count() > 1:
+    if len(user.cached_workspaces) > 1:
         # when user has multiple workspaces, remind them of the one they are currently on
         with gui.div(className="mb-3"):
             BasePage.render_author(workspace, show_as_link=False, current_user=user)

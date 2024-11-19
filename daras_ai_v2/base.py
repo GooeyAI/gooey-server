@@ -2577,12 +2577,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)
 
-    def can_user_see_workspaces(self) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin()
-            or self.request.user.get_workspaces().count() > 1
-        )
-
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:
         return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
