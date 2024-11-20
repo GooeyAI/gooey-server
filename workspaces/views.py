@@ -21,8 +21,12 @@ rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 def invitation_page(
     current_user: AppUser | None, session: dict, invite: WorkspaceInvite
 ):
-    with gui.center(
-        className="position-absolute top-0 start-0 w-100 min-vw-100 min-vh-100 bg-black pb-5"
+    with (
+        gui.div(
+            className="position-absolute top-0 start-0 bottom-0 bg-black min-vw-100 min-vh-100",
+            style={"overflow-x": "hidden"},
+        ),
+        gui.center(className="mb-5"),
     ):
         gui.image(
             src=settings.GOOEY_LOGO_IMG_WHITE,
