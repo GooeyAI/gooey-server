@@ -198,11 +198,18 @@ def invitation_route(
             current_user=request.user, session=request.session, invite=invite
         )
 
+    description = invite.created_by.full_name()
+    if email := invite.created_by.email:
+        description += f" ({email})"
+    elif phone := invite.created_by.phone_number:
+        description += f" ({phone.as_international})"
+    description += f" invited you to join {invite.workspace.display_name()} on Gooey.AI"
+
     return dict(
         meta=raw_build_meta_tags(
             url=str(request.url),
-            title=f"Join {invite.workspace.display_name()} • Gooey.AI",
-            description=f"Invitation to join {invite.workspace.display_name()}",
+            title=invite.workspace.display_name(),
+            description=description,
             image=invite.workspace.get_photo(),
             robots="noindex,nofollow",
         )
