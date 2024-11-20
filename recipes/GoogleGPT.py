@@ -256,7 +256,9 @@ class GoogleGPTPage(BasePage):
             is_user_url=False,
             current_user=self.request.user,
         )
+
         # add pretty titles to references
+
         for ref in response.references:
             key = furl(ref["url"]).remove(fragment=True).url
             ref["title"] = link_titles.get(key, "")

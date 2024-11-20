@@ -30,6 +30,7 @@ home = '<i class="fa-regular fa-home"></i>'
 notes = '<i class="fa-regular fa-money-check-pen"></i>'
 lock = '<i class="fa-solid fa-lock"></i>'
 globe = '<i class="fa-regular fa-globe"></i>'
+chevron_right = '<i class="fa-sharp-duotone fa-solid fa-sm fa-chevron-right"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

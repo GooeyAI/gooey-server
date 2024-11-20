@@ -21,6 +21,7 @@ from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.fastapi_tricks import get_app_route_url
+from daras_ai_v2.profiles import get_profile_image
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import COMMON_EMAIL_DOMAINS
 from .tasks import send_added_to_workspace_email, send_invitation_email
@@ -310,6 +311,9 @@ class Workspace(SafeDeleteModel):
     def get_pp_custom_id(self) -> str:
         return json.dumps(dict(workspace_id=self.id))
 
+    def display_html(self, current_user: AppUser | None = None) -> str:
+        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
+
     def display_name(self, current_user: AppUser | None = None) -> str:
         if self.name:
             return self.name
@@ -321,15 +325,18 @@ class Workspace(SafeDeleteModel):
             return f"{self.created_by.first_name_possesive()} Workspace"
 
     def html_icon(self, current_user: AppUser | None = None) -> str:
-        if self.is_personal and self.created_by_id == current_user.id:
-            if self.created_by.photo_url:
-                return f'<img src="{self.created_by.photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
-            else:
-                return icons.home
-        elif self.photo_url:
-            return f'<img src="{self.photo_url}" style="height: 25px; width: auto; border-radius: 5px">'
+        if photo_url := self.get_photo():
+            return f'<img src="{photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
+        if self.is_personal:
+            return icons.home
         else:
             return icons.company
+
+    def get_photo(self) -> str | None:
+        if self.is_personal:
+            return self.created_by and get_profile_image(self.created_by)
+        else:
+            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
 
 class WorkspaceMembership(SafeDeleteModel):
@@ -463,7 +470,7 @@ class WorkspaceInviteQuerySet(models.QuerySet):
                     f"User {invitee} auto-accepted invitation to workspace {invite.workspace}"
                 )
                 send_added_to_workspace_email.delay(
-                    workspace_id=invite.workspace_id, user_id=invitee.id
+                    invite_id=invite.id, user_id=invitee.id
                 )
         else:
             invite.send_email()
