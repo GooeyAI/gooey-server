@@ -110,8 +110,12 @@ def _handle_invite_accepted(
         )
         logout_url = get_app_route_url(logout, query_params={"next": login_url})
         gui.error(
-            f"Doh! This invitation is for **{invite.email}**, not you. "
-            f"Please [log in]({logout_url}) with the correct email address.",
+            f"""
+            Doh! This invitation is for `{invite.email}`, and you \
+            are logged in with `{current_user.email}`.
+            Please have the workspace owner invite `{current_user.email}` \
+            or [login to Gooey.AI]({logout_url}) with `{invite.email}`.
+            """,
         )
         return
 
