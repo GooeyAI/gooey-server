@@ -42,33 +42,10 @@ def copy_to_clipboard_button(
     )
 
 
-def copy_to_clipboard_button_with_return(
-    label: str,
-    *,
-    key: str,
-    value: str,
-    style: dict[str, str] | None = None,
-    className: str = "",
-    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "primary",
-) -> bool:
-    """
-    Same as copy_to_clipboard_button, but with a boolean return value.
-    This can be used for additional side effects on the button from
-    Python code, besides copying a value to clipboard.
-    """
-    pressed = gui.button(
-        label,
-        id=key,
-        className=className,
-        style=style,
-        type=type,
-        **{"data-clipboard-text": value},
+def copy_text_to_clipboard(text):
+    gui.js(
+        # language="javascript"
+        f"""
+        navigator.clipboard.writeText({json.dumps(text)});
+        """
     )
-    if pressed:
-        gui.js(
-            # language="javascript"
-            f"""
-            copyToClipboard(document.getElementById("{escape(key)}"));
-            """
-        )
-    return pressed

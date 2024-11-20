@@ -40,8 +40,8 @@ from daras_ai_v2 import settings, urls, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
+    copy_text_to_clipboard,
     copy_to_clipboard_button,
-    copy_to_clipboard_button_with_return,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -518,10 +518,7 @@ class BasePage:
                 dialog.set_open(True)
 
             if dialog.is_open:
-                with gui.alert_dialog(
-                    ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
-                ):
-                    self._render_share_modal(dialog=dialog)
+                self._render_share_modal(dialog=dialog)
         else:
             self._render_copy_link_button()
 
@@ -534,84 +531,90 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        with gui.div(className="visibility-radio mb-5"):
-            options = {
-                str(enum.value): enum.help_text() for enum in PublishedRunVisibility
-            }
-            if self.request.user and self.request.user.handle:
-                profile_url = self.request.user.handle.get_app_url()
-                pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
-            elif self.request.user and not self.request.user.is_anonymous:
-                edit_profile_url = AccountTabs.profile.url_path
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+        copy_link_button_key = "copy-link-in-share-modal"
+        if gui.session_state.pop(copy_link_button_key, None):
+            # we don't render the modal, only execute the copy-link action
+            copy_text_to_clipboard(self.current_app_url(self.tab))
+            dialog.set_open(False)
+            return
 
-            published_run_visibility = PublishedRunVisibility(
-                int(
-                    gui.radio(
-                        "",
-                        options=options,
-                        format_func=options.__getitem__,
-                        key="published_run_visibility",
-                        value=str(self.current_pr.visibility),
+        with gui.alert_dialog(
+            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
+        ):
+            with gui.div(className="visibility-radio mb-5"):
+                options = {
+                    str(enum.value): enum.help_text() for enum in PublishedRunVisibility
+                }
+                if self.request.user and self.request.user.handle:
+                    profile_url = self.request.user.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
+                elif self.request.user and not self.request.user.is_anonymous:
+                    edit_profile_url = AccountTabs.profile.url_path
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+
+                published_run_visibility = PublishedRunVisibility(
+                    int(
+                        gui.radio(
+                            "",
+                            options=options,
+                            format_func=options.__getitem__,
+                            key="published_run_visibility",
+                            value=str(self.current_pr.visibility),
+                        )
                     )
                 )
-            )
-            gui.radio(
-                "",
-                options=[
-                    '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
-                ],
-                disabled=True,
-                checked_by_default=False,
-            )
-
-        workspaces = self.request.user.cached_workspaces
-        if workspaces and self.current_pr.workspace not in workspaces:
-            with gui.div(className="alert alert-warning mb-0 mt-4"):
-                duplicate = gui.button(
-                    f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
+                gui.radio(
+                    "",
+                    options=[
+                        '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
+                    ],
+                    disabled=True,
+                    checked_by_default=False,
                 )
-                gui.html(" this workflow to edit with others")
-                ref = gui.use_alert_dialog(key="publish-modal")
-                if duplicate:
-                    self.clear_publish_form()
-                    ref.set_open(True)
-                if ref.is_open:
-                    gui.session_state["published_run_workspace"] = workspaces[-1].id
-                    return self._render_publish_dialog(ref=ref)
 
-        with gui.div(className="d-flex justify-content-between pt-4"):
-            pressed_copy = copy_to_clipboard_button_with_return(
-                label="Copy Link",
-                key="copy-link-in-share-modal",
-                className="py-2 px-3 m-0",
-                value=self.current_app_url(self.tab),
-                type="secondary",
-            )
-            pressed_done = gui.button(
-                "Done",
-                type="primary",
-                className="py-2 px-5 m-0",
-            )
-            if pressed_copy or pressed_done:
-                if self.current_pr.visibility != published_run_visibility:
-                    visibility = PublishedRunVisibility(published_run_visibility)
-                    self.current_pr.add_version(
-                        user=self.request.user,
-                        saved_run=self.current_pr.saved_run,
-                        title=self.current_pr.title,
-                        notes=self.current_pr.notes,
-                        visibility=visibility,
-                        change_notes=f"Visibility changed to {visibility.name.title()}",
+            if self.current_pr.visibility != published_run_visibility:
+                visibility = PublishedRunVisibility(published_run_visibility)
+                self.current_pr.add_version(
+                    user=self.request.user,
+                    saved_run=self.current_pr.saved_run,
+                    title=self.current_pr.title,
+                    notes=self.current_pr.notes,
+                    visibility=visibility,
+                    change_notes=f"Visibility changed to {visibility.name.title()}",
+                )
+
+            workspaces = self.request.user.cached_workspaces
+            if workspaces and self.current_pr.workspace not in workspaces:
+                with gui.div(className="alert alert-warning mb-0 mt-4"):
+                    duplicate = gui.button(
+                        f"{icons.fork} Duplicate",
+                        type="link",
+                        className="d-inline m-0 p-0",
                     )
+                    gui.html(" this workflow to edit with others")
+                    ref = gui.use_alert_dialog(key="publish-modal")
+                    if duplicate:
+                        self.clear_publish_form()
+                        ref.set_open(True)
+                    if ref.is_open:
+                        gui.session_state["published_run_workspace"] = workspaces[-1].id
+                        return self._render_publish_dialog(ref=ref)
 
-                dialog.set_open(False)
-                gui.rerun()
+            with gui.div(className="d-flex justify-content-between pt-4"):
+                gui.button(
+                    label=f"{icons.link} Copy Link",
+                    key=copy_link_button_key,
+                    className="py-2 px-3 m-0",
+                    type="secondary",
+                )
+                if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
+                    dialog.set_open(False)
+                    gui.rerun()
 
     def _render_save_button(self):
         can_edit = self.can_user_edit_published_run(self.current_pr)
