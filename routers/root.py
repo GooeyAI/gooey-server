@@ -716,6 +716,21 @@ def page_wrapper(
                 gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
                 gui.div(className="container-xxl my-2"),
             ):
+                with gui.tag("a", href="/"):
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_IMG,
+                        width="300",
+                        height="142",
+                        className="img-fluid logo d-none d-sm-block",
+                    )
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_RECT,
+                        width="145",
+                        height="40",
+                        className="img-fluid logo d-sm-none",
+                    )
                 with gui.div(
                     className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
                 ):
