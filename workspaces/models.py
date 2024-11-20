@@ -155,12 +155,6 @@ class Workspace(SafeDeleteModel):
     def get_slug(self):
         return slugify(self.display_name())
 
-    def get_photo(self) -> str | None:
-        if self.is_personal:
-            return self.created_by and self.created_by.photo_url
-        else:
-            return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
-
     @transaction.atomic()
     def create_with_owner(self):
         # free credits for first team created by a user
