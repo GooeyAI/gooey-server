@@ -12,9 +12,18 @@ copy_to_clipboard_scripts = """
 function copyToClipboard(button) {
     navigator.clipboard.writeText(button.getAttribute("data-clipboard-text"));
     const original = button.innerHTML;
-    button.innerHTML = `%(copied_icon)s Copied`;
+    const originalStyleWidth = button.style.width || "";
+
+    if (button.offsetWidth > 90) {
+        // 90 is roughly an estimate for pixel-width of the text we want to insert.
+        // if the button was already big enough to show the new text, we want to stay that size.
+        button.style.width = button.offsetWidth + "px";
+    }
+    button.innerHTML = `Copied %(copied_icon)s`;
+
     setTimeout(() => {
         button.innerHTML = original;
+        button.style.width = originalStyleWidth;
     }, 2000);
 }
 </script>
