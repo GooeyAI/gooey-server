@@ -28,8 +28,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
 )
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
-
-from mdit_plain.renderer import RendererPlain
+from daras_ai_v2.tts_markdown_renderer import RendererPlain
 from markdown_it import MarkdownIt
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -198,7 +197,6 @@ class TextToSpeechPage(BasePage):
          # Parse markdown to plain text
         parser = MarkdownIt(renderer_cls=RendererPlain)
         text = parser.render(text)
-        
         provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
         match provider:

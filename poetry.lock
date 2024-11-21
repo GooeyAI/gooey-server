@@ -3307,20 +3307,6 @@ files = [
 traitlets = "*"
 
 [[package]]
-name = "mdit-plain"
-version = "1.0.1"
-description = "A plain text renderer for markdown-it-py"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "mdit_plain-1.0.1-py3-none-any.whl", hash = "sha256:d09ef4441ebd3373d452d2c2cb81a9d825cc6d0dbc4a6719ec4277e9993b9471"},
-    {file = "mdit_plain-1.0.1.tar.gz", hash = "sha256:e0cd2c4c5371995e9df3c88eb503004f99eb240b7f6babe3fc49c98152cc25aa"},
-]
-
-[package.extras]
-test = ["markdown-it-py (>=1.1.0)"]
-
-[[package]]
 name = "mdurl"
 version = "0.1.2"
 description = "Markdown URL utilities"
