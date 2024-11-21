@@ -1384,13 +1384,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     gui.write("Message quicklink not available.")
                 elif bi.platform == Platform.TWILIO:
                     copy_to_clipboard_button(
-                        '<i class="fa-regular fa-link"></i> Copy Phone Number',
+                        f"{icons.link} Copy Phone Number",
                         value=bi.twilio_phone_number.as_e164,
                         type="secondary",
                     )
                 else:
                     copy_to_clipboard_button(
-                        f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
+                        f"{icons.link} Copy {Platform(bi.platform).label} Link",
                         value=test_link,
                         type="secondary",
                     )

@@ -3,6 +3,7 @@ import typing
 import gooey_gui as gui
 from api_keys.models import ApiKey
 from app_users.models import AppUser
+from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
 if typing.TYPE_CHECKING:
@@ -70,7 +71,7 @@ If you lose this secret key, you'll need to generate a new one.
         )
     with col2:
         copy_to_clipboard_button(
-            "📎 Copy Secret Key",
+            f"{icons.link} Copy Secret Key",
             value=secret_key,
             style="height: 3.2rem",
         )
