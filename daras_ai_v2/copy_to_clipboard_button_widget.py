@@ -3,6 +3,8 @@ import typing
 from html import escape
 
 import gooey_gui as gui
+from daras_ai_v2 import icons
+
 
 # language="html"
 copy_to_clipboard_scripts = """
@@ -10,13 +12,15 @@ copy_to_clipboard_scripts = """
 function copyToClipboard(button) {
     navigator.clipboard.writeText(button.getAttribute("data-clipboard-text"));
     const original = button.innerHTML;
-    button.textContent = "✅ Copied";
+    button.innerHTML = `%(copied_icon)s Copied`;
     setTimeout(() => {
         button.innerHTML = original;
     }, 2000);
 }
 </script>
-"""
+""" % {
+    "copied_icon": icons.check
+}
 
 
 def copy_to_clipboard_button(
