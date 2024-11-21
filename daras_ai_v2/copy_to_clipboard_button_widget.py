@@ -1,4 +1,3 @@
-import json
 import typing
 from html import escape
 
@@ -39,13 +38,4 @@ def copy_to_clipboard_button(
     {label}
 </button>
         """,
-    )
-
-
-def copy_text_to_clipboard(text):
-    gui.js(
-        # language="javascript"
-        f"""
-        navigator.clipboard.writeText({json.dumps(text)});
-        """
     )
