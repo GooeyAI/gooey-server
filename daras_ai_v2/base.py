@@ -39,10 +39,7 @@ from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
-from daras_ai_v2.copy_to_clipboard_button_widget import (
-    copy_text_to_clipboard,
-    copy_to_clipboard_button,
-)
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
@@ -531,13 +528,6 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        copy_link_button_key = "copy-link-in-share-modal"
-        if gui.session_state.pop(copy_link_button_key, None):
-            # we don't render the modal, only execute the copy-link action
-            copy_text_to_clipboard(self.current_app_url(self.tab))
-            dialog.set_open(False)
-            return
-
         with gui.alert_dialog(
             ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
         ):
@@ -606,11 +596,11 @@ class BasePage:
                         return self._render_publish_dialog(ref=ref)
 
             with gui.div(className="d-flex justify-content-between pt-4"):
-                gui.button(
+                copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
-                    key=copy_link_button_key,
-                    className="py-2 px-3 m-0",
+                    value=self.current_app_url(self.tab),
                     type="secondary",
+                    className="py-2 px-3 m-0",
                 )
                 if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
                     dialog.set_open(False)
