@@ -11,7 +11,6 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
 
-from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
@@ -26,6 +25,9 @@ from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
 
 app = CustomAPIRouter()
 
@@ -234,7 +236,7 @@ class AccountTabs(TabData, Enum):
 
     @classmethod
     def get_tabs_for_user(
-        cls, user: AppUser | None, workspace: Workspace | None
+        cls, user: typing.Optional["AppUser"], workspace: Workspace | None
     ) -> list["AccountTabs"]:
 
         ret = list(cls)
@@ -252,7 +254,7 @@ class AccountTabs(TabData, Enum):
 def billing_tab(request: Request, workspace: Workspace):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
-    return billing_page(workspace)
+    return billing_page(workspace=workspace, user=request.user)
 
 
 def profile_tab(request: Request):
@@ -264,6 +266,13 @@ def all_saved_runs_tab(request: Request):
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
+    else:
+        pr_filter &= Q(
+            visibility__in=(
+                PublishedRunVisibility.PUBLIC,
+                PublishedRunVisibility.INTERNAL,
+            )
+        ) | Q(created_by=request.user)
     prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
 
     def _render_run(pr: PublishedRun):

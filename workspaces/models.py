@@ -39,9 +39,22 @@ def validate_workspace_domain_name(value: str):
 
 
 class WorkspaceRole(models.IntegerChoices):
-    OWNER = (1, "🏆 Owner")
-    ADMIN = (2, "🔧 Admin")
-    MEMBER = (3, "👥 Member")
+    OWNER = (1, "Owner")
+    ADMIN = (2, "Admin")
+    MEMBER = (3, "Member")
+
+    @classmethod
+    def display_html(cls, role: WorkspaceRole | int) -> str:
+        if isinstance(role, int):
+            role = WorkspaceRole(role)
+
+        match role:
+            case WorkspaceRole.OWNER:
+                return f"{icons.owner} {role.label}"
+            case WorkspaceRole.ADMIN:
+                return f"{icons.admin} {role.label}"
+            case WorkspaceRole.MEMBER:
+                return f"{icons.member} {role.label}"
 
 
 class WorkspaceQuerySet(SafeDeleteQueryset):
@@ -151,6 +164,11 @@ class Workspace(SafeDeleteModel):
             return f"[Deleted] {self.display_name()}"
         else:
             return self.display_name()
+
+    def clean(self) -> None:
+        if not self.is_personal and not self.name:
+            raise ValidationError("Team name is required for workspaces")
+        return super().clean()
 
     def get_slug(self):
         return slugify(self.display_name())
@@ -306,7 +324,7 @@ class Workspace(SafeDeleteModel):
         return json.dumps(dict(workspace_id=self.id))
 
     def display_html(self, current_user: AppUser | None = None) -> str:
-        return f"{self.html_icon(current_user)}&nbsp;&nbsp;{self.display_name(current_user)}"
+        return f"{self.html_icon()}&nbsp;&nbsp;{self.display_name(current_user)}"
 
     def display_name(self, current_user: AppUser | None = None) -> str:
         if self.name:
@@ -314,11 +332,13 @@ class Workspace(SafeDeleteModel):
         elif (
             self.is_personal and current_user and self.created_by_id == current_user.id
         ):
-            return "Personal Account"
+            return f"{current_user.full_name()} (Personal)"
+        elif self.is_personal:
+            return self.created_by.full_name()
         else:
             return f"{self.created_by.first_name_possesive()} Workspace"
 
-    def html_icon(self, current_user: AppUser | None = None) -> str:
+    def html_icon(self) -> str:
         if photo_url := self.get_photo():
             return f'<img src="{photo_url}" style="height: 25px; width: 25px; object-fit: cover; border-radius: 12.5px;">'
         if self.is_personal:
@@ -373,7 +393,13 @@ class WorkspaceMembership(SafeDeleteModel):
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
 
+    def clean(self) -> None:
+        if self.workspace.is_personal and self.user_id != self.workspace.created_by_id:
+            raise ValidationError("You cannot add users to a personal workspace")
+        return super().clean()
+
     def can_edit_workspace(self):
+        # workspace metadata, billing, etc.
         return self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
 
     def can_leave_workspace(self):
@@ -510,6 +536,11 @@ class WorkspaceInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.workspace} ({self.get_status_display()})"
+
+    def clean(self) -> None:
+        if self.workspace.is_personal:
+            raise ValidationError("You cannot invite users to a personal workspace")
+        return super().clean()
 
     @admin.display(description="Expired")
     def has_expired(self):
