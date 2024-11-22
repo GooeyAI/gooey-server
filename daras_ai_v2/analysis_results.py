@@ -7,6 +7,7 @@ from django.db.models import IntegerChoices
 import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import BotIntegration, Message
+from daras_ai_v2 import icons
 from daras_ai_v2.base import RecipeTabs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -172,7 +173,7 @@ def render_title_breadcrumb_share(
         with gui.div(className="d-flex align-items-center"):
             with gui.div(className="d-flex align-items-start right-action-icons"):
                 copy_to_clipboard_button(
-                    '<i class="fa-regular fa-link"></i> <span class="d-none d-lg-inline"> Copy Link</span>',
+                    f'{icons.link} <span class="d-none d-lg-inline">Copy Link</span>',
                     value=current_url,
                     type="secondary",
                     className="mb-0 ms-lg-2",

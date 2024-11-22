@@ -314,18 +314,18 @@ def all_saved_runs_tab(request: Request):
 
     if workspace.is_personal:
         if request.user.handle:
+            gui.caption(
+                f"""
+                All your Saved workflows are here, with public ones listed on your \
+                profile page at {request.user.handle.get_app_url()}.
+                """
+            )
+        else:
             edit_profile_url = AccountTabs.profile.url_path
             gui.caption(
                 f"""
                 All your Saved workflows are here. Public ones will be listed on \
                 your profile page if you [create a username]({edit_profile_url}).
-                """
-            )
-        else:
-            gui.caption(
-                f"""
-                All your Saved workflows are here, with public ones listed on your \
-                profile page at {request.user.handle.get_app_url()}.
                 """
             )
     else:

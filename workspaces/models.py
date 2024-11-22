@@ -471,29 +471,20 @@ class WorkspaceInviteQuerySet(models.QuerySet):
                 invite.status = WorkspaceInvite.Status.PENDING
                 invite.save(update_fields=["status"])
 
-        should_auto_accept = (
-            workspace.domain_name
-            and workspace.domain_name.lower() == email.split("@")[-1].lower()
-        )
-        if should_auto_accept:
-            try:
-                invitee = AppUser.objects.get(email=invite.email)
-            except AppUser.DoesNotExist:
-                invite.send_email()
-            else:
-                invite.accept(
-                    invitee,
-                    updated_by=current_user or invite.created_by,
-                    auto_accepted=True,
-                )
-                logger.info(
-                    f"User {invitee} auto-accepted invitation to workspace {invite.workspace}"
-                )
-                send_added_to_workspace_email.delay(
-                    invite_id=invite.id, user_id=invitee.id
-                )
-        else:
+        try:
+            invitee = AppUser.objects.get(email=invite.email)
+        except AppUser.DoesNotExist:
             invite.send_email()
+        else:
+            invite.accept(
+                invitee,
+                updated_by=current_user or invite.created_by,
+                auto_accepted=True,
+            )
+            logger.info(
+                f"User {invitee} auto-accepted invitation to workspace {invite.workspace}"
+            )
+            send_added_to_workspace_email.delay(invite_id=invite.id, user_id=invitee.id)
 
         return invite
 
