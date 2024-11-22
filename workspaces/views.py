@@ -120,11 +120,15 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                 PricingPlan.STARTER,
                 PricingPlan.CREATOR,
             ):
-                billing_info += f" [Upgrade]({get_route_path(account_route)})"
+                billing_info += (
+                    f'<span className="ms-4 text-primary text-decoration-none">'
+                    f"[Upgrade]({get_route_path(account_route)})"
+                    f"</span>"
+                )
             gui.write(billing_info, unsafe_allow_html=True)
 
     if membership.can_edit_workspace():
-        with col2, gui.div(className="mt-2"):
+        with col2, gui.div(className="mt-2 text-center"):
             edit_workspace_button_with_dialog(membership)
 
     gui.newline()
@@ -360,7 +364,7 @@ def render_workspace_leave_dialog(
 
 
 def render_members_list(workspace: Workspace, current_member: WorkspaceMembership):
-    with gui.tag("table", className="table table-responsive"):
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Name")
@@ -447,7 +451,7 @@ def render_pending_invites_list(
         return
 
     gui.write("#### Pending")
-    with gui.tag("table", className="table table-responsive"):
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Email")
@@ -460,7 +464,7 @@ def render_pending_invites_list(
 
         with gui.tag("tbody"):
             for invite in pending_invites:
-                with gui.tag("tr", className="text-break align-middle"):
+                with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
                         gui.html(html_lib.escape(invite.email))
                     with gui.tag("td"):
