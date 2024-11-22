@@ -567,7 +567,7 @@ class BasePage:
                 )
 
             workspaces = self.request.user.cached_workspaces
-            if self.current_workspace.is_personal and len(workspaces) > 1:
+            if self.current_pr.workspace.is_personal and len(workspaces) > 1:
                 with gui.div(
                     className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
                 ):
