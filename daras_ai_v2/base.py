@@ -67,7 +67,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
 )
 from routers.root import RecipeTabs
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
@@ -572,7 +572,9 @@ class BasePage:
                     className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
                 ):
                     duplicate = gui.button(
-                        f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0",
+                        f"{icons.fork} Duplicate",
+                        type="link",
+                        className="d-inline m-0 p-0",
                     )
                     gui.html("&nbsp;" + "this workflow to edit with others")
                     ref = gui.use_alert_dialog(key="publish-modal")
@@ -583,7 +585,7 @@ class BasePage:
                     if ref.is_open:
                         return self._render_publish_dialog(ref=ref)
 
-            with gui.div(className="d-flex justify-content-between pt-4"):
+            with gui.div(className="d-flex justify-content-between pt-5"):
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
                     value=self.current_app_url(self.tab),
@@ -603,7 +605,10 @@ class BasePage:
                 gui.html("WORKSPACE")
             self.render_workspace_author(workspace)
         with col2:
-            membership = workspace.memberships.get(user_id=self.request.user.id)
+            try:
+                membership = workspace.memberships.get(user_id=self.request.user.id)
+            except WorkspaceMembership.DoesNotExist:
+                return
             member_invite_button_with_dialog(
                 membership,
                 close_on_confirm=False,
@@ -843,11 +848,11 @@ class BasePage:
             } | workspace_options
 
         with gui.div(className="d-flex gap-3"):
-            with gui.div(className="mt-2"):
+            with gui.div(className="mt-2 text-nowrap"):
                 gui.write("Workspace")
 
             if len(workspace_options) > 1:
-                with gui.div(style=dict(minWidth="300px")):
+                with gui.div(style=dict(maxWidth="300px", width="100%")):
                     workspace_id = gui.selectbox(
                         "",
                         key=key,
