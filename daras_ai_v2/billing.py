@@ -19,14 +19,22 @@ from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 
 if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
     from workspaces.models import Workspace
 
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def billing_page(workspace: "Workspace"):
+def billing_page(workspace: "Workspace", user: "AppUser"):
+    from daras_ai_v2.base import BasePage
+
     render_payments_setup()
+
+    if len(user.cached_workspaces) > 1:
+        # when user has multiple workspaces, remind them of the one they are currently on
+        with gui.div(className="mb-3"):
+            BasePage.render_workspace_author(workspace, show_as_link=False)
 
     if workspace.subscription and workspace.subscription.is_paid():
         with gui.div(className="mb-5"):

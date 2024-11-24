@@ -28,6 +28,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
 )
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
+from daras_ai_v2.tts_markdown_renderer import RendererPlain
+from markdown_it import MarkdownIt
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -60,6 +62,7 @@ class TextToSpeechSettings(BaseModel):
     openai_voice_name: OpenAI_TTS_Voices.api_choices | None
     openai_tts_model: OpenAI_TTS_Models.api_choices | None
     ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None
+
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
@@ -191,6 +194,10 @@ class TextToSpeechPage(BasePage):
 
     def run(self, state: dict):
         text = state["text_prompt"].strip()
+        
+         # Parse markdown to plain text
+        parser = MarkdownIt(renderer_cls=RendererPlain)
+        text = parser.render(text)
         provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
         match provider:

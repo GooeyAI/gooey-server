@@ -1,8 +1,9 @@
-import json
 import typing
 from html import escape
 
 import gooey_gui as gui
+from daras_ai_v2 import icons
+
 
 # language="html"
 copy_to_clipboard_scripts = """
@@ -10,13 +11,24 @@ copy_to_clipboard_scripts = """
 function copyToClipboard(button) {
     navigator.clipboard.writeText(button.getAttribute("data-clipboard-text"));
     const original = button.innerHTML;
-    button.textContent = "✅ Copied";
+    const originalStyleWidth = button.style.width || "";
+
+    if (button.offsetWidth > 90) {
+        // 90 is roughly an estimate for pixel-width of the text we want to insert.
+        // if the button was already big enough to show the new text, we want to stay that size.
+        button.style.width = button.offsetWidth + "px";
+    }
+    button.innerHTML = `Copied %(copied_icon)s`;
+
     setTimeout(() => {
         button.innerHTML = original;
+        button.style.width = originalStyleWidth;
     }, 2000);
 }
 </script>
-"""
+""" % {
+    "copied_icon": icons.check
+}
 
 
 def copy_to_clipboard_button(
@@ -40,35 +52,3 @@ def copy_to_clipboard_button(
 </button>
         """,
     )
-
-
-def copy_to_clipboard_button_with_return(
-    label: str,
-    *,
-    key: str,
-    value: str,
-    style: dict[str, str] | None = None,
-    className: str = "",
-    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "primary",
-) -> bool:
-    """
-    Same as copy_to_clipboard_button, but with a boolean return value.
-    This can be used for additional side effects on the button from
-    Python code, besides copying a value to clipboard.
-    """
-    pressed = gui.button(
-        label,
-        id=key,
-        className=className,
-        style=style,
-        type=type,
-        **{"data-clipboard-text": value},
-    )
-    if pressed:
-        gui.js(
-            # language="javascript"
-            f"""
-            copyToClipboard(document.getElementById("{escape(key)}"));
-            """
-        )
-    return pressed

@@ -1,9 +1,12 @@
 import gooey_gui as gui
+from django.core.exceptions import ValidationError
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
-from .models import Workspace
+from handles.models import COMMON_EMAIL_DOMAINS
+from .models import Workspace, WorkspaceInvite, WorkspaceRole
+
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 
@@ -41,7 +44,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         gui.html(
             " ".join(
                 [
-                    current.html_icon(user),
+                    current.html_icon(),
                     display_name,
                     '<i class="ps-1 fa-regular fa-chevron-down"></i>',
                 ],
@@ -64,7 +67,7 @@ def global_workspace_selector(user: AppUser, session: dict):
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html(workspace.html_icon(user))
+                        gui.html(workspace.html_icon())
                     with gui.div(
                         className="col-10 d-flex justify-content-between align-items-center"
                     ):
@@ -105,9 +108,7 @@ def global_workspace_selector(user: AppUser, session: dict):
                         gui.html("Manage Workspace")
 
         if gui.session_state.pop("--create-workspace", None):
-            name = f"{user.first_name_possesive()} Team Workspace"
-            if len(workspaces) > 1:
-                name += f" {len(workspaces) - 1}"
+            name = get_default_workspace_name_for_user(user)
             workspace = Workspace(name=name, created_by=user)
             workspace.create_with_owner()
             session[SESSION_SELECTED_WORKSPACE] = workspace.id
@@ -163,7 +164,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     return current
 
 
-def get_current_workspace(user: AppUser, session: dict) -> "Workspace":
+def get_current_workspace(user: AppUser, session: dict) -> Workspace:
     try:
         workspace_id = session[SESSION_SELECTED_WORKSPACE]
         return Workspace.objects.get(
@@ -179,3 +180,18 @@ def get_current_workspace(user: AppUser, session: dict) -> "Workspace":
 
 def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
+
+
+def get_default_workspace_name_for_user(user: AppUser) -> str:
+    workspace_count = len(user.cached_workspaces)
+    email_domain = user.email and user.email.split("@", maxsplit=1)[1] or ""
+    if (
+        email_domain
+        and email_domain not in COMMON_EMAIL_DOMAINS
+        and workspace_count <= 1
+    ):
+        email_domain_prefix = email_domain.split(".")[0].title()
+        return f"{email_domain_prefix} Team"
+
+    suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
+    return f"{user.first_name_possesive()} Team Workspace" + suffix

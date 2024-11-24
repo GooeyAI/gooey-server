@@ -36,13 +36,10 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, urls, icons
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
-from daras_ai_v2.copy_to_clipboard_button_widget import (
-    copy_to_clipboard_button,
-    copy_to_clipboard_button_with_return,
-)
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
@@ -69,9 +66,8 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
-from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
@@ -518,10 +514,7 @@ class BasePage:
                 dialog.set_open(True)
 
             if dialog.is_open:
-                with gui.alert_dialog(
-                    ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
-                ):
-                    self._render_share_modal(dialog=dialog)
+                self._render_share_modal(dialog=dialog)
         else:
             self._render_copy_link_button()
 
@@ -534,22 +527,22 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        with gui.div(className="visibility-radio mb-5"):
-            options = {
-                str(enum.value): enum.help_text() for enum in PublishedRunVisibility
-            }
-            if self.request.user and self.request.user.handle:
-                profile_url = self.request.user.handle.get_app_url()
-                pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
-            elif self.request.user and not self.request.user.is_anonymous:
-                edit_profile_url = AccountTabs.profile.url_path
-                options[
-                    str(PublishedRunVisibility.PUBLIC.value)
-                ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+        # modal is only valid for logged in users
+        assert self.request.user and self.current_workspace
 
+        with gui.alert_dialog(
+            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
+        ):
+            if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
+                with gui.div(className="mb-4"):
+                    self._render_workspace_with_invite_button(self.current_pr.workspace)
+
+            options = {
+                str(enum.value): enum.help_text(self.current_pr.workspace)
+                for enum in PublishedRunVisibility.choices_for_workspace(
+                    self.current_pr.workspace
+                )
+            }
             published_run_visibility = PublishedRunVisibility(
                 int(
                     gui.radio(
@@ -561,69 +554,74 @@ class BasePage:
                     )
                 )
             )
-            gui.radio(
-                "",
-                options=[
-                    '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
-                ],
-                disabled=True,
-                checked_by_default=False,
-            )
 
-        workspaces = self.request.user.cached_workspaces
-        if workspaces and self.current_pr.workspace not in workspaces:
-            with gui.div(className="alert alert-warning mb-0 mt-4"):
-                duplicate = gui.button(
-                    f"{icons.fork} Duplicate", type="link", className="d-inline m-0 p-0"
+            if self.current_pr.visibility != published_run_visibility:
+                visibility = PublishedRunVisibility(published_run_visibility)
+                self.current_pr.add_version(
+                    user=self.request.user,
+                    saved_run=self.current_pr.saved_run,
+                    title=self.current_pr.title,
+                    notes=self.current_pr.notes,
+                    visibility=visibility,
+                    change_notes=f"Visibility changed to {visibility.name.title()}",
                 )
-                gui.html(" this workflow to edit with others")
-                ref = gui.use_alert_dialog(key="publish-modal")
-                if duplicate:
-                    self.clear_publish_form()
-                    ref.set_open(True)
-                if ref.is_open:
-                    gui.session_state["published_run_workspace"] = workspaces[-1].id
-                    return self._render_publish_dialog(ref=ref)
 
-        with gui.div(className="d-flex justify-content-between pt-4"):
-            pressed_copy = copy_to_clipboard_button_with_return(
-                label="Copy Link",
-                key="copy-link-in-share-modal",
-                className="py-2 px-3 m-0",
-                value=self.current_app_url(self.tab),
-                type="secondary",
-            )
-            pressed_done = gui.button(
-                "Done",
-                type="primary",
-                className="py-2 px-5 m-0",
-            )
-            if pressed_copy or pressed_done:
-                if self.current_pr.visibility != published_run_visibility:
-                    visibility = PublishedRunVisibility(published_run_visibility)
-                    self.current_pr.add_version(
-                        user=self.request.user,
-                        saved_run=self.current_pr.saved_run,
-                        title=self.current_pr.title,
-                        notes=self.current_pr.notes,
-                        visibility=visibility,
-                        change_notes=f"Visibility changed to {visibility.name.title()}",
+            workspaces = self.request.user.cached_workspaces
+            if self.current_pr.workspace.is_personal and len(workspaces) > 1:
+                with gui.div(
+                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
+                ):
+                    duplicate = gui.button(
+                        f"{icons.fork} Duplicate",
+                        type="link",
+                        className="d-inline m-0 p-0",
                     )
+                    gui.html("&nbsp;" + "this workflow to edit with others")
+                    ref = gui.use_alert_dialog(key="publish-modal")
+                    if duplicate:
+                        self.clear_publish_form()
+                        gui.session_state["published_run_workspace"] = workspaces[-1].id
+                        ref.set_open(True)
+                    if ref.is_open:
+                        return self._render_publish_dialog(ref=ref)
 
-                dialog.set_open(False)
-                gui.rerun()
+            with gui.div(className="d-flex justify-content-between pt-5"):
+                copy_to_clipboard_button(
+                    label=f"{icons.link} Copy Link",
+                    value=self.current_app_url(self.tab),
+                    type="secondary",
+                    className="py-2 px-3 m-0",
+                )
+                if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
+                    dialog.set_open(False)
+                    gui.rerun()
+
+    def _render_workspace_with_invite_button(self, workspace: Workspace):
+        from workspaces.views import member_invite_button_with_dialog
+
+        col1, col2 = gui.columns([9, 3])
+        with col1:
+            with gui.tag("p", className="mb-1 text-muted"):
+                gui.html("WORKSPACE")
+            self.render_workspace_author(workspace)
+        with col2:
+            try:
+                membership = workspace.memberships.get(user_id=self.request.user.id)
+            except WorkspaceMembership.DoesNotExist:
+                return
+            member_invite_button_with_dialog(
+                membership,
+                close_on_confirm=False,
+                type="tertiary",
+                className="mb-0",
+            )
 
     def _render_save_button(self):
-        can_edit = self.can_user_edit_published_run(self.current_pr)
-
         with gui.div(className="d-flex justify-content-end"):
             gui.html(
                 """
                 <style>
                     .save-button-menu .gui-input label p { color: black; }
-                    .visibility-radio .gui-input {
-                        margin-bottom: 0;
-                    }
                     .published-options-menu {
                         z-index: 1;
                     }
@@ -631,7 +629,7 @@ class BasePage:
                 """
             )
 
-            if can_edit:
+            if self.can_user_edit_published_run(self.current_pr):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
                 icon, label = icons.save, "Save and Run"
@@ -699,7 +697,6 @@ class BasePage:
 
     def _render_publish_form(
         self,
-        *,
         sr: SavedRun,
         pr: PublishedRun,
         dialog: gui.AlertDialogRef,
@@ -753,7 +750,7 @@ class BasePage:
                 pressed_save = gui.button(
                     f"{icons.save} Save",
                     type="primary",
-                    className="mb-0 py-2 px-4",
+                    className="mb-0 ms-2 py-2 px-4",
                 )
             else:
                 pressed_save_as_new = gui.button(
@@ -851,11 +848,11 @@ class BasePage:
             } | workspace_options
 
         with gui.div(className="d-flex gap-3"):
-            with gui.div(className="mt-2"):
+            with gui.div(className="mt-2 text-nowrap"):
                 gui.write("Workspace")
 
             if len(workspace_options) > 1:
-                with gui.div(style=dict(minWidth="300px")):
+                with gui.div(style=dict(maxWidth="300px", width="100%")):
                     workspace_id = gui.selectbox(
                         "",
                         key=key,
@@ -867,7 +864,7 @@ class BasePage:
                     return workspace_options[workspace_id]
             else:
                 with gui.div(className="p-2 mb-2"):
-                    self.render_author(
+                    self.render_workspace_author(
                         self.current_workspace,
                         show_as_link=False,
                     )
@@ -1623,9 +1620,10 @@ class BasePage:
                 self.render_run_cost()
             with col2:
                 submitted = gui.button(
-                    "🏃 Run",
+                    f"{icons.run} Run",
                     key=key,
                     type="primary",
+                    unsafe_allow_html=True,
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
             if not submitted:
@@ -2191,6 +2189,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         pr_filter = Q(workspace=self.current_workspace)
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
+        else:
+            pr_filter &= Q(
+                visibility__in=(
+                    PublishedRunVisibility.PUBLIC,
+                    PublishedRunVisibility.INTERNAL,
+                )
+            ) | Q(created_by=self.request.user)
         published_runs = PublishedRun.objects.filter(
             Q(workflow=self.workflow) & pr_filter
         )[:50]
@@ -2213,10 +2218,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
-        uid = self.request.user.uid
-        if self.is_current_user_admin():
-            uid = self.request.query_params.get("uid", uid)
-
         before = self.request.query_params.get("updated_at__lt", None)
         if before:
             before = datetime.datetime.fromisoformat(before)
@@ -2225,7 +2226,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         run_history = list(
             SavedRun.objects.filter(
                 workflow=self.workflow,
-                uid=uid,
                 updated_at__lt=before,
                 workspace=self.current_workspace,
             )[:25]
