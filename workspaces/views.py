@@ -13,14 +13,12 @@ from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
-    DEFAULT_WORKSPACE_PHOTO_URL,
     Workspace,
     WorkspaceInvite,
     WorkspaceMembership,
     WorkspaceRole,
 )
 from .widgets import get_current_workspace, set_current_workspace
-
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
@@ -125,11 +123,6 @@ def _handle_invite_accepted(
             """,
         )
         return
-
-    if invite.workspace.memberships.filter(user=current_user).exists():
-        # already a member, redirect to workspace page
-        set_current_workspace(session, int(invite.workspace_id))
-        raise gui.RedirectException(workspace_redirect_url)
 
     invite.accept(current_user, updated_by=current_user)
     set_current_workspace(session, int(invite.workspace_id))
