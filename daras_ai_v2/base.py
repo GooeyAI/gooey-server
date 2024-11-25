@@ -2186,7 +2186,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _saved_tab(self):
         self.ensure_authentication()
 
-        pr_filter = Q(workspace=self.current_workspace)
+        before = self.request.query_params.get("updated_at__lt", None)
+        if before:
+            before = datetime.datetime.fromisoformat(before)
+        else:
+            before = timezone.now()
+
+        pr_filter = Q(workspace=self.current_workspace, updated_at__lt=before)
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         else:
@@ -2214,6 +2220,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             self.render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
+
+        next_url = self.current_app_url(
+            RecipeTabs.saved,
+            query_params={"updated_at__lt": published_runs[-1].updated_at},
+        )
+        with gui.link(to=str(next_url)):
+            gui.html(
+                # language=HTML
+                """<button type="button" class="btn btn-theme">Load More</button>"""
+            )
 
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
