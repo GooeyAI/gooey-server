@@ -1,9 +1,11 @@
 import typing
 from contextlib import contextmanager
+from datetime import datetime
 from enum import Enum
 
 import gooey_gui as gui
 from django.db.models import Q
+from django.utils import timezone
 from fastapi.requests import Request
 from furl import furl
 from loguru import logger
@@ -259,6 +261,12 @@ def profile_tab(request: Request):
 
 
 def all_saved_runs_tab(request: Request):
+    page_size = 25
+    if before := request.query_params.get("updated_at__lt"):
+        before = datetime.fromisoformat(before)
+    else:
+        before = timezone.now()
+
     workspace = get_current_workspace(request.user, request.session)
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
@@ -270,7 +278,13 @@ def all_saved_runs_tab(request: Request):
                 PublishedRunVisibility.INTERNAL,
             )
         ) | Q(created_by=request.user)
-    prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
+    pr_filter &= Q(updated_at__lt=before)
+
+    prs = (
+        PublishedRun.objects.select_related("workspace", "created_by", "saved_run")
+        .filter(pr_filter)
+        .order_by("-updated_at")[:page_size]
+    )
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
@@ -333,6 +347,17 @@ def all_saved_runs_tab(request: Request):
 
     with gui.div(className="mt-4"):
         grid_layout(3, prs, _render_run)
+
+    if len(prs) == page_size:
+        next_url = furl(
+            get_route_path(saved_route),
+            query_params={"updated_at__lt": prs[-1].updated_at.isoformat()},
+        )
+        with gui.link(to=str(next_url)):
+            gui.html(
+                # language=HTML
+                """<button type="button" class="btn btn-theme">Load More</button>"""
+            )
 
 
 def api_keys_tab(request: Request):
