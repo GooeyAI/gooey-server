@@ -702,12 +702,15 @@ class BasePage:
         dialog: gui.AlertDialogRef,
     ):
         form_container = gui.div()
-
-        gui.newline()
-        selected_workspace = self._render_workspace_selector(
-            key="published_run_workspace"
+        bottom_container = gui.div(
+            className="d-flex justify-content-between mt-4 gap-2"
         )
-        user_can_edit = selected_workspace.id == self.current_pr.workspace_id
+
+        with bottom_container:
+            selected_workspace = self._render_workspace_selector(
+                key="published_run_workspace"
+            )
+            user_can_edit = selected_workspace.id == self.current_pr.workspace_id
 
         with form_container:
             if user_can_edit:
@@ -740,7 +743,7 @@ class BasePage:
                         placeholder="Add change notes",
                     )
 
-        with gui.div(className="d-flex justify-content-end mt-4 gap-2"):
+        with bottom_container, gui.div():
             if user_can_edit:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
