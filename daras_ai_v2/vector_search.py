@@ -67,6 +67,7 @@ from daras_ai_v2.search_ref import (
     remove_quotes,
     generate_text_fragment_url,
 )
+from daras_ai_v2.office_utils_pptx import pptx_to_text_pages
 from daras_ai_v2.text_splitter import text_splitter, Document
 from embeddings.models import EmbeddedFile, EmbeddingsReference
 from files.models import FileMetadata
@@ -769,14 +770,8 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
         else:
             return pdf_to_text_pages(f=io.BytesIO(f_bytes))
 
-    elif mime_type in [
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.ms-powerpoint",
-    ]:
-        if use_form_reco:
-            return pptx_to_form_reco(f_url, f_name, f_bytes, mime_type)
-        else:
-            return pptx_to_text_pages(f=io.BytesIO(f_bytes))
+    elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":  
+        return pptx_to_text_pages(f=io.BytesIO(f_bytes))
 
     else:
         df = tabular_bytes_to_str_df(
@@ -829,100 +824,6 @@ def tabular_bytes_to_any_df(
             )
     return df
 
-def pptx_to_text_pages(f: typing.BinaryIO) -> list[str]:
-    """
-    Extracts and converts text, tables, charts, and grouped shapes from a PPTX file into Markdown format.
-    """
-    from pptx import Presentation
-    from pptx.enum.shapes import MSO_SHAPE_TYPE
-
-    prs = Presentation(f)
-    slides_text = []
-
-    for slide_num, slide in enumerate(prs.slides, start=1):
-        slide_content = [f"Slide {slide_num}:"]  # Markdown heading for slide
-        for shape in slide.shapes:
-            try:
-                if shape.has_text_frame:
-                    text = shape.text.strip()
-                    if text:
-                        slide_content.append(f"{text}")
-                if shape.has_table:
-                    slide_content.extend(pptx_format_table(shape.table))
-                if shape.has_chart:
-                    # check this shape is a chart
-                    chart = shape.chart
-                    chart_title = (
-                        chart.chart_title.text_frame.text
-                        if chart.has_title
-                        else "Chart"
-                    )
-                    chart_text = [f" {chart_title}:"]
-                    for series in chart.series:
-                        series_text = f"Series '{series.name}'"
-                        chart_text.append(series_text)
-                    slide_content.extend(chart_text)
-                if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
-                    slide_content.extend(pptx_format_grouped_shape(shape))
-            except Exception as e:
-                # Catch any exceptions and append to slide content which should be handled better
-                slide_content.append(f"  Error processing shape: {e}")
-                
-        slides_text.append("\n".join(slide_content)+"\n")
-    return slides_text
-
-
-def pptx_format_table(table) -> list[str]:
-    """
-    Formats a Shape-table into Markdown.
-    """
-    table_text = []
-    if len(table.rows) == 0:
-        return table_text
-
-    header_row = [cell.text.strip() for cell in table.rows[0].cells]
-    num_columns = len(header_row)
-
-    table_text.append(pptx_gen_table_row(header_row))
-    table_text.append(pptx_gen_table_row([":-:" for _ in header_row]))
-
-    for row_idx in range(1, len(table.rows)):
-        row = table.rows[row_idx]
-        row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-        if row_text:
-            table_text.append(pptx_gen_table_row(row_text))
-
-    return table_text
-
-
-def pptx_gen_table_row(row: list[str]) -> str:
-    """
-    Generates a formatted table row for Markdown.
-    """
-    return "| " + " | ".join([c.replace("\n", "<br />") for c in row]) + " |"
-
-
-def pptx_format_grouped_shape(group_shape) -> list[str]:
-    """
-    Recursively formats grouped shapes, extracting text from each.
-    """
-    group_text = []
-    check_recursively_for_text(group_shape, group_text)
-    return group_text
-
-def check_recursively_for_text(shape, group_text):
-    from pptx.enum.shapes import MSO_SHAPE_TYPE
-
-    if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
-        for sub_shape in shape.shapes:
-            check_recursively_for_text(sub_shape, group_text)
-    else:
-        if hasattr(shape, "text"):
-            text = shape.text.strip()
-            if text:
-                group_text.append(f"{text}")
-                
-                
 class UnsupportedDocumentError(UserError):
     pass
 
@@ -931,29 +832,6 @@ def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
     import pdftotext
 
     return list(pdftotext.PDF(f))
-
-
-def pptx_to_form_reco(f_url: str, f_name: str, f_bytes: bytes, mime_type: str) -> list[str]:
-
-    if is_gdrive_url(furl(f_url)):
-        f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
-    num_slides = get_pptx_num_slides(f_bytes)
-    
-    return list(map_parallel(
-        lambda slide_num: 
-        azure_doc_extract_page_num(f_url, slide_num, model_id="prebuilt-read"),
-        range(1, num_slides + 1),
-        max_workers=4,
-    ))
-
-
-def get_pptx_num_slides(f_bytes: bytes) -> int:
-    from pptx import Presentation
-
-    with tempfile.NamedTemporaryFile() as infile:
-        infile.write(f_bytes)
-        prs = Presentation(infile.name)
-        return len(prs.slides)
 
 
 def pdf_to_form_reco_df(
