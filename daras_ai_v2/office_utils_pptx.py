@@ -1,10 +1,11 @@
 import typing
+import re
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.shapes import PP_PLACEHOLDER
 
 
-def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool=False) -> list[str]:
+def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[str]:
     """
     Extracts and converts text, tables, charts, and grouped shapes from a PPTX file into Markdown format.
     """
@@ -12,7 +13,7 @@ def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool=False) -> list[st
     slides_text = []
 
     for slide_num, slide in enumerate(prs.slides, start=1):
-        slide_content = [f"Slide {slide_num}"] 
+        slide_content = [f"Slide {slide_num}"]
         for shape in slide.shapes:
             try:
                 if shape.has_text_frame:
@@ -26,17 +27,15 @@ def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool=False) -> list[st
 
                 if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
                     slide_content.extend(handle_grouped_shapes(shape))
-                
+
                 # if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 #     slide_content.extend(handle_pictures(shape))
 
-
             except Exception as e:
                 slide_content.append(f"  Error processing shape: {e}")
-                
+
         slides_text.append("\n".join(slide_content) + "\n")
     return slides_text
-
 
 
 def handle_text_elements(shape) -> list[str]:
@@ -99,7 +98,10 @@ def handle_text_elements(shape) -> list[str]:
                 else:
                     if shape.is_placeholder:
                         placeholder_type = shape.placeholder_format.type
-                        if placeholder_type in [PP_PLACEHOLDER.CENTER_TITLE, PP_PLACEHOLDER.TITLE]:
+                        if placeholder_type in [
+                            PP_PLACEHOLDER.CENTER_TITLE,
+                            PP_PLACEHOLDER.TITLE,
+                        ]:
                             doc_label = "TITLE"
                         elif placeholder_type == PP_PLACEHOLDER.SUBTITLE:
                             doc_label = "SECTION_HEADER"
@@ -119,19 +121,20 @@ def handle_text_elements(shape) -> list[str]:
 
     return text_elements
 
+
 def handle_tables(shape) -> list[str]:
     """
     Handles tables within a shape, converting them into Markdown format.
     """
-    
-    if not hasattr(shape, 'has_table') or not shape.has_table:
+
+    if not hasattr(shape, "has_table") or not shape.has_table:
         return []
     table = shape.table
     table_xml = shape._element
 
     num_rows = len(table.rows)
     num_cols = len(table.columns)
-    grid = [['' for _ in range(num_cols)] for _ in range(num_rows)]
+    grid = [["" for _ in range(num_cols)] for _ in range(num_rows)]
 
     for row_idx, row in enumerate(table.rows):
 
@@ -147,27 +150,31 @@ def handle_tables(shape) -> list[str]:
             col_span = int(cell_xml.get("gridSpan", 1))
 
             # Place text in the grid
-            grid[row_idx][col_idx] = cell.text.strip()
+            # remove newline char to prevserve table structure
+            cleaned_text = re.sub(r"[\n\r]", "", cell.text)
+            grid[row_idx][col_idx] = cleaned_text
+
             # Mark spanned cells
             for i in range(row_span):
                 for j in range(col_span):
                     if i == 0 and j == 0:
                         continue
                     if row_idx + i < num_rows and col_idx + j < num_cols:
-                        grid[row_idx + i][col_idx + j] = ''
+                        grid[row_idx + i][col_idx + j] = ""
 
     # Convert grid to Markdown format
     table_text = []
-    header = '|' + '|'.join(grid[0]) + '|'
-    separator = '|' + "---|" * num_cols
+    header = "|" + "|".join(grid[0]) + "|"
+    separator = "|" + "---|" * num_cols
     table_text.append(header)
     table_text.append(separator)
     for row in grid[1:]:
-        line = '|' + '|'.join(row) + ' |'
+        line = "|" + "|".join(row) + "|"
         table_text.append(line)
         print(line)
 
     return table_text
+
 
 def handle_grouped_shapes(shape) -> list[str]:
     """
@@ -186,23 +193,20 @@ def handle_grouped_shapes(shape) -> list[str]:
     handle_shapes(shape)
     return group_text
 
-def handle_charts(shape)-> list[str]:
+
+def handle_charts(shape) -> list[str]:
     """
     Handles charts within a shape, converting them into Markdown format.
     """
     chart = shape.chart
-    chart_title = (
-        chart.chart_title.text_frame.text
-        if chart.has_title
-        else "Chart"
-    )
+    chart_title = chart.chart_title.text_frame.text if chart.has_title else "Chart"
     chart_text = [f" {chart_title}:"]
     for series in chart.series:
         series_text = f"Series '{series.name}'"
         chart_text.append(series_text)
     return chart_text
 
+
 # TODO :azure form reco to extract text from images
 def handle_pictures(shape):
     pass
-

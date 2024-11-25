@@ -770,7 +770,10 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
         else:
             return pdf_to_text_pages(f=io.BytesIO(f_bytes))
 
-    elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":  
+    elif (
+        mime_type
+        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ):
         return pptx_to_text_pages(f=io.BytesIO(f_bytes))
 
     else:
@@ -824,6 +827,7 @@ def tabular_bytes_to_any_df(
             )
     return df
 
+
 class UnsupportedDocumentError(UserError):
     pass
 
@@ -874,10 +878,10 @@ def get_pdf_num_pages(f_bytes: bytes) -> int:
 
 def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
     if is_gdrive_presentation_url(furl(url)):
-        param="slide"
+        param = "slide"
     else:
-        param= "page"
-        
+        param = "page"
+
     return furl(url).set(fragment_args={param: page_num} if page_num else {})
 
 
