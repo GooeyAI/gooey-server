@@ -38,14 +38,13 @@ def bulk_documents_uploader(
     accept: typing.Iterable[str] = None,
     help: str | None = None,
 ) -> list[str]:
-    with gui.tooltip(help, help="true"):
-        gui.write(label, className="gui-input", unsafe_allow_html=True)
+    gui.write(label, className="gui-input", help=help)
     documents = gui.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
     custom_key = "__custom_" + key
     if gui.session_state.get(f"__custom_checkbox_{key}"):
-        if not custom_key in gui.session_state:
+        if custom_key not in gui.session_state:
             gui.session_state[custom_key] = "\n".join(documents)
         widget = gui.text_area
         kwargs = dict(height=150)
