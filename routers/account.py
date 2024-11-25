@@ -6,7 +6,6 @@ import gooey_gui as gui
 from django.db.models import Q
 from fastapi.requests import Request
 from furl import furl
-from gooey_gui.core import RedirectException
 from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
@@ -190,29 +189,27 @@ def invitation_route(
     workspace_slug: str | None,
     email: str | None,
 ):
-    from routers.root import login
-
-    if not request.user or request.user.is_anonymous:
-        next_url = request.url.path
-        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
-        raise RedirectException(redirect_url)
-
     try:
         invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
-        invite = WorkspaceInvite.objects.get(id=invite_id)
+        invite = WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
     except (IndexError, WorkspaceInvite.DoesNotExist):
         return Response(status_code=404)
 
-    with page_wrapper(request):
-        invitation_page(
-            current_user=request.user, session=request.session, invite=invite
-        )
+    invitation_page(current_user=request.user, session=request.session, invite=invite)
+
+    description = invite.created_by.full_name()
+    if email := invite.created_by.email:
+        description += f" ({email})"
+    elif phone := invite.created_by.phone_number:
+        description += f" ({phone.as_international})"
+    description += f" invited you to join {invite.workspace.display_name()} on Gooey.AI"
 
     return dict(
         meta=raw_build_meta_tags(
             url=str(request.url),
-            title=f"Join {invite.workspace.display_name()} • Gooey.AI",
-            description=f"Invitation to join {invite.workspace.display_name()}",
+            title=invite.workspace.display_name(),
+            description=description,
+            image=invite.workspace.get_photo(),
             robots="noindex,nofollow",
         )
     )
