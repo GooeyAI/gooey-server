@@ -72,26 +72,27 @@ def variables_input(
 
         col1, col2 = gui.columns([11, 1], responsive=False)
         with col1:
-            value = old_vars.get(name)
+            displayed_value = stored_value = old_vars.get(name)
             try:
-                new_text_value = gui.session_state[var_key]
+                displayed_value = gui.session_state[var_key]
             except KeyError:
-                if value is None:
-                    value = ""
-                is_json = isinstance(value, (dict, list))
+                if stored_value is None:
+                    displayed_value = ""
+                is_json = isinstance(stored_value, (dict, list))
                 if is_json:
-                    value = json.dumps(value, indent=2)
-                gui.session_state[var_key] = str(value)
+                    displayed_value = json.dumps(stored_value, indent=2)
+                gui.session_state[var_key] = str(displayed_value)
             else:
                 try:
-                    value = json.loads(new_text_value)
-                    is_json = isinstance(value, (dict, list))
-                    if not is_json:
-                        value = new_text_value
+                    stored_value = json.loads(displayed_value)
                 except json.JSONDecodeError:
                     is_json = False
-                    value = new_text_value
-            new_vars[name] = value
+                else:
+                    is_json = isinstance(stored_value, (dict, list))
+                if not is_json:
+                    stored_value = displayed_value
+
+            new_vars[name] = stored_value
 
             gui.text_area(
                 "**```" + name + "```**" + (" (JSON)" if is_json else ""),
