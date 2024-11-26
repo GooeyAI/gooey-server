@@ -112,6 +112,9 @@ def render_content():
             sub_section_title("Link")
             link()
 
+            sub_section_title("Text with Help Icon")
+            text_with_help_icon()
+
             sub_section_title("Colored Text")
             colored_text()
 
@@ -146,6 +149,14 @@ def normal_text():
 def link():
     with gui.tag("a", href="https://www.gooey.ai"):
         gui.html("This is a link")
+
+
+@show_source_code
+def text_with_help_icon():
+    gui.write("This is a text with a help icon\n\nAnd multiple lines", help="Help me!")
+    gui.write("# This is a h1 heading", help="Help me!")
+    gui.write("## This is a h2 heading", help="Help me!")
+    gui.write("### This is a h3 heading", help="Help me!")
 
 
 @show_source_code
@@ -185,7 +196,7 @@ def render_components():
         # Inputs
         render_inputs()
 
-        section_title("File Upload Button")
+        section_title("File Upload Menu")
         file_upload()
 
 
@@ -195,7 +206,6 @@ def file_upload():
         "**Upload Any File**",
         key="file_uploader_test0",
         help="Attach a video/audio/file to this.",
-        optional=True,
         accept=["audio/*"],
     )
 
@@ -208,14 +218,25 @@ def render_inputs():
     def text_area():
         gui.text_area(
             "Label: Take some input from user",
-            "",
-            100,
-            "textArea_test0",
-            "want help?",
-            "You can also show a placeholder",
+            height=100,
+            key="textArea_test0",
+            help="want help?",
+            placeholder="You can also show a placeholder",
         )
 
     text_area()
+
+    sub_section_title("Checkbox")
+
+    @show_source_code
+    def checkbox():
+        gui.checkbox(
+            "Label: Check this box",
+            key="checkbox_test0",
+            help="want help?",
+        )
+
+    checkbox()
 
     sub_section_title("Multi Select")
 
@@ -296,6 +317,8 @@ def buttons():
         gui.button("Secondary", key="test1")
         gui.button("Tertiary", key="test3", type="tertiary")
         gui.button("Link Button", key="test3", type="link")
+        with gui.tooltip("Help me!"):
+            gui.button("Button With Tooltip")
 
 
 def code_block(content: str):
@@ -303,7 +326,7 @@ def code_block(content: str):
     formatted_code = "\n".join(code_lines)
     with gui.tag("div", className="mt-4"):
         gui.write(
-            rf"""
+            r"""
                 ```python %s
             """
             % formatted_code,
