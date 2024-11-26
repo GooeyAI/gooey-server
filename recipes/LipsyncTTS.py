@@ -56,7 +56,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         gui.file_uploader(
             """
             #### Input Face
-            Upload a video/image that contains faces to use
+            Upload a video/image with one human face.
             *Recommended - mp4 / mov / png / jpg*
             """,
             key="input_face",

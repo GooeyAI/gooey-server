@@ -467,7 +467,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.file_uploader(
                     """
                     ###### 👩‍🦰 Input Face
-                    Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
+                    Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
                     """,
                     key="input_face",
                 )
