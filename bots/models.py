@@ -1819,23 +1819,12 @@ class PublishedRun(models.Model):
                     "visibility",
                     "is_approved_example",
                     "published_run_id",
-                ]
-            ),
-            models.Index(
-                fields=[
-                    "workflow",
-                    "visibility",
-                    "is_approved_example",
-                    "published_run_id",
                     "example_priority",
                     "updated_at",
                 ]
             ),
             models.Index(
-                "created_by",
-                "visibility",
-                models.F("updated_at").desc(),
-                name="published_run_cre_vis_upd_idx",
+                fields=["-updated_at", "workspace", "created_by", "visibility"]
             ),
         ]
 
