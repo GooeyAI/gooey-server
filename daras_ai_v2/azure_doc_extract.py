@@ -16,12 +16,13 @@ from daras_ai_v2.text_splitter import default_length_function
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_page_num(url: str, page_num: int, model_id="prebuilt-layout") -> str:
+def azure_doc_extract_page_num(
+    url: str, page_num: int, model_id="prebuilt-layout"
+) -> str:
     if page_num:
         params = dict(pages=str(page_num))
     else:
         params = None
-        
     pages = azure_doc_extract_pages(url, params=params, model_id=model_id)
     if pages and pages[0]:
         return str(pages[0])
@@ -32,7 +33,6 @@ def azure_doc_extract_page_num(url: str, page_num: int, model_id="prebuilt-layou
 def azure_doc_extract_pages(
     pdf_url: str, model_id: str = "prebuilt-layout", params: dict = None
 ) -> list[str]:
-
     result = azure_form_recognizer(pdf_url, model_id, params)
     return [
         records_to_text(extract_records(result, page["pageNumber"]))
@@ -85,28 +85,27 @@ def extract_records(result: dict, page_num: int) -> list[dict]:
     table_polys = extract_tables(result, page_num)
     records = []
     for para in result.get("paragraphs", []):
-        #indirectly check if the para is in the current page
+        # indirectly check if the para is in the current page
         bounding_regions = para.get("boundingRegions")
         if not bounding_regions:
-            records.append({
-                "role": para.get("role", ""),
-                "content": strip_content(para["content"]),
-            })
+            records.append(
+                {
+                    "role": para.get("role", ""),
+                    "content": strip_content(para["content"]),
+                }
+            )
             continue
 
         try:
-            if para["boundingRegions"][0]["pageNumber"] != page_num:
-
+            if bounding_regions[0]["pageNumber"] != page_num:
                 continue
         except (KeyError, IndexError):
-
             continue
         for table in table_polys:
             if rect_contains(
                 outer=table["polygon"], inner=para["boundingRegions"][0]["polygon"]
             ):
                 if not table.get("added"):
-                    
                     records.append({"role": "csv", "content": table["content"]})
                     table["added"] = True
                 break
@@ -145,7 +144,7 @@ def rect_contains(*, outer: list[int], inner: list[int]):
 
 def extract_tables(result, page):
     table_polys = []
-    for table in result.get('tables', []):
+    for table in result.get("tables", []):
         try:
             if table["boundingRegions"][0]["pageNumber"] != page:
                 continue

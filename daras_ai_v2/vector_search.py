@@ -881,7 +881,6 @@ def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
         param = "slide"
     else:
         param = "page"
-
     return furl(url).set(fragment_args={param: page_num} if page_num else {})
 
 
