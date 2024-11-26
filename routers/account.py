@@ -1,11 +1,9 @@
 import typing
 from contextlib import contextmanager
-from datetime import datetime
 from enum import Enum
 
 import gooey_gui as gui
 from django.db.models import Q
-from django.utils import timezone
 from fastapi.requests import Request
 from furl import furl
 from loguru import logger
@@ -20,6 +18,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -261,12 +260,6 @@ def profile_tab(request: Request):
 
 
 def all_saved_runs_tab(request: Request):
-    page_size = 25
-    if before := request.query_params.get("updated_at__lt"):
-        before = datetime.fromisoformat(before)
-    else:
-        before = timezone.now()
-
     workspace = get_current_workspace(request.user, request.session)
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
@@ -278,12 +271,13 @@ def all_saved_runs_tab(request: Request):
                 PublishedRunVisibility.INTERNAL,
             )
         ) | Q(created_by=request.user)
-    pr_filter &= Q(updated_at__lt=before)
 
-    prs = (
-        PublishedRun.objects.select_related("workspace", "created_by", "saved_run")
-        .filter(pr_filter)
-        .order_by("-updated_at")[:page_size]
+    qs = PublishedRun.objects.select_related(
+        "workspace", "created_by", "saved_run"
+    ).filter(pr_filter)
+
+    prs, cursor = paginate_queryset(
+        qs=qs, ordering=["-updated_at"], cursor=request.query_params
     )
 
     def _render_run(pr: PublishedRun):
@@ -348,16 +342,7 @@ def all_saved_runs_tab(request: Request):
     with gui.div(className="mt-4"):
         grid_layout(3, prs, _render_run)
 
-    if len(prs) == page_size:
-        next_url = furl(
-            get_route_path(saved_route),
-            query_params={"updated_at__lt": prs[-1].updated_at.isoformat()},
-        )
-        with gui.link(to=str(next_url)):
-            gui.html(
-                # language=HTML
-                """<button type="button" class="btn btn-theme">Load More</button>"""
-            )
+    paginate_button(url=request.url, cursor=cursor)
 
 
 def api_keys_tab(request: Request):
