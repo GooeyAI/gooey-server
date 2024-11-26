@@ -1780,11 +1780,13 @@ class PublishedRun(models.Model):
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
         related_name="published_runs",
+        blank=True,
     )
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
+        blank=True,
     )
 
     workspace = models.ForeignKey(
@@ -1955,6 +1957,7 @@ class PublishedRunVersion(models.Model):
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
+        blank=True,
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
