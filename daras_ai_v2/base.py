@@ -703,7 +703,7 @@ class BasePage:
     ):
         form_container = gui.div()
         bottom_container = gui.div(
-            className="d-flex justify-content-between mt-4 gap-2"
+            className="mt-4 d-block d-lg-flex justify-content-between"
         )
 
         with bottom_container:
@@ -743,7 +743,7 @@ class BasePage:
                         placeholder="Add change notes",
                     )
 
-        with bottom_container, gui.div():
+        with bottom_container, gui.div(className="mt-4 mt-lg-0 text-end"):
             if user_can_edit:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
