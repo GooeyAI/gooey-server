@@ -83,7 +83,7 @@ class InsufficientCredits(UserError):
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
+You’ll receive {settings.VERIFIED_EMAIL_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
 """
         else:

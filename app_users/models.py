@@ -186,7 +186,6 @@ class AppUser(models.Model):
         self.display_name = user.display_name or ""
         self.email = str(user.email)
         self.phone_number = str(user.phone_number)
-        provider_list = user.provider_data
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
         )
@@ -214,12 +213,15 @@ class AppUser(models.Model):
         # get existing balance or set free credits
         if self.is_anonymous:
             self.balance = settings.ANON_USER_FREE_CREDITS
-        elif (
-            "+" in str(self.email) or "@gmail.com" not in str(self.email)
-        ) and provider_list[-1].provider_id == "password":
-            self.balance = settings.EMAIL_USER_FREE_CREDITS
+        elif any(
+            provider.provider_id != "password" for provider in user.provider_data
+        ) or (
+            "+" not in self.email
+            and self.email.split("@")[-1].lower() in settings.VERIFIED_EMAIL_DOMAINS
+        ):
+            self.balance = settings.VERIFIED_EMAIL_USER_FREE_CREDITS
         else:
-            self.balance = settings.LOGIN_USER_FREE_CREDITS
+            self.balance = 0
 
         if handle := Handle.create_default_for_user(user=self):
             self.handle = handle
