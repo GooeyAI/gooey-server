@@ -63,6 +63,7 @@ class TextToSpeechSettings(BaseModel):
     openai_tts_model: OpenAI_TTS_Models.api_choices | None
     ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None
 
+
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3621e11a-88d9-11ee-b549-02420a000167/Compare%20AI%20voice%20generators.png.png"

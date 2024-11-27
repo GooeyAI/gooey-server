@@ -6,12 +6,10 @@ import gooey_gui as gui
 from django.db.models import Q
 from fastapi.requests import Request
 from furl import furl
-from gooey_gui.core import RedirectException
 from loguru import logger
 from requests.models import HTTPError
 from starlette.responses import Response
 
-from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
@@ -20,12 +18,16 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
 
 app = CustomAPIRouter()
 
@@ -188,29 +190,27 @@ def invitation_route(
     workspace_slug: str | None,
     email: str | None,
 ):
-    from routers.root import login
-
-    if not request.user or request.user.is_anonymous:
-        next_url = request.url.path
-        redirect_url = str(furl(get_route_path(login), query_params={"next": next_url}))
-        raise RedirectException(redirect_url)
-
     try:
         invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
-        invite = WorkspaceInvite.objects.get(id=invite_id)
+        invite = WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
     except (IndexError, WorkspaceInvite.DoesNotExist):
         return Response(status_code=404)
 
-    with page_wrapper(request):
-        invitation_page(
-            current_user=request.user, session=request.session, invite=invite
-        )
+    invitation_page(current_user=request.user, session=request.session, invite=invite)
+
+    description = invite.created_by.full_name()
+    if email := invite.created_by.email:
+        description += f" ({email})"
+    elif phone := invite.created_by.phone_number:
+        description += f" ({phone.as_international})"
+    description += f" invited you to join {invite.workspace.display_name()} on Gooey.AI"
 
     return dict(
         meta=raw_build_meta_tags(
             url=str(request.url),
-            title=f"Join {invite.workspace.display_name()} • Gooey.AI",
-            description=f"Invitation to join {invite.workspace.display_name()}",
+            title=invite.workspace.display_name(),
+            description=description,
+            image=invite.workspace.get_photo(),
             robots="noindex,nofollow",
         )
     )
@@ -234,7 +234,7 @@ class AccountTabs(TabData, Enum):
 
     @classmethod
     def get_tabs_for_user(
-        cls, user: AppUser | None, workspace: Workspace | None
+        cls, user: typing.Optional["AppUser"], workspace: Workspace | None
     ) -> list["AccountTabs"]:
 
         ret = list(cls)
@@ -252,7 +252,7 @@ class AccountTabs(TabData, Enum):
 def billing_tab(request: Request, workspace: Workspace):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
-    return billing_page(workspace)
+    return billing_page(workspace=workspace, user=request.user)
 
 
 def profile_tab(request: Request):
@@ -264,7 +264,21 @@ def all_saved_runs_tab(request: Request):
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
-    prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
+    else:
+        pr_filter &= Q(
+            visibility__in=(
+                PublishedRunVisibility.PUBLIC,
+                PublishedRunVisibility.INTERNAL,
+            )
+        ) | Q(created_by=request.user)
+
+    qs = PublishedRun.objects.select_related(
+        "workspace", "created_by", "saved_run"
+    ).filter(pr_filter)
+
+    prs, cursor = paginate_queryset(
+        qs=qs, ordering=["-updated_at"], cursor=request.query_params
+    )
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
@@ -327,6 +341,8 @@ def all_saved_runs_tab(request: Request):
 
     with gui.div(className="mt-4"):
         grid_layout(3, prs, _render_run)
+
+    paginate_button(url=request.url, cursor=cursor)
 
 
 def api_keys_tab(request: Request):

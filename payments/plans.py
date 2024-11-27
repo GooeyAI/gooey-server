@@ -73,7 +73,7 @@ class PricingPlan(PricingPlanData, Enum):
         key="starter",
         title="Starter",
         description="The best of private & open source AI",
-        credits=settings.LOGIN_USER_FREE_CREDITS,
+        credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
         monthly_charge=0,
         long_description=dedent(
             """
@@ -97,7 +97,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         title_override="Free",
-        caption_override=f"{settings.LOGIN_USER_FREE_CREDITS:,} Credits to start",
+        caption_override=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} Credits to start",
     )
 
     CREATOR = PricingPlanData(

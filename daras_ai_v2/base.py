@@ -16,7 +16,6 @@ from time import sleep
 import gooey_gui as gui
 import sentry_sdk
 from django.db.models import Q, Sum
-from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
@@ -36,7 +35,7 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, urls, icons
+from daras_ai_v2 import settings, icons
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -53,6 +52,7 @@ from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from functions.models import RecipeFunction, FunctionTrigger
 from functions.recipe_functions import (
@@ -66,9 +66,8 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
 )
-from routers.account import AccountTabs
 from routers.root import RecipeTabs
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
@@ -528,44 +527,33 @@ class BasePage:
         )
 
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
+        # modal is only valid for logged in users
+        assert self.request.user and self.current_workspace
+
         with gui.alert_dialog(
             ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
         ):
-            with gui.div(className="visibility-radio mb-5"):
-                options = {
-                    str(enum.value): enum.help_text() for enum in PublishedRunVisibility
-                }
-                if self.request.user and self.request.user.handle:
-                    profile_url = self.request.user.handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    options[
-                        str(PublishedRunVisibility.PUBLIC.value)
-                    ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
-                elif self.request.user and not self.request.user.is_anonymous:
-                    edit_profile_url = AccountTabs.profile.url_path
-                    options[
-                        str(PublishedRunVisibility.PUBLIC.value)
-                    ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+            if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
+                with gui.div(className="mb-4"):
+                    self._render_workspace_with_invite_button(self.current_pr.workspace)
 
-                published_run_visibility = PublishedRunVisibility(
-                    int(
-                        gui.radio(
-                            "",
-                            options=options,
-                            format_func=options.__getitem__,
-                            key="published_run_visibility",
-                            value=str(self.current_pr.visibility),
-                        )
+            options = {
+                str(enum.value): enum.help_text(self.current_pr.workspace)
+                for enum in PublishedRunVisibility.choices_for_workspace(
+                    self.current_pr.workspace
+                )
+            }
+            published_run_visibility = PublishedRunVisibility(
+                int(
+                    gui.radio(
+                        "",
+                        options=options,
+                        format_func=options.__getitem__,
+                        key="published_run_visibility",
+                        value=str(self.current_pr.visibility),
                     )
                 )
-                gui.radio(
-                    "",
-                    options=[
-                        '<span class="text-muted">Anyone at my workspace (coming soon)</span>'
-                    ],
-                    disabled=True,
-                    checked_by_default=False,
-                )
+            )
 
             if self.current_pr.visibility != published_run_visibility:
                 visibility = PublishedRunVisibility(published_run_visibility)
@@ -579,23 +567,25 @@ class BasePage:
                 )
 
             workspaces = self.request.user.cached_workspaces
-            if workspaces and self.current_pr.workspace not in workspaces:
-                with gui.div(className="alert alert-warning mb-0 mt-4"):
+            if self.current_pr.workspace.is_personal and len(workspaces) > 1:
+                with gui.div(
+                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
+                ):
                     duplicate = gui.button(
                         f"{icons.fork} Duplicate",
                         type="link",
                         className="d-inline m-0 p-0",
                     )
-                    gui.html(" this workflow to edit with others")
+                    gui.html("&nbsp;" + "this workflow to edit with others")
                     ref = gui.use_alert_dialog(key="publish-modal")
                     if duplicate:
                         self.clear_publish_form()
+                        gui.session_state["published_run_workspace"] = workspaces[-1].id
                         ref.set_open(True)
                     if ref.is_open:
-                        gui.session_state["published_run_workspace"] = workspaces[-1].id
                         return self._render_publish_dialog(ref=ref)
 
-            with gui.div(className="d-flex justify-content-between pt-4"):
+            with gui.div(className="d-flex justify-content-between pt-5"):
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
                     value=self.current_app_url(self.tab),
@@ -606,17 +596,32 @@ class BasePage:
                     dialog.set_open(False)
                     gui.rerun()
 
-    def _render_save_button(self):
-        can_edit = self.can_user_edit_published_run(self.current_pr)
+    def _render_workspace_with_invite_button(self, workspace: Workspace):
+        from workspaces.views import member_invite_button_with_dialog
 
+        col1, col2 = gui.columns([9, 3])
+        with col1:
+            with gui.tag("p", className="mb-1 text-muted"):
+                gui.html("WORKSPACE")
+            self.render_workspace_author(workspace)
+        with col2:
+            try:
+                membership = workspace.memberships.get(user_id=self.request.user.id)
+            except WorkspaceMembership.DoesNotExist:
+                return
+            member_invite_button_with_dialog(
+                membership,
+                close_on_confirm=False,
+                type="tertiary",
+                className="mb-0",
+            )
+
+    def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
             gui.html(
                 """
                 <style>
                     .save-button-menu .gui-input label p { color: black; }
-                    .visibility-radio .gui-input {
-                        margin-bottom: 0;
-                    }
                     .published-options-menu {
                         z-index: 1;
                     }
@@ -624,7 +629,7 @@ class BasePage:
                 """
             )
 
-            if can_edit:
+            if self.can_user_edit_published_run(self.current_pr):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
                 icon, label = icons.save, "Save and Run"
@@ -692,7 +697,6 @@ class BasePage:
 
     def _render_publish_form(
         self,
-        *,
         sr: SavedRun,
         pr: PublishedRun,
         dialog: gui.AlertDialogRef,
@@ -746,7 +750,7 @@ class BasePage:
                 pressed_save = gui.button(
                     f"{icons.save} Save",
                     type="primary",
-                    className="mb-0 py-2 px-4",
+                    className="mb-0 ms-2 py-2 px-4",
                 )
             else:
                 pressed_save_as_new = gui.button(
@@ -844,11 +848,11 @@ class BasePage:
             } | workspace_options
 
         with gui.div(className="d-flex gap-3"):
-            with gui.div(className="mt-2"):
+            with gui.div(className="mt-2 text-nowrap"):
                 gui.write("Workspace")
 
             if len(workspace_options) > 1:
-                with gui.div(style=dict(minWidth="300px")):
+                with gui.div(style=dict(maxWidth="300px", width="100%")):
                     workspace_id = gui.selectbox(
                         "",
                         key=key,
@@ -860,7 +864,7 @@ class BasePage:
                     return workspace_options[workspace_id]
             else:
                 with gui.div(className="p-2 mb-2"):
-                    self.render_author(
+                    self.render_workspace_author(
                         self.current_workspace,
                         show_as_link=False,
                     )
@@ -1616,9 +1620,10 @@ class BasePage:
                 self.render_run_cost()
             with col2:
                 submitted = gui.button(
-                    "🏃 Run",
+                    f"{icons.run} Run",
                     key=key,
                     type="primary",
+                    unsafe_allow_html=True,
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
             if not submitted:
@@ -2074,7 +2079,7 @@ class BasePage:
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
+You’ll receive {settings.VERIFIED_EMAIL_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
@@ -2166,17 +2171,21 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 allow_hide=allow_hide,
             )
 
-        example_runs = (
-            PublishedRun.objects.filter(
-                workflow=self.workflow,
-                visibility=PublishedRunVisibility.PUBLIC,
-                is_approved_example=True,
-            )
-            .exclude(published_run_id="")
-            .order_by("-example_priority", "-updated_at")[:50]
+        qs = PublishedRun.objects.filter(
+            workflow=self.workflow,
+            visibility=PublishedRunVisibility.PUBLIC,
+            is_approved_example=True,
+        ).exclude(published_run_id="")
+
+        example_runs, cursor = paginate_queryset(
+            qs=qs,
+            ordering=["-example_priority", "-updated_at"],
+            cursor=self.request.query_params,
         )
 
         grid_layout(3, example_runs, _render)
+
+        paginate_button(url=self.request.url, cursor=cursor)
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -2184,9 +2193,19 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         pr_filter = Q(workspace=self.current_workspace)
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
-        published_runs = PublishedRun.objects.filter(
-            Q(workflow=self.workflow) & pr_filter
-        )[:50]
+        else:
+            pr_filter &= Q(
+                visibility__in=(
+                    PublishedRunVisibility.PUBLIC,
+                    PublishedRunVisibility.INTERNAL,
+                )
+            ) | Q(created_by=self.request.user)
+        qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
+
+        published_runs, cursor = paginate_queryset(
+            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
+        )
+
         if not published_runs:
             gui.write("No published runs yet")
             return
@@ -2203,25 +2222,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
+        paginate_button(url=self.request.url, cursor=cursor)
+
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
-        uid = self.request.user.uid
-        if self.is_current_user_admin():
-            uid = self.request.query_params.get("uid", uid)
-
-        before = self.request.query_params.get("updated_at__lt", None)
-        if before:
-            before = datetime.datetime.fromisoformat(before)
-        else:
-            before = timezone.now()
-        run_history = list(
-            SavedRun.objects.filter(
-                workflow=self.workflow,
-                uid=uid,
-                updated_at__lt=before,
-                workspace=self.current_workspace,
-            )[:25]
+        qs = SavedRun.objects.filter(
+            workflow=self.workflow,
+            workspace=self.current_workspace,
+        )
+        run_history, cursor = paginate_queryset(
+            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
         )
         if not run_history:
             gui.write("No history yet")
@@ -2229,15 +2240,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, run_history, self._render_run_preview)
 
-        next_url = self.current_app_url(
-            RecipeTabs.history,
-            query_params={"updated_at__lt": run_history[-1].to_dict()["updated_at"]},
-        )
-        with gui.link(to=str(next_url)):
-            gui.html(
-                # language=HTML
-                """<button type="button" class="btn btn-theme">Load More</button>"""
-            )
+        paginate_button(url=self.request.url, cursor=cursor)
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):

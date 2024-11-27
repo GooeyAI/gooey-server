@@ -1632,13 +1632,13 @@ yaml = ["PyYAML"]
 
 [[package]]
 name = "gooey-gui"
-version = "0.4.1"
+version = "0.5.1"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "gooey_gui-0.4.1-py3-none-any.whl", hash = "sha256:5a8a31148462c4ba64dd7f54480a82091ce7e447a78b6d05016572788f61b861"},
-    {file = "gooey_gui-0.4.1.tar.gz", hash = "sha256:7d67fbc3bfe30b8d309b95a7f67394fa35ac91cc995760f5715b9c63f72090c3"},
+    {file = "gooey_gui-0.5.1-py3-none-any.whl", hash = "sha256:94753261753f8240cf111558715130965d935ea1dee539df73aba4517f4392c9"},
+    {file = "gooey_gui-0.5.1.tar.gz", hash = "sha256:e7c34c8b90f78097a904d1ee806228c036ed7ab3f8271793dbce4b8dd9cdbaad"},
 ]
 
 [package.dependencies]
@@ -6839,4 +6839,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "49f59312114e579aaff305194477c2ff58e7be07751ce7fb8e87662b00aa7ff3"
+content-hash = "457433d9ca60f3485d0ee9d222c5dbdf18859d58c0e53fb1af4db669e284404d"

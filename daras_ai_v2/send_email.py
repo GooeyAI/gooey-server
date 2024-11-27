@@ -51,7 +51,7 @@ def send_low_balance_email(
 ):
     from routers.account import account_route
 
-    print("sending...")
+    logger.info("Sending low balance email...")
 
     recipeints = "support@gooey.ai, devs@gooey.ai"
     for user in workspace.get_owners():

@@ -4,82 +4,140 @@ from copy import copy
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
+from django.utils.translation import ngettext
 
 from app_users.models import AppUser
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
+from payments.plans import PricingPlan
+from .models import (
+    Workspace,
+    WorkspaceInvite,
+    WorkspaceMembership,
+    WorkspaceRole,
+)
 from .widgets import get_current_workspace, set_current_workspace
-
-DEFAULT_WORKSPACE_LOGO = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
-
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def invitation_page(current_user: AppUser, session: dict, invite: WorkspaceInvite):
-    from routers.account import members_route
-
-    workspaces_page_path = get_route_path(members_route)
-
-    with gui.div(className="text-center my-5"):
-        gui.write(
-            f"# Invitation to join {invite.workspace.display_name(current_user)}",
-            className="d-block mb-5",
+def invitation_page(
+    current_user: AppUser | None, session: dict, invite: WorkspaceInvite
+):
+    with (
+        gui.div(
+            className="position-absolute top-0 start-0 bottom-0 bg-black min-vw-100 min-vh-100",
+            style={"overflow-x": "hidden"},
+        ),
+        gui.center(className="mb-5"),
+    ):
+        gui.image(
+            src=settings.GOOEY_LOGO_IMG_WHITE,
+            className="my-2",
+            style={
+                "width": "min(400px, 75vw)",
+                "height": "auto",
+                "object-fit": "cover",
+                "aspect-ratio": "8/3",
+            },
         )
-
-        if invite.workspace.memberships.filter(user=current_user).exists():
-            # redirect to workspace page
-            raise gui.RedirectException(workspaces_page_path)
-
-        if invite.email != current_user.email:
-            gui.write(
-                f"Doh! This invitation is for **{invite.email}**, not you. Please log in with the correct email address.",
-            )
-            return
-
-        if invite.status != WorkspaceInvite.Status.PENDING:
-            gui.write(f"This invitation has been {invite.get_status_display()}.")
-            return
-
-        gui.write(f"You've been invited by **{invite.created_by.full_name()}**")
-        gui.newline()
-
         with gui.div(
-            className="d-flex justify-content-center align-items-center mx-auto",
-            style={"max-width": "600px"},
+            className="d-flex flex-column justify-content-center align-items-center bg-white p-5 rounded-3",
+            style={"width": "min(500px, 90vw)"},
         ):
-            if gui.button("Decline", className="w-50"):
-                invite.reject(current_user)
-                gui.rerun()
+            if invite.status != WorkspaceInvite.Status.PENDING:
+                gui.write(
+                    f"This invitation has been {invite.get_status_display().lower()}.",
+                    className="mt-4 d-block",
+                )
+                return
 
-            if gui.button("Accept", type="primary", className="w-50"):
-                invite.accept(current_user, updated_by=current_user)
-                set_current_workspace(session, int(invite.workspace_id))
-                raise gui.RedirectException(workspaces_page_path)
+            gui.image(
+                src=invite.created_by.photo_url,
+                className="rounded-circle m-0",
+                style={"width": "150px", "height": "150px", "object-fit": "cover"},
+            )
+
+            invite_creator = invite.created_by.full_name()
+            if invite.created_by.email:
+                invite_creator += f" ({invite.created_by.email})"
+            gui.write(
+                f"{invite_creator} has invited you to join",
+                className="d-block text-muted mt-4",
+            )
+            with gui.div(
+                className="d-block d-md-flex align-items-center justify-content-center mb-4"
+            ):
+                gui.image(
+                    src=invite.workspace.get_photo(),
+                    className="rounded",
+                    style={"height": "70px", "width": "70px", "object-fit": "contain"},
+                )
+                with gui.tag("h1", className="my-0 ms-md-2 text-center text-md-start"):
+                    gui.html(html_lib.escape(invite.workspace.display_name()))
+
+            members_count = invite.workspace.memberships.count()
+            members_text = ngettext("member", "members", members_count)
+            gui.caption(f"{members_count} {members_text}")
+
+            if gui.button(
+                "Join Workspace",
+                className="my-2 w-100",
+                type="primary",
+                style={"max-width": "400px"},
+            ):
+                with gui.div(className="text-start"):
+                    # reset text alignment from center
+                    _handle_invite_accepted(
+                        invite, session=session, current_user=current_user
+                    )
+
+
+def _handle_invite_accepted(
+    invite: WorkspaceInvite, session: dict, current_user: AppUser | None
+):
+    from routers.account import account_route
+    from routers.root import login, logout
+
+    workspace_redirect_url = get_route_path(account_route)
+    if not current_user or current_user.is_anonymous:
+        login_url = get_app_route_url(
+            login, query_params={"next": invite.get_invite_url()}
+        )
+        raise gui.RedirectException(login_url)
+
+    if invite.email != current_user.email:
+        # logout current user, and redirect to login
+        login_url = get_app_route_url(
+            login, query_params={"next": invite.get_invite_url()}
+        )
+        logout_url = get_app_route_url(logout, query_params={"next": login_url})
+        gui.error(
+            f"""
+            Doh! This invitation is for `{invite.email}`, and you \
+            are logged in with `{current_user.email}`.
+            Please have the workspace owner invite `{current_user.email}` \
+            or [login to Gooey.AI]({logout_url}) with `{invite.email}`.
+            """,
+        )
+        return
+
+    invite.accept(current_user, updated_by=current_user)
+    set_current_workspace(session, int(invite.workspace_id))
+    raise gui.RedirectException(workspace_redirect_url)
 
 
 def workspaces_page(user: AppUser, session: dict):
+    from routers.account import account_route
+
     workspace = get_current_workspace(user, session)
+    if workspace.is_personal:
+        raise gui.RedirectException(get_route_path(account_route))
+
     membership = workspace.memberships.get(user=user)
     render_workspace_by_membership(membership)
-
-
-def render_workspace_creation_view(user: AppUser):
-    gui.write(f"# {icons.company} Create an Workspace", unsafe_allow_html=True)
-
-    workspace = Workspace(created_by=user)
-    render_workspace_create_or_edit_form(workspace, user)
-
-    if gui.button("Create"):
-        try:
-            workspace.create_with_owner()
-        except ValidationError as e:
-            gui.write(str(e), className="text-danger")
-        else:
-            gui.rerun()
 
 
 def render_workspace_by_membership(membership: WorkspaceMembership):
@@ -89,38 +147,64 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         - current user
         - current user's role in the workspace (and other metadata)
     """
+    from routers.account import account_route
+
     workspace = membership.workspace
 
-    with gui.div(
-        className="d-xs-block d-sm-flex flex-row-reverse justify-content-between"
-    ):
-        with gui.div(className="d-flex justify-content-center align-items-center"):
-            edit_workspace_button_with_dialog(membership)
+    with gui.div(className="d-block d-sm-flex justify-content-between"):
+        col1 = gui.div(
+            className="d-block d-md-flex text-center text-sm-start align-items-center"
+        )
+        col2 = gui.div()
 
-        with gui.div(className="d-flex align-items-center"):
-            gui.image(
-                workspace.photo_url or DEFAULT_WORKSPACE_LOGO,
-                className="my-0 me-4 rounded",
-                style={"width": "128px", "height": "128px", "object-fit": "contain"},
+    with col1:
+        gui.image(
+            workspace.get_photo(),
+            className="my-0 me-4 rounded",
+            style={"width": "128px", "height": "128px", "object-fit": "contain"},
+        )
+        with gui.div(className="d-flex flex-column justify-content-end"):
+            plan = (
+                workspace.subscription
+                and PricingPlan.from_sub(workspace.subscription)
+                or PricingPlan.STARTER
             )
-            with gui.div(className="d-flex flex-column justify-content-center"):
-                gui.write(f"# {workspace.display_name(membership.user)}")
-                if workspace.domain_name:
-                    gui.write(
-                        f"Workspace Domain: `@{workspace.domain_name}`",
-                        className="text-muted",
-                    )
+
+            with gui.tag("h1", className="mb-0" if workspace.domain_name else ""):
+                gui.html(html_lib.escape(workspace.display_name(membership.user)))
+            if workspace.domain_name:
+                gui.caption(f"Domain: `@{workspace.domain_name}`")
+
+            billing_info = f"""
+                <span class="text-muted">Credits:</span> {workspace.balance}
+                <span class="text-muted">Plan:</span> {plan.title}
+            """.strip()
+            if membership.can_edit_workspace() and plan in (
+                PricingPlan.STARTER,
+                PricingPlan.CREATOR,
+            ):
+                billing_info += (
+                    f'<span className="ms-4 text-primary text-decoration-none">'
+                    f"[Upgrade]({get_route_path(account_route)})"
+                    f"</span>"
+                )
+            gui.write(billing_info, unsafe_allow_html=True)
+
+    if membership.can_edit_workspace():
+        with col2, gui.div(className="mt-2 text-center"):
+            edit_workspace_button_with_dialog(membership)
 
     gui.newline()
 
     with gui.div(className="d-flex justify-content-between align-items-center"):
-        gui.write("## Members")
+        gui.write("#### Members")
         member_invite_button_with_dialog(membership)
     render_members_list(workspace=workspace, current_member=membership)
 
     gui.newline()
 
-    render_pending_invites_list(workspace=workspace, current_member=membership)
+    if membership.can_invite():
+        render_pending_invites_list(workspace=workspace, current_member=membership)
 
     can_leave = membership.can_leave_workspace()
     if not can_leave:
@@ -129,12 +213,14 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
     gui.newline()
 
     dialog_ref = gui.use_confirm_dialog(key="leave-workspace", close_on_confirm=False)
-    with gui.div(className="text-end"):
-        if gui.button(
-            label=f"{icons.sign_out} Leave",
-            className="py-2 bg-danger border-danger text-light",
-        ):
-            dialog_ref.set_open(True)
+    with gui.div():
+        gui.write("#### Danger Zone")
+        with gui.div():
+            if gui.button(
+                label=f"{icons.sign_out} Leave",
+                className="py-2 text-danger",
+            ):
+                dialog_ref.set_open(True)
 
     if dialog_ref.is_open:
         new_owner_id = render_workspace_leave_dialog(dialog_ref, membership)
@@ -152,13 +238,18 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         gui.rerun()
 
 
-def member_invite_button_with_dialog(membership: WorkspaceMembership):
+def member_invite_button_with_dialog(
+    membership: WorkspaceMembership,
+    *,
+    close_on_confirm: bool = True,
+    **props,
+):
     if not membership.can_invite():
         return
 
     ref = gui.use_confirm_dialog(key="invite-member", close_on_confirm=False)
 
-    if gui.button(label=f"{icons.add_user} Invite"):
+    if gui.button(label=f"{icons.add_user} Invite", **props):
         clear_invite_creation_form()
         ref.set_open(True)
     if not ref.is_open:
@@ -170,9 +261,9 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
         confirm_label=f"{icons.send} Send Invite",
     ):
         role, email = render_invite_creation_form(membership.workspace)
-
         if not ref.pressed_confirm:
             return
+
         try:
             WorkspaceInvite.objects.create_and_send_invite(
                 workspace=membership.workspace,
@@ -181,10 +272,13 @@ def member_invite_button_with_dialog(membership: WorkspaceMembership):
                 defaults=dict(role=role),
             )
         except ValidationError as e:
-            gui.write(str(e), className="text-danger")
+            gui.write("\n".join(e.messages), className="text-danger")
         else:
-            ref.set_open(False)
-            gui.rerun()
+            if close_on_confirm:
+                ref.set_open(False)
+                gui.rerun()
+            else:
+                gui.success("Invite sent successfully!")
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
@@ -212,7 +306,7 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
             workspace_copy.full_clean()
         except ValidationError as e:
             # newlines in markdown
-            gui.write(str(e), className="text-danger")
+            gui.write("\n".join(e.messages), className="text-danger")
         else:
             workspace_copy.save()
             membership.workspace.refresh_from_db()
@@ -230,28 +324,27 @@ def render_workspace_edit_view_by_membership(
 
 
 def clear_invite_creation_form():
-    keys = {k for k in gui.session_state.keys() if k.startswith("invite-")}
+    keys = {k for k in gui.session_state.keys() if k.startswith("invite-form-")}
     for k in keys:
         gui.session_state.pop(k, None)
 
 
 def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
-    gui.write("Invite a new member to this workspace.")
-
-    choices = dict(WorkspaceRole.choices)
-    role = gui.selectbox(
-        "######  Role",
-        options=choices.keys(),
-        format_func=choices.get,
-        value=WorkspaceRole.MEMBER.value,
-        key="invite-role",
-    )
+    gui.write(f"Invite to **{workspace.display_name()}**.")
 
     email = gui.text_input(
         "###### Email",
         style=dict(minWidth="300px"),
-        key="invite-email",
+        key="invite-form-email",
     ).strip()
+
+    role = gui.selectbox(
+        "###### Role",
+        options=WorkspaceRole,
+        format_func=WorkspaceRole.display_html,
+        value=WorkspaceRole.ADMIN.value,
+        key="invite-form-role",
+    )
 
     if workspace.domain_name:
         gui.caption(
@@ -334,13 +427,13 @@ def render_workspace_leave_dialog(
 
 
 def render_members_list(workspace: Workspace, current_member: WorkspaceMembership):
-    with gui.tag("table", className="table table-responsive"):
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Name")
             with gui.tag("th", scope="col"):
                 gui.html("Role")
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col", className="text-nowrap"):
                 gui.html(f"{icons.time} Since")
             with gui.tag("th", scope="col"):
                 gui.html("")
@@ -355,8 +448,8 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                                 gui.html(html_lib.escape(name))
                         else:
                             gui.html(html_lib.escape(name))
-                    with gui.tag("td"):
-                        gui.html(m.get_role_display())
+                    with gui.tag("td", className="text-nowrap"):
+                        gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
                         gui.html("...", **render_local_date_attrs(m.created_at))
                     with gui.tag("td", className="text-end"):
@@ -402,7 +495,7 @@ def render_membership_actions(
         gui.button_with_confirm_dialog(
             ref=ref,
             trigger_label=f"{icons.remove_user} Remove",
-            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            trigger_className="btn-sm my-0 py-0 text-danger",
             modal_title="#### Remove a Member",
             modal_content=f"Are you sure you want to remove **{m.user.full_name()}** from **{m.workspace.display_name(m.user)}**?",
             confirm_label="Remove",
@@ -420,21 +513,21 @@ def render_pending_invites_list(
     if not pending_invites:
         return
 
-    gui.write("## Pending")
-    with gui.tag("table", className="table table-responsive"):
+    gui.write("#### Pending")
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Email")
             with gui.tag("th", scope="col"):
                 gui.html("Invited By")
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col", className="text-nowrap"):
                 gui.html(f"{icons.time} Invite Sent")
             with gui.tag("th", scope="col"):
                 pass
 
         with gui.tag("tbody"):
             for invite in pending_invites:
-                with gui.tag("tr", className="text-break align-middle"):
+                with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
                         gui.html(html_lib.escape(invite.email))
                     with gui.tag("td"):
@@ -483,7 +576,7 @@ def render_invitation_actions(
         gui.button_with_confirm_dialog(
             ref=ref,
             trigger_label=f"{icons.cancel} Cancel",
-            trigger_className="btn-sm my-0 py-0 bg-danger border-danger text-light",
+            trigger_className="btn-sm my-0 py-0 text-danger",
             modal_title="#### Cancel Invitation",
             modal_content=f"Are you sure you want to cancel the invitation to **{invite.email}**?",
             cancel_label="No, keep it",
