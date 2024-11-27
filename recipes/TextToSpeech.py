@@ -194,8 +194,8 @@ class TextToSpeechPage(BasePage):
 
     def run(self, state: dict):
         text = state["text_prompt"].strip()
-        
-         # Parse markdown to plain text
+
+        # Parse markdown to plain text
         parser = MarkdownIt(renderer_cls=RendererPlain)
         text = parser.render(text)
         provider = self._get_tts_provider(state)
