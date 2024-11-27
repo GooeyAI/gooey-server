@@ -86,6 +86,7 @@ sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
 gooey-gui = "^0.4.1"
 django-safedelete = "^1.4.0"
 numexpr = "^2.10.1"
+django-csp = "^3.8"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
