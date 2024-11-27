@@ -2173,7 +2173,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         qs = PublishedRun.objects.filter(
             workflow=self.workflow,
-            visibility=PublishedRunVisibility.PUBLIC,
             is_approved_example=True,
         ).exclude(published_run_id="")
 
