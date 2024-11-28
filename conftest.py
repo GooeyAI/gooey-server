@@ -34,7 +34,7 @@ def db_fixtures(transactional_db):
     from django.core.management import call_command
 
     print("Loading fixtures from fixture.json")
-    call_command("loaddata", "fixture.json")
+    call_command("loaddata", "--no-color", "fixture.json")
 
 
 @pytest.fixture

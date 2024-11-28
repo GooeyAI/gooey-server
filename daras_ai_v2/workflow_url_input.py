@@ -5,7 +5,7 @@ from django.db.models import Q
 from furl import furl
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunVisibility, SavedRun, Workflow
+from bots.models import PublishedRun, SavedRun, Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.enum_selector_widget import BLANK_OPTION
@@ -150,16 +150,14 @@ def get_published_run_options(
     include_root: bool = True,
 ) -> dict[str, str]:
     # approved examples
-    pr_query = Q(is_approved_example=True, visibility=PublishedRunVisibility.PUBLIC)
-
+    pr_query = PublishedRun.approved_example_q()
     if current_user:
         # user's saved runs
         pr_query |= Q(created_by=current_user)
-
     saved_runs_and_examples = PublishedRun.objects.filter(
         pr_query,
         workflow=page_cls.workflow,
-    ).exclude(published_run_id="")
+    )
     saved_runs_and_examples = sorted(
         saved_runs_and_examples,
         reverse=True,

@@ -2171,13 +2171,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 allow_hide=allow_hide,
             )
 
-        qs = (
-            PublishedRun.objects.filter(
-                workflow=self.workflow,
-                is_approved_example=True,
-            )
-            .exclude(published_run_id="")
-            .exclude(visibility=PublishedRunVisibility.UNLISTED)
+        qs = PublishedRun.objects.filter(
+            PublishedRun.approved_example_q(),
+            workflow=self.workflow,
         )
 
         example_runs, cursor = paginate_queryset(
