@@ -1809,18 +1809,16 @@ class PublishedRun(models.Model):
         ]
 
         indexes = [
-            models.Index(fields=["workflow"]),
             models.Index(fields=["workflow", "created_by"]),
             models.Index(fields=["workflow", "published_run_id"]),
-            models.Index(fields=["workflow", "visibility", "is_approved_example"]),
             models.Index(
                 fields=[
-                    "workflow",
-                    "visibility",
                     "is_approved_example",
+                    "visibility",
                     "published_run_id",
-                    "example_priority",
                     "updated_at",
+                    "workflow",
+                    "example_priority",
                 ]
             ),
             models.Index(
@@ -1926,6 +1924,14 @@ class PublishedRun(models.Model):
             enable_rate_limits=enable_rate_limits,
             deduct_credits=deduct_credits,
             parent_pr=self,
+        )
+
+    @classmethod
+    def approved_example_q(cls):
+        return (
+            Q(is_approved_example=True)
+            & ~Q(visibility=PublishedRunVisibility.UNLISTED)
+            & ~Q(published_run_id="")
         )
 
 

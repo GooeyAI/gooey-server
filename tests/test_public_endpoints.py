@@ -1,8 +1,9 @@
+import random
+
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from bots.models import PublishedRun, Workflow
-from daras_ai_v2.all_pages import all_api_pages, all_hidden_pages
+from bots.models import Workflow, PublishedRun
 from routers import facebook_api
 from routers.root import RecipeTabs
 from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
@@ -43,22 +44,13 @@ def _test_get_path(path):
 
 
 def test_all_post(db_fixtures, force_authentication, threadpool_subtest):
-    for page_cls in all_api_pages + all_hidden_pages:
-        for slug in page_cls.slug_versions:
-            for tab in RecipeTabs:
-                threadpool_subtest(_test_post_path, tab.url_path(slug))
-
-    published_examples = (
-        PublishedRun.objects.exclude(is_approved_example=False)
-        .exclude(published_run_id="")
-        .order_by("workflow")
-    )
-    for pr in published_examples:
-        slug = Workflow(pr.workflow).page_cls.slug_versions[-1]
-        threadpool_subtest(
-            _test_post_path,
-            RecipeTabs.run.url_path(slug, "test-run-slug", pr.published_run_id),
-        )
+    for pr in PublishedRun.objects.all():
+        for tab in RecipeTabs:
+            slug = random.choice(Workflow(pr.workflow).page_cls.slug_versions)
+            threadpool_subtest(
+                _test_post_path,
+                tab.url_path(slug, "test-run-slug", pr.published_run_id),
+            )
 
 
 def _test_post_path(url):
