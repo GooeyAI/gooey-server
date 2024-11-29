@@ -168,3 +168,12 @@ def get_mimetype_from_response(response: requests.Response) -> str:
 
 def gs_url_to_uri(url: str) -> str:
     return "gs://" + "/".join(furl(url).path.segments)
+
+
+def delete_blob_from_url(url):
+
+    parsed_url = furl(url)
+    blob_name = "/".join(parsed_url.path.segments[1:])
+    bucket = gcs_bucket()
+    blob = bucket.blob(blob_name)
+    blob.delete()
