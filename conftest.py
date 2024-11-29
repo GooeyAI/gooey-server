@@ -39,7 +39,10 @@ def db_fixtures(transactional_db):
 
 @pytest.fixture
 def force_authentication():
-    with auth_backend.force_authentication() as user:
+    with (
+        auth_backend.force_authentication() as user,
+        patch("daras_ai_v2.settings.ADMIN_EMAILS", [user.email]),
+    ):
         yield user
 
 

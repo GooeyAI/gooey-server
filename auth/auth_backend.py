@@ -18,8 +18,10 @@ authlocal = []
 @contextmanager
 def force_authentication():
     user = Workspace.objects.get(id=get_default_published_run_workspace()).created_by
+    user.email = "test@pytest.com"
     user.balance = 10**9
     user.disable_rate_limits = True
+    user.save()
     authlocal.append(user)
     try:
         yield authlocal[0]
