@@ -3,22 +3,14 @@ import json
 from furl import furl
 from starlette.testclient import TestClient
 
-from bots.models import BotIntegration, Workflow, Platform, SavedRun
+from bots.models import BotIntegration, Platform
 from server import app
 
 client = TestClient(app)
 
 
-def test_send_msg_streaming(transactional_db, mock_celery_tasks, force_authentication):
-    bi = BotIntegration.objects.create(
-        platform=Platform.WEB,
-        workspace=force_authentication.get_or_create_personal_workspace()[0],
-        created_by=force_authentication,
-        saved_run=SavedRun.objects.create(
-            workflow=Workflow.VIDEO_BOTS,
-            uid=force_authentication.uid,
-        ),
-    )
+def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks):
+    bi = BotIntegration.objects.filter(platform=Platform.WEB).first()
     r = client.post(
         "/v3/integrations/stream/",
         json={
