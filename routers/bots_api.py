@@ -13,7 +13,7 @@ from starlette.responses import StreamingResponse, Response
 from bots.models import Platform, Conversation, BotIntegration, Message, SavedRun
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
-from daras_ai_v2.base import RecipeRunState, BasePage, StateKeys
+from daras_ai_v2.base import RecipeRunState, StateKeys
 from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed
 from daras_ai_v2.redis_cache import get_redis_cache
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -317,6 +317,7 @@ class ApiInterface(BotInterface):
                 )
         except Exception as e:
             self.queue.put(StreamError(detail=err_msg_for_exc(e)))
+            raise
         finally:
             self.queue.put(None)
 
