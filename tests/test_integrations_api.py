@@ -19,13 +19,13 @@ def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks
         },
         allow_redirects=False,
     )
-    assert r.ok, r.text
+    assert r.is_success, r.text
 
     r = client.get(
         str(furl(r.headers["Location"]).path),
         allow_redirects=False,
     )
-    assert r.ok, r.text
+    assert r.is_success, r.text
     assert r.headers["Content-Type"].startswith("text/event-stream")
 
     actual_events = []

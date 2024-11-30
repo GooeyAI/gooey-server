@@ -48,8 +48,8 @@ def test_all_get(db_fixtures, threadpool_subtest):
 
 
 def _test_get_path(path):
-    r = client.get(path, allow_redirects=False)
-    assert r.ok, r.content
+    r = client.get(path)
+    assert r.is_success, r.content
 
 
 def test_integration_stats_route(db_fixtures, force_authentication, threadpool_subtest):
@@ -103,7 +103,7 @@ def _test_post_path(url, *test_content):
         if r.is_redirect:
             url = r.headers["Location"]
             continue
-        assert r.ok, r.content
+        assert r.is_success, r.content
         for expected in test_content:
             assert expected in str(r.json()), str(r.json())
         return
