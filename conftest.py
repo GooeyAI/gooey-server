@@ -34,7 +34,7 @@ def db_fixtures(transactional_db):
     from django.core.management import call_command
 
     print("Loading fixtures from fixture.json")
-    call_command("loaddata", "--no-color", "fixture.json")
+    call_command("loaddata", "fixture.json")
 
 
 @pytest.fixture
@@ -118,3 +118,9 @@ def threadpool_subtest(subtests, max_workers: int = 128):
 @pytest.fixture(autouse=True)
 def clear_pytest_outbox():
     pytest_outbox.clear()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def patch_django_supports_color():
+    with patch("django.core.management.color.supports_color", return_value=False):
+        yield
