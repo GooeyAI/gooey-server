@@ -10,7 +10,6 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    gcs_blob_for,
     resize_img_scale,
     delete_blob_from_url,
 )
@@ -20,7 +19,6 @@ from loguru import logger
 EMU_TO_PIXELS = 0.000264583  # Conversion factor from EMU to pixels
 
 
-# TODO use_form_reco
 def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[str]:
     """
     Extracts text, tables, charts, grouped shapes, and images from a PPTX file into Markdown format.
@@ -38,43 +36,44 @@ def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[
         slide_height = int(prs.slide_height * EMU_TO_PIXELS)
 
         # Collect all images and their positions
-        for shape in slide.shapes:
-            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+        if use_form_reco:
+            for shape in slide.shapes:
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    try:
+                        image_stream = io.BytesIO(shape.image.blob)
+                        img = Image.open(image_stream)
+
+                        # Apply cropping
+                        cropped_img = apply_cropping(img, shape)
+
+                        # Get position and dimensions (convert from EMU to pixels)
+                        position = {
+                            "left": int(shape.left * EMU_TO_PIXELS),
+                            "top": int(shape.top * EMU_TO_PIXELS),
+                            "width": int(shape.width * EMU_TO_PIXELS),
+                            "height": int(shape.height * EMU_TO_PIXELS),
+                        }
+
+                        images_and_positions.append((cropped_img, position))
+                    except Exception as e:
+                        logger.debug(f"Error processing image: {e}")
+
+            # Create collage if images are present
+            if images_and_positions:
                 try:
-                    image_stream = io.BytesIO(shape.image.blob)
-                    img = Image.open(image_stream)
+                    collage = create_positioned_collage(
+                        images_and_positions, slide_width, slide_height
+                    )
 
-                    # Apply cropping
-                    cropped_img = apply_cropping(img, shape)
+                    # Convert collage to bytes
+                    with io.BytesIO() as output:
+                        collage.save(output, format="PNG")
+                        collage_bytes = output.getvalue()
 
-                    # Get position and dimensions (convert from EMU to pixels)
-                    position = {
-                        "left": int(shape.left * EMU_TO_PIXELS),
-                        "top": int(shape.top * EMU_TO_PIXELS),
-                        "width": int(shape.width * EMU_TO_PIXELS),
-                        "height": int(shape.height * EMU_TO_PIXELS),
-                    }
+                    slide_content.append(handle_pictures(collage_bytes))
 
-                    images_and_positions.append((cropped_img, position))
                 except Exception as e:
-                    logger.debug(f"Error processing image: {e}")
-
-        # Create collage if images are present
-        if images_and_positions:
-            try:
-                collage = create_positioned_collage(
-                    images_and_positions, slide_width, slide_height
-                )
-
-                # Convert collage to bytes
-                with io.BytesIO() as output:
-                    collage.save(output, format="PNG")
-                    collage_bytes = output.getvalue()
-
-                slide_content.extend(handle_pictures(collage_bytes))
-
-            except Exception as e:
-                logger.debug(f"Error creating collage: {e}")
+                    logger.debug(f"Error creating collage: {e}")
 
         # Process other shapes
         for shape in slide.shapes:
@@ -131,6 +130,7 @@ def create_positioned_collage(
 
     for img, pos in images_and_positions:
         # Resize the image to fit the specified dimensions
+        # https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters
         resized_img = img.resize((pos["width"], pos["height"]), Image.LANCZOS)
         # Paste the resized image at the specified position
         canvas.paste(resized_img, (pos["left"], pos["top"]))
@@ -307,13 +307,10 @@ def handle_charts(shape) -> list[str]:
     return chart_text
 
 
-# TODO :azure form reco to extract text from images
-def handle_pictures(image_bytes) -> list[str]:
+def handle_pictures(image_bytes) -> str:
 
     image_hash = hashlib.sha256(image_bytes[:64]).hexdigest()
     unique_filename = f"{image_hash}.png"
-
-    logger.debug(f"Extracting text from image: {unique_filename}")
 
     # Resize the image bytes before uploading
     target_size = (800, 600)
@@ -321,14 +318,11 @@ def handle_pictures(image_bytes) -> list[str]:
 
     # Upload image and get the URL
     image_url = upload_file_from_bytes(unique_filename, resized_image_bytes)
-    logger.debug(f"Uploaded image to: {image_url}")
 
     extracted_text = azure_doc_extract_page_num(
         image_url, page_num=1, model_id="prebuilt-read"
     )
-    logger.debug(f"Extracted text from image: {extracted_text}")
 
     delete_blob_from_url(image_url)
-    logger.debug(f"Deleted image from GCS: {unique_filename}")
 
-    return [extracted_text]
+    return extracted_text
