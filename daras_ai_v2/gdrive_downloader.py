@@ -63,6 +63,7 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
 def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
+    from googleapiclient.errors import HttpError
 
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
@@ -84,10 +85,28 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     # download
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
+
     done = False
-    while done is False:
-        _, done = downloader.next_chunk()
-        # print(f"Download {int(status.progress() * 100)}%")
+    try:
+        while done is False:
+            _, done = downloader.next_chunk()
+            # print(f"Download {int(status.progress() * 100)}%")
+    except HttpError as error:
+        if (
+            mime_type
+            == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ):
+            # print(f"Error downloading file: {error}. Retrying...")
+            request = service.files().get_media(
+                fileId=file_id,
+                supportsAllDrives=True,
+            )
+            downloader = MediaIoBaseDownload(file, request)
+            done = False
+
+            while done is False:
+                _, done = downloader.next_chunk()
+
     f_bytes = file.getvalue()
     return f_bytes, mime_type
 
@@ -109,8 +128,10 @@ def docs_export_mimetype(f: furl) -> tuple[str, str]:
         mime_type = "text/csv"
         ext = ".csv"
     elif "presentation" in f.path.segments:
-        mime_type = "application/pdf"
-        ext = ".pdf"
+        mime_type = (
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+        ext = ".pptx"
     elif "drawings" in f.path.segments:
         mime_type = "application/pdf"
         ext = ".pdf"
