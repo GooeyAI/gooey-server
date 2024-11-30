@@ -176,46 +176,76 @@ class LargeLanguageModels(Enum):
     )
 
     # https://console.groq.com/docs/models
+    llama3_2_90b_vision = LLMSpec(
+        label="Llama 3.2 90B + Vision (Meta AI)",
+        model_id="llama-3.2-90b-vision-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+        is_vision_model=True,
+    )
+    llama3_2_11b_vision = LLMSpec(
+        label="Llama 3.2 11B + Vision (Meta AI)",
+        model_id="llama-3.2-11b-vision-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+        is_vision_model=True,
+    )
+
+    llama3_2_3b = LLMSpec(
+        label="Llama 3.2 3B (Meta AI)",
+        model_id="llama-3.2-3b-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+    )
+    llama3_2_1b = LLMSpec(
+        label="Llama 3.2 1B (Meta AI)",
+        model_id="llama-3.2-1b-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+    )
+
+    llama3_1_70b = LLMSpec(
+        label="Llama 3.1 70B (Meta AI)",
+        model_id="llama-3.1-70b-versatile",
+        llm_api=LLMApis.groq,
+        context_window=32_768,
+        price=1,
+        supports_json=True,
+    )
+    llama3_1_8b = LLMSpec(
+        label="Llama 3.1 8B (Meta AI)",
+        model_id="llama-3.1-8b-instant",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+    )
+
     llama3_70b = LLMSpec(
-        label="Llama 3 70b (Meta AI)",
+        label="Llama 3 70B (Meta AI)",
         model_id="llama3-70b-8192",
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
         supports_json=True,
     )
-    llama_3_groq_70b_tool_use = LLMSpec(
-        label="Llama 3 Groq 70b Tool Use",
-        model_id="llama3-groq-70b-8192-tool-use-preview",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        price=1,
-        supports_json=True,
-    )
     llama3_8b = LLMSpec(
-        label="Llama 3 8b (Meta AI)",
+        label="Llama 3 8B (Meta AI)",
         model_id="llama3-8b-8192",
         llm_api=LLMApis.groq,
         context_window=8192,
         price=1,
         supports_json=True,
     )
-    llama_3_groq_8b_tool_use = LLMSpec(
-        label="Llama 3 Groq 8b Tool Use",
-        model_id="llama3-groq-8b-8192-tool-use-preview",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        price=1,
-        supports_json=True,
-    )
-    llama2_70b_chat = LLMSpec(
-        label="Llama 2 70b Chat [Deprecated] (Meta AI)",
-        model_id="llama2-70b-4096",
-        llm_api=LLMApis.groq,
-        context_window=4096,
-        price=1,
-        is_deprecated=True,
-    )
+
     mixtral_8x7b_instruct_0_1 = LLMSpec(
         label="Mixtral 8x7b Instruct v0.1 (Mistral)",
         model_id="mixtral-8x7b-32768",
@@ -338,6 +368,48 @@ class LargeLanguageModels(Enum):
         price=1,
         is_chat_model=False,
     )
+    llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
+        label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
+        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
+        llm_api=LLMApis.self_hosted,
+        context_window=8192,
+        price=1,
+    )
+    sarvam_2b = LLMSpec(
+        label="Sarvam 2B (sarvamai)",
+        model_id="sarvamai/sarvam-2b-v0.5",
+        llm_api=LLMApis.self_hosted,
+        context_window=2048,
+        price=1,
+    )
+
+    llama_3_groq_70b_tool_use = LLMSpec(
+        label="Llama 3 Groq 70b Tool Use [Deprecated]",
+        model_id="llama3-groq-70b-8192-tool-use-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+        is_deprecated=True,
+    )
+    llama_3_groq_8b_tool_use = LLMSpec(
+        label="Llama 3 Groq 8b Tool Use [Deprecated]",
+        model_id="llama3-groq-8b-8192-tool-use-preview",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+        supports_json=True,
+        is_deprecated=True,
+    )
+    llama2_70b_chat = LLMSpec(
+        label="Llama 2 70B Chat [Deprecated] (Meta AI)",
+        model_id="llama2-70b-4096",
+        llm_api=LLMApis.groq,
+        context_window=4096,
+        price=1,
+        is_deprecated=True,
+    )
+
     sea_lion_7b_instruct = LLMSpec(
         label="SEA-LION-7B-Instruct [Deprecated] (aisingapore)",
         model_id="aisingapore/sea-lion-7b-instruct",
@@ -353,20 +425,6 @@ class LargeLanguageModels(Enum):
         context_window=8192,
         price=1,
         is_deprecated=True,
-    )
-    llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
-        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
-        llm_api=LLMApis.self_hosted,
-        context_window=8192,
-        price=1,
-    )
-    sarvam_2b = LLMSpec(
-        label="Sarvam 2B (sarvamai)",
-        model_id="sarvamai/sarvam-2b-v0.5",
-        llm_api=LLMApis.self_hosted,
-        context_window=2048,
-        price=1,
     )
 
     # https://platform.openai.com/docs/models/gpt-3
