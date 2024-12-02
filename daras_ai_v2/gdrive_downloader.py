@@ -111,7 +111,7 @@ def download_blob_file_content(
             _, done = downloader.next_chunk()
             # print(f"Download {int(status.progress() * 100)}%")
     except HttpError as error:
-        # retry if error exporting google docs format files e.g .pptx files uploaded to docs.google.com
+        # retry if error exporting google docs format files e.g .pptx/.docx files uploaded to docs.google.com
         if "presentation" in f.path.segments:
             # update mime_type to download the file directly
             mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -122,6 +122,19 @@ def download_blob_file_content(
             done = False
             while done is False:
                 _, done = downloader.next_chunk()
+
+        elif "document" in f.path.segments:
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            request, _ = service_request(
+                service, file_id, f, mime_type, retried_request=True
+            )
+            downloader = MediaIoBaseDownload(file, request)
+            done = False
+            while done is False:
+                _, done = downloader.next_chunk()
+
+        else:
+            raise error
 
     f_bytes = file.getvalue()
     return f_bytes, mime_type
