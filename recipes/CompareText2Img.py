@@ -294,4 +294,4 @@ def loras_input(key: str = "loras"):
     )
     if not lora_urls:
         return
-    gui.session_state[key] = [LoraWeight(path=url, scale=1) for url in lora_urls]
+    gui.session_state[key] = [LoraWeight(path=url, scale=1).dict() for url in lora_urls]
