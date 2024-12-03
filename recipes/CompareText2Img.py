@@ -132,6 +132,8 @@ class CompareText2ImgPage(BasePage):
         )
         if selected_models and set(selected_models) <= {Text2ImgModels.flux_1_dev.name}:
             loras_input()
+        else:
+            gui.session_state.pop("loras", None)
 
     def validate_form_v2(self):
         assert gui.session_state["text_prompt"], "Please provide a prompt"
@@ -292,6 +294,9 @@ def loras_input(key: str = "loras"):
         accept_multiple_files=True,
         value=[lora["path"] for lora in gui.session_state.get(key) or []],
     )
-    if not lora_urls:
-        return
-    gui.session_state[key] = [LoraWeight(path=url, scale=1).dict() for url in lora_urls]
+    if lora_urls:
+        gui.session_state[key] = [
+            LoraWeight(path=url, scale=1).dict() for url in lora_urls
+        ]
+    else:
+        gui.session_state.pop("loras", None)
