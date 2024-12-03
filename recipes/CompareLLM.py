@@ -127,7 +127,8 @@ class CompareLLMPage(BasePage):
         with col1:
             gui.write("**Prompt**")
             gui.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
-            for key, value in state.get("variables", {}).items():
+            variables = state.get("variables") or {}
+            for key, value in variables.items():
                 gui.text_area(f"`{key}`", value=str(value), disabled=True)
         with col2:
             _render_outputs(state, 300)
