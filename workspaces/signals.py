@@ -1,33 +1,47 @@
-import traceback
-from django.db.models.signals import post_save
+from django.core.exceptions import ValidationError
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from loguru import logger
 from safedelete.signals import post_softdelete
-import sentry_sdk
 
 from app_users.models import AppUser
+from workspaces.tasks import send_added_to_workspace_email
 from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
 
 
-@receiver(post_save, sender=AppUser)
-def add_user_existing_workspace(instance: AppUser, **kwargs):
-    """
-    if the domain name matches, add the user to the workspace
-    """
-    if not instance.email:
+@receiver(pre_save, sender=AppUser)
+def invite_user_to_workspaces_with_matching_domain(instance: AppUser, **kwargs):
+    if instance.id or not instance.email:
+        # don't send invitation if: 1. user is being updated, 2. user doesn't have an email
         return
+
     email_domain = instance.email.split("@")[-1].lower()
     for workspace in Workspace.objects.filter(domain_name=email_domain):
+        WorkspaceInvite.objects.get_or_create(
+            workspace=workspace,
+            email=instance.email,
+            defaults={"created_by": workspace.created_by},
+        )
+
+
+@receiver(post_save, sender=AppUser)
+def auto_accept_invitations_for_user(instance: AppUser, **kwargs):
+    if not instance.email:
+        return
+
+    for invite in WorkspaceInvite.objects.filter(
+        email=instance.email, status=WorkspaceInvite.Status.PENDING
+    ):
         try:
-            WorkspaceInvite.objects.create_and_send_invite(
-                workspace=workspace,
-                email=instance.email,
-                created_by=workspace.created_by,
-                defaults=dict(role=WorkspaceRole.MEMBER),
+            invite.accept(instance, updated_by=instance, auto_accepted=True)
+        except ValidationError as e:
+            logger.error(
+                f"Failed to auto-accept invitation {invite} for user {instance}: {e}"
             )
-        except Exception as e:
-            traceback.print_exc()
-            sentry_sdk.capture_exception(e)
+        else:
+            send_added_to_workspace_email.delay(
+                invite_id=invite.id, user_id=instance.id
+            )
 
 
 @receiver(post_softdelete, sender=WorkspaceMembership)
