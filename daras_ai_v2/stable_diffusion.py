@@ -306,18 +306,20 @@ def text2img(
 
     match model:
         case Text2ImgModels.flux_1_dev:
+            payload = dict(
+                prompt=prompt,
+                image_size=dict(width=width, height=height),
+                num_inference_steps=num_inference_steps,
+                seed=seed,
+                guidance_scale=guidance_scale,
+                num_images=num_outputs,
+                enable_safety_checker=False,
+            )
+            if loras:
+                payload["loras"] = [lora.dict() for lora in loras]
             return generate_fal_images(
                 model_id=text2img_model_ids[model],
-                payload=dict(
-                    prompt=prompt,
-                    image_size=dict(width=width, height=height),
-                    num_inference_steps=num_inference_steps,
-                    seed=seed,
-                    loras=[lora.dict() for lora in loras] if loras else None,
-                    guidance_scale=guidance_scale,
-                    num_images=num_outputs,
-                    enable_safety_checker=False,
-                ),
+                payload=payload,
             )
         case Text2ImgModels.dall_e_3:
             from openai import OpenAI
