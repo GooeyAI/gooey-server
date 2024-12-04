@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
-from handles.models import COMMON_EMAIL_DOMAINS
+from handles.models import COMMON_EMAIL_DOMAINS, Handle
 from .models import Workspace, WorkspaceInvite, WorkspaceRole
 
 
@@ -114,6 +114,9 @@ def global_workspace_selector(user: AppUser, session: dict):
             name = get_default_workspace_name_for_user(user)
             workspace = Workspace(name=name, created_by=user)
             workspace.create_with_owner()
+            workspace.handle = Handle.create_default_for_workspace(workspace)
+            if workspace.handle:
+                workspace.save()
             session[SESSION_SELECTED_WORKSPACE] = workspace.id
             raise gui.RedirectException(get_route_path(members_route))
 
