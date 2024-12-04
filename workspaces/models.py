@@ -113,6 +113,7 @@ class Workspace(SafeDeleteModel):
     )
 
     photo_url = CustomURLField(null=True, blank=True)
+    description = models.TextField(blank=True, default="")
     domain_name = models.CharField(
         max_length=30,
         blank=True,

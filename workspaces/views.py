@@ -603,6 +603,12 @@ def render_workspace_create_or_edit_form(
         key="workspace-name",
         value=workspace.name,
     ).strip()
+    workspace.description = gui.text_area(
+        "###### Description _(Optional)_",
+        key="workspace-description",
+        placeholder="Tell the world about your team!",
+        value=workspace.description,
+    )
     if current_user.email or workspace.domain_name:
         workspace.domain_name = gui.selectbox(
             "###### Domain Name _(Optional)_",
