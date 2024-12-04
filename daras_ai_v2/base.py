@@ -45,7 +45,7 @@ from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
-from daras_ai_v2.html_spinner_widget import html_spinner
+from daras_ai_v2.html_spinner_widget import html_spinner, scroll_into_view
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.prompt_vars import variables_input
@@ -1942,7 +1942,7 @@ class BasePage:
         sr = self.create_and_validate_new_run(enable_rate_limits=True)
         if not sr:
             return
-
+        scroll_into_view(".gooey-spinner-top")
         self.call_runner_task(sr)
         return sr
 
@@ -2281,7 +2281,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if saved_run.run_status:
             started_at_text(saved_run.created_at)
-            html_spinner(saved_run.run_status, scroll_into_view=False)
+            html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
             gui.error(saved_run.error_msg, unsafe_allow_html=True)
 
