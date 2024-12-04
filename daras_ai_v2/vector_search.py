@@ -52,6 +52,7 @@ from daras_ai_v2.functional import (
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
+    is_gdrive_presentation_url,
     url_to_gdrive_file_id,
     gdrive_metadata,
 )
@@ -66,6 +67,7 @@ from daras_ai_v2.search_ref import (
     remove_quotes,
     generate_text_fragment_url,
 )
+from daras_ai_v2.office_utils_pptx import pptx_to_text_pages
 from daras_ai_v2.text_splitter import text_splitter, Document
 from embeddings.models import EmbeddedFile, EmbeddingsReference
 from files.models import FileMetadata
@@ -767,6 +769,13 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
             df = pdf_to_form_reco_df(f_url, f_name, f_bytes, mime_type)
         else:
             return pdf_to_text_pages(f=io.BytesIO(f_bytes))
+
+    elif (
+        mime_type
+        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ):
+        return pptx_to_text_pages(f=io.BytesIO(f_bytes))
+
     else:
         df = tabular_bytes_to_str_df(
             f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
@@ -868,7 +877,11 @@ def get_pdf_num_pages(f_bytes: bytes) -> int:
 
 
 def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
-    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
+    if is_gdrive_presentation_url(furl(url)):
+        param = "slide"
+    else:
+        param = "page"
+    return furl(url).set(fragment_args={param: page_num} if page_num else {})
 
 
 # dont use more than 1GB of memory for pandoc in total

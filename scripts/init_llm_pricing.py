@@ -551,6 +551,63 @@ def run():
     # groq
 
     llm_pricing_create(
+        model_id="llama-3.2-90b-vision-preview",
+        model_name=LargeLanguageModels.llama3_2_90b_vision.name,
+        unit_cost_input=0.90,
+        unit_cost_output=0.90,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+    llm_pricing_create(
+        model_id="llama-3.2-11b-vision-preview",
+        model_name=LargeLanguageModels.llama3_2_11b_vision.name,
+        unit_cost_input=0.18,
+        unit_cost_output=0.18,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+
+    llm_pricing_create(
+        model_id="llama-3.2-3b-preview",
+        model_name=LargeLanguageModels.llama3_2_3b.name,
+        unit_cost_input=0.06,
+        unit_cost_output=0.06,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+    llm_pricing_create(
+        model_id="llama-3.2-1b-preview",
+        model_name=LargeLanguageModels.llama3_2_1b.name,
+        unit_cost_input=0.04,
+        unit_cost_output=0.04,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+
+    llm_pricing_create(
+        model_id="llama-3.1-70b-versatile",
+        model_name=LargeLanguageModels.llama3_1_70b.name,
+        unit_cost_input=0.59,
+        unit_cost_output=0.79,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+    llm_pricing_create(
+        model_id="llama-3.1-8b-instant",
+        model_name=LargeLanguageModels.llama3_1_8b.name,
+        unit_cost_input=0.05,
+        unit_cost_output=0.08,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+
+    llm_pricing_create(
         model_id="llama3-70b-8192",
         model_name=LargeLanguageModels.llama3_70b.name,
         unit_cost_input=0.59,

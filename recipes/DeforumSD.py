@@ -91,24 +91,6 @@ class DeforumSDPage(BasePage):
     def render_form_v2(self):
         fps_slider = gui.session_state["fps"]
 
-        gui.write("#### 👩‍💻 Animation Prompts")
-        gui.caption(
-            """
-            Describe the scenes or series of images that you want to generate into an animation. 
-            You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next.
-            """
-        )
-        gui.write("#### Step 1: Draft & Refine Keyframes")
-
-        animation_prompts_editor(fps_slider)
-
-        gui.write("#### Step 2: Increase Animation Quality")
-        gui.caption(
-            """
-            Once you like your keyframes, increase your frames per second for high quality.
-            """
-        )
-
         # keep track of the prev value of fps slider to keep slider and preset in sync
         prev_fps_slider = gui.session_state.setdefault("-prev-fps", fps_slider)
         gui.session_state["-prev-fps"] = fps_slider
@@ -119,6 +101,24 @@ class DeforumSDPage(BasePage):
         elif fps_preset != str(fps_slider):
             # fps preset changed, update the fps slider
             gui.session_state["fps"] = int(fps_preset)
+
+        gui.write("#### 👩‍💻 Animation Prompts")
+        gui.caption(
+            """
+            Describe the scenes or series of images that you want to generate into an animation. 
+            You can add as many prompts as you like. Mention the keyframe seconds for each prompt i.e. the transition point from the first prompt to the next.
+            """
+        )
+        gui.write("#### Step 1: Draft & Refine Keyframes")
+
+        animation_prompts_editor(prev_fps_slider, fps_slider)
+
+        gui.write("#### Step 2: Increase Animation Quality")
+        gui.caption(
+            """
+            Once you like your keyframes, increase your frames per second for high quality.
+            """
+        )
 
         options = {
             "2": "Draft: 2 FPS",
@@ -133,7 +133,7 @@ class DeforumSDPage(BasePage):
             checked_by_default=False,
         )
 
-        gui.slider(label="", min_value=1, max_value=30, key="fps")
+        gui.slider(label="", min_value=2, max_value=30, key="fps")
 
     def get_cost_note(self) -> str | None:
         return f"{gui.session_state.get('max_frames')} frames @ {CREDITS_PER_FRAME} Cr /frame"
@@ -331,6 +331,7 @@ class ZoomPanSettings(BaseModel):
 
 
 def animation_prompts_editor(
+    prev_fps: int,
     fps: int,
     key: str = "animation_prompts",
 ):
@@ -348,6 +349,7 @@ def animation_prompts_editor(
         render_inputs=partial(
             animation_prompts_list_item,
             key=key,
+            prev_fps=prev_fps,
             fps=fps,
             use_3d=use_3d,
             zoom_kf=zoom_kf,
@@ -398,6 +400,7 @@ def animation_prompts_list_item(
     item_dict: dict,
     *,
     key: str,
+    prev_fps: int,
     fps: int,
     use_3d: bool = False,
     zoom_kf: dict,
@@ -436,13 +439,17 @@ def animation_prompts_list_item(
                     f'<i class="mt-3 pt-1 fa-duotone fa-solid fa-timer fa-lg" style="width: {_icon_width}"></i>',
                 )
 
+                # an arbitrary scaling factor to make the movement consistent across different fps
+                fps_scaling = 1.2
+
+                fps1 = (prev_fps + fps_scaling) ** fps_scaling
                 zp_settings = ZoomPanSettings(
-                    zoom=zoom_kf.pop(frame, 1.0),
-                    translation_x=translation_x_kf.pop(frame, 0.0),
-                    translation_y=translation_y_kf.pop(frame, 0.0),
-                    rotation_3d_x=rotation_3d_x_kf.pop(frame, 0.0),
-                    rotation_3d_y=rotation_3d_y_kf.pop(frame, 0.0),
-                    rotation_3d_z=rotation_3d_z_kf.pop(frame, 0.0),
+                    zoom=zoom_kf.pop(frame, 1.0) ** prev_fps,
+                    translation_x=translation_x_kf.pop(frame, 0.0) * fps1,
+                    translation_y=translation_y_kf.pop(frame, 0.0) * fps1,
+                    rotation_3d_x=rotation_3d_x_kf.pop(frame, 0.0) * fps1,
+                    rotation_3d_y=rotation_3d_y_kf.pop(frame, 0.0) * fps1,
+                    rotation_3d_z=rotation_3d_z_kf.pop(frame, 0.0) * fps1,
                 )
 
                 item_dict["_seconds"] = seconds = gui.number_input(
@@ -465,13 +472,14 @@ def animation_prompts_list_item(
                     settings=zp_settings,
                 )
 
-                zoom_kf[frame] = zp_settings.zoom
-                translation_x_kf[frame] = zp_settings.translation_x
-                translation_y_kf[frame] = zp_settings.translation_y
+                fps2 = (fps + fps_scaling) ** fps_scaling
+                zoom_kf[frame] = zp_settings.zoom ** (1 / fps)
+                translation_x_kf[frame] = zp_settings.translation_x / fps2
+                translation_y_kf[frame] = zp_settings.translation_y / fps2
                 if use_3d:
-                    rotation_3d_x_kf[frame] = zp_settings.rotation_3d_x
-                    rotation_3d_y_kf[frame] = zp_settings.rotation_3d_y
-                    rotation_3d_z_kf[frame] = zp_settings.rotation_3d_z
+                    rotation_3d_x_kf[frame] = zp_settings.rotation_3d_x / fps2
+                    rotation_3d_y_kf[frame] = zp_settings.rotation_3d_y / fps2
+                    rotation_3d_z_kf[frame] = zp_settings.rotation_3d_z / fps2
 
             with gui.div(className="d-flex gap-4 align-items-start mt-2 me-1"):
                 if gui.button(
@@ -584,7 +592,7 @@ def zoom_pan_dialog(
             return
         settings.rotation_3d_x = key_frame_slider(
             label="""###### Tilt Up/Down""",
-            caption="Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.",
+            caption="Tilts the camera up or down in degrees per second. This parameter uses positive values to tilt up and negative values to tilt down.",
             min_value=-10,
             max_value=10,
             key=item_key + ":rotation_3d_x",
@@ -592,7 +600,7 @@ def zoom_pan_dialog(
         )
         settings.rotation_3d_y = key_frame_slider(
             label="###### Pan Left/Right",
-            caption="Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.",
+            caption="Pans the canvas left or right in degrees per second. This parameter uses positive values to pan right and negative values to pan left.",
             min_value=-10,
             max_value=10,
             key=item_key + ":rotation_3d_y",
@@ -600,7 +608,7 @@ def zoom_pan_dialog(
         )
         settings.rotation_3d_z = key_frame_slider(
             label="###### Roll Clockwise/Counterclockwise",
-            caption="Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise.",
+            caption="Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per second. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise.",
             min_value=-10,
             max_value=10,
             key=item_key + ":rotation_3d_z",
@@ -621,39 +629,39 @@ def get_zoom_pan_summary(
     if 0.999 < zoom < 1.001:
         pass
     elif zoom < 1:
-        parts.append(f"Out: {zoom:.3f}")
+        parts.append(f"Out: {zoom:.3f}×")
     else:
-        parts.append(f"In: {zoom:.3f}")
+        parts.append(f"In: {zoom:.3f}×")
     if -0.001 < translation_x < 0.001:
         pass
     elif translation_x > 0:
-        parts.append(f"Right: {translation_x:.3f}")
+        parts.append(f"Right: {translation_x:.3f} ➡️")
     else:
-        parts.append(f"Left: {translation_x:.3f}")
+        parts.append(f"Left: {translation_x:.3f} ⬅️")
     if -0.001 < translation_y < 0.001:
         pass
     elif translation_y > 0:
-        parts.append(f"Up: {translation_y:.3f}")
+        parts.append(f"Up: {translation_y:.3f} ⬆️")
     else:
-        parts.append(f"Down: {-translation_y:.3f}")
+        parts.append(f"Down: {-translation_y:.3f} ⬇️")
     if -0.001 < rotation_3d_x < 0.001:
         pass
     elif rotation_3d_x > 0:
-        parts.append(f"Tilt ⤴: {rotation_3d_x:.3f}")
+        parts.append(f"Tilt ⤴: {rotation_3d_x:.3f}°")
     else:
-        parts.append(f"Tilt ⤵: {-rotation_3d_x:.3f}")
+        parts.append(f"Tilt ⤵: {-rotation_3d_x:.3f}°")
     if -0.001 < rotation_3d_y < 0.001:
         pass
     elif rotation_3d_y > 0:
-        parts.append(f"Pan ↪: {rotation_3d_y:.3f}")
+        parts.append(f"Pan ↪: {rotation_3d_y:.3f}°")
     else:
-        parts.append(f"Pan ↩: {-rotation_3d_y:.3f}")
+        parts.append(f"Pan ↩: {-rotation_3d_y:.3f}°")
     if -0.001 < rotation_3d_z < 0.001:
         pass
     elif rotation_3d_z > 0:
-        parts.append(f"Roll ↺: {rotation_3d_z:.3f}")
+        parts.append(f"Roll ↺: {rotation_3d_z:.3f}°")
     else:
-        parts.append(f"Roll ↻: {-rotation_3d_z:.3f}")
+        parts.append(f"Roll ↻: {-rotation_3d_z:.3f}°")
     return " • ".join(parts)
 
 

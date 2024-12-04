@@ -4,6 +4,7 @@
 
 <script>
     window.addEventListener("DOMContentLoaded", async function () {
+        if (typeof google === "undefined") return;
         google.accounts.id.initialize({
             client_id: window.GOOGLE_CLIENT_ID,
             callback: handleCredentialResponse,
@@ -26,6 +27,7 @@
     <script>
         window.addEventListener("DOMContentLoaded", async function () {
             await window.waitUntilHydrated;
+            if (typeof detectIncognito === "undefined") return;
             let result = await detectIncognito();
             if (!result.isPrivate) return;
             let elem = document.getElementById("main-content");

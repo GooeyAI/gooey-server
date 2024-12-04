@@ -105,7 +105,10 @@ def global_workspace_selector(user: AppUser, session: dict):
                     with gui.div(className="col-2 d-flex justify-content-center"):
                         gui.html('<i class="fa-regular fa-octopus"></i>')
                     with gui.div(className="col-10"):
-                        gui.html("Manage Workspace")
+                        if current.memberships.get(user=user).can_edit_workspace():
+                            gui.html("Manage Workspace")
+                        else:
+                            gui.html("Open Workspace")
 
         if gui.session_state.pop("--create-workspace", None):
             name = get_default_workspace_name_for_user(user)

@@ -16,12 +16,14 @@ from daras_ai_v2.text_splitter import default_length_function
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_page_num(pdf_url: str, page_num: int) -> str:
+def azure_doc_extract_page_num(
+    url: str, page_num: int, model_id="prebuilt-layout"
+) -> str:
     if page_num:
         params = dict(pages=str(page_num))
     else:
         params = None
-    pages = azure_doc_extract_pages(pdf_url, params=params)
+    pages = azure_doc_extract_pages(url, params=params, model_id=model_id)
     if pages and pages[0]:
         return str(pages[0])
     else:
@@ -53,7 +55,7 @@ def azure_form_recognizer_models() -> dict[str, str]:
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
-def azure_form_recognizer(url: str, model_id: str, params: dict = None):
+def azure_form_recognizer(url: str, model_id: str, params: dict = None) -> dict:
     r = requests.post(
         str(
             furl(settings.AZURE_FORM_RECOGNIZER_ENDPOINT)
@@ -79,11 +81,23 @@ def azure_form_recognizer(url: str, model_id: str, params: dict = None):
 
 
 def extract_records(result: dict, page_num: int) -> list[dict]:
+
     table_polys = extract_tables(result, page_num)
     records = []
     for para in result.get("paragraphs", []):
+        # indirectly check if the para is in the current page
+        bounding_regions = para.get("boundingRegions")
+        if not bounding_regions:
+            records.append(
+                {
+                    "role": para.get("role", ""),
+                    "content": strip_content(para["content"]),
+                }
+            )
+            continue
+
         try:
-            if para["boundingRegions"][0]["pageNumber"] != page_num:
+            if bounding_regions[0]["pageNumber"] != page_num:
                 continue
         except (KeyError, IndexError):
             continue
@@ -130,7 +144,7 @@ def rect_contains(*, outer: list[int], inner: list[int]):
 
 def extract_tables(result, page):
     table_polys = []
-    for table in result["tables"]:
+    for table in result.get("tables", []):
         try:
             if table["boundingRegions"][0]["pageNumber"] != page:
                 continue

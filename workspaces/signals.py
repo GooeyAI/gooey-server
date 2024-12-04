@@ -1,4 +1,5 @@
 import traceback
+from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from loguru import logger
@@ -22,10 +23,10 @@ def add_user_existing_workspace(instance: AppUser, **kwargs):
             WorkspaceInvite.objects.create_and_send_invite(
                 workspace=workspace,
                 email=instance.email,
-                created_by=workspace.created_by,
+                current_user=workspace.created_by,
                 defaults=dict(role=WorkspaceRole.MEMBER),
             )
-        except Exception as e:
+        except ValidationError as e:
             traceback.print_exc()
             sentry_sdk.capture_exception(e)
 
