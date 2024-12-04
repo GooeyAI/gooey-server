@@ -194,10 +194,11 @@ class TextToSpeechPage(BasePage):
 
     def run(self, state: dict):
         text = state["text_prompt"].strip()
-        
-         # Parse markdown to plain text
+
+        # Parse markdown to plain text
         parser = MarkdownIt(renderer_cls=RendererPlain)
         text = parser.render(text)
+
         provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
         match provider:
@@ -291,7 +292,7 @@ class TextToSpeechPage(BasePage):
 
                 yield "Uploading Audio file..."
                 state["audio_url"] = upload_file_from_bytes(
-                    f"google_tts_gen.mp3", response.audio_content
+                    "google_tts_gen.mp3", response.audio_content
                 )
 
             case TextToSpeechProviders.ELEVEN_LABS:
@@ -423,7 +424,7 @@ class TextToSpeechPage(BasePage):
                     },
                 )
                 raise_for_status(response)
-                audio_url = upload_file_from_bytes(f"ghana_gen.wav", response.content)
+                audio_url = upload_file_from_bytes("ghana_gen.wav", response.content)
                 state["audio_url"] = audio_url
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):

@@ -1,10 +1,13 @@
 import io
 import typing
 from enum import Enum
+from time import sleep
 
 import requests
 from PIL import Image
 from django.db import models
+from furl import furl
+from pydantic import BaseModel
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -13,6 +16,7 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -46,6 +50,8 @@ inpaint_model_ids = {
 
 
 class Text2ImgModels(Enum):
+    flux_1_dev = "FLUX.1 [dev]"
+
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     dream_shaper = "DreamShaper (Lykon)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
@@ -70,6 +76,7 @@ class Text2ImgModels(Enum):
 
 
 text2img_model_ids = {
+    Text2ImgModels.flux_1_dev: "fal-ai/flux-general",
     Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
@@ -203,6 +210,11 @@ class Schedulers(models.TextChoices):
     )
 
 
+class LoraWeight(BaseModel):
+    path: str
+    scale: float = 1.0
+
+
 def sd_upscale(
     *,
     prompt: str,
@@ -269,7 +281,7 @@ def instruct_pix2pix(
 
 def text2img(
     *,
-    selected_model: str,
+    model: Text2ImgModels,
     prompt: str,
     num_outputs: int,
     num_inference_steps: int,
@@ -281,19 +293,42 @@ def text2img(
     scheduler: str = None,
     dall_e_3_quality: str | None = None,
     dall_e_3_style: str | None = None,
+    loras: list[LoraWeight] | None = None,
 ):
-    if selected_model != Text2ImgModels.dall_e_3.name:
+    if model not in {
+        Text2ImgModels.dall_e_3,
+        Text2ImgModels.flux_1_dev,
+    }:
         _resolution_check(width, height, max_size=(1024, 1024))
 
-    match selected_model:
-        case Text2ImgModels.dall_e_3.name:
+    if model in Text2ImgModels._deprecated():
+        raise UserError(f"Model {model.value} is deprecated")
+
+    match model:
+        case Text2ImgModels.flux_1_dev:
+            payload = dict(
+                prompt=prompt,
+                image_size=dict(width=width, height=height),
+                num_inference_steps=num_inference_steps,
+                seed=seed,
+                guidance_scale=guidance_scale,
+                num_images=num_outputs,
+                enable_safety_checker=False,
+            )
+            if loras:
+                payload["loras"] = [lora.dict() for lora in loras]
+            return generate_fal_images(
+                model_id=text2img_model_ids[model],
+                payload=payload,
+            )
+        case Text2ImgModels.dall_e_3:
             from openai import OpenAI
 
             client = OpenAI()
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[Text2ImgModels[selected_model]],
+                    model=dall_e_model_ids[model],
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -302,7 +337,7 @@ def text2img(
                     size=f"{width}x{height}",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.dall_e.name:
+        case Text2ImgModels.dall_e:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
@@ -316,11 +351,11 @@ def text2img(
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case _:
-            prompt = add_prompt_prefix(prompt, selected_model)
+            prompt = add_prompt_prefix(prompt, model.name)
             return call_sd_multi(
                 "diffusion.text2img",
                 pipeline={
-                    "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+                    "model_id": text2img_model_ids[model],
                     "scheduler": Schedulers[scheduler].label if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
@@ -340,6 +375,38 @@ def text2img(
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def generate_fal_images(model_id: str, payload: dict) -> list[str]:
+    r = requests.post(
+        str(furl("https://queue.fal.run") / model_id),
+        headers=_fal_auth_headers(),
+        json=payload,
+    )
+    raise_for_status(r)
+    result = r.json()
+    status_url = result["status_url"]
+
+    for _ in range(600):
+        r = requests.get(status_url, headers=_fal_auth_headers())
+        raise_for_status(r)
+        result = r.json()
+
+        if result["status"] != "COMPLETED":
+            sleep(1)
+        else:
+            repsonse_url = result["response_url"]
+            r = requests.get(repsonse_url, headers=_fal_auth_headers())
+            raise_for_status(r)
+            result = r.json()
+
+            return [r["url"] for r in result["images"]]
+
+    raise TimeoutError("Timeout waiting for image to be generated from fal.ai")
+
+
+def _fal_auth_headers():
+    return {"Authorization": f"Key {settings.FAL_API_KEY}"}
 
 
 def _get_dall_e_img_size(width: int, height: int) -> int:

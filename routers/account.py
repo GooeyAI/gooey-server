@@ -18,6 +18,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -270,7 +271,14 @@ def all_saved_runs_tab(request: Request):
                 PublishedRunVisibility.INTERNAL,
             )
         ) | Q(created_by=request.user)
-    prs = PublishedRun.objects.filter(pr_filter).order_by("-updated_at")
+
+    qs = PublishedRun.objects.select_related(
+        "workspace", "created_by", "saved_run"
+    ).filter(pr_filter)
+
+    prs, cursor = paginate_queryset(
+        qs=qs, ordering=["-updated_at"], cursor=request.query_params
+    )
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
@@ -333,6 +341,8 @@ def all_saved_runs_tab(request: Request):
 
     with gui.div(className="mt-4"):
         grid_layout(3, prs, _render_run)
+
+    paginate_button(url=request.url, cursor=cursor)
 
 
 def api_keys_tab(request: Request):

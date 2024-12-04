@@ -275,6 +275,7 @@ GROQ_API_KEY = config("GROQ_API_KEY", default="")
 
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
+FAL_API_KEY = config("FAL_API_KEY", default="")
 
 APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
@@ -331,12 +332,24 @@ INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID = config(
 )
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
-EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
-ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
-LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 500, cast=int)
-FIRST_WORKSPACE_FREE_CREDITS = config("WORKSPACE_FREE_CREDITS", 500, cast=int)
-ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 
+ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
+VERIFIED_EMAIL_USER_FREE_CREDITS = config(
+    "VERIFIED_EMAIL_USER_FREE_CREDITS", 500, cast=int
+)
+VERIFIED_EMAIL_DOMAINS = {
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "icloud.com",
+    "me.com",
+    "zohomail.com",
+}
+FIRST_WORKSPACE_FREE_CREDITS = config("WORKSPACE_FREE_CREDITS", 500, cast=int)
+
+ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 ADDON_AMOUNT_CHOICES = [10, 30, 50, 100, 300, 500, 1000]  # USD
 AUTO_RECHARGE_BALANCE_THRESHOLD_CHOICES = [300, 1000, 3000, 10000]  # Credit balance
 AUTO_RECHARGE_COOLDOWN_SECONDS = config("AUTO_RECHARGE_COOLDOWN_SECONDS", 60, cast=int)

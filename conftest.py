@@ -39,7 +39,10 @@ def db_fixtures(transactional_db):
 
 @pytest.fixture
 def force_authentication():
-    with auth_backend.force_authentication() as user:
+    with (
+        auth_backend.force_authentication() as user,
+        patch("daras_ai_v2.settings.ADMIN_EMAILS", [user.email]),
+    ):
         yield user
 
 
@@ -115,3 +118,9 @@ def threadpool_subtest(subtests, max_workers: int = 128):
 @pytest.fixture(autouse=True)
 def clear_pytest_outbox():
     pytest_outbox.clear()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def patch_django_supports_color():
+    with patch("django.core.management.color.supports_color", return_value=False):
+        yield

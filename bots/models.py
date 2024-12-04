@@ -1780,11 +1780,13 @@ class PublishedRun(models.Model):
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
         related_name="published_runs",
+        blank=True,
     )
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
+        blank=True,
     )
 
     workspace = models.ForeignKey(
@@ -1807,33 +1809,20 @@ class PublishedRun(models.Model):
         ]
 
         indexes = [
-            models.Index(fields=["workflow"]),
             models.Index(fields=["workflow", "created_by"]),
             models.Index(fields=["workflow", "published_run_id"]),
-            models.Index(fields=["workflow", "visibility", "is_approved_example"]),
             models.Index(
                 fields=[
-                    "workflow",
-                    "visibility",
                     "is_approved_example",
-                    "published_run_id",
-                ]
-            ),
-            models.Index(
-                fields=[
-                    "workflow",
                     "visibility",
-                    "is_approved_example",
                     "published_run_id",
-                    "example_priority",
                     "updated_at",
+                    "workflow",
+                    "example_priority",
                 ]
             ),
             models.Index(
-                "created_by",
-                "visibility",
-                models.F("updated_at").desc(),
-                name="published_run_cre_vis_upd_idx",
+                fields=["-updated_at", "workspace", "created_by", "visibility"]
             ),
         ]
 
@@ -1937,6 +1926,14 @@ class PublishedRun(models.Model):
             parent_pr=self,
         )
 
+    @classmethod
+    def approved_example_q(cls):
+        return (
+            Q(is_approved_example=True)
+            & ~Q(visibility=PublishedRunVisibility.UNLISTED)
+            & ~Q(published_run_id="")
+        )
+
 
 class PublishedRunVersion(models.Model):
     version_id = models.CharField(max_length=128, unique=True)
@@ -1955,6 +1952,7 @@ class PublishedRunVersion(models.Model):
         "app_users.AppUser",
         on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
         null=True,
+        blank=True,
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")

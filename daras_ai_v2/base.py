@@ -16,7 +16,6 @@ from time import sleep
 import gooey_gui as gui
 import sentry_sdk
 from django.db.models import Q, Sum
-from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
@@ -53,6 +52,7 @@ from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from functions.models import RecipeFunction, FunctionTrigger
 from functions.recipe_functions import (
@@ -2082,7 +2082,7 @@ class BasePage:
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
+You’ll receive {settings.VERIFIED_EMAIL_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
@@ -2174,17 +2174,20 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 allow_hide=allow_hide,
             )
 
-        example_runs = (
-            PublishedRun.objects.filter(
-                workflow=self.workflow,
-                visibility=PublishedRunVisibility.PUBLIC,
-                is_approved_example=True,
-            )
-            .exclude(published_run_id="")
-            .order_by("-example_priority", "-updated_at")[:50]
+        qs = PublishedRun.objects.filter(
+            PublishedRun.approved_example_q(),
+            workflow=self.workflow,
+        )
+
+        example_runs, cursor = paginate_queryset(
+            qs=qs,
+            ordering=["-example_priority", "-updated_at"],
+            cursor=self.request.query_params,
         )
 
         grid_layout(3, example_runs, _render)
+
+        paginate_button(url=self.request.url, cursor=cursor)
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -2199,9 +2202,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     PublishedRunVisibility.INTERNAL,
                 )
             ) | Q(created_by=self.request.user)
-        published_runs = PublishedRun.objects.filter(
-            Q(workflow=self.workflow) & pr_filter
-        )[:50]
+        qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
+
+        published_runs, cursor = paginate_queryset(
+            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
+        )
+
         if not published_runs:
             gui.write("No published runs yet")
             return
@@ -2218,20 +2224,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
+        paginate_button(url=self.request.url, cursor=cursor)
+
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
-        before = self.request.query_params.get("updated_at__lt", None)
-        if before:
-            before = datetime.datetime.fromisoformat(before)
-        else:
-            before = timezone.now()
-        run_history = list(
-            SavedRun.objects.filter(
-                workflow=self.workflow,
-                updated_at__lt=before,
-                workspace=self.current_workspace,
-            )[:25]
+        qs = SavedRun.objects.filter(
+            workflow=self.workflow,
+            workspace=self.current_workspace,
+        )
+        run_history, cursor = paginate_queryset(
+            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
         )
         if not run_history:
             gui.write("No history yet")
@@ -2239,15 +2242,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, run_history, self._render_run_preview)
 
-        next_url = self.current_app_url(
-            RecipeTabs.history,
-            query_params={"updated_at__lt": run_history[-1].to_dict()["updated_at"]},
-        )
-        with gui.link(to=str(next_url)):
-            gui.html(
-                # language=HTML
-                """<button type="button" class="btn btn-theme">Load More</button>"""
-            )
+        paginate_button(url=self.request.url, cursor=cursor)
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):

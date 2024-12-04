@@ -314,20 +314,19 @@ def output_resolution_setting():
         gui.session_state.get(
             "selected_model", gui.session_state.get("selected_models")
         )
-        or ""
+        or []
     )
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
+    selected_models = set(selected_models)
 
     allowed_shapes = None
-    if "jack_qiao" in selected_models or "sd_1_4" in selected_models:
-        pixel_options = [512]
-    elif selected_models == ["deepfloyd_if"]:
+    if selected_models and selected_models <= {Text2ImgModels.flux_1_dev.name}:
         pixel_options = [1024]
-    elif selected_models == ["dall_e"]:
+    elif selected_models and selected_models <= {Text2ImgModels.dall_e.name}:
         pixel_options = [256, 512, 1024]
         allowed_shapes = ["square"]
-    elif selected_models == ["dall_e_3"]:
+    elif selected_models and selected_models <= {Text2ImgModels.dall_e_3.name}:
         pixel_options = [1024]
         allowed_shapes = ["square", "wide"]
     else:

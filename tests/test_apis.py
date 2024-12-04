@@ -69,11 +69,7 @@ def _test_api_async(page_cls: typing.Type[BasePage], endpoint: str):
 def test_apis_examples(
     mock_celery_tasks, db_fixtures, force_authentication, threadpool_subtest
 ):
-    qs = (
-        PublishedRun.objects.exclude(is_approved_example=False)
-        .exclude(published_run_id="")
-        .order_by("workflow")
-    )
+    qs = PublishedRun.objects.filter(PublishedRun.approved_example_q())
     for pr in qs:
         page_cls = Workflow(pr.workflow).page_cls
         endpoint = f"/v2/{page_cls.slug_versions[0]}/?example_id={pr.published_run_id}"

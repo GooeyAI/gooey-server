@@ -25,6 +25,7 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
     sd_upscale,
     Schedulers,
+    LoraWeight,
 )
 
 DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/039110ba-1f72-11ef-8d23-02420a00015d/Compare%20image%20generators.jpg"
@@ -72,6 +73,8 @@ class CompareText2ImgPage(BasePage):
 
         edit_instruction: str | None
         image_guidance_scale: float | None
+
+        loras: list[LoraWeight] | None
 
     class ResponseModel(BaseModel):
         output_images: dict[
@@ -123,10 +126,14 @@ class CompareText2ImgPage(BasePage):
         [Check out our prompt guide](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit#slide=id.g210b1678eba_0_26).
         """
         )
-        enum_multiselect(
+        selected_models = enum_multiselect(
             Text2ImgModels,
             key="selected_models",
         )
+        if selected_models and set(selected_models) <= {Text2ImgModels.flux_1_dev.name}:
+            loras_input()
+        else:
+            gui.session_state.pop("loras", None)
 
     def validate_form_v2(self):
         assert gui.session_state["text_prompt"], "Please provide a prompt"
@@ -166,7 +173,6 @@ class CompareText2ImgPage(BasePage):
         gui.session_state["edit_instruction"] = gui.session_state.get(
             "__edit_instruction"
         )
-
         negative_prompt_setting()
         output_resolution_setting()
         num_outputs_setting(gui.session_state.get("selected_models", []))
@@ -192,10 +198,11 @@ class CompareText2ImgPage(BasePage):
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {Text2ImgModels[selected_model].value}..."
+            model = Text2ImgModels[selected_model]
+            yield f"Running {model.value}..."
 
             output_images[selected_model] = text2img(
-                selected_model=selected_model,
+                model=model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 num_inference_steps=request.quality,
@@ -207,6 +214,7 @@ class CompareText2ImgPage(BasePage):
                 seed=request.seed,
                 negative_prompt=request.negative_prompt,
                 scheduler=request.scheduler,
+                loras=request.loras,
             )
 
             if request.edit_instruction:
@@ -272,3 +280,23 @@ class CompareText2ImgPage(BasePage):
                     total += 2
         num_outputs = state.get("num_outputs") or 0
         return total * num_outputs
+
+
+def loras_input(key: str = "loras"):
+    lora_urls = gui.file_uploader(
+        "**🔌 LoRAs**",
+        help=(
+            "The LoRAs to use for the image generation. "
+            "You can use any number of LoRAs and they will be merged together to generate the final image.\n\n"
+            "You can use [fal.ai](https://fal.ai/models/fal-ai/flux-lora-fast-training) to train your own LoRAs. "
+        ),
+        optional=True,
+        accept_multiple_files=True,
+        value=[lora["path"] for lora in gui.session_state.get(key) or []],
+    )
+    if lora_urls:
+        gui.session_state[key] = [
+            LoraWeight(path=url, scale=1).dict() for url in lora_urls
+        ]
+    else:
+        gui.session_state.pop("loras", None)

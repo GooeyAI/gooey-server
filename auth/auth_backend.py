@@ -6,9 +6,10 @@ from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
-from daras_ai_v2.crypto import get_random_doc_id
+from bots.models import get_default_published_run_workspace
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, ANONYMOUS_USER_COOKIE
 from gooeysite.bg_db_conn import db_middleware
+from workspaces.models import Workspace
 
 # quick and dirty way to bypass authentication for testing
 authlocal = []
@@ -16,17 +17,12 @@ authlocal = []
 
 @contextmanager
 def force_authentication():
-    authlocal.append(
-        AppUser.objects.get_or_create(
-            email="tests@pytest.org",
-            defaults=dict(
-                is_anonymous=False,
-                uid=get_random_doc_id(),
-                balance=10**9,
-                disable_rate_limits=True,
-            ),
-        )[0]
-    )
+    user = Workspace.objects.get(id=get_default_published_run_workspace()).created_by
+    user.email = "test@pytest.com"
+    user.balance = 10**9
+    user.disable_rate_limits = True
+    user.save()
+    authlocal.append(user)
     try:
         yield authlocal[0]
     finally:
