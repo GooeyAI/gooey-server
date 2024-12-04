@@ -184,8 +184,10 @@ class AppUser(models.Model):
         self.uid = user.uid
         self.is_disabled = user.disabled
         self.display_name = user.display_name or ""
-        self.email = str(user.email)
-        self.phone_number = str(user.phone_number)
+        if user.email:
+            self.email = str(user.email)
+        if user.phone_number:
+            self.phone_number = str(user.phone_number)
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
         )
