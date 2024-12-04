@@ -63,6 +63,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     )
     fields = [
         "name",
+        "description",
         "domain_name",
         "created_by",
         "is_personal",
