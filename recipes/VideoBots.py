@@ -439,11 +439,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             label=f"###### {field_title(self.RequestModel, 'user_language')}",
                             key="user_language",
                         )
+                else:
+                    gui.session_state["asr_task"] = None
+                    gui.session_state["translation_model"] = None
+                    gui.session_state["user_language"] = None
 
                 gui.newline()
         else:
-            gui.session_state["translation_model"] = None
             gui.session_state["asr_model"] = None
+            gui.session_state["asr_language"] = None
+            gui.session_state["asr_prompt"] = None
+
+            gui.session_state["asr_task"] = None
+            gui.session_state["translation_model"] = None
             gui.session_state["user_language"] = None
 
         if gui.switch(
