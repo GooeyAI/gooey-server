@@ -431,22 +431,7 @@ def _edit_user_profile_photo_section(user: AppUser):
 def _edit_user_profile_form_section(user: AppUser):
     user.display_name = gui.text_input("Name", value=user.display_name)
 
-    handle_style: dict[str, str] = {}
-    if handle := gui.text_input(
-        "Username",
-        value=(user.handle and user.handle.name or ""),
-        style=handle_style,
-    ):
-        if not user.handle or user.handle.name != handle:
-            try:
-                Handle(name=handle).full_clean()
-            except ValidationError as e:
-                gui.error(e.messages[0], icon="")
-                handle_style["border"] = "1px solid var(--bs-danger)"
-            else:
-                gui.success("Handle is available", icon="")
-                handle_style["border"] = "1px solid var(--bs-success)"
-
+    handle_name = render_handle_input("Username", handle=user.handle)
     if email := user.email:
         gui.text_input("Email", value=email, disabled=True)
     if phone_number := user.phone_number:
@@ -475,19 +460,7 @@ def _edit_user_profile_form_section(user: AppUser):
     ):
         try:
             with transaction.atomic():
-                if handle and not user.handle:
-                    # user adds a new handle
-                    user.handle = Handle(name=handle)
-                    user.handle.save()
-                elif handle and user.handle and user.handle.name != handle:
-                    # user changes existing handle
-                    user.handle.name = handle
-                    user.handle.save()
-                elif not handle and user.handle:
-                    # user removes existing handle
-                    user.handle.delete()
-                    user.handle = None
-
+                user.handle = update_handle(handle=user.handle, name=handle_name)
                 user.full_clean()
                 user.save()
         except (ValidationError, IntegrityError) as e:
@@ -540,6 +513,50 @@ def _get_meta_description_for_profile(user: AppUser) -> str:
 
     description += make_natural_english_list(activity_texts)
     return description
+
+
+def render_handle_input(
+    label: str, *, handle: Handle | None = None, **kwargs
+) -> str | None:
+    handle_style: dict[str, str] = {}
+    new_handle = gui.text_input(
+        label,
+        value=handle and handle.name or "",
+        style=handle_style,
+        **kwargs,
+    )
+    if not new_handle or (handle and handle.name == new_handle):
+        # nothing to validate
+        return new_handle
+
+    try:
+        Handle(name=new_handle).full_clean()
+    except ValidationError as e:
+        gui.error(e.messages[0], icon="")
+        handle_style["border"] = "1px solid var(--bs-danger)"
+    else:
+        gui.success("Handle is available", icon="")
+        handle_style["border"] = "1px solid var(--bs-success)"
+
+    return new_handle
+
+
+def update_handle(handle: Handle | None, name: str | None) -> Handle | None:
+    if handle and name and handle.name != name:
+        # user changes existing handle
+        handle.name = name
+        handle.save()
+        return handle
+    elif handle and not name:
+        # user removes existing handle
+        handle.delete()
+        return None
+    elif not handle and name:
+        # user adds a new handle
+        handle = Handle(name=name)
+        handle.save()
+        return handle
+    return handle
 
 
 def github_url_for_username(username: str) -> str:
