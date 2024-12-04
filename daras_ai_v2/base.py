@@ -702,15 +702,32 @@ class BasePage:
         dialog: gui.AlertDialogRef,
     ):
         form_container = gui.div()
-        bottom_container = gui.div(
-            className="mt-4 d-block d-lg-flex justify-content-between"
-        )
 
-        with bottom_container:
+        with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
             selected_workspace = self._render_workspace_selector(
                 key="published_run_workspace"
             )
             user_can_edit = selected_workspace.id == self.current_pr.workspace_id
+
+            with gui.div(className="mt-4 mt-lg-0 text-end"):
+                if user_can_edit:
+                    pressed_save_as_new = gui.button(
+                        f"{icons.fork} Save as New",
+                        type="secondary",
+                        className="mb-0 py-2 px-4",
+                    )
+                    pressed_save = gui.button(
+                        f"{icons.save} Save",
+                        type="primary",
+                        className="mb-0 ms-2 py-2 px-4",
+                    )
+                else:
+                    pressed_save_as_new = gui.button(
+                        f"{icons.fork} Save as New",
+                        type="primary",
+                        className="mb-0 py-2 px-4",
+                    )
+                    pressed_save = False
 
         with form_container:
             if user_can_edit:
@@ -742,26 +759,6 @@ class BasePage:
                         key="published_run_change_notes",
                         placeholder="Add change notes",
                     )
-
-        with bottom_container, gui.div(className="mt-4 mt-lg-0 text-end"):
-            if user_can_edit:
-                pressed_save_as_new = gui.button(
-                    f"{icons.fork} Save as New",
-                    type="secondary",
-                    className="mb-0 py-2 px-4",
-                )
-                pressed_save = gui.button(
-                    f"{icons.save} Save",
-                    type="primary",
-                    className="mb-0 ms-2 py-2 px-4",
-                )
-            else:
-                pressed_save_as_new = gui.button(
-                    f"{icons.fork} Save as New",
-                    type="primary",
-                    className="mb-0 py-2 px-4",
-                )
-                pressed_save = False
 
         self._render_admin_options(sr, pr)
 
