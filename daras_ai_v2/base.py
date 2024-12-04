@@ -309,6 +309,7 @@ class BasePage:
                     ]
                 },
             }
+            event.setdefault("tags", {}).update(user_is_paying=user.is_paying)
         return event
 
     def refresh_state(self):
