@@ -618,6 +618,12 @@ def render_workspace_create_or_edit_form(
         gui.caption(
             f"We'll automatically add any user with an `@{workspace.domain_name}` email to this workspace."
         )
+    workspace.description = gui.text_area(
+        "###### Description _(Optional)_",
+        key="workspace-description",
+        placeholder="Tell the world about your team!",
+        value=workspace.description,
+    )
     workspace.photo_url = gui.file_uploader(
         "###### Logo",
         accept=["image/*"],
