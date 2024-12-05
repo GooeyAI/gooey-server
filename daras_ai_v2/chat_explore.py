@@ -1,7 +1,7 @@
 import datetime
 
 import gooey_gui as gui
-from bots.models import BotIntegration, Platform, PublishedRunVisibility, Message
+from bots.models import BotIntegration, Platform, Message, PublishedRun
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.bot_integration_widgets import get_bot_test_link
@@ -18,11 +18,8 @@ def render():
     gui.newline()
 
     integrations = BotIntegration.objects.filter(
-        published_run__isnull=False,
-        published_run__visibility=PublishedRunVisibility.PUBLIC,
-        published_run__is_approved_example=True,
-    ).exclude(published_run__published_run_id="")
-
+        published_run__in=PublishedRun.approved_example_q()
+    )
     grid_layout(3, integrations, _render_bi)
 
 
