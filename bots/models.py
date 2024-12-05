@@ -46,8 +46,7 @@ class PublishedRunVisibility(models.IntegerChoices):
         if not workspace or workspace.is_personal:
             return [cls.UNLISTED, cls.PUBLIC]
         else:
-            # TODO: Add cls.PUBLIC when team-handles are added
-            return [cls.UNLISTED, cls.INTERNAL]
+            return [cls.UNLISTED, cls.INTERNAL, cls.PUBLIC]
 
     def help_text(self, workspace: typing.Optional["Workspace"] = None):
         from routers.account import profile_route, saved_route
@@ -55,15 +54,21 @@ class PublishedRunVisibility(models.IntegerChoices):
         match self:
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Only me + people with a link"
-            case PublishedRunVisibility.PUBLIC if workspace and workspace.is_personal:
-                user = workspace.created_by
-                if user.handle:
-                    profile_url = user.handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{pretty_profile_url}" target="_blank">{profile_url}</a>'
+            case PublishedRunVisibility.PUBLIC if workspace:
+                if workspace.is_personal:
+                    handle = workspace.created_by and workspace.created_by.handle
                 else:
+                    handle = workspace.handle
+
+                if handle:
+                    profile_url = handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a>'
+                elif workspace.is_personal:
                     edit_profile_url = get_route_path(profile_route)
                     return f'{self.get_icon()} Public on <a href="{edit_profile_url}" target="_blank">my profile page</a>'
+                else:
+                    return f"{self.get_icon()} Public"
             case PublishedRunVisibility.PUBLIC:
                 return f"{self.get_icon()} Public"
             case PublishedRunVisibility.INTERNAL if workspace:
