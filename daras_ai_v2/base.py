@@ -300,15 +300,17 @@ class BasePage:
                         "phone_number",
                         "photo_url",
                         "balance",
-                        "is_paying",
-                        "is_anonymous",
-                        "is_disabled",
                         "disable_safety_checker",
                         "disable_rate_limits",
                         "created_at",
                     ]
                 },
             }
+            event.setdefault("tags", {}).update(
+                user_is_paying=user.is_paying,
+                user_is_anonymous=user.is_anonymous,
+                user_is_disabled=user.is_disabled,
+            )
         return event
 
     def refresh_state(self):

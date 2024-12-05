@@ -78,16 +78,16 @@ class BotInterface:
     user_id: str
     convo: Conversation
     bi: BotIntegration
-    saved_run: SavedRun
+    saved_run: SavedRun | None = None
     input_type: typing.Literal[
         "text", "audio", "video", "image", "document", "interactive"
     ]
-    user_msg_id: str = None
+    user_msg_id: str | None = None
     can_update_message: bool = False
 
-    page_cls: typing.Type[BasePage] = None
+    page_cls: typing.Type[BasePage] | None = None
     query_params: dict
-    user_language: str = None
+    user_language: str | None = None
     workspace: Workspace
     current_user: AppUser
     show_feedback_buttons: bool = False
@@ -98,7 +98,7 @@ class BotInterface:
     recipe_run_state = RecipeRunState.starting
     run_status = "Starting..."
 
-    request_overrides: dict = None
+    request_overrides: dict | None = None
 
     def __init__(self):
         assert self.convo, "A conversation must be set"
@@ -118,8 +118,6 @@ class BotInterface:
                 run_id=self.saved_run.run_id,
                 uid=self.saved_run.uid,
             )
-        else:
-            raise AssertionError(f"No saved run found for {self.bi=}")
 
         if self.saved_run:
             self.input_glossary = self.saved_run.state.get("input_glossary_document")
@@ -133,15 +131,8 @@ class BotInterface:
         elif should_translate_lang(user_language):
             self.user_language = user_language
 
-        if self.bi.workspace:
-            self.workspace = self.bi.workspace
-            self.current_user = self.bi.created_by
-        else:
-            # TODO: remove this once all bots have been migrated to workspaces
-            self.workspace = Workspace.objects.get_or_create_from_uid(
-                self.bi.billing_account_uid
-            )[0]
-            self.current_user = self.workspace.created_by
+        self.workspace = self.bi.workspace
+        self.current_user = self.bi.created_by
 
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
