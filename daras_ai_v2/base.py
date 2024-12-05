@@ -1360,10 +1360,12 @@ class BasePage:
         )
 
     @cached_property
-    def current_workspace(self) -> typing.Optional["Workspace"]:
-        return self.request.user and get_current_workspace(
-            self.request.user, self.request.session
-        )
+    def current_workspace(self) -> Workspace:
+        if not self.request.user:
+            raise Workspace.DoesNotExist(
+                "User must be logged in to get their workspace"
+            )
+        return get_current_workspace(self.request.user, self.request.session)
 
     @cached_property
     def current_sr_user(self) -> AppUser | None:
@@ -2581,11 +2583,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
 
     def is_current_user_paying(self) -> bool:
-        return bool(
-            self.request.user
-            and self.current_workspace
-            and self.current_workspace.is_paying
-        )
+        try:
+            return self.current_workspace.is_paying
+        except Workspace.DoesNotExist:
+            return False
 
     def is_current_user_owner(self) -> bool:
         return bool(self.request.user and self.current_sr_user == self.request.user)
