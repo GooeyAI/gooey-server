@@ -1,17 +1,12 @@
 import json
-import tempfile
 import typing
-from enum import Enum
-from functools import partial
 
 import gooey_gui as gui
 from django.utils.text import slugify
 
 from app_users.models import AppUser
-from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
-from daras_ai_v2.settings import templates
 from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
@@ -20,38 +15,74 @@ if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
 
 
-def call_recipe_functions(
-    *,
-    saved_run: "SavedRun",
-    workspace: "Workspace",
-    current_user: AppUser,
-    request_model: typing.Type["BasePage.RequestModel"],
-    response_model: typing.Type["BasePage.ResponseModel"],
-    state: dict,
-    trigger: FunctionTrigger,
-) -> typing.Generator[typing.Union[str, tuple[str, "LLMTool"]], None, None]:
-    from daras_ai_v2.workflow_url_input import url_to_runs
+class LLMTool:
+    def __init__(self, function_url: str):
+        from daras_ai_v2.workflow_url_input import url_to_runs
 
-    functions = state.get("functions") or []
-    functions = [fun for fun in functions if fun.get("trigger") == trigger.name]
-    if not functions:
-        return
+        self.function_url = function_url
 
-    request = request_model.parse_obj(state)
-    variables = state.setdefault("variables", {})
-    fn_vars = dict(
-        web_url=saved_run.get_app_url(),
-        request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
-        response={k: v for k, v in state.items() if k in response_model.__fields__},
-    )
+        _, sr, pr = url_to_runs(function_url)
+        self._function_runs = (sr, pr)
 
-    if trigger != FunctionTrigger.prompt:
-        yield f"Running {trigger.name} hooks..."
+        self.name = slugify(pr.title).replace("-", "_")
+        self.label = pr.title
 
-    def run(sr, pr, /, **kwargs):
+        self.spec = {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": pr.notes,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        key: {"type": get_json_type(value)}
+                        for key, value in sr.state.get("variables", {}).items()
+                    },
+                },
+            },
+        }
+
+    def bind(
+        self,
+        saved_run: "SavedRun",
+        workspace: "Workspace",
+        current_user: AppUser,
+        request_model: typing.Type["BasePage.RequestModel"],
+        response_model: typing.Type["BasePage.ResponseModel"],
+        state: dict,
+        trigger: FunctionTrigger,
+    ) -> "LLMTool":
+        self.saved_run = saved_run
+        self.workspace = workspace
+        self.current_user = current_user
+        self.request_model = request_model
+        self.response_model = response_model
+        self.state = state
+        self.trigger = trigger
+        return self
+
+    def __call__(self, **kwargs):
+        try:
+            self.saved_run
+        except AttributeError:
+            raise RuntimeError("This LLMTool instance is not yet bound")
+
+        request = self.request_model.parse_obj(self.state)
+        variables = self.state.setdefault("variables", {})
+        fn_vars = dict(
+            web_url=self.saved_run.get_app_url(),
+            request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
+            response={
+                k: v
+                for k, v in self.state.items()
+                if k in self.response_model.__fields__
+            },
+        )
+
+        sr, pr = self._function_runs
         result, sr = sr.submit_api_call(
-            workspace=workspace,
-            current_user=current_user,
+            workspace=self.workspace,
+            current_user=self.current_user,
             parent_pr=pr,
             request_body=dict(
                 variables=sr.state.get("variables", {}) | variables | fn_vars | kwargs,
@@ -60,11 +91,11 @@ def call_recipe_functions(
         )
 
         CalledFunction.objects.create(
-            saved_run=saved_run, function_run=sr, trigger=trigger.db_value
+            saved_run=self.saved_run, function_run=sr, trigger=self.trigger.db_value
         )
 
         # wait for the result if its a pre request function
-        if trigger == FunctionTrigger.post:
+        if self.trigger == FunctionTrigger.post:
             return
         sr.wait_for_celery_result(result)
         # if failed, raise error
@@ -77,8 +108,11 @@ def call_recipe_functions(
             return
         if isinstance(return_value, dict):
             for k, v in return_value.items():
-                if k in request_model.__fields__ or k in response_model.__fields__:
-                    state[k] = v
+                if (
+                    k in self.request_model.__fields__
+                    or k in self.response_model.__fields__
+                ):
+                    self.state[k] = v
                 else:
                     variables[k] = v
         else:
@@ -86,30 +120,42 @@ def call_recipe_functions(
 
         return return_value
 
-    for fun in functions:
-        _, sr, pr = url_to_runs(fun.get("url"))
-        if trigger != FunctionTrigger.prompt:
-            run(sr, pr)
-        else:
-            fn_name = slugify(pr.title).replace("-", "_")
-            yield fn_name, LLMTool(
-                fn=partial(run, sr, pr),
-                label=pr.title,
-                spec={
-                    "type": "function",
-                    "function": {
-                        "name": fn_name,
-                        "description": pr.notes,
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                key: {"type": get_json_type(value)}
-                                for key, value in sr.state.get("variables", {}).items()
-                            },
-                        },
-                    },
-                },
-            )
+
+def call_recipe_functions(
+    *,
+    saved_run: "SavedRun",
+    workspace: "Workspace",
+    current_user: AppUser,
+    request_model: typing.Type["BasePage.RequestModel"],
+    response_model: typing.Type["BasePage.ResponseModel"],
+    state: dict,
+    trigger: FunctionTrigger,
+) -> typing.Iterable[str]:
+    yield f"Running {trigger.name} hooks..."
+    for tool in get_tools_from_state(state, trigger):
+        tool.bind(
+            saved_run=saved_run,
+            workspace=workspace,
+            current_user=current_user,
+            request_model=request_model,
+            response_model=response_model,
+            state=state,
+            trigger=trigger,
+        )
+        tool()
+
+
+def get_tools_from_state(
+    state: dict, trigger: FunctionTrigger
+) -> typing.Iterable[LLMTool]:
+
+    functions = state.get("functions")
+    if not functions:
+        return
+    for function in functions:
+        if function.get("trigger") != trigger.name:
+            continue
+        yield LLMTool(function.get("url"))
 
 
 def get_json_type(val) -> str:
@@ -210,60 +256,3 @@ def functions_input(current_user: AppUser, key="functions"):
             )
     else:
         gui.session_state.pop(key, None)
-
-
-def json_to_pdf(filename: str, data: str) -> str:
-    html = templates.get_template("form_output.html").render(data=json.loads(data))
-    pdf_bytes = html_to_pdf(html)
-    if not filename.endswith(".pdf"):
-        filename += ".pdf"
-    return upload_file_from_bytes(filename, pdf_bytes, "application/pdf")
-
-
-def html_to_pdf(html: str) -> bytes:
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.set_content(html)
-        with tempfile.NamedTemporaryFile(suffix=".pdf") as outfile:
-            page.pdf(path=outfile.name, format="A4")
-            ret = outfile.read()
-        browser.close()
-
-    return ret
-
-
-class LLMTool(typing.NamedTuple):
-    fn: typing.Callable
-    label: str
-    spec: dict
-
-
-class LLMTools(LLMTool, Enum):
-    json_to_pdf = LLMTool(
-        fn=json_to_pdf,
-        label="Save JSON as PDF",
-        spec={
-            "type": "function",
-            "function": {
-                "name": json_to_pdf.__name__,
-                "description": "Save JSON data to PDF",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "filename": {
-                            "type": "string",
-                            "description": "A short but descriptive filename for the PDF",
-                        },
-                        "data": {
-                            "type": "string",
-                            "description": "The JSON data to write to the PDF",
-                        },
-                    },
-                    "required": ["filename", "data"],
-                },
-            },
-        },
-    )

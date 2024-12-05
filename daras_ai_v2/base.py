@@ -61,6 +61,7 @@ from functions.recipe_functions import (
     is_functions_enabled,
     render_called_functions,
     LLMTool,
+    get_tools_from_state,
 )
 from payments.auto_recharge import (
     should_attempt_auto_recharge,
@@ -1347,8 +1348,8 @@ class BasePage:
         gui.session_state["is_flagged"] = is_flagged
 
     def get_current_llm_tools(self) -> dict[str, LLMTool]:
-        return dict(
-            call_recipe_functions(
+        return {
+            tool.name: tool.bind(
                 saved_run=self.current_sr,
                 workspace=self.current_workspace,
                 current_user=self.request.user,
@@ -1357,7 +1358,8 @@ class BasePage:
                 state=gui.session_state,
                 trigger=FunctionTrigger.prompt,
             )
-        )
+            for tool in get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+        }
 
     @cached_property
     def current_workspace(self) -> Workspace:
