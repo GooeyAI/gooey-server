@@ -760,7 +760,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if gui.session_state.get("functions"):
             prompt_funcs = call_recipe_functions(
                 saved_run=self.current_sr,
-                workspace=self.current_workspace,
+                workspace=None,
                 current_user=self.request.user,
                 request_model=self.RequestModel,
                 response_model=self.ResponseModel,
