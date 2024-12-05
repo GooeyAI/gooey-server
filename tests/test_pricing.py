@@ -2,7 +2,11 @@ from starlette.testclient import TestClient
 
 from bots.models import AppUser
 from bots.models import SavedRun, Workflow
+from daras_ai_v2.lipsync_api import LipsyncModel
+from payments.models import Subscription
+from payments.plans import PricingPlan
 from recipes.CompareLLM import CompareLLMPage
+from recipes.Lipsync import LipsyncPage
 from recipes.VideoBots import VideoBotsPage
 from server import app
 from usage_costs.models import UsageCost, ModelPricing
@@ -157,4 +161,36 @@ def test_workflowmetadata_2x_multiplier(transactional_db):
     )
     assert (
         llm_page.get_price_roundoff(state=state) == (210 + llm_page.PROFIT_CREDITS) * 2
+    )
+
+
+def test_lipsync_pricing(transactional_db):
+    page = LipsyncPage(user=AppUser.objects.create(is_anonymous=False, balance=5))
+    assert (
+        page.get_price_roundoff(
+            state=dict(selected_model=LipsyncModel.Wav2Lip.name, duration_sec=32)
+        )
+        == 42
+    )
+    assert (
+        page.get_price_roundoff(
+            state=dict(selected_model=LipsyncModel.SadTalker.name, duration_sec=32)
+        )
+        == 84
+    )
+
+    page.current_workspace.subscription = Subscription.objects.create(
+        plan=PricingPlan.ENTERPRISE.db_value
+    )
+    assert (
+        page.get_price_roundoff(
+            state=dict(selected_model=LipsyncModel.Wav2Lip.name, duration_sec=32)
+        )
+        == 66
+    )
+    assert (
+        page.get_price_roundoff(
+            state=dict(selected_model=LipsyncModel.SadTalker.name, duration_sec=32)
+        )
+        == 132
     )

@@ -11,19 +11,9 @@ from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from payments.plans import PricingPlan
 
 DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
-
-
-CREDITS_PER_MINUTE = 36
-
-
-def price_for_model(selected_model: str | None) -> float:
-    if selected_model == LipsyncModel.SadTalker.name:
-        multiplier = 2
-    else:
-        multiplier = 1
-    return CREDITS_PER_MINUTE * multiplier
 
 
 class LipsyncPage(BasePage):
@@ -142,15 +132,34 @@ class LipsyncPage(BasePage):
 
     def get_cost_note(self) -> str | None:
         selected_model = gui.session_state.get("selected_model")
-        return f"{price_for_model(selected_model)}/minute"
+        price = self.price_for_model(selected_model)
+        return f"{price.credits} credits per {price.seconds} sec clip"
 
     def get_raw_price(self, state: dict) -> float:
+        price = self.price_for_model(state.get("selected_model"))
         try:
             duration_sec = state["duration_sec"]
         except KeyError:
-            return 1
-        duration_sec = ceil(duration_sec / 5) * 5  # round up to nearest 5 seconds
+            return price.credits
+        return ceil(duration_sec / price.seconds) * price.credits
 
-        price = price_for_model(state.get("selected_model"))
+    def price_for_model(self, selected_model: str | None) -> "LipsyncPrice":
+        if selected_model == LipsyncModel.SadTalker.name:
+            credits = 12
+        else:
+            credits = 6
+        if (
+            self.current_workspace
+            and self.current_workspace.subscription
+            and self.current_workspace.subscription.plan
+            == PricingPlan.ENTERPRISE.db_value
+        ):
+            seconds = 3
+        else:
+            seconds = 5
+        return LipsyncPrice(credits, seconds)
 
-        return duration_sec / 60 * price
+
+class LipsyncPrice(typing.NamedTuple):
+    credits: int
+    seconds: int
