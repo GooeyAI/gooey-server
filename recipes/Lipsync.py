@@ -49,7 +49,7 @@ class LipsyncPage(BasePage):
         gui.file_uploader(
             """
             #### Input Face
-            Upload a video/image that contains faces to use  
+            Upload a video/image with one human face.
             *Recommended - mp4 / mov / png / jpg* 
             """,
             key="input_face",
@@ -58,8 +58,8 @@ class LipsyncPage(BasePage):
         gui.file_uploader(
             """
             #### Input Audio
-            Upload the video/audio file to use as audio source for lipsyncing  
-            *Recommended - wav / mp3*
+            Add a video/audio file as the lipsync audio source.
+            *Recommended - mp4 / mov / wav / mp3*
             """,
             key="input_audio",
         )
