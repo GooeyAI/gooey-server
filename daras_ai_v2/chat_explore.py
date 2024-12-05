@@ -18,7 +18,7 @@ def render():
     gui.newline()
 
     integrations = BotIntegration.objects.filter(
-        published_run__in=PublishedRun.approved_example_q()
+        published_run__in=PublishedRun.objects.filter(PublishedRun.approved_example_q())
     )
     grid_layout(3, integrations, _render_bi)
 
