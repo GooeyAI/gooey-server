@@ -233,6 +233,7 @@ class AsrModels(Enum):
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
+    whisper_chichewa_large_v3 = "Whisper Large v3 chichewa (opportunity.org)"
     gpt_4_o_audio = "GPT-4o Audio (openai)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
@@ -284,6 +285,7 @@ asr_model_ids = {
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
+    AsrModels.whisper_chichewa_large_v3: "dmatekenya/whisper-large-v3-chichewa",
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
@@ -294,6 +296,7 @@ asr_model_ids = {
 forced_asr_languages = {
     AsrModels.whisper_hindi_large_v2: "hi",
     AsrModels.whisper_telugu_large_v2: "te",
+    AsrModels.whisper_chichewa_large_v3: "shona",
     AsrModels.vakyansh_bhojpuri: "bho",
     AsrModels.nemo_english: "en",
     AsrModels.nemo_hindi: "hi",
@@ -304,6 +307,7 @@ asr_supported_languages = {
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_telugu_large_v2: {"te"},
+    AsrModels.whisper_chichewa_large_v3: {"shona"},
     AsrModels.whisper_hindi_large_v2: {"hi"},
     AsrModels.vakyansh_bhojpuri: {"bho"},
     AsrModels.nemo_english: {"en"},
