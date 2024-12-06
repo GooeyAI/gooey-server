@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction, IntegrityError
 from django.db.backends.base.schema import logger
 from django.db.models.aggregates import Sum
+from django.db.models.functions import Abs
 from django.db.models.query_utils import Q
 from django.utils import timezone
 from django.utils.text import slugify
@@ -256,6 +257,35 @@ class Workspace(SafeDeleteModel):
                 pass
             raise
 
+    def get_api_key_run_count(self) -> int:
+        return (
+            self.saved_runs.filter(is_api_call=True, price__gt=0)
+            .exclude(messages__isnull=False)
+            .count()
+        )
+
+    def get_api_key_credit_usage(self) -> int:
+        return (
+            self.saved_runs.filter(is_api_call=True)
+            .exclude(messages__isnull=False)  # exclude bot-integration runs
+            .aggregate(total=Sum("price"))
+            .get("total")
+            or 0
+        )
+
+    def get_bot_run_count(self) -> int:
+        return self.saved_runs.filter(
+            is_api_call=True, price__gt=0, messages__isnull=False
+        ).count()
+
+    def get_bot_credit_usage(self) -> int:
+        return (
+            self.saved_runs.filter(is_api_call=True, messages__isnull=False)
+            .aggregate(total=Sum("price"))
+            .get("total")
+            or 0
+        )
+
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = None
 
@@ -437,6 +467,21 @@ class WorkspaceMembership(SafeDeleteModel):
         return (
             self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
             and not self.workspace.is_personal
+        )
+
+    def get_run_count(self) -> int:
+        return self.workspace.saved_runs.filter(
+            uid=self.user.uid,
+            price__gt=0,  # proxy for successful runs
+            is_api_call=False,
+        ).count()
+
+    def get_credit_usage(self) -> int:
+        return (
+            self.workspace.saved_runs.filter(
+                uid=self.user.uid, price__gt=0, is_api_call=False
+            ).aggregate(total=Sum("price"))["total"]
+            or 0
         )
 
 

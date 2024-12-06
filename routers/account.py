@@ -109,6 +109,12 @@ def account_route(request: Request):
     )
 
 
+@gui.route(app, "/account/analytics")
+def analytics_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.analytics) as current_workspace:
+        analytics_tab(request)
+
+
 @gui.route(app, "/account/profile/")
 def profile_route(request: Request):
     with account_page_wrapper(request, AccountTabs.profile) as current_workspace:
@@ -227,6 +233,7 @@ class AccountTabs(TabData, Enum):
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+    analytics = TabData(title=f"{icons.analytics} Analytics", route=analytics_route)
 
     @property
     def url_path(self) -> str:
@@ -241,10 +248,12 @@ class AccountTabs(TabData, Enum):
 
         if workspace.is_personal:
             ret.remove(cls.members)
+            ret.remove(cls.analytics)
         else:
             ret.remove(cls.profile)
             if not workspace.memberships.get(user=user).can_edit_workspace():
                 ret.remove(cls.billing)
+                ret.remove(cls.analytics)
 
         return ret
 
@@ -343,6 +352,61 @@ def all_saved_runs_tab(request: Request):
         grid_layout(3, prs, _render_run)
 
     paginate_button(url=request.url, cursor=cursor)
+
+
+def analytics_tab(request: Request):
+    workspace = get_current_workspace(request.user, request.session)
+    gui.write("# Usage & Limits")
+    gui.caption(
+        f"Member, API & Integration usage for **{workspace.display_name(request.user)}**."
+    )
+
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
+        with gui.tag("thead"), gui.tag("tr"):
+            with gui.tag("th", scope="col"):
+                gui.html("Name")
+            with gui.tag("th", scope="col"):
+                gui.html("Type")
+            with gui.tag("th", scope="col"):
+                gui.html("Runs")
+            with gui.tag("th", scope="col"):
+                gui.html("Credits Used")
+            with gui.tag("th", scope="col"):
+                gui.html("")
+
+        with gui.tag("tbody"):
+            for m in workspace.memberships.all():
+                with gui.tag("tr", className="no-margin"):
+                    with gui.tag("td"):
+                        gui.write(m.user.full_name())
+                    with gui.tag("td"):
+                        gui.html("User")
+                    with gui.tag("td"):
+                        gui.html(f"{m.get_run_count()}")
+                    with gui.tag("td"):
+                        gui.html(f"{m.get_credit_usage()} Cr")
+                    with gui.tag("td"):
+                        gui.html("")
+
+            with gui.tag("tr", className="no-margin"):
+                with gui.tag("td"):
+                    gui.write(f"[API Keys]({get_route_path(api_keys_route)})")
+                with gui.tag("td"):
+                    gui.html("API Key")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_api_key_run_count()}")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_api_key_credit_usage()} Cr")
+
+            with gui.tag("tr", className="no-margin"):
+                with gui.tag("td"):
+                    gui.write("Bot Integrations")
+                with gui.tag("td"):
+                    gui.html("Bot")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_bot_run_count()}")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_bot_credit_usage()} Cr")
 
 
 def api_keys_tab(request: Request):
