@@ -71,10 +71,35 @@ class LLMSpec(typing.NamedTuple):
     is_vision_model: bool = False
     is_deprecated: bool = False
     supports_json: bool = False
+    supports_temperature: bool = True
 
 
 class LargeLanguageModels(Enum):
-    # https://platform.openai.com/docs/models/gpt-4o
+    # https://platform.openai.com/docs/models#o1
+    o1_preview = LLMSpec(
+        label="o1-preview (openai)",
+        model_id="o1-preview-2024-09-12",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=50,
+        is_vision_model=False,
+        supports_json=False,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models#o1
+    o1_mini = LLMSpec(
+        label="o1-mini (openai)",
+        model_id="o1-mini-2024-09-12",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=13,
+        is_vision_model=False,
+        supports_json=False,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models#gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
         model_id="gpt-4o-2024-08-06",
@@ -84,7 +109,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
     )
-    # https://platform.openai.com/docs/models/gpt-4o-mini
+    # https://platform.openai.com/docs/models#gpt-4o-mini
     gpt_4_o_mini = LLMSpec(
         label="GPT-4o-mini (openai)",
         model_id="gpt-4o-mini",
@@ -488,6 +513,7 @@ class LargeLanguageModels(Enum):
         self.is_chat_model = spec.is_chat_model
         self.is_vision_model = spec.is_vision_model
         self.supports_json = spec.supports_json
+        self.supports_temperature = spec.supports_temperature
 
     @property
     def value(self):
@@ -592,6 +618,8 @@ def run_language_model(
                 messages[0]["content"] = "\n\n".join(
                     [get_entry_text(messages[0]), DEFAULT_JSON_PROMPT]
                 )
+        if not model.supports_temperature:
+            temperature = None
         result = _run_chat_model(
             api=model.llm_api,
             model=model.model_id,
@@ -728,7 +756,7 @@ def _run_chat_model(
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
-    temperature: float,
+    temperature: float | None,
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTool] | None,
@@ -743,7 +771,7 @@ def _run_chat_model(
             return _run_openai_chat(
                 model=model,
                 avoid_repetition=avoid_repetition,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 messages=messages,
                 num_outputs=num_outputs,
                 stop=stop,
@@ -997,9 +1025,9 @@ def _run_openai_chat(
     *,
     model: str,
     messages: list[ConversationEntry],
-    max_tokens: int,
+    max_completion_tokens: int,
     num_outputs: int,
-    temperature: float,
+    temperature: float | None = None,
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[LLMTool] | None = None,
@@ -1021,10 +1049,10 @@ def _run_openai_chat(
             _get_chat_completions_create(
                 model=model_str,
                 messages=messages,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 stop=stop or NOT_GIVEN,
                 n=num_outputs,
-                temperature=temperature,
+                temperature=temperature or NOT_GIVEN,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
