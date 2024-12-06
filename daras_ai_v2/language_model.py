@@ -1052,7 +1052,7 @@ def _run_openai_chat(
                 max_completion_tokens=max_completion_tokens,
                 stop=stop or NOT_GIVEN,
                 n=num_outputs,
-                temperature=temperature or NOT_GIVEN,
+                temperature=temperature if temperature is not None else NOT_GIVEN,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
