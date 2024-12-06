@@ -815,7 +815,7 @@ class BasePage:
                 workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
+                visibility=self._get_default_pr_visibility(selected_workspace),
             )
         else:
             if not self.can_user_edit_published_run(self.current_pr):
@@ -875,6 +875,14 @@ class BasePage:
     def _get_default_pr_title(self):
         recipe_title = self.get_root_pr().title or self.title
         return f"{self.request.user.first_name_possesive()} {recipe_title}"
+
+    def _get_default_pr_visibility(self, workspace: Workspace | None = None):
+        if not workspace:
+            workspace = self.current_workspace
+        if workspace and not workspace.is_personal:
+            return PublishedRunVisibility.INTERNAL
+        else:
+            return PublishedRunVisibility.UNLISTED
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -975,7 +983,7 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
+                visibility=self._get_default_pr_visibility(),
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -989,7 +997,7 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
+                visibility=self._get_default_pr_visibility(),
             )
             raise gui.RedirectException(
                 self.app_url(example_id=new_pr.published_run_id)
@@ -1017,7 +1025,7 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+                visibility=self._get_default_pr_visibility(),
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -1938,7 +1946,7 @@ class BasePage:
             workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
-            visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+            visibility=self._get_default_pr_visibility(),
         )
         raise gui.RedirectException(pr.get_app_url())
 
