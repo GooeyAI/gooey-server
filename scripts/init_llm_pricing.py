@@ -5,6 +5,30 @@ category = ModelCategory.LLM
 
 
 def run():
+    # o1-preview
+
+    llm_pricing_create(
+        model_id="o1-preview-2024-09-12",
+        model_name=LargeLanguageModels.o1_preview.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1-mini
+
+    llm_pricing_create(
+        model_id="o1-mini-2024-09-12",
+        model_name=LargeLanguageModels.o1_mini.name,
+        unit_cost_input=3,
+        unit_cost_output=12,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
     # GPT-4o-mini
 
     llm_pricing_create(
@@ -14,7 +38,7 @@ def run():
         unit_cost_output=0.600,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
     )
 
     # GPT-4o
@@ -26,7 +50,7 @@ def run():
         unit_cost_output=15,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
     )
     llm_pricing_create(
         model_id="gpt-4o-2024-08-06",
@@ -35,7 +59,7 @@ def run():
         unit_cost_output=10,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
     )
     llm_pricing_create(
         model_id="gpt-4o",
@@ -44,7 +68,7 @@ def run():
         unit_cost_output=15,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
     )
     llm_pricing_create(
         model_id="openai-gpt-4o-prod-eastus2-1",
@@ -68,7 +92,7 @@ def run():
                 unit_quantity=1000,
                 category=category,
                 provider=ModelProvider.openai,
-                pricing_url="https://openai.com/pricing",
+                pricing_url="https://openai.com/api/pricing",
             ),
         )
         ModelPricing.objects.get_or_create(
@@ -80,7 +104,7 @@ def run():
                 unit_quantity=1000,
                 category=category,
                 provider=ModelProvider.openai,
-                pricing_url="https://openai.com/pricing",
+                pricing_url="https://openai.com/api/pricing",
             ),
         )
 
@@ -120,7 +144,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -132,7 +156,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -147,7 +171,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -159,7 +183,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -174,7 +198,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -186,7 +210,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -226,7 +250,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -238,7 +262,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -278,7 +302,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -290,7 +314,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -305,7 +329,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -317,7 +341,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -332,7 +356,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -344,7 +368,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -384,7 +408,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -396,7 +420,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
