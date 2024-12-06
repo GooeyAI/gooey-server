@@ -825,7 +825,7 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
+                visibility=pr.visibility,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
