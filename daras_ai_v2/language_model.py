@@ -176,11 +176,19 @@ class LargeLanguageModels(Enum):
     )
 
     # https://console.groq.com/docs/models
+    llama3_3_70b = LLMSpec(
+        label="Llama 3.3 70B",
+        model_id="llama-3.3-70b-versatile",
+        llm_api=LLMApis.groq,
+        context_window=128_000,
+        price=1,
+        supports_json=True,
+    )
     llama3_2_90b_vision = LLMSpec(
         label="Llama 3.2 90B + Vision (Meta AI)",
         model_id="llama-3.2-90b-vision-preview",
         llm_api=LLMApis.groq,
-        context_window=8192,
+        context_window=128_000,
         price=1,
         supports_json=True,
         is_vision_model=True,
@@ -189,7 +197,7 @@ class LargeLanguageModels(Enum):
         label="Llama 3.2 11B + Vision (Meta AI)",
         model_id="llama-3.2-11b-vision-preview",
         llm_api=LLMApis.groq,
-        context_window=8192,
+        context_window=128_000,
         price=1,
         supports_json=True,
         is_vision_model=True,
@@ -199,7 +207,7 @@ class LargeLanguageModels(Enum):
         label="Llama 3.2 3B (Meta AI)",
         model_id="llama-3.2-3b-preview",
         llm_api=LLMApis.groq,
-        context_window=8192,
+        context_window=128_000,
         price=1,
         supports_json=True,
     )
@@ -207,7 +215,7 @@ class LargeLanguageModels(Enum):
         label="Llama 3.2 1B (Meta AI)",
         model_id="llama-3.2-1b-preview",
         llm_api=LLMApis.groq,
-        context_window=8192,
+        context_window=128_000,
         price=1,
         supports_json=True,
     )
@@ -216,7 +224,7 @@ class LargeLanguageModels(Enum):
         label="Llama 3.1 70B (Meta AI)",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
-        context_window=32_768,
+        context_window=128_000,
         price=1,
         supports_json=True,
     )
@@ -224,7 +232,7 @@ class LargeLanguageModels(Enum):
         label="Llama 3.1 8B (Meta AI)",
         model_id="llama-3.1-8b-instant",
         llm_api=LLMApis.groq,
-        context_window=8192,
+        context_window=128_00,
         price=1,
         supports_json=True,
     )

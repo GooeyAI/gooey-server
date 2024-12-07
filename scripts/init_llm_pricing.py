@@ -551,6 +551,15 @@ def run():
     # groq
 
     llm_pricing_create(
+        model_id="llama-3.3-70b-versatile",
+        model_name=LargeLanguageModels.llama3_2_90b_vision.name,
+        unit_cost_input=0.59,
+        unit_cost_output=0.79,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
+    llm_pricing_create(
         model_id="llama-3.2-90b-vision-preview",
         model_name=LargeLanguageModels.llama3_2_90b_vision.name,
         unit_cost_input=0.90,
