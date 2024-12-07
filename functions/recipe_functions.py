@@ -197,11 +197,11 @@ def functions_input(current_user: AppUser, key="functions"):
         with gui.div(className="ps-1"):
             gui.session_state.setdefault(key, [{}])
             with gui.div(className="d-flex align-items-center"):
-                gui.write("###### Functions")
-            gui.caption(
-                "Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs. <a href='/functions-help' target='_blank'>Learn more.</a>",
-                unsafe_allow_html=True,
-            )
+                gui.write(
+                    "###### Functions",
+                    help="Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs.\n"
+                    "<a href='/functions-help' target='_blank'>Learn more.</a>",
+                )
             list_view_editor(
                 add_btn_label="Add Function",
                 add_btn_type="tertiary",

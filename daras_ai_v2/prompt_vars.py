@@ -22,10 +22,9 @@ def variables_input(
     from daras_ai_v2.workflow_url_input import del_button
 
     def render_title_desc():
-        gui.write(label)
-        gui.caption(
-            f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
-            unsafe_allow_html=True,
+        gui.write(
+            label,
+            help=f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
         )
 
     # find all variables in the prompts
