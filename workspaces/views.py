@@ -4,12 +4,14 @@ from copy import copy
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.translation import ngettext
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
+from daras_ai_v2.profiles import render_handle_input, update_handle
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
@@ -297,6 +299,7 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
         ref=ref,
         modal_title="#### Edit Workspace",
         confirm_label=f"{icons.save} Save",
+        large=True,
     ):
         workspace_copy = render_workspace_edit_view_by_membership(ref, membership)
 
@@ -308,7 +311,12 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
             # newlines in markdown
             gui.write("\n".join(e.messages), className="text-danger")
         else:
-            workspace_copy.save()
+            with transaction.atomic():
+                workspace_copy.handle = update_handle(
+                    handle=workspace_copy.handle,
+                    name=gui.session_state.get("workspace-handle"),
+                )
+                workspace_copy.save()
             membership.workspace.refresh_from_db()
             ref.set_open(False)
             gui.rerun()
@@ -629,6 +637,12 @@ def render_workspace_create_or_edit_form(
         accept=["image/*"],
         key="workspace-logo",
         value=workspace.photo_url,
+    )
+    render_handle_input(
+        "###### Handle",
+        key="workspace-handle",
+        handle=workspace.handle,
+        placeholder="PiedPiperInc",
     )
 
 

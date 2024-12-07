@@ -125,6 +125,15 @@ class Workspace(SafeDeleteModel):
         ],
     )
 
+    handle = models.OneToOneField(
+        "handles.Handle",
+        on_delete=models.SET_NULL,
+        default=None,
+        blank=True,
+        null=True,
+        related_name="workspace",
+    )
+
     # billing
     balance = models.IntegerField("bal", default=0)
     is_paying = models.BooleanField("paid", default=False)
