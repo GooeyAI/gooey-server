@@ -1,8 +1,11 @@
 import typing
 
+from markdown_it import MarkdownIt
+
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.tts_markdown_renderer import RendererPlain
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
@@ -125,15 +128,23 @@ def meta_title_for_page(
             tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
             parts.append(tbreadcrumbs.h1_title)
 
-            # use the short title for non-root examples
-            part = metadata.short_title
-            if tbreadcrumbs.published_title:
-                part = f"{pr.title} {part}"
-            # add the creator's name
-            user = sr.get_creator()
-            if user and user.display_name:
-                part += f" by {user.display_name}"
-            parts.append(part)
+            if (
+                pr
+                and not pr.is_root()
+                and pr.workspace
+                and not pr.workspace.is_personal
+            ):
+                parts.append(pr.workspace.display_name())
+            else:
+                # use the short title for non-root examples
+                part = metadata.short_title
+                if tbreadcrumbs.published_title:
+                    part = f"{pr.title} {part}"
+                # add the creator's name
+                user = sr.get_creator()
+                if user and user.display_name:
+                    part += f" by {user.display_name}"
+                parts.append(part)
 
             ret = SEP.join(parts)
 
@@ -150,6 +161,7 @@ def meta_description_for_page(
     else:
         description = metadata.meta_description
 
+    description = MarkdownIt(renderer_cls=RendererPlain).render(description)
     if not (pr and pr.is_root()) or not description:
         # for all non-root examples, or when there is no other description
         description += SEP + "AI API, workflow & prompt shared on Gooey.AI."
