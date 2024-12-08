@@ -1,11 +1,10 @@
 import gooey_gui as gui
-from django.core.exceptions import ValidationError
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS
-from .models import Workspace, WorkspaceInvite, WorkspaceRole
+from .models import Workspace
 
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
@@ -31,7 +30,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    popover, content = gui.popover(interactive=True)
+    popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
