@@ -774,7 +774,7 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
         mime_type
         == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     ):
-        return pptx_to_text_pages(f=io.BytesIO(f_bytes))
+        return pptx_to_text_pages(f=io.BytesIO(f_bytes), use_form_reco=use_form_reco)
 
     else:
         df = tabular_bytes_to_str_df(
