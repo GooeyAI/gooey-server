@@ -105,7 +105,7 @@ from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     LLMTool,
     render_called_functions,
-    call_recipe_functions,
+    get_tools_from_state,
 )
 from recipes.DocSearch import (
     get_top_k_references,
@@ -746,6 +746,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.write("###### `references`")
             gui.json(references)
 
+        if gui.session_state.get("functions"):
+            prompt_funcs = list(
+                get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+            )
+            if prompt_funcs:
+                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+                for tool in prompt_funcs:
+                    gui.json(tool.spec.get("function", tool.spec), depth=3)
+
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
@@ -756,21 +765,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     unsafe_allow_html=True,
                 )
                 gui.json(final_prompt, depth=5)
-
-        if gui.session_state.get("functions"):
-            prompt_funcs = call_recipe_functions(
-                saved_run=self.current_sr,
-                workspace=None,
-                current_user=self.request.user,
-                request_model=self.RequestModel,
-                response_model=self.ResponseModel,
-                state=gui.session_state,
-                trigger=FunctionTrigger.prompt,
-            )
-            if prompt_funcs:
-                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                for name, tool in prompt_funcs:
-                    gui.json(tool.spec.get("function", tool.spec), depth=3)
 
         for k in ["raw_output_text", "output_text", "raw_tts_text"]:
             for idx, text in enumerate(gui.session_state.get(k) or []):
@@ -1059,7 +1053,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         yield f"Summarizing with {model.value}..."
 
         tools = self.get_current_llm_tools()
-
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
             messages=response.final_prompt,
@@ -1727,7 +1720,7 @@ def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
     tool = tools[tool_name]
     yield f"🛠 {tool.label}..."
     kwargs = json.loads(call["function"]["arguments"])
-    return tool.fn(**kwargs)
+    return tool(**kwargs)
 
 
 class ConnectChoice(typing.NamedTuple):
