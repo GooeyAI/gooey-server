@@ -748,6 +748,26 @@ def page_wrapper(request: Request, className=""):
         with gui.div(id="main-content", className="container-xxl " + className):
             yield current_workspace
 
+        gui.html(
+            """
+            <div id="gooey-embed"></div>
+            <script id="gooey-bot-embed-script" src="https://gooey.ai/chat/the-gooeyai-bot-4rv/lib.js"></script>
+            """
+        )
+        gui.js(
+            # language=javascript
+            """
+                async function loadGooeyEmbed() {
+                    await window.waitUntilHydrated;
+                    if (typeof GooeyEmbed === 'undefined') return;
+                    GooeyEmbed.unmount();
+                    GooeyEmbed.mount({});
+                }
+                const script = document.getElementById("gooey-bot-embed-script");
+                if (script) script.onload = loadGooeyEmbed;
+                loadGooeyEmbed();
+                """,
+        )
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
