@@ -8,9 +8,9 @@ from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.field_render import field_title_desc
-from daras_ai_v2.prompt_vars import variables_input
-from functions.models import CalledFunction
+from daras_ai_v2.field_render import field_title
+from daras_ai_v2.variables_widget import variables_input
+from functions.models import CalledFunction, VariableSchema
 
 
 class ConsoleLogs(BaseModel):
@@ -35,6 +35,11 @@ class FunctionsPage(BasePage):
             {},
             title="Variables",
             description="Variables to be used in the code",
+        )
+        variables_schema: dict[str, VariableSchema] = Field(
+            {},
+            title="⌥ Variables Schema",
+            description="Schema for variables to be used in the variables input",
         )
 
     class ResponseModel(BaseModel):
@@ -77,10 +82,10 @@ class FunctionsPage(BasePage):
 
     def render_form_v2(self):
         gui.code_editor(
-            label="##### " + field_title_desc(self.RequestModel, "code"),
+            label="##### " + field_title(self.RequestModel, "code"),
             key="code",
             language="javascript",
-            height=300,
+            style=dict(maxHeight="50vh"),
         )
 
     def get_price_roundoff(self, state: dict) -> float:

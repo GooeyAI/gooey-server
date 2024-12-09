@@ -1,6 +1,6 @@
 import pytest
 
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 
 @pytest.mark.parametrize(

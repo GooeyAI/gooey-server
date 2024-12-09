@@ -11,7 +11,7 @@ from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
-    from daras_ai_v2.base import BasePage
+    from daras_ai_v2.base import BasePage, JsonTypes
     from workspaces.models import Workspace
 
 
@@ -21,22 +21,29 @@ class LLMTool:
 
         self.function_url = function_url
 
-        _, sr, pr = url_to_runs(function_url)
-        self._function_runs = (sr, pr)
+        _, fn_sr, fn_pr = url_to_runs(function_url)
+        self._function_runs = (fn_sr, fn_pr)
 
-        self.name = slugify(pr.title).replace("-", "_")
-        self.label = pr.title
+        self.name = slugify(fn_pr.title).replace("-", "_")
+        self.label = fn_pr.title
 
+        fn_vars = fn_sr.state.get("variables", {})
+        fn_vars_schema = fn_sr.state.get("variables_schema", {})
         self.spec = {
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": pr.notes,
+                "description": fn_pr.notes,
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        key: {"type": get_json_type(value)}
-                        for key, value in sr.state.get("variables", {}).items()
+                        key: {
+                            "type": schema.get("type", get_json_type(value)),
+                            "description": schema.get("description", ""),
+                        }
+                        for key, value in fn_vars.items()
+                        if (schema := fn_vars_schema.get(key, {}))
+                        and schema.get("role") != "system"
                     },
                 },
             },
@@ -67,43 +74,41 @@ class LLMTool:
         except AttributeError:
             raise RuntimeError("This LLMTool instance is not yet bound")
 
-        request = self.request_model.parse_obj(self.state)
-        variables = self.state.setdefault("variables", {})
-        fn_vars = dict(
-            web_url=self.saved_run.get_app_url(),
-            request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
-            response={
-                k: v
-                for k, v in self.state.items()
-                if k in self.response_model.__fields__
-            },
-        )
+        fn_sr, fn_pr = self._function_runs
 
-        sr, pr = self._function_runs
-        result, sr = sr.submit_api_call(
+        state_vars = self.state.setdefault("variables", {})
+        state_vars_schema = self.state.setdefault("variables_schema", {})
+        system_vars, system_vars_schema = self._get_system_vars()
+        fn_vars = (
+            (fn_sr.state.get("variables") or {}) | state_vars | system_vars | kwargs
+        )
+        fn_vars_schema = (
+            (fn_sr.state.get("variables_schema") or {})
+            | state_vars_schema
+            | system_vars_schema
+        )
+        result, fn_sr = fn_sr.submit_api_call(
             workspace=self.workspace,
             current_user=self.current_user,
-            parent_pr=pr,
-            request_body=dict(
-                variables=sr.state.get("variables", {}) | variables | fn_vars | kwargs,
-            ),
+            parent_pr=fn_pr,
+            request_body=dict(variables=fn_vars, variables_schema=fn_vars_schema),
             deduct_credits=False,
         )
 
         CalledFunction.objects.create(
-            saved_run=self.saved_run, function_run=sr, trigger=self.trigger.db_value
+            saved_run=self.saved_run, function_run=fn_sr, trigger=self.trigger.db_value
         )
 
         # wait for the result if its a pre request function
         if self.trigger == FunctionTrigger.post:
             return
-        sr.wait_for_celery_result(result)
+        fn_sr.wait_for_celery_result(result)
         # if failed, raise error
-        if sr.error_msg:
-            raise RuntimeError(sr.error_msg)
+        if fn_sr.error_msg:
+            raise RuntimeError(fn_sr.error_msg)
 
         # save the output from the function
-        return_value = sr.state.get("return_value")
+        return_value = fn_sr.state.get("return_value")
         if return_value is None:
             return
         if isinstance(return_value, dict):
@@ -114,11 +119,28 @@ class LLMTool:
                 ):
                     self.state[k] = v
                 else:
-                    variables[k] = v
+                    state_vars[k] = v
+                    state_vars_schema[k] = {"role": "system"}
         else:
-            variables["return_value"] = return_value
+            state_vars["return_value"] = return_value
+            state_vars_schema["return_value"] = {"role": "system"}
 
         return return_value
+
+    def _get_system_vars(self) -> tuple[dict, dict]:
+        request = self.request_model.parse_obj(self.state)
+        system_vars = dict(
+            web_url=self.saved_run.get_app_url(),
+            request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
+            response={
+                k: v
+                for k, v in self.state.items()
+                if k in self.response_model.__fields__
+            },
+        )
+        system_vars_schema = {var: {"role": "system"} for var in system_vars}
+
+        return system_vars, system_vars_schema
 
 
 def call_recipe_functions(
@@ -158,48 +180,18 @@ def get_tools_from_state(
         yield LLMTool(function.get("url"))
 
 
-def get_json_type(val) -> str:
+def get_json_type(val) -> "JsonTypes":
     match val:
-        case list() | tuple() | set():
-            return "array"
         case str():
             return "string"
         case int() | float() | complex():
             return "number"
         case bool():
             return "boolean"
+        case list() | tuple() | set():
+            return "array"
         case _:
             return "object"
-
-
-def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
-    from recipes.Functions import FunctionsPage
-    from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-
-    if not is_functions_enabled():
-        return
-    qs = saved_run.called_functions.filter(trigger=trigger.db_value)
-    if not qs.exists():
-        return
-    for called_fn in qs:
-        tb = get_title_breadcrumbs(
-            FunctionsPage,
-            called_fn.function_run,
-            called_fn.function_run.parent_published_run(),
-        )
-        title = (tb.published_title and tb.published_title.title) or tb.h1_title
-        key = f"fn-call-details-{called_fn.id}"
-        with gui.expander(f"🧩 Called `{title}`", key=key):
-            if not gui.session_state.get(key):
-                continue
-            gui.html(
-                f'<i class="fa-regular fa-external-link-square"></i> <a target="_blank" href="{called_fn.function_run.get_app_url()}">'
-                "Inspect Function Call"
-                "</a>"
-            )
-            return_value = called_fn.function_run.state.get("return_value")
-            if return_value is not None:
-                gui.json(return_value, expanded=True)
 
 
 def is_functions_enabled(key="functions") -> bool:
@@ -256,3 +248,46 @@ def functions_input(current_user: AppUser, key="functions"):
             )
     else:
         gui.session_state.pop(key, None)
+
+
+def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
+    from recipes.Functions import FunctionsPage
+    from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+
+    if not is_functions_enabled():
+        return
+    qs = saved_run.called_functions.filter(trigger=trigger.db_value)
+    if not qs.exists():
+        return
+    for called_fn in qs:
+        fn_sr = called_fn.function_run
+        tb = get_title_breadcrumbs(
+            FunctionsPage,
+            fn_sr,
+            fn_sr.parent_published_run(),
+        )
+        title = (tb.published_title and tb.published_title.title) or tb.h1_title
+        key = f"fn-call-details-{called_fn.id}"
+        with gui.expander(f"🧩 Called `{title}`", key=key):
+            if not gui.session_state.get(key):
+                continue
+            gui.html(
+                f'<i class="fa-regular fa-external-link-square"></i> <a target="_blank" href="{fn_sr.get_app_url()}">'
+                "Inspect Function Call"
+                "</a>"
+            )
+
+            fn_vars = fn_sr.state.get("variables", {})
+            fn_vars_schema = fn_sr.state.get("variables_schema", {})
+            inputs = {
+                key: value
+                for key, value in fn_vars.items()
+                if fn_vars_schema.get(key, {}).get("role") != "system"
+            }
+            gui.write("**Inputs**")
+            gui.json(inputs)
+
+            return_value = fn_sr.state.get("return_value")
+            if return_value is not None:
+                gui.write("**Return value**")
+                gui.json(return_value)

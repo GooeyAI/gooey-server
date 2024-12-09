@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from daras_ai_v2.language_model import (
     run_language_model,
 )
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 Model = typing.TypeVar("Model", bound=BaseModel)
 

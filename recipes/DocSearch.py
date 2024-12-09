@@ -26,7 +26,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -269,7 +269,7 @@ def render_doc_search_step(state: dict):
     output_text = state.get("output_text", [])
     for idx, text in enumerate(output_text):
         gui.text_area(
-            f"**Output Text**",
+            "**Output Text**",
             help=f"output {idx}",
             disabled=True,
             value=text,
