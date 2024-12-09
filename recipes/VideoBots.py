@@ -1319,7 +1319,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         workspace=self.current_workspace,
                         platform=Platform.WEB,
                     )
-                    redirect_url = connect_bot_to_published_run(bi, pr)
+                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.WHATSAPP:
                     redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:

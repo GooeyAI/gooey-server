@@ -77,9 +77,10 @@ def fb_connect_whatsapp_redirect(request: Request):
         display_phone_number = phone_number["display_phone_number"]
         phone_number_id = phone_number["id"]
 
+        current_workspace = get_current_workspace(request.user, request.session)
         options = dict(
             created_by=request.user,
-            workspace=get_current_workspace(request.user, request.session),
+            workspace=current_workspace,
             platform=Platform.WHATSAPP,
             name=f"{business_name} - {account_name}",
             wa_phone_number=display_phone_number,
@@ -93,7 +94,7 @@ def fb_connect_whatsapp_redirect(request: Request):
         bi, created = BotIntegration.objects.get_or_create(
             wa_phone_number_id=phone_number_id, defaults=options
         )
-        if not created:
+        if not created or bi.workspace_id != current_workspace.id:
             BotIntegration.objects.filter(id=bi.id).update(**options)
         else:
             # register the phone number for Whatsapp
@@ -118,7 +119,7 @@ def fb_connect_whatsapp_redirect(request: Request):
         )
         r.raise_for_status()
 
-        redirect_url = connect_bot_to_published_run(bi, pr)
+        redirect_url = connect_bot_to_published_run(bi, pr, overwrite=False)
 
     if redirect_url:
         return RedirectResponse(redirect_url)
@@ -164,7 +165,7 @@ def fb_connect_redirect(request: Request):
 
     redirect_url = None
     for bi in integrations:
-        redirect_url = connect_bot_to_published_run(bi, pr)
+        redirect_url = connect_bot_to_published_run(bi, pr, overwrite=False)
 
     if redirect_url:
         return RedirectResponse(redirect_url)
