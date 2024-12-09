@@ -350,12 +350,24 @@ class BasePage:
 
         header_placeholder = gui.div()
         gui.newline()
+        with gui.div(className="position-relative"):
+            with gui.nav_tabs():
+                for tab in self.get_tabs():
+                    url = self.current_app_url(tab)
+                    with gui.nav_item(url, active=tab == self.tab):
+                        gui.html(tab.title)
 
-        with gui.nav_tabs():
-            for tab in self.get_tabs():
-                url = self.current_app_url(tab)
-                with gui.nav_item(url, active=tab == self.tab):
-                    gui.html(tab.title)
+            if self.current_pr and not self.current_pr.is_root():
+                with gui.div(
+                    className="container-margin-reset d-none d-md-block",
+                    style=dict(
+                        position="absolute",
+                        top="50%",
+                        right="0",
+                        transform="translateY(-50%)",
+                    ),
+                ):
+                    self._render_saved_timestamp(self.current_pr)
         with gui.nav_tab_content():
             self.render_selected_tab()
 
@@ -471,6 +483,10 @@ class BasePage:
             "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2"
         ):
             gui.html("Unpublished changes")
+
+    def _render_saved_timestamp(self, pr: PublishedRun):
+        with gui.tag("span", className="text-muted"):
+            gui.write(f"{get_relative_time(pr.updated_at)}")
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
