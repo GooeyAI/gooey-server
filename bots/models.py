@@ -17,7 +17,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2 import icons, urls
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_route_path, get_api_route_url
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -827,6 +827,10 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+        if settings.DEBUG:
+            from routers.bots_api import stream_create
+
+            config["apiUrl"] = get_api_route_url(stream_create)
         return config
 
     def translate(self, text: str) -> str:

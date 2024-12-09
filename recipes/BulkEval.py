@@ -23,7 +23,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 

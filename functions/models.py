@@ -2,6 +2,7 @@ import typing
 
 from django.db import models
 from pydantic import BaseModel, Field
+from typing_extensions import NotRequired, TypedDict
 
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
@@ -27,6 +28,15 @@ class RecipeFunction(BaseModel):
         title="Trigger",
         description="When to run this function. `pre` runs before the recipe, `post` runs after the recipe.",
     )
+
+
+JsonTypes = typing.Literal["string", "number", "boolean", "array", "object"]
+
+
+class VariableSchema(TypedDict):
+    type: NotRequired[JsonTypes]
+    role: NotRequired[typing.Literal["user", "system"]]
+    description: NotRequired[str]
 
 
 class CalledFunctionResponse(BaseModel):

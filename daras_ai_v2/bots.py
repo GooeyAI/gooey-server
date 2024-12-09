@@ -356,9 +356,10 @@ def _process_and_send_msg(
     # get latest messages for context
     saved_msgs = bot.convo.msgs_for_llm_context()
 
-    variables = (bot.saved_run.state.get("variables") or {}) | build_run_vars(
-        bot.convo, bot.user_msg_id
-    )
+    system_vars, system_vars_schema = build_system_vars(bot.convo, bot.user_msg_id)
+    state = bot.saved_run.state
+    variables = (state.get("variables") or {}) | system_vars
+    variables_schema = (state.get("variables_schema") or {}) | system_vars_schema
     body = dict(
         input_prompt=input_text,
         input_audio=input_audio,
@@ -366,6 +367,7 @@ def _process_and_send_msg(
         input_documents=input_documents,
         messages=saved_msgs,
         variables=variables,
+        variables_schema=variables_schema,
     )
     if bot.user_language:
         body["user_language"] = bot.user_language
@@ -484,7 +486,7 @@ def _process_and_send_msg(
     )
 
 
-def build_run_vars(convo: Conversation, user_msg_id: str):
+def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict]:
     from routers.bots_api import MSG_ID_PREFIX
 
     bi = convo.bot_integration
@@ -524,7 +526,8 @@ def build_run_vars(convo: Conversation, user_msg_id: str):
             variables["bot_twilio_phone_number"] = (
                 bi.twilio_phone_number and bi.twilio_phone_number.as_international
             )
-    return variables
+    variables_schema = {var: {"role": "system"} for var in variables}
+    return variables, variables_schema
 
 
 def _save_msgs(

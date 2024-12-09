@@ -48,13 +48,13 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner, scroll_into_view
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.urls import paginate_queryset, paginate_button
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
-from functions.models import RecipeFunction, FunctionTrigger
+from daras_ai_v2.variables_widget import variables_input
+from functions.models import RecipeFunction, FunctionTrigger, VariableSchema
 from functions.recipe_functions import (
     functions_input,
     call_recipe_functions,
@@ -141,6 +141,10 @@ class BasePage:
         variables: dict[str, typing.Any] | None = Field(
             title="⌥ Variables",
             description="Variables to be used as Jinja prompt templates and in functions as arguments",
+        )
+        variables_schema: dict[str, VariableSchema] | None = Field(
+            title="Variables Schema",
+            description="Schema for variables to be used in the variables input",
         )
 
     ResponseModel: typing.Type[BaseModel]

@@ -1,7 +1,7 @@
 import typing
 
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -14,7 +14,6 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -22,7 +21,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -201,7 +200,7 @@ class GoogleGPTPage(BasePage):
         output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
             gui.text_area(
-                f"**Output Text**",
+                "**Output Text**",
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
