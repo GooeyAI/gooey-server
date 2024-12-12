@@ -1,6 +1,5 @@
-from inspect import getmembers, ismethod
-
 from html.parser import HTMLParser
+from inspect import getmembers, ismethod
 
 
 class HTMLTextRenderer(HTMLParser):

@@ -1,6 +1,9 @@
 import ast
 
 import parse
+from markdown_it import MarkdownIt
+
+from daras_ai_v2.tts_markdown_renderer import RendererPlain
 
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
@@ -40,3 +43,8 @@ def format_number_with_suffix(num: int) -> str:
         "{:f}".format(num_float).rstrip("0").rstrip("."),
         ["", "K", "M", "B", "T"][magnitude],
     )
+
+
+def unmarkdown(text: str) -> str:
+    """markdown to plaintext"""
+    return MarkdownIt(renderer_cls=RendererPlain).render(text)

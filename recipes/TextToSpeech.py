@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status, UserError
@@ -28,8 +29,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
 )
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
-from daras_ai_v2.tts_markdown_renderer import RendererPlain
-from markdown_it import MarkdownIt
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -196,8 +195,7 @@ class TextToSpeechPage(BasePage):
         text = state["text_prompt"].strip()
 
         # Parse markdown to plain text
-        parser = MarkdownIt(renderer_cls=RendererPlain)
-        text = parser.render(text)
+        text = unmarkdown(text)
 
         provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
