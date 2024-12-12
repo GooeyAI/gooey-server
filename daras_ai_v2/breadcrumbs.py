@@ -32,28 +32,27 @@ class TitleBreadCrumbs(typing.NamedTuple):
 
 
 def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = False):
-    gui.html(
-        """
-        <style>
-        @media (min-width: 1024px) {
-            .fs-lg-5 {
-                font-size: 1.25rem !important;
-            }
-        }
-        </style>
-        """
-    )
-
     if not (breadcrumbs.root_title or breadcrumbs.published_title):
         # avoid empty space when breadcrumbs are not rendered
         return
 
-    with gui.breadcrumbs():
+    with (
+        gui.styled(
+            """
+            @media (min-width: 1024px) {
+                & a {
+                    font-size: 1.25rem !important;
+                }
+            }
+            """
+        ),
+        gui.breadcrumbs(),
+    ):
         if breadcrumbs.root_title:
             gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
                 link_to=breadcrumbs.root_title.url,
-                className="text-muted fs-lg-5",
+                className="text-muted",
             )
         if breadcrumbs.published_title:
             gui.breadcrumb_item(
