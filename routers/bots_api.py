@@ -16,6 +16,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
 from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed
 from daras_ai_v2.redis_cache import get_redis_cache
+from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import (
     AsyncApiResponseModelV3,
@@ -140,6 +141,8 @@ class MessagePart(BaseModel):
     detail: str = Field(
         description="Details about the status of the run as a human readable string"
     )
+
+    references: list[SearchReference] | None
 
     text: str | None
     audio: str | None
@@ -326,9 +329,20 @@ class ApiInterface(BotInterface):
         self.uid = sr.uid
         self.queue.put(RunStart(**build_async_api_response(sr)))
 
-    def send_run_status(self, update_msg_id: str | None) -> str | None:
+    def send_run_status(
+        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+    ) -> str | None:
         self.queue.put(
-            MessagePart(status=self.recipe_run_state, detail=self.run_status)
+            MessagePart(
+                status=self.recipe_run_state,
+                detail=self.run_status,
+                references=(
+                    #  avoid sending the entire snippet to save bandwidth
+                    [r | dict(snippet="") for r in references]
+                    if references
+                    else None
+                ),
+            )
         )
         return None
 

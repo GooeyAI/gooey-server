@@ -11,13 +11,12 @@ from sentry_sdk import capture_exception
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import (
-    run_google_translate,
     audio_bytes_to_wav,
-    should_translate_lang,
 )
 from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
+from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.text_splitter import text_splitter
 from recipes.VideoBots import ReplyButton
 
@@ -133,7 +132,9 @@ class SlackBot(BotInterface):
             button_id=self._actions[0]["value"], context_msg_id=self._msg_ts
         )
 
-    def send_run_status(self, update_msg_id: str | None) -> str | None:
+    def send_run_status(
+        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+    ) -> str | None:
         if not self.run_status:
             return update_msg_id
         return self.send_msg(text=self.run_status, update_msg_id=update_msg_id)

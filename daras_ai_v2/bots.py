@@ -24,6 +24,7 @@ from bots.models import (
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -205,7 +206,9 @@ class BotInterface:
     def on_run_created(self, sr: "SavedRun"):
         pass
 
-    def send_run_status(self, update_msg_id: str | None) -> str | None:
+    def send_run_status(
+        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+    ) -> str | None:
         pass
 
     def nice_filename(self, mime_type: str) -> str:
@@ -411,7 +414,9 @@ def _process_and_send_msg(
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
                     # if no text, send the run status as text
-                    update_msg_id = bot.send_run_status(update_msg_id=update_msg_id)
+                    update_msg_id = bot.send_run_status(
+                        update_msg_id=update_msg_id, references=state.get("references")
+                    )
                     continue  # no text, wait for the next update
                 streaming_done = state.get("finish_reason")
                 # send the response to the user
