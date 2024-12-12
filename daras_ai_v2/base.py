@@ -874,14 +874,6 @@ class BasePage:
         recipe_title = self.get_root_pr().title or self.title
         return f"{self.request.user.first_name_possesive()} {recipe_title}"
 
-    def _get_default_pr_visibility(self, workspace: Workspace | None = None):
-        if not workspace:
-            workspace = self.current_workspace
-        if workspace and not workspace.is_personal:
-            return PublishedRunVisibility.INTERNAL
-        else:
-            return PublishedRunVisibility.UNLISTED
-
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
             raise TitleValidationError(
@@ -1939,7 +1931,6 @@ class BasePage:
             workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
-            visibility=self._get_default_pr_visibility(),
         )
         raise gui.RedirectException(pr.get_app_url())
 
