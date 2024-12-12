@@ -1,11 +1,9 @@
 import typing
 
-from markdown_it import MarkdownIt
-
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
+from daras_ai.text_format import unmarkdown
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.tts_markdown_renderer import RendererPlain
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
@@ -161,7 +159,7 @@ def meta_description_for_page(
     else:
         description = metadata.meta_description
 
-    description = MarkdownIt(renderer_cls=RendererPlain).render(description)
+    description = unmarkdown(description)
     if not (pr and pr.is_root()) or not description:
         # for all non-root examples, or when there is no other description
         description += SEP + "AI API, workflow & prompt shared on Gooey.AI."
