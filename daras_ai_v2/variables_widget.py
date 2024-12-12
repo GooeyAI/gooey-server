@@ -169,15 +169,17 @@ def render_list_item(
         gui.write(f"**{value_type}**", className="text-muted small")
 
         if schema.get("role") == "system":
-            gui.caption(
+            gui.write(
                 "System provided",
                 help="This variable is automatically provided by the system. ",
+                className="text-muted small",
             )
         if is_template_var:
-            gui.caption(
+            gui.write(
                 "Template variable",
                 help="Your instruction or other prompts reference this variable. "
                 "Add a value and tap Run to test a sample value.",
+                className="text-muted small",
             )
 
         gui.div(className="flex-grow-1")
@@ -188,9 +190,14 @@ def render_list_item(
             key=dialog_ref.open_btn_key,
         )
 
-    item["value"] = json_value_editor(entry_key, value, value_type)
+    with (
+        gui.styled(".gui-input:has(&) { margin-bottom: 0 }")
+        if description
+        else gui.dummy()
+    ):
+        item["value"] = json_value_editor(entry_key, value, value_type)
 
-    gui.caption(description, style=dict(marginTop="-5px", display="relative"))
+    gui.markdown(description, className="text-muted small")
 
 
 def json_value_editor(entry_key: str, value, value_type: "JsonTypes"):
