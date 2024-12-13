@@ -766,6 +766,12 @@ def _run_chat_model(
     logger.info(
         f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
+    if model in (
+        LargeLanguageModels.o1_mini.model_id,
+        LargeLanguageModels.o1_preview.model_id,
+    ):
+        replace_system_with_user_prompts(messages)
+
     match api:
         case LLMApis.openai:
             return _run_openai_chat(
@@ -867,10 +873,7 @@ def _run_self_hosted_llm(
         not isinstance(text_inputs, str)
         and model == LargeLanguageModels.sea_lion_7b_instruct.model_id
     ):
-        for i, entry in enumerate(text_inputs):
-            if entry["role"] == CHATML_ROLE_SYSTEM:
-                text_inputs[i]["role"] = CHATML_ROLE_USER
-                text_inputs.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
+        replace_system_with_user_prompts(text_inputs)
 
     ret = call_celery_task(
         "llm.chat",
@@ -1674,3 +1677,11 @@ def format_chat_entry(
             {"type": "text", "text": content},
         ]
     return {"role": role, "content": content}
+
+
+def replace_system_with_user_prompts(messages: list[ConversationEntry]) -> None:
+    """in-place"""
+    for i, entry in enumerate(messages):
+        if entry["role"] == CHATML_ROLE_SYSTEM:
+            messages[i]["role"] = CHATML_ROLE_USER
+            messages.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
