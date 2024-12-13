@@ -820,7 +820,6 @@ class BasePage:
                 workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
             if not self.can_user_edit_published_run(self.current_pr):
@@ -830,7 +829,6 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -900,12 +898,10 @@ class BasePage:
         saved_run: SavedRun,
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
-            or published_run.visibility != visibility
             or published_run.saved_run != saved_run
         )
 
@@ -980,7 +976,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -994,7 +989,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=new_pr.published_run_id)
@@ -1022,7 +1016,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -1465,7 +1458,7 @@ class BasePage:
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1944,7 +1937,6 @@ class BasePage:
             workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
-            visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
         )
         raise gui.RedirectException(pr.get_app_url())
 

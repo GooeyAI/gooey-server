@@ -49,6 +49,13 @@ class PublishedRunVisibility(models.IntegerChoices):
             # TODO: Add cls.PUBLIC when team-handles are added
             return [cls.UNLISTED, cls.INTERNAL]
 
+    @classmethod
+    def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
+        if not workspace or workspace.is_personal:
+            return cls.UNLISTED
+        else:
+            return cls.INTERNAL
+
     def help_text(self, workspace: typing.Optional["Workspace"] = None):
         from routers.account import profile_route, saved_route
 
@@ -1678,7 +1685,7 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1705,13 +1712,16 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         workspace_id = (
             workspace
             and workspace.id
             or PublishedRun._meta.get_field("workspace").get_default()
         )
+        if not visibility:
+            visibility = PublishedRunVisibility.get_default_for_workspace(workspace)
+
         with transaction.atomic():
             pr = self.create(
                 workflow=workflow,
@@ -1844,7 +1854,7 @@ class PublishedRun(models.Model):
         workspace: "Workspace",
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ) -> "PublishedRun":
         return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
@@ -1867,13 +1877,14 @@ class PublishedRun(models.Model):
         *,
         user: AppUser | None,
         saved_run: SavedRun,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
         title: str = "",
         notes: str = "",
         change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
+        visibility = visibility or self.visibility
         with transaction.atomic():
             version = PublishedRunVersion(
                 published_run=self,
