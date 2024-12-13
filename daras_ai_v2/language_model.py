@@ -873,7 +873,7 @@ def _run_self_hosted_llm(
         not isinstance(text_inputs, str)
         and model == LargeLanguageModels.sea_lion_7b_instruct.model_id
     ):
-        replace_system_with_user_prompts(text_inputs)
+        replace_system_with_user_prompts(text_inputs, add_assistant_prompt=True)
 
     ret = call_celery_task(
         "llm.chat",
@@ -1679,9 +1679,12 @@ def format_chat_entry(
     return {"role": role, "content": content}
 
 
-def replace_system_with_user_prompts(messages: list[ConversationEntry]) -> None:
+def replace_system_with_user_prompts(
+    messages: list[ConversationEntry], add_assistant_prompt: bool = False
+) -> None:
     """in-place"""
     for i, entry in enumerate(messages):
         if entry["role"] == CHATML_ROLE_SYSTEM:
             messages[i]["role"] = CHATML_ROLE_USER
-            messages.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
+            if add_assistant_prompt:
+                messages.insert(i + 1, dict(role=CHATML_ROLE_ASSISTANT, content=""))
