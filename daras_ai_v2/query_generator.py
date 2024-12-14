@@ -18,11 +18,12 @@ def generate_final_search_query(
     context: dict = None,
     response_format_type: typing.Literal["text", "json_object"] = None,
 ):
-    if context is None:
-        context = request.dict()
-        if response:
-            context |= response.dict()
-    instructions = render_prompt_vars(instructions, context).strip()
+    state = request.dict()
+    if response:
+        state |= response.dict()
+    if context:
+        state |= context
+    instructions = render_prompt_vars(instructions, state).strip()
     if not instructions:
         return ""
     return run_language_model(

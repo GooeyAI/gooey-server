@@ -983,8 +983,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 yield "Creating search query..."
                 response.final_search_query = generate_final_search_query(
                     request=request,
+                    response=response,
                     instructions=query_instructions,
-                    context={**gui.session_state, "messages": chat_history},
+                    context={"messages": chat_history},
                 )
             else:
                 query_msgs.reverse()
@@ -1001,8 +1002,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 keyword_query = json.loads(
                     generate_final_search_query(
                         request=k_request,
+                        response=response,
                         instructions=keyword_instructions,
-                        context={**gui.session_state, "messages": chat_history},
+                        context={"messages": chat_history},
                         response_format_type="json_object",
                     ),
                 )
@@ -1014,7 +1016,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             response.references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
                     {
-                        **gui.session_state,
+                        **request.dict(),
+                        **response.dict(),
                         "search_query": response.final_search_query,
                         "keyword_query": response.final_keyword_query,
                     },

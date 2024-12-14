@@ -168,14 +168,16 @@ class DocSearchPage(BasePage):
         else:
             response.final_search_query = request.search_query
 
-        response.references = yield from get_top_k_references(
-            DocSearchRequest.parse_obj(
-                {
-                    **request.dict(),
-                    "search_query": response.final_search_query,
-                },
-            ),
-            current_user=self.request.user,
+        response.references = yield from (
+            get_top_k_references(
+                DocSearchRequest.parse_obj(
+                    {
+                        **request.dict(),
+                        "search_query": response.final_search_query,
+                    },
+                ),
+                current_user=self.request.user,
+            )
         )
 
         # empty search result, abort!
