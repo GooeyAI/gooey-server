@@ -18,19 +18,19 @@ TRANSLATION_TESTS = [
     (
         "te",
         "90 రోజుల తర్వాత మిర్చి తోటలో ఏమేమి పోషకాలు వేసి వేయాలి",
-        "after 90 days what nutrients should be added to the pepper garden?",
+        "what nutrients should be added to the chilli garden after 90 days?",
     ),
     # swahili
     (
         "sw",
         "Unastahili kuchanganya mchanga na nini unapopanda kahawa?",
-        "What should you mix sand with when planting coffee?",
+        "what should you mix the soil with when planting coffee?",
     ),
     # amharic
     (
         "am",
         "ለዘር የሚሆን የስንዴ ምርጥ ዘር ዓይነት ስንት ናቸው?እንደ ሀገረችን እትዮጵያ ደረጃ?",
-        "What are the best types of wheat for seed? According to our country, Ethiopia?",
+        "what are the best wheat seeds for seed production? according to the standards of our country ethiopia?",
     ),
     # spanish
     (
