@@ -1042,6 +1042,14 @@ def _run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
+    if model in (
+        LargeLanguageModels.o1_mini.model_id,
+        LargeLanguageModels.o1_preview.model_id,
+    ):
+        for entry in messages:
+            if entry["role"] == CHATML_ROLE_SYSTEM:
+                entry["role"] = CHATML_ROLE_USER
+
     if avoid_repetition:
         frequency_penalty = 0.1
         presence_penalty = 0.25
