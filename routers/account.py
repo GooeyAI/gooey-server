@@ -24,7 +24,7 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import get_current_workspace, SWITCH_WORKSPACE_KEY
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -111,9 +111,16 @@ def account_route(request: Request):
 
 @gui.route(app, "/account/profile/")
 def profile_route(request: Request):
+    is_switching_workspace = gui.session_state.get(SWITCH_WORKSPACE_KEY)
     with account_page_wrapper(request, AccountTabs.profile) as current_workspace:
         if not current_workspace.is_personal:
-            raise gui.RedirectException(get_route_path(members_route))
+            if is_switching_workspace:
+                raise gui.RedirectException(get_route_path(members_route))
+            else:
+                gui.session_state[SWITCH_WORKSPACE_KEY] = str(
+                    request.user.get_or_create_personal_workspace()[0].id
+                )
+                gui.rerun()
         profile_tab(request)
     url = get_og_url_path(request)
     return dict(
