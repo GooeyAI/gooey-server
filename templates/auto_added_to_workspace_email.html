@@ -32,7 +32,7 @@
   PS. You were automatically added to {{ invite.workspace.display_name() }}
   {%- if user.email and
          invite.workspace.domain_name and
-         user.email.split("@")[-1] == invite.workspace.domain_name %}
+         user.email.lower().endswith(invite.workspace.domain_name) %}
     because your email address matches the workspace's domain -
     <strong>{{ invite.workspace.domain_name }}</strong>
   {% endif -%}.
