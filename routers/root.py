@@ -772,7 +772,7 @@ def page_wrapper(request: Request, className=""):
 
 
 def anonymous_login_container(request: Request, context: dict):
-    next_url = str(furl(request.url.path).add(query_params=request.query_params))
+    next_url = str(furl(request.url.path, query_params=request.query_params))
     login_url = str(furl("/login/", query_params=dict(next=next_url)))
 
     with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
