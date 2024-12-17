@@ -1,9 +1,11 @@
 import io
 
 from furl import furl
-
+import requests
+from loguru import logger
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
+from daras_ai_v2.exceptions import raise_for_status
 
 
 def is_gdrive_url(f: furl) -> bool:
@@ -60,7 +62,7 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
     return filter(None, urls)
 
 
-def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
+def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes, str]:
     from googleapiclient import discovery
 
     # get drive file id
@@ -70,7 +72,7 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
 
     request, mime_type = service_request(service, file_id, f, mime_type)
     file_bytes, mime_type = download_blob_file_content(
-        service, request, file_id, f, mime_type
+        service, request, file_id, f, mime_type, export_links
     )
 
     return file_bytes, mime_type
@@ -96,7 +98,7 @@ def service_request(
 
 
 def download_blob_file_content(
-    service, request, file_id: str, f: furl, mime_type: str
+    service, request, file_id: str, f: furl, mime_type: str, export_links: dict
 ) -> tuple[bytes, str]:
     from googleapiclient.http import MediaIoBaseDownload
     from googleapiclient.errors import HttpError
@@ -105,39 +107,45 @@ def download_blob_file_content(
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
 
-    done = False
-    try:
+    if (
+        mime_type
+        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ):
+        # logger.debug(f"Downloading {str(f)!r} using export links")
+        f_url_export = export_links.get(mime_type, None)
+        if f_url_export:
+
+            f_bytes = download_from_exportlinks(f_url_export)
+        else:
+            request = service.files().get_media(
+                fileId=file_id,
+                supportsAllDrives=True,
+            )
+            downloader = MediaIoBaseDownload(file, request)
+
+            done = False
+            while done is False:
+                _, done = downloader.next_chunk()
+                # print(f"Download {int(status.progress() * 100)}%")
+            f_bytes = file.getvalue()
+
+    else:
+        done = False
         while done is False:
             _, done = downloader.next_chunk()
             # print(f"Download {int(status.progress() * 100)}%")
-    except HttpError as error:
-        # retry if error exporting google docs format files e.g .pptx/.docx files uploaded to docs.google.com
-        if "presentation" in f.path.segments:
-            # update mime_type to download the file directly
-            mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            request, _ = service_request(
-                service, file_id, f, mime_type, retried_request=True
-            )
-            downloader = MediaIoBaseDownload(file, request)
-            done = False
-            while done is False:
-                _, done = downloader.next_chunk()
+        f_bytes = file.getvalue()
 
-        elif "document" in f.path.segments:
-            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            request, _ = service_request(
-                service, file_id, f, mime_type, retried_request=True
-            )
-            downloader = MediaIoBaseDownload(file, request)
-            done = False
-            while done is False:
-                _, done = downloader.next_chunk()
-
-        else:
-            raise error
-
-    f_bytes = file.getvalue()
     return f_bytes, mime_type
+
+
+def download_from_exportlinks(f: furl) -> bytes:
+    try:
+        r = requests.get(f)
+        f_bytes = r.content
+    except requests.exceptions.RequestException as e:
+        raise_for_status(e)
+    return f_bytes
 
 
 def docs_export_mimetype(f: furl) -> tuple[str, str]:
@@ -157,8 +165,10 @@ def docs_export_mimetype(f: furl) -> tuple[str, str]:
         mime_type = "text/csv"
         ext = ".csv"
     elif "presentation" in f.path.segments:
-        mime_type = "application/pdf"
-        ext = ".pdf"
+        mime_type = (
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+        ext = ".pptx"
     elif "drawings" in f.path.segments:
         mime_type = "application/pdf"
         ext = ".pdf"
@@ -176,7 +186,7 @@ def gdrive_metadata(file_id: str) -> dict:
         .get(
             supportsAllDrives=True,
             fileId=file_id,
-            fields="name,md5Checksum,modifiedTime,mimeType,size",
+            fields="name,md5Checksum,modifiedTime,mimeType,size,exportLinks",
         )
         .execute()
     )
