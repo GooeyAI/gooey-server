@@ -29,8 +29,13 @@
 </p>
 
 <p>
-  PS. You were automatically added to {{ invite.workspace.display_name() }} because
-  your email address matches the workspace's domain - <strong>{{ invite.workspace.domain_name }}</strong>.
+  PS. You were automatically added to {{ invite.workspace.display_name() }}
+  {%- if user.email and
+         invite.workspace.domain_name and
+         user.email.split("@")[-1] == invite.workspace.domain_name %}
+    because your email address matches the workspace's domain -
+    <strong>{{ invite.workspace.domain_name }}</strong>
+  {% endif -%}.
   If you'd like, you can leave this workspace via the
   <a href="{{ workspaces_url }}">Members page</a>.
 </p>
