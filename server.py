@@ -152,4 +152,6 @@ async def _exc_handler(request: Request, exc: Exception, template_name: str):
 if __name__ == "__main__":
     from gooey_gui.core.reloader import runserver
 
-    runserver("server:app", port=8080, reload=True, reload_excludes=["models.py"])
+    runserver(
+        "server:app", port=8080, reload=True, reload_excludes=["models.py", "api.py"]
+    )

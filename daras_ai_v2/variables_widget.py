@@ -49,7 +49,7 @@ def variables_input(
     )
     pressed_add = False
     if var_names or allow_add:
-        with gui.div(className="d-flex  align-items-center gap-3 mb-2"):
+        with gui.div(className="d-flex align-items-center gap-3 mb-2"):
             gui.write(
                 label,
                 help=f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",

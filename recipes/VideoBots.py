@@ -997,7 +997,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
-                k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
+                k_request.selected_model = LargeLanguageModels.gpt_4_o.name
+                k_request.max_tokens = 4096
                 keyword_query = json.loads(
                     generate_final_search_query(
                         request=k_request,

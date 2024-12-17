@@ -28,7 +28,7 @@ def generate_final_search_query(
     return run_language_model(
         model=request.selected_model,
         prompt=instructions,
-        max_tokens=1024,
+        max_tokens=request.max_tokens,
         quality=request.quality,
         temperature=request.sampling_temperature,
         avoid_repetition=request.avoid_repetition,
