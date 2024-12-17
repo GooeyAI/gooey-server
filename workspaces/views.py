@@ -117,7 +117,7 @@ def _handle_invite_accepted(
 
     workspace_redirect_url = get_route_path(account_route)
 
-    if invite.email.lower() != current_user.email.lower():
+    if not current_user.email or invite.email.lower() != current_user.email.lower():
         # logout current user, and redirect to login
         login_url = get_app_route_url(
             login, query_params={"next": invite.get_invite_url()}
@@ -341,11 +341,15 @@ def clear_invite_creation_form():
 def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
     gui.write(f"Invite to **{workspace.display_name()}**.")
 
-    email = gui.text_input(
-        "###### Email",
-        style=dict(minWidth="300px"),
-        key="invite-form-email",
-    ).strip()
+    email = (
+        gui.text_input(
+            "###### Email",
+            style=dict(minWidth="300px", textTransform="lowercase"),
+            key="invite-form-email",
+        )
+        .strip()
+        .lower()
+    )
 
     role = gui.selectbox(
         "###### Role",
