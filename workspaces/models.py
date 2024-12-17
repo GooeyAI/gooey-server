@@ -589,7 +589,7 @@ class WorkspaceInvite(models.Model):
         """
         Raises: ValidationError
         """
-        assert invitee.email == self.email, "Email mismatch"
+        assert invitee.email.lower() == self.email.lower(), "Email mismatch"
 
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,

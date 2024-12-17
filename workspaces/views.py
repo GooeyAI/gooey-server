@@ -26,6 +26,8 @@ rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 def invitation_page(
     current_user: AppUser | None, session: dict, invite: WorkspaceInvite
 ):
+    from routers.root import login
+
     with (
         gui.div(
             className="position-absolute top-0 start-0 bottom-0 bg-black min-vw-100 min-vh-100",
@@ -82,6 +84,18 @@ def invitation_page(
             members_text = ngettext("member", "members", members_count)
             gui.caption(f"{members_count} {members_text}")
 
+            if not current_user or current_user.is_anonymous:
+                login_url = get_app_route_url(
+                    login, query_params={"next": invite.get_invite_url()}
+                )
+                with gui.tag(
+                    "a",
+                    className="my-2 w-100 btn btn-theme btn-primary",
+                    href=login_url,
+                ):
+                    gui.html("Join Workspace")
+                return
+
             if gui.button(
                 "Join Workspace",
                 className="my-2 w-100",
@@ -102,13 +116,8 @@ def _handle_invite_accepted(
     from routers.root import login, logout
 
     workspace_redirect_url = get_route_path(account_route)
-    if not current_user or current_user.is_anonymous:
-        login_url = get_app_route_url(
-            login, query_params={"next": invite.get_invite_url()}
-        )
-        raise gui.RedirectException(login_url)
 
-    if invite.email != current_user.email:
+    if invite.email.lower() != current_user.email.lower():
         # logout current user, and redirect to login
         login_url = get_app_route_url(
             login, query_params={"next": invite.get_invite_url()}
