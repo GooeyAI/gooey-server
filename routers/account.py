@@ -8,7 +8,7 @@ from fastapi.requests import Request
 from furl import furl
 from loguru import logger
 from requests.models import HTTPError
-from starlette.responses import Response
+from starlette.exceptions import HTTPException
 
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
@@ -197,12 +197,7 @@ def invitation_route(
     workspace_slug: str | None,
     email: str | None,
 ):
-    try:
-        invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
-        invite = WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
-    except (IndexError, WorkspaceInvite.DoesNotExist):
-        return Response(status_code=404)
-
+    invite = load_invite_from_hashid_or_404(invite_id)
     invitation_page(current_user=request.user, session=request.session, invite=invite)
 
     description = invite.created_by.full_name()
@@ -221,6 +216,14 @@ def invitation_route(
             robots="noindex,nofollow",
         )
     )
+
+
+def load_invite_from_hashid_or_404(invite_id: str) -> WorkspaceInvite:
+    try:
+        invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
+        return WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
+    except (IndexError, WorkspaceInvite.DoesNotExist):
+        raise HTTPException(status_code=404)
 
 
 class TabData(typing.NamedTuple):

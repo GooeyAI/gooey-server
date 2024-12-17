@@ -27,6 +27,11 @@ def invitation_page(
     current_user: AppUser | None, session: dict, invite: WorkspaceInvite
 ):
     from routers.root import login
+    from routers.account import members_route
+
+    if invite.status == WorkspaceInvite.Status.ACCEPTED:
+        set_current_workspace(session, int(invite.workspace_id))
+        raise gui.RedirectException(get_route_path(members_route))
 
     with (
         gui.div(
@@ -313,11 +318,11 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
             return
         try:
             workspace_copy.full_clean()
+            workspace_copy.save()
         except ValidationError as e:
             # newlines in markdown
             gui.write("\n".join(e.messages), className="text-danger")
         else:
-            workspace_copy.save()
             membership.workspace.refresh_from_db()
             ref.set_open(False)
             gui.rerun()
@@ -355,7 +360,7 @@ def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
         "###### Role",
         options=WorkspaceRole,
         format_func=WorkspaceRole.display_html,
-        value=WorkspaceRole.ADMIN.value,
+        value=WorkspaceRole.MEMBER.value,
         key="invite-form-role",
     )
 

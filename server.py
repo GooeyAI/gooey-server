@@ -153,5 +153,8 @@ if __name__ == "__main__":
     from gooey_gui.core.reloader import runserver
 
     runserver(
-        "server:app", port=8080, reload=True, reload_excludes=["models.py", "api.py"]
+        "server:app",
+        port=8080,
+        reload=True,
+        reload_excludes=["models.py", "admin.py", "api.py"],
     )

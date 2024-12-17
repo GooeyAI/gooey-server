@@ -353,6 +353,26 @@ class Workspace(SafeDeleteModel):
         else:
             return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
+    def add_domain_members(self):
+        from app_users.models import AppUser
+
+        if not self.domain_name:
+            return
+        current_user = self.get_owners().first()
+        if not current_user:
+            return
+        for user_email in (
+            AppUser.objects.filter(email__iendswith=self.domain_name)
+            .exclude(workspace_memberships__workspace=self)
+            .values_list("email", flat=True)
+        )[:50]:
+            WorkspaceInvite.objects.create_and_send_invite(
+                workspace=self,
+                email=user_email,
+                current_user=current_user,
+                defaults=dict(role=WorkspaceRole.MEMBER),
+            )
+
 
 class WorkspaceMembership(SafeDeleteModel):
     workspace = models.ForeignKey(
@@ -583,7 +603,7 @@ class WorkspaceInvite(models.Model):
         self,
         invitee: AppUser,
         *,
-        updated_by: AppUser | None,
+        updated_by: AppUser | None = None,
         auto_accepted: bool = False,
     ) -> tuple[WorkspaceMembership, bool]:
         """

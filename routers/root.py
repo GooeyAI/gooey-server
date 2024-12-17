@@ -1,12 +1,14 @@
 import datetime
 import json
 import tempfile
+import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
 from time import time
 
 import gooey_gui as gui
+import sentry_sdk
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
@@ -34,6 +36,7 @@ from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
     get_route_path,
+    resolve_url,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
@@ -99,6 +102,9 @@ async def favicon():
 
 @app.get("/login/")
 def login(request: Request):
+    from routers.account import invitation_route
+    from routers.account import load_invite_from_hashid_or_404
+
     if request.user and not request.user.is_anonymous:
         return RedirectResponse(
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
@@ -106,6 +112,19 @@ def login(request: Request):
     context = {
         "request": request,
     }
+
+    try:
+        if (
+            (next_url := request.query_params.get("next"))
+            and (match := resolve_url(next_url))
+            and match.route.name == invitation_route.__name__
+            and (invite_id := match.matched_params.get("invite_id"))
+        ):
+            context["invite"] = load_invite_from_hashid_or_404(invite_id)
+    except Exception as e:
+        traceback.print_exc()
+        sentry_sdk.capture_exception(e)
+
     return templates.TemplateResponse(
         "login_options.html",
         context=context,
