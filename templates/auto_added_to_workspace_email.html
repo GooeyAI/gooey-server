@@ -7,35 +7,23 @@
   {% if invite.created_by.email %}
   ({{ invite.created_by.email }})
   {% endif %}
-  added you to {{ invite.workspace.display_name() }}
+  added you to the "{{ invite.workspace.display_name() }}" workspace
   on <a href="{{ settings.APP_BASE_URL }}">Gooey.AI</a>.
 </p>
 
 <p>
-  <a href="{{ workspaces_url }}">Explore {{ invite.workspace.display_name() }}.</a>
+  <a href="{{ workspaces_url }}">Open {{ invite.workspace.display_name() }}</a>
 </p>
 
 <p>
-  Through your Workspace above, you can run the top
-  private and open source AI models and collaborate on your
-  team's <a href="{{ saved_url }}">saved workflows.</a>
-  Check out <a href="{{ settings.DOCS_URL }}">{{ settings.DOCS_URL }}</a> too for a
-  great set of tutorials and guides.
+  Through the workspace link above, you can run frontier
+  private and open source AI models and collaborate on
+  <a href="{{ saved_url }}">saved workflows</a>.
+  Check out <a href="{{ settings.DOCS_URL }}">{{ settings.DOCS_URL }}</a> for a
+  great set of tutorials and guides too.
 </p>
 
 <p>
-  Happy building!<br/>
+  Happy Building!<br/>
   Gooey.AI team
-</p>
-
-<p>
-  PS. You were automatically added to {{ invite.workspace.display_name() }}
-  {%- if user.email and
-         invite.workspace.domain_name and
-         user.email.lower().endswith(invite.workspace.domain_name) %}
-    because your email address matches the workspace's domain -
-    <strong>{{ invite.workspace.domain_name }}</strong>
-  {% endif -%}.
-  If you'd like, you can leave this workspace via the
-  <a href="{{ workspaces_url }}">Members page</a>.
 </p>
