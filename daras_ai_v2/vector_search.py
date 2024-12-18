@@ -310,6 +310,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
         total_bytes = int(meta.get("size") or 0)
+        export_links = meta.get("exportLinks", {})
     else:
         try:
             if is_user_uploaded_url(f_url):
@@ -327,6 +328,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             mime_type = None
             etag = None
             total_bytes = 0
+            export_links = {}
         else:
             name = (
                 r.headers.get("content-disposition", "")
@@ -338,6 +340,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
                 etag = etag.strip('"')
             mime_type = get_mimetype_from_response(r)
             total_bytes = int(r.headers.get("content-length") or 0)
+            export_links = {}
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(f_url):
@@ -347,9 +350,12 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return FileMetadata(
+
+    file_metadata = FileMetadata(
         name=name, etag=etag, mime_type=mime_type or "", total_bytes=total_bytes
     )
+    file_metadata.export_links = export_links or {}
+    return file_metadata
 
 
 def yt_dlp_get_video_entries(url: str) -> list[dict]:
@@ -650,7 +656,10 @@ def doc_url_to_text_pages(
     Download document from url and convert to text pages.
     """
     f_bytes, mime_type = download_content_bytes(
-        f_url=f_url, mime_type=file_meta.mime_type, is_user_url=is_user_url
+        f_url=f_url,
+        mime_type=file_meta.mime_type,
+        is_user_url=is_user_url,
+        export_links=file_meta.export_links,
     )
     if not f_bytes:
         return []
@@ -664,14 +673,18 @@ def doc_url_to_text_pages(
 
 
 def download_content_bytes(
-    *, f_url: str, mime_type: str, is_user_url: bool = True
+    *,
+    f_url: str,
+    mime_type: str,
+    is_user_url: bool = True,
+    export_links: dict[str, str] = {},
 ) -> tuple[bytes, str]:
     if is_yt_dlp_able_url(f_url):
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
-        return gdrive_download(f, mime_type)
+        return gdrive_download(f, mime_type, export_links)
     try:
         # download from url
         if is_user_uploaded_url(f_url):

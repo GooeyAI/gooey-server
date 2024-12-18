@@ -612,7 +612,7 @@ def get_columns(files: list[str]) -> list[str]:
 def read_df_any(f_url: str) -> "pd.DataFrame":
     file_meta = doc_url_to_file_metadata(f_url)
     f_bytes, mime_type = download_content_bytes(
-        f_url=f_url, mime_type=file_meta.mime_type
+        f_url=f_url, mime_type=file_meta.mime_type, export_links=file_meta.export_links
     )
     df = tabular_bytes_to_any_df(
         f_name=file_meta.name, f_bytes=f_bytes, mime_type=mime_type

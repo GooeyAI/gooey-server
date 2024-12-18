@@ -34,7 +34,11 @@ def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[
             except Exception as e:
                 slide_content.append(f"  Error processing shape: {e}")
 
+        if slide.has_notes_slide:
+            slide_content.extend(handle_author_notes(slide))
+
         slides_text.append("\n".join(slide_content) + "\n")
+
     return slides_text
 
 
@@ -43,81 +47,55 @@ def handle_text_elements(shape) -> list[str]:
     Handles text elements within a shape, including lists.
     """
     text_elements = []
-    is_a_list = False
-    is_list_group_created = False
-    enum_list_item_value = 0
-    bullet_type = "None"
-    list_label = "LIST"
     namespaces = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
 
-    # Identify if shape contains lists
+    current_list_type = None
+    list_item_index = 0
+
     for paragraph in shape.text_frame.paragraphs:
         p = paragraph._element
+        paragraph_text = ""
+        is_list_item = False
+
+        # Determine list type
         if p.find(".//a:buChar", namespaces=namespaces) is not None:
-            bullet_type = "Bullet"
-            is_a_list = True
+            current_list_type = "Bullet"
+            is_list_item = True
         elif p.find(".//a:buAutoNum", namespaces=namespaces) is not None:
-            bullet_type = "Numbered"
-            is_a_list = True
+            current_list_type = "Numbered"
+            is_list_item = True
+        elif paragraph.level > 0:  # Indented text is also treated as a list
+            current_list_type = "Bullet"
+            is_list_item = True
         else:
-            is_a_list = False
+            current_list_type = None
+            list_item_index = 0  # Reset numbering if no list
 
-        if paragraph.level > 0:
-            is_a_list = True
+        # Process paragraph text
+        for run in p.iterfind(".//a:r", namespaces=namespaces):
+            run_text = run.text.strip() if run.text else ""
+            if run_text:
+                paragraph_text += run_text
 
-        if is_a_list:
-            if bullet_type == "Numbered":
-                list_label = "ORDERED_LIST"
-
-    # Iterate through paragraphs to build up text
-    for paragraph in shape.text_frame.paragraphs:
-        p = paragraph._element
-        enum_list_item_value += 1
-        inline_paragraph_text = ""
-        inline_list_item_text = ""
-        doc_label = "PARAGRAPH"
-
-        for e in p.iterfind(".//a:r", namespaces=namespaces):
-            if len(e.text.strip()) > 0:
-                e_is_a_list_item = False
-                is_numbered = False
-                if p.find(".//a:buChar", namespaces=namespaces) is not None:
-                    bullet_type = "Bullet"
-                    e_is_a_list_item = True
-                elif p.find(".//a:buAutoNum", namespaces=namespaces) is not None:
-                    bullet_type = "Numbered"
-                    is_numbered = True
-                    e_is_a_list_item = True
+        if is_list_item:
+            if current_list_type == "Numbered":
+                list_item_index += 1
+                list_prefix = f"{list_item_index}."
+            else:
+                list_prefix = "•"  # Default bullet symbol
+            text_elements.append(f"{list_prefix} {paragraph_text}")
+        else:
+            # Handle placeholders for titles or subtitles
+            if shape.is_placeholder:
+                placeholder_type = shape.placeholder_format.type
+                if placeholder_type == PP_PLACEHOLDER.TITLE:
+                    text_elements.append(f"TITLE: {paragraph_text}")
+                elif placeholder_type == PP_PLACEHOLDER.SUBTITLE:
+                    text_elements.append(f"SECTION_HEADER: {paragraph_text}")
                 else:
-                    e_is_a_list_item = False
-
-                if e_is_a_list_item:
-                    if len(inline_paragraph_text) > 0:
-                        text_elements.append(inline_paragraph_text)
-                    inline_list_item_text += e.text
-                else:
-                    if shape.is_placeholder:
-                        placeholder_type = shape.placeholder_format.type
-                        if placeholder_type in [
-                            PP_PLACEHOLDER.CENTER_TITLE,
-                            PP_PLACEHOLDER.TITLE,
-                        ]:
-                            doc_label = "TITLE"
-                        elif placeholder_type == PP_PLACEHOLDER.SUBTITLE:
-                            doc_label = "SECTION_HEADER"
-                    enum_list_item_value = 0
-                    inline_paragraph_text += e.text
-
-        if len(inline_paragraph_text) > 0:
-            text_elements.append(inline_paragraph_text)
-
-        if len(inline_list_item_text) > 0:
-            enum_marker = ""
-            if is_numbered:
-                enum_marker = str(enum_list_item_value) + "."
-            if not is_list_group_created:
-                is_list_group_created = True
-            text_elements.append(f"{enum_marker} {inline_list_item_text}")
+                    text_elements.append(paragraph_text)
+            else:
+                text_elements.append(paragraph_text)
 
     return text_elements
 
@@ -171,7 +149,7 @@ def handle_tables(shape) -> list[str]:
     for row in grid[1:]:
         line = "|" + "|".join(row) + "|"
         table_text.append(line)
-        print(line)
+        # print(line)
 
     return table_text
 
@@ -205,6 +183,17 @@ def handle_charts(shape) -> list[str]:
         series_text = f"Series '{series.name}'"
         chart_text.append(series_text)
     return chart_text
+
+
+def handle_author_notes(slide) -> list[str]:
+
+    notes = []
+    if slide.notes_slide.notes_text_frame:
+        notes_text = slide.notes_slide.notes_text_frame.text.strip()
+        if notes_text:
+            notes.append("Speaker Notes:")
+            notes.append(notes_text)
+    return notes
 
 
 # TODO :azure form reco to extract text from images

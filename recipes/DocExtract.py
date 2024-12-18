@@ -475,7 +475,9 @@ def process_source(
         elif is_video:
             f = furl(webpage_url)
             if is_gdrive_url(f):
-                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+                f_bytes, _ = gdrive_download(
+                    f, doc_meta.mime_type, doc_meta.export_links
+                )
                 webpage_url = upload_file_from_bytes(
                     doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
