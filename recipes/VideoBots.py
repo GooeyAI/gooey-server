@@ -582,8 +582,29 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
             citation_style_selector()
-            gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
 
+            gui.write("###### Cache")
+            gui.caption(
+                f"""
+                By default we embed your knowledge files & links and cache their contents for fast responses. 
+                """
+            )
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
+            with col1:
+                gui.checkbox(
+                    "Always Check for Updates",
+                    help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
+                    tooltip_placement="bottom",
+                )
+            with col2:
+                with gui.tooltip(
+                    "Clear the knowledge cache and re-index all knowledge base files and links."
+                ):
+                    gui.button(
+                        "♻️ Refresh Cache",
+                        type="tertiary",
+                    )
             doc_extract_selector(self.request.user)
 
             gui.write("---")
