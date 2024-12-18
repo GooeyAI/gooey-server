@@ -22,13 +22,20 @@ class WorkspaceInviteAdmin(admin.ModelAdmin):
         "email",
         "status",
         "has_expired",
+        "visits",
         "created_by",
         "updated_by",
         "created_at",
         "updated_at",
     ]
     list_filter = ["created_at", "status"]
-    readonly_fields = ["auto_accepted", "has_expired", "created_at", "updated_at"]
+    readonly_fields = [
+        "visits",
+        "auto_accepted",
+        "has_expired",
+        "created_at",
+        "updated_at",
+    ]
     autocomplete_fields = ["workspace", "created_by", "updated_by"]
 
 
