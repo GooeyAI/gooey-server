@@ -775,7 +775,7 @@ def _run_chat_model(
     )
     match api:
         case LLMApis.openai:
-            return _run_openai_chat(
+            return run_openai_chat(
                 model=model,
                 avoid_repetition=avoid_repetition,
                 max_completion_tokens=max_tokens,
@@ -1027,7 +1027,7 @@ def _run_anthropic_chat(
 
 
 @retry_if(openai_should_retry)
-def _run_openai_chat(
+def run_openai_chat(
     *,
     model: str,
     messages: list[ConversationEntry],

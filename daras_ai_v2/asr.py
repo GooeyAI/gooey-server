@@ -1112,12 +1112,12 @@ def run_asr(
         raise_for_status(r)
         data = r.json()
     elif selected_model == AsrModels.gpt_4_o_audio:
-        from daras_ai_v2.language_model import _run_openai_chat
+        from daras_ai_v2.language_model import run_openai_chat
 
         audio_r = requests.get(audio_url)
         raise_for_status(audio_r, is_user_url=True)
 
-        return _run_openai_chat(
+        return run_openai_chat(
             model=asr_model_ids[selected_model],
             messages=[
                 {
@@ -1137,7 +1137,7 @@ def run_asr(
                     ],
                 },
             ],
-            max_tokens=4096,
+            max_completion_tokens=4096,
             num_outputs=1,
             temperature=1,
         )[0]["content"]
