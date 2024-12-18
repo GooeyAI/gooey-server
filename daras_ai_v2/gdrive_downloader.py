@@ -2,7 +2,7 @@ import io
 
 from furl import furl
 import requests
-from loguru import logger
+
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.exceptions import raise_for_status
@@ -64,88 +64,36 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
 
 def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes, str]:
     from googleapiclient import discovery
+    from googleapiclient.http import MediaIoBaseDownload
 
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
     service = discovery.build("drive", "v3")
 
-    request, mime_type = service_request(service, file_id, f, mime_type)
-    file_bytes, mime_type = download_blob_file_content(
-        service, request, file_id, f, mime_type, export_links
+    if f.host != "drive.google.com":
+        # export google docs to appropriate type
+        export_mime_type, _ = docs_export_mimetype(f)
+        if f_url_export := export_links.get(export_mime_type, None):
+            r = requests.get(f_url_export)
+            file_bytes = r.content
+            raise_for_status(r)
+            return file_bytes, export_mime_type
+
+    request = service.files().get_media(
+        fileId=file_id,
+        supportsAllDrives=True,
     )
-
-    return file_bytes, mime_type
-
-
-def service_request(
-    service, file_id: str, f: furl, mime_type: str, retried_request=False
-) -> tuple[any, str]:
-    # get files in drive directly
-    if f.host == "drive.google.com" or retried_request:
-        request = service.files().get_media(
-            fileId=file_id,
-            supportsAllDrives=True,
-        )
-    # export google docs to appropriate type
-    else:
-        mime_type, _ = docs_export_mimetype(f)
-        request = service.files().export_media(
-            fileId=file_id,
-            mimeType=mime_type,
-        )
-    return request, mime_type
-
-
-def download_blob_file_content(
-    service, request, file_id: str, f: furl, mime_type: str, export_links: dict
-) -> tuple[bytes, str]:
-    from googleapiclient.http import MediaIoBaseDownload
-    from googleapiclient.errors import HttpError
-
     # download
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
+    done = False
+    while done is False:
+        _, done = downloader.next_chunk()
+        # print(f"Download {int(status.progress() * 100)}%")
+    file_bytes = file.getvalue()
 
-    if (
-        mime_type
-        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    ):
-        # logger.debug(f"Downloading {str(f)!r} using export links")
-        f_url_export = export_links.get(mime_type, None)
-        if f_url_export:
-
-            f_bytes = download_from_exportlinks(f_url_export)
-        else:
-            request = service.files().get_media(
-                fileId=file_id,
-                supportsAllDrives=True,
-            )
-            downloader = MediaIoBaseDownload(file, request)
-
-            done = False
-            while done is False:
-                _, done = downloader.next_chunk()
-                # print(f"Download {int(status.progress() * 100)}%")
-            f_bytes = file.getvalue()
-
-    else:
-        done = False
-        while done is False:
-            _, done = downloader.next_chunk()
-            # print(f"Download {int(status.progress() * 100)}%")
-        f_bytes = file.getvalue()
-
-    return f_bytes, mime_type
-
-
-def download_from_exportlinks(f: furl) -> bytes:
-    try:
-        r = requests.get(f)
-        f_bytes = r.content
-    except requests.exceptions.RequestException as e:
-        raise_for_status(e)
-    return f_bytes
+    return file_bytes, mime_type
 
 
 def docs_export_mimetype(f: furl) -> tuple[str, str]:
