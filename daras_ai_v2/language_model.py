@@ -1050,6 +1050,10 @@ def _run_openai_chat(
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 entry["role"] = CHATML_ROLE_USER
 
+        # reserved tokens for reasoning...
+        # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
+        max_completion_tokens += 25_000
+
     if avoid_repetition:
         frequency_penalty = 0.1
         presence_penalty = 0.25
