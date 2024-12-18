@@ -524,6 +524,8 @@ class WorkspaceInvite(models.Model):
         choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
 
+    visits = models.IntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -637,7 +639,7 @@ class WorkspaceInvite(models.Model):
         self.auto_accepted = auto_accepted
 
         self.full_clean()
-        self.save()
+        self.save(update_fields=["status", "updated_by", "auto_accepted"])
 
         return membership, created
 

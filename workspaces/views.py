@@ -4,6 +4,7 @@ from copy import copy
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
+from django.db.models import F
 from django.utils.translation import ngettext
 
 from app_users.models import AppUser
@@ -32,6 +33,8 @@ def invitation_page(
     if invite.status == WorkspaceInvite.Status.ACCEPTED:
         set_current_workspace(session, int(invite.workspace_id))
         raise gui.RedirectException(get_route_path(members_route))
+
+    WorkspaceInvite.objects.filter(id=invite.id).update(visits=F("visits") + 1)
 
     with (
         gui.div(
