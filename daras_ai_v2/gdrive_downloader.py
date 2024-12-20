@@ -1,9 +1,11 @@
 import io
 
 from furl import furl
+import requests
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
+from daras_ai_v2.exceptions import raise_for_status
 
 
 def is_gdrive_url(f: furl) -> bool:
@@ -60,7 +62,7 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
     return filter(None, urls)
 
 
-def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
+def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
 
@@ -68,19 +70,20 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     file_id = url_to_gdrive_file_id(f)
     # get metadata
     service = discovery.build("drive", "v3")
-    # get files in drive directly
-    if f.host == "drive.google.com":
-        request = service.files().get_media(
-            fileId=file_id,
-            supportsAllDrives=True,
-        )
-    # export google docs to appropriate type
-    else:
-        mime_type, _ = docs_export_mimetype(f)
-        request = service.files().export_media(
-            fileId=file_id,
-            mimeType=mime_type,
-        )
+
+    if f.host != "drive.google.com":
+        # export google docs to appropriate type
+        export_mime_type, _ = docs_export_mimetype(f)
+        if f_url_export := export_links.get(export_mime_type, None):
+            r = requests.get(f_url_export)
+            file_bytes = r.content
+            raise_for_status(r, is_user_url=True)
+            return file_bytes, export_mime_type
+
+    request = service.files().get_media(
+        fileId=file_id,
+        supportsAllDrives=True,
+    )
     # download
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
@@ -88,8 +91,9 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     while done is False:
         _, done = downloader.next_chunk()
         # print(f"Download {int(status.progress() * 100)}%")
-    f_bytes = file.getvalue()
-    return f_bytes, mime_type
+    file_bytes = file.getvalue()
+
+    return file_bytes, mime_type
 
 
 def docs_export_mimetype(f: furl) -> tuple[str, str]:
@@ -109,8 +113,10 @@ def docs_export_mimetype(f: furl) -> tuple[str, str]:
         mime_type = "text/csv"
         ext = ".csv"
     elif "presentation" in f.path.segments:
-        mime_type = "application/pdf"
-        ext = ".pdf"
+        mime_type = (
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+        ext = ".pptx"
     elif "drawings" in f.path.segments:
         mime_type = "application/pdf"
         ext = ".pdf"
@@ -128,7 +134,7 @@ def gdrive_metadata(file_id: str) -> dict:
         .get(
             supportsAllDrives=True,
             fileId=file_id,
-            fields="name,md5Checksum,modifiedTime,mimeType,size",
+            fields="name,md5Checksum,modifiedTime,mimeType,size,exportLinks",
         )
         .execute()
     )
