@@ -77,7 +77,7 @@ def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes,
         if f_url_export := export_links.get(export_mime_type, None):
             r = requests.get(f_url_export)
             file_bytes = r.content
-            raise_for_status(r)
+            raise_for_status(r, is_user_url=True)
             return file_bytes, export_mime_type
 
     request = service.files().get_media(
