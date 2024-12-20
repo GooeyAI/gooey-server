@@ -1,19 +1,81 @@
 import typing
 import re
+import hashlib
+import re
+from PIL import Image
+import io
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.shapes import PP_PLACEHOLDER
 
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    resize_img_scale,
+    delete_blob_from_url,
+)
+from daras_ai_v2.azure_doc_extract import azure_doc_extract_page_num
+from loguru import logger
+
+EMU_TO_PIXELS = 0.000264583  # Conversion factor from EMU to pixels
+
 
 def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[str]:
     """
-    Extracts and converts text, tables, charts, and grouped shapes from a PPTX file into Markdown format.
+    Extracts text, tables, charts, grouped shapes, and images from a PPTX file into Markdown format.
+    Combines images into a single collage while preserving positions, dimensions, and cropping.
     """
     prs = Presentation(f)
     slides_text = []
 
     for slide_num, slide in enumerate(prs.slides, start=1):
-        slide_content = [f"Slide {slide_num}"]
+        slide_content = [f"\nSlide {slide_num}: "]
+        images_and_positions = []
+
+        # Slide dimensions in pixels
+        slide_width = int(prs.slide_width * EMU_TO_PIXELS)
+        slide_height = int(prs.slide_height * EMU_TO_PIXELS)
+
+        # Collect all images and their positions
+        if use_form_reco:
+            for shape in slide.shapes:
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    try:
+                        image_stream = io.BytesIO(shape.image.blob)
+                        img = Image.open(image_stream)
+
+                        # Apply cropping
+                        cropped_img = apply_cropping(img, shape)
+
+                        # Get position and dimensions (convert from EMU to pixels)
+                        position = {
+                            "left": int(shape.left * EMU_TO_PIXELS),
+                            "top": int(shape.top * EMU_TO_PIXELS),
+                            "width": int(shape.width * EMU_TO_PIXELS),
+                            "height": int(shape.height * EMU_TO_PIXELS),
+                        }
+
+                        images_and_positions.append((cropped_img, position))
+                    except Exception as e:
+                        logger.debug(f"Error processing image: {e}")
+
+            # Create collage if images are present
+            if images_and_positions:
+                try:
+                    collage = create_positioned_collage(
+                        images_and_positions, slide_width, slide_height
+                    )
+
+                    # Convert collage to bytes
+                    with io.BytesIO() as output:
+                        collage.save(output, format="PNG")
+                        collage_bytes = output.getvalue()
+
+                    slide_content.append(handle_pictures(collage_bytes))
+
+                except Exception as e:
+                    logger.debug(f"Error creating collage: {e}")
+
+        # Process other shapes
         for shape in slide.shapes:
             try:
                 if shape.has_text_frame:
@@ -28,14 +90,52 @@ def pptx_to_text_pages(f: typing.BinaryIO, use_form_reco: bool = False) -> list[
                 if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
                     slide_content.extend(handle_grouped_shapes(shape))
 
-                # if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                #     slide_content.extend(handle_pictures(shape))
-
             except Exception as e:
                 slide_content.append(f"  Error processing shape: {e}")
 
-        slides_text.append("\n".join(slide_content) + "\n")
+        slides_text.append("\n".join(slide_content))
     return slides_text
+
+
+def apply_cropping(img: Image.Image, shape) -> Image.Image:
+    """
+    Applies cropping to an image based on the cropping information in the PowerPoint shape.
+    """
+    # Retrieve cropping percentages
+    crop_left = shape.crop_left
+    crop_right = shape.crop_right
+    crop_top = shape.crop_top
+    crop_bottom = shape.crop_bottom
+
+    # Calculate crop box in pixels
+    img_width, img_height = img.size
+    left = crop_left * img_width
+    right = img_width - (crop_right * img_width)
+    top = crop_top * img_height
+    bottom = img_height - (crop_bottom * img_height)
+
+    # Crop the image
+    cropped_img = img.crop((int(left), int(top), int(right), int(bottom)))
+    return cropped_img
+
+
+def create_positioned_collage(
+    images_and_positions: list[tuple[Image.Image, dict]], slide_width, slide_height
+):
+    """
+    Creates a collage where images are placed at their exact positions and dimensions.
+    """
+    # Create a blank canvas matching the slide dimensions
+    canvas = Image.new("RGBA", (slide_width, slide_height), (255, 255, 255, 0))
+
+    for img, pos in images_and_positions:
+        # Resize the image to fit the specified dimensions
+        # https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters
+        resized_img = img.resize((pos["width"], pos["height"]), Image.LANCZOS)
+        # Paste the resized image at the specified position
+        canvas.paste(resized_img, (pos["left"], pos["top"]))
+
+    return canvas
 
 
 def handle_text_elements(shape) -> list[str]:
@@ -207,6 +307,22 @@ def handle_charts(shape) -> list[str]:
     return chart_text
 
 
-# TODO :azure form reco to extract text from images
-def handle_pictures(shape):
-    pass
+def handle_pictures(image_bytes) -> str:
+
+    image_hash = hashlib.sha256(image_bytes[:64]).hexdigest()
+    unique_filename = f"{image_hash}.png"
+
+    # Resize the image bytes before uploading
+    target_size = (800, 600)
+    resized_image_bytes = resize_img_scale(image_bytes, target_size)
+
+    # Upload image and get the URL
+    image_url = upload_file_from_bytes(unique_filename, resized_image_bytes)
+
+    extracted_text = azure_doc_extract_page_num(
+        image_url, page_num=1, model_id="prebuilt-read"
+    )
+
+    delete_blob_from_url(image_url)
+
+    return extracted_text
