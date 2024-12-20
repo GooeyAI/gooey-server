@@ -1,5 +1,5 @@
 import io
-import mimetypes
+
 from furl import furl
 import requests
 
@@ -71,15 +71,17 @@ def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes,
     # get metadata
     service = discovery.build("drive", "v3")
 
+    docs_export_mimetype = {
+        "application/vnd.google-apps.document": "text/plain",
+        "application/vnd.google-apps.spreadsheet": "text/csv",
+        "application/vnd.google-apps.presentation": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.google-apps.drawing": "application/pdf",
+    }
+
     if f.host != "drive.google.com":
         # export google docs to appropriate type
-        export_mime_type, _, is_google_workspace_doc = docs_export_mimetype(
-            f, mime_type
-        )
-
-        if is_google_workspace_doc and (
-            f_url_export := export_links.get(export_mime_type, None)
-        ):
+        export_mime_type = docs_export_mimetype.get(mime_type, mime_type)
+        if f_url_export := export_links.get(export_mime_type, None):
             r = requests.get(f_url_export)
             file_bytes = r.content
             raise_for_status(r, is_user_url=True)
@@ -99,46 +101,6 @@ def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes,
     file_bytes = file.getvalue()
 
     return file_bytes, mime_type
-
-
-def docs_export_mimetype(f: furl, mime_type) -> tuple[str, str, bool]:
-    """
-    return the mimetype to export google docs - https://developers.google.com/drive/api/guides/ref-export-formats
-
-    Args:
-        f (furl): google docs link
-
-    Returns:
-        tuple[str, str]: (mime_type, extension, is_google_workspace_supported)
-    """
-
-    supported_mimetypes = {
-        "application/vnd.google-apps.spreadsheet",
-        "application/vnd.google-apps.presentation",
-        "application/vnd.google-apps.drawing",
-        "application/vnd.google-apps.document",
-    }
-
-    is_google_workspace_supported = mime_type in supported_mimetypes
-
-    if is_google_workspace_supported:
-        if "document" in f.path.segments:
-            mime_type = "text/plain"
-            ext = ".txt"
-        elif "spreadsheets" in f.path.segments:
-            mime_type = "text/csv"
-            ext = ".csv"
-        elif "presentation" in f.path.segments:
-            mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            ext = ".pptx"
-        elif "drawings" in f.path.segments:
-            mime_type = "application/pdf"
-            ext = ".pdf"
-        else:
-            raise ValueError(f"Not sure how to export google docs url: {str(f)!r}")
-    else:
-        ext = f".{mimetypes.guess_extension(mime_type)}" or ""
-    return mime_type, ext, is_google_workspace_supported
 
 
 def gdrive_metadata(file_id: str) -> dict:
