@@ -62,7 +62,9 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
     return filter(None, urls)
 
 
-def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes, str]:
+def gdrive_download(
+    f: furl, mime_type: str, export_links: dict = {}
+) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
 
