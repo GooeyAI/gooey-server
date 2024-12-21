@@ -62,7 +62,9 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
     return filter(None, urls)
 
 
-def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes, str]:
+def gdrive_download(
+    f: furl, mime_type: str, export_links: dict = {}
+) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
 
@@ -71,9 +73,16 @@ def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes,
     # get metadata
     service = discovery.build("drive", "v3")
 
+    docs_export_mimetype = {
+        "application/vnd.google-apps.document": "text/plain",
+        "application/vnd.google-apps.spreadsheet": "text/csv",
+        "application/vnd.google-apps.presentation": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.google-apps.drawing": "application/pdf",
+    }
+
     if f.host != "drive.google.com":
         # export google docs to appropriate type
-        export_mime_type, _ = docs_export_mimetype(f)
+        export_mime_type = docs_export_mimetype.get(mime_type, mime_type)
         if f_url_export := export_links.get(export_mime_type, None):
             r = requests.get(f_url_export)
             file_bytes = r.content
@@ -94,35 +103,6 @@ def gdrive_download(f: furl, mime_type: str, export_links: dict) -> tuple[bytes,
     file_bytes = file.getvalue()
 
     return file_bytes, mime_type
-
-
-def docs_export_mimetype(f: furl) -> tuple[str, str]:
-    """
-    return the mimetype to export google docs - https://developers.google.com/drive/api/guides/ref-export-formats
-
-    Args:
-        f (furl): google docs link
-
-    Returns:
-        tuple[str, str]: (mime_type, extension)
-    """
-    if "document" in f.path.segments:
-        mime_type = "text/plain"
-        ext = ".txt"
-    elif "spreadsheets" in f.path.segments:
-        mime_type = "text/csv"
-        ext = ".csv"
-    elif "presentation" in f.path.segments:
-        mime_type = (
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        )
-        ext = ".pptx"
-    elif "drawings" in f.path.segments:
-        mime_type = "application/pdf"
-        ext = ".pdf"
-    else:
-        raise ValueError(f"Not sure how to export google docs url: {str(f)!r}")
-    return mime_type, ext
 
 
 def gdrive_metadata(file_id: str) -> dict:
