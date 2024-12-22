@@ -225,6 +225,7 @@ class DocExtractPage(BasePage):
                 message="Updating sheet...",
             )
         else:
+            # TODO: implement this as well
             file_url_metas = yield from flatapply_parallel(
                 doc_or_yt_url_to_metadatas,
                 request.documents,
