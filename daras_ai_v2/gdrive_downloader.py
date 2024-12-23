@@ -7,7 +7,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.exceptions import raise_for_status
 
-docs_export_mimetype = {
+DOCS_EXPORT_MIMETYPES = {
     "application/vnd.google-apps.document": "text/plain",
     "application/vnd.google-apps.spreadsheet": "text/csv",
     "application/vnd.google-apps.presentation": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -85,7 +85,7 @@ def gdrive_download(
 
     if f.host != "drive.google.com":
         # export google docs to appropriate type
-        export_mime_type = docs_export_mimetype.get(mime_type, mime_type)
+        export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
         if f_url_export := export_links.get(export_mime_type, None):
             r = requests.get(f_url_export)
             file_bytes = r.content

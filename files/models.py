@@ -7,10 +7,7 @@ class FileMetadata(models.Model):
     etag = models.CharField(max_length=255, null=True)
     mime_type = models.CharField(max_length=255, default="", blank=True)
     total_bytes = models.PositiveIntegerField(default=0, blank=True)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.export_links = {}
+    export_links: dict[str, str] | None = None
 
     def __str__(self):
         ret = f"{self.name or 'Unnamed'} - {self.mime_type}"
