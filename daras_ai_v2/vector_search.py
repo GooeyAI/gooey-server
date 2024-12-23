@@ -310,7 +310,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
         total_bytes = int(meta.get("size") or 0)
-        export_links = meta.get("exportLinks", {})
+        export_links = meta.get("exportLinks", None)
     else:
         try:
             if is_user_uploaded_url(f_url):
@@ -328,7 +328,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             mime_type = None
             etag = None
             total_bytes = 0
-            export_links = {}
+            export_links = None
         else:
             name = (
                 r.headers.get("content-disposition", "")
@@ -340,7 +340,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
                 etag = etag.strip('"')
             mime_type = get_mimetype_from_response(r)
             total_bytes = int(r.headers.get("content-length") or 0)
-            export_links = {}
+            export_links = None
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(f_url):

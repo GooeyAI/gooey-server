@@ -1,11 +1,18 @@
 import io
-
+import typing
 from furl import furl
 import requests
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.exceptions import raise_for_status
+
+docs_export_mimetype = {
+    "application/vnd.google-apps.document": "text/plain",
+    "application/vnd.google-apps.spreadsheet": "text/csv",
+    "application/vnd.google-apps.presentation": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.google-apps.drawing": "application/pdf",
+}
 
 
 def is_gdrive_url(f: furl) -> bool:
@@ -63,22 +70,18 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
 
 
 def gdrive_download(
-    f: furl, mime_type: str, export_links: dict = {}
+    f: furl, mime_type: str, export_links: typing.Optional[dict] = None
 ) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
+
+    if export_links is None:
+        export_links = {}
 
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
     service = discovery.build("drive", "v3")
-
-    docs_export_mimetype = {
-        "application/vnd.google-apps.document": "text/plain",
-        "application/vnd.google-apps.spreadsheet": "text/csv",
-        "application/vnd.google-apps.presentation": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.google-apps.drawing": "application/pdf",
-    }
 
     if f.host != "drive.google.com":
         # export google docs to appropriate type
