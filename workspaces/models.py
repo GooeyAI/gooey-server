@@ -524,7 +524,7 @@ class WorkspaceInvite(models.Model):
         choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
 
-    visits = models.IntegerField(default=0)
+    clicks = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
