@@ -748,28 +748,35 @@ def page_wrapper(request: Request, className=""):
         with gui.div(id="main-content", className="container-xxl " + className):
             yield current_workspace
 
-        gui.html(
-            """
-            <div id="gooey-embed"></div>
-            <script id="gooey-bot-embed-script" src="https://gooey.ai/chat/the-gooeyai-bot-4rv/lib.js"></script>
-            """
-        )
-        gui.js(
-            # language=javascript
-            """
-                async function loadGooeyEmbed() {
-                    await window.waitUntilHydrated;
-                    if (typeof GooeyEmbed === 'undefined') return;
-                    GooeyEmbed.unmount();
-                    GooeyEmbed.mount({});
-                }
-                const script = document.getElementById("gooey-bot-embed-script");
-                if (script) script.onload = loadGooeyEmbed;
-                loadGooeyEmbed();
-                """,
-        )
+        # except /copilot insert gooey-bot
+        if not request.url.path.startswith("/copilot"):
+            insert_gooey_bot_widget()
+
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
+
+
+def insert_gooey_bot_widget():
+    gui.html(
+        """
+                <div id="gooey-bot-embed"></div>
+                <script id="gooey-bot-embed-script" src="https://gooey.ai/chat/the-gooeyai-bot-4rv/lib.js"></script>
+                """
+    )
+    gui.js(
+        # language=javascript
+        """
+            async function loadGooeyEmbed() {
+                await window.waitUntilHydrated;
+                if (typeof GooeyEmbed === 'undefined') return;
+                GooeyEmbed.unmount();
+                GooeyEmbed.mount({ "target": "#gooey-bot-embed" });
+            }
+            const script = document.getElementById("gooey-bot-embed-script");
+            if (script) script.onload = loadGooeyEmbed;
+            loadGooeyEmbed();
+            """,
+    )
 
 
 def anonymous_login_container(request: Request, context: dict):
