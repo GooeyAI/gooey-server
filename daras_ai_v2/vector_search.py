@@ -440,8 +440,13 @@ def get_or_create_embedded_file(
                 )[0]
                 for ref in refs:
                     ref.embedded_file = embedded_file
-                EmbeddingsReference.objects.bulk_create(refs)
-            return embedded_file
+                EmbeddingsReference.objects.bulk_create(
+                    refs,
+                    update_conflicts=True,
+                    update_fields=["url", "title", "snippet", "updated_at"],
+                    unique_fields=["vespa_doc_id"],
+                )
+        return embedded_file
 
 
 def create_embeddings_in_search_db(
@@ -456,7 +461,7 @@ def create_embeddings_in_search_db(
     embedding_model: EmbeddingModels,
     is_user_url: bool,
 ) -> list[EmbeddingsReference]:
-    refs = []
+    refs = {}
     vespa = get_vespa_app()
     for ref, embedding in get_embeds_for_doc(
         f_url=f_url,
@@ -475,7 +480,7 @@ def create_embeddings_in_search_db(
             title=ref["title"],
             snippet=ref["snippet"],
         )
-        refs.append(db_ref)
+        refs[db_ref.vespa_doc_id] = db_ref
         vespa.feed_data_point(
             schema=settings.VESPA_SCHEMA,
             data_id=doc_id,
@@ -488,7 +493,7 @@ def create_embeddings_in_search_db(
             ),
             operation_type="feed",
         )
-    return refs
+    return list(refs.values())
 
 
 def get_embeds_for_doc(

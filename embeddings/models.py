@@ -76,6 +76,7 @@ class EmbeddingsReference(models.Model):
     vespa_doc_id = models.CharField(
         max_length=256,
         help_text="The Document ID of this embedding in Vespa. A hash of the file metadata + the split snippet.",
+        unique=True,
     )
     url = CustomURLField()
     title = models.TextField()
