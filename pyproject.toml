@@ -88,6 +88,8 @@ django-safedelete = "^1.4.0"
 numexpr = "^2.10.1"
 django-csp = "^3.8"
 python-pptx = "^1.0.2"
+azure-identity = "^1.19.0"
+azure-keyvault-secrets = "^4.9.0"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

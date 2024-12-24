@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "functions",
     "workspaces",
     "api_keys",
+    "managed_secrets",
 ]
 
 MIDDLEWARE = [
@@ -423,6 +424,8 @@ AZURE_SPEECH_REGION = config("AZURE_SPEECH_REGION", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.com"
 AZURE_TTS_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com"
+
+AZURE_KEY_VAULT_ENDPOINT = config("AZURE_KEY_VAULT_ENDPOINT", "")
 
 AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
 AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")

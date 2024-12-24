@@ -1,6 +1,8 @@
 import typing
 
 import gooey_gui as gui
+from django.contrib.humanize.templatetags.humanize import naturaltime
+
 from api_keys.models import ApiKey
 from app_users.models import AppUser
 from daras_ai_v2 import icons
@@ -25,28 +27,57 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 
     api_keys = list(workspace.api_keys.order_by("-created_at"))
 
-    table_area = gui.div()
+    table_area = gui.div(
+        className="table-responsive text-nowrap container-margin-reset"
+    )
 
-    if gui.button("＋ Create new secret key"):
+    if gui.button("＋ Create new API Key"):
         api_key = generate_new_api_key(workspace=workspace, user=user)
         api_keys.insert(0, api_key)
 
     with table_area:
-        import pandas as pd
-
-        gui.table(
-            pd.DataFrame.from_records(
-                columns=["Secret Key (Preview)", "Created At", "Created By"],
-                data=[
-                    (
-                        api_key.preview,
-                        api_key.created_at.strftime("%B %d, %Y at %I:%M:%S %p %Z"),
-                        api_key.created_by and api_key.created_by.full_name() or "",
-                    )
-                    for api_key in api_keys
-                ],
-            ),
-        )
+        with gui.tag("table", className="table table-striped"):
+            with gui.tag("thead"), gui.tag("tr"):
+                with gui.tag("th"):
+                    gui.write("Gooey.AI Key")
+                with gui.tag("th"):
+                    gui.write("Created At")
+                with gui.tag("th"):
+                    gui.write("Created By")
+                gui.tag("th")
+            with gui.tag("tbody"):
+                for api_key in api_keys:
+                    with gui.tag("tr"):
+                        with gui.tag("td"):
+                            gui.write(f"`{api_key.preview}`")
+                        with gui.tag("td"):
+                            gui.write(str(naturaltime(api_key.created_at)))
+                        with gui.tag("td"):
+                            gui.write(
+                                api_key.created_by
+                                and api_key.created_by.full_name()
+                                or ""
+                            )
+                        with gui.tag("td"):
+                            delete_dialog = gui.use_confirm_dialog(
+                                key=f"delete_api_key_{api_key.id}"
+                            )
+                            gui.button_with_confirm_dialog(
+                                ref=delete_dialog,
+                                trigger_label=icons.delete,
+                                trigger_type="tertiary",
+                                trigger_className="text-danger p-0 m-0",
+                                modal_title="### Delete API Key",
+                                modal_content=f"Are you sure you want to delete `{api_key.preview}`?\n\n"
+                                "API requests made using this key will be rejected, "
+                                "which could cause any systems still depending on it to break. "
+                                "Once deleted, you'll no longer be able to view or modify this API key.",
+                                confirm_label="Delete",
+                                confirm_className="border-danger bg-danger text-white",
+                            )
+                            if delete_dialog.pressed_confirm:
+                                api_key.delete()
+                                gui.rerun()
 
 
 def generate_new_api_key(workspace: "Workspace", user: AppUser) -> ApiKey:
@@ -54,12 +85,11 @@ def generate_new_api_key(workspace: "Workspace", user: AppUser) -> ApiKey:
 
     gui.success(
         """
-##### API key generated
-
+**API key generated**
 Please save this secret key somewhere safe and accessible.
 For security reasons, **you won't be able to view it again** through your account.
 If you lose this secret key, you'll need to generate a new one.
-            """
+        """
     )
     col1, col2 = gui.columns([3, 1], responsive=False)
     with col1:
