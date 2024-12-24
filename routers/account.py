@@ -19,6 +19,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
+from managed_secrets.widgets import manage_secrets_table
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -356,9 +357,13 @@ def all_saved_runs_tab(request: Request):
 
 
 def api_keys_tab(request: Request):
-    gui.write("# 🔐 API Keys")
     workspace = get_current_workspace(request.user, request.session)
+
+    gui.write("## 🔐 API Keys")
     manage_api_keys(workspace=workspace, user=request.user)
+
+    gui.write("## 🛡 Secrets")
+    manage_secrets_table(workspace, request.user)
 
 
 @contextmanager
