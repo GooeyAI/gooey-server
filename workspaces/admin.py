@@ -1,8 +1,9 @@
 from django.contrib import admin
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from safedelete.admin import SafeDeleteAdmin, SafeDeleteAdminFilter
 
 from bots.admin_links import change_obj_url, open_in_new_tab
+from payments.models import Subscription
 from usage_costs.models import UsageCost
 from . import models
 
@@ -85,7 +86,19 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     ]
     inlines = [WorkspaceMembershipInline, WorkspaceInviteInline]
     ordering = ["-created_at"]
-    autocomplete_fields = ["created_by", "subscription"]
+    autocomplete_fields = ["created_by"]
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        self.obj = obj
+        return super().get_form(request, obj, change, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "subscription" and self.obj:
+            kwargs["queryset"] = Subscription.objects.filter(
+                Q(workspace=self.obj) | Q(workspace__isnull=True)
+            )[:10]
+        return field
 
     @admin.display(description="Name")
     def display_name(self, workspace: models.Workspace):
