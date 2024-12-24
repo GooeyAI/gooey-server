@@ -23,7 +23,7 @@ class WorkspaceInviteAdmin(admin.ModelAdmin):
         "email",
         "status",
         "has_expired",
-        "visits",
+        "clicks",
         "created_by",
         "updated_by",
         "created_at",
@@ -31,7 +31,7 @@ class WorkspaceInviteAdmin(admin.ModelAdmin):
     ]
     list_filter = ["created_at", "status"]
     readonly_fields = [
-        "visits",
+        "clicks",
         "auto_accepted",
         "has_expired",
         "created_at",
