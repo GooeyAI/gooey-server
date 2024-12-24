@@ -34,7 +34,7 @@ def invitation_page(
         set_current_workspace(session, int(invite.workspace_id))
         raise gui.RedirectException(get_route_path(members_route))
 
-    WorkspaceInvite.objects.filter(id=invite.id).update(visits=F("visits") + 1)
+    WorkspaceInvite.objects.filter(id=invite.id).update(clicks=F("clicks") + 1)
 
     with (
         gui.div(
