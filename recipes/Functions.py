@@ -161,9 +161,9 @@ class FunctionsPage(BasePage):
                     trigger_className="p-1 mb-2",
                 )
                 options |= set(
-                    self.current_workspace.managed_secrets.order_by(
-                        "-created_at"
-                    ).values_list("name", flat=True)
+                    workspace.managed_secrets.order_by("-created_at").values_list(
+                        "name", flat=True
+                    )
                 )
         gui.multiselect(
             label="",
