@@ -14,6 +14,7 @@ from daras_ai_v2.variables_widget import variables_input
 from functions.models import CalledFunction, VariableSchema
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
+from workspaces.models import Workspace
 
 
 class ConsoleLogs(BaseModel):
@@ -145,14 +146,16 @@ class FunctionsPage(BasePage):
                 help=field_desc(self.RequestModel, "secrets"),
                 unsafe_allow_html=True,
             )
-            edit_secret_button_with_dialog(
-                self.current_workspace,
-                self.request.user,
-                trigger_label=f"{icons.add} Add",
-                trigger_type="tertiary",
-                trigger_className="p-1 mb-2",
-            )
-
+            try:
+                edit_secret_button_with_dialog(
+                    self.current_workspace,
+                    self.request.user,
+                    trigger_label=f"{icons.add} Add",
+                    trigger_type="tertiary",
+                    trigger_className="p-1 mb-2",
+                )
+            except Workspace.DoesNotExist:
+                pass
         options = list(
             set(
                 self.current_workspace.managed_secrets.order_by(
