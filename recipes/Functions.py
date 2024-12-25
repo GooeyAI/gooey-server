@@ -138,6 +138,8 @@ class FunctionsPage(BasePage):
             description="Pass custom parameters to your function and access the parent workflow data. "
             "Variables will be passed down as the first argument to your anonymous JS function.",
         )
+
+        options = set(gui.session_state.get("secrets") or [])
         with gui.div(className="d-flex align-items-center gap-3 mb-2"):
             gui.markdown(
                 "###### "
@@ -147,26 +149,25 @@ class FunctionsPage(BasePage):
                 unsafe_allow_html=True,
             )
             try:
+                workspace = self.current_workspace
+            except Workspace.DoesNotExist:
+                pass
+            else:
                 edit_secret_button_with_dialog(
-                    self.current_workspace,
+                    workspace,
                     self.request.user,
                     trigger_label=f"{icons.add} Add",
                     trigger_type="tertiary",
                     trigger_className="p-1 mb-2",
                 )
-            except Workspace.DoesNotExist:
-                pass
-        options = list(
-            set(
-                self.current_workspace.managed_secrets.order_by(
-                    "-created_at"
-                ).values_list("name", flat=True)
-            )
-            | set(gui.session_state.get("secrets", []))
-        )
+                options |= set(
+                    self.current_workspace.managed_secrets.order_by(
+                        "-created_at"
+                    ).values_list("name", flat=True)
+                )
         gui.multiselect(
             label="",
-            options=options,
+            options=list(options),
             key="secrets",
             allow_none=True,
         )
