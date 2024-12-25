@@ -213,4 +213,4 @@ def edit_secret_button_with_dialog(
         )
     else:
         dialog.set_open(False)
-        raise gui.RedirectException
+        raise gui.RerunException()
