@@ -150,7 +150,7 @@ def edit_secret_button_with_dialog(
             onKeyUp="setValue(value.replace(/ /g, '_').replace(/[^a-zA-Z0-9_\$]/g, ''))",
             key="secret:name",
             value=secret and secret.name,
-        )
+        ).upper()
         if name and name[0].isdigit():
             gui.error(
                 "Secret name must be a valid JS variable name and cannot start with a number."
