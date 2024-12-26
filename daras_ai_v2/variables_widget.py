@@ -116,7 +116,7 @@ def render_list_item(
                     className="font-monospace",
                 )
 
-            description = gui.text_input(
+            description = gui.text_area(
                 label="###### Description",
                 key=entry_key + ":desc",
                 value=description,

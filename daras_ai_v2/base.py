@@ -751,7 +751,7 @@ class BasePage:
                 className="mt-1",
             )
             gui.write("Description", className="fs-5 container-margin-reset")
-            published_run_description = gui.text_input(
+            published_run_description = gui.text_area(
                 "",
                 key="published_run_description",
                 value=notes,
