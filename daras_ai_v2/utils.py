@@ -1,22 +1,19 @@
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
+
+THRESHOLDS = [
+    (timedelta(days=365), "y"),
+    (timedelta(days=30), "mo"),
+    (timedelta(days=1), "d"),
+    (timedelta(hours=1), "h"),
+    (timedelta(minutes=1), "m"),
+    (timedelta(seconds=3), "s"),
+]
 
 
-def get_relative_time(timestamp):
+def get_relative_time(timestamp: datetime) -> str:
     diff = timezone.now() - timestamp
-    seconds = diff.total_seconds()
-
-    if seconds < 2:
-        return "Just now"
-    if seconds < timedelta(minutes=1).total_seconds():
-        return f"{int(seconds)}s ago"
-    elif seconds < timedelta(hours=1).total_seconds():
-        return f"{int(seconds/timedelta(minutes=1).total_seconds())}m ago"
-    elif seconds < timedelta(days=1).total_seconds():
-        return f"{int(seconds/timedelta(hours=1).total_seconds())}h ago"
-    elif seconds < timedelta(days=30).total_seconds():
-        return f"{int(seconds/timedelta(days=1).total_seconds())}d ago"
-    elif seconds < timedelta(days=365).total_seconds():
-        return f"{int(seconds/timedelta(days=30).total_seconds())}mo ago"
-    else:
-        return f"{int(seconds/timedelta(days=365).total_seconds())}y ago"
+    for threshold, unit in THRESHOLDS:
+        if diff >= threshold:
+            return f"{round(diff / threshold)}{unit} ago"
+    return "Just now"
