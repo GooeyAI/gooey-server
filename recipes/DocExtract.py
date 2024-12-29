@@ -5,20 +5,16 @@ import typing
 import gooey_gui as gui
 import requests
 from aifail import retry_if
-from django.db.models import IntegerChoices
-from furl import furl
-from pydantic import BaseModel, Field
-
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
-    run_translate,
     AsrModels,
-    run_asr,
-    download_youtube_to_wav_url,
-    audio_url_to_wav,
     TranslationModels,
+    audio_url_to_wav,
+    download_youtube_to_wav_url,
+    run_asr,
+    run_translate,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_doc_extract_page_num,
@@ -33,15 +29,15 @@ from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
 )
-from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
+from daras_ai_v2.gdrive_downloader import gdrive_download, is_gdrive_url
 from daras_ai_v2.language_model import (
-    run_language_model,
     LargeLanguageModels,
+    run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
-    language_model_settings,
-    language_model_selector,
     LanguageModelSettings,
+    language_model_selector,
+    language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
@@ -49,17 +45,22 @@ from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import (
     add_page_number_to_pdf,
-    yt_dlp_get_video_entries,
+    doc_or_yt_url_to_file_metas,
     doc_url_to_file_metadata,
-    get_pdf_num_pages,
     doc_url_to_text_pages,
-    doc_or_yt_url_to_metadatas,
+    get_pdf_num_pages,
     is_yt_dlp_able_url,
+    yt_dlp_extract_info,
+    yt_dlp_info_to_entries,
 )
+from django.db.models import IntegerChoices
 from files.models import FileMetadata
+from furl import furl
+from pydantic import BaseModel, Field
+
+from recipes.asr_page import AsrPage
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
-from recipes.asr_page import AsrPage
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
@@ -226,7 +227,7 @@ class DocExtractPage(BasePage):
             )
         else:
             file_url_metas = yield from flatapply_parallel(
-                doc_or_yt_url_to_metadatas,
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
                 request.documents,
                 message="Extracting metadata...",
             )
@@ -367,7 +368,7 @@ def col_i2a(col: int) -> str:
 
 def extract_info(url: str) -> list[dict | None]:
     if is_yt_dlp_able_url(url):
-        return yt_dlp_get_video_entries(url)
+        return yt_dlp_info_to_entries(yt_dlp_extract_info(url))
 
     # assume it's a direct link
     file_meta = doc_url_to_file_metadata(url)
@@ -582,8 +583,8 @@ threadlocal = threading.local()
 
 
 def get_spreadsheet_service():
-    from oauth2client.service_account import ServiceAccountCredentials
     from googleapiclient.discovery import build
+    from oauth2client.service_account import ServiceAccountCredentials
 
     try:
         return threadlocal.spreadsheets
