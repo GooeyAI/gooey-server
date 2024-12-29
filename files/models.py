@@ -7,6 +7,7 @@ class FileMetadata(models.Model):
     etag = models.CharField(max_length=255, null=True)
     mime_type = models.CharField(max_length=255, default="", blank=True)
     total_bytes = models.PositiveIntegerField(default=0, blank=True)
+
     export_links: dict[str, str] | None = None
 
     def __str__(self):
@@ -16,6 +17,9 @@ class FileMetadata(models.Model):
         if self.etag:
             ret += f" - {self.etag}"
         return ret
+
+    def astuple(self) -> tuple:
+        return self.name, self.etag, self.mime_type, self.total_bytes
 
     class Meta:
         indexes = [
