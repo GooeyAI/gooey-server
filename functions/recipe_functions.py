@@ -109,23 +109,26 @@ class LLMTool:
 
         # save the output from the function
         return_value = fn_sr.state.get("return_value")
-        if return_value is None:
-            return
-        if isinstance(return_value, dict):
-            for k, v in return_value.items():
-                if (
-                    k in self.request_model.__fields__
-                    or k in self.response_model.__fields__
-                ):
-                    self.state[k] = v
-                else:
-                    state_vars[k] = v
-                    state_vars_schema[k] = {"role": "system"}
-        else:
-            state_vars["return_value"] = return_value
-            state_vars_schema["return_value"] = {"role": "system"}
+        if return_value is not None:
+            if isinstance(return_value, dict):
+                for k, v in return_value.items():
+                    if (
+                        k in self.request_model.__fields__
+                        or k in self.response_model.__fields__
+                    ):
+                        self.state[k] = v
+                    else:
+                        state_vars[k] = v
+                        state_vars_schema[k] = {"role": "system"}
+            else:
+                state_vars["return_value"] = return_value
+                state_vars_schema["return_value"] = {"role": "system"}
 
-        return return_value
+        return dict(
+            return_value=return_value,
+            error=fn_sr.state.get("error"),
+            logs=fn_sr.state.get("logs"),
+        )
 
     def _get_system_vars(self) -> tuple[dict, dict]:
         request = self.request_model.parse_obj(self.state)
