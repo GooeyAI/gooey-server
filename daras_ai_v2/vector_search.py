@@ -802,7 +802,7 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
     if "sections" in df.columns or "snippet" in df.columns:
         return df
     else:
-        df.columns = [THEAD + col + THEAD for col in df.columns]
+        df.columns = [THEAD + str(col) + THEAD for col in df.columns]
         return pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=["sections"])
 
 
