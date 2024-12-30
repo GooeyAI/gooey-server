@@ -2,11 +2,11 @@ import json
 import typing
 
 import gooey_gui as gui
-from django.utils.text import slugify
-
 from app_users.models import AppUser
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
+from django.utils.text import slugify
+
 from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
@@ -36,15 +36,7 @@ class LLMTool:
                 "description": fn_pr.notes,
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        key: {
-                            "type": schema.get("type", get_json_type(value)),
-                            "description": schema.get("description", ""),
-                        }
-                        for key, value in fn_vars.items()
-                        if (schema := fn_vars_schema.get(key, {}))
-                        and schema.get("role") != "system"
-                    },
+                    "properties": dict(generate_tool_params(fn_vars, fn_vars_schema)),
                 },
             },
         }
@@ -173,7 +165,6 @@ def call_recipe_functions(
 def get_tools_from_state(
     state: dict, trigger: FunctionTrigger
 ) -> typing.Iterable[LLMTool]:
-
     functions = state.get("functions")
     if not functions:
         return
@@ -181,6 +172,27 @@ def get_tools_from_state(
         if function.get("trigger") != trigger.name:
             continue
         yield LLMTool(function.get("url"))
+
+
+def generate_tool_params(
+    fn_vars: dict, fn_vars_schema: dict
+) -> typing.Iterable[tuple[str, dict]]:
+    for name, value in fn_vars.items():
+        var_schema = fn_vars_schema.get(name, {})
+        if var_schema and var_schema.get("role") == "system":
+            continue
+        json_type = var_schema.get("type", get_json_type(value))
+        json_schema = {
+            "type": json_type,
+            "description": var_schema.get("description", ""),
+        }
+        if json_type == "array":
+            try:
+                items_type = get_json_type(value[0])
+            except IndexError:
+                items_type = "object"
+            json_schema["items"] = {"type": items_type}
+        yield name, json_schema
 
 
 def get_json_type(val) -> "JsonTypes":
@@ -202,8 +214,8 @@ def is_functions_enabled(key="functions") -> bool:
 
 
 def functions_input(current_user: AppUser, key="functions"):
-    from recipes.BulkRunner import list_view_editor
     from daras_ai_v2.base import BasePage
+    from recipes.BulkRunner import list_view_editor
 
     def render_function_input(list_key: str, del_key: str, d: dict):
         from daras_ai_v2.workflow_url_input import workflow_url_input
@@ -254,8 +266,8 @@ def functions_input(current_user: AppUser, key="functions"):
 
 
 def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
-    from recipes.Functions import FunctionsPage
     from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+    from recipes.Functions import FunctionsPage
 
     if not is_functions_enabled():
         return
