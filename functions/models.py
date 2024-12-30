@@ -1,11 +1,10 @@
 import typing
 
+from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from django.db import models
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired, TypedDict
-
-from daras_ai_v2.custom_enum import GooeyEnum
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 
 
 class _TriggerData(typing.NamedTuple):
@@ -14,8 +13,8 @@ class _TriggerData(typing.NamedTuple):
 
 
 class FunctionTrigger(_TriggerData, GooeyEnum):
-    pre = _TriggerData(label="⏪ Before", db_value=1)
     prompt = _TriggerData(label="✨ Prompt", db_value=3)
+    pre = _TriggerData(label="⏪ Before", db_value=1)
     post = _TriggerData(label="⏩ After", db_value=2)
 
 
