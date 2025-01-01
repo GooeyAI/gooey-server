@@ -2,19 +2,19 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel, Field
-
 from bots.models import Workflow
-from daras_ai_v2 import settings, icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import raise_for_status, UserError
-from daras_ai_v2.field_render import field_title, field_desc
+from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.variables_widget import variables_input
-from functions.models import CalledFunction, VariableSchema
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
+from pydantic import BaseModel, Field
 from workspaces.models import Workspace
+
+from functions.models import CalledFunction, VariableSchema
 
 
 class ConsoleLogs(BaseModel):
@@ -80,8 +80,7 @@ class FunctionsPage(BasePage):
 
         if request.secrets:
             yield "Decrypting secrets..."
-            secret_values = map_parallel(self._load_secret, request.secrets)
-            env = dict(zip(request.secrets, secret_values))
+            env = dict(map_parallel(self._load_secret, request.secrets))
         else:
             env = None
 
@@ -103,7 +102,7 @@ class FunctionsPage(BasePage):
         response.return_value = data.get("retval")
         response.error = data.get("error")
 
-    def _load_secret(self, name: str) -> str:
+    def _load_secret(self, name: str) -> tuple[str, str]:
         try:
             secret = ManagedSecret.objects.get(
                 workspace=self.current_workspace, name=name
@@ -113,7 +112,7 @@ class FunctionsPage(BasePage):
                 f"Secret `{name}` not found. Please go to your [account keys](/account/api-keys/) section and provide this value."
             )
         secret.load_value()
-        return secret.value
+        return secret.name, secret.value
 
     def render_form_v2(self):
         gui.code_editor(
@@ -165,12 +164,13 @@ class FunctionsPage(BasePage):
                         "name", flat=True
                     )
                 )
-        gui.multiselect(
-            label="",
-            options=list(options),
-            key="secrets",
-            allow_none=True,
-        )
+        with gui.div(className="font-monospace"):
+            gui.multiselect(
+                label="",
+                options=list(options),
+                key="secrets",
+                allow_none=True,
+            )
 
     def render_output(self):
         if error := gui.session_state.get("error"):

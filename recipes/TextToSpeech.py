@@ -2,33 +2,34 @@ import json
 import time
 import typing
 
-import requests
-from pydantic import BaseModel, Field
-
 import gooey_gui as gui
+import requests
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
+from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import raise_for_status, UserError
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
-    azure_tts_voices,
     ELEVEN_LABS_MODELS,
-    elevenlabs_init_state,
     GHANA_NLP_TTS_LANGUAGES,
     OLD_ELEVEN_LABS_VOICES,
+    UBERDUCK_VOICES,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
+    TextToSpeechProviders,
+    azure_tts_voices,
+    elevenlabs_load_state,
     text_to_speech_provider_selector,
     text_to_speech_settings,
-    TextToSpeechProviders,
-    UBERDUCK_VOICES,
 )
-from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
+from managed_secrets.models import ManagedSecret
+from pydantic import BaseModel, Field
+from workspaces.models import Workspace
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -102,19 +103,8 @@ class TextToSpeechPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["tts_provider"]
 
-    def fields_not_to_save(self):
-        return ["elevenlabs_api_key"]
-
-    def fields_to_save(self):
-        fields = super().fields_to_save()
-        try:
-            fields.remove("elevenlabs_api_key")
-        except ValueError:
-            pass
-        return fields
-
     def run_as_api_tab(self):
-        elevenlabs_init_state(self)
+        elevenlabs_load_state(self)
         super().run_as_api_tab()
 
     def preview_description(self, state: dict) -> str:
@@ -167,8 +157,7 @@ class TextToSpeechPage(BasePage):
         gui.audio(audio_url, show_download_button=True)
 
     def _get_elevenlabs_price(self, state: dict):
-        _, is_user_provided_key = self._get_elevenlabs_api_key(state)
-        if is_user_provided_key:
+        if state.get("elevenlabs_api_key"):
             return 0
         else:
             text = state.get("text_prompt", "")
@@ -183,8 +172,7 @@ class TextToSpeechPage(BasePage):
     def get_cost_note(self):
         tts_provider = gui.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
-            _, is_user_provided_key = self._get_elevenlabs_api_key(gui.session_state)
-            if is_user_provided_key:
+            if gui.session_state.get("elevenlabs_api_key"):
                 return "*No additional credit charge given we'll use your API key*"
             else:
                 return "*4 credits per 10 words*"
@@ -252,8 +240,8 @@ class TextToSpeechPage(BasePage):
                         time.sleep(0.1)
 
             case TextToSpeechProviders.GOOGLE_TTS:
-                from google.cloud import texttospeech
                 import emoji
+                from google.cloud import texttospeech
 
                 voice_name = (
                     state["google_voice_name"]
@@ -344,8 +332,8 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.AZURE_TTS:
-                import emoji
                 import azure.cognitiveservices.speech as speechsdk
+                import emoji
 
                 voice_name = state.get("azure_voice_name", "en-US")
                 try:
@@ -445,17 +433,25 @@ class TextToSpeechPage(BasePage):
         """
         Returns the 11labs API key and whether it is a user-provided key or the default key
         """
-        # ElevenLabs is available for non-paying users with their own API key
-        if state.get("elevenlabs_api_key"):
-            return state["elevenlabs_api_key"], True
-        else:
-            return settings.ELEVEN_LABS_API_KEY, False
+        api_key_or_name = state.get("elevenlabs_api_key")
+        if api_key_or_name:
+            try:
+                managed_secret = ManagedSecret.objects.get(
+                    workspace=self.current_workspace, name=api_key_or_name
+                )
+            except (Workspace.DoesNotExist, ManagedSecret.DoesNotExist):
+                state.pop("elevenlabs_api_key", None)  # avoid saving raw api keys
+                return api_key_or_name, True
+            else:
+                managed_secret.load_value()
+                return managed_secret.value, True
+        return settings.ELEVEN_LABS_API_KEY, False
 
     def related_workflows(self) -> list:
-        from recipes.VideoBots import VideoBotsPage
-        from recipes.LipsyncTTS import LipsyncTTSPage
-        from recipes.DeforumSD import DeforumSDPage
         from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.VideoBots import VideoBotsPage
 
         return [
             VideoBotsPage,

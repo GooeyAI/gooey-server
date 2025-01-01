@@ -15,34 +15,16 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
-from app_users.models import AppUser, AppUserTransaction
-from daras_ai.image_input import truncate_text_words
-from daras_ai.text_format import format_number_with_suffix
 from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
-from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
-from functions.recipe_functions import (
-    LLMTool,
-    call_recipe_functions,
-    functions_input,
-    get_tools_from_state,
-    is_functions_enabled,
-    render_called_functions,
-)
 from furl import furl
-from payments.auto_recharge import (
-    run_auto_recharge_gracefully,
-    should_attempt_auto_recharge,
-)
 from pydantic import BaseModel, Field, ValidationError
-from routers.root import RecipeTabs
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
-from workspaces.models import Workspace, WorkspaceMembership
-from workspaces.widgets import get_current_workspace, set_current_workspace
 
+from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
@@ -51,6 +33,8 @@ from bots.models import (
     SavedRun,
     Workflow,
 )
+from daras_ai.image_input import truncate_text_words
+from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
@@ -70,6 +54,22 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.variables_widget import variables_input
+from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
+from functions.recipe_functions import (
+    LLMTool,
+    call_recipe_functions,
+    functions_input,
+    get_tools_from_state,
+    is_functions_enabled,
+    render_called_functions,
+)
+from payments.auto_recharge import (
+    run_auto_recharge_gracefully,
+    should_attempt_auto_recharge,
+)
+from routers.root import RecipeTabs
+from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
     # Small
@@ -2072,7 +2072,7 @@ class BasePage:
             run_id=sr.run_id,
             uid=sr.uid,
             channel=self.realtime_channel_name(sr.run_id, sr.uid),
-            unsaved_state=self._unsaved_state() | (unsaved_state or {}),
+            unsaved_state=unsaved_state,
             deduct_credits=deduct_credits,
         )
 
@@ -2132,18 +2132,6 @@ class BasePage:
             StateKeys.run_status,
             StateKeys.run_time,
         ]
-
-    def _unsaved_state(self) -> dict[str, typing.Any]:
-        result = {}
-        for field in self.fields_not_to_save():
-            try:
-                result[field] = gui.session_state[field]
-            except KeyError:
-                pass
-        return result
-
-    def fields_not_to_save(self) -> list[str]:
-        return []
 
     def _examples_tab(self):
         allow_hide = self.is_current_user_admin()
@@ -2412,7 +2400,7 @@ class BasePage:
 
         api_example_generator(
             api_url=api_url,
-            request_body=request_body | self._unsaved_state(),
+            request_body=request_body,
             as_form_data=as_form_data,
             as_async=as_async,
         )

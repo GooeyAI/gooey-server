@@ -2,15 +2,15 @@ import typing
 
 import gooey_gui as gui
 from absl.flags import ValidationError
+from daras_ai_v2 import icons
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import IntegrityError
 
-from daras_ai_v2 import icons
 from managed_secrets.models import ManagedSecret
 
 if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
     from bots.models import AppUser
+    from workspaces.models import Workspace
 
 
 def manage_secrets_table(workspace: "Workspace", user: "AppUser"):
@@ -51,9 +51,9 @@ def manage_secrets_table(workspace: "Workspace", user: "AppUser"):
                         with gui.tag("td", className="d-flex gap-3"):
                             if gui.session_state.pop(f"secret:{secret.id}:show", False):
                                 secret.load_value()
-                            if secret.value:
+                            try:
                                 gui.write(f"`{secret.value}`")
-                            else:
+                            except ManagedSecret.NotLoadedErorr:
                                 gui.write("`" + "*" * 10 + "`")
                                 gui.button(
                                     '<i class="fa-solid fa-eye"></i>',
@@ -110,6 +110,7 @@ def edit_secret_button_with_dialog(
     trigger_type: str,
     trigger_className: str = "",
     secret: ManagedSecret | None = None,
+    secret_name: str | None = None,
 ):
     if secret:
         key = f"secret:{secret.id}:edit"
@@ -149,7 +150,7 @@ def edit_secret_button_with_dialog(
             # language=javascript
             onKeyUp="setValue(value.replace(/ /g, '_').replace(/[^a-zA-Z0-9_\$]/g, ''))",
             key="secret:name",
-            value=secret and secret.name,
+            value=(secret and secret.name) or secret_name,
         ).upper()
         if name and name[0].isdigit():
             gui.error(

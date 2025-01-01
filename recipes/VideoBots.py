@@ -5,7 +5,7 @@ import typing
 from itertools import zip_longest
 
 import gooey_gui as gui
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -14,24 +14,24 @@ from bots.models import (
     Platform,
     PublishedRun,
     PublishedRunVisibility,
+    Workflow,
 )
-from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
-    language_filter_selector,
-    translation_model_selector,
-    translation_language_selector,
-    run_translate,
-    TranslationModels,
     AsrModels,
+    TranslationModels,
     asr_language_selector,
-    run_asr,
-    should_translate_lang,
     asr_model_selector,
+    language_filter_selector,
+    run_asr,
+    run_translate,
+    should_translate_lang,
+    translation_language_selector,
+    translation_model_selector,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -40,73 +40,73 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
+    broadcast_input,
     general_integration_settings,
+    get_bot_test_link,
+    integrations_welcome_screen,
     slack_specific_settings,
     twilio_specific_settings,
-    broadcast_input,
-    get_bot_test_link,
     web_widget_config,
-    integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    query_instructions_widget,
-    keyword_instructions_widget,
-    doc_search_advanced_settings,
-    doc_extract_selector,
     bulk_documents_uploader,
     citation_style_selector,
+    doc_extract_selector,
+    doc_search_advanced_settings,
+    keyword_instructions_widget,
+    query_instructions_widget,
     cache_knowledge_widget,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
+from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
-    run_language_model,
-    calc_gpt_tokens,
+    CHATML_ROLE_ASSISTANT,
+    CHATML_ROLE_SYSTEM,
+    CHATML_ROLE_USER,
+    SUPERSCRIPT,
     ConversationEntry,
     LargeLanguageModels,
-    CHATML_ROLE_ASSISTANT,
-    CHATML_ROLE_USER,
-    CHATML_ROLE_SYSTEM,
+    calc_gpt_tokens,
+    format_chat_entry,
     get_entry_images,
     get_entry_text,
-    format_chat_entry,
-    SUPERSCRIPT,
+    run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
-    language_model_settings,
     LanguageModelSettings,
     language_model_selector,
+    language_model_settings,
 )
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
-    parse_refs,
     CitationStyles,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
+    parse_refs,
 )
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
-    text_to_speech_settings,
+    elevenlabs_load_state,
     text_to_speech_provider_selector,
-    elevenlabs_init_state,
+    text_to_speech_settings,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import DocSearchRequest
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     LLMTool,
-    render_called_functions,
     get_tools_from_state,
+    render_called_functions,
 )
 from recipes.DocSearch import (
     get_top_k_references,
@@ -302,10 +302,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
-        from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
         from recipes.DocSearch import DocSearchPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
 
         return [
             LipsyncTTSPage,
@@ -608,19 +608,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.write("##### 🔠 Language Model Settings")
         language_model_settings(gui.session_state.get("selected_model"))
 
-    def fields_not_to_save(self):
-        return ["elevenlabs_api_key"]
-
-    def fields_to_save(self) -> [str]:
-        fields = super().fields_to_save()
-        try:
-            fields.remove("elevenlabs_api_key")
-        except ValueError:
-            pass
-        return fields
-
     def run_as_api_tab(self):
-        elevenlabs_init_state(self)
+        elevenlabs_load_state(self)
         super().run_as_api_tab()
 
     def render_example(self, state: dict):
