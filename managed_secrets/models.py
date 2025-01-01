@@ -1,8 +1,7 @@
 import uuid
 
-from django.db import models
-
 from daras_ai_v2 import settings
+from django.db import models
 
 'az role assignment create --role "Key Vault Secrets Officer" --assignee "<upn>" --scope "/subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.KeyVault/vaults/<your-unique-keyvault-name>"'
 
@@ -10,7 +9,7 @@ from daras_ai_v2 import settings
 class ManagedSecretQuerySet(models.QuerySet):
     def create(self, *, value: str, **kwargs):
         secret = super().create(**kwargs)
-        secret.store_value(value)
+        secret.value = value
         return secret
 
 
@@ -34,22 +33,40 @@ class ManagedSecret(models.Model):
 
     objects: ManagedSecretQuerySet = ManagedSecretQuerySet.as_manager()
 
-    value: str | None = None
-
     class Meta:
         unique_together = ("workspace", "name")
 
     def __str__(self):
         return f"{self.name} ({self._external_name()})"
 
+    _value: str | None = None
+
+    class NotLoadedErorr(Exception):
+        pass
+
+    @property
+    def value(self) -> str:
+        if self._value is None:
+            raise self.NotLoadedErorr()
+        return self._value
+
+    @value.setter
+    def value(self, x: str):
+        self.store_value(x)
+
     def store_value(self, value: str):
         client = _get_az_secret_client()
         client.set_secret(self._external_name(), value)
-        self.value = value
+        self._value = value
 
     def load_value(self):
+        import azure.core.exceptions
+
         client = _get_az_secret_client()
-        self.value = client.get_secret(self._external_name()).value
+        try:
+            self._value = client.get_secret(self._external_name()).value
+        except azure.core.exceptions.ResourceNotFoundError:
+            self._value = None
 
     def delete_value(self):
         import azure.core.exceptions
@@ -65,8 +82,8 @@ class ManagedSecret(models.Model):
 
 
 def _get_az_secret_client():
-    from azure.keyvault.secrets import SecretClient
     from azure.identity import DefaultAzureCredential
+    from azure.keyvault.secrets import SecretClient
 
     credential = DefaultAzureCredential()
     return SecretClient(

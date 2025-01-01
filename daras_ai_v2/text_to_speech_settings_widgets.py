@@ -1,21 +1,23 @@
 import typing
 from enum import Enum
 
+import gooey_gui as gui
 import requests
 from furl import furl
 
-import gooey_gui as gui
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from managed_secrets.models import ManagedSecret
+from managed_secrets.widgets import edit_secret_button_with_dialog
+from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
-SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
 
 UBERDUCK_VOICES = {
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
@@ -66,7 +68,7 @@ OLD_ELEVEN_LABS_VOICES = { "Rachel": "21m00Tcm4TlvDq8ikWAM", "Clyde": "2EiwWnXFn
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def default_elevenlabs_voices() -> dict[str, str]:
-    return fetch_elevenlabs_voices(settings.ELEVEN_LABS_API_KEY)
+    return fetch_elevenlabs_voices()
 
 
 ELEVEN_LABS_MODELS = {
@@ -349,53 +351,81 @@ def uberduck_settings():
 
 
 def elevenlabs_selector(page: "BasePage"):
-    elevenlabs_init_state(page)
+    elevenlabs_load_state(page)
 
-    elevenlabs_use_custom_key = gui.checkbox(
-        "Use custom API key + Voice ID",
-        value=bool(gui.session_state.get("elevenlabs_api_key")),
-        help="[Learn how](https://gooey.ai/docs/guides/lipsync-videos-with-custom-voices) to add custom voices!",
-    )
-    if elevenlabs_use_custom_key:
-        elevenlabs_api_key = gui.text_input(
+    voices = {}
+
+    try:
+        workspace = page.current_workspace
+    except Workspace.DoesNotExist:
+        workspace = None
+        elevenlabs_use_custom_key = False
+        gui.caption(
+            f"""
+Note: You need to be [Signed In]({page.get_auth_url()}) to use ElevenLabs voices.
             """
-            ###### Your ElevenLabs API key
-            *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
-            to know how to obtain an API key from
-            ElevenLabs.*
-            """,
-            key="elevenlabs_api_key",
         )
+    else:
+        elevenlabs_use_custom_key = gui.checkbox(
+            "Use custom API Key & Voice",
+            value=bool(gui.session_state.get("elevenlabs_api_key")),
+            help="""
+Your ElevenLabs API key
+- Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a> to know how to obtain an API key from ElevenLabs.
+- [Learn how](https://gooey.ai/docs/guides/lipsync-videos-with-custom-voices) to add custom voices!
+- Manage your secrets in the [account keys](/account/api-keys/) section.
+            """,
+        )
+        if not (
+            elevenlabs_use_custom_key
+            or page.is_current_user_paying()
+            or page.is_current_user_admin()
+        ):
+            gui.caption(
+                """
+Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
+Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
+                """
+            )
+
+    if elevenlabs_use_custom_key:
+        options = workspace.managed_secrets.order_by("-created_at").values_list(
+            "name", flat=True
+        )
+        with gui.div(className="d-flex"):
+            with gui.div(className="flex-grow-1 font-monospace"):
+                elevenlabs_api_key = gui.selectbox(
+                    label="",
+                    options=list(options),
+                    key="elevenlabs_api_key",
+                    allow_none=True,
+                )
+            edit_secret_button_with_dialog(
+                workspace,
+                page.request.user,
+                trigger_label=f"{icons.add} Add",
+                trigger_type="tertiary",
+                trigger_className="p-1 ms-2",
+                secret_name="ELEVENLABS_API_KEY",
+            )
+
         if elevenlabs_api_key:
             try:
-                voices = fetch_elevenlabs_voices(elevenlabs_api_key)
+                voices = fetch_elevenlabs_voices(
+                    page.current_workspace.id, elevenlabs_api_key
+                )
             except requests.exceptions.HTTPError as e:
                 gui.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
                 return
             selected_voice_id = gui.session_state.get("elevenlabs_voice_id")
             if selected_voice_id and selected_voice_id not in voices:
                 voices[selected_voice_id] = selected_voice_id
-        else:
-            voices = {}
     else:
         gui.session_state["elevenlabs_api_key"] = None
-        if not (
-            page and (page.is_current_user_paying() or page.is_current_user_admin())
-        ):
-            gui.caption(
-                """
-                Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
-                Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
-                """
-            )
         if settings.ELEVEN_LABS_API_KEY:
             voices = default_elevenlabs_voices()
-        else:
-            voices = {}
-
-    page.request.session[SESSION_ELEVENLABS_API_KEY] = gui.session_state.get(
-        "elevenlabs_api_key"
-    )
+    if not voices:
+        return
     gui.selectbox(
         """
         ###### Voice
@@ -414,12 +444,23 @@ def elevenlabs_selector(page: "BasePage"):
     )
 
 
-def elevenlabs_init_state(page: "BasePage"):
-    if not gui.session_state.get("elevenlabs_api_key"):
-        gui.session_state["elevenlabs_api_key"] = page.request.session.get(
-            SESSION_ELEVENLABS_API_KEY
-        )
-    # for backwards compat
+def elevenlabs_load_state(page: "BasePage"):
+    # load api key from request session for backwards compat
+    old_api_key = page.request.session.get("__user__elevenlabs_api_key", None)
+    if old_api_key and not gui.session_state.get("elevenlabs_api_key"):
+        try:
+            managed_secret, created = ManagedSecret.objects.get_or_create(
+                workspace=page.current_workspace,
+                name="ELEVENLABS_API_KEY",
+                defaults=dict(created_by=page.request.user, value=old_api_key),
+            )
+        except Workspace.DoesNotExist:
+            pass
+        else:
+            gui.session_state["elevenlabs_api_key"] = managed_secret.name
+            del page.request.session["__user__elevenlabs_api_key"]
+
+    # convert voice name to voice id for backwards compat
     if old_voice_name := gui.session_state.pop("elevenlabs_voice_name", None):
         try:
             gui.session_state["elevenlabs_voice_id"] = OLD_ELEVEN_LABS_VOICES[
@@ -527,7 +568,21 @@ _elevenlabs_category_order = {
 
 
 @gui.cache_in_session_state
-def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
+def fetch_elevenlabs_voices(
+    workspace_id: int | None = None, api_key_name: str | None = None
+) -> dict[str, str]:
+    if api_key_name:
+        try:
+            managed_secret = ManagedSecret.objects.get(
+                workspace_id=workspace_id, name=api_key_name
+            )
+        except ManagedSecret.DoesNotExist:
+            return {}
+        else:
+            managed_secret.load_value()
+            api_key = managed_secret.value
+    else:
+        api_key = settings.ELEVEN_LABS_API_KEY
     r = requests.get(
         "https://api.elevenlabs.io/v1/voices",
         headers={"Accept": "application/json", "xi-api-key": api_key},
