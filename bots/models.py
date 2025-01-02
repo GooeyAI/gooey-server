@@ -63,7 +63,7 @@ class PublishedRunVisibility(models.IntegerChoices):
                 if handle:
                     profile_url = handle.get_app_url()
                     pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a>'
+                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a> (view only)'
                 elif workspace.is_personal:
                     edit_profile_url = get_route_path(profile_route)
                     return f'{self.get_icon()} Public on <a href="{edit_profile_url}" target="_blank">my profile page</a>'
