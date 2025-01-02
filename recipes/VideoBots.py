@@ -55,6 +55,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_extract_selector,
     bulk_documents_uploader,
     citation_style_selector,
+    cache_knowledge_widget,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
@@ -585,21 +586,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             citation_style_selector()
             gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
-
-            gui.write("###### Cache")
-            gui.caption(
-                f"""
-                By default we embed your knowledge files & links and cache their contents for fast responses. 
-                """
-            )
-
-            gui.checkbox(
-                "Always Check for Updates",
-                help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
-                tooltip_placement="right",
-                key="check_document_updates",
-            )
-
+            cache_knowledge_widget()
             doc_extract_selector(self.request.user)
 
             gui.write("---")

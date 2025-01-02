@@ -1,13 +1,14 @@
 import typing
 
+
 from furl import furl
 from pydantic import BaseModel
-
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
+    cache_knowledge_widget,
     doc_search_advanced_settings,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
@@ -21,7 +22,6 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -34,6 +34,7 @@ from daras_ai_v2.serp_search_locations import (
     SerpSearchLocation,
     SerpSearchType,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
     DocSearchRequest,
@@ -75,6 +76,7 @@ class GoogleGPTPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         dense_weight=1.0,
+        check_document_updates=False,
     )
 
     class RequestModelBase(BasePage.RequestModel):
@@ -87,7 +89,7 @@ class GoogleGPTPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-
+        check_document_updates: bool | None
         max_search_urls: int | None
 
         max_references: int | None
@@ -149,6 +151,7 @@ class GoogleGPTPage(BasePage):
         gui.write("---")
         gui.write("##### 🔎 Document Search Settings")
         query_instructions_widget()
+        cache_knowledge_widget()
         gui.write("---")
         doc_search_advanced_settings()
 

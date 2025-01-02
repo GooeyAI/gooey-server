@@ -123,6 +123,22 @@ def keyword_instructions_widget():
     )
 
 
+def cache_knowledge_widget():
+    gui.write("###### Cache")
+    gui.caption(
+        f"""
+        By default we embed your knowledge files & links and cache their contents for fast responses. 
+        """
+    )
+
+    gui.checkbox(
+        "Always Check for Updates",
+        help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
+        tooltip_placement="right",
+        key="check_document_updates",
+    )
+
+
 def doc_extract_selector(current_user: AppUser | None):
     from recipes.DocExtract import DocExtractPage
     from daras_ai_v2.workflow_url_input import workflow_url_input
