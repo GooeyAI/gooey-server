@@ -84,6 +84,7 @@ class DocSearchRequest(BaseModel):
     scroll_jump: int | None
 
     doc_extract_url: str | None
+    check_document_updates: typing.Optional[bool] = False
 
     embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
     dense_weight: float | None = Field(
@@ -138,6 +139,7 @@ def get_top_k_references(
 
     yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
+    check_document_updates = request.check_document_updates
 
     if request.doc_extract_url:
         page_cls, sr, pr = url_to_runs(request.doc_extract_url)
@@ -161,6 +163,7 @@ def get_top_k_references(
             selected_asr_model=selected_asr_model,
             embedding_model=embedding_model,
             is_user_url=is_user_url,
+            check_document_updates=check_document_updates,
             current_user=current_user,
         ),
         input_docs,
@@ -409,6 +412,7 @@ def get_or_create_embedded_file(
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     is_user_url: bool,
+    check_document_updates: bool,
     current_user: AppUser,
 ) -> EmbeddedFile:
     """
@@ -433,7 +437,7 @@ def get_or_create_embedded_file(
             embedded_file = None
         else:
             # skip metadata check for bucket urls (since they are unique & static)
-            if is_user_uploaded_url(f_url):
+            if is_user_uploaded_url(f_url) or not check_document_updates:
                 return embedded_file
 
         file_meta, leaf_url_metas = doc_or_yt_url_to_file_metas(f_url)

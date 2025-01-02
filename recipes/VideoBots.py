@@ -172,6 +172,7 @@ class VideoBotsPage(BasePage):
         "max_context_words": 200,
         "scroll_jump": 5,
         "use_url_shortener": False,
+        "check_document_updates": False,
         "dense_weight": 1.0,
         "translation_model": DEFAULT_TRANSLATION_MODEL,
     }
@@ -218,6 +219,7 @@ class VideoBotsPage(BasePage):
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
+        check_document_updates: bool | None
 
         asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
             title="Speech-to-Text Provider",
@@ -582,7 +584,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
             citation_style_selector()
-            gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
+
+            gui.write("###### Cache")
+            gui.caption(
+                f"""
+                By default we embed your knowledge files & links and cache their contents for fast responses. 
+                """
+            )
+
+            gui.checkbox(
+                "Always Check for Updates",
+                help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
+                tooltip_placement="right",
+                key="check_document_updates",
+            )
 
             doc_extract_selector(self.request.user)
 

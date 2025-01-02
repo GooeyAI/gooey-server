@@ -71,7 +71,7 @@ def bulk_documents_uploader(
             accept=accept,
             accept_multiple_files=True,
         )
-    gui.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
+    gui.checkbox("Show as Links", key=f"__custom_checkbox_{key}")
     documents = gui.session_state.setdefault(key, [])
     try:
         documents = list(_expand_gdrive_folders(documents))
