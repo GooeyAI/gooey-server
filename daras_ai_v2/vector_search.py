@@ -84,7 +84,7 @@ class DocSearchRequest(BaseModel):
     scroll_jump: int | None
 
     doc_extract_url: str | None
-    check_document_updates: typing.Optional[bool] = False
+    check_document_updates: typing.Optional[bool] = True
 
     embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
     dense_weight: float | None = Field(
