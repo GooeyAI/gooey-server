@@ -38,7 +38,11 @@ from daras_ai_v2.fastapi_tricks import (
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
+from daras_ai_v2.profiles import (
+    team_profile_page,
+    user_profile_page,
+    get_meta_tags_for_profile,
+)
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -628,6 +632,10 @@ def render_handle_page(request: Request, name: str):
         with page_wrapper(request):
             user_profile_page(request, handle.user)
         return dict(meta=get_meta_tags_for_profile(handle.user))
+    elif handle.has_workspace:
+        with page_wrapper(request):
+            team_profile_page(request, handle.workspace)
+        return {}
     elif handle.has_redirect:
         return RedirectResponse(
             handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}

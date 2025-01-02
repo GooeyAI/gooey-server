@@ -29,6 +29,9 @@ from daras_ai_v2.meta_content import (
 )
 from handles.models import Handle
 
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
 
 class ContributionsSummary(typing.NamedTuple):
     total: int
@@ -49,6 +52,35 @@ def get_meta_tags_for_profile(user: AppUser):
         image=get_profile_image(user),
         canonical_url=user.handle.get_app_url(),
     )
+
+
+def team_profile_page(request: Request, workspace: "Workspace"):
+    run_count = SavedRun.objects.filter(workspace=workspace).count()
+
+    # header
+    with gui.div(className="my-3"):
+        col1, col2 = gui.columns([2, 10])
+    with col1:
+        render_profile_image(workspace.get_photo())
+    with (
+        col2,
+        gui.div(
+            className="h-100 d-flex flex-column justify-content-between gap-2 no-margin"
+        ),
+    ):
+        with gui.div():
+            gui.write(f"# {workspace.display_name()}")
+            gui.caption(workspace.description)
+        with gui.div():
+            gui.caption(
+                f"{icons.run} {format_number_with_suffix(run_count)} runs",
+                unsafe_allow_html=True,
+            )
+
+    gui.write("---")
+
+    # main content
+    render_public_runs_grid(workspace)
 
 
 def user_profile_page(request: Request, user: AppUser):
@@ -166,8 +198,13 @@ def user_profile_header(request, user: AppUser):
 
 
 def user_profile_main_content(user: AppUser):
+    workspace = user.get_or_create_personal_workspace()[0]
+    render_public_runs_grid(workspace)
+
+
+def render_public_runs_grid(workspace: "Workspace"):
     public_runs = PublishedRun.objects.filter(
-        created_by=user,
+        workspace=workspace,
         visibility=PublishedRunVisibility.PUBLIC,
     ).order_by("-updated_at")
 
