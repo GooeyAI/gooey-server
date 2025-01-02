@@ -11,7 +11,7 @@ class WorkspaceMembershipInline(admin.TabularInline):
     model = models.WorkspaceMembership
     extra = 0
     autocomplete_fields = ["user", "workspace"]
-    readonly_fields = ["invite", "created_at", "updated_at"]
+    readonly_fields = ["invite", "clicks", "created_at", "updated_at"]
     ordering = ["-created_at"]
 
 
@@ -22,13 +22,20 @@ class WorkspaceInviteAdmin(admin.ModelAdmin):
         "email",
         "status",
         "has_expired",
+        "clicks",
         "created_by",
         "updated_by",
         "created_at",
         "updated_at",
     ]
     list_filter = ["created_at", "status"]
-    readonly_fields = ["auto_accepted", "has_expired", "created_at", "updated_at"]
+    readonly_fields = [
+        "clicks",
+        "auto_accepted",
+        "has_expired",
+        "created_at",
+        "updated_at",
+    ]
     autocomplete_fields = ["workspace", "created_by", "updated_by"]
 
 
