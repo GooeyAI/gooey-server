@@ -1829,6 +1829,7 @@ class PublishedRun(models.Model):
             models.Index(
                 fields=["-updated_at", "workspace", "created_by", "visibility"]
             ),
+            models.Index(fields=["visibility", "workspace", "-updated_at"]),
         ]
 
     def __str__(self):
