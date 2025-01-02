@@ -14,6 +14,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_advanced_settings,
     query_instructions_widget,
     doc_extract_selector,
+    cache_knowledge_widget,
 )
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
@@ -65,12 +66,13 @@ class DocSearchPage(BasePage):
         "selected_model": LargeLanguageModels.text_davinci_003.name,
         "citation_style": CitationStyles.number.name,
         "dense_weight": 1.0,
+        "check_document_updates": False,
     }
 
     class RequestModelBase(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
-
+        check_document_updates: bool | None
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
@@ -138,6 +140,7 @@ class DocSearchPage(BasePage):
         citation_style_selector()
         doc_extract_selector(self.request.user)
         query_instructions_widget()
+        cache_knowledge_widget()
         gui.write("---")
         doc_search_advanced_settings()
 
