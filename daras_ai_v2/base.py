@@ -484,20 +484,10 @@ class BasePage:
                     self._unsaved_options_modal()
 
     def render_social_buttons(self):
-        with gui.div(
-            className="d-flex align-items-start right-action-icons gap-lg-2 gap-1"
+        with (
+            gui.styled("& .btn { padding: 6px }"),
+            gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
         ):
-            gui.html(
-                # styling for buttons in this div
-                """
-                <style>
-                .right-action-icons .btn {
-                    padding: 6px;
-                }
-                </style>
-                """.strip()
-            )
-
             if self.tab == RecipeTabs.run:
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
@@ -625,17 +615,6 @@ class BasePage:
 
     def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
-            gui.html(
-                """
-                <style>
-                    .save-button-menu .gui-input label p { color: black; }
-                    .published-options-menu {
-                        z-index: 1;
-                    }
-                </style>
-                """
-            )
-
             if self.can_user_edit_published_run(self.current_pr):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
@@ -1166,15 +1145,6 @@ class BasePage:
         version: PublishedRunVersion,
         older_version: PublishedRunVersion | None,
     ):
-        gui.html(
-            """
-            <style>
-            .disable-p-margin p {
-                margin-bottom: 0;
-            }
-            </style>
-            """
-        )
         url = self.app_url(
             example_id=version.published_run.published_run_id,
             run_id=version.saved_run.run_id,
@@ -1190,7 +1160,7 @@ class BasePage:
                             version.changed_by, responsive=False, show_as_link=False
                         )
                 else:
-                    gui.write("###### Deleted User", className="disable-p-margin")
+                    gui.write("###### Deleted User", className="container-margin-reset")
                 with gui.tag("h6", className="mb-0"):
                     gui.html(
                         "Loading...",
@@ -1199,7 +1169,7 @@ class BasePage:
                             date_options={"month": "short", "day": "numeric"},
                         ),
                     )
-            with gui.div(className="disable-p-margin"):
+            with gui.div(className="container-margin-reset"):
                 is_first_version = not older_version
                 if is_first_version:
                     with gui.tag("span", className="badge bg-secondary px-3"):
@@ -1562,40 +1532,36 @@ class BasePage:
         if not photo and not name:
             return
 
-        responsive_image_size = (
-            f"calc({image_size} * 0.67)" if responsive else image_size
-        )
-
-        # new class name so that different ones don't conflict
-        class_name = f"author-image-{image_size}"
         if responsive:
-            class_name += "-responsive"
+            responsive_image_size = f"calc({image_size} * 0.67)"
+        else:
+            responsive_image_size = image_size
 
         linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
             if photo:
-                gui.html(
-                    f"""
-                    <style>
-                    .{class_name} {{
-                        width: {responsive_image_size};
-                        height: {responsive_image_size};
-                        margin-right: 6px;
-                        border-radius: 50%;
-                        object-fit: cover;
-                        pointer-events: none;
-                    }}
-
-                    @media (min-width: 1024px) {{
-                        .{class_name} {{
-                            width: {image_size};
-                            height: {image_size};
-                        }}
-                    }}
-                    </style>
-                """
-                )
-                gui.image(photo, className=class_name)
+                with gui.styled(
+                    """
+                    @media (min-width: 1024px) {
+                        & {
+                            width: %(image_size)s;
+                            height: %(image_size)s;
+                        }
+                    }
+                    """
+                    % dict(image_size=image_size)
+                ):
+                    gui.image(
+                        photo,
+                        style=dict(
+                            width=responsive_image_size,
+                            height=responsive_image_size,
+                            marginRight="6px",
+                            borderRadius="50%",
+                            objectFit="cover",
+                            pointerEvents="none",
+                        ),
+                    )
 
             if name:
                 name_style = {"fontSize": text_size} if text_size else {}
