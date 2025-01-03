@@ -586,7 +586,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             citation_style_selector()
             gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
-            cache_knowledge_widget()
+            cache_knowledge_widget(self)
             doc_extract_selector(self.request.user)
 
             gui.write("---")

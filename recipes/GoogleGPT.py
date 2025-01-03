@@ -151,7 +151,7 @@ class GoogleGPTPage(BasePage):
         gui.write("---")
         gui.write("##### 🔎 Document Search Settings")
         query_instructions_widget()
-        cache_knowledge_widget()
+        cache_knowledge_widget(self)
         gui.write("---")
         doc_search_advanced_settings()
 
