@@ -123,20 +123,31 @@ def keyword_instructions_widget():
     )
 
 
-def cache_knowledge_widget():
+def cache_knowledge_widget(self):
     gui.write("###### Cache")
     gui.caption(
         f"""
         By default we embed your knowledge files & links and cache their contents for fast responses. 
         """
     )
-
-    gui.checkbox(
-        "Always Check for Updates",
-        help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
-        tooltip_placement="right",
-        key="check_document_updates",
-    )
+    col1, col2 = gui.columns(2, style={"alignItems": "center"})
+    with col1:
+        gui.checkbox(
+            "Always Check for Updates",
+            help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
+            tooltip_placement="bottom",
+            key="check_document_updates",
+        )
+    with col2:
+        with gui.tooltip(
+            "Clear the knowledge cache and re-index all knowledge base files and links."
+        ):
+            if gui.button(
+                "♻️ Refresh Cache",
+                type="tertiary",
+            ):
+                unsaved_model_state = {"check_document_updates": True}
+                self.submit_and_redirect(unsaved_model_state=unsaved_model_state)
 
 
 def doc_extract_selector(current_user: AppUser | None):

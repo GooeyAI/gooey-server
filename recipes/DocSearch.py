@@ -140,7 +140,7 @@ class DocSearchPage(BasePage):
         citation_style_selector()
         doc_extract_selector(self.request.user)
         query_instructions_widget()
-        cache_knowledge_widget()
+        cache_knowledge_widget(self)
         gui.write("---")
         doc_search_advanced_settings()
 
