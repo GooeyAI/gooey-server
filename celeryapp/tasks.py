@@ -61,7 +61,12 @@ def runner_task(
     error_msg = None
 
     @db_middleware
-    def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
+    def save_on_step(
+        yield_val: str | tuple[str, dict] = None,
+        *,
+        done: bool = False,
+        sr_session_state: dict[str, typing.Any],
+    ):
         if isinstance(yield_val, tuple):
             run_status, extra_output = yield_val
         else:
@@ -93,7 +98,8 @@ def runner_task(
         # send outputs to ui
         gui.realtime_push(channel, output)
         # save to db
-        page.dump_state_to_sr(gui.session_state | output, sr)
+        # dont save unsaved_state
+        page.dump_state_to_sr(sr_session_state | output, sr)
 
     page = page_cls(
         user=AppUser.objects.get(id=user_id),
@@ -103,12 +109,13 @@ def runner_task(
     sr = page.current_sr
     set_current_workspace(page.request.session, int(sr.workspace_id))
     threadlocal.saved_run = sr
-    gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
+    original_state = sr.to_dict()
+    gui.set_session_state(original_state | (unsaved_state or {}))
 
     try:
-        save_on_step()
+        save_on_step(sr_session_state=original_state)
         for val in page.main(sr, gui.session_state):
-            save_on_step(val)
+            save_on_step(val, sr_session_state=original_state)
 
     # render errors nicely
     except Exception as e:
@@ -130,7 +137,7 @@ def runner_task(
 
     # save everything, mark run as completed
     finally:
-        save_on_step(done=True)
+        save_on_step(done=True, sr_session_state=original_state)
         threadlocal.saved_run = None
 
     post_runner_tasks.delay(sr.id)
