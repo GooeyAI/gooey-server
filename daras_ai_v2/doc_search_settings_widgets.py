@@ -1,16 +1,20 @@
 import os
 import typing
 
+import gooey_gui as gui
+from app_users.models import AppUser
 from furl import furl
 from sentry_sdk import capture_exception
 
-import gooey_gui as gui
-from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.search_ref import CitationStyles
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+
 
 _user_media_url_prefix = os.path.join(
     "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
@@ -123,7 +127,7 @@ def keyword_instructions_widget():
     )
 
 
-def cache_knowledge_widget(self):
+def cache_knowledge_widget(page: "BasePage"):
     gui.write("###### Cache")
     gui.caption(
         f"""
@@ -138,20 +142,18 @@ def cache_knowledge_widget(self):
             tooltip_placement="bottom",
             key="check_document_updates",
         )
-    with col2:
-        with gui.tooltip(
-            "Clear the knowledge cache and re-index all knowledge base files and links."
-        ):
-            if gui.button(
-                "♻️ Refresh Cache",
-                type="tertiary",
-            ):
-                unsaved_model_state = {"check_document_updates": True}
-                self.submit_and_redirect(unsaved_model_state=unsaved_model_state)
+    with col2, gui.tooltip("Check documents for changes, re-index if needed & Run"):
+        if gui.button("♻️ Refresh Cache", type="tertiary"):
+            if gui.session_state.get("check_document_updates"):
+                unsaved_state = {}
+            else:
+                unsaved_state = dict(check_document_updates=True)
+            page.submit_and_redirect(unsaved_state=unsaved_state)
 
 
 def doc_extract_selector(current_user: AppUser | None):
     from recipes.DocExtract import DocExtractPage
+
     from daras_ai_v2.workflow_url_input import workflow_url_input
 
     gui.write("###### Create Synthetic Data")

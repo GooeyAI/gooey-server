@@ -1910,9 +1910,9 @@ class BasePage:
         pass
 
     def submit_and_redirect(
-        self, unsaved_model_state: dict[str, typing.Any] = None
+        self, unsaved_state: dict[str, typing.Any] = None
     ) -> typing.NoReturn | None:
-        sr = self.on_submit(unsaved_model_state=unsaved_model_state)
+        sr = self.on_submit(unsaved_state=unsaved_state)
         if not sr:
             return
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
@@ -1942,11 +1942,11 @@ class BasePage:
         )
         raise gui.RedirectException(pr.get_app_url())
 
-    def on_submit(self, unsaved_model_state: dict[str, typing.Any] = None):
+    def on_submit(self, unsaved_state: dict[str, typing.Any] = None):
         sr = self.create_and_validate_new_run(enable_rate_limits=True)
         if not sr:
             return
-        self.call_runner_task(sr, unsaved_model_state=unsaved_model_state)
+        self.call_runner_task(sr, unsaved_state=unsaved_state)
         return sr
 
     def should_submit_after_login(self) -> bool:
@@ -2062,7 +2062,7 @@ class BasePage:
         self,
         sr: SavedRun,
         deduct_credits: bool = True,
-        unsaved_model_state: dict[str, typing.Any] = None,
+        unsaved_state: dict[str, typing.Any] = None,
     ):
         from celeryapp.tasks import runner_task
 
@@ -2072,7 +2072,7 @@ class BasePage:
             run_id=sr.run_id,
             uid=sr.uid,
             channel=self.realtime_channel_name(sr.run_id, sr.uid),
-            unsaved_state=self._unsaved_state() | (unsaved_model_state or {}),
+            unsaved_state=self._unsaved_state() | (unsaved_state or {}),
             deduct_credits=deduct_credits,
         )
 

@@ -8,27 +8,27 @@ from time import time
 import gooey_gui as gui
 import requests
 import sentry_sdk
-from django.db.models import Sum
-from django.utils import timezone
-from fastapi import HTTPException
-from loguru import logger
-
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
-from bots.models import SavedRun, Platform, Workflow
-from celeryapp.celeryconfig import app
+from bots.models import Platform, SavedRun, Workflow
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.base import StateKeys, BasePage
+from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
+from django.db.models import Sum
+from django.utils import timezone
+from fastapi import HTTPException
 from gooeysite.bg_db_conn import db_middleware
+from loguru import logger
 from payments.auto_recharge import (
-    should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
+    should_attempt_auto_recharge,
 )
 from workspaces.widgets import set_current_workspace
+
+from celeryapp.celeryconfig import app
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -61,12 +61,7 @@ def runner_task(
     error_msg = None
 
     @db_middleware
-    def save_on_step(
-        yield_val: str | tuple[str, dict] = None,
-        *,
-        done: bool = False,
-        sr_session_state: dict[str, typing.Any],
-    ):
+    def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
         if isinstance(yield_val, tuple):
             run_status, extra_output = yield_val
         else:
@@ -97,9 +92,13 @@ def runner_task(
 
         # send outputs to ui
         gui.realtime_push(channel, output)
-        # save to db
         # dont save unsaved_state
-        page.dump_state_to_sr(sr_session_state | output, sr)
+        saved_state = gui.session_state | output
+        if unsaved_state:
+            for k in unsaved_state:
+                saved_state.pop(k, None)
+        # save to db
+        page.dump_state_to_sr(saved_state, sr)
 
     page = page_cls(
         user=AppUser.objects.get(id=user_id),
@@ -109,13 +108,12 @@ def runner_task(
     sr = page.current_sr
     set_current_workspace(page.request.session, int(sr.workspace_id))
     threadlocal.saved_run = sr
-    original_state = sr.to_dict()
-    gui.set_session_state(original_state | (unsaved_state or {}))
+    gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
 
     try:
-        save_on_step(sr_session_state=original_state)
+        save_on_step()
         for val in page.main(sr, gui.session_state):
-            save_on_step(val, sr_session_state=original_state)
+            save_on_step(val)
 
     # render errors nicely
     except Exception as e:
@@ -137,7 +135,7 @@ def runner_task(
 
     # save everything, mark run as completed
     finally:
-        save_on_step(done=True, sr_session_state=original_state)
+        save_on_step(done=True)
         threadlocal.saved_run = None
 
     post_runner_tasks.delay(sr.id)
