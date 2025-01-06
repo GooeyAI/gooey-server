@@ -43,7 +43,7 @@ class WorkspaceInviteInline(admin.TabularInline):
     model = models.WorkspaceInvite
     extra = 0
     autocomplete_fields = WorkspaceInviteAdmin.autocomplete_fields
-    readonly_fields = ["auto_accepted", "created_at", "updated_at"]
+    readonly_fields = ["auto_accepted", "clicks", "created_at", "updated_at"]
     ordering = ["status", "-created_at"]
 
 
