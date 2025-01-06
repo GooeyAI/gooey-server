@@ -13,7 +13,15 @@ THRESHOLDS = [
 
 def get_relative_time(timestamp: datetime) -> str:
     diff = timezone.now() - timestamp
+
+    if abs(diff) < timedelta(seconds=3):
+        return "Just now"
+
     for threshold, unit in THRESHOLDS:
-        if diff >= threshold:
-            return f"{round(diff / threshold)}{unit} ago"
+        if abs(diff) >= threshold:
+            value = round(diff / threshold)
+            return (
+                f"{value}{unit} ago" if diff > timedelta() else f"in {abs(value)}{unit}"
+            )
+
     return "Just now"

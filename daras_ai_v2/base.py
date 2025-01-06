@@ -70,6 +70,7 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
+from daras_ai_v2.utils import get_relative_time
 
 DEFAULT_META_IMG = (
     # Small
@@ -357,7 +358,11 @@ class BasePage:
                     with gui.nav_item(url, active=tab == self.tab):
                         gui.html(tab.title)
 
-            if self.current_pr and not self.current_pr.is_root():
+            if (
+                self.current_pr
+                and not self.current_pr.is_root()
+                and self.tab == RecipeTabs.run
+            ):
                 with gui.div(
                     className="container-margin-reset d-none d-md-block",
                     style=dict(
