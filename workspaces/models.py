@@ -639,7 +639,7 @@ class WorkspaceInvite(models.Model):
         self.auto_accepted = auto_accepted
 
         self.full_clean()
-        self.save(update_fields=["status", "updated_by", "auto_accepted"])
+        self.save(update_fields=["status", "updated_by", "auto_accepted", "updated_at"])
 
         return membership, created
 
