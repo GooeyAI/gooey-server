@@ -6,7 +6,7 @@ import json
 import math
 import typing
 import uuid
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from enum import Enum
 from functools import cached_property
 from itertools import pairwise
@@ -15,29 +15,45 @@ from time import sleep
 
 import gooey_gui as gui
 import sentry_sdk
+from app_users.models import AppUser, AppUserTransaction
+from daras_ai.image_input import truncate_text_words
+from daras_ai.text_format import format_number_with_suffix
 from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
+from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
+from functions.recipe_functions import (
+    LLMTool,
+    call_recipe_functions,
+    functions_input,
+    get_tools_from_state,
+    is_functions_enabled,
+    render_called_functions,
+)
 from furl import furl
+from payments.auto_recharge import (
+    run_auto_recharge_gracefully,
+    should_attempt_auto_recharge,
+)
 from pydantic import BaseModel, Field, ValidationError
+from routers.root import RecipeTabs
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
+from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.widgets import get_current_workspace, set_current_workspace
 
-from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
-    SavedRun,
     PublishedRun,
     PublishedRunVersion,
     PublishedRunVisibility,
-    Workflow,
     RetentionPolicy,
+    SavedRun,
+    Workflow,
 )
-from daras_ai.image_input import truncate_text_words
-from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -49,27 +65,11 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
+from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.urls import paginate_queryset, paginate_button
+from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.variables_widget import variables_input
-from functions.models import RecipeFunction, FunctionTrigger, VariableSchema
-from functions.recipe_functions import (
-    functions_input,
-    call_recipe_functions,
-    is_functions_enabled,
-    render_called_functions,
-    LLMTool,
-    get_tools_from_state,
-)
-from payments.auto_recharge import (
-    should_attempt_auto_recharge,
-    run_auto_recharge_gracefully,
-)
-from routers.root import RecipeTabs
-from workspaces.models import Workspace, WorkspaceMembership
-from workspaces.widgets import get_current_workspace, set_current_workspace
 
 DEFAULT_META_IMG = (
     # Small
@@ -499,7 +499,7 @@ class BasePage:
             )
 
             if self.tab == RecipeTabs.run:
-                if self.request.user and not self.request.user.is_anonymous:
+                if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 self._render_share_button()
                 self._render_save_button()
@@ -649,11 +649,11 @@ class BasePage:
                 className="mb-0 px-3 px-lg-4",
                 type="primary",
             ):
-                if not self.request.user or self.request.user.is_anonymous:
-                    self._publish_for_anonymous_user()
-                else:
+                if self.is_logged_in():
                     self.clear_publish_form()
                     ref.set_open(True)
+                else:
+                    self._publish_for_anonymous_user()
 
             if not ref.is_open:
                 return
@@ -677,7 +677,7 @@ class BasePage:
         Note: all input keys in this method should start with `published_run_*`
         (see: method clear_publish_form)
         """
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         sr = self.current_sr
         pr = self.current_pr
@@ -751,7 +751,7 @@ class BasePage:
                 className="mt-1",
             )
             gui.write("Description", className="fs-5 container-margin-reset")
-            published_run_description = gui.text_input(
+            published_run_description = gui.text_area(
                 "",
                 key="published_run_description",
                 value=notes,
@@ -925,7 +925,7 @@ class BasePage:
             return False
 
     def _saved_options_modal(self):
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
@@ -1003,7 +1003,7 @@ class BasePage:
             self._render_version_history()
 
     def _unsaved_options_modal(self):
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         gui.write(
             "Like this AI workflow? Duplicate and then customize it for your use case."
@@ -1116,7 +1116,7 @@ class BasePage:
         tabs = [RecipeTabs.run, RecipeTabs.examples, RecipeTabs.run_as_api]
         if self.request.user:
             tabs.extend([RecipeTabs.history])
-        if self.request.user and not self.request.user.is_anonymous:
+        if self.is_logged_in():
             tabs.extend([RecipeTabs.saved])
         return tabs
 
@@ -1916,7 +1916,7 @@ class BasePage:
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         updated_count = SavedRun.objects.filter(
             id=self.current_sr.id,
@@ -1948,17 +1948,24 @@ class BasePage:
         return sr
 
     def should_submit_after_login(self) -> bool:
-        return bool(
-            self.request.query_params.get(SUBMIT_AFTER_LOGIN_Q)
-            and self.request.user
-            and not self.request.user.is_anonymous
-        )
+        should_submit = bool(self.request.query_params.get(SUBMIT_AFTER_LOGIN_Q))
+
+        if should_submit:
+            # if the user is already logged in, then submit the run, otherwise ignore this flag
+            return self.is_logged_in()
+
+        # if the user is not logged in and the error is due to insufficient credits,
+        # then flag to submit the run after the user logs in
+        if (
+            self.current_sr.error_type == InsufficientCredits.__name__
+            and not self.is_logged_in()
+        ):
+            self.request.query_params[SUBMIT_AFTER_LOGIN_Q] = "1"
+            raise gui.QueryParamsRedirectException(self.request.query_params)
 
     def should_publish_after_login(self) -> bool:
         return bool(
-            self.request.query_params.get(PUBLISH_AFTER_LOGIN_Q)
-            and self.request.user
-            and not self.request.user.is_anonymous
+            self.request.query_params.get(PUBLISH_AFTER_LOGIN_Q) and self.is_logged_in()
         )
 
     def create_and_validate_new_run(
@@ -2065,38 +2072,6 @@ class BasePage:
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
-
-    def generate_credit_error_message(self, run_id, uid) -> str:
-        account_url = furl(settings.APP_BASE_URL) / "account/"
-        if self.request.user.is_anonymous:
-            account_url.query.params["next"] = self.app_url(
-                run_id=run_id,
-                uid=uid,
-                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
-            )
-            # language=HTML
-            error_msg = f"""
-<p data-{SUBMIT_AFTER_LOGIN_Q}>
-Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
-</p>
-
-You’ll receive {settings.VERIFIED_EMAIL_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
-and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
-            """
-        else:
-            # language=HTML
-            error_msg = f"""
-<p>
-Doh! You’re out of Gooey.AI credits.
-</p>
-
-<p>
-Please <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
-</p>
-
-We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
-            """
-        return error_msg
 
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
@@ -2245,6 +2220,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
             raise gui.RedirectException(self.get_auth_url(next_url))
+
+    def is_logged_in(self) -> bool:
+        return bool(self.request.user and not self.request.user.is_anonymous)
 
     def get_auth_url(self, next_url: str | None = None) -> str:
         from routers.root import login
@@ -2436,7 +2414,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         gui.write("#### 🎁 Example Response")
         gui.json(response_body, expanded=True)
 
-        if not self.request.user or self.request.user.is_anonymous:
+        if not self.is_logged_in():
             gui.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
