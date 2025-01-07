@@ -42,7 +42,7 @@ def bulk_documents_uploader(
     accept: typing.Iterable[str] = None,
     help: str | None = None,
 ) -> list[str]:
-    gui.write(label, className="gui-input", help=help)
+    gui.write(label, className="gui-input", help=help, unsafe_allow_html=True)
     documents = gui.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
