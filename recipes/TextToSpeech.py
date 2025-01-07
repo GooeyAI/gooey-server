@@ -4,6 +4,8 @@ import typing
 
 import gooey_gui as gui
 import requests
+from pydantic import BaseModel, Field
+
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai.text_format import unmarkdown
@@ -28,7 +30,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
 )
 from managed_secrets.models import ManagedSecret
-from pydantic import BaseModel, Field
 from workspaces.models import Workspace
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -440,7 +441,9 @@ class TextToSpeechPage(BasePage):
                     workspace=self.current_workspace, name=api_key_or_name
                 )
             except (Workspace.DoesNotExist, ManagedSecret.DoesNotExist):
-                state.pop("elevenlabs_api_key", None)  # avoid saving raw api keys
+                # avoid saving raw api keys
+                state.pop("elevenlabs_api_key", None)
+                gui.session_state.pop("elevenlabs_api_key", None)
                 return api_key_or_name, True
             else:
                 managed_secret.load_value()
