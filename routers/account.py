@@ -122,7 +122,7 @@ def profile_route(request: Request):
                     request.user.get_or_create_personal_workspace()[0].id
                 )
                 gui.rerun()
-        profile_tab(request)
+        profile_tab(request, current_workspace)
     url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
@@ -266,8 +266,8 @@ def billing_tab(request: Request, workspace: Workspace):
     return billing_page(workspace=workspace, user=request.user)
 
 
-def profile_tab(request: Request):
-    return edit_user_profile_page(user=request.user)
+def profile_tab(request: Request, workspace: Workspace):
+    return edit_user_profile_page(workspace=workspace)
 
 
 def all_saved_runs_tab(request: Request):
@@ -329,11 +329,11 @@ def all_saved_runs_tab(request: Request):
         return
 
     if workspace.is_personal:
-        if request.user.handle:
+        if handle := request.user.get_handle():
             gui.caption(
                 f"""
                 All your Saved workflows are here, with public ones listed on your \
-                profile page at {request.user.handle.get_app_url()}.
+                profile page at {handle.get_app_url()}.
                 """
             )
         else:

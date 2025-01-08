@@ -29,6 +29,9 @@ from daras_ai_v2.meta_content import (
 )
 from handles.models import Handle
 
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
 
 class ContributionsSummary(typing.NamedTuple):
     total: int
@@ -41,13 +44,15 @@ class PublicRunsSummary(typing.NamedTuple):
 
 
 def get_meta_tags_for_profile(user: AppUser):
-    assert user.handle
+    handle = user.get_handle()
+    assert handle
+
     return raw_build_meta_tags(
-        url=user.handle.get_app_url(),
+        url=handle.get_app_url(),
         title=_get_meta_title_for_profile(user),
         description=_get_meta_description_for_profile(user) or None,
         image=get_profile_image(user),
-        canonical_url=user.handle.get_app_url(),
+        canonical_url=handle.get_app_url(),
     )
 
 
@@ -58,7 +63,7 @@ def user_profile_page(request: Request, user: AppUser):
     user_profile_main_content(user)
 
 
-def user_profile_header(request, user: AppUser):
+def user_profile_header(request: Request, user: AppUser):
     if user.banner_url:
         with _banner_image_div(user.banner_url, className="my-3"):
             pass
@@ -99,8 +104,9 @@ def user_profile_header(request, user: AppUser):
                 ):
                     gui.html(f"{icons.edit} Edit Profile")
 
-        with gui.tag("p", className="lead text-secondary mb-0"):
-            gui.html(escape_html(user.handle and user.handle.name or ""))
+        if handle := user.get_handle():
+            with gui.tag("p", className="lead text-secondary mb-0"):
+                gui.html(escape_html(handle and handle.name or ""))
 
         if user.bio:
             with gui.div(className="mt-2 text-secondary"):
@@ -254,19 +260,24 @@ def _set_is_uploading_photo(val: bool):
     gui.session_state["_uploading_photo"] = val
 
 
-def edit_user_profile_page(user: AppUser):
-    _edit_user_profile_header(user)
-    _edit_user_profile_banner(user)
+def edit_user_profile_page(workspace: "Workspace"):
+    assert workspace.is_personal
+
+    _edit_user_profile_header(workspace)
+    _edit_user_profile_banner(workspace)
 
     colspec = [2, 10] if not _is_uploading_photo() else [6, 6]
     photo_col, form_col = gui.columns(colspec)
     with photo_col:
-        _edit_user_profile_photo_section(user)
+        _edit_user_profile_photo_section(workspace)
     with form_col:
-        _edit_user_profile_form_section(user)
+        _edit_user_profile_form_section(workspace)
 
 
-def _edit_user_profile_header(user: AppUser):
+def _edit_user_profile_header(workspace: "Workspace"):
+    user = workspace.created_by
+    handle = workspace.handle or user.handle  # TODO: remove fallback
+
     gui.write("# Update your Profile")
 
     with gui.div(className="mb-3"):
@@ -276,18 +287,18 @@ def _edit_user_profile_header(user: AppUser):
             with gui.tag("span"):
                 gui.html(
                     str(furl(settings.APP_BASE_URL) / "/")
-                    + f"<strong>{escape_html(user.handle.name) if user.handle else 'your-username'}</strong> ",
+                    + f"<strong>{escape_html(handle.name) if handle else 'your-username'}</strong> ",
                 )
 
-        if user.handle:
+        if handle:
             copy_to_clipboard_button(
                 f"{icons.copy_solid} Copy",
-                value=user.handle.get_app_url(),
+                value=handle.get_app_url(),
                 type="tertiary",
                 className="m-0",
             )
             with gui.link(
-                to=user.handle.get_app_url(),
+                to=handle.get_app_url(),
                 className="btn btn-theme btn-tertiary m-0",
             ):
                 gui.html(f"{icons.preview} Preview")
@@ -314,7 +325,9 @@ def _banner_image_div(url: str | None, **props):
     return gui.div(style=style, className=className)
 
 
-def _edit_user_profile_banner(user: AppUser):
+def _edit_user_profile_banner(workspace: "Workspace"):
+    user = workspace.created_by
+
     def _is_uploading_banner_photo() -> bool:
         return bool(gui.session_state.get("_uploading_banner_photo"))
 
@@ -383,7 +396,9 @@ def _edit_user_profile_banner(user: AppUser):
                     gui.rerun()
 
 
-def _edit_user_profile_photo_section(user: AppUser):
+def _edit_user_profile_photo_section(workspace: "Workspace"):
+    user = workspace.created_by
+
     with gui.div(className="w-100 h-100 d-flex align-items-center flex-column"):
         if _is_uploading_photo():
             image_div = gui.div(
@@ -428,23 +443,25 @@ def _edit_user_profile_photo_section(user: AppUser):
                     gui.rerun()
 
 
-def _edit_user_profile_form_section(user: AppUser):
+def _edit_user_profile_form_section(workspace: "Workspace"):
+    user = workspace.created_by
+    current_handle = workspace.handle or user.handle  # TODO: remove fallback
     user.display_name = gui.text_input("Name", value=user.display_name)
 
     handle_style: dict[str, str] = {}
-    if handle := gui.text_input(
+    if new_handle := gui.text_input(
         "Username",
-        value=(user.handle and user.handle.name or ""),
+        value=current_handle and current_handle.name or "",
         style=handle_style,
     ):
-        if not user.handle or user.handle.name != handle:
+        if not current_handle or current_handle.name != new_handle:
             try:
-                Handle(name=handle).full_clean()
+                Handle(name=new_handle).full_clean()
             except ValidationError as e:
                 gui.error(e.messages[0], icon="")
                 handle_style["border"] = "1px solid var(--bs-danger)"
             else:
-                gui.success("Handle is available", icon="")
+                gui.success(f"Handle `@{new_handle}` is available", icon="")
                 handle_style["border"] = "1px solid var(--bs-success)"
 
     if email := user.email:
@@ -475,21 +492,36 @@ def _edit_user_profile_form_section(user: AppUser):
     ):
         try:
             with transaction.atomic():
-                if handle and not user.handle:
+                if new_handle and not current_handle:
                     # user adds a new handle
-                    user.handle = Handle(name=handle)
-                    user.handle.save()
-                elif handle and user.handle and user.handle.name != handle:
+                    workspace.handle = Handle(name=new_handle)
+                    workspace.handle.save()
+                elif (
+                    new_handle and current_handle and current_handle.name != new_handle
+                ):
                     # user changes existing handle
-                    user.handle.name = handle
-                    user.handle.save()
-                elif not handle and user.handle:
+                    if workspace.handle:
+                        workspace.handle.name = new_handle
+                        workspace.handle.save()
+                    elif user.handle:
+                        # TODO: remove this once all handles are migrated
+                        user.handle.delete()
+                        user.handle = None
+                        workspace.handle = Handle(name=new_handle)
+                        workspace.handle.save()
+                elif not new_handle and current_handle:
                     # user removes existing handle
-                    user.handle.delete()
-                    user.handle = None
-
+                    if workspace.handle:
+                        workspace.handle.delete()
+                        workspace.handle = None
+                    elif user.handle:
+                        # TODO: remove this once all handles are migrated
+                        user.handle.delete()
+                        user.handle = None
                 user.full_clean()
+                workspace.full_clean()
                 user.save()
+                workspace.save()
         except (ValidationError, IntegrityError) as e:
             for m in e.messages:
                 gui.error(m, icon="⚠️")
@@ -498,7 +530,13 @@ def _edit_user_profile_form_section(user: AppUser):
 
 
 def _get_meta_title_for_profile(user: AppUser) -> str:
-    title = user.display_name if user.display_name else user.handle.name
+    if user.display_name:
+        title = user.display_name
+    elif handle := user.get_handle():
+        title = handle.name
+    else:
+        title = ""
+
     if user.company:
         title += f" - {user.company[:15]}"
 
@@ -516,7 +554,8 @@ def _get_meta_description_for_profile(user: AppUser) -> str:
     if description:
         description += f" {META_SEP} "
 
-    description += f"{user.handle.name} has "
+    if handle := user.get_handle():
+        description += f"{handle.name} has "
 
     public_runs_summary = get_public_runs_summary(user)
     contributions_summary = get_contributions_summary(user)

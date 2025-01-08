@@ -643,7 +643,14 @@ def recipe_or_handle_or_static(
 
 def render_handle_page(request: Request, name: str):
     handle = Handle.objects.get_by_name(name)
-    if handle.has_user:
+    if handle.has_workspace and handle.workspace.is_personal:
+        user = handle.workspace.created_by
+    elif handle.has_user:
+        user = handle.user
+    else:
+        user = None
+
+    if user:
         with page_wrapper(request):
             user_profile_page(request, handle.user)
         return dict(meta=get_meta_tags_for_profile(handle.user))

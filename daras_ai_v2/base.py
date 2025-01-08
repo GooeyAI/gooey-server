@@ -446,7 +446,8 @@ class BasePage:
             ):
                 if user := self.current_sr_user:
                     full_name = user.full_name()
-                    link = user.handle and user.handle.get_app_url()
+                    handle = user.get_handle()
+                    link = handle and handle.get_app_url()
                 else:
                     full_name = "Deleted User"
                     link = None
@@ -1499,8 +1500,9 @@ class BasePage:
             name = workspace.created_by.display_name
         else:
             name = workspace.display_name()
-        if show_as_link and workspace.is_personal and workspace.created_by.handle:
-            link = workspace.created_by.handle.get_app_url()
+        if show_as_link and workspace.is_personal:
+            handle = workspace.handle or workspace.created_by.handle
+            link = handle and handle.get_app_url()
         else:
             link = None
         return cls._render_author(
@@ -1526,8 +1528,8 @@ class BasePage:
             return
         photo = user.photo_url
         name = user.full_name()
-        if show_as_link and user.handle:
-            link = user.handle.get_app_url()
+        if show_as_link and (handle := user.get_handle()):
+            link = handle.get_app_url()
         else:
             link = None
         return cls._render_author(
