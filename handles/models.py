@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
@@ -118,14 +119,25 @@ class Handle(models.Model):
     def __str__(self):
         return f"@{self.name}"
 
-    def clean(self):
+    def _validate_exclusive(self):
+        if (
+            self.has_workspace
+            and self.has_user
+            and self.workspace.created_by_id == self.user.id
+        ):
+            # TODO: remove this once all handles are migrated
+            return
+
         lookups = [
             self.has_redirect,
+            self.has_workspace,
             self.has_user,
         ]
         if sum(lookups) > 1:
             raise ValidationError("A handle must be exclusive")
 
+    def clean(self):
+        self._validate_exclusive()
         super().clean()
 
     def save(self, *args, **kwargs):
@@ -134,9 +146,19 @@ class Handle(models.Model):
 
     @property
     def has_user(self):
+        warnings.warn("deprecated, use `has_workspace` instead", DeprecationWarning)
         try:
             self.user
         except Handle.user.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
+
+    @property
+    def has_workspace(self):
+        try:
+            self.workspace
+        except Handle.workspace.RelatedObjectDoesNotExist:
             return False
         else:
             return True

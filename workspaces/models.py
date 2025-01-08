@@ -112,8 +112,6 @@ class Workspace(SafeDeleteModel):
         related_name="created_workspaces",
     )
 
-    photo_url = CustomURLField(null=True, blank=True)
-    description = models.TextField(blank=True, default="")
     domain_name = models.CharField(
         max_length=30,
         blank=True,
@@ -124,6 +122,17 @@ class Workspace(SafeDeleteModel):
             validate_workspace_domain_name,
         ],
     )
+
+    # profile
+    handle = models.OneToOneField(
+        "handles.Handle",
+        on_delete=models.SET_NULL,
+        related_name="workspace",
+        null=True,
+        blank=True,
+    )
+    photo_url = CustomURLField(null=True, blank=True)
+    description = models.TextField(blank=True, default="")
 
     # billing
     balance = models.IntegerField("bal", default=0)

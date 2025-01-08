@@ -129,6 +129,7 @@ class AppUser(models.Model):
         blank=True,
         null=True,
         related_name="user",
+        help_text="[deprecated] use workspace.handle instead",
     )
 
     banner_url = CustomURLField(blank=True, default="")
@@ -225,11 +226,12 @@ class AppUser(models.Model):
         else:
             self.balance = 0
 
-        if handle := Handle.create_default_for_user(user=self):
-            self.handle = handle
-
         self.save()
-        self.get_or_create_personal_workspace()
+        workspace, _ = self.get_or_create_personal_workspace()
+
+        if handle := Handle.create_default_for_user(user=self):
+            workspace.handle = handle
+            workspace.save()
 
         return self
 
@@ -247,6 +249,12 @@ class AppUser(models.Model):
                 memberships__user=self, memberships__deleted__isnull=True
             ).order_by("-is_personal", "-created_at")
         ) or [self.get_or_create_personal_workspace()[0]]
+
+    def get_handle(self) -> Handle | None:
+        if self.handle:
+            return self.handle
+        workspace, _ = self.get_or_create_personal_workspace()
+        return workspace.handle
 
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()

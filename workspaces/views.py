@@ -464,7 +464,7 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                 with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
                         name = m.user.full_name(current_user=current_member.user)
-                        if m.user.handle_id:
+                        if handle := m.user.get_handle():
                             with gui.link(to=m.user.handle.get_app_url()):
                                 gui.html(html_lib.escape(name))
                         else:
