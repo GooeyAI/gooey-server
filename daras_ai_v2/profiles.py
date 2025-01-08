@@ -363,8 +363,8 @@ def _edit_user_profile_banner(user: AppUser):
             with gui.div(className="position-absolute bottom-0 end-0"):
                 if user.banner_url and gui.button(
                     f"{icons.clear} Clear",
-                    type="tertiary",
-                    className="text-dark",
+                    type="secondary",
+                    className="text-dark me-2",
                 ):
                     user.banner_url = ""
                     user.save(update_fields=["banner_url"])
