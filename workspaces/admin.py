@@ -54,6 +54,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "display_name",
         "is_personal",
         "created_by",
+        "handle",
         "is_paying",
         "balance",
         "subscription",
@@ -73,6 +74,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "name",
         "description",
         "domain_name",
+        "handle",
         "created_by",
         "is_personal",
         ("is_paying", "stripe_customer_id"),
@@ -81,7 +83,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         ("created_at", "updated_at"),
         "open_in_stripe",
     ]
-    search_fields = ["name", "created_by__display_name", "domain_name"]
+    search_fields = ["name", "created_by__display_name", "domain_name", "handle__name"]
     readonly_fields = [
         "is_personal",
         "created_at",
@@ -93,7 +95,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     ]
     inlines = [WorkspaceMembershipInline, WorkspaceInviteInline]
     ordering = ["-created_at"]
-    autocomplete_fields = ["created_by"]
+    autocomplete_fields = ["created_by", "handle"]
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         self.obj = obj
