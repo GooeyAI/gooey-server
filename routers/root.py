@@ -652,8 +652,8 @@ def render_handle_page(request: Request, name: str):
 
     if user:
         with page_wrapper(request):
-            user_profile_page(request, handle.user)
-        return dict(meta=get_meta_tags_for_profile(handle.user))
+            user_profile_page(request, user)
+        return dict(meta=get_meta_tags_for_profile(user))
     elif handle.has_redirect:
         return RedirectResponse(
             handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}
