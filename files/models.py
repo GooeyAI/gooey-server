@@ -1,5 +1,6 @@
 from django.db import models
 from django.template.defaultfilters import filesizeformat
+from loguru import logger
 
 
 class FileMetadata(models.Model):
@@ -16,6 +17,16 @@ class FileMetadata(models.Model):
             ret += f" - {filesizeformat(self.total_bytes)}"
         if self.etag:
             ret += f" - {self.etag}"
+        return ret
+
+    def __eq__(self, other):
+        ret = bool(
+            isinstance(other, FileMetadata)
+            # avoid null comparisions -- when metadata is not available and hence not comparable
+            and (self.etag or other.etag or self.total_bytes or other.total_bytes)
+            and self.astuple() == other.astuple()
+        )
+        logger.debug(f"checking: `{self}` == `{other}` ({ret})")
         return ret
 
     def astuple(self) -> tuple:

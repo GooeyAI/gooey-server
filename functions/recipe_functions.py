@@ -148,8 +148,11 @@ def call_recipe_functions(
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Iterable[str]:
+    tools = list(get_tools_from_state(state, trigger))
+    if not tools:
+        return
     yield f"Running {trigger.name} hooks..."
-    for tool in get_tools_from_state(state, trigger):
+    for tool in tools:
         tool.bind(
             saved_run=saved_run,
             workspace=workspace,
