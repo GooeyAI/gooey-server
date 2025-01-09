@@ -344,17 +344,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         gui.text_area(
             """
-            #### 📝 Instructions
+            #### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions
             """,
             key="bot_script",
             height=300,
             help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
         )
 
-        language_model_selector(label="#### 🧠 Language Model")
+        language_model_selector(
+            label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
+        )
 
         bulk_documents_uploader(
-            "#### 📄 Knowledge",
+            """ 
+            #### <i class="fa-light fa-books" style="fontSize:20px"></i> Knowledge
+            """,
             accept=["audio/*", "application/*", "video/*", "text/*"],
             help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
         )
