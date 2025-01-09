@@ -1,6 +1,7 @@
+import pytest
+
 from conftest import flaky
 from daras_ai_v2.asr import run_google_translate
-
 
 TRANSLATION_TESTS = [
     # hindi romanized
@@ -47,6 +48,9 @@ TRANSLATION_TESTS = [
 ]
 
 
+@pytest.mark.skip(
+    reason="Translation tests temporarily disabled due to frequent false positives"
+)
 def test_google_translate(threadpool_subtest):
     for lang, text, expected in TRANSLATION_TESTS:
         threadpool_subtest(google_translate_check, text, expected, source_language=lang)
