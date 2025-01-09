@@ -560,6 +560,10 @@ class BasePage:
                 for enum in PublishedRunVisibility.choices_for_workspace(
                     self.current_pr.workspace
                 )
+            } | {
+                str(self.current_pr.visibility): PublishedRunVisibility(
+                    self.current_pr.visibility
+                ).help_text(self.current_pr.workspace)
             }
             published_run_visibility = PublishedRunVisibility(
                 int(
