@@ -652,7 +652,7 @@ def render_handle_page(request: Request, name: str):
 
     if user:
         with page_wrapper(request):
-            user_profile_page(request, user)
+            user_profile_page(request, user=user, handle=handle)
         return dict(meta=get_meta_tags_for_profile(user))
     elif handle.has_redirect:
         return RedirectResponse(
