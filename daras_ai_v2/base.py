@@ -557,12 +557,7 @@ class BasePage:
 
             options = {
                 str(enum.value): enum.help_text(self.current_pr.workspace)
-                for enum in [
-                    *PublishedRunVisibility.choices_for_workspace(
-                        self.current_pr.workspace
-                    ),
-                    PublishedRunVisibility(self.current_pr.visibility),
-                ]
+                for enum in PublishedRunVisibility.choices_for_pr(self.current_pr)
             }
             published_run_visibility = PublishedRunVisibility(
                 int(
