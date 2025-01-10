@@ -56,14 +56,14 @@ def get_meta_tags_for_profile(user: AppUser):
     )
 
 
-def user_profile_page(request: Request, user: AppUser):
+def user_profile_page(request: Request, user: AppUser, handle: Handle | None):
     with gui.div(className="mt-3"):
-        user_profile_header(request, user)
+        user_profile_header(request, user=user, handle=handle)
     gui.html("\n<hr>\n")
     user_profile_main_content(user)
 
 
-def user_profile_header(request: Request, user: AppUser):
+def user_profile_header(request: Request, user: AppUser, handle: Handle | None):
     if user.banner_url:
         with _banner_image_div(user.banner_url, className="my-3"):
             pass
@@ -104,9 +104,9 @@ def user_profile_header(request: Request, user: AppUser):
                 ):
                     gui.html(f"{icons.edit} Edit Profile")
 
-        if handle := user.get_handle():
+        if handle:
             with gui.tag("p", className="lead text-secondary mb-0"):
-                gui.html(escape_html(handle and handle.name or ""))
+                gui.html(escape_html(handle.name))
 
         if user.bio:
             with gui.div(className="mt-2 text-secondary"):
