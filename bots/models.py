@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -40,14 +42,14 @@ class PublishedRunVisibility(models.IntegerChoices):
     INTERNAL = 3
 
     @classmethod
-    def choices_for_workspace(
-        cls, workspace: typing.Optional["Workspace"]
-    ) -> typing.Iterable["PublishedRunVisibility"]:
-        if not workspace or workspace.is_personal:
-            return [cls.UNLISTED, cls.PUBLIC]
+    def choices_for_pr(
+        cls, pr: PublishedRun
+    ) -> typing.Iterable[PublishedRunVisibility]:
+        if not pr.workspace or pr.workspace.is_personal:
+            return {cls.UNLISTED, cls.PUBLIC, PublishedRunVisibility(pr.visibility)}
         else:
             # TODO: Add cls.PUBLIC when team-handles are added
-            return [cls.UNLISTED, cls.INTERNAL]
+            return {cls.UNLISTED, cls.INTERNAL, PublishedRunVisibility(pr.visibility)}
 
     @classmethod
     def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
