@@ -8,6 +8,7 @@ import multiprocessing
 import re
 import tempfile
 import typing
+import unicodedata
 from functools import partial
 from time import time
 
@@ -197,6 +198,7 @@ def get_top_k_references(
     s = time()
     search_result = query_vespa(
         request.search_query,
+        request.keyword_query,
         file_ids=vespa_file_ids,
         limit=request.max_references or 100,
         embedding_model=embedding_model,
@@ -245,34 +247,63 @@ def vespa_search_results_to_refs(
 
 def query_vespa(
     search_query: str,
+    keyword_query: str | list[str] | None,
     file_ids: list[str],
     limit: int,
     embedding_model: EmbeddingModels,
     semantic_weight: float = 1.0,
+    threshold: float = 0.7,
+    rerank_count: int = 1000,
 ) -> dict:
-    query_embedding = create_embeddings_cached([search_query], model=embedding_model)[0]
-    if query_embedding is None or not file_ids:
+    if not file_ids:
         return {"root": {"children": []}}
-    file_ids_str = ", ".join(map(repr, file_ids))
-    query = f"select * from {settings.VESPA_SCHEMA} where file_id in (@fileIds) and (userQuery() or ({{targetHits: {limit}}}nearestNeighbor(embedding, q))) limit {limit}"
-    logger.debug(f"Vespa query: {query!r}")
-    if semantic_weight == 1.0:
-        ranking = "semantic"
-    elif semantic_weight == 0.0:
-        ranking = "bm25"
-    else:
-        ranking = "fusion"
-    response = get_vespa_app().query(
-        yql=query,
-        query=search_query,
-        ranking=ranking,
-        body={
-            "ranking.features.query(q)": padded_embedding(query_embedding),
-            "ranking.features.query(semanticWeight)": semantic_weight,
-            "fileIds": file_ids_str,
-        },
+
+    yql = "select * from %(schema)s where file_id in (@fileIds) and " % dict(
+        schema=settings.VESPA_SCHEMA
     )
+    bm25_yql = "( {targetHits: %(hits)i} userInput(@bm25Query) )"
+    semantic_yql = "( {targetHits: %(hits)i, distanceThreshold: %(threshold)f} nearestNeighbor(embedding, queryEmbedding) )"
+
+    if semantic_weight == 0.0:
+        yql += bm25_yql % dict(hits=limit)
+        ranking = "bm25"
+    elif semantic_weight == 1.0:
+        yql += semantic_yql % dict(hits=limit, threshold=threshold)
+        ranking = "semantic"
+    else:
+        yql += (
+            "( "
+            + bm25_yql % dict(hits=rerank_count)
+            + " or "
+            + semantic_yql % dict(hits=rerank_count, threshold=threshold)
+            + " )"
+        )
+        ranking = "fusion"
+
+    body = {"yql": yql, "ranking": ranking, "hits": limit}
+
+    if ranking in ("bm25", "fusion"):
+        if isinstance(keyword_query, list):
+            keyword_query = " ".join(keyword_query)
+        body["bm25Query"] = remove_control_characters(keyword_query or search_query)
+
+    logger.debug(
+        "vespa query " + " ".join(repr(f"{k}={v}") for k, v in body.items()) + " ..."
+    )
+
+    if ranking in ("semantic", "fusion"):
+        query_embedding = create_embeddings_cached(
+            [search_query], model=embedding_model
+        )[0]
+        if query_embedding is None:
+            return {"root": {"children": []}}
+        body["input.query(queryEmbedding)"] = padded_embedding(query_embedding)
+
+    body["fileIds"] = ", ".join(map(repr, file_ids))
+
+    response = get_vespa_app().query(body)
     assert response.is_successful()
+
     return response.get_json()
 
 
@@ -599,6 +630,23 @@ def create_embeddings_in_search_db(
 
 def _sha256(x) -> str:
     return hashlib.sha256(str(x).encode()).hexdigest()
+
+
+def format_embedding_row(
+    doc_id: str,
+    file_id: str,
+    ref: SearchReference,
+    embedding: np.ndarray,
+    created_at: datetime.datetime,
+):
+    return dict(
+        id=doc_id,
+        file_id=file_id,
+        embedding=padded_embedding(embedding),
+        created_at=int(created_at.timestamp() * 1000),
+        title=remove_control_characters(ref["title"]),
+        snippet=remove_control_characters(ref["snippet"]),
+    )
 
 
 def get_embeds_for_doc(
@@ -1063,22 +1111,9 @@ def render_sources_widget(refs: list[SearchReference]):
         )
 
 
-def format_embedding_row(
-    doc_id: str,
-    file_id: str,
-    ref: SearchReference,
-    embedding: np.ndarray,
-    created_at: datetime.datetime,
-):
-    return dict(
-        id=doc_id,
-        file_id=file_id,
-        embedding=padded_embedding(embedding),
-        created_at=int(created_at.timestamp() * 1000),
-        # url=ref["url"].encode("unicode-escape").decode(),
-        # title=ref["title"].encode("unicode-escape").decode(),
-        # snippet=ref["snippet"].encode("unicode-escape").decode(),
-    )
+def remove_control_characters(s):
+    # from https://docs.vespa.ai/en/troubleshooting-encoding.html
+    return "".join(ch for ch in s if unicodedata.category(ch)[0] != "C")
 
 
 EMBEDDING_SIZE = 3072
