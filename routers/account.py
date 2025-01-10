@@ -329,7 +329,7 @@ def all_saved_runs_tab(request: Request):
         return
 
     if workspace.is_personal:
-        if handle := request.user.get_handle():
+        if handle := (workspace.handle or request.user.handle):
             gui.caption(
                 f"""
                 All your Saved workflows are here, with public ones listed on your \
