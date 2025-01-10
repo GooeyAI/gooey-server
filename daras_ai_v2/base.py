@@ -1795,7 +1795,9 @@ class BasePage:
         if not self.functions_in_settings:
             functions_input(self.request.user)
         variables_input(
-            template_keys=self.template_keys, allow_add=is_functions_enabled()
+            template_keys=self.template_keys,
+            allow_add=is_functions_enabled(),
+            exclude=self.fields_to_save(),
         )
 
     @classmethod
