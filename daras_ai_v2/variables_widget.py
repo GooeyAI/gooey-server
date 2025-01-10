@@ -23,6 +23,7 @@ def variables_input(
     description: str = "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with <a href='https://jinja.palletsprojects.com/en/3.1.x/templates/' target='_blank'>Jinja</a>, e.g. `{{ my_variable }}`\n  ",
     key: str = "variables",
     allow_add: bool = False,
+    exclude: typing.Iterable[str] = (),
 ):
     from recipes.BulkRunner import list_view_editor
 
@@ -45,7 +46,7 @@ def variables_input(
     var_names = (
         (template_var_names | set(variables.keys()))
         - set(context_globals().keys())  # dont show global context variables
-        - set(gui.session_state.keys())  # dont show other session state variables
+        - set(exclude)  # used for hiding request/response fields
     )
     pressed_add = False
     if var_names or allow_add:

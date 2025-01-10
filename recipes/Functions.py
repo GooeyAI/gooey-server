@@ -136,6 +136,7 @@ class FunctionsPage(BasePage):
             allow_add=True,
             description="Pass custom parameters to your function and access the parent workflow data. "
             "Variables will be passed down as the first argument to your anonymous JS function.",
+            exclude=self.fields_to_save(),
         )
 
         options = set(gui.session_state.get("secrets") or [])
