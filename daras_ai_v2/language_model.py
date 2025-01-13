@@ -1049,7 +1049,11 @@ def run_openai_chat(
         for entry in messages:
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 entry["role"] = CHATML_ROLE_USER
+
+        # unsupported API options
         max_tokens = NOT_GIVEN
+        response_format_type = None
+        avoid_repetition = False
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
