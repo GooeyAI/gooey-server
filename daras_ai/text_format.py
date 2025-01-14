@@ -1,5 +1,5 @@
 import ast
-
+import re
 import parse
 from markdown_it import MarkdownIt
 
@@ -48,3 +48,25 @@ def format_number_with_suffix(num: int) -> str:
 def unmarkdown(text: str) -> str:
     """markdown to plaintext"""
     return MarkdownIt(renderer_cls=RendererPlain).render(text)
+
+
+def wa_markdown(text: str) -> str:
+    patterns = [
+        (
+            re.compile(r"^(#+)\s+(.*)$", flags=re.MULTILINE),
+            lambda m: f"*{m.group(2)}*",
+        ),  # "# headings" -> "*headings*"
+        (
+            re.compile(r"\*\*(.+?)\*\*"),
+            lambda m: f"*{m.group(1)}*",
+        ),  # "**bold**"" -> "*bold*"
+        (
+            re.compile(r"~~(.+?)~~"),
+            lambda m: f"~{m.group(1)}~",
+        ),  # "~~text~~" -> "~text~"
+    ]
+
+    for pattern, repl in patterns:
+        text = pattern.sub(repl, text)
+
+    return text
