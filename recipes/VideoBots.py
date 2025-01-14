@@ -751,9 +751,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.json(references)
 
         if gui.session_state.get("functions"):
-            prompt_funcs = list(
-                get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
-            )
+            try:
+                prompt_funcs = list(
+                    get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+                )
+            except:
+                prompt_funcs = None
             if prompt_funcs:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
                 for tool in prompt_funcs:

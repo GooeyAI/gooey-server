@@ -502,7 +502,7 @@ def do_check_document_updates(
     metadatas = yield from apply_parallel(
         doc_or_yt_url_to_file_metas,
         lookups.keys(),
-        message="Fetching latest knowlege docs...",
+        message="Fetching latest knowledge docs...",
         max_workers=100,
     )
 
