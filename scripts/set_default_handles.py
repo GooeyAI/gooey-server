@@ -5,6 +5,8 @@ from handles.models import Handle
 
 
 def run():
+    # TODO:update to set handle on workspace
+
     registered_users = AppUser.objects.filter(
         handle__isnull=True,
         is_anonymous=False,
