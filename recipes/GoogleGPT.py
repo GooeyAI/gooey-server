@@ -1,6 +1,9 @@
 import typing
 
 import gooey_gui as gui
+from furl import furl
+from pydantic import BaseModel
+
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -33,9 +36,6 @@ from daras_ai_v2.serp_search_locations import (
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import render_sources_widget
-from furl import furl
-from pydantic import BaseModel
-
 from recipes.DocSearch import (
     DocSearchRequest,
     EmptySearchResults,
@@ -51,8 +51,6 @@ class GoogleGPTPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
-
-    price = 175
 
     sane_defaults = dict(
         search_query="rugs",
@@ -117,6 +115,18 @@ class GoogleGPTPage(BasePage):
         gui.text_area("#### Google Search Query", key="search_query")
         gui.text_input("Search on a specific site *(optional)*", key="site_filter")
 
+        gui.switch(
+            "#####  🕵️‍♀️ Activate Deep Search",
+            help="Download and embed the webpages for enhanced understanding. Slower but powerful.",
+            key="_activate_deep_search",
+            value=bool(gui.session_state.get("embedding_model")),
+        )
+        gui.switch(
+            "##### 💬 Generate Answer",
+            key="_generate_answer",
+            value=bool(gui.session_state.get("task_instructions")),
+        )
+
     def validate_form_v2(self):
         assert gui.session_state.get(
             "search_query", ""
@@ -137,22 +147,37 @@ class GoogleGPTPage(BasePage):
         render_output_with_refs(state, 200)
 
     def render_settings(self):
-        gui.text_area(
-            "### Task Instructions",
-            key="task_instructions",
-            height=300,
-        )
-        gui.write("---")
-        selected_model = language_model_selector()
-        language_model_settings(selected_model)
-        gui.write("---")
+        if gui.session_state.get("_generate_answer"):
+            if gui.session_state.get("task_instructions") is None:
+                gui.session_state["task_instructions"] = self.current_sr.state.get(
+                    "task_instructions", ""
+                )
+            gui.text_area(
+                """
+                ### Instructions
+                Instruct the LLM model on how to interpret the results to create an answer.
+                """,
+                key="task_instructions",
+                height=300,
+            )
+            gui.write("---")
+            selected_model = language_model_selector()
+            language_model_settings(selected_model)
+            gui.write("---")
+        else:
+            gui.session_state["task_instructions"] = None
+
         serp_search_settings()
         gui.write("---")
-        gui.write("##### 🔎 Document Search Settings")
-        query_instructions_widget()
-        cache_knowledge_widget(self)
-        gui.write("---")
-        doc_search_advanced_settings()
+
+        if gui.session_state.get("_activate_deep_search"):
+            gui.write("##### 🔎 Document Search Settings")
+            query_instructions_widget()
+            cache_knowledge_widget(self)
+            gui.write("---")
+            doc_search_advanced_settings()
+        else:
+            gui.session_state["embedding_model"] = None
 
     def related_workflows(self) -> list:
         from recipes.DocSearch import DocSearchPage
@@ -245,28 +270,37 @@ class GoogleGPTPage(BasePage):
         if not link_titles:
             raise EmptySearchResults(response.final_search_query)
 
-        # run vector search on links
-        response.references = yield from get_top_k_references(
-            DocSearchRequest.parse_obj(
-                {
-                    **request.dict(),
-                    "documents": list(link_titles.keys()),
-                    "search_query": request.search_query,
-                },
-            ),
-            is_user_url=False,
-            current_user=self.request.user,
-        )
-
-        # add pretty titles to references
-
-        for ref in response.references:
-            key = furl(ref["url"]).remove(fragment=True).url
-            ref["title"] = link_titles.get(key, "")
+        if request.embedding_model:
+            # run vector search on links
+            response.references = yield from get_top_k_references(
+                DocSearchRequest.parse_obj(
+                    {
+                        **request.dict(),
+                        "documents": list(link_titles.keys()),
+                        "search_query": request.search_query,
+                    },
+                ),
+                is_user_url=False,
+                current_user=self.request.user,
+            )
+            # add pretty titles to references
+            for ref in response.references:
+                key = furl(ref["url"]).remove(fragment=True).url
+                ref["title"] = link_titles.get(key, "")
+        else:
+            response.references = [
+                SearchReference(url=item.url, title=item.title, snippet=item.snippet)
+                for item in links
+            ]
 
         # empty search result, abort!
         if not response.references:
             raise EmptySearchResults(request.search_query)
+
+        if not request.task_instructions:
+            response.final_prompt = ""
+            response.output_text = []
+            return
 
         response.final_prompt = ""
         # add search results to the prompt
@@ -290,3 +324,11 @@ class GoogleGPTPage(BasePage):
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
         )
+
+    def get_raw_price(self, state: dict) -> float:
+        price = 1
+        if state.get("embedding_model"):
+            price += 87
+        if state.get("task_instructions"):
+            price += 87
+        return price
