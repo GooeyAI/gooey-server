@@ -115,16 +115,29 @@ class GoogleGPTPage(BasePage):
         gui.text_area("#### Google Search Query", key="search_query")
         gui.text_input("Search on a specific site *(optional)*", key="site_filter")
 
-        gui.switch(
-            "#####  🕵️‍♀️ Activate Deep Search",
-            help="Download and embed the webpages for enhanced understanding. Slower but powerful.",
-            key="_activate_deep_search",
-            value=bool(gui.session_state.get("embedding_model")),
-        )
-        gui.switch(
+        if gui.switch(
             "##### 💬 Generate Answer",
             key="_generate_answer",
             value=bool(gui.session_state.get("task_instructions")),
+        ):
+            if gui.session_state.get("task_instructions") is None:
+                gui.session_state["task_instructions"] = self.current_sr.state.get(
+                    "task_instructions", ""
+                )
+            gui.text_area("### Instructions", key="task_instructions", height=300)
+            gui.caption(
+                "Instruct the LLM model on how to interpret the results to create an answer."
+            )
+        else:
+            gui.session_state["task_instructions"] = None
+
+        gui.switch(
+            "#####  🕵️‍♀️ Activate Deep Search",
+            key="_activate_deep_search",
+            value=bool(gui.session_state.get("embedding_model")),
+        )
+        gui.caption(
+            "Download and embed the webpages for enhanced understanding. Slower but powerful."
         )
 
     def validate_form_v2(self):
@@ -147,25 +160,10 @@ class GoogleGPTPage(BasePage):
         render_output_with_refs(state, 200)
 
     def render_settings(self):
-        if gui.session_state.get("_generate_answer"):
-            if gui.session_state.get("task_instructions") is None:
-                gui.session_state["task_instructions"] = self.current_sr.state.get(
-                    "task_instructions", ""
-                )
-            gui.text_area(
-                """
-                ### Instructions
-                Instruct the LLM model on how to interpret the results to create an answer.
-                """,
-                key="task_instructions",
-                height=300,
-            )
-            gui.write("---")
+        if gui.session_state.get("task_instructions"):
             selected_model = language_model_selector()
             language_model_settings(selected_model)
             gui.write("---")
-        else:
-            gui.session_state["task_instructions"] = None
 
         serp_search_settings()
         gui.write("---")
