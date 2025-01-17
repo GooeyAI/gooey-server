@@ -112,7 +112,7 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        gui.text_area("#### Google Search Query", key="search_query")
+        gui.text_area("#### Search Query", key="search_query")
         gui.text_input("Only show results from site: *(optional)*", key="site_filter")
 
         if gui.switch(
