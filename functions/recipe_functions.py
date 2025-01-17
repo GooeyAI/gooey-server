@@ -2,15 +2,15 @@ import json
 import typing
 
 import gooey_gui as gui
+from django.utils.text import slugify
+
 from app_users.models import AppUser
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
-from django.utils.text import slugify
-
 from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun
+    from bots.models import SavedRun, Workflow
     from daras_ai_v2.base import BasePage, JsonTypes
     from workspaces.models import Workspace
 
@@ -18,17 +18,24 @@ if typing.TYPE_CHECKING:
 class LLMTool:
     def __init__(self, function_url: str):
         from daras_ai_v2.workflow_url_input import url_to_runs
+        from bots.models import Workflow
 
         self.function_url = function_url
 
         _, fn_sr, fn_pr = url_to_runs(function_url)
-        self._function_runs = (fn_sr, fn_pr)
+        self._fn_runs = (fn_sr, fn_pr)
 
         self.name = slugify(fn_pr.title).replace("-", "_")
         self.label = fn_pr.title
 
-        fn_vars = fn_sr.state.get("variables", {})
-        fn_vars_schema = fn_sr.state.get("variables_schema", {})
+        if fn_sr.workflow == Workflow.FUNCTIONS:
+            fn_vars = fn_sr.state.get("variables", {})
+            fn_vars_schema = fn_sr.state.get("variables_schema", {})
+        else:
+            page_cls = Workflow(fn_sr.workflow).page_cls
+            _, fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)
+            fn_vars_schema = page_cls.RequestModel.schema()["properties"]
+
         self.spec = {
             "type": "function",
             "function": {
@@ -61,34 +68,48 @@ class LLMTool:
         return self
 
     def __call__(self, **kwargs):
+        from bots.models import Workflow
+        from daras_ai_v2.base import extract_model_fields
+
         try:
             self.saved_run
         except AttributeError:
             raise RuntimeError("This LLMTool instance is not yet bound")
 
-        fn_sr, fn_pr = self._function_runs
+        fn_sr, fn_pr = self._fn_runs
 
-        state_vars = self.state.setdefault("variables", {})
-        state_vars_schema = self.state.setdefault("variables_schema", {})
-        system_vars, system_vars_schema = self._get_system_vars()
-        fn_vars = (
-            (fn_sr.state.get("variables") or {}) | state_vars | system_vars | kwargs
-        )
-        fn_vars_schema = (
-            (fn_sr.state.get("variables_schema") or {})
-            | state_vars_schema
-            | system_vars_schema
-        )
+        if fn_sr.workflow == Workflow.FUNCTIONS:
+            state_vars = self.state.setdefault("variables", {})
+            state_vars_schema = self.state.setdefault("variables_schema", {})
+            system_vars, system_vars_schema = self._get_system_vars()
+            request_body = dict(
+                variables=(
+                    (fn_sr.state.get("variables") or {})
+                    | state_vars
+                    | system_vars
+                    | kwargs
+                ),
+                variables_schema=(
+                    (fn_sr.state.get("variables_schema") or {})
+                    | state_vars_schema
+                    | system_vars_schema
+                ),
+            )
+        else:
+            request_body = kwargs
+
         result, fn_sr = fn_sr.submit_api_call(
             workspace=self.workspace,
             current_user=self.current_user,
             parent_pr=fn_pr,
-            request_body=dict(variables=fn_vars, variables_schema=fn_vars_schema),
+            request_body=request_body,
             deduct_credits=False,
         )
 
         CalledFunction.objects.create(
-            saved_run=self.saved_run, function_run=fn_sr, trigger=self.trigger.db_value
+            saved_run=self.saved_run,
+            function_run=fn_sr,
+            trigger=self.trigger.db_value,
         )
 
         # wait for the result if its a pre request function
@@ -98,6 +119,11 @@ class LLMTool:
         # if failed, raise error
         if fn_sr.error_msg:
             raise RuntimeError(fn_sr.error_msg)
+
+        if fn_sr.workflow != Workflow.FUNCTIONS:
+            page_cls = Workflow(fn_sr.workflow).page_cls
+            return_value = extract_model_fields(page_cls.ResponseModel, fn_sr.state)
+            return return_value
 
         # save the output from the function
         return_value = fn_sr.state.get("return_value")
@@ -270,7 +296,7 @@ def functions_input(current_user: AppUser, key="functions"):
 
 def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
     from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-    from recipes.Functions import FunctionsPage
+    from bots.models import Workflow
 
     if not is_functions_enabled():
         return
@@ -280,11 +306,15 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
     for called_fn in qs:
         fn_sr = called_fn.function_run
         tb = get_title_breadcrumbs(
-            FunctionsPage,
+            Workflow(fn_sr.workflow).page_cls,
             fn_sr,
             fn_sr.parent_published_run(),
         )
-        title = (tb.published_title and tb.published_title.title) or tb.h1_title
+        title = (
+            (tb.published_title and tb.published_title.title)
+            or (tb.root_title and tb.root_title.title)
+            or tb.h1_title
+        )
         key = f"fn-call-details-{called_fn.id}"
         with gui.expander(f"🧩 Called `{title}`", key=key):
             if not gui.session_state.get(key):
@@ -295,6 +325,8 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
                 "</a>"
             )
 
+            if fn_sr.workflow != Workflow.FUNCTIONS:
+                continue
             fn_vars = fn_sr.state.get("variables", {})
             fn_vars_schema = fn_sr.state.get("variables_schema", {})
             inputs = {
