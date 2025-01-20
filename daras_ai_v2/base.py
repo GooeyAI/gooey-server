@@ -2377,12 +2377,12 @@ class BasePage:
         as_form_data = gui.checkbox("##### Upload Files via Form Data")
 
         api_url, request_body = self.get_example_request(
-            gui.session_state,
+            self.current_sr.state,
             include_all=include_all,
             pr=self.current_pr,
         )
         response_body = self.get_example_response_body(
-            gui.session_state, as_async=as_async, include_all=include_all
+            self.current_sr.state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
