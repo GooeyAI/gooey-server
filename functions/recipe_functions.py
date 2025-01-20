@@ -33,7 +33,7 @@ class LLMTool:
             fn_vars_schema = fn_sr.state.get("variables_schema", {})
         else:
             page_cls = Workflow(fn_sr.workflow).page_cls
-            _, fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)
+            fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)[1]
             fn_vars_schema = page_cls.RequestModel.schema()["properties"]
 
         self.spec = {
@@ -305,8 +305,9 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
         return
     for called_fn in qs:
         fn_sr = called_fn.function_run
+        page_cls = Workflow(fn_sr.workflow).page_cls
         tb = get_title_breadcrumbs(
-            Workflow(fn_sr.workflow).page_cls,
+            page_cls,
             fn_sr,
             fn_sr.parent_published_run(),
         )
@@ -325,15 +326,16 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
                 "</a>"
             )
 
-            if fn_sr.workflow != Workflow.FUNCTIONS:
-                continue
-            fn_vars = fn_sr.state.get("variables", {})
-            fn_vars_schema = fn_sr.state.get("variables_schema", {})
-            inputs = {
-                key: value
-                for key, value in fn_vars.items()
-                if fn_vars_schema.get(key, {}).get("role") != "system"
-            }
+            if fn_sr.workflow == Workflow.FUNCTIONS:
+                fn_vars = fn_sr.state.get("variables", {})
+                fn_vars_schema = fn_sr.state.get("variables_schema", {})
+                inputs = {
+                    key: value
+                    for key, value in fn_vars.items()
+                    if fn_vars_schema.get(key, {}).get("role") != "system"
+                }
+            else:
+                inputs = page_cls.get_example_request(fn_sr.state)[1]
             gui.write("**Inputs**")
             gui.json(inputs)
 

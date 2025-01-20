@@ -79,13 +79,17 @@ def variables_input(
         key=list_key,
         render_inputs=partial(render_list_item, template_var_names=template_var_names),
     )
+
+    if error:
+        gui.error(f"{type(error).__qualname__}: {error.message}")
+
+    if not list_items and gui.session_state.get(key) is None:
+        return
+
     gui.session_state[key] = {item["name"]: item["value"] for item in list_items}
     gui.session_state[schema_key] = {
         item["name"]: item["schema"] for item in list_items
     }
-
-    if error:
-        gui.error(f"{type(error).__qualname__}: {error.message}")
 
 
 def render_list_item(
