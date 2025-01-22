@@ -389,7 +389,7 @@ class VideoBotsStatsPage(BasePage):
 
         with gui.div(className="col-12 col-md-8"):
             gui.session_state.setdefault(
-                "export_functions", [f.get_app_url() for f in scheduled_functions]
+                "scheduled_functions", [f.get_app_url() for f in scheduled_functions]
             )
             with gui.div(className="d-flex align-items-center gap-3 mb-2"):
                 gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
@@ -397,15 +397,15 @@ class VideoBotsStatsPage(BasePage):
                     f"{icons.add} Add",
                     type="tertiary",
                     className="p-1 mb-2",
-                    key="add-to-export-functions",
+                    key="add-to-scheduled-functions",
                 ):
                     gui.session_state.setdefault(
-                        "--list-view:export_functions", []
+                        "--list-view:scheduled_functions", []
                     ).append({})
 
             input_functions: list[dict] = []
 
-            def render_export_function_inputs(key: str, del_key: str | None, d: dict):
+            def render_scheduled_function_input(key: str, del_key: str | None, d: dict):
                 ret = workflow_url_input(
                     page_cls=FunctionsPage,
                     key=key,
@@ -422,8 +422,8 @@ class VideoBotsStatsPage(BasePage):
                     input_functions.append(dict(saved_run=sr, published_run=None))
 
             list_view_editor(
-                key="export_functions",
-                render_inputs=render_export_function_inputs,
+                key="scheduled_functions",
+                render_inputs=render_scheduled_function_input,
                 flatten_dict_key="url",
             )
 
