@@ -15,6 +15,13 @@ if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
 
 
+FUNCTIONS_HELP_TEXT = """\
+Functions give your workflow the ability run Javascript code (with webcalls!) \
+allowing it execute logic, use common JS libraries or make external API calls \
+before or after the workflow runs.
+<a href='/functions-help' target='_blank'>Learn more.</a>"""
+
+
 class LLMTool:
     def __init__(self, function_url: str):
         from daras_ai_v2.workflow_url_input import url_to_runs
@@ -255,8 +262,7 @@ def functions_input(current_user: AppUser, key="functions"):
             with gui.div(className="d-flex align-items-center"):
                 gui.write(
                     "###### Functions",
-                    help="Functions give your workflow the ability run Javascript code (with webcalls!) allowing it execute logic, use common JS libraries or make external API calls before or after the workflow runs.\n"
-                    "<a href='/functions-help' target='_blank'>Learn more.</a>",
+                    help=FUNCTIONS_HELP_TEXT,
                 )
             list_view_editor(
                 add_btn_label="Add Function",
