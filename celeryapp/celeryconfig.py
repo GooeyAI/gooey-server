@@ -1,6 +1,7 @@
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 from daras_ai_v2 import settings
 
 
@@ -18,6 +19,13 @@ app.conf.update(
     task_serializer="pickle",
     accept_content=["pickle"],
     result_serializer="pickle",
+    timezone=settings.TIME_ZONE,
+    beat_schedule={
+        "run_all_scheduled_functions": {
+            "task": "bots.tasks.run_all_scheduled_functions",
+            "schedule": crontab(hour="0", minute="0"),  # everyday at 00:00
+        },
+    },
 )
 
 # Load task modules from all registered Django apps.
