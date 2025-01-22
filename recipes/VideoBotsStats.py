@@ -371,7 +371,6 @@ class VideoBotsStatsPage(BasePage):
         scheduled_functions = bi.scheduled_functions.select_related(
             "published_run", "saved_run"
         ).all()
-        print(f"{scheduled_functions=}")
         export_daily_switch = gui.switch(
             "##### Export Daily",
             tooltip_placement="left",
