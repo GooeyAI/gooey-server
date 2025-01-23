@@ -308,18 +308,15 @@ class VideoBotsStatsPage(BasePage):
                 ]
             )
 
-            # download as csv button
-            gui.html("<br/>")
-            self._render_export_options(
-                bi=bi,
-                conversations=conversations,
-                messages=messages,
-                details=details,
-                start_date=start_date,
-                end_date=end_date,
-                sort_by=sort_by,
-            )
-
+        self._render_export_options(
+            bi=bi,
+            conversations=conversations,
+            messages=messages,
+            details=details,
+            start_date=start_date,
+            end_date=end_date,
+            sort_by=sort_by,
+        )
         self.update_url(view, details, start_date, end_date, sort_by)
 
     def _render_export_options(
