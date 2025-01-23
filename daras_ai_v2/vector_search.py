@@ -23,6 +23,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
+from workspaces.models import Workspace
 from daras_ai.image_input import (
     get_mimetype_from_response,
     safe_filename,
@@ -56,6 +57,11 @@ from daras_ai_v2.gdrive_downloader import (
     is_gdrive_presentation_url,
     is_gdrive_url,
     url_to_gdrive_file_id,
+)
+from daras_ai_v2.onedrive_downloader import (
+    is_onedrive_url,
+    onedrive_meta,
+    onedrive_download,
 )
 from daras_ai_v2.office_utils_pptx import pptx_to_text_pages
 from daras_ai_v2.redis_cache import redis_lock
@@ -123,7 +129,11 @@ Snippet: """
 
 
 def get_top_k_references(
-    request: DocSearchRequest, is_user_url: bool = True, current_user: AppUser = None
+    request: DocSearchRequest,
+    is_user_url: bool = True,
+    current_user: AppUser = None,
+    current_workspace: typing.Optional[Workspace] = None,
+    current_app_url: typing.Optional[str] = None,
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
@@ -162,6 +172,8 @@ def get_top_k_references(
         selected_asr_model=selected_asr_model,
         embedding_model=embedding_model,
         check_document_updates=request.check_document_updates,
+        current_workspace=current_workspace,
+        current_app_url=current_app_url,
     )
 
     if args_to_create:
@@ -315,6 +327,8 @@ def get_vespa_app():
 
 def doc_or_yt_url_to_file_metas(
     f_url: str,
+    current_workspace: typing.Optional[Workspace] = None,
+    current_app_url: typing.Optional[str] = None,
 ) -> tuple[FileMetadata, list[tuple[str, FileMetadata]]]:
     if is_yt_dlp_able_url(f_url):
         data = yt_dlp_extract_info(f_url)
@@ -328,7 +342,7 @@ def doc_or_yt_url_to_file_metas(
             file_meta = yt_info_to_video_metadata(data)
             return file_meta, [(f_url, file_meta)]
     else:
-        file_meta = doc_url_to_file_metadata(f_url)
+        file_meta = doc_url_to_file_metadata(f_url, current_workspace, current_app_url)
         return file_meta, [(f_url, file_meta)]
 
 
@@ -355,7 +369,11 @@ def yt_info_to_video_metadata(data: dict) -> FileMetadata:
     )
 
 
-def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
+def doc_url_to_file_metadata(
+    f_url: str,
+    current_workspace: typing.Optional[Workspace] = None,
+    current_app_url: typing.Optional[str] = None,
+) -> FileMetadata:
     from googleapiclient.errors import HttpError
 
     f = furl(f_url.strip("/"))
@@ -376,6 +394,13 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         mime_type = meta["mimeType"]
         total_bytes = int(meta.get("size") or 0)
         export_links = meta.get("exportLinks", None)
+    elif is_onedrive_url(f):
+        meta = onedrive_meta(f_url, current_workspace, current_app_url)
+        name = meta["name"]
+        etag = meta.get("eTag") or meta.get("lastModifiedDateTime")
+        mime_type = meta["file"]["mimeType"]
+        total_bytes = int(meta.get("size") or 0)
+        export_links = dict(downloadUrl=meta["@microsoft.graph.downloadUrl"])
     else:
         if is_user_uploaded_url(f_url):
             kwargs = {}
@@ -463,6 +488,8 @@ def do_check_document_updates(
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     check_document_updates: bool,
+    current_workspace: Workspace | None,
+    current_app_url: str | None,
 ) -> typing.Generator[
     str,
     None,
@@ -500,7 +527,9 @@ def do_check_document_updates(
             lookups.pop(f_url, None)
 
     metadatas = yield from apply_parallel(
-        doc_or_yt_url_to_file_metas,
+        lambda url: doc_or_yt_url_to_file_metas(
+            url, current_workspace=current_workspace, current_app_url=current_app_url
+        ),
         lookups.keys(),
         message="Fetching latest knowledge docs...",
         max_workers=100,
@@ -843,6 +872,8 @@ def download_content_bytes(
     if is_gdrive_url(f):
         # download from google drive
         return gdrive_download(f, mime_type, export_links)
+    elif is_onedrive_url(f):
+        return onedrive_download(f, mime_type, export_links)
     try:
         # download from url
         if is_user_uploaded_url(f_url):
