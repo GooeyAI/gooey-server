@@ -156,6 +156,12 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
+        self.render_stats(bi)
+
+        with gui.expander("Export Options"):
+            self.render_scheduled_export_options(bi)
+
+    def render_stats(self, bi: BotIntegration):
         run_url = VideoBotsPage.app_url(
             example_id=bi.published_run and bi.published_run.published_run_id,
         )
@@ -291,51 +297,32 @@ class VideoBotsStatsPage(BasePage):
 
         if df.empty:
             gui.write("No data to show yet.")
-        else:
-            columns = df.columns.tolist()
-            gui.data_table(
-                [columns]
-                + [
-                    [
-                        dict(
-                            readonly=True,
-                            displayData=str(df.iloc[idx, col]),
-                            data=str(df.iloc[idx, col]),
-                        )
-                        for col in range(len(columns))
-                    ]
-                    for idx in range(min(500, len(df)))
+            self.update_url(view, details, start_date, end_date, sort_by)
+            return
+
+        columns = df.columns.tolist()
+        gui.data_table(
+            [columns]
+            + [
+                [
+                    dict(
+                        readonly=True,
+                        displayData=str(df.iloc[idx, col]),
+                        data=str(df.iloc[idx, col]),
+                    )
+                    for col in range(len(columns))
                 ]
-            )
+                for idx in range(min(500, len(df)))
+            ]
+        )
 
         gui.html("<br>")
-        self._render_export_options(
-            bi=bi,
-            conversations=conversations,
-            messages=messages,
-            details=details,
-            start_date=start_date,
-            end_date=end_date,
-            sort_by=sort_by,
-        )
-        self.update_url(view, details, start_date, end_date, sort_by)
 
-    def _render_export_options(
-        self,
-        bi: BotIntegration,
-        conversations: ConversationQuerySet,
-        messages: MessageQuerySet,
-        details: str | None,
-        sort_by: str | None,
-        start_date: datetime | None,
-        end_date: datetime | None,
-    ):
-        with gui.expander("Export Options"):
-            with gui.div(className="d-flex align-items-center gap-2"):
-                export_csv_button = gui.button("Download CSV file", type="secondary")
-                gui.caption("Includes full data (UI only shows first 500 rows)")
-
-            if export_csv_button:
+        with (
+            gui.div(className="d-flex align-items-center gap-2"),
+            gui.tooltip("Includes full data (UI only shows first 500 rows)"),
+        ):
+            if gui.button("Download CSV file"):
                 df = get_tabular_data(
                     bi=bi,
                     conversations=conversations,
@@ -363,15 +350,14 @@ class VideoBotsStatsPage(BasePage):
                     )
                 )
 
-            self._render_scheduled_export_options(bi)
+        self.update_url(view, details, start_date, end_date, sort_by)
 
-    def _render_scheduled_export_options(self, bi: BotIntegration):
+    def render_scheduled_export_options(self, bi: BotIntegration):
         scheduled_functions = bi.scheduled_functions.select_related(
             "published_run", "saved_run"
         ).all()
         export_daily_switch = gui.switch(
             "##### Export Daily",
-            tooltip_placement="left",
             value=bool(scheduled_functions),
         )
         gui.write(
@@ -425,26 +411,23 @@ class VideoBotsStatsPage(BasePage):
                 flatten_dict_key="url",
             )
 
-            with gui.div(
-                className="d-flex flex-row-reverse justify-content-start align-items-baseline gap-2"
-            ):
-                if gui.button("Save", type="primary"):
-                    try:
-                        with transaction.atomic():
-                            objs = [
-                                BotIntegrationScheduledFunction.objects.get_or_create(
-                                    saved_run=f["saved_run"],
-                                    published_run=f["published_run"],
-                                )[0]
-                                for f in input_functions
-                            ]
-                            bi.scheduled_functions.exclude(
-                                id__in=[o.id for o in objs]
-                            ).delete()
-                    except ValidationError as e:
-                        gui.error(str(e))
-                    else:
-                        gui.success("Saved!")
+            if gui.button("Save", type="primary"):
+                try:
+                    with transaction.atomic():
+                        objs = [
+                            BotIntegrationScheduledFunction.objects.get_or_create(
+                                saved_run=f["saved_run"],
+                                published_run=f["published_run"],
+                            )[0]
+                            for f in input_functions
+                        ]
+                        bi.scheduled_functions.exclude(
+                            id__in=[o.id for o in objs]
+                        ).delete()
+                except ValidationError as e:
+                    gui.error(str(e))
+                else:
+                    gui.success("Saved!")
 
     # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
     # this also allows them to share the url (once organizations are supported)
