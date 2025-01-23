@@ -33,7 +33,10 @@ def onedrive_connect_redirect(request: Request):
     if not code:
         error = request.query_params.get("error")
         error_description = request.query_params.get("error_description")
-        return HTMLResponse(f"Authorization code missing! {error} : {error_description}", status_code=400)
+        return HTMLResponse(
+            f"Authorization code missing! {error} : {error_description}",
+            status_code=400,
+        )
 
     redirect_url = load_current_run_url_from_state(request)
     user_access_token, user_refresh_token = _get_access_token_from_code(
