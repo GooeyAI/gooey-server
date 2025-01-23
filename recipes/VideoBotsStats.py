@@ -308,6 +308,7 @@ class VideoBotsStatsPage(BasePage):
                 ]
             )
 
+        gui.html("<br>")
         self._render_export_options(
             bi=bi,
             conversations=conversations,
