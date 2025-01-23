@@ -43,7 +43,7 @@ def onedrive_download(f: furl, mime_type: str, export_links: dict):
 def onedrive_meta(
     f_url: str, current_workspace: Workspace, current_app_url: str, retries: int = 1
 ):
-    # check if curret_workspace have the field current_workspace.onedrive_access_token or onedrive_access_token.refresh_token
+    # check if current_workspace have the field current_workspace.onedrive_access_token or onedrive_access_token.refresh_token
     if not (
         current_workspace.onedrive_access_token
         and current_workspace.onedrive_refresh_token
@@ -64,7 +64,7 @@ def onedrive_meta(
 
         return metadata
     except requests.exceptions.HTTPError as e:
-        if e.status_code == 401 and retries > 0:
+        if e.response.status_code == 401 and retries > 0:
             try:
                 current_workspace.onedrive_access_token = (
                     get_access_token_from_refresh_token(
@@ -78,5 +78,10 @@ def onedrive_meta(
                 )
             except Exception:
                 raise OneDriveAuth(generate_onedrive_auth_url(current_app_url))
+
+        elif e.response.status_code == 403:
+            raise UserError(
+                "make sure the document is accessible from logged in microsoft account"
+            )
         else:
             raise e
