@@ -61,6 +61,8 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "domain_name",
         "created_at",
         "updated_at",
+        "onedrive_access_token",
+        "onedrive_refresh_token",
     ] + list(SafeDeleteAdmin.list_display)
     list_filter = (
         [
@@ -82,6 +84,8 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         ("total_payments", "total_charged", "total_usage_cost"),
         ("created_at", "updated_at"),
         "open_in_stripe",
+        "onedrive_access_token",
+        "onedrive_refresh_token",
     ]
     search_fields = ["name", "created_by__display_name", "domain_name", "handle__name"]
     readonly_fields = [
