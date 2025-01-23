@@ -440,7 +440,7 @@ class VideoBotsStatsPage(BasePage):
                                 )[0]
                                 for f in input_functions
                             ]
-                            deleted = bi.scheduled_functions.exclude(
+                            bi.scheduled_functions.exclude(
                                 id__in=[o.id for o in objs]
                             ).delete()
                     except ValidationError as e:

@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from json import JSONDecodeError
 
 import sentry_sdk
@@ -219,7 +220,7 @@ def send_broadcast_msg(
 def run_all_scheduled_functions():
     for sf in BotIntegrationScheduledFunction.objects.select_related(
         "bot_integration"
-    ).all():
+    ).exclude(last_run_at__gt=timezone.now() - timedelta(hours=23)):
         bi = sf.bot_integration
         today = timezone.now().date()
         conversations, messages = get_conversations_and_messages(bi)
@@ -246,6 +247,8 @@ def run_all_scheduled_functions():
             parent_pr=fn_pr,
             current_user=bi.workspace.created_by,
         )
+        sf.last_run_at = fn_sr.created_at
+        sf.save(update_fields=["last_run_at"])
         fn_sr.wait_for_celery_result(result)
 
         if fn_sr.error_msg:
