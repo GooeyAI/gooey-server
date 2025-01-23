@@ -950,6 +950,8 @@ class BotIntegrationScheduledFunction(models.Model):
         default=None,
     )
 
+    last_run_at = models.DateTimeField(null=True, blank=True, default=None)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
