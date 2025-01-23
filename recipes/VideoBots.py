@@ -1040,19 +1040,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     keyword_query = list(keyword_query.values())[0]
                 response.final_keyword_query = keyword_query
 
-            if response.final_search_query:
-                # perform doc search
-                response.references = yield from get_top_k_references(
-                    DocSearchRequest.parse_obj(
-                        {
-                            **request.dict(),
-                            **response.dict(),
-                            "search_query": response.final_search_query,
-                            "keyword_query": response.final_keyword_query,
-                        },
-                    ),
-                    current_user=self.request.user,
-                )
+            if response.final_search_query:# perform doc search
+            response.references = yield from get_top_k_references(
+                DocSearchRequest.parse_obj(
+                    {
+                        **request.dict(),
+                        **response.dict(),
+                        "search_query": response.final_search_query,
+                        "keyword_query": response.final_keyword_query,
+                    },
+                ),
+                current_user=self.request.user,
+                current_workspace=self.current_workspace,
+                current_app_url = self.current_app_url()
+            )
             if request.use_url_shortener:
                 for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
