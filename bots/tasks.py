@@ -220,7 +220,7 @@ def send_broadcast_msg(
 def run_all_scheduled_functions():
     for sf in BotIntegrationScheduledFunction.objects.select_related(
         "bot_integration"
-    ).exclude(last_run_at__gt=timezone.now() - timedelta(hours=23)):
+    ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
         bi = sf.bot_integration
         today = timezone.now().date()
         conversations, messages = get_conversations_and_messages(bi)
