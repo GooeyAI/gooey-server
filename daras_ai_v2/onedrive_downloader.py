@@ -58,6 +58,10 @@ def onedrive_meta(
         )
         raise_for_status(r)
         metadata = r.json()
+
+        if "children" in metadata:
+            raise UserError("Folders are not supported .")
+
         return metadata
     except requests.exceptions.HTTPError as e:
         if e.status_code == 401 and retries > 0:

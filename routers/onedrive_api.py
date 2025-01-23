@@ -14,13 +14,17 @@ from loguru import logger
 app = CustomAPIRouter()
 
 
-def load_current_run_url_from_state(request: Request) -> str:
-    url = json.loads(request.query_params.get("state") or "{}").get("current_app_url")
+def load_current_run_url_from_state(request: Request) -> furl:
+    url = furl(
+        json.loads(request.query_params.get("state") or "{}").get("current_app_url")
+    )
     return url
 
 
 @app.get("/__/onedrive/connect/")
 def onedrive_connect_redirect(request: Request):
+    from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+
     if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
@@ -41,9 +45,8 @@ def onedrive_connect_redirect(request: Request):
         update_fields=["onedrive_access_token", "onedrive_refresh_token"]
     )
 
-    # redirect_url=load_current_run_url_from_state(request)
-    logger.debug(redirect_url)
-    print(redirect_url)
+    redirect_url.add({SUBMIT_AFTER_LOGIN_Q: "1"})
+
     return RedirectResponse(redirect_url)
 
 
