@@ -368,7 +368,7 @@ class BasePage:
                         transform="translateY(-50%)",
                     ),
                 ):
-                    self._render_saved_timestamp(self.current_pr)
+                    self._render_saved_timestamp(self.current_pr, self.current_sr)
         with gui.nav_tab_content():
             self.render_selected_tab()
 
@@ -485,17 +485,10 @@ class BasePage:
         ):
             gui.html("Unpublished changes")
 
-    def _render_saved_timestamp(self, pr: PublishedRun):
-        last_run_at = gui.session_state.get(
-            StateKeys.updated_at, datetime.datetime.today()
-        )
-
-        if isinstance(last_run_at, str):
-            last_run_at = datetime.datetime.fromisoformat(last_run_at)
-
+    def _render_saved_timestamp(self, pr: PublishedRun, sr: SavedRun):
         with gui.tag("span", className="text-muted"):
             gui.write(
-                f"{get_relative_time(pr.updated_at if pr.is_root() else last_run_at)}"
+                f"{get_relative_time(pr.updated_at if pr.is_root() else sr.updated_at)}"
             )
 
     def _render_options_button_with_dialog(self):
