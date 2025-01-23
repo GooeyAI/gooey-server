@@ -59,7 +59,7 @@ def onedrive_meta(
         raise_for_status(r)
         metadata = r.json()
 
-        if "children" in metadata:
+        if "folder" in metadata:
             raise UserError("Folders are not supported .")
 
         return metadata
