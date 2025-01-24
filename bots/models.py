@@ -1369,9 +1369,8 @@ class MessageQuerySet(models.QuerySet):
                     else ""
                 ),
                 "Photo Input": ", ".join(
-                    message.attachments.filter(
-                        metadata__mime_type__startswith="image/"
-                    ).values_list("url", flat=True)
+                    (message.saved_run and message.saved_run.state.get("input_images"))
+                    or []
                 ),
                 "Audio Input": (
                     (message.saved_run and message.saved_run.state.get("input_audio"))

@@ -217,7 +217,7 @@ def send_broadcast_msg(
 
 
 @shared_task
-def run_all_scheduled_runs():
+def exec_scheduled_runs():
     for sched in BotIntegrationScheduledRun.objects.select_related(
         "bot_integration"
     ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
@@ -240,22 +240,19 @@ def run_all_scheduled_runs():
             content_type="text/csv",
         )
 
+        logger.info(f"exported stats for {bi} -> {csv_url}")
+
         fn_sr, fn_pr = sched.get_runs()
         result, fn_sr = fn_sr.submit_api_call(
             workspace=bi.workspace,
-            request_body=dict(variables={"message_history_csv_url": csv_url}),
+            request_body=dict(variables=dict(messages_export_url=csv_url)),
             parent_pr=fn_pr,
             current_user=bi.workspace.created_by,
         )
         sched.last_run_at = fn_sr.created_at
         sched.save(update_fields=["last_run_at"])
-        fn_sr.wait_for_celery_result(result)
 
-        if fn_sr.error_msg:
-            # if failed, log error_msg
-            logger.warning(f"errored... {fn_sr.error_msg}")
-        else:
-            logger.info(f"completed... {fn_sr.get_app_url()}")
+        logger.info(f"ran scheduled function {fn_sr.get_app_url()}")
 
 
 ## Disabled for now to prevent messing up the chat history
