@@ -2,8 +2,8 @@ import os
 
 from celery import Celery
 from celery.schedules import crontab
-from daras_ai_v2 import settings
 
+from daras_ai_v2 import settings
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
@@ -21,9 +21,9 @@ app.conf.update(
     result_serializer="pickle",
     timezone=settings.TIME_ZONE,
     beat_schedule={
-        "run_all_scheduled_runs": {
-            "task": "bots.tasks.run_all_scheduled_runs",
-            "schedule": crontab(hour="0", minute="0"),  # everyday at 00:00
+        "exec_scheduled_runs": {
+            "task": "bots.tasks.exec_scheduled_runs",
+            "schedule": crontab(minute="0"),  # Executes every hour
         },
     },
 )

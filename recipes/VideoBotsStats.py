@@ -414,14 +414,15 @@ class VideoBotsStatsPage(BasePage):
             if gui.button("Save", type="primary"):
                 try:
                     with transaction.atomic():
-                        objs = [
+                        # save scheduled runs
+                        sched_run_ids = [
                             BotIntegrationScheduledRun.objects.get_or_create(
-                                saved_run=f["saved_run"],
-                                published_run=f["published_run"],
-                            )[0]
-                            for f in input_functions
+                                bot_integration=bi, **data
+                            )[0].id
+                            for data in input_functions
                         ]
-                        bi.scheduled_runs.exclude(id__in=[o.id for o in objs]).delete()
+                        # delete any scheduled runs that were removed
+                        bi.scheduled_runs.exclude(id__in=sched_run_ids).delete()
                 except ValidationError as e:
                     gui.error(str(e))
                 else:
