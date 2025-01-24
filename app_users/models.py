@@ -122,16 +122,6 @@ class AppUser(models.Model):
 
     disable_safety_checker = models.BooleanField(default=False)
 
-    handle = models.OneToOneField(
-        "handles.Handle",
-        on_delete=models.SET_NULL,
-        default=None,
-        blank=True,
-        null=True,
-        related_name="user",
-        help_text="[deprecated] use workspace.handle instead",
-    )
-
     banner_url = CustomURLField(blank=True, default="")
     bio = StrippedTextField(blank=True, default="")
     company = models.CharField(max_length=255, blank=True, default="")

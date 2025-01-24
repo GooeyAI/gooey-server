@@ -126,19 +126,7 @@ class Handle(models.Model):
         return f"@{self.name}"
 
     def _validate_exclusive(self):
-        if (
-            self.has_workspace
-            and self.has_user
-            and self.workspace.created_by_id == self.user.id
-        ):
-            # TODO: remove this once all handles are migrated
-            return
-
-        lookups = [
-            self.has_redirect,
-            self.has_workspace,
-            self.has_user,
-        ]
+        lookups = [self.has_redirect, self.has_workspace]
         if sum(lookups) > 1:
             raise ValidationError("A handle must be exclusive")
 
@@ -149,16 +137,6 @@ class Handle(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-
-    @property
-    def has_user(self):
-        warnings.warn("deprecated, use `has_workspace` instead", DeprecationWarning)
-        try:
-            self.user
-        except Handle.user.RelatedObjectDoesNotExist:
-            return False
-        else:
-            return True
 
     @property
     def has_workspace(self):
