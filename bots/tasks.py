@@ -10,7 +10,7 @@ from django.utils import timezone
 from loguru import logger
 
 from bots.models import (
-    BotIntegrationScheduledFunction,
+    BotIntegrationScheduledRun,
     Message,
     CHATML_ROLE_ASSISSTANT,
     BotIntegration,
@@ -217,15 +217,15 @@ def send_broadcast_msg(
 
 
 @shared_task
-def run_all_scheduled_functions():
-    for sf in BotIntegrationScheduledFunction.objects.select_related(
+def run_all_scheduled_runs():
+    for sched in BotIntegrationScheduledRun.objects.select_related(
         "bot_integration"
     ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
-        bi = sf.bot_integration
+        bi = sched.bot_integration
         today = timezone.now().date()
         conversations, messages = get_conversations_and_messages(bi)
         df = get_tabular_data(
-            bi=sf.bot_integration,
+            bi=sched.bot_integration,
             conversations=conversations,
             messages=messages,
             details="Messages",
@@ -240,21 +240,20 @@ def run_all_scheduled_functions():
             content_type="text/csv",
         )
 
-        fn_sr, fn_pr = sf.get_runs()
+        fn_sr, fn_pr = sched.get_runs()
         result, fn_sr = fn_sr.submit_api_call(
             workspace=bi.workspace,
             request_body=dict(variables={"message_history_csv_url": csv_url}),
             parent_pr=fn_pr,
             current_user=bi.workspace.created_by,
         )
-        sf.last_run_at = fn_sr.created_at
-        sf.save(update_fields=["last_run_at"])
+        sched.last_run_at = fn_sr.created_at
+        sched.save(update_fields=["last_run_at"])
         fn_sr.wait_for_celery_result(result)
 
         if fn_sr.error_msg:
             # if failed, log error_msg
             logger.warning(f"errored... {fn_sr.error_msg}")
-            sentry_sdk.capture_exception(RuntimeError(fn_sr.error_msg))
         else:
             logger.info(f"completed... {fn_sr.get_app_url()}")
 

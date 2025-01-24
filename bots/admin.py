@@ -14,7 +14,7 @@ from django.utils.timesince import timesince
 from app_users.models import AppUser
 from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
 from bots.models import (
-    BotIntegrationScheduledFunction,
+    BotIntegrationScheduledRun,
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
     SavedRun,
@@ -128,7 +128,7 @@ class BotIntegrationAnalysisRunInline(admin.TabularInline):
 
 
 class BotIntegrationScheduledFunctionInline(admin.TabularInline):
-    model = BotIntegrationScheduledFunction
+    model = BotIntegrationScheduledRun
     autocomplete_fields = ["saved_run", "published_run"]
     readonly_fields = ["created_at"]
     extra = 0

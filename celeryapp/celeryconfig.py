@@ -21,8 +21,8 @@ app.conf.update(
     result_serializer="pickle",
     timezone=settings.TIME_ZONE,
     beat_schedule={
-        "run_all_scheduled_functions": {
-            "task": "bots.tasks.run_all_scheduled_functions",
+        "run_all_scheduled_runs": {
+            "task": "bots.tasks.run_all_scheduled_runs",
             "schedule": crontab(hour="0", minute="0"),  # everyday at 00:00
         },
     },

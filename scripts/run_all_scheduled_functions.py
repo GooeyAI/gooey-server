@@ -1,5 +1,5 @@
-from bots.tasks import run_all_scheduled_functions
+from bots.tasks import run_all_scheduled_runs
 
 
 def run():
-    run_all_scheduled_functions.delay()
+    run_all_scheduled_runs.delay()
