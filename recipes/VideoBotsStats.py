@@ -20,7 +20,7 @@ from furl import furl
 from pydantic import BaseModel, ValidationError
 
 from bots.models import (
-    BotIntegrationScheduledFunction,
+    BotIntegrationScheduledRun,
     Workflow,
     Platform,
     BotIntegration,
@@ -353,12 +353,12 @@ class VideoBotsStatsPage(BasePage):
         self.update_url(view, details, start_date, end_date, sort_by)
 
     def render_scheduled_export_options(self, bi: BotIntegration):
-        scheduled_functions = bi.scheduled_functions.select_related(
+        scheduled_runs = bi.scheduled_runs.select_related(
             "published_run", "saved_run"
         ).all()
         export_daily_switch = gui.switch(
             "##### Export Daily",
-            value=bool(scheduled_functions),
+            value=bool(scheduled_runs),
         )
         gui.write(
             "Once per day, functions listed below will be called with a parameter "
@@ -366,14 +366,14 @@ class VideoBotsStatsPage(BasePage):
         )
 
         if not export_daily_switch:
-            if scheduled_functions:
+            if scheduled_runs:
                 # user disabled the switch now, delete all scheduled functions
-                scheduled_functions.delete()
+                scheduled_runs.delete()
             return
 
         with gui.div(className="col-12 col-md-8"):
             gui.session_state.setdefault(
-                "scheduled_functions", [f.get_app_url() for f in scheduled_functions]
+                "scheduled_runs", [f.get_app_url() for f in scheduled_runs]
             )
             with gui.div(className="d-flex align-items-center gap-3 mb-2"):
                 gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
@@ -384,12 +384,12 @@ class VideoBotsStatsPage(BasePage):
                     key="add-to-scheduled-functions",
                 ):
                     gui.session_state.setdefault(
-                        "--list-view:scheduled_functions", []
+                        "--list-view:scheduled_runs", []
                     ).append({})
 
             input_functions: list[dict] = []
 
-            def render_scheduled_function_input(key: str, del_key: str | None, d: dict):
+            def render_scheduled_run_input(key: str, del_key: str | None, d: dict):
                 ret = workflow_url_input(
                     page_cls=FunctionsPage,
                     key=key,
@@ -406,8 +406,8 @@ class VideoBotsStatsPage(BasePage):
                     input_functions.append(dict(saved_run=sr, published_run=None))
 
             list_view_editor(
-                key="scheduled_functions",
-                render_inputs=render_scheduled_function_input,
+                key="scheduled_runs",
+                render_inputs=render_scheduled_run_input,
                 flatten_dict_key="url",
             )
 
@@ -415,15 +415,13 @@ class VideoBotsStatsPage(BasePage):
                 try:
                     with transaction.atomic():
                         objs = [
-                            BotIntegrationScheduledFunction.objects.get_or_create(
+                            BotIntegrationScheduledRun.objects.get_or_create(
                                 saved_run=f["saved_run"],
                                 published_run=f["published_run"],
                             )[0]
                             for f in input_functions
                         ]
-                        bi.scheduled_functions.exclude(
-                            id__in=[o.id for o in objs]
-                        ).delete()
+                        bi.scheduled_runs.exclude(id__in=[o.id for o in objs]).delete()
                 except ValidationError as e:
                     gui.error(str(e))
                 else:

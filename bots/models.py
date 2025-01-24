@@ -927,16 +927,16 @@ class BotIntegrationAnalysisRun(models.Model):
             raise ValueError("No saved run found")
 
 
-class BotIntegrationScheduledFunction(models.Model):
+class BotIntegrationScheduledRun(models.Model):
     bot_integration = models.ForeignKey(
         "BotIntegration",
         on_delete=models.CASCADE,
-        related_name="scheduled_functions",
+        related_name="scheduled_runs",
     )
     saved_run = models.ForeignKey(
         "bots.SavedRun",
         on_delete=models.CASCADE,
-        related_name="scheduled_functions",
+        related_name="scheduled_runs",
         null=True,
         blank=True,
         default=None,
@@ -944,7 +944,7 @@ class BotIntegrationScheduledFunction(models.Model):
     published_run = models.ForeignKey(
         "bots.PublishedRun",
         on_delete=models.CASCADE,
-        related_name="scheduled_functions",
+        related_name="scheduled_runs",
         null=True,
         blank=True,
         default=None,
@@ -960,7 +960,7 @@ class BotIntegrationScheduledFunction(models.Model):
             models.CheckConstraint(
                 check=models.Q(saved_run__isnull=False)
                 ^ models.Q(published_run__isnull=False),
-                name="bi_scheduled_functions_saved_run_xor_published_run",
+                name="bi_scheduled_runs_saved_run_xor_published_run",
             )
         ]
 
