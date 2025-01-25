@@ -361,8 +361,8 @@ class VideoBotsStatsPage(BasePage):
             value=bool(scheduled_runs),
         )
         gui.write(
-            "Once per day, functions listed below will be called with a parameter "
-            "(`message_history_csv_url`), the publicly accessible link of the day's messages."
+            "Once per day, functions listed below will be called with the variable "
+            "`messages_export_url`, the publicly accessible link of the day's messages as a csv file."
         )
 
         if not export_daily_switch:
