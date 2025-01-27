@@ -219,9 +219,10 @@ class AppUser(models.Model):
         self.save()
         workspace, _ = self.get_or_create_personal_workspace()
 
-        if handle := Handle.create_default_for_workspace(workspace):
-            workspace.handle = handle
-            workspace.save()
+        if not self.is_anonymous:
+            if handle := Handle.create_default_for_workspace(workspace):
+                workspace.handle = handle
+                workspace.save()
 
         return self
 
