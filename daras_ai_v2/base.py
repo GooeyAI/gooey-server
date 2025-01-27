@@ -1498,9 +1498,8 @@ class BasePage:
             name = workspace.created_by.display_name
         else:
             name = workspace.display_name()
-        if show_as_link and workspace.is_personal:
-            handle = workspace.handle or workspace.created_by.handle
-            link = handle and handle.get_app_url()
+        if show_as_link and workspace.is_personal and workspace.handle_id:
+            link = workspace.handle.get_app_url()
         else:
             link = None
         return cls._render_author(

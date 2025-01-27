@@ -65,8 +65,7 @@ class PublishedRunVisibility(models.IntegerChoices):
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Only me + people with a link"
             case PublishedRunVisibility.PUBLIC if workspace and workspace.is_personal:
-                user = workspace.created_by
-                if handle := (workspace.handle or user.handle):
+                if handle := workspace.handle:
                     profile_url = handle.get_app_url()
                     pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
                     return f'{self.get_icon()} Public on <a href="{pretty_profile_url}" target="_blank">{profile_url}</a>'

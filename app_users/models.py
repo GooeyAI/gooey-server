@@ -241,8 +241,6 @@ class AppUser(models.Model):
         ) or [self.get_or_create_personal_workspace()[0]]
 
     def get_handle(self) -> Handle | None:
-        if self.handle:
-            return self.handle
         workspace, _ = self.get_or_create_personal_workspace()
         return workspace.handle
 
