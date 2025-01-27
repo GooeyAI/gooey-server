@@ -233,7 +233,9 @@ class AsrModels(Enum):
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
-    whisper_chichewa_large_v3 = "Whisper Large v3 chichewa (opportunity.org)"
+    whisper_chichewa_large_v3 = (
+        "Whisper Large v3 chichewa [Deprecated] (opportunity.org)"
+    )
     gpt_4_o_audio = "GPT-4o Audio (openai)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
@@ -259,7 +261,7 @@ class AsrModels(Enum):
 
     @classmethod
     def _deprecated(cls):
-        return {cls.seamless_m4t}
+        return {cls.seamless_m4t, cls.whisper_chichewa_large_v3}
 
     @classmethod
     def get(cls, key, default=None):

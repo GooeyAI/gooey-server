@@ -8,6 +8,7 @@ import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, IntegerChoices, QuerySet
 from django.utils import timezone
@@ -411,7 +412,7 @@ class SavedRun(models.Model):
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
-        parent_pr: "PublishedRun" = None,
+        parent_pr: typing.Optional["PublishedRun"] = None,
         current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
@@ -925,6 +926,65 @@ class BotIntegrationAnalysisRun(models.Model):
             raise ValueError("No saved run found")
 
 
+class BotIntegrationScheduledRun(models.Model):
+    bot_integration = models.ForeignKey(
+        "BotIntegration",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+    )
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
+    last_run_at = models.DateTimeField(null=True, blank=True, default=None)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            # ensure only one of saved_run or published_run is set
+            models.CheckConstraint(
+                check=models.Q(saved_run__isnull=False)
+                ^ models.Q(published_run__isnull=False),
+                name="bi_scheduled_runs_saved_run_xor_published_run",
+            )
+        ]
+
+    def clean(self):
+        if (self.published_run or self.saved_run).workflow != Workflow.FUNCTIONS:
+            raise ValidationError("Expected a Functions workflow")
+        return super().clean()
+
+    def get_app_url(self) -> str:
+        if self.published_run:
+            return self.published_run.get_app_url()
+        elif self.saved_run:
+            return self.saved_run.get_app_url()
+        else:
+            raise ValueError("No saved run found")
+
+    def get_runs(self) -> tuple[SavedRun, PublishedRun | None]:
+        if self.published_run:
+            return self.published_run.saved_run, self.published_run
+        elif self.saved_run:
+            return self.saved_run, None
+        else:
+            raise ValueError("No saved run found")
+
+
 class ConvoState(models.IntegerChoices):
     INITIAL = 0, "Initial"
     ASK_FOR_FEEDBACK_THUMBS_UP = 1, "Ask for feedback (👍)"
@@ -1308,9 +1368,8 @@ class MessageQuerySet(models.QuerySet):
                     else ""
                 ),
                 "Photo Input": ", ".join(
-                    message.attachments.filter(
-                        metadata__mime_type__startswith="image/"
-                    ).values_list("url", flat=True)
+                    (message.saved_run and message.saved_run.state.get("input_images"))
+                    or []
                 ),
                 "Audio Input": (
                     (message.saved_run and message.saved_run.state.get("input_audio"))

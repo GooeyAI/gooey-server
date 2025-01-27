@@ -2378,12 +2378,12 @@ class BasePage:
         as_form_data = gui.checkbox("##### Upload Files via Form Data")
 
         api_url, request_body = self.get_example_request(
-            gui.session_state,
+            self.current_sr.state,
             include_all=include_all,
             pr=self.current_pr,
         )
         response_body = self.get_example_response_body(
-            gui.session_state, as_async=as_async, include_all=include_all
+            self.current_sr.state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
@@ -2596,7 +2596,8 @@ def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
     include_all: bool = True,
-    preferred_fields: list[str] = None,
+    preferred_fields: typing.Iterable[str] | None = None,
+    unpreferred_fields: typing.Iterable[str] = ("variables_schema",),
     diff_from: dict | None = None,
 ) -> dict:
     """
@@ -2615,6 +2616,7 @@ def extract_model_fields(
             or (preferred_fields and field_name in preferred_fields)
             or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )
+        and field_name not in unpreferred_fields
     }
 
 

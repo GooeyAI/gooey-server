@@ -1,6 +1,8 @@
 import json
+from datetime import timedelta
 from json import JSONDecodeError
 
+import sentry_sdk
 from celery import shared_task
 from django.db import transaction
 from django.db.models import QuerySet
@@ -8,6 +10,7 @@ from django.utils import timezone
 from loguru import logger
 
 from bots.models import (
+    BotIntegrationScheduledRun,
     Message,
     CHATML_ROLE_ASSISSTANT,
     BotIntegration,
@@ -15,6 +18,7 @@ from bots.models import (
     Platform,
     BotIntegrationAnalysisRun,
 )
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
 from daras_ai_v2.slack_bot import (
@@ -25,6 +29,7 @@ from daras_ai_v2.slack_bot import (
 from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from recipes.VideoBots import ReplyButton, messages_as_prompt
+from recipes.VideoBotsStats import get_conversations_and_messages, get_tabular_data
 
 MAX_PROMPT_LEN = 100_000
 
@@ -209,6 +214,45 @@ def send_broadcast_msg(
                     f"Platform {bi.platform} doesn't support broadcasts yet"
                 )
         # save_broadcast_message(convo, text, msg_id)
+
+
+@shared_task
+def exec_scheduled_runs():
+    for sched in BotIntegrationScheduledRun.objects.select_related(
+        "bot_integration"
+    ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
+        bi = sched.bot_integration
+        today = timezone.now().date()
+        conversations, messages = get_conversations_and_messages(bi)
+        df = get_tabular_data(
+            bi=sched.bot_integration,
+            conversations=conversations,
+            messages=messages,
+            details="Messages",
+            sort_by=None,
+            start_date=today,
+            end_date=today,
+        )
+        csv = df.to_csv()
+        csv_url = upload_file_from_bytes(
+            filename=f"stats-{today.strftime('%Y-%m-%d')}.csv",
+            data=csv,
+            content_type="text/csv",
+        )
+
+        logger.info(f"exported stats for {bi} -> {csv_url}")
+
+        fn_sr, fn_pr = sched.get_runs()
+        result, fn_sr = fn_sr.submit_api_call(
+            workspace=bi.workspace,
+            request_body=dict(variables=dict(messages_export_url=csv_url)),
+            parent_pr=fn_pr,
+            current_user=bi.workspace.created_by,
+        )
+        sched.last_run_at = fn_sr.created_at
+        sched.save(update_fields=["last_run_at"])
+
+        logger.info(f"ran scheduled function {fn_sr.get_app_url()}")
 
 
 ## Disabled for now to prevent messing up the chat history

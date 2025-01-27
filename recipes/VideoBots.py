@@ -173,7 +173,6 @@ class VideoBotsPage(BasePage):
         "max_context_words": 200,
         "scroll_jump": 5,
         "use_url_shortener": False,
-        "check_document_updates": False,
         "dense_weight": 1.0,
         "translation_model": DEFAULT_TRANSLATION_MODEL,
     }
@@ -615,6 +614,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def run_as_api_tab(self):
         elevenlabs_load_state(self)
         super().run_as_api_tab()
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "messages"]
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
