@@ -364,6 +364,10 @@ class VideoBotsStatsPage(BasePage):
             "Once per day, functions listed below will be called with the variable "
             "`messages_export_url`, the publicly accessible link of the day's messages as a csv file."
         )
+        gui.caption(
+            "Run history for these functions can be found on your "
+            f"[Functions page]({FunctionsPage.app_url(tab=RecipeTabs.history)})."
+        )
 
         if not export_daily_switch:
             if scheduled_runs:
