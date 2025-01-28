@@ -2,7 +2,6 @@ import json
 from datetime import timedelta
 from json import JSONDecodeError
 
-import sentry_sdk
 from celery import shared_task
 from django.db import transaction
 from django.db.models import QuerySet
@@ -219,11 +218,10 @@ def send_broadcast_msg(
 @shared_task
 def exec_scheduled_runs():
     for sched in BotIntegrationScheduledRun.objects.select_related(
-        "bot_integration"
+        "bot_integration__workspace__created_by"
     ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
-        bi = sched.bot_integration
         today = timezone.now().date()
-        conversations, messages = get_conversations_and_messages(bi)
+        conversations, messages = get_conversations_and_messages(sched.bot_integration)
         df = get_tabular_data(
             bi=sched.bot_integration,
             conversations=conversations,
@@ -240,14 +238,19 @@ def exec_scheduled_runs():
             content_type="text/csv",
         )
 
-        logger.info(f"exported stats for {bi} -> {csv_url}")
+        logger.info(f"exported stats for {sched.bot_integration} -> {csv_url}")
 
         fn_sr, fn_pr = sched.get_runs()
         result, fn_sr = fn_sr.submit_api_call(
-            workspace=bi.workspace,
-            request_body=dict(variables=dict(messages_export_url=csv_url)),
+            workspace=sched.bot_integration.workspace,
+            request_body=dict(
+                variables=(
+                    fn_sr.state.get("variables", {}) | dict(messages_export_url=csv_url)
+                ),
+                variables_schema=fn_sr.state.get("variables_schema", {}),
+            ),
             parent_pr=fn_pr,
-            current_user=bi.workspace.created_by,
+            current_user=sched.bot_integration.workspace.created_by,
         )
         sched.last_run_at = fn_sr.created_at
         sched.save(update_fields=["last_run_at"])
