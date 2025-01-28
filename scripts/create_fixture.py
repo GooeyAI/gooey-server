@@ -99,11 +99,12 @@ def export_pr(pr: PublishedRun):
 
 def export_workspace(workspace: Workspace):
     yield from export_user(workspace.created_by)
-    yield export(workspace, include_fks={"created_by"})
+    if workspace.handle_id:
+        yield export(workspace.handle)
+    yield export(workspace, include_fks={"created_by", "handle"})
 
 
 def export_user(user: AppUser):
-    yield user.handle
     yield export(
         user,
         only_include={
