@@ -37,10 +37,10 @@ def get_field_mappings(module: str) -> List[Dict]:
     field_mappings = {
         "Deals": [
             {"api_name": "Layout", "default_value": {"value": "6093802000000498176"}},
-            {"api_name": "id", "index": 0},
-            {"api_name": "Invoice_ID", "index": 1},
-            {"api_name": "Account_Lookup", "index": 2, "find_by": "id"},
-            {"api_name": "Contact_Lookup", "index": 3, "find_by": "id"},
+            {"api_name": "Invoice_ID", "index": 0},
+            {"api_name": "Account_Lookup", "index": 1, "find_by": "Gooey_ID"},
+            {"api_name": "Contact_Lookup", "index": 2, "find_by": "Gooey_User_ID"},
+            {"api_name": "Contact_Name", "index": 3, "find_by": "id"},
             {"api_name": "Account_Title", "index": 4},
             {"api_name": "Contact_Email", "index": 5},
             {"api_name": "Amount", "index": 6},
@@ -58,30 +58,31 @@ def get_field_mappings(module: str) -> List[Dict]:
             {"api_name": "Primary_Workflow", "index": 18},
         ],
         "Contacts": [
-            {"api_name": "id", "index": 0},
-            {"api_name": "Gooey_User_ID", "index": 1},
-            # {"api_name": "Gooey_Admin_Link", "index": 2},
-            {"api_name": "Contact_Name", "index": 3},
-            {"api_name": "Last_Name", "index": 4},
-            {"api_name": "Email", "index": 5},
-            {"api_name": "Phone", "index": 6},
-            {"api_name": "Not_Synced", "index": 7},
-            {"api_name": "Contact_Image", "index": 8},
-            {"api_name": "Gooey_Created_Date", "index": 9, "format": "yyyy-MM-dd"},
-            {"api_name": "Gooey_Handle", "index": 10},
-            {"api_name": "Registered_Date", "index": 11, "format": "yyyy-MM-dd"},
-            {"api_name": "Description", "index": 12},
-            {"api_name": "Company", "index": 13},
-            {"api_name": "Personal_Url", "index": 14},
+            {"api_name": "Gooey_User_ID", "index": 0},
+            {"api_name": "Gooey_Admin_Link", "index": 1},
+            {"api_name": "Contact_Name", "index": 2},
+            {"api_name": "Last_Name", "index": 3},
+            {"api_name": "Email", "index": 4},
+            {"api_name": "Phone", "index": 5},
+            {"api_name": "Not_Synced", "index": 6},
+            {"api_name": "Contact_Image", "index": 7},
+            {"api_name": "Gooey_Created_Date", "index": 8, "format": "yyyy-MM-dd"},
+            {"api_name": "Gooey_Handle", "index": 9},
+            {"api_name": "Registered_Date", "index": 10, "format": "yyyy-MM-dd"},
+            {"api_name": "Description", "index": 11},
+            {"api_name": "Company", "index": 12},
+            {"api_name": "Personal_Url", "index": 13},
+            {"api_name": "Account_Lookup", "find_by": "Gooey_ID", "index": 14},
         ],
         "Accounts": [
-            {"api_name": "id", "index": 0},
+            {"api_name": "Gooey_ID", "index": 0},
             {"api_name": "Account_Name", "index": 1},
-            {"api_name": "Balance", "index": 2},
-            {"api_name": "Is_Paying", "index": 3},
-            {"api_name": "Gooey_Admin_Link", "index": 4},
-            {"api_name": "Created_Date", "index": 5, "format": "yyyy-MM-dd"},
-            {"api_name": "Updated_At", "index": 5, "format": "yyyy-MM-dd"},
+            {"api_name": "Picture", "index": 2},
+            {"api_name": "Balance", "index": 3},
+            {"api_name": "Is_Paying", "index": 4},
+            {"api_name": "Gooey_Admin_Link", "index": 5},
+            {"api_name": "Created_Date", "index": 6, "format": "yyyy-MM-dd"},
+            {"api_name": "Updated_At", "index": 7, "format": "yyyy-MM-dd"},
         ],
     }
     return field_mappings.get(module, [])
@@ -106,9 +107,9 @@ def get_unique_field(module: str) -> str:
     :return: Unique field name for the specified module
     """
     unique_fields = {
-        "Contacts": "id",
-        "Accounts": "id",
-        "Deals": "id",
+        "Contacts": "Gooey_User_ID",
+        "Accounts": "Gooey_ID",
+        "Deals": "Invoice_ID",
     }
     return unique_fields.get(module, "ID")
 
@@ -127,11 +128,10 @@ class ConfigurableFieldMapper:
         """
         default_config = {
             "contact_mapping": {
-                "id": {"db_key": "id"},
                 "Gooey_User_ID": {"db_key": "uid"},
                 "Gooey_Admin_Link": {
-                    "db_key": "django_appUser_url",
-                    "transformer": lambda url: url(),
+                    "db_key": "id",
+                    "transformer": lambda id: f"https://admin.gooey.ai/app_users/appuser/{id}",
                 },
                 "Contact_Name": {"db_key": "display_name"},
                 "Last_Name": {
@@ -159,7 +159,6 @@ class ConfigurableFieldMapper:
                 "Personal_URL": {"db_key": "website_url"},
             },
             "transaction_mapping": {
-                "id": {"db_key": "id"},
                 "Invoice_ID": {"db_key": "invoice_id"},
                 "Account_Lookup": {
                     "db_key": "workspace",
@@ -167,9 +166,13 @@ class ConfigurableFieldMapper:
                 },
                 "Contact_Lookup": {
                     "db_key": "user",
-                    "transformer": lambda user: user.id,
+                    "transformer": lambda user: user.uid,
                 },
-                "Account_Name": {"db_key": "workspace"},
+                "Contact_Name": {
+                    "db_key": "user",
+                    "transformer": lambda user: user.display_name,
+                },
+                "Account_Title": {"db_key": "workspace"},
                 "Contact_Email": {
                     "db_key": "user",
                     "transformer": lambda user: user.email,
@@ -195,14 +198,14 @@ class ConfigurableFieldMapper:
                 "Currency": {"db_key": "currency", "default": "USD"},
             },
             "workspace_mapping": {
-                "id": {"db_key": "id"},
+                "Gooey_ID": {"db_key": "id"},
                 "Account_Name": {"db_key": "name"},
-                "Account_Image": {"db_key": "photo_url"},
+                "Picture": {"db_key": "photo_url"},
                 "Balance": {"db_key": "balance"},
                 "Is_Paying": {"db_key": "is_paying"},
                 "Gooey_Admin_Link": {
-                    "db_key": "django_workspace_url",
-                    "transformer": lambda url: url(),
+                    "db_key": "id",
+                    "transformer": lambda id: f"https://admin.gooey.ai/workspaces/workspace/{id}/",
                 },
                 "Created_Date": {
                     "db_key": "created_at",
@@ -301,7 +304,7 @@ class ZohoBulkUploader:
             )
             deal_data.update(
                 {
-                    "Deal_Name": f"${transaction.amount} {transaction.workspace} {transaction.reason_note()}",
+                    "Deal_Name": f"${transaction.amount} {transaction.workspace} {transaction.created_at.strftime(settings.SHORT_DATETIME_FORMAT)} {transaction.reason_note()}",
                     "Stage": "Organic  Closed Won",
                     "Vertical": "Organic",
                     "Pipeline": "Organic Deals",
@@ -459,6 +462,7 @@ class ZOHOSync:
         end_date: Optional[datetime] = None,
         positive_only: bool = True,
         limit: int | None = None,
+        dry_run: bool = False,
     ):
         stats = {"processed": 0, "successful": 0, "failed": 0, "errors": []}
         # Build transaction query with optional date filtering
@@ -513,11 +517,21 @@ class ZOHOSync:
                 print(f"{batch_label} Contacts CSV: {contact_file}")
                 print(f"{batch_label} Accounts CSV: {account_file}")
 
-                if deal_file:
+                if not dry_run and (deal_file and contact_file and account_file):
                     upload_response = self.bulk_uploader.process_bulk_upload(
                         [deal_file, account_file, contact_file]
                     )
                     print(f"Deals upload response: {upload_response}")
+                else:
+                    print("Dry run. Skipping upload.")
+                    print(
+                        "Deal File:",
+                        deal_file,
+                        "Contact File:",
+                        contact_file,
+                        "Account File:",
+                        account_file,
+                    )
 
             except Exception as e:
                 self.logger.error(f"Batch sync failed: {str(e)}")
