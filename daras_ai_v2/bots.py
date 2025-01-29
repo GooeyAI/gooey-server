@@ -2,14 +2,12 @@ import mimetypes
 import typing
 from datetime import datetime
 
-import glom
 import gooey_gui as gui
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
-from pyquery import PyQuery as pq
 
 from app_users.models import AppUser
 from bots.models import (
@@ -172,7 +170,7 @@ class BotInterface:
             text = self.translate_response(text)
 
         buttons = buttons or []
-        text = parse_html(text, buttons)
+        text = parse_bot_html(text, buttons)
 
         return self._send_msg(
             text=text,
@@ -234,12 +232,16 @@ class BotInterface:
             return text or ""
 
 
-def parse_html(
+def parse_bot_html(
     text: str,
     buttons: list,
     max_title_len: int = 20,
     max_id_len: int = 256,
 ) -> str:
+    if "<button" not in text:
+        return text
+    from pyquery import PyQuery as pq
+
     doc = pq(f"<root>{text}</root>")
     elements = doc("button")
     if not elements:
@@ -653,6 +655,8 @@ def _handle_interactive_msg(bot: BotInterface):
 
         # not sure what button was pressed, ignore
         case _:
+            import glom
+
             # encoded by parse_html
             target, title = None, None
             parts = csv_decode_row(button.button_id)
