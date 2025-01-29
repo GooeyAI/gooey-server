@@ -43,27 +43,52 @@ class PublicRunsSummary(typing.NamedTuple):
     top_workflows: dict[Workflow, int]
 
 
-def get_meta_tags_for_profile(user: AppUser):
-    handle = user.get_handle()
-    assert handle
+def get_meta_tags_for_profile(handle: Handle):
+    assert handle.has_workspace
 
     return raw_build_meta_tags(
         url=handle.get_app_url(),
-        title=_get_meta_title_for_profile(user),
-        description=_get_meta_description_for_profile(user) or None,
-        image=get_profile_image(user),
+        title=_get_meta_title_for_profile(handle),
+        description=_get_meta_description_for_profile(handle) or None,
+        image=handle.workspace.get_photo(),
         canonical_url=handle.get_app_url(),
     )
 
 
-def user_profile_page(request: Request, user: AppUser, handle: Handle | None):
-    with gui.div(className="mt-3"):
-        user_profile_header(request, user=user, handle=handle)
+def profile_page(request: Request, handle: Handle):
+    if handle.workspace.is_personal:
+        user_profile_header(request, user=handle.workspace.created_by, handle=handle)
+    else:
+        team_profile_header(request, workspace=handle.workspace)
+
     gui.html("\n<hr>\n")
-    user_profile_main_content(user)
+    render_public_runs_grid(handle.workspace)
 
 
-def user_profile_header(request: Request, user: AppUser, handle: Handle | None):
+def team_profile_header(request: Request, workspace: "Workspace"):
+    run_count = SavedRun.objects.filter(workspace=workspace).count()
+
+    with gui.div(className="my-3"):
+        col1, col2 = gui.columns([2, 10])
+    with col1:
+        render_profile_image(workspace.get_photo())
+    with (
+        col2,
+        gui.div(
+            className="h-100 d-flex flex-column justify-content-between gap-2 no-margin"
+        ),
+    ):
+        with gui.div():
+            gui.write(f"# {workspace.display_name()}")
+            gui.caption(workspace.description)
+        with gui.div():
+            gui.caption(
+                f"{icons.run} {format_number_with_suffix(run_count)} runs",
+                unsafe_allow_html=True,
+            )
+
+
+def user_profile_header(request: Request, user: AppUser, handle: Handle):
     if user.banner_url:
         with _banner_image_div(user.banner_url, className="my-3"):
             pass
@@ -75,10 +100,7 @@ def user_profile_header(request: Request, user: AppUser, handle: Handle | None):
         col1,
         gui.div(className="d-flex justify-content-center align-items-center h-100"),
     ):
-        render_profile_image(
-            get_profile_image(user),
-            className="mb-3",
-        )
+        render_profile_image(user.get_photo(), className="mb-3")
 
     run_count = get_run_count(user)
     contribs = get_contributions_summary(user)
@@ -171,9 +193,9 @@ def user_profile_header(request: Request, user: AppUser, handle: Handle | None):
         )
 
 
-def user_profile_main_content(user: AppUser):
+def render_public_runs_grid(workspace: "Workspace"):
     public_runs = PublishedRun.objects.filter(
-        created_by=user,
+        workspace=workspace,
         visibility=PublishedRunVisibility.PUBLIC,
     ).order_by("-updated_at")
 
@@ -421,9 +443,9 @@ def _edit_user_profile_photo_section(workspace: "Workspace"):
                     gui.rerun()
 
             with image_div:
-                render_profile_image(get_profile_image(user))
+                render_profile_image(user.get_photo())
         else:
-            render_profile_image(get_profile_image(user))
+            render_profile_image(user.get_photo())
 
             with gui.div(className="mt-2"):
                 if gui.button(
@@ -446,21 +468,7 @@ def _edit_user_profile_form_section(workspace: "Workspace"):
     user = workspace.created_by
     user.display_name = gui.text_input("Name", value=user.display_name)
 
-    handle_style: dict[str, str] = {}
-    if new_handle := gui.text_input(
-        "Username",
-        value=workspace.handle and workspace.handle.name or "",
-        style=handle_style,
-    ):
-        if not workspace.handle or workspace.handle.name != new_handle:
-            try:
-                Handle(name=new_handle).full_clean()
-            except ValidationError as e:
-                gui.error(e.messages[0], icon="")
-                handle_style["border"] = "1px solid var(--bs-danger)"
-            else:
-                gui.success(f"Handle `@{new_handle}` is available", icon="")
-                handle_style["border"] = "1px solid var(--bs-success)"
+    handle_name = render_handle_input("Username", handle=workspace.handle)
 
     if email := user.email:
         gui.text_input("Email", value=email, disabled=True)
@@ -488,43 +496,36 @@ def _edit_user_profile_form_section(workspace: "Workspace"):
     ):
         try:
             with transaction.atomic():
-                if new_handle and not workspace.handle:
-                    # user adds a new handle
-                    workspace.handle = Handle(name=new_handle)
-                    workspace.handle.save()
-                elif new_handle and workspace.handle.name != new_handle:
-                    # change existing handle
-                    workspace.handle.name = new_handle
-                    workspace.handle.save()
-                elif not new_handle and workspace.handle:
-                    # remove existing handle
-                    workspace.handle.delete()
-                    workspace.handle = None
-                workspace.full_clean()
+                new_handle = update_handle(workspace.handle, name=handle_name)
+                if new_handle != workspace.handle:
+                    workspace.handle = new_handle
+                    workspace.save()
                 user.save()
-                workspace.save()
         except ValidationError as e:
             gui.error("\n\n".join(e.messages))
         else:
             gui.success("Changes saved")
 
 
-def _get_meta_title_for_profile(user: AppUser) -> str:
-    if user.display_name:
-        title = user.display_name
-    elif handle := user.get_handle():
-        title = handle.name
+def _get_meta_title_for_profile(handle: Handle) -> str:
+    workspace = handle.workspace
+    if not workspace.is_personal:
+        title = workspace.display_name()
     else:
-        title = ""
-
-    if user.company:
-        title += f" - {user.company[:15]}"
+        title = workspace.created_by.display_name or handle.name or ""
+        if workspace.created_by.company:
+            title += f" - {workspace.created_by.company[:15]}"
 
     title += f" {META_SEP} {META_TITLE_SUFFIX}"
     return title
 
 
-def _get_meta_description_for_profile(user: AppUser) -> str:
+def _get_meta_description_for_profile(handle: Handle) -> str:
+    workspace = handle.workspace
+    if not workspace.is_personal:
+        return workspace.description
+
+    user = workspace.created_by
     description = truncate_text_words(user.bio, maxlen=60)
 
     total_runs = get_run_count(user)
@@ -534,8 +535,7 @@ def _get_meta_description_for_profile(user: AppUser) -> str:
     if description:
         description += f" {META_SEP} "
 
-    if handle := user.get_handle():
-        description += f"{handle.name} has "
+    description += f"{handle.name} has "
 
     public_runs_summary = get_public_runs_summary(user)
     contributions_summary = get_contributions_summary(user)
@@ -561,17 +561,53 @@ def _get_meta_description_for_profile(user: AppUser) -> str:
     return description
 
 
+def render_handle_input(
+    label: str, *, handle: Handle | None = None, **kwargs
+) -> str | None:
+    handle_style: dict[str, str] = {}
+    new_handle = gui.text_input(
+        label,
+        value=handle and handle.name or "",
+        style=handle_style,
+        **kwargs,
+    )
+    if not new_handle or (handle and handle.name == new_handle):
+        # nothing to validate
+        return new_handle
+
+    try:
+        Handle(name=new_handle).full_clean()
+    except ValidationError as e:
+        gui.error(e.messages[0], icon="")
+        handle_style["border"] = "1px solid var(--bs-danger)"
+    else:
+        gui.success("Handle is available", icon="")
+        handle_style["border"] = "1px solid var(--bs-success)"
+
+    return new_handle
+
+
+def update_handle(handle: Handle | None, name: str | None) -> Handle | None:
+    if handle and name and handle.name != name:
+        # user changes existing handle
+        handle.name = name
+        handle.save()
+        return handle
+    elif handle and not name:
+        # user removes existing handle
+        handle.delete()
+        return None
+    elif not handle and name:
+        # user adds a new handle
+        handle = Handle(name=name)
+        handle.save()
+        return handle
+    else:
+        return handle
+
+
 def github_url_for_username(username: str) -> str:
     return f"https://github.com/{escape_html(username)}"
-
-
-def get_profile_image(user: AppUser, placeholder_seed: str | None = None) -> str:
-    return user.photo_url or get_placeholder_profile_image(placeholder_seed or user.uid)
-
-
-def get_placeholder_profile_image(seed: str) -> str:
-    hash = hashlib.md5(seed.encode()).hexdigest()
-    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
 
 
 def get_profile_title(user: AppUser) -> str:
