@@ -1,7 +1,7 @@
-import hashlib
 import typing
 from html import escape as escape_html
 
+from django.utils.translation import ngettext
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -28,9 +28,8 @@ from daras_ai_v2.meta_content import (
     raw_build_meta_tags,
 )
 from handles.models import Handle
-
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.widgets import set_current_workspace
 
 
 class ContributionsSummary(typing.NamedTuple):
@@ -56,42 +55,16 @@ def get_meta_tags_for_profile(handle: Handle):
 
 
 def profile_page(request: Request, handle: Handle):
-    if handle.workspace.is_personal:
-        user_profile_header(request, user=handle.workspace.created_by, handle=handle)
-    else:
-        team_profile_header(request, workspace=handle.workspace)
-
+    with gui.div(className="mt-3"):
+        profile_header(request=request, handle=handle)
     gui.html("\n<hr>\n")
     render_public_runs_grid(handle.workspace)
 
 
-def team_profile_header(request: Request, workspace: "Workspace"):
-    run_count = SavedRun.objects.filter(workspace=workspace).count()
-
-    with gui.div(className="my-3"):
-        col1, col2 = gui.columns([2, 10])
-    with col1:
-        render_profile_image(workspace.get_photo())
-    with (
-        col2,
-        gui.div(
-            className="h-100 d-flex flex-column justify-content-between gap-2 no-margin"
-        ),
-    ):
-        with gui.div():
-            gui.write(f"# {workspace.display_name()}")
-            gui.caption(workspace.description)
-        with gui.div():
-            gui.caption(
-                f"{icons.run} {format_number_with_suffix(run_count)} runs",
-                unsafe_allow_html=True,
-            )
-
-
-def user_profile_header(request: Request, user: AppUser, handle: Handle):
-    if user.banner_url:
-        with _banner_image_div(user.banner_url, className="my-3"):
-            pass
+def profile_header(request: Request, handle: Handle):
+    workspace = handle.workspace
+    if banner_url := workspace.get_banner_url():
+        _banner_image_div(banner_url, className="my-3")
 
     with gui.div(className="mt-3"):
         col1, col2 = gui.columns([2, 10])
@@ -100,10 +73,7 @@ def user_profile_header(request: Request, user: AppUser, handle: Handle):
         col1,
         gui.div(className="d-flex justify-content-center align-items-center h-100"),
     ):
-        render_profile_image(user.get_photo(), className="mb-3")
-
-    run_count = get_run_count(user)
-    contribs = get_contributions_summary(user)
+        render_profile_image(workspace.get_photo(), className="mb-3")
 
     with (
         col2,
@@ -115,68 +85,100 @@ def user_profile_header(request: Request, user: AppUser, handle: Handle):
             className="d-inline d-lg-flex w-100 justify-content-between align-items-end"
         ):
             with gui.tag("h1", className="d-inline my-0 me-2"):
-                gui.html(escape_html(get_profile_title(user)))
+                gui.html(escape_html(get_profile_title(workspace)))
 
-            if request.user == user:
-                from routers.account import AccountTabs
+            if request.user in (workspace.get_owners() | workspace.get_admins()):
+                _render_edit_profile_button(request=request, workspace=workspace)
 
-                with gui.link(
-                    to=AccountTabs.profile.url_path,
-                    className="text-decoration-none btn btn-theme btn-secondary mb-0",
-                ):
-                    gui.html(f"{icons.edit} Edit Profile")
+        with gui.tag("p", className="lead text-secondary mb-0"):
+            gui.html(escape_html(handle.name))
 
-        if handle:
-            with gui.tag("p", className="lead text-secondary mb-0"):
-                gui.html(escape_html(handle.name))
+        with gui.div(className="mt-2 text-secondary"):
+            gui.write(workspace.get_description() or "")
 
-        if user.bio:
-            with gui.div(className="mt-2 text-secondary"):
-                gui.html(escape_html(user.bio))
+        if workspace.is_personal:
+            _render_user_profile_links(workspace.created_by)
+            _render_user_profile_stats(workspace.created_by)
+        else:
+            _render_team_profile_links(workspace)
+            _render_team_profile_stats(workspace)
 
-        with gui.div(className="mt-3 d-flex flex-column d-lg-block"):
-            if user.github_username:
-                with gui.link(
-                    to=github_url_for_username(user.github_username),
+
+def _render_edit_profile_button(request: Request, workspace: Workspace):
+    from routers.account import AccountTabs
+
+    if workspace.is_personal:
+        label = f"{icons.edit} Edit Profile"
+        link = AccountTabs.profile.url_path
+    else:
+        label = f"{icons.octopus} Manage Workspace"
+        link = AccountTabs.members.url_path
+
+    if gui.button(label, type="secondary"):
+        set_current_workspace(request.session, workspace.id)
+        raise gui.RedirectException(link)
+
+
+def _render_user_profile_links(user: AppUser):
+    with gui.div(className="mt-3 d-flex flex-column d-lg-block"):
+        if user.github_username:
+            with gui.link(
+                to=github_url_for_username(user.github_username),
+                className="text-decoration-none",
+            ):
+                gui.pill(
+                    f"{icons.github} " + escape_html(user.github_username),
+                    unsafe_allow_html=True,
+                    text_bg=None,
+                    className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
+                )
+
+        if user.website_url:
+            with (
+                gui.tag(
+                    "span", className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1"
+                ),
+                gui.link(to=user.website_url, className="text-decoration-none"),
+            ):
+                gui.html(
+                    f"{icons.link} " + escape_html(urls.remove_scheme(user.website_url))
+                )
+
+        if user.company:
+            with gui.tag(
+                "span", className="text-sm text-muted me-lg-4 mb-1 d-inline-block"
+            ):
+                gui.html(f"{icons.company} " + escape_html(user.company))
+
+
+def _render_team_profile_links(workspace: Workspace):
+    with gui.div(className="mt-3 d-flex flex-column d-lg-block"):
+        if workspace.domain_name:
+            with (
+                gui.tag(
+                    "span", className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1"
+                ),
+                gui.link(
+                    to=f"https://{escape_html(workspace.domain_name)}",
                     className="text-decoration-none",
-                ):
-                    gui.pill(
-                        f"{icons.github} " + escape_html(user.github_username),
-                        unsafe_allow_html=True,
-                        text_bg=None,
-                        className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
-                    )
+                ),
+            ):
+                gui.html(f"{icons.link} {escape_html(workspace.domain_name)}")
 
-            if user.website_url:
-                with (
-                    gui.tag(
-                        "span",
-                        className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1",
-                    ),
-                    gui.link(to=user.website_url, className="text-decoration-none"),
-                ):
-                    gui.html(
-                        f"{icons.link} "
-                        + escape_html(urls.remove_scheme(user.website_url))
-                    )
 
-            if user.company:
-                with gui.tag(
-                    "span",
-                    className="text-sm text-muted me-lg-4 mb-1 d-inline-block",
-                ):
-                    gui.html(f"{icons.company} " + escape_html(user.company))
+def _render_user_profile_stats(user: AppUser):
+    run_count = get_run_count(user)
+    contribs = get_contributions_summary(user)
 
-        top_contributions_text = make_natural_english_list(
-            [
-                f"{escape_html(workflow.short_title)} ({count})"
-                for workflow, count in contribs.top_contributions.items()
-            ],
-            last_sep=", ",
-        )
-
-        gui.html(
-            f"""\
+    top_contributions_text = make_natural_english_list(
+        [
+            f"{escape_html(workflow.short_title)} ({count})"
+            for workflow, count in contribs.top_contributions.items()
+        ],
+        last_sep=", ",
+    )
+    gui.html(
+        f"""\
 <div class="d-flex mt-3">
     <div class="me-3 text-secondary">
         {icons.run} {escape_html(format_number_with_suffix(run_count))} runs
@@ -190,10 +192,33 @@ def user_profile_header(request: Request, user: AppUser, handle: Handle):
     </div>
 </div>
 """
-        )
+    )
 
 
-def render_public_runs_grid(workspace: "Workspace"):
+def _render_team_profile_stats(workspace: Workspace):
+    public_workflow_count = PublishedRun.objects.filter(
+        workspace=workspace, visibility=PublishedRunVisibility.PUBLIC
+    ).count()
+    members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
+
+    with gui.div(className="d-flex mt-3 text-secondary"):
+        with gui.div(className="me-3"):
+            gui.html(
+                f"{format_number_with_suffix(public_workflow_count)} Public Workflows"
+            )
+
+        with gui.div(className=""):
+            _render_member_photos(workspace)
+            members_text = ngettext(
+                singular="Member", plural="Members", number=members_count
+            )
+            gui.html(f"{members_count} {members_text}")
+
+
+def _render_member_photos(workspace: Workspace): ...
+
+
+def render_public_runs_grid(workspace: Workspace):
     public_runs = PublishedRun.objects.filter(
         workspace=workspace,
         visibility=PublishedRunVisibility.PUBLIC,
@@ -282,7 +307,7 @@ def _set_is_uploading_photo(val: bool):
     gui.session_state["_uploading_photo"] = val
 
 
-def edit_user_profile_page(workspace: "Workspace"):
+def edit_user_profile_page(workspace: Workspace):
     assert workspace.is_personal
 
     _edit_user_profile_header(workspace)
@@ -296,7 +321,7 @@ def edit_user_profile_page(workspace: "Workspace"):
         _edit_user_profile_form_section(workspace)
 
 
-def _edit_user_profile_header(workspace: "Workspace"):
+def _edit_user_profile_header(workspace: Workspace):
     handle = workspace.handle
 
     gui.write("# Update your Profile")
@@ -346,7 +371,7 @@ def _banner_image_div(url: str | None, **props):
     return gui.div(style=style, className=className)
 
 
-def _edit_user_profile_banner(workspace: "Workspace"):
+def _edit_user_profile_banner(workspace: Workspace):
     user = workspace.created_by
 
     def _is_uploading_banner_photo() -> bool:
@@ -417,7 +442,7 @@ def _edit_user_profile_banner(workspace: "Workspace"):
                     gui.rerun()
 
 
-def _edit_user_profile_photo_section(workspace: "Workspace"):
+def _edit_user_profile_photo_section(workspace: Workspace):
     user = workspace.created_by
 
     with gui.div(className="w-100 h-100 d-flex align-items-center flex-column"):
@@ -464,7 +489,7 @@ def _edit_user_profile_photo_section(workspace: "Workspace"):
                     gui.rerun()
 
 
-def _edit_user_profile_form_section(workspace: "Workspace"):
+def _edit_user_profile_form_section(workspace: Workspace):
     user = workspace.created_by
     user.display_name = gui.text_input("Name", value=user.display_name)
 
@@ -610,7 +635,11 @@ def github_url_for_username(username: str) -> str:
     return f"https://github.com/{escape_html(username)}"
 
 
-def get_profile_title(user: AppUser) -> str:
+def get_profile_title(workspace: Workspace) -> str:
+    if not workspace.is_personal:
+        return workspace.display_name()
+
+    user = workspace.created_by
     if user.display_name:
         return user.display_name
     elif user.email:
