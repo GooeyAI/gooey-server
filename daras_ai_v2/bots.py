@@ -233,12 +233,12 @@ class BotInterface:
 
 
 def parse_bot_html(
-    text: str,
+    text: str | None,
     buttons: list,
     max_title_len: int = 20,
     max_id_len: int = 256,
 ) -> str:
-    if "<button" not in text:
+    if not text or "<button" not in text:
         return text
     from pyquery import PyQuery as pq
 
