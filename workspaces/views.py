@@ -1,6 +1,7 @@
 import html as html_lib
 from copy import copy
 
+from django.db import transaction
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
@@ -11,6 +12,7 @@ from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
+from daras_ai_v2.profiles import render_handle_input, update_handle
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
@@ -316,12 +318,20 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
         confirm_label=f"{icons.save} Save",
     ):
         workspace_copy = render_workspace_edit_view_by_membership(ref, membership)
+        input_handle_name = gui.session_state.pop(
+            "workspace-handle-name",
+            workspace_copy.handle and workspace_copy.handle.name,
+        )
 
         if not ref.pressed_confirm:
             return
         try:
             workspace_copy.full_clean()
-            workspace_copy.save()
+            with transaction.atomic():
+                new_handle = update_handle(workspace_copy.handle, input_handle_name)
+                if new_handle != workspace_copy.handle:
+                    workspace_copy.handle = new_handle
+                workspace_copy.save()
         except ValidationError as e:
             # newlines in markdown
             gui.write("\n".join(e.messages), className="text-danger")
@@ -624,6 +634,11 @@ def render_workspace_create_or_edit_form(
         key="workspace-name",
         value=workspace.name,
     ).strip()
+    render_handle_input(
+        "###### Handle",
+        key="workspace-handle-name",
+        handle=workspace.handle,
+    )
     workspace.description = gui.text_area(
         "###### Description _(Optional)_",
         key="workspace-description",
@@ -650,6 +665,12 @@ def render_workspace_create_or_edit_form(
         accept=["image/*"],
         key="workspace-logo",
         value=workspace.photo_url,
+    )
+    workspace.banner_url = gui.file_uploader(
+        "###### Banner",
+        accept=["image/*"],
+        key="workspace-banner-url",
+        value=workspace.banner_url,
     )
 
 

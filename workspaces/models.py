@@ -131,6 +131,7 @@ class Workspace(SafeDeleteModel):
         blank=True,
     )
     photo_url = CustomURLField(null=True, blank=True)
+    banner_url = CustomURLField(null=True, blank=True)
     description = models.TextField(blank=True, default="")
 
     # billing
@@ -208,6 +209,15 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
+            workspace_memberships__deleted__isnull=True,
+        )
+
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -360,6 +370,18 @@ class Workspace(SafeDeleteModel):
             return self.created_by.get_photo()
         else:
             return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
+
+    def get_banner_url(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.banner_url
+        else:
+            return self.banner_url
+
+    def get_description(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.bio
+        else:
+            return self.description
 
     def add_domain_members(self):
         from app_users.models import AppUser
