@@ -1,3 +1,4 @@
+import hashlib
 import typing
 from functools import cached_property
 
@@ -248,6 +249,9 @@ class AppUser(models.Model):
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
 
+    def get_photo(self) -> str:
+        return self.photo_url or get_placeholder_profile_image(self.uid)
+
 
 class TransactionReason(models.IntegerChoices):
     DEDUCT = 1, "Deduct"
@@ -381,3 +385,8 @@ class AppUserTransaction(models.Model):
                     furl("https://www.paypal.com/unifiedtransactions/details/payment/")
                     / self.invoice_id
                 )
+
+
+def get_placeholder_profile_image(seed: str) -> str:
+    hash = hashlib.md5(seed.encode()).hexdigest()
+    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"

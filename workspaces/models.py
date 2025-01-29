@@ -21,7 +21,6 @@ from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.profiles import get_profile_image
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import COMMON_EMAIL_DOMAINS
 from .tasks import send_added_to_workspace_email, send_invitation_email
@@ -356,9 +355,9 @@ class Workspace(SafeDeleteModel):
         else:
             return icons.company
 
-    def get_photo(self) -> str | None:
+    def get_photo(self) -> str:
         if self.is_personal:
-            return self.created_by and get_profile_image(self.created_by)
+            return self.created_by.get_photo()
         else:
             return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
 
