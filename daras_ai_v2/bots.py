@@ -2,12 +2,14 @@ import mimetypes
 import typing
 from datetime import datetime
 
+import glom
 import gooey_gui as gui
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
+from pyquery import PyQuery as pq
 
 from app_users.models import AppUser
 from bots.models import (
@@ -21,8 +23,10 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -30,7 +34,6 @@ from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
-
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -70,6 +73,9 @@ class ButtonPressed(BaseModel):
     )
     context_msg_id: str = Field(
         description="The message ID of the context message on which the button was pressed"
+    )
+    button_title: str | None = Field(
+        description="The title of the button that was pressed by the user"
     )
 
 
@@ -164,6 +170,10 @@ class BotInterface:
         """
         if should_translate:
             text = self.translate_response(text)
+
+        buttons = buttons or []
+        text = parse_html(text, buttons)
+
         return self._send_msg(
             text=text,
             audio=audio,
@@ -224,6 +234,32 @@ class BotInterface:
             return text or ""
 
 
+def parse_html(
+    text: str,
+    buttons: list,
+    max_title_len: int = 20,
+    max_id_len: int = 256,
+) -> str:
+    doc = pq(f"<root>{text}</root>")
+    elements = doc("button")
+    if not elements:
+        return text
+    for idx, btn in enumerate(elements):
+        if not btn.text:
+            continue
+        buttons.append(
+            ReplyButton(
+                id=truncate_text_words(
+                    # parsed by _handle_interactive_msg
+                    csv_encode_row(idx + 1, btn.attrib.get("gui-target"), btn.text),
+                    max_id_len,
+                ),
+                title=truncate_text_words(btn.text, max_title_len),
+            )
+        )
+    return doc.remove("button").html().strip()
+
+
 def _echo(bot, input_text):
     response_text = f"You said ```{input_text}```\nhttps://www.youtube.com/"
     if bot.get_input_audio():
@@ -263,10 +299,10 @@ def _msg_handler(bot: BotInterface):
     input_images = None
     input_documents = None
     match bot.input_type:
-        # handle button press
+        # handled button press
         case "interactive":
-            _handle_interactive_msg(bot)
-            return
+            if _handle_interactive_msg(bot):
+                return
         case "image":
             input_images = bot.get_input_images()
             if not input_images:
@@ -375,7 +411,7 @@ def _process_and_send_msg(
     if bot.user_language:
         body["user_language"] = bot.user_language
     if bot.request_overrides:
-        body = bot.request_overrides | body
+        body.update(bot.request_overrides)
         try:
             variables.update(bot.request_overrides["variables"])
         except KeyError:
@@ -605,6 +641,7 @@ def _handle_interactive_msg(bot: BotInterface):
                 # buttons=_feedback_post_click_buttons(),
                 should_translate=True,
             )
+            return True
 
         # handle skip
         case ButtonIds.action_skip:
@@ -612,19 +649,22 @@ def _handle_interactive_msg(bot: BotInterface):
             # reset state
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
-            return
+            return True
 
         # not sure what button was pressed, ignore
         case _:
-            bot_name = str(bot.bi.name)
-            bot.send_msg(
-                text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
-                should_translate=True,
+            # encoded by parse_html
+            target, title = None, None
+            parts = csv_decode_row(button.button_id)
+            if len(parts) >= 3:
+                target, title = parts[1:3]
+            bot.request_overrides = bot.request_overrides or {}
+            glom.assign(
+                bot.request_overrides,
+                target or "input_prompt",
+                title or button.button_title,
             )
-            # reset state
-            bot.convo.state = ConvoState.INITIAL
-            bot.convo.save()
-            return
+            return False
 
 
 class ButtonIds:

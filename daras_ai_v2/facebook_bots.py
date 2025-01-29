@@ -92,6 +92,7 @@ class WhatsappBot(BotInterface):
     def get_interactive_msg_info(self) -> ButtonPressed:
         return ButtonPressed(
             button_id=self.input_message["interactive"]["button_reply"]["id"],
+            button_title=self.input_message["interactive"]["button_reply"]["title"],
             context_msg_id=self.input_message["context"]["id"],
         )
 
@@ -168,7 +169,7 @@ class WhatsappBot(BotInterface):
                 messages = [
                     # interactive text msg + video in header
                     _build_msg_buttons(
-                        buttons,
+                        buttons[i : i + 3],
                         {
                             "body": {
                                 "text": text or "\u200b",
@@ -178,7 +179,9 @@ class WhatsappBot(BotInterface):
                                 "video": {"link": video},
                             },
                         },
-                    ),
+                    )
+                    # wa allows max 3 buttons per message
+                    for i in range(0, len(buttons), 3)
                 ]
             else:
                 messages = [
@@ -195,13 +198,15 @@ class WhatsappBot(BotInterface):
             # interactive text msg
             messages = [
                 _build_msg_buttons(
-                    buttons,
+                    buttons[i : i + 3],
                     {
                         "body": {
                             "text": text or "\u200b",
-                        }
+                        },
                     },
-                ),
+                )
+                # wa allows max 3 buttons per message
+                for i in range(0, len(buttons), 3)
             ]
         elif text:
             # simple text msg
@@ -209,7 +214,7 @@ class WhatsappBot(BotInterface):
                 {
                     "type": "text",
                     "text": {
-                        "body": text,
+                        "body": text or "\u200b",
                         "preview_url": True,
                     },
                 },
