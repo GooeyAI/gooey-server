@@ -201,13 +201,13 @@ def _render_team_profile_stats(workspace: Workspace):
     ).count()
     members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
 
-    with gui.div(className="d-flex mt-3 text-secondary"):
+    with gui.div(className="d-flex align-items-center mt-3 text-secondary"):
         with gui.div(className="me-3"):
             gui.html(
                 f"{format_number_with_suffix(public_workflow_count)} Public Workflows"
             )
 
-        with gui.div(className=""):
+        with gui.div(className="d-flex align-items-center gap-2"):
             _render_member_photos(workspace)
             members_text = ngettext(
                 singular="Member", plural="Members", number=members_count
@@ -215,7 +215,38 @@ def _render_team_profile_stats(workspace: Workspace):
             gui.html(f"{members_count} {members_text}")
 
 
-def _render_member_photos(workspace: Workspace): ...
+def _render_member_photos(workspace: Workspace):
+    with gui.styled(
+        """
+        .avatar-group { display: flex; }
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            background-color: white;
+            overflow: hidden;
+            margin-left: -15px;
+        }
+        .avatar:first-child {
+            margin-left: 0;
+        }
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        """
+    ):
+        with gui.div(className="avatar-group"):
+            members = reversed(
+                WorkspaceMembership.objects.select_related("user")
+                .filter(workspace=workspace)
+                .order_by("created_at")[:5]
+            )
+            for member in members:
+                with gui.div(className="avatar"):
+                    gui.image(src=member.user.get_photo())
 
 
 def render_public_runs_grid(workspace: Workspace):
