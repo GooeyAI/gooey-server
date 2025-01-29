@@ -107,7 +107,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 class OneDriveAuth(UserError):
     def __init__(self, auth_url):
         message = f"""
-        <p>OneDrive access token or refresh token is missing for this workspace.</p><a href="{auth_url}"> LOGIN </a>"""
+<p>
+Onedrive access token or refresh token is missing for this workspace.
+</p>
+
+<p>
+<a href="{auth_url}">Please login</a> to your Onedrive account to use Onedrive files.
+</p>
+"""
         super().__init__(message, status_code=HTTP_401_UNAUTHORIZED)
 
 

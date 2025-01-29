@@ -16,7 +16,7 @@ def is_onedrive_url(f: furl) -> bool:
         return True
     elif f.host == "onedrive.live.com":
         raise UserError(
-            "Please provide a shareable OneDrive link (1drv.ms). Direct onedrive.live.com links are not supported."
+            "Direct onedrive.live.com links are not supported. Please provide a shareable OneDrive link (from Share > Copy Link) E.g. https://1drv.ms/xxx"
         )
 
 
@@ -60,7 +60,7 @@ def onedrive_meta(
         metadata = r.json()
 
         if "folder" in metadata:
-            raise UserError("Folders are not supported .")
+            raise UserError("Folders / OneNote are not supported yet.")
 
         return metadata
     except requests.exceptions.HTTPError as e:
@@ -81,7 +81,7 @@ def onedrive_meta(
 
         elif e.response.status_code == 403:
             raise UserError(
-                "make sure the document is accessible from logged in microsoft account"
+                message=f"""[This document]({f_url}) is not accessible by the logged-in User.\n Please make the document accessible for viewing, or [Login]({generate_onedrive_auth_url(current_app_url)}) with a onedrive account that can access this file.\n\n Note that you can only be logged in to one onedrive account at a time."""
             )
         else:
             raise e

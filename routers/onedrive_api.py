@@ -52,7 +52,7 @@ def onedrive_connect_redirect(request: Request):
 
     redirect_url.add({SUBMIT_AFTER_LOGIN_Q: "1"})
 
-    return RedirectResponse(redirect_url)
+    return RedirectResponse(redirect_url.url)
 
 
 onedrive_connect_redirect_url = (
@@ -90,18 +90,6 @@ def _get_access_token_from_code(
     code: str,
     redirect_uri: str,
 ):
-    # url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-    # logger.debug(
-    #     f"{settings.ONEDRIVE_CLIENT_ID=} ,  {settings.ONEDRIVE_CLIENT_SECRET=}"
-    # )
-
-    # payload = {
-    #     "client_id": settings.ONEDRIVE_CLIENT_ID,
-    #     "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-    #     "code": code,
-    #     "redirect_uri": redirect_uri,
-    #     "grant_type": "authorization_code",
-    # }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     r = requests.post(
         url="https://login.microsoftonline.com/common/oauth2/v2.0/token",
