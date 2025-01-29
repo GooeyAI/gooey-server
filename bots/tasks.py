@@ -28,7 +28,11 @@ from daras_ai_v2.slack_bot import (
 from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from recipes.VideoBots import ReplyButton, messages_as_prompt
-from recipes.VideoBotsStats import get_conversations_and_messages, get_tabular_data
+from recipes.VideoBotsStats import (
+    exec_export_fn,
+    get_conversations_and_messages,
+    get_tabular_data,
+)
 
 MAX_PROMPT_LEN = 100_000
 
@@ -220,37 +224,9 @@ def exec_scheduled_runs():
     for sched in BotIntegrationScheduledRun.objects.select_related(
         "bot_integration__workspace__created_by"
     ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
-        today = timezone.now().date()
-        conversations, messages = get_conversations_and_messages(sched.bot_integration)
-        df = get_tabular_data(
-            bi=sched.bot_integration,
-            conversations=conversations,
-            messages=messages,
-            details="Messages",
-            sort_by=None,
-            start_date=today,
-            end_date=today,
-        )
-        csv = df.to_csv()
-        csv_url = upload_file_from_bytes(
-            filename=f"stats-{today.strftime('%Y-%m-%d')}.csv",
-            data=csv,
-            content_type="text/csv",
-        )
-
-        logger.info(f"exported stats for {sched.bot_integration} -> {csv_url}")
-
         fn_sr, fn_pr = sched.get_runs()
-        result, fn_sr = fn_sr.submit_api_call(
-            workspace=sched.bot_integration.workspace,
-            request_body=dict(
-                variables=(
-                    fn_sr.state.get("variables", {}) | dict(messages_export_url=csv_url)
-                ),
-                variables_schema=fn_sr.state.get("variables_schema", {}),
-            ),
-            parent_pr=fn_pr,
-            current_user=sched.bot_integration.workspace.created_by,
+        result, fn_sr = exec_export_fn(
+            bi=sched.bot_integration, fn_sr=fn_sr.id, fn_pr=fn_pr.id
         )
         sched.last_run_at = fn_sr.created_at
         sched.save(update_fields=["last_run_at"])

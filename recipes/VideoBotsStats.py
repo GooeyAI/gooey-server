@@ -17,10 +17,13 @@ from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
+from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from bots.models import (
     BotIntegrationScheduledRun,
+    PublishedRun,
+    SavedRun,
     Workflow,
     Platform,
     BotIntegration,
@@ -31,6 +34,7 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
@@ -394,20 +398,49 @@ class VideoBotsStatsPage(BasePage):
             input_functions: list[dict] = []
 
             def render_scheduled_run_input(key: str, del_key: str | None, d: dict):
-                ret = workflow_url_input(
-                    page_cls=FunctionsPage,
-                    key=key,
-                    internal_state=d,
-                    del_key=del_key,
-                    current_user=self.request.user,
-                )
-                if not ret:
-                    return
-                _, sr, pr = ret
-                if pr and pr.saved_run_id == sr.id:
-                    input_functions.append(dict(saved_run=None, published_run=pr))
-                else:
-                    input_functions.append(dict(saved_run=sr, published_run=None))
+                with gui.div(className="d-flex align-items-center gap-3"):
+                    with gui.div(className="flex-grow-1"):
+                        input_workflow = workflow_url_input(
+                            page_cls=FunctionsPage,
+                            key=key,
+                            internal_state=d,
+                            del_key=del_key,
+                            current_user=self.request.user,
+                        )
+                    if not input_workflow:
+                        return
+                    _, sr, pr = input_workflow
+                    if pr and pr.saved_run_id == sr.id:
+                        input_functions.append(dict(saved_run=None, published_run=pr))
+                    else:
+                        input_functions.append(dict(saved_run=sr, published_run=None))
+
+                    export_fn_run_key = "run_export_fn"
+                    if gui.button(
+                        f"{icons.run} Run",
+                        type="tertiary",
+                        disabled=gui.session_state.get(export_fn_run_key, False),
+                        key=f"{export_fn_run_key}-{sr.run_id}",
+                    ):
+                        gui.session_state[export_fn_run_key] = sr.run_id
+
+                if gui.session_state.get(export_fn_run_key) == sr.run_id:
+
+                    def jsonable_exec_export_fn(bi_id, sr_id, pr_id):
+                        return exec_export_fn(
+                            bi=BotIntegration.objects.get(id=bi_id),
+                            fn_sr=SavedRun.objects.get(id=sr_id),
+                            fn_pr=pr_id and PublishedRun.objects.get(id=pr_id),
+                        )[0].id
+
+                    if sr_id := gui.run_in_thread(
+                        jsonable_exec_export_fn, args=[bi.id, sr.id, pr and pr.id]
+                    ):
+                        fn_sr = SavedRun.objects.get(sr_id)
+                        gui.success(
+                            f"Function started. View [here]({fn_sr.get_app_url()})."
+                        )
+                        gui.session_state.pop(export_fn_run_key)
 
             list_view_editor(
                 key="scheduled_runs",
@@ -1023,3 +1056,39 @@ def get_tabular_data(
         df.sort_values(by=[sort_by], ascending=False, inplace=True)
 
     return df
+
+
+def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | None):
+    today = timezone.now().date()
+    conversations, messages = get_conversations_and_messages(bi)
+    df = get_tabular_data(
+        bi=bi,
+        conversations=conversations,
+        messages=messages,
+        details="Messages",
+        sort_by=None,
+        start_date=today,
+        end_date=today,
+    )
+    csv = df.to_csv()
+    csv_url = upload_file_from_bytes(
+        filename=f"stats-{today.strftime('%Y-%m-%d')}.csv",
+        data=csv,
+        content_type="text/csv",
+    )
+
+    logger.info(f"exported stats for {bi} -> {csv_url}")
+
+    result, fn_sr = fn_sr.submit_api_call(
+        workspace=bi.workspace,
+        request_body=dict(
+            variables=(
+                fn_sr.state.get("variables", {}) | dict(messages_export_url=csv_url)
+            ),
+            variables_schema=fn_sr.state.get("variables_schema", {}),
+        ),
+        parent_pr=fn_pr,
+        current_user=bi.workspace.created_by,
+    )
+
+    return result, fn_sr
