@@ -62,6 +62,7 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
+from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
@@ -101,7 +102,11 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
-from daras_ai_v2.vector_search import DocSearchRequest
+from daras_ai_v2.vector_search import (
+    DocSearchRequest,
+    doc_url_to_text_pages,
+    doc_or_yt_url_to_file_metas,
+)
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     LLMTool,
@@ -864,9 +869,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def ocr_step(self, request):
         ocr_texts = []
-        if request.document_model and (request.input_images or request.input_documents):
+        if request.document_model and request.input_images:
             yield "Running Azure Form Recognizer..."
-            for url in (request.input_images or []) + (request.input_documents or []):
+            for url in request.input_images:
                 ocr_text = (
                     azure_form_recognizer(url, model_id="prebuilt-read")
                     .get("content", "")
@@ -875,6 +880,26 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if not ocr_text:
                     continue
                 ocr_texts.append(ocr_text)
+        if request.input_documents:
+            import pandas as pd
+
+            file_url_metas = yield from flatapply_parallel(
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
+                request.input_documents,
+                message="Extracting Input Documents...",
+            )
+            for f_url, file_meta in file_url_metas:
+                pages = doc_url_to_text_pages(
+                    f_url=f_url,
+                    file_meta=file_meta,
+                    selected_asr_model=request.asr_model,
+                )
+                if isinstance(pages, pd.DataFrame):
+                    ocr_texts.append(pages.to_csv(index=False))
+                elif len(pages) <= 1:
+                    ocr_texts.append("\n\n---\n\n".join(pages))
+                else:
+                    ocr_texts.append(json.dumps(pages))
         return ocr_texts
 
     def asr_step(self, request, response, user_input):
