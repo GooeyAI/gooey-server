@@ -14,7 +14,7 @@ from bots.models import Platform, Conversation, BotIntegration, Message, SavedRu
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
-from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_html
+from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_bot_html
 from daras_ai_v2.redis_cache import get_redis_cache
 from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -309,7 +309,7 @@ class ApiInterface(BotInterface):
                 state = sr.to_dict()
                 output = VideoBotsPage.ResponseModel.parse_obj(state)
                 output.output_text = [
-                    parse_html(text, []) for text in output.output_text or []
+                    parse_bot_html(text, []) for text in output.output_text or []
                 ]
                 self.queue.put(
                     FinalResponse(
