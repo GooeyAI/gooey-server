@@ -419,24 +419,17 @@ class VideoBotsStatsPage(BasePage):
                     if gui.button(
                         f"{icons.run} Run",
                         type="tertiary",
-                        disabled=gui.session_state.get(export_fn_run_key, False),
                         key=f"{export_fn_run_key}-{sr.run_id}",
                     ):
                         gui.session_state[export_fn_run_key] = sr.run_id
 
                 if gui.session_state.get(export_fn_run_key) == sr.run_id:
-
-                    def jsonable_exec_export_fn(bi_id, sr_id, pr_id):
-                        return exec_export_fn(
-                            bi=BotIntegration.objects.get(id=bi_id),
-                            fn_sr=SavedRun.objects.get(id=sr_id),
-                            fn_pr=pr_id and PublishedRun.objects.get(id=pr_id),
-                        )[0].id
-
                     if sr_id := gui.run_in_thread(
-                        jsonable_exec_export_fn, args=[bi.id, sr.id, pr and pr.id]
+                        jsonable_exec_export_fn,
+                        args=[bi.id, sr.id, pr and pr.id],
+                        placeholder="Starting function...",
                     ):
-                        fn_sr = SavedRun.objects.get(sr_id)
+                        fn_sr = SavedRun.objects.get(id=sr_id)
                         gui.success(
                             f"Function started. View [here]({fn_sr.get_app_url()})."
                         )
@@ -1056,6 +1049,14 @@ def get_tabular_data(
         df.sort_values(by=[sort_by], ascending=False, inplace=True)
 
     return df
+
+
+def jsonable_exec_export_fn(bi_id, sr_id, pr_id):
+    return exec_export_fn(
+        bi=BotIntegration.objects.get(id=bi_id),
+        fn_sr=SavedRun.objects.get(id=sr_id),
+        fn_pr=pr_id and PublishedRun.objects.get(id=pr_id),
+    )[1].id
 
 
 def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | None):
