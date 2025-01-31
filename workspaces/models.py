@@ -127,13 +127,13 @@ class Workspace(SafeDeleteModel):
         blank=True,
         default="",
         help_text="Onedrive OAuth2 access token (mandatory)",
-        editable=False,
+        editable=True,
     )
     onedrive_refresh_token = models.TextField(
         blank=True,
         default="",
         help_text="OneDrive OAuth2 refresh token",
-        editable=False,
+        editable=True,
     )
 
     # profile
