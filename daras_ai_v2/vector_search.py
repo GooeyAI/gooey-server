@@ -394,7 +394,8 @@ def doc_url_to_file_metadata(
         mime_type = meta["mimeType"]
         total_bytes = int(meta.get("size") or 0)
         export_links = meta.get("exportLinks", None)
-    elif is_onedrive_url(f):
+    elif is_onedrive_url(f) and current_workspace and current_app_url:
+
         meta = onedrive_meta(f_url, current_workspace, current_app_url)
         name = meta["name"]
         etag = meta.get("eTag") or meta.get("lastModifiedDateTime")
