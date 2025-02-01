@@ -96,7 +96,7 @@ def global_workspace_selector(user: AppUser, session: dict):
                 ):
                     with gui.div(className="row align-items-center"):
                         with gui.div(className="col-2 d-flex justify-content-center"):
-                            gui.html('<i class="fa-regular fa-octopus"></i>')
+                            gui.html(icons.octopus)
                         with gui.div(className="col-10"):
                             gui.html("New Team Workspace")
         else:
@@ -108,7 +108,7 @@ def global_workspace_selector(user: AppUser, session: dict):
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html('<i class="fa-regular fa-octopus"></i>')
+                        gui.html(icons.octopus)
                     with gui.div(className="col-10"):
                         if current.memberships.get(user=user).can_edit_workspace():
                             gui.html("Manage Workspace")
