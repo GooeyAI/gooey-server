@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import warnings
+import typing
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
@@ -11,6 +12,11 @@ from furl import furl
 
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
+
 
 HANDLE_ALLOWED_CHARS = r"[A-Za-z0-9_\.-]+"
 HANDLE_REGEX = rf"^{HANDLE_ALLOWED_CHARS}$"
@@ -120,19 +126,7 @@ class Handle(models.Model):
         return f"@{self.name}"
 
     def _validate_exclusive(self):
-        if (
-            self.has_workspace
-            and self.has_user
-            and self.workspace.created_by_id == self.user.id
-        ):
-            # TODO: remove this once all handles are migrated
-            return
-
-        lookups = [
-            self.has_redirect,
-            self.has_workspace,
-            self.has_user,
-        ]
+        lookups = [self.has_redirect, self.has_workspace]
         if sum(lookups) > 1:
             raise ValidationError("A handle must be exclusive")
 
@@ -143,16 +137,6 @@ class Handle(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-
-    @property
-    def has_user(self):
-        warnings.warn("deprecated, use `has_workspace` instead", DeprecationWarning)
-        try:
-            self.user
-        except Handle.user.RelatedObjectDoesNotExist:
-            return False
-        else:
-            return True
 
     @property
     def has_workspace(self):
@@ -168,8 +152,8 @@ class Handle(models.Model):
         return bool(self.redirect_url)
 
     @classmethod
-    def create_default_for_user(cls, user: "AppUser"):
-        for handle_name in _generate_handle_options(user):
+    def create_default_for_workspace(cls, workspace: "Workspace"):
+        for handle_name in _generate_handle_options(workspace):
             if handle := _attempt_create_handle(handle_name):
                 return handle
         return None
@@ -192,7 +176,19 @@ def _make_handle_from(name):
     return name
 
 
-def _generate_handle_options(user):
+def _generate_handle_options(workspace: "Workspace") -> typing.Iterator[str]:
+    if workspace.is_personal:
+        yield from _generate_handle_options_for_personal_workspace(workspace.created_by)
+    else:
+        handle_name = _make_handle_from(workspace.display_name())
+        yield handle_name[:HANDLE_MAX_LENGTH]
+        for i in range(1, 10):
+            yield f"{handle_name[:HANDLE_MAX_LENGTH-1]}{i}"
+
+
+def _generate_handle_options_for_personal_workspace(
+    user: "AppUser",
+) -> typing.Iterator[str]:
     if user.is_anonymous or not user.email:
         return
 
@@ -234,9 +230,7 @@ def _generate_handle_options(user):
             yield f"{email_handle[:HANDLE_MAX_LENGTH-1]}{i}"
 
 
-def _attempt_create_handle(handle_name):
-    from handles.models import Handle
-
+def _attempt_create_handle(handle_name: str):
     handle = Handle(name=handle_name)
     try:
         handle.full_clean()
