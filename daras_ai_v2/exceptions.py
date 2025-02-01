@@ -7,6 +7,7 @@ from furl import furl
 from loguru import logger
 from requests import HTTPError
 from starlette.status import HTTP_402_PAYMENT_REQUIRED
+from starlette.status import HTTP_401_UNAUTHORIZED
 
 from daras_ai_v2 import settings
 
@@ -101,6 +102,20 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 """
 
         super().__init__(message, status_code=HTTP_402_PAYMENT_REQUIRED)
+
+
+class OneDriveAuth(UserError):
+    def __init__(self, auth_url):
+        message = f"""
+<p>
+Onedrive access token or refresh token is missing for this workspace.
+</p>
+
+<p>
+<a href="{auth_url}">Please login</a> to your Onedrive account to use Onedrive files.
+</p>
+"""
+        super().__init__(message, status_code=HTTP_401_UNAUTHORIZED)
 
 
 FFMPEG_ERR_MSG = (

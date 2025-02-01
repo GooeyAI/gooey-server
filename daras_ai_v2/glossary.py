@@ -15,7 +15,9 @@ def validate_glossary_document(document: str):
 
     metadata = doc_url_to_file_metadata(document)
     f_bytes, mime_type = download_content_bytes(
-        f_url=document, mime_type=metadata.mime_type, export_links=metadata.export_links
+        f_url=document,
+        mime_type=metadata.mime_type,
+        export_links=metadata.export_links,
     )
     df = tabular_bytes_to_str_df(
         f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type
