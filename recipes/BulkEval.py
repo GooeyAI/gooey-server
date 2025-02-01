@@ -26,6 +26,7 @@ from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.variables_widget import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
+from workspaces.models import Workspace
 
 NROWS_CACHE_KEY = "__nrows"
 
@@ -302,7 +303,9 @@ Here's what you uploaded:
         response.aggregations = []
 
         with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = submit(pool, request, response)
+            futs = submit(
+                pool, request, response, self.current_workspace, self.current_app_url()
+            )
             yield from iterate(futs, request, response)
 
     def fields_to_save(self) -> [str]:
@@ -342,13 +345,15 @@ def submit(
     pool: ThreadPoolExecutor,
     request: BulkEvalPage.RequestModel,
     response: BulkEvalPage.ResponseModel,
+    current_workspace: typing.Optional[Workspace] = None,
+    current_app_url: typing.Optional[str] = None,
 ) -> list[Future[TaskResult]]:
     futs = []
     for doc_ix, doc in enumerate(request.documents):
         response.output_documents.append(doc)
         response.final_prompts.append([])
         response.aggregations.append([])
-        df = read_df_any(doc)
+        df = read_df_any(doc, current_workspace, current_app_url)
         out_df_recs = []
         for current_rec in df.to_dict(orient="records"):
             out_df_recs.append(current_rec)
