@@ -166,23 +166,19 @@ class WhatsappBot(BotInterface):
         messages = []
         if video:
             if buttons:
-                messages = [
-                    # interactive text msg + video in header
-                    _build_msg_buttons(
-                        buttons[i : i + 3],
-                        {
-                            "body": {
-                                "text": text or "\u200b",
-                            },
-                            "header": {
-                                "type": "video",
-                                "video": {"link": video},
-                            },
+                # interactive text msg + video in header
+                messages = _build_msg_buttons(
+                    buttons,
+                    {
+                        "body": {
+                            "text": text or "\u200b",
                         },
-                    )
-                    # wa allows max 3 buttons per message
-                    for i in range(0, len(buttons), 3)
-                ]
+                        "header": {
+                            "type": "video",
+                            "video": {"link": video},
+                        },
+                    },
+                )
             else:
                 messages = [
                     # simple video msg + text caption
@@ -196,18 +192,14 @@ class WhatsappBot(BotInterface):
                 ]
         elif buttons:
             # interactive text msg
-            messages = [
-                _build_msg_buttons(
-                    buttons[i : i + 3],
-                    {
-                        "body": {
-                            "text": text or "\u200b",
-                        },
+            messages = _build_msg_buttons(
+                buttons,
+                {
+                    "body": {
+                        "text": text or "\u200b",
                     },
-                )
-                # wa allows max 3 buttons per message
-                for i in range(0, len(buttons), 3)
-            ]
+                },
+            )
         elif text:
             # simple text msg
             messages = [
@@ -272,23 +264,29 @@ def retrieve_wa_media_by_id(
     return content, media_info["mime_type"]
 
 
-def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> dict:
-    return {
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            **msg,
-            "action": {
-                "buttons": [
-                    {
-                        "type": "reply",
-                        "reply": {"id": button["id"], "title": button["title"]},
-                    }
-                    for button in buttons
-                ],
-            },
-        },
-    }
+def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> list[dict]:
+    ret = []
+    for i in range(0, len(buttons), 3):
+        ret.append(
+            {
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    **msg,
+                    "action": {
+                        "buttons": [
+                            {
+                                "type": "reply",
+                                "reply": {"id": button["id"], "title": button["title"]},
+                            }
+                            for button in buttons[i : i + 3]
+                        ],
+                    },
+                },
+            }
+        )
+        msg = {}  # dont repeat text in subsequent messages
+    return ret
 
 
 def send_wa_msgs_raw(

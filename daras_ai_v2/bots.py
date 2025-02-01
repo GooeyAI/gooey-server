@@ -253,7 +253,11 @@ def parse_bot_html(
             ReplyButton(
                 id=truncate_text_words(
                     # parsed by _handle_interactive_msg
-                    csv_encode_row(idx + 1, btn.attrib.get("gui-target"), btn.text),
+                    csv_encode_row(
+                        idx + 1,
+                        btn.attrib.get("gui-target") or "input_prompt",
+                        btn.text,
+                    ),
                     max_id_len,
                 ),
                 title=truncate_text_words(btn.text, max_title_len),
