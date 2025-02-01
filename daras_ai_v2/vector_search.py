@@ -871,7 +871,6 @@ def download_content_bytes(
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
-        # download from google drive
         return gdrive_download(f, mime_type, export_links)
     elif is_onedrive_url(f):
         return onedrive_download(f, mime_type, export_links)
@@ -1022,7 +1021,9 @@ def tabular_bytes_to_any_df(
             df = pd.read_json(f, dtype=dtype)
         case "application/xml":
             df = pd.read_xml(f, dtype=dtype)
-        case _ if "excel" in mime_type or "spreadsheet" in mime_type:
+        case (
+            _
+        ) if "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in mime_type or "spreadsheet" in mime_type:
             df = pd.read_excel(f, dtype=dtype)
         case _:
             raise UnsupportedDocumentError(
