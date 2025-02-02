@@ -285,7 +285,8 @@ def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> list[dict]:
                 },
             }
         )
-        msg = {}  # dont repeat text in subsequent messages
+        # dont repeat text in subsequent messages
+        msg = {"body": {"text": "\u200b"}}
     return ret
 
 
