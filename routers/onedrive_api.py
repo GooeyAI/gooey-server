@@ -42,12 +42,19 @@ def onedrive_connect_redirect(request: Request):
     user_access_token, user_refresh_token = _get_access_token_from_code(
         code, onedrive_connect_redirect_url
     )
+    user_display_name = _get_user_display_name(user_access_token)
 
     current_workspace = get_current_workspace(request.user, request.session)
+
     current_workspace.onedrive_access_token = user_access_token
     current_workspace.onedrive_refresh_token = user_refresh_token
+    current_workspace.onedrive_user_name = user_display_name
     current_workspace.save(
-        update_fields=["onedrive_access_token", "onedrive_refresh_token"]
+        update_fields=[
+            "onedrive_access_token",
+            "onedrive_refresh_token",
+            "onedrive_user_name",
+        ]
     )
 
     redirect_url.add({SUBMIT_AFTER_LOGIN_Q: "1"})
@@ -79,11 +86,22 @@ def generate_onedrive_auth_url(current_app_url: str) -> str:
                 [
                     "Files.Read.All",
                     "offline_access",
+                    "User.Read",
                 ]
             ),
             "state": json.dumps(dict(current_app_url=current_app_url)),
         },
     ).tostr()
+
+
+def _get_user_display_name(code: str):
+    headers = {"Authorization": f"Bearer {code}"}
+    r = requests.get(
+        url="https://graph.microsoft.com/v1.0/me",
+        headers=headers,
+    )
+    raise_for_status(r)
+    return r.json()["displayName"]
 
 
 def _get_access_token_from_code(
