@@ -81,7 +81,17 @@ def onedrive_meta(
 
         elif e.response.status_code == 403:
             raise UserError(
-                message=f"""[This document]({f_url}) is not accessible by the logged-in User.\n Please make the document accessible for viewing, or [Login]({generate_onedrive_auth_url(current_app_url)}) with a onedrive account that can access this file.\n\n Note that you can only be logged in to one onedrive account at a time."""
+                message=f"""
+            <p>
+            <a href="{f_url}" target="_blank">This document </a> is not accessible by "{current_workspace.onedrive_user_name}".
+            Please share the document with this account (Share > Manage Access).
+            </p>
+            <p>
+            Alternatively, 
+            <a href="{generate_onedrive_auth_url(current_app_url)}" target="_blank">Login</a> with a OneDrive account that can access this file.
+            Note that you can only be logged in to one OneDrive account at a time.
+            </p>
+            """
             )
         else:
             raise e
