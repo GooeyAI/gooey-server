@@ -1543,7 +1543,7 @@ class BasePage:
     ):
         if not user:
             return
-        photo = user.photo_url
+        photo = user["photo_url"]
         name = user.full_name()
         if show_as_link and (handle := user.get_handle()):
             link = handle.get_app_url()
@@ -2190,16 +2190,14 @@ class BasePage:
             return
 
         def _render(pr: PublishedRun):
-            with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
-                gui.pill(
-                    PublishedRunVisibility(pr.visibility).get_badge_html(),
-                    unsafe_allow_html=True,
-                    className="border border-dark",
-                )
+            self.render_published_run_preview_v2(published_run=pr)
 
-            self.render_published_run_preview(published_run=pr)
-
-        grid_layout(3, published_runs, _render)
+        with gui.div(className="position-relative w-100"):
+            for item in published_runs:
+                _render(item)
+                # render divder only if not the last item
+                if item != published_runs[-1]:
+                    gui.div(className="mb-2 mt-2 border-bottom")
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2291,6 +2289,84 @@ class BasePage:
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
+
+    def render_published_run_preview_v2(self, published_run: PublishedRun, **kwargs):
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+        with gui.styled(
+            """
+                h4 {
+                    margin:0
+                }
+                .pr-list-item-col-1 {
+                    max-width: 100%;
+                }
+                .pr-list-item-col-4 {
+                    max-width: 100%;
+                }
+                @media (min-width: 1024px) {
+                        .pr-list-item-col-1 {
+                            max-width: 60%;
+                        }
+                        .pr-list-item-col-4 {
+                            max-width: 40%;
+                        }
+                    }
+                """
+        ):
+            with gui.div(
+                className="d-flex flex-column flex-md-row align-items-md-center justify-content-between w-100"
+            ):
+
+                # Right Column
+                with gui.div(
+                    className="d-flex align-items-center pr-list-item-col-1 mb-4",
+                ):
+                    gui.write("## 💬")
+                    with gui.div(className="ms-2 flex-grow-1"):
+                        with gui.div(
+                            className="d-flex align-items-md-baseline flex-column flex-md-row",
+                        ):
+                            with gui.div(className="me-2"):
+                                with gui.link(to=published_run.get_app_url()):
+                                    gui.write(f"#### {tb.h1_title}")
+                            with gui.div(
+                                className="d-flex", style={"font-size": "0.9rem"}
+                            ):
+                                gui.pill(
+                                    PublishedRunVisibility(
+                                        published_run.visibility
+                                    ).get_badge_html(),
+                                    unsafe_allow_html=True,
+                                    className="border border-dark",
+                                )
+                                if kwargs and kwargs["workflow_pill"]:
+                                    gui.pill(
+                                        kwargs["workflow_pill"],
+                                        unsafe_allow_html=True,
+                                        className="border border-dark ms-2",
+                                    )
+                        if published_run.notes:
+                            gui.caption(published_run.notes, line_clamp=2)
+
+                # middle column
+                # with gui.div(
+                #     className="d-flex align-items-center mb-4 pr-list-item-col-2"
+                # ):
+                #     # user name and photo
+                #     self.render_author(
+                #         published_run.get,
+                #         image_size="30px",
+                #         responsive=False,
+                #         show_as_link=False,
+                #     )
+                # Left Column
+                with gui.div(
+                    className="ms-2 d-flex justify-content-end flex-grow-1 pr-list-item-col-4"
+                ):
+                    updated_at = published_run.saved_run.updated_at
+
+                    if updated_at and isinstance(updated_at, datetime.datetime):
+                        gui.caption(f"{get_relative_time(updated_at)}")
 
     def _render_example_preview(
         self,
