@@ -830,7 +830,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
         llm_model = LargeLanguageModels[request.selected_model]
-        user_input = request.input_prompt.strip()
+        user_input = (request.input_prompt or "").strip()
         if not (
             user_input
             or request.input_audio
