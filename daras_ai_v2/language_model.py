@@ -1120,8 +1120,10 @@ def _stream_openai_chunked(
     *,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
-    step_chunk_size: int = 150,
+    step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
+    from pyquery import PyQuery as pq
+
     ret = []
     chunk_size = start_chunk_size
 
@@ -1158,6 +1160,15 @@ def _stream_openai_chunked(
             chunk = entry["chunk"]
             if len(chunk) < chunk_size:
                 continue
+            # if chunk contains buttons we wait for the buttons to be complete
+            if "<button" in chunk:
+                doc = pq(f"<root>{chunk}</root>")
+                if doc("button") and not (
+                    last_part := doc.contents()[-1]
+                    and isinstance(last_part, str)
+                    and last_part.strip()
+                ):
+                    continue
 
             # iterate through the separators and find the best one that matches
             for sep in default_separators[:-1]:

@@ -309,7 +309,7 @@ class ApiInterface(BotInterface):
                 state = sr.to_dict()
                 output = VideoBotsPage.ResponseModel.parse_obj(state)
                 output.output_text = [
-                    parse_bot_html(text, []) for text in output.output_text or []
+                    parse_bot_html(text)[1] for text in output.output_text or []
                 ]
                 self.queue.put(
                     FinalResponse(

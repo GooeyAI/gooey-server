@@ -148,7 +148,7 @@ class BotInterface:
         text: str | None = None,
         audio: str = None,
         video: str = None,
-        buttons: list[ReplyButton] = None,
+        send_feedback_buttons: bool = False,
         documents: list[str] = None,
         update_msg_id: str = None,
         should_translate: bool = False,
@@ -159,7 +159,7 @@ class BotInterface:
         :param text: The text to send
         :param audio: The audio URL to send
         :param video: The video URL to send
-        :param buttons: The interactive reply buttons to send
+        :param send_feedback_buttons: Whether to send feedback buttons with the message
         :param documents: The document URLs to send
         :param update_msg_id: The message ID of the message to update in-place
         :param should_translate: The messages from the saved run itself should automatically be translated,
@@ -169,8 +169,21 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons = buttons or []
-        text = parse_bot_html(text, buttons)
+        buttons, text = parse_bot_html(text)
+
+        if buttons and send_feedback_buttons:
+            self._send_msg(
+                text=text,
+                audio=audio,
+                video=video,
+                buttons=buttons,
+                documents=documents,
+                update_msg_id=update_msg_id,
+            )
+            text = ""
+
+        if send_feedback_buttons:
+            buttons = _feedback_start_buttons()
 
         return self._send_msg(
             text=text,
@@ -234,36 +247,37 @@ class BotInterface:
 
 def parse_bot_html(
     text: str | None,
-    buttons: list,
     max_title_len: int = 20,
     max_id_len: int = 256,
-) -> str:
+) -> tuple[list[ReplyButton], str]:
     if not text or "<button" not in text:
-        return text
+        return [], text
     from pyquery import PyQuery as pq
 
     doc = pq(f"<root>{text}</root>")
     elements = doc("button")
     if not elements:
-        return text
-    for idx, btn in enumerate(elements):
-        if not btn.text:
-            continue
-        buttons.append(
-            ReplyButton(
-                id=truncate_text_words(
-                    # parsed by _handle_interactive_msg
-                    csv_encode_row(
-                        idx + 1,
-                        btn.attrib.get("gui-target") or "input_prompt",
-                        btn.text,
-                    ),
-                    max_id_len,
+        return [], text
+    buttons = [
+        ReplyButton(
+            id=truncate_text_words(
+                # parsed by _handle_interactive_msg
+                csv_encode_row(
+                    idx + 1,
+                    btn.attrib.get("gui-target") or "input_prompt",
+                    btn.text,
                 ),
-                title=truncate_text_words(btn.text, max_title_len),
-            )
+                max_id_len,
+            ),
+            title=truncate_text_words(btn.text, max_title_len),
         )
-    return doc.remove("button").html().strip()
+        for idx, btn in enumerate(elements)
+        if btn.text
+    ]
+    text = "\n\n".join(
+        s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
+    )
+    return buttons, text
 
 
 def _echo(bot, input_text):
@@ -431,10 +445,7 @@ def _process_and_send_msg(
     )
     bot.on_run_created(sr)
 
-    if bot.show_feedback_buttons:
-        buttons = _feedback_start_buttons()
-    else:
-        buttons = None
+    send_feedback_buttons = bot.show_feedback_buttons
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -466,7 +477,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                     last_idx = len(text)
                 else:
@@ -476,13 +487,13 @@ def _process_and_send_msg(
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
                     sent_msg_id = update_msg_id
                     # don't show buttons again
-                    buttons = None
+                    send_feedback_buttons = False
                 if streaming_done:
                     break  # we're done streaming, stop the loop
 
@@ -503,20 +514,20 @@ def _process_and_send_msg(
     video = state.get("output_video") and state.get("output_video")[0]
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or buttons):
+    if not (text or audio or video or documents or send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or buttons:
+    if text or audio or video or documents or send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
-            buttons=buttons,
+            send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
 
