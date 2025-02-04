@@ -2321,7 +2321,9 @@ class BasePage:
                 with gui.div(
                     className="d-flex align-items-center pr-list-item-col-1 mb-4",
                 ):
-                    gui.write("## 💬")
+                    gui.write(
+                        f"## {get_workflow_emoji(Workflow(published_run.workflow))}"
+                    )
                     with gui.div(className="ms-2 flex-grow-1"):
                         with gui.div(
                             className="d-flex align-items-md-baseline flex-column flex-md-row",
