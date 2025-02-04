@@ -70,7 +70,7 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
-from daras_ai_v2.utils import get_relative_time
+from daras_ai_v2.utils import get_relative_time, get_workflow_emoji
 
 DEFAULT_META_IMG = (
     # Small
@@ -2305,7 +2305,9 @@ class BasePage:
                 with gui.div(
                     className="d-flex align-items-center pr-list-item-col-1 mb-4",
                 ):
-                    gui.write("## 💬")
+                    gui.write(
+                        f"## {get_workflow_emoji(Workflow(published_run.workflow))}"
+                    )
                     with gui.div(className="ms-2 flex-grow-1"):
                         with gui.div(
                             className="d-flex align-items-md-baseline flex-column flex-md-row",
