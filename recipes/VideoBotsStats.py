@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, timedelta
+from functools import partial
 from textwrap import dedent
 
 import gooey_gui as gui
@@ -20,6 +21,7 @@ from furl import furl
 from loguru import logger
 from pydantic import BaseModel, ValidationError
 
+from app_users.models import AppUser
 from bots.models import (
     BotIntegrationScheduledRun,
     PublishedRun,
@@ -397,47 +399,14 @@ class VideoBotsStatsPage(BasePage):
 
             input_functions: list[dict] = []
 
-            def render_scheduled_run_input(key: str, del_key: str | None, d: dict):
-                with gui.div(className="d-flex align-items-center gap-3"):
-                    with gui.div(className="flex-grow-1"):
-                        input_workflow = workflow_url_input(
-                            page_cls=FunctionsPage,
-                            key=key,
-                            internal_state=d,
-                            del_key=del_key,
-                            current_user=self.request.user,
-                        )
-                    if not input_workflow:
-                        return
-                    _, sr, pr = input_workflow
-                    if pr and pr.saved_run_id == sr.id:
-                        input_functions.append(dict(saved_run=None, published_run=pr))
-                    else:
-                        input_functions.append(dict(saved_run=sr, published_run=None))
-
-                    export_fn_run_key = "run_export_fn"
-                    if gui.button(
-                        f"{icons.run} Run",
-                        type="tertiary",
-                        key=f"{export_fn_run_key}-{sr.run_id}",
-                    ):
-                        gui.session_state[export_fn_run_key] = sr.run_id
-
-                if gui.session_state.get(export_fn_run_key) == sr.run_id:
-                    if sr_id := gui.run_in_thread(
-                        jsonable_exec_export_fn,
-                        args=[bi.id, sr.id, pr and pr.id],
-                        placeholder="Starting function...",
-                    ):
-                        fn_sr = SavedRun.objects.get(id=sr_id)
-                        gui.success(
-                            f"Function started. View [here]({fn_sr.get_app_url()})."
-                        )
-                        gui.session_state.pop(export_fn_run_key)
-
             list_view_editor(
                 key="scheduled_runs",
-                render_inputs=render_scheduled_run_input,
+                render_inputs=partial(
+                    render_scheduled_run_input,
+                    current_user=self.request.user,
+                    bi=bi,
+                    input_functions=input_functions,
+                ),
                 flatten_dict_key="url",
             )
 
@@ -532,6 +501,54 @@ class VideoBotsStatsPage(BasePage):
         else:
             trunc_fn = TruncYear
         return start_date, end_date, view, factor, trunc_fn
+
+
+def render_scheduled_run_input(
+    key: str,
+    del_key: str | None,
+    d: dict,
+    *,
+    current_user: AppUser,
+    bi: BotIntegration,
+    input_functions: list[dict],
+):
+    with gui.div(className="d-lg-flex"):
+        with gui.div(className="flex-lg-grow-1"):
+            input_workflow = workflow_url_input(
+                page_cls=FunctionsPage,
+                key=key,
+                internal_state=d,
+                del_key=del_key,
+                current_user=current_user,
+            )
+        if not input_workflow:
+            return
+        _, sr, pr = input_workflow
+        if pr and pr.saved_run_id == sr.id:
+            input_functions.append(dict(saved_run=None, published_run=pr))
+        else:
+            input_functions.append(dict(saved_run=sr, published_run=None))
+
+        run_export_key = key + ":run_export"
+        if gui.button(
+            f"{icons.run} Run Now",
+            help="Run this function now to test it.",
+            key=run_export_key + ":btn",
+            type="tertiary",
+        ):
+            d[run_export_key] = True
+
+    if d.get(run_export_key) and (
+        url := gui.run_in_thread(
+            jsonable_exec_export_fn,
+            args=[bi.id, sr.id, pr and pr.id],
+            placeholder="Starting function...",
+        )
+    ):
+        gui.success(
+            f'Function started. View <a href="{url}">here</a>.', unsafe_allow_html=True
+        )
+        d.pop(run_export_key)
 
 
 def get_conversations_and_messages(bi) -> tuple[ConversationQuerySet, MessageQuerySet]:
@@ -1051,12 +1068,13 @@ def get_tabular_data(
     return df
 
 
-def jsonable_exec_export_fn(bi_id, sr_id, pr_id):
-    return exec_export_fn(
+def jsonable_exec_export_fn(bi_id: id, sr_id: id, pr_id: id) -> str:
+    result, fn_sr = exec_export_fn(
         bi=BotIntegration.objects.get(id=bi_id),
         fn_sr=SavedRun.objects.get(id=sr_id),
         fn_pr=pr_id and PublishedRun.objects.get(id=pr_id),
-    )[1].id
+    )
+    return fn_sr.get_app_url()
 
 
 def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | None):
