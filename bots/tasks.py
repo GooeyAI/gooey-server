@@ -17,7 +17,6 @@ from bots.models import (
     Platform,
     BotIntegrationAnalysisRun,
 )
-from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
 from daras_ai_v2.slack_bot import (
@@ -30,8 +29,6 @@ from daras_ai_v2.vector_search import references_as_prompt
 from recipes.VideoBots import ReplyButton, messages_as_prompt
 from recipes.VideoBotsStats import (
     exec_export_fn,
-    get_conversations_and_messages,
-    get_tabular_data,
 )
 
 MAX_PROMPT_LEN = 100_000
@@ -226,7 +223,7 @@ def exec_scheduled_runs():
     ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
         fn_sr, fn_pr = sched.get_runs()
         result, fn_sr = exec_export_fn(
-            bi=sched.bot_integration, fn_sr=fn_sr.id, fn_pr=fn_pr.id
+            bi=sched.bot_integration, fn_sr=fn_sr, fn_pr=fn_pr
         )
         sched.last_run_at = fn_sr.created_at
         sched.save(update_fields=["last_run_at"])
