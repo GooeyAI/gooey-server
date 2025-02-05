@@ -1,9 +1,14 @@
 import ast
 import re
 import parse
-from markdown_it import MarkdownIt
+from typing import Mapping, Any
 
+from markdown_it import MarkdownIt
+from mdformat.renderer import MDRenderer
+
+from daras_ai.mdit_wa_plugin import WhatsappParser
 from daras_ai_v2.tts_markdown_renderer import RendererPlain
+from daras_ai_v2.text_splitter import new_para
 
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
@@ -50,23 +55,38 @@ def unmarkdown(text: str) -> str:
     return MarkdownIt(renderer_cls=RendererPlain).render(text)
 
 
+WA_FORMATTING_OPTIONS: Mapping[str, Any] = {
+    "mdformat": {"number": True},
+    "parser_extension": [WhatsappParser],
+}
+
+
 def wa_markdown(text: str) -> str:
-    patterns = [
-        (
-            re.compile(r"^(#+)\s+(.*)$", flags=re.MULTILINE),
-            lambda m: f"*{m.group(2)}*",
-        ),  # "# headings" -> "*headings*"
-        (
-            re.compile(r"\*\*(.+?)\*\*"),
-            lambda m: f"*{m.group(1)}*",
-        ),  # "**bold**"" -> "*bold*"
-        (
-            re.compile(r"~~(.+?)~~"),
-            lambda m: f"~{m.group(1)}~",
-        ),  # "~~text~~" -> "~text~"
-    ]
+    """commonmark to WA compatible Markdown"""
 
-    for pattern, repl in patterns:
-        text = pattern.sub(repl, text)
+    if text is None:
+        return ""
 
-    return text
+    md = MarkdownIt("commonmark").enable("table").enable("strikethrough")
+
+    tokens = md.parse(text)
+    return MDRenderer().render(tokens, options=WA_FORMATTING_OPTIONS, env={})
+
+
+def is_list_item_complete(text: str) -> bool:
+    """Returns True if the last block is a list item, False otherwise."""
+
+    if text is None:
+        return False
+    blocks = re.split(new_para, text.strip())
+
+    if not blocks:
+        return False
+
+    last_block = blocks[-1].strip()
+    lines = [ln for ln in last_block.split("\n") if ln.strip()]
+    list_item_pattern = re.compile(r"^\s*(?:[*+\-]|\d+\.)\s+")
+
+    is_list_block = any(list_item_pattern.match(ln) for ln in lines)
+
+    return is_list_block

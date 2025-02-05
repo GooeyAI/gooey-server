@@ -91,6 +91,7 @@ python-pptx = "^1.0.2"
 azure-identity = "^1.19.0"
 azure-keyvault-secrets = "^4.9.0"
 xlrd = "^2.0.1"
+mdformat = "^0.7.21"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

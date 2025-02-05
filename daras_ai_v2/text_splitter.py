@@ -32,7 +32,7 @@ default_separators = (
     re.compile(sentence_end + new_para),
     re.compile(new_para),
     re.compile(sentence_end + new_line),
-    # re.compile(sentence_end + whitespace),
+    re.compile(sentence_end + whitespace),
     re.compile(new_line),
     re.compile(whitespace),
 )
