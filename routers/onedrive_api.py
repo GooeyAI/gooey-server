@@ -1,24 +1,18 @@
 import json
 
 import requests
+from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
 from furl import furl
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
+
+from bots.models import SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from routers.custom_api_router import CustomAPIRouter
-from workspaces.widgets import get_current_workspace
-from loguru import logger
 
 app = CustomAPIRouter()
-
-
-def load_current_run_url_from_state(request: Request) -> furl:
-    url = furl(
-        json.loads(request.query_params.get("state") or "{}").get("current_app_url")
-    )
-    return url
 
 
 @app.get("/__/onedrive/connect/")
@@ -38,18 +32,15 @@ def onedrive_connect_redirect(request: Request):
             status_code=400,
         )
 
-    redirect_url = load_current_run_url_from_state(request)
-    user_access_token, user_refresh_token = _get_access_token_from_code(
-        code, onedrive_connect_redirect_url
-    )
+    user_access_token, user_refresh_token = _get_access_token_from_code(code)
     user_display_name = _get_user_display_name(user_access_token)
 
-    current_workspace = get_current_workspace(request.user, request.session)
+    sr = load_sr_from_state(request)
 
-    current_workspace.onedrive_access_token = user_access_token
-    current_workspace.onedrive_refresh_token = user_refresh_token
-    current_workspace.onedrive_user_name = user_display_name
-    current_workspace.save(
+    sr.workspace.onedrive_access_token = user_access_token
+    sr.workspace.onedrive_refresh_token = user_refresh_token
+    sr.workspace.onedrive_user_name = user_display_name
+    sr.workspace.save(
         update_fields=[
             "onedrive_access_token",
             "onedrive_refresh_token",
@@ -57,20 +48,11 @@ def onedrive_connect_redirect(request: Request):
         ]
     )
 
-    redirect_url.add({SUBMIT_AFTER_LOGIN_Q: "1"})
-
+    redirect_url = sr.get_app_url({SUBMIT_AFTER_LOGIN_Q: "1"})
     return RedirectResponse(redirect_url.url)
 
 
-onedrive_connect_redirect_url = (
-    furl(
-        settings.APP_BASE_URL,
-    )
-    / app.url_path_for(onedrive_connect_redirect.__name__)
-).tostr()
-
-
-def generate_onedrive_auth_url(current_app_url: str) -> str:
+def generate_onedrive_auth_url(sr_id: int) -> str:
     """Build the Microsoft OAuth URL to start interactive authorization.
 
     Returns:
@@ -89,56 +71,63 @@ def generate_onedrive_auth_url(current_app_url: str) -> str:
                     "User.Read",
                 ]
             ),
-            "state": json.dumps(dict(current_app_url=current_app_url)),
+            "state": json.dumps(dict(sr_id=sr_id)),
         },
     ).tostr()
 
 
-def _get_user_display_name(code: str):
-    headers = {"Authorization": f"Bearer {code}"}
+def load_sr_from_state(request: Request) -> SavedRun:
+    sr_id = json.loads(request.query_params.get("state") or "{}").get("sr_id")
+    try:
+        return SavedRun.objects.get(id=sr_id)
+    except SavedRun.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Published Run not found")
+
+
+def _get_user_display_name(code: str) -> str:
     r = requests.get(
         url="https://graph.microsoft.com/v1.0/me",
-        headers=headers,
+        headers={"Authorization": f"Bearer {code}"},
     )
     raise_for_status(r)
     return r.json()["displayName"]
 
 
-def _get_access_token_from_code(
-    code: str,
-    redirect_uri: str,
-):
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+def _get_access_token_from_code(code: str) -> tuple[str, str]:
     r = requests.post(
         url="https://login.microsoftonline.com/common/oauth2/v2.0/token",
         data={
             "client_id": settings.ONEDRIVE_CLIENT_ID,
             "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "code": code,
-            "redirect_uri": redirect_uri,
+            "redirect_uri": onedrive_connect_redirect_url,
             "grant_type": "authorization_code",
+            "code": code,
         },
-        headers=headers,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     raise_for_status(r)
-    tokens = r.json()
-    return tokens["access_token"], tokens["refresh_token"]
+    data = r.json()
+    return data["access_token"], data["refresh_token"]
 
 
-def get_access_token_from_refresh_token(refresh_token: str, redirect_uri: str) -> str:
+def get_access_token_from_refresh_token(refresh_token: str) -> tuple[str, str]:
     # https://learn.microsoft.com/en-us/onedrive/developer/rest-api/getting-started/graph-oauth?view=odsp-graph-online
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
     r = requests.post(
         "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         data={
             "client_id": settings.ONEDRIVE_CLIENT_ID,
-            "redirect_uri": redirect_uri,
             "client_secret": settings.ONEDRIVE_CLIENT_SECRET,
-            "refresh_token": refresh_token,
+            "redirect_uri": onedrive_connect_redirect_url,
             "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
         },
-        headers=headers,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     raise_for_status(r)
-    return r.json()["access_token"]
+    data = r.json()
+    return data["access_token"], data["refresh_token"]
+
+
+onedrive_connect_redirect_url = (
+    furl(settings.APP_BASE_URL) / app.url_path_for(onedrive_connect_redirect.__name__)
+).tostr()
