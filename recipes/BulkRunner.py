@@ -34,7 +34,6 @@ from daras_ai_v2.workflow_url_input import (
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
-from workspaces.models import Workspace
 
 DEFAULT_BULK_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png"
 
@@ -291,11 +290,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.output_documents = []
 
         for doc_ix, doc in enumerate(request.documents):
-            df = read_df_any(
-                doc,
-                current_workspace=self.current_workspace,
-                current_app_url=self.current_app_url(),
-            )
+            df = read_df_any(doc)
             in_recs = df.to_dict(orient="records")
             out_recs = []
 
@@ -614,16 +609,8 @@ def get_columns(files: list[str]) -> list[str]:
     )
 
 
-def read_df_any(
-    f_url: str,
-    current_workspace: typing.Optional[Workspace] = None,
-    current_app_url: typing.Optional[str] = None,
-) -> "pd.DataFrame":
-    file_meta = doc_url_to_file_metadata(
-        f_url,
-        current_workspace=current_workspace,
-        current_app_url=current_app_url,
-    )
+def read_df_any(f_url: str) -> "pd.DataFrame":
+    file_meta = doc_url_to_file_metadata(f_url)
     f_bytes, mime_type = download_content_bytes(
         f_url=f_url, mime_type=file_meta.mime_type, export_links=file_meta.export_links
     )

@@ -227,11 +227,7 @@ class DocExtractPage(BasePage):
             )
         else:
             file_url_metas = yield from flatapply_parallel(
-                lambda f_url: doc_or_yt_url_to_file_metas(
-                    f_url,
-                    current_workspace=self.current_workspace,
-                    current_app_url=self.current_app_url(),
-                )[1],
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
                 request.documents,
                 message="Extracting metadata...",
             )

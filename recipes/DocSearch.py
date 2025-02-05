@@ -177,8 +177,6 @@ class DocSearchPage(BasePage):
                 },
             ),
             current_user=self.request.user,
-            current_workspace=self.current_workspace,
-            current_app_url=self.current_app_url(),
         )
 
         # empty search result, abort!
