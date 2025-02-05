@@ -174,11 +174,7 @@ Prompt for merging several outputs together
         for f_url in request.documents:
             pages = doc_url_to_text_pages(
                 f_url=f_url,
-                file_meta=doc_url_to_file_metadata(
-                    f_url,
-                    current_workspace=self.current_workspace,
-                    current_app_url=self.current_app_url(),
-                ),
+                file_meta=doc_url_to_file_metadata(f_url),
                 selected_asr_model=request.selected_asr_model,
             )
             full_text += "\n\n".join(pages)

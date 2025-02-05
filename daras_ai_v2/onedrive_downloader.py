@@ -1,14 +1,15 @@
-from furl import furl
-import requests
 import base64
-from workspaces.models import Workspace
+
+import requests
+from furl import furl
+
+from bots.models import SavedRun
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.exceptions import raise_for_status, OneDriveAuth
 from routers.onedrive_api import (
     generate_onedrive_auth_url,
     get_access_token_from_refresh_token,
 )
-from loguru import logger
 
 
 def is_onedrive_url(f: furl) -> bool:
@@ -20,38 +21,39 @@ def is_onedrive_url(f: furl) -> bool:
         )
 
 
+_url_encode_translation = str.maketrans({"/": "_", "+": "-", "=": ""})
+
+
 def encode_onedrive_url(sharing_url: str) -> str:
     # https://learn.microsoft.com/en-us/onedrive/developer/rest-api/api/shares_get
-
-    base64_value = base64.b64encode(sharing_url.encode("utf-8")).decode("utf-8")
-    encoded_url = base64_value.rstrip("=").replace("/", "_").replace("+", "-")
+    base64_value = base64.b64encode(sharing_url.encode()).decode()
+    encoded_url = base64_value.translate(_url_encode_translation)
     return f"u!{encoded_url}"
 
 
-def onedrive_download(f: furl, mime_type: str, export_links: dict):
-    if export_links is None or "downloadUrl" not in export_links:
+def onedrive_download(mime_type: str, export_links: dict):
+    download_url = export_links.get(mime_type)
+    if not download_url:
         raise ValueError(
             "Download URL not found in export_links. Cannot download file."
         )
-    download_url = export_links["downloadUrl"]
-    r = requests.get(download_url, stream=True)
+    r = requests.get(download_url)
     raise_for_status(r)
     file_content = r.content
     return file_content, mime_type
 
 
-def onedrive_meta(
-    f_url: str, current_workspace: Workspace, current_app_url: str, retries: int = 1
-):
-    # check if current_workspace have the field current_workspace.onedrive_access_token or onedrive_access_token.refresh_token
+def onedrive_meta(f_url: str, sr: SavedRun, *, try_refresh: bool = True):
+    # check if saved run workspace has onedrive_access_token and onedrive_refresh_token
     if not (
-        current_workspace.onedrive_access_token
-        and current_workspace.onedrive_refresh_token
+        sr.workspace
+        and sr.workspace.onedrive_access_token
+        and sr.workspace.onedrive_refresh_token
     ):
-        raise OneDriveAuth(generate_onedrive_auth_url(current_app_url))
+        raise OneDriveAuth(generate_onedrive_auth_url(sr.id))
     try:
         encoded_url = encode_onedrive_url(f_url)
-        headers = {"Authorization": f"Bearer {current_workspace.onedrive_access_token}"}
+        headers = {"Authorization": f"Bearer {sr.workspace.onedrive_access_token}"}
         r = requests.get(
             f"https://graph.microsoft.com/v1.0/shares/{encoded_url}/driveItem",
             headers=headers,
@@ -63,35 +65,34 @@ def onedrive_meta(
             raise UserError("Folders / OneNote are not supported yet.")
 
         return metadata
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 401 and retries > 0:
+
+    except requests.HTTPError as e:
+        if e.response.status_code == 401 and try_refresh:
             try:
-                current_workspace.onedrive_access_token = (
-                    get_access_token_from_refresh_token(
-                        current_workspace.onedrive_refresh_token,
-                        current_app_url,
-                    )
+                (
+                    sr.workspace.onedrive_access_token,
+                    sr.workspace.onedrive_refresh_token,
+                ) = get_access_token_from_refresh_token(
+                    sr.workspace.onedrive_refresh_token
                 )
-                current_workspace.save(update_fields=["onedrive_access_token"])
-                return onedrive_meta(
-                    f_url, current_workspace, current_app_url, retries - 1
-                )
-            except Exception:
-                raise OneDriveAuth(generate_onedrive_auth_url(current_app_url))
+                sr.workspace.save(update_fields=["onedrive_access_token"])
+                return onedrive_meta(f_url, sr, try_refresh=False)
+            except requests.HTTPError:
+                raise OneDriveAuth(generate_onedrive_auth_url(sr.id))
 
         elif e.response.status_code == 403:
             raise UserError(
                 message=f"""
-            <p>
-            <a href="{f_url}" target="_blank">This document </a> is not accessible by "{current_workspace.onedrive_user_name}".
-            Please share the document with this account (Share > Manage Access).
-            </p>
-            <p>
-            Alternatively, 
-            <a href="{generate_onedrive_auth_url(current_app_url)}" target="_blank">Login</a> with a OneDrive account that can access this file.
-            Note that you can only be logged in to one OneDrive account at a time.
-            </p>
-            """
+<p>
+<a href="{f_url}" target="_blank">This document </a> is not accessible by "{sr.workspace.onedrive_user_name}".
+Please share the document with this account (Share > Manage Access).
+</p>
+<p>
+Alternatively, <a href="{generate_onedrive_auth_url(sr.id)}" target="_blank">Login</a> with a OneDrive account that can access this file.
+Note that you can only be logged in to one OneDrive account at a time.
+</p>
+"""
             )
+
         else:
-            raise e
+            raise

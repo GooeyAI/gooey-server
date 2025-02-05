@@ -1051,8 +1051,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     },
                 ),
                 current_user=self.request.user,
-                current_workspace=self.current_workspace,
-                current_app_url=self.current_app_url(),
             )
             if request.use_url_shortener:
                 for reference in response.references:
