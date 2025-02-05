@@ -5,6 +5,30 @@ category = ModelCategory.LLM
 
 
 def run():
+    # o3-mini
+
+    llm_pricing_create(
+        model_id="o3-mini-2025-01-31",
+        model_name=LargeLanguageModels.o3_mini.name,
+        unit_cost_input=1.10,
+        unit_cost_output=4.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1
+
+    llm_pricing_create(
+        model_id="o1-2024-12-17",
+        model_name=LargeLanguageModels.o1.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
     # o1-preview
 
     llm_pricing_create(

@@ -76,6 +76,30 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models#o3-mini
+    o3_mini = LLMSpec(
+        label="o3-mini (openai)",
+        model_id="o3-mini-2025-01-31",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        price=13,
+        is_vision_model=False,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models#o1
+    o1 = LLMSpec(
+        label="o1 (openai)",
+        model_id="o1-2024-12-17",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        price=50,
+        is_vision_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
         label="o1-preview (openai)",
@@ -655,6 +679,8 @@ def run_language_model(
                 )
         if not model.supports_temperature:
             temperature = None
+        if not model.supports_json:
+            response_format_type = None
         result = _run_chat_model(
             api=model.llm_api,
             model=model.model_id,
@@ -1085,6 +1111,8 @@ def run_openai_chat(
     if model in (
         LargeLanguageModels.o1_mini.model_id,
         LargeLanguageModels.o1_preview.model_id,
+        LargeLanguageModels.o1.model_id,
+        LargeLanguageModels.o3_mini.model_id,
     ):
         for entry in messages:
             if entry["role"] == CHATML_ROLE_SYSTEM:
@@ -1092,7 +1120,6 @@ def run_openai_chat(
 
         # unsupported API options
         max_tokens = NOT_GIVEN
-        response_format_type = None
         avoid_repetition = False
 
         # reserved tokens for reasoning...
