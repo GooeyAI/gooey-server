@@ -31,7 +31,7 @@ def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks
     actual_events = []
     for event in r.text.split("\n\n"):
         assert not event.startswith("event: error"), event
-        data = event.split("data: ", maxsplit=1)[-1]
+        data = event.removeprefix("data: ")
         if not data:
             continue
         event = json.loads(data)
