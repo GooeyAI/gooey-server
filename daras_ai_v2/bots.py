@@ -250,14 +250,11 @@ def parse_bot_html(
     max_title_len: int = 20,
     max_id_len: int = 256,
 ) -> tuple[list[ReplyButton], str]:
-    if not text or "<button" not in text:
-        return [], text
     from pyquery import PyQuery as pq
 
-    doc = pq(f"<root>{text}</root>")
-    elements = doc("button")
-    if not elements:
+    if not text:
         return [], text
+    doc = pq(f"<root>{text}</root>")
     buttons = [
         ReplyButton(
             id=truncate_text_words(
@@ -271,7 +268,7 @@ def parse_bot_html(
             ),
             title=truncate_text_words(btn.text, max_title_len),
         )
-        for idx, btn in enumerate(elements)
+        for idx, btn in enumerate(doc("button") or [])
         if btn.text
     ]
     text = "\n\n".join(

@@ -51,6 +51,7 @@ class ModelProvider(models.IntegerChoices):
     azure_openai = 4, "Azure OpenAI"
     anthropic = 6, "Anthropic"
     groq = 7, "groq"
+    fireworks = 8, "Fireworks AI"
 
     aks = 5, "Azure Kubernetes Service"
 

@@ -56,6 +56,7 @@ class LLMApis(Enum):
     gemini = 2
     openai = 3
     # together = 4
+    fireworks = 4
     groq = 5
     anthropic = 6
     self_hosted = 7
@@ -66,7 +67,7 @@ class LLMSpec(typing.NamedTuple):
     model_id: str | tuple
     llm_api: LLMApis
     context_window: int
-    price: int
+    price: int = 1
     is_chat_model: bool = True
     is_vision_model: bool = False
     is_deprecated: bool = False
@@ -141,12 +142,13 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision (openai) 🔻",
+        label="GPT-4 Vision (openai) [Deprecated]",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=6,
         is_vision_model=True,
+        is_deprecated=True,
     )
 
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
@@ -200,6 +202,14 @@ class LargeLanguageModels(Enum):
         is_chat_model=False,
     )
 
+    deepseek_r1 = LLMSpec(
+        label="DeepSeek R1",
+        model_id="accounts/fireworks/models/deepseek-r1",
+        llm_api=LLMApis.fireworks,
+        context_window=128_000,
+        supports_json=True,
+    )
+
     # https://console.groq.com/docs/models
     llama3_3_70b = LLMSpec(
         label="Llama 3.3 70B",
@@ -245,6 +255,14 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    llama3_1_405b = LLMSpec(
+        label="Llama 3.1 405B (Meta AI)",
+        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
+        llm_api=LLMApis.fireworks,
+        context_window=128_000,
+        price=1,
+        supports_json=True,
+    )
     llama3_1_70b = LLMSpec(
         label="Llama 3.1 70B (Meta AI)",
         model_id="llama-3.1-70b-versatile",
@@ -279,6 +297,14 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    mistral_small_24b_instruct = LLMSpec(
+        label="Mistral Small 24B Instruct (Mistral)",
+        model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
+        llm_api=LLMApis.fireworks,
+        context_window=32_768,
+        price=1,
+        supports_json=True,
+    )
     mixtral_8x7b_instruct_0_1 = LLMSpec(
         label="Mixtral 8x7b Instruct v0.1 (Mistral)",
         model_id="mixtral-8x7b-32768",
@@ -774,6 +800,18 @@ def _run_chat_model(
         f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
     match api:
+        case LLMApis.fireworks:
+            return _run_fireworks_chat(
+                model=model,
+                avoid_repetition=avoid_repetition,
+                max_completion_tokens=max_tokens,
+                messages=messages,
+                num_outputs=num_outputs,
+                stop=stop,
+                temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
+            )
         case LLMApis.openai:
             return run_openai_chat(
                 model=model,
@@ -1317,12 +1355,12 @@ def _run_groq_chat(
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
-    data = {
-        "model": model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-    }
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
     if tools:
         data["tools"] = [tool.spec for tool in tools]
     if avoid_repetition:
@@ -1334,16 +1372,67 @@ def _run_groq_chat(
         data["response_format"] = {"type": response_format_type}
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
         json=data,
-        headers={
-            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-        },
     )
     raise_for_status(r)
     out = r.json()
 
     record_cost_auto(
         model=model, sku=ModelSku.llm_prompt, quantity=out["usage"]["prompt_tokens"]
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
+    return [choice["message"] for choice in out["choices"]]
+
+
+@retry_if(aifail.http_should_retry)
+def _run_fireworks_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_completion_tokens: int,
+    num_outputs: int,
+    temperature: float | None = None,
+    stop: list[str] | None = None,
+    avoid_repetition: bool = False,
+    tools: list[LLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
+):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_completion_tokens,
+        n=num_outputs,
+        temperature=temperature,
+    )
+    if tools:
+        data["tools"] = [tool.spec for tool in tools]
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    if response_format_type:
+        data["response_format"] = {"type": response_format_type}
+    r = requests.post(
+        "https://api.fireworks.ai/inference/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.FIREWORKS_API_KEY}"},
+        json=data,
+    )
+    raise_for_status(r)
+    out = r.json()
+
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=out["usage"]["prompt_tokens"],
     )
     record_cost_auto(
         model=model,

@@ -804,6 +804,38 @@ def run():
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
     )
 
+    # fireworks
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-r1",
+        model_name=LargeLanguageModels.deepseek_r1.name,
+        unit_cost_input=3,
+        unit_cost_output=8,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.90,
+        unit_cost_output=0.90,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
+        model_name=LargeLanguageModels.llama3_1_405b.name,
+        unit_cost_input=3,
+        unit_cost_output=3,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
 
 def llm_pricing_create(
     model_id: str,
