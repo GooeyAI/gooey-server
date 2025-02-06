@@ -1109,19 +1109,24 @@ def run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
-    if model in (
+    if model in [
         LargeLanguageModels.o1_mini.model_id,
-        LargeLanguageModels.o1_preview.model_id,
         LargeLanguageModels.o1.model_id,
         LargeLanguageModels.o3_mini.model_id,
-    ):
+    ]:
+        # fuck you, openai
         for entry in messages:
             if entry["role"] == CHATML_ROLE_SYSTEM:
-                entry["role"] = CHATML_ROLE_USER
+                if model == LargeLanguageModels.o1_mini.model_id:
+                    entry["role"] = CHATML_ROLE_USER
+                else:
+                    entry["role"] = "developer"
 
         # unsupported API options
         max_tokens = NOT_GIVEN
         avoid_repetition = False
+        if model == LargeLanguageModels.o1.model_id:
+            stream = False
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
