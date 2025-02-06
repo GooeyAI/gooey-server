@@ -102,7 +102,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
-        label="o1-preview (openai)",
+        label="o1-preview (openai) [Deprecated]",
         model_id="o1-preview-2024-09-12",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -110,6 +110,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=False,
         supports_json=False,
         supports_temperature=False,
+        is_deprecated=True,
     )
 
     # https://platform.openai.com/docs/models#o1
