@@ -486,9 +486,10 @@ class BasePage:
                     transform="translateY(-50%)",
                 ),
             ):
+                show_last_saved = pr.saved_run == sr or pr.is_root()
                 with gui.tag("span", className="text-muted"):
                     gui.write(
-                        f"{get_relative_time(pr.updated_at if pr.is_root() else sr.updated_at)}"
+                        f"{get_relative_time(pr.updated_at if show_last_saved else sr.updated_at)}"
                     )
 
     def _render_options_button_with_dialog(self):
