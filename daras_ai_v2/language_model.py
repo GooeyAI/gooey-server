@@ -264,12 +264,13 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B (Meta AI)",
+        label="Llama 3.1 70B (Meta AI) [Deprecated]",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
         price=1,
         supports_json=True,
+        is_deprecated=True,
     )
     llama3_1_8b = LLMSpec(
         label="Llama 3.1 8B (Meta AI)",
@@ -322,12 +323,13 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemma_7b_it = LLMSpec(
-        label="Gemma 7B (Google)",
+        label="Gemma 7B (Google) [Deprecated]",
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
         price=1,
         supports_json=True,
+        is_deprecated=True,
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
