@@ -1236,12 +1236,11 @@ def _stream_openai_chunked(
             # if chunk contains buttons we wait for the buttons to be complete
             if "<button" in chunk:
                 doc = pq(f"<root>{chunk}</root>")
-                if doc("button") and not (
-                    last_part := doc.contents()[-1]
-                    and isinstance(last_part, str)
-                    and last_part.strip()
-                ):
-                    continue
+                if doc("button"):
+                    last_part = doc.contents()[-1]
+                    # if the last part is not a string or is empty, we need to wait for more data
+                    if not (isinstance(last_part, str) and last_part.strip()):
+                        continue
 
             # iterate through the separators and find the best one that matches
             for sep in default_separators[:-1]:
