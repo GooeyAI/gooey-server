@@ -843,7 +843,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             request=request, response=response, user_input=user_input
         )
 
-        ocr_texts = yield from self.ocr_step(request=request)
+        ocr_texts = yield from self.document_understanding_step(request=request)
 
         request.translation_model = (
             request.translation_model or DEFAULT_TRANSLATION_MODEL
@@ -867,7 +867,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         yield from self.lipsync_step(request, response)
 
-    def ocr_step(self, request):
+    def document_understanding_step(self, request):
         ocr_texts = []
         if request.document_model and request.input_images:
             yield "Running Azure Form Recognizer..."
@@ -1170,6 +1170,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def output_translation_step(self, request, response, output_text):
+        from daras_ai_v2.bots import parse_bot_html
+
         # translate response text
         if should_translate_lang(request.user_language):
             yield f"Translating response to {request.user_language}..."
@@ -1185,6 +1187,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
+
+        # remove html tags from the output text for tts
+        raw_tts_text = [
+            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
+        ]
+        if raw_tts_text != output_text:
+            response.raw_tts_text = raw_tts_text
+
         return output_text
 
     def tts_step(self, request, response):
