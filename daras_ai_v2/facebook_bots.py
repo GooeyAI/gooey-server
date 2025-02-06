@@ -139,7 +139,8 @@ class WhatsappBot(BotInterface):
     ) -> str | None:
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
-        text = wa_markdown(text)
+        images, text = wa_markdown(text)
+
         # split text into chunks if too long
         if text and len(text) > WA_MSG_MAX_SIZE:
             splits = text_splitter(
@@ -192,6 +193,32 @@ class WhatsappBot(BotInterface):
                         },
                     },
                 ]
+
+        elif images:
+            if buttons:
+                messages = _build_msg_buttons(
+                    buttons,
+                    {
+                        "body": {
+                            "text": text or "\u200b",
+                        },
+                        "header": {
+                            "type": "image",
+                            "image": {"link": images[0]},
+                        },
+                    },
+                )
+            else:
+                messages = [
+                    {
+                        "type": "image",
+                        "image": {
+                            "link": images[0],
+                            "caption": text,
+                        },
+                    },
+                ]
+
         elif buttons:
             # interactive text msg
             messages = _build_msg_buttons(

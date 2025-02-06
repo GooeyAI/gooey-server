@@ -2,19 +2,17 @@ from mdformat.renderer._context import (
     RenderContext,
     make_render_children,
     WRAP_POINT,
+    _render_inline_as_text,
 )
 from mdformat.renderer._tree import RenderTreeNode
 from mdformat.plugins import ParserExtensionInterface
+from mdformat.renderer._util import maybe_add_link_brackets
 
 
 def wa_heading_renderer(node: RenderTreeNode, context: RenderContext) -> str:
     text = make_render_children(separator="")(node, context)
-    text = text.replace("\n", " ")
-
-    if text.startswith("*"):
-        text = text.lstrip("*")
-    if text.endswith("*"):
-        text = text.rstrip("*")
+    text = text.lstrip("*")
+    text = text.rstrip("*")
 
     return f"*{text}*"
 
@@ -42,17 +40,27 @@ def wa_link_renderer(node: RenderTreeNode, context: RenderContext) -> str:
     # Get the display text for the link
     text = "".join(child.render(context) for child in node.children)
 
-    if context.do_wrap:
-        text = text.replace(WRAP_POINT, " ")
-
     uri = node.attrs["href"]
-
-    # Return the link text followed by the URL in parentheses (WhatsApp format)
     return f"{text} ({uri})"
 
 
 def wa_image_renderer(node: RenderTreeNode, context: RenderContext) -> str:
-    return ""
+    description = _render_inline_as_text(node, context)
+    ref_label = node.meta.get("label")
+    if ref_label:
+        context.env["used_refs"].add(ref_label)
+        ref_label_repr = ref_label.lower()
+        if description.lower() == ref_label_repr:
+            return f"[{description}]"
+        return f" {description} [{ref_label_repr}]"
+
+    uri = node.attrs["src"]
+    assert isinstance(uri, str)
+    uri = maybe_add_link_brackets(uri)
+    title = node.attrs.get("title")
+    if title is not None:
+        return f'{description} ({uri} "{title}")'
+    return f"{description} ({uri})"
 
 
 def wa_hr_renderer(node: RenderTreeNode, context: RenderContext) -> str:
