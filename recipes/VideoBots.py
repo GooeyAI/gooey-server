@@ -1710,7 +1710,7 @@ def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
             mime_type = mimetypes.guess_type(f)[0] or ""
             if mime_type.startswith("image/"):
                 new_input_images.append(f)
-            if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+            elif mime_type.startswith("audio/") or mime_type.startswith("video/"):
                 new_input_audio = f
             else:
                 new_input_documents.append(f)
