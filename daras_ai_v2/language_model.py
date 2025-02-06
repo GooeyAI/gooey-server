@@ -374,6 +374,16 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
 
+    gemini_2_flash = LLMSpec(
+        label="Gemini 2 Flash (Google)",
+        model_id="gemini-2.0-flash-001",
+        llm_api=LLMApis.gemini,
+        context_window=1_048_576,
+        price=20,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     gemini_1_5_flash = LLMSpec(
         label="Gemini 1.5 Flash (Google)",
