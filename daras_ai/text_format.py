@@ -13,6 +13,7 @@ from daras_ai.mdit_wa_plugin import WhatsappParser
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.tts_markdown_renderer import RendererPlain
 from daras_ai_v2.text_splitter import new_para
+from loguru import logger
 
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
@@ -86,9 +87,13 @@ def extract_image_urls(tokens) -> list[str]:
 
 
 def get_mimetype_from_url(url: str) -> str:
-    r = requests.head(url)
-    raise_for_status(r)
-    return r.headers.get("content-type", "application/octet-stream")
+    try:
+        r = requests.head(url)
+        raise_for_status(r)
+        return r.headers.get("content-type", "application/octet-stream")
+    except requests.RequestException as e:
+        logger.warning(f"Error fetching mimetype for {url}: {e}")
+        return "application/octet-stream"
 
 
 def process_wa_image_urls(image_urls: list[str]) -> list[str]:
