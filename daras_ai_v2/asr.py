@@ -82,13 +82,25 @@ WHISPER_LARGE_V2_SUPPORTED = {
     "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
     "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
 }  # fmt: skip
+
+# this map exists because replicate is stupid
 WHISPER_LARGE_V3_SUPPORTED = {
-    'mt', 'sn', 'lv', 'el', 'fa', 'sd', 'eu', 'no', 'pa', 'br', 'es', 'mk', 'ht', 'lb', 'hu', 'mi', 'ba', 'oc', 'sl',
-    'ru', 'si', 'it', 'su', 'az', 'pl', 'hr', 'ko', 'ur', 'vi', 'hy', 'ar', 'lo', 'cs', 'be', 'tg', 'lt', 'ms', 'mn',
-    'th', 'so', 'ml', 'ca', 'as', 'fr', 'fi', 'ja', 'pt', 'bs', 'tr', 'nl', 'mg', 'tl', 'te', 'ha', 'fo', 'en', 'sw',
-    'yue', 'ps', 'bn', 'is', 'gu', 'ta', 'af', 'sq', 'cy', 'sr', 'uk', 'de', 'am', 'sv', 'nn', 'ka', 'kk', 'yi', 'tk',
-    'yo', 'sk', 'kn', 'ln', 'id', 'bo', 'jv', 'mr', 'et', 'ne', 'km', 'gl', 'da', 'he', 'la', 'hi', 'ro', 'bg', 'my',
-    'uz', 'tt', 'zh', 'haw', 'sa'
+    "af": "afrikaans", "sq": "albanian", "am": "amharic", "ar": "arabic", "hy": "armenian", "as": "assamese",
+    "az": "azerbaijani", "ba": "bashkir", "eu": "basque", "be": "belarusian", "bn": "bengali", "bs": "bosnian",
+    "br": "breton", "bg": "bulgarian", "yue": "cantonese", "ca": "catalan", "zh": "chinese", "hr": "croatian",
+    "cs": "czech", "da": "danish", "nl": "dutch", "en": "english", "et": "estonian", "fo": "faroese", "fi": "finnish",
+    "fr": "french", "gl": "galician", "ka": "georgian", "de": "german", "el": "greek", "gu": "gujarati",
+    "ht": "haitian creole", "ha": "hausa", "haw": "hawaiian", "he": "hebrew", "hi": "hindi", "hu": "hungarian",
+    "is": "icelandic", "id": "indonesian", "it": "italian", "ja": "japanese", "jv": "javanese", "kn": "kannada",
+    "kk": "kazakh", "km": "khmer", "ko": "korean", "lo": "lao", "la": "latin", "lv": "latvian", "ln": "lingala",
+    "lt": "lithuanian", "lb": "luxembourgish", "mk": "macedonian", "mg": "malagasy", "ms": "malay", "ml": "malayalam",
+    "mt": "maltese", "mi": "maori", "mr": "marathi", "mn": "mongolian", "my": "myanmar", "ne": "nepali",
+    "no": "norwegian", "nn": "nynorsk", "oc": "occitan", "ps": "pashto", "fa": "persian", "pl": "polish",
+    "pt": "portuguese", "pa": "punjabi", "ro": "romanian", "ru": "russian", "sa": "sanskrit", "sr": "serbian",
+    "sn": "shona", "sd": "sindhi", "si": "sinhala", "sk": "slovak", "sl": "slovenian", "so": "somali", "es": "spanish",
+    "su": "sundanese", "sw": "swahili", "sv": "swedish", "tl": "tagalog", "tg": "tajik", "ta": "tamil", "tt": "tatar",
+    "te": "telugu", "th": "thai", "bo": "tibetan", "tr": "turkish", "tk": "turkmen", "uk": "ukrainian", "ur": "urdu",
+    "uz": "uzbek", "vi": "vietnamese", "cy": "welsh", "yi": "yiddish", "yo": "yoruba",
 }  # fmt: skip
 
 # https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
@@ -953,9 +965,9 @@ def run_asr(
             "task": "translate" if speech_translation_target else "transcribe",
         }
         if language:
-            config["language"] = (
-                langcodes.Language.get(language).language_name().lower()
-            )
+            config["language"] = WHISPER_LARGE_V3_SUPPORTED[
+                normalised_lang_in_collection(language, WHISPER_LARGE_V3_SUPPORTED)
+            ]
         data = replicate.run(
             asr_model_ids[AsrModels.whisper_large_v3],
             input=config,
