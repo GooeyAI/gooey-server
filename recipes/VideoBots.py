@@ -1779,7 +1779,7 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.WHATSAPP,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
-        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/pricing) for a number on us.Read our guide to connect your own mobile # (that's not already on WhatsApp) or upgrade for a number on us.",
+        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/pricing) for a number on us.",
     ),
     ConnectChoice(
         platform=Platform.SLACK,
