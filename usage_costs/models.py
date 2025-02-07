@@ -52,6 +52,7 @@ class ModelProvider(models.IntegerChoices):
     anthropic = 6, "Anthropic"
     groq = 7, "groq"
     fireworks = 8, "Fireworks AI"
+    mistral = 9, "Mistral AI"
 
     aks = 5, "Azure Kubernetes Service"
 

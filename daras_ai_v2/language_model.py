@@ -60,6 +60,7 @@ class LLMApis(Enum):
     groq = 5
     anthropic = 6
     self_hosted = 7
+    mistral = 8
 
 
 class LLMSpec(typing.NamedTuple):
@@ -323,21 +324,37 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    pixtral_large = LLMSpec(
+        label="Pixtral Large 24/11",
+        model_id="pixtral-large-2411",
+        llm_api=LLMApis.mistral,
+        context_window=131_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    mistral_large = LLMSpec(
+        label="Mistral Large 24/11",
+        model_id="mistral-large-2411",
+        llm_api=LLMApis.mistral,
+        context_window=131_000,
+        supports_json=True,
+    )
     mistral_small_24b_instruct = LLMSpec(
-        label="Mistral Small 24B Instruct (Mistral)",
-        model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
-        llm_api=LLMApis.fireworks,
+        label="Mistral Small 25/01",
+        model_id="mistral-small-2501",
+        llm_api=LLMApis.mistral,
         context_window=32_768,
         price=1,
         supports_json=True,
     )
     mixtral_8x7b_instruct_0_1 = LLMSpec(
-        label="Mixtral 8x7b Instruct v0.1 (Mistral)",
+        label="Mixtral 8x7b Instruct v0.1 [Deprecated]",
         model_id="mixtral-8x7b-32768",
         llm_api=LLMApis.groq,
         context_window=32_768,
         price=1,
         supports_json=True,
+        is_deprecated=True,
     )
     gemma_2_9b_it = LLMSpec(
         label="Gemma 2 9B (Google)",
@@ -829,6 +846,18 @@ def _run_chat_model(
         f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
     match api:
+        case LLMApis.mistral:
+            return _run_mistral_chat(
+                model=model,
+                avoid_repetition=avoid_repetition,
+                max_completion_tokens=max_tokens,
+                messages=messages,
+                num_outputs=num_outputs,
+                stop=stop,
+                temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
+            )
         case LLMApis.fireworks:
             return _run_fireworks_chat(
                 model=model,
@@ -1474,6 +1503,82 @@ def _run_fireworks_chat(
         quantity=out["usage"]["completion_tokens"],
     )
     return [choice["message"] for choice in out["choices"]]
+
+
+@retry_if(aifail.http_should_retry)
+def _run_mistral_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_completion_tokens: int,
+    num_outputs: int,
+    temperature: float | None = None,
+    stop: list[str] | None = None,
+    avoid_repetition: bool = False,
+    tools: list[LLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
+):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_completion_tokens,
+        n=num_outputs,
+        temperature=temperature,
+    )
+    if tools:
+        data["tools"] = [tool.spec for tool in tools]
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    if response_format_type:
+        data["response_format"] = {"type": response_format_type}
+    r = requests.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.MISTRAL_API_KEY}"},
+        json=data,
+    )
+    raise_for_status(r)
+    out = r.json()
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=out["usage"]["prompt_tokens"],
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
+    return list(_parse_mistral_output(out))
+
+
+def _parse_mistral_output(out: dict) -> typing.Iterable[dict]:
+    for choice in out["choices"]:
+        message = choice["message"]
+        content = message.get("content")
+        # clean up the damn references
+        if isinstance(content, list):
+            message["content"] = "".join(
+                filter(None, map(_mistral_ref_chunk_to_str, content))
+            )
+        else:
+            message["content"] = content.replace("[REF]", " [").replace("[/REF]", "]")
+        yield message
+
+
+def _mistral_ref_chunk_to_str(chunk: dict) -> str | None:
+    text = chunk.get("text")
+    if text:
+        return text
+    ref_ids = chunk.get("reference_ids")
+    if ref_ids:
+        return " [" + ", ".join(map(str, ref_ids)) + "]"
+    return None
 
 
 # def _run_together_chat(

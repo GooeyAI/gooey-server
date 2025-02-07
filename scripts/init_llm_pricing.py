@@ -860,6 +860,36 @@ def run():
         pricing_url="https://fireworks.ai/pricing",
     )
 
+    # mistral
+
+    llm_pricing_create(
+        model_id="pixtral-large-2411",
+        model_name=LargeLanguageModels.pixtral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-large-2411",
+        model_name=LargeLanguageModels.mistral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-small-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.3,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+
 
 def llm_pricing_create(
     model_id: str,
