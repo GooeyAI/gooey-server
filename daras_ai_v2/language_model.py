@@ -212,7 +212,6 @@ class LargeLanguageModels(Enum):
         model_id=("openai-gpt-4-prod-ca-1", "gpt-4"),
         llm_api=LLMApis.openai,
         context_window=8192,
-        max_output_tokens=8192,
         price=10,
     )
     gpt_4_32k = LLMSpec(
