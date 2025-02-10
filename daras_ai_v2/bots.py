@@ -223,6 +223,9 @@ class BotInterface:
     def get_interactive_msg_info(self) -> ButtonPressed:
         raise NotImplementedError("This bot does not support interactive messages.")
 
+    def get_location_info(self) -> dict:
+        raise NotImplementedError("This bot does not support location messages.")
+
     def on_run_created(self, sr: "SavedRun"):
         pass
 
@@ -287,7 +290,7 @@ def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
     except Exception as e:
-        # send error msg as repsonse
+        # send error msg as response
         bot.send_msg(text=ERROR_MSG.format(e))
         raise
 
@@ -333,6 +336,12 @@ def _msg_handler(bot: BotInterface):
             if not input_audio:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
+        case "location":
+            input_location = bot.get_location_info()
+            if not input_location:
+                bot.send_msg(text=DEFAULT_RESPONSE)
+                return
+            input_text = _handle_location_msg(input_text, input_location)
         case "text":
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
@@ -377,7 +386,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
         run_google_translate([input_text], "en", glossary_url=bot.input_glossary)
     )
     last_feedback.save()
-    # send back a confimation msg
+    # send back a confirmation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
     bot_name = str(bot.bi.name)
     # reset convo state
@@ -673,6 +682,20 @@ def _handle_interactive_msg(bot: BotInterface):
                 title or button.button_title,
             )
             return False
+
+
+def _handle_location_msg(input_text, input_location: dict[str, float]) -> str:
+    from geopy.geocoders import Nominatim
+
+    if not input_location:
+        return input_text
+
+    geolocator = Nominatim(user_agent="my_geopy_app")
+    location = geolocator.reverse(
+        str(input_location["latitude"]) + "," + str(input_location["longitude"])
+    )
+    input_text += "My present location is" + location.raw["address"].__str__()
+    return input_text
 
 
 class ButtonIds:

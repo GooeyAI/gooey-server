@@ -13,6 +13,7 @@ from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
+from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -102,6 +103,13 @@ class WhatsappBot(BotInterface):
             button_title=self.input_message["interactive"]["button_reply"]["title"],
             context_msg_id=self.input_message["context"]["id"],
         )
+
+    def get_location_info(self) -> dict | None:
+        try:
+            location_info = self.input_message["location"]
+        except KeyError:
+            return None
+        return location_info
 
     def _send_msg(
         self,
