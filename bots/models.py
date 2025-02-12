@@ -1904,6 +1904,7 @@ class PublishedRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = PublishedRunQuerySet.as_manager()
+    photo_url = CustomURLField(default="", blank=True)
 
     class Meta:
         get_latest_by = "updated_at"
