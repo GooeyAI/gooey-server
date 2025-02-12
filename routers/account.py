@@ -295,7 +295,7 @@ def all_saved_runs_tab(request: Request):
         workflow = Workflow(pr.workflow)
         visibility = PublishedRunVisibility(pr.visibility)
 
-        workflow.page_cls().render_published_run_preview_v2(
+        workflow.page_cls().render_published_run_full_width(
             pr, workflow_pill=workflow.short_title
         )
 
@@ -344,12 +344,11 @@ def all_saved_runs_tab(request: Request):
             f"Saved workflows of **{workspace_name}** are here and visible & editable by other workspace members."
         )
 
-    with gui.div(className="mt-4"):
-        for pr in prs:
-            _render_run(pr)
-            # render divder only if not the last item
-            if pr != prs[-1]:
-                gui.div(className="mb-2 mt-2 border-bottom")
+    for pr in prs:
+        _render_run(pr)
+        # render divder only if not the last item
+        if pr != prs[-1]:
+            gui.div(className="mb-2 mt-2 border-bottom")
 
     paginate_button(url=request.url, cursor=cursor)
 
