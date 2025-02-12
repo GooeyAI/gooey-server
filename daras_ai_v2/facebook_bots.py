@@ -243,13 +243,14 @@ class WhatsappBot(BotInterface):
                 for link in documents
             ] + messages
 
-        messages += [
-            {
-                "type": "image",
-                "image": {"link": wa_img_convert(img_url)},
-            }
-            for img_url in images
-        ]
+        if images:
+            messages += [
+                {
+                    "type": "image",
+                    "image": {"link": wa_img_convert(img_url)},
+                }
+                for img_url in images
+            ]
 
         return send_wa_msgs_raw(
             bot_number=bot_number,
