@@ -1543,7 +1543,7 @@ class BasePage:
     ):
         if not user:
             return
-        photo = user["photo_url"]
+        photo = user.photo_url
         name = user.full_name()
         if show_as_link and (handle := user.get_handle()):
             link = handle.get_app_url()
@@ -2190,7 +2190,7 @@ class BasePage:
             return
 
         def _render(pr: PublishedRun):
-            self.render_published_run_preview_v2(published_run=pr)
+            self.render_published_run_full_width(published_run=pr)
 
         with gui.div(className="position-relative w-100"):
             for item in published_runs:
@@ -2290,85 +2290,168 @@ class BasePage:
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
 
-    def render_published_run_preview_v2(self, published_run: PublishedRun, **kwargs):
+    def render_published_run_full_width(self, published_run: PublishedRun, **kwargs):
+        max_desc_words = 150
+        max_desc_words_mobile = 100
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-        with gui.styled(
-            """
-                h4 {
-                    margin:0
-                }
-                .pr-list-item-col-1 {
-                    max-width: 100%;
-                }
-                .pr-list-item-col-4 {
-                    max-width: 100%;
-                }
-                @media (min-width: 1024px) {
-                        .pr-list-item-col-1 {
-                            max-width: 60%;
-                        }
-                        .pr-list-item-col-4 {
-                            max-width: 40%;
-                        }
-                    }
-                """
-        ):
-            with gui.div(
-                className="d-flex flex-column flex-md-row align-items-md-center justify-content-between w-100"
-            ):
+        version = published_run.versions.latest()
+        pills = [
+            lambda: gui.pill(
+                PublishedRunVisibility(published_run.visibility).get_badge_html(),
+                unsafe_allow_html=True,
+                className="border border-dark",
+            )
+        ]
+        if kwargs.get("workflow_pill"):
+            pills.append(
+                lambda: gui.pill(
+                    kwargs["workflow_pill"],
+                    unsafe_allow_html=True,
+                    className="border border-dark ms-2",
+                )
+            )
+        photo_url = published_run.photo_url
+        updated_at = published_run.saved_run.updated_at
+        display_picture = lambda size: (
+            gui.image(
+                src=photo_url,
+                className="m-0",
+                style={
+                    "width": size,
+                    "height": size,
+                    "objectFit": "cover",
+                    "borderRadius": "50%",
+                },
+            )
+            if photo_url
+            else gui.write(
+                f"# {get_workflow_emoji(Workflow(published_run.workflow))}",
+                className="m-0 container-margin-reset",
+            )
+        )
 
-                # Right Column
-                with gui.div(
-                    className="d-flex align-items-center pr-list-item-col-1 mb-4",
-                ):
-                    gui.write(
-                        f"## {get_workflow_emoji(Workflow(published_run.workflow))}"
+        def run_count():
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                with gui.div():
+                    gui.caption(
+                        f"{run_icon} {run_count} runs",
+                        unsafe_allow_html=True,
                     )
-                    with gui.div(className="ms-2 flex-grow-1"):
-                        with gui.div(
-                            className="d-flex align-items-md-baseline flex-column flex-md-row",
-                        ):
-                            with gui.div(className="me-2"):
-                                with gui.link(to=published_run.get_app_url()):
-                                    gui.write(f"#### {tb.h1_title}")
-                            with gui.div(
-                                className="d-flex", style={"font-size": "0.9rem"}
-                            ):
-                                gui.pill(
-                                    PublishedRunVisibility(
-                                        published_run.visibility
-                                    ).get_badge_html(),
-                                    unsafe_allow_html=True,
-                                    className="border border-dark",
-                                )
-                                if kwargs and kwargs["workflow_pill"]:
-                                    gui.pill(
-                                        kwargs["workflow_pill"],
-                                        unsafe_allow_html=True,
-                                        className="border border-dark ms-2",
-                                    )
-                        if published_run.notes:
-                            gui.caption(published_run.notes, line_clamp=2)
 
-                # middle column
-                # with gui.div(
-                #     className="d-flex align-items-center mb-4 pr-list-item-col-2"
-                # ):
-                #     # user name and photo
-                #     self.render_author(
-                #         published_run.get,
-                #         image_size="30px",
-                #         responsive=False,
-                #         show_as_link=False,
-                #     )
-                # Left Column
+        with gui.div(className="row align-items-center position-relative py-2"):
+            with gui.styled(
+                """
+                    h4, h1 {
+                        margin: 0 !important;
+                    }
+                    @media (min-width: 768px) {
+                        h4, h1 {
+                        margin-bottom: 0.2rem !important;
+                        }
+
+                """
+            ):
                 with gui.div(
-                    className="ms-2 d-flex justify-content-end flex-grow-1 pr-list-item-col-4"
+                    className="col-1 p-0 d-none d-md-flex align-items-center justify-content-center container-margin-reset"
                 ):
-                    updated_at = published_run.saved_run.updated_at
+                    display_picture("80px")
+                with gui.div(
+                    className="col-12 col-md-7 p-0 position-relative container-margin-reset"
+                ):
 
+                    with gui.div(className="d-flex align-items-center"):
+                        with gui.div(
+                            className="justify-content-center d-md-none",
+                            style={"minWidth": "40px"},
+                        ):
+                            display_picture("40px")
+                        with gui.div(className="ms-2 flex-grow-1"):
+                            with gui.div(
+                                className="d-flex flex-column flex-md-row align-items-md-center"
+                            ):
+                                with gui.div(className="d-md-block"):
+                                    with gui.link(
+                                        to=published_run.get_app_url(),
+                                    ):
+
+                                        gui.write(
+                                            f"#### {truncate_text_words(tb.h1_title, 50)}",
+                                        )
+                                with gui.div(
+                                    className="d-md-flex d-none align-items-center mb-1 ms-2",
+                                    style={"font-size": "0.9rem"},
+                                ):
+                                    for pill in pills:
+                                        pill()
+                            if published_run.notes:
+                                with gui.div(
+                                    className="d-none d-md-block container-margin-reset"
+                                ):
+                                    gui.caption(
+                                        truncate_text_words(
+                                            published_run.notes, max_desc_words
+                                        ),
+                                    )
+                                # mobile version
+                                with gui.div(className="d-md-none"):
+                                    gui.caption(
+                                        truncate_text_words(
+                                            published_run.notes, max_desc_words_mobile
+                                        ),
+                                        style={"fontSize": "14px"},
+                                    )
+
+            with gui.div(className="d-none d-md-block col-12 col-md-2 flex-grow-1"):
+                self.render_author(
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=False,
+                )
+                if version.change_notes:
+                    with gui.div(className="mt-2"):
+                        gui.caption(
+                            f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 20))}",
+                            unsafe_allow_html=True,
+                        )
+
+            with gui.div(className="col-12 col-md-2"):
+                with gui.div(
+                    className="d-flex d-md-none justify-content-between justify-content-md-end align-items-center"
+                ):
+                    with gui.div(
+                        className="d-md-none mb-1 flex-grow-1 d-flex justify-content-between align-items-center container-margin-reset",
+                    ):
+                        with gui.div(
+                            className="d-flex",
+                            style={"font-size": "0.7rem", "marginLeft": "42px"},
+                        ):
+                            for pill in pills:
+                                pill()
+                        with gui.div(className="d-flex gap-1 align-items-center"):
+                            self.render_author(
+                                published_run.last_edited_by,
+                                image_size="14px",
+                                text_size="0.8rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                            if updated_at and isinstance(updated_at, datetime.datetime):
+                                gui.caption(
+                                    f" • {get_relative_time(updated_at)}",
+                                    style={"fontSize": "0.8rem"},
+                                )
+
+                with gui.div(className="d-none d-md-block text-end"):
                     if updated_at and isinstance(updated_at, datetime.datetime):
-                        gui.caption(f"{get_relative_time(updated_at)}")
+                        gui.caption(
+                            f"{get_relative_time(updated_at)}",
+                            className="container-margin-reset",
+                        )
+                    run_count()
 
     def _render_example_preview(
         self,
