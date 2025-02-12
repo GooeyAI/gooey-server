@@ -136,7 +136,7 @@ def wa_markdown(text: str) -> str | tuple[list[str | Any], str]:
     if text is None:
         return ""
 
-    md = MarkdownIt("commonmark").enable("table").enable("strikethrough")
+    md = MarkdownIt("commonmark").enable("strikethrough")
     tokens = md.parse(text)
     image_urls = extract_image_urls(tokens)
     processed_images = process_wa_image_urls(image_urls)

@@ -1,8 +1,8 @@
 from mdformat.renderer._context import (
     RenderContext,
     make_render_children,
-    WRAP_POINT,
     _render_inline_as_text,
+    WRAP_POINT,
 )
 from mdformat.renderer._tree import RenderTreeNode
 from mdformat.plugins import ParserExtensionInterface
@@ -14,7 +14,7 @@ def wa_heading_renderer(node: RenderTreeNode, context: RenderContext) -> str:
     text = text.lstrip("*")
     text = text.rstrip("*")
 
-    return f"*{text}*"
+    return "*" + text + "*"
 
 
 def wa_em_renderer(node: RenderTreeNode, context: RenderContext) -> str:
