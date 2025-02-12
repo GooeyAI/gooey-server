@@ -139,7 +139,10 @@ class WhatsappBot(BotInterface):
         user_number: str,
         access_token: str | None = None,
     ) -> str | None:
-        text, images = markdown_to_wa(text)
+        if text:
+            text, images = markdown_to_wa(text)
+        else:
+            images = None
 
         # split text into chunks if too long
         if text and len(text) > WA_MSG_MAX_SIZE:
