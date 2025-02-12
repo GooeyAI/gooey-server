@@ -25,6 +25,7 @@ from openai.types.chat import (
 )
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
+from daras_ai.text_format import is_list_item_complete
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
@@ -1280,6 +1281,10 @@ def _stream_openai_chunked(
                     # if the last part is not a string or is empty, we need to wait for more data
                     if not (isinstance(last_part, str) and last_part.strip()):
                         continue
+
+            # add regex to handle not breaking in list items
+            if is_list_item_complete(chunk):
+                continue
 
             # iterate through the separators and find the best one that matches
             for sep in default_separators[:-1]:

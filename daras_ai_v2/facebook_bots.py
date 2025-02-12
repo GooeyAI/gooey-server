@@ -10,6 +10,7 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
+from daras_ai.text_format import wa_markdown
 
 WA_MSG_MAX_SIZE = 1024
 
@@ -138,6 +139,8 @@ class WhatsappBot(BotInterface):
     ) -> str | None:
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
+        images, text = wa_markdown(text)
+
         # split text into chunks if too long
         if text and len(text) > WA_MSG_MAX_SIZE:
             splits = text_splitter(
@@ -190,6 +193,32 @@ class WhatsappBot(BotInterface):
                         },
                     },
                 ]
+
+        elif images:
+            if buttons:
+                messages = _build_msg_buttons(
+                    buttons,
+                    {
+                        "body": {
+                            "text": text or "\u200b",
+                        },
+                        "header": {
+                            "type": "image",
+                            "image": {"link": images[0]},
+                        },
+                    },
+                )
+            else:
+                messages = [
+                    {
+                        "type": "image",
+                        "image": {
+                            "link": images[0],
+                            "caption": text,
+                        },
+                    },
+                ]
+
         elif buttons:
             # interactive text msg
             messages = _build_msg_buttons(
