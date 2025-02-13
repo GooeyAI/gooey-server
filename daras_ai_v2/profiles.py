@@ -275,8 +275,7 @@ def edit_user_profile_page(workspace: "Workspace"):
 
 
 def _edit_user_profile_header(workspace: "Workspace"):
-    user = workspace.created_by
-    handle = workspace.handle or user.handle  # TODO: remove fallback
+    handle = workspace.handle
 
     gui.write("# Update your Profile")
 
@@ -445,16 +444,15 @@ def _edit_user_profile_photo_section(workspace: "Workspace"):
 
 def _edit_user_profile_form_section(workspace: "Workspace"):
     user = workspace.created_by
-    current_handle = workspace.handle or user.handle  # TODO: remove fallback
     user.display_name = gui.text_input("Name", value=user.display_name)
 
     handle_style: dict[str, str] = {}
     if new_handle := gui.text_input(
         "Username",
-        value=current_handle and current_handle.name or "",
+        value=workspace.handle and workspace.handle.name or "",
         style=handle_style,
     ):
-        if not current_handle or current_handle.name != new_handle:
+        if not workspace.handle or workspace.handle.name != new_handle:
             try:
                 Handle(name=new_handle).full_clean()
             except ValidationError as e:
@@ -481,8 +479,6 @@ def _edit_user_profile_form_section(workspace: "Workspace"):
         user.full_clean()
     except ValidationError as e:
         error_msg = "\n\n".join(e.messages)
-
-    if error_msg:
         gui.error(error_msg, icon="⚠️")
 
     if gui.button(
@@ -492,39 +488,23 @@ def _edit_user_profile_form_section(workspace: "Workspace"):
     ):
         try:
             with transaction.atomic():
-                if new_handle and not current_handle:
+                if new_handle and not workspace.handle:
                     # user adds a new handle
                     workspace.handle = Handle(name=new_handle)
                     workspace.handle.save()
-                elif (
-                    new_handle and current_handle and current_handle.name != new_handle
-                ):
-                    # user changes existing handle
-                    if workspace.handle:
-                        workspace.handle.name = new_handle
-                        workspace.handle.save()
-                    elif user.handle:
-                        # TODO: remove this once all handles are migrated
-                        user.handle.delete()
-                        user.handle = None
-                        workspace.handle = Handle(name=new_handle)
-                        workspace.handle.save()
-                elif not new_handle and current_handle:
-                    # user removes existing handle
-                    if workspace.handle:
-                        workspace.handle.delete()
-                        workspace.handle = None
-                    elif user.handle:
-                        # TODO: remove this once all handles are migrated
-                        user.handle.delete()
-                        user.handle = None
-                user.full_clean()
+                elif new_handle and workspace.handle.name != new_handle:
+                    # change existing handle
+                    workspace.handle.name = new_handle
+                    workspace.handle.save()
+                elif not new_handle and workspace.handle:
+                    # remove existing handle
+                    workspace.handle.delete()
+                    workspace.handle = None
                 workspace.full_clean()
                 user.save()
                 workspace.save()
-        except (ValidationError, IntegrityError) as e:
-            for m in e.messages:
-                gui.error(m, icon="⚠️")
+        except ValidationError as e:
+            gui.error("\n\n".join(e.messages))
         else:
             gui.success("Changes saved")
 
