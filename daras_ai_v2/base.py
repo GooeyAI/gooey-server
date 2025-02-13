@@ -358,21 +358,7 @@ class BasePage:
                     with gui.nav_item(url, active=tab == self.tab):
                         gui.html(tab.title)
 
-            if (
-                self.current_pr
-                and not self.current_pr.is_root()
-                and self.tab == RecipeTabs.run
-            ):
-                with gui.div(
-                    className="container-margin-reset d-none d-md-block",
-                    style=dict(
-                        position="absolute",
-                        top="50%",
-                        right="0",
-                        transform="translateY(-50%)",
-                    ),
-                ):
-                    self._render_saved_timestamp(self.current_pr)
+                    self._render_saved_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
 
@@ -490,9 +476,27 @@ class BasePage:
         ):
             gui.html("Unpublished changes")
 
-    def _render_saved_timestamp(self, pr: PublishedRun):
-        with gui.tag("span", className="text-muted"):
-            gui.write(f"{get_relative_time(pr.updated_at)}")
+    def _render_saved_timestamp(self):
+        sr, pr = self.current_sr_pr
+        if not (pr and self.tab == RecipeTabs.run):
+            return
+        if pr.saved_run_id == sr.id or pr.is_root():
+            dt = pr.updated_at
+        else:
+            dt = sr.updated_at
+        with (
+            gui.div(
+                className="container-margin-reset d-none d-md-block",
+                style=dict(
+                    position="absolute",
+                    top="50%",
+                    right="0",
+                    transform="translateY(-50%)",
+                ),
+            ),
+            gui.tag("span", className="text-muted"),
+        ):
+            gui.write(get_relative_time(dt))
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
