@@ -1,3 +1,4 @@
+import hashlib
 import typing
 from functools import cached_property
 
@@ -122,16 +123,6 @@ class AppUser(models.Model):
 
     disable_safety_checker = models.BooleanField(default=False)
 
-    handle = models.OneToOneField(
-        "handles.Handle",
-        on_delete=models.SET_NULL,
-        default=None,
-        blank=True,
-        null=True,
-        related_name="user",
-        help_text="[deprecated] use workspace.handle instead",
-    )
-
     banner_url = CustomURLField(blank=True, default="")
     bio = StrippedTextField(blank=True, default="")
     company = models.CharField(max_length=255, blank=True, default="")
@@ -229,9 +220,10 @@ class AppUser(models.Model):
         self.save()
         workspace, _ = self.get_or_create_personal_workspace()
 
-        if handle := Handle.create_default_for_user(user=self):
-            workspace.handle = handle
-            workspace.save()
+        if not self.is_anonymous:
+            if handle := Handle.create_default_for_workspace(workspace):
+                workspace.handle = handle
+                workspace.save()
 
         return self
 
@@ -251,13 +243,14 @@ class AppUser(models.Model):
         ) or [self.get_or_create_personal_workspace()[0]]
 
     def get_handle(self) -> Handle | None:
-        if self.handle:
-            return self.handle
         workspace, _ = self.get_or_create_personal_workspace()
         return workspace.handle
 
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
+
+    def get_photo(self) -> str:
+        return self.photo_url or get_placeholder_profile_image(self.uid)
 
 
 class TransactionReason(models.IntegerChoices):
@@ -392,3 +385,8 @@ class AppUserTransaction(models.Model):
                     furl("https://www.paypal.com/unifiedtransactions/details/payment/")
                     / self.invoice_id
                 )
+
+
+def get_placeholder_profile_image(seed: str) -> str:
+    hash = hashlib.md5(seed.encode()).hexdigest()
+    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
