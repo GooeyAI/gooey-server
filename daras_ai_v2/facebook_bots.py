@@ -9,6 +9,7 @@ from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
+from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -98,6 +99,13 @@ class WhatsappBot(BotInterface):
             button_title=self.input_message["interactive"]["button_reply"]["title"],
             context_msg_id=self.input_message["context"]["id"],
         )
+
+    def get_location_info(self) -> dict | None:
+        try:
+            location_info = self.input_message["location"]
+        except KeyError:
+            return None
+        return location_info
 
     def _send_msg(
         self,
@@ -284,25 +292,59 @@ def retrieve_wa_media_by_id(
 def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> list[dict]:
     ret = []
     for i in range(0, len(buttons), 3):
-        ret.append(
-            {
-                "type": "interactive",
-                "interactive": {
-                    "type": "button",
-                    **msg,
-                    "action": {
-                        "buttons": [
-                            {
-                                "type": "reply",
-                                "reply": {"id": button["id"], "title": button["title"]},
-                            }
-                            for button in buttons[i : i + 3]
-                        ],
+        button_group = buttons[i : i + 3]
+
+        send_location_request = False
+        if button_group:
+            for button in button_group:
+                try:
+                    button_id = csv_decode_row(button["id"])
+                    if button_id[1] == "send_location":
+                        send_location_request = True
+                        break
+                except IndexError:
+                    continue
+
+        if send_location_request:
+            ret.append(
+                {
+                    "type": "interactive",
+                    "interactive": {
+                        "type": "location_request_message",
+                        "body": {
+                            "text": msg.get("body", {}).get(
+                                "text", "Please share your location."
+                            ),
+                        },
+                        "action": {"name": "send_location"},
                     },
-                },
-            }
-        )
-        # dont repeat text in subsequent messages
+                }
+            )
+            # dont send follow up ReplyButtons
+            break
+        else:
+            ret.append(
+                {
+                    "type": "interactive",
+                    "interactive": {
+                        "type": "button",
+                        **msg,
+                        "action": {
+                            "buttons": [
+                                {
+                                    "type": "reply",
+                                    "reply": {
+                                        "id": button["id"],
+                                        "title": button["title"],
+                                    },
+                                }
+                                for button in button_group
+                            ],
+                        },
+                    },
+                }
+            )
+        # Prevent text repetition in subsequent messages
         msg = {"body": {"text": "\u200b"}}
     return ret
 
