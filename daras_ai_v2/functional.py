@@ -31,7 +31,9 @@ def apply_parallel(
     if not max_workers:
         yield
         return []
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    with ThreadPoolExecutor(
+        max_workers=max_workers, initializer=get_initializer()
+    ) as pool:
         fs = [pool.submit(fn, *args) for args in zip(*iterables)]
         length = len(fs)
         ret = [None] * length
@@ -52,7 +54,9 @@ def fetch_parallel(
     max_workers = max_workers or max(map(len, iterables))
     if not max_workers:
         return
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    with ThreadPoolExecutor(
+        max_workers=max_workers, initializer=get_initializer()
+    ) as pool:
         fs = [pool.submit(fn, *args) for args in zip(*iterables)]
         for fut in as_completed(fs):
             yield fut.result()
@@ -90,7 +94,9 @@ def map_parallel(
     max_workers = max_workers or max(map(len, iterables))
     if not max_workers:
         return []
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    with ThreadPoolExecutor(
+        max_workers=max_workers, initializer=get_initializer()
+    ) as pool:
         return list(pool.map(fn, *iterables))
 
 
@@ -104,7 +110,9 @@ def map_parallel_ascompleted(
     max_workers = max_workers or max(map(len, iterables))
     if not max_workers:
         return
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with ThreadPoolExecutor(
+        max_workers=max_workers, initializer=get_initializer()
+    ) as executor:
         fs = {
             executor.submit(fn, *args): arg_id
             for arg_id, args in zip(ids, zip(*iterables))
@@ -124,3 +132,14 @@ def shape(seq: typing.Sequence | np.ndarray) -> tuple[int, ...]:
         return (len(seq),) + shape(seq[0])
     else:
         return ()
+
+
+def get_initializer() -> typing.Callable:
+    from celeryapp.tasks import threadlocal
+
+    parent = threadlocal.__dict__
+
+    def initializer():
+        threadlocal.__dict__.update(parent)
+
+    return initializer
