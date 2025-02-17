@@ -220,6 +220,12 @@ def file_upload(form_data: FormData = fastapi_request_form):
             img.transform(resize=form_data.get("resize", f"{1024 ** 2}@>"))
             data = img.make_blob()
 
+    if len(data) > settings.MAX_UPLOAD_SIZE:
+        return Response(
+            content=f"File size exceeds the maximum allowed size of {settings.MAX_UPLOAD_SIZE} bytes",
+            status_code=400,
+        )
+
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 

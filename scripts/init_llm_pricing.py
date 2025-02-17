@@ -5,6 +5,30 @@ category = ModelCategory.LLM
 
 
 def run():
+    # o3-mini
+
+    llm_pricing_create(
+        model_id="o3-mini-2025-01-31",
+        model_name=LargeLanguageModels.o3_mini.name,
+        unit_cost_input=1.10,
+        unit_cost_output=4.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1
+
+    llm_pricing_create(
+        model_id="o1-2024-12-17",
+        model_name=LargeLanguageModels.o1.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
     # o1-preview
 
     llm_pricing_create(
@@ -452,6 +476,15 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="gemini-2.0-flash-001",
+        model_name=LargeLanguageModels.gemini_2_flash.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/pricing",
+    )
+    llm_pricing_create(
         model_id="gemini-1.5-flash",
         model_name=LargeLanguageModels.gemini_1_5_flash.name,
         unit_cost_input=0.075,
@@ -802,6 +835,68 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.aks,
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
+    # fireworks
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-r1",
+        model_name=LargeLanguageModels.deepseek_r1.name,
+        unit_cost_input=3,
+        unit_cost_output=8,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.90,
+        unit_cost_output=0.90,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
+        model_name=LargeLanguageModels.llama3_1_405b.name,
+        unit_cost_input=3,
+        unit_cost_output=3,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    # mistral
+
+    llm_pricing_create(
+        model_id="pixtral-large-2411",
+        model_name=LargeLanguageModels.pixtral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-large-2411",
+        model_name=LargeLanguageModels.mistral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-small-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.3,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
     )
 
 

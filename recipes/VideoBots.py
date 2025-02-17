@@ -62,6 +62,7 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
+from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
@@ -101,7 +102,11 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
-from daras_ai_v2.vector_search import DocSearchRequest
+from daras_ai_v2.vector_search import (
+    DocSearchRequest,
+    doc_url_to_text_pages,
+    doc_or_yt_url_to_file_metas,
+)
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     LLMTool,
@@ -746,9 +751,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.json(references)
 
         if gui.session_state.get("functions"):
-            prompt_funcs = list(
-                get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
-            )
+            try:
+                prompt_funcs = list(
+                    get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+                )
+            except:
+                prompt_funcs = None
             if prompt_funcs:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
                 for tool in prompt_funcs:
@@ -825,7 +833,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
         llm_model = LargeLanguageModels[request.selected_model]
-        user_input = request.input_prompt.strip()
+        user_input = (request.input_prompt or "").strip()
         if not (
             user_input
             or request.input_audio
@@ -838,7 +846,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             request=request, response=response, user_input=user_input
         )
 
-        ocr_texts = yield from self.ocr_step(request=request)
+        ocr_texts = yield from self.document_understanding_step(request=request)
 
         request.translation_model = (
             request.translation_model or DEFAULT_TRANSLATION_MODEL
@@ -862,11 +870,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         yield from self.lipsync_step(request, response)
 
-    def ocr_step(self, request):
+    def document_understanding_step(self, request):
         ocr_texts = []
-        if request.document_model and (request.input_images or request.input_documents):
+        if request.document_model and request.input_images:
             yield "Running Azure Form Recognizer..."
-            for url in (request.input_images or []) + (request.input_documents or []):
+            for url in request.input_images:
                 ocr_text = (
                     azure_form_recognizer(url, model_id="prebuilt-read")
                     .get("content", "")
@@ -875,6 +883,26 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if not ocr_text:
                     continue
                 ocr_texts.append(ocr_text)
+        if request.input_documents:
+            import pandas as pd
+
+            file_url_metas = yield from flatapply_parallel(
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
+                request.input_documents,
+                message="Extracting Input Documents...",
+            )
+            for f_url, file_meta in file_url_metas:
+                pages = doc_url_to_text_pages(
+                    f_url=f_url,
+                    file_meta=file_meta,
+                    selected_asr_model=request.asr_model,
+                )
+                if isinstance(pages, pd.DataFrame):
+                    ocr_texts.append(pages.to_csv(index=False))
+                elif len(pages) <= 1:
+                    ocr_texts.append("\n\n---\n\n".join(pages))
+                else:
+                    ocr_texts.append(json.dumps(pages))
         return ocr_texts
 
     def asr_step(self, request, response, user_input):
@@ -985,7 +1013,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     response=response,
                     instructions=query_instructions,
                     context={"messages": chat_history},
-                )
+                ).strip()
             else:
                 query_msgs.reverse()
                 response.final_search_query = "\n---\n".join(
@@ -1012,18 +1040,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     keyword_query = list(keyword_query.values())[0]
                 response.final_keyword_query = keyword_query
 
-            # perform doc search
-            response.references = yield from get_top_k_references(
-                DocSearchRequest.parse_obj(
-                    {
-                        **request.dict(),
-                        **response.dict(),
-                        "search_query": response.final_search_query,
-                        "keyword_query": response.final_keyword_query,
-                    },
-                ),
-                current_user=self.request.user,
-            )
+            if response.final_search_query:
+                # perform doc search
+                response.references = yield from get_top_k_references(
+                    DocSearchRequest.parse_obj(
+                        {
+                            **request.dict(),
+                            **response.dict(),
+                            "search_query": response.final_search_query,
+                            "keyword_query": response.final_keyword_query,
+                        },
+                    ),
+                    current_user=self.request.user,
+                )
             if request.use_url_shortener:
                 for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
@@ -1145,6 +1174,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def output_translation_step(self, request, response, output_text):
+        from daras_ai_v2.bots import parse_bot_html
+
         # translate response text
         if should_translate_lang(request.user_language):
             yield f"Translating response to {request.user_language}..."
@@ -1160,6 +1191,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
+
+        # remove html tags from the output text for tts
+        raw_tts_text = [
+            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
+        ]
+        if raw_tts_text != output_text:
+            response.raw_tts_text = raw_tts_text
+
         return output_text
 
     def tts_step(self, request, response):
@@ -1675,7 +1714,7 @@ def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
             mime_type = mimetypes.guess_type(f)[0] or ""
             if mime_type.startswith("image/"):
                 new_input_images.append(f)
-            if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+            elif mime_type.startswith("audio/") or mime_type.startswith("video/"):
                 new_input_audio = f
             else:
                 new_input_documents.append(f)

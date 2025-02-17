@@ -266,7 +266,10 @@ class GoogleGPTPage(BasePage):
         # extract links & their corresponding titles
         link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}
         if not link_titles:
-            raise EmptySearchResults(response.final_search_query)
+            response.references = []
+            response.final_prompt = ""
+            response.output_text = []
+            return
 
         if request.embedding_model:
             # run vector search on links
@@ -291,11 +294,7 @@ class GoogleGPTPage(BasePage):
                 for item in links
             ]
 
-        # empty search result, abort!
-        if not response.references:
-            raise EmptySearchResults(request.search_query)
-
-        if not request.task_instructions:
+        if not (response.references and request.task_instructions):
             response.final_prompt = ""
             response.output_text = []
             return

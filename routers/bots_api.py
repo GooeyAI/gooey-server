@@ -14,7 +14,7 @@ from bots.models import Platform, Conversation, BotIntegration, Message, SavedRu
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
-from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed
+from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_bot_html
 from daras_ai_v2.redis_cache import get_redis_cache
 from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -307,6 +307,10 @@ class ApiInterface(BotInterface):
             if self.run_id and self.uid:
                 sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
+                output = VideoBotsPage.ResponseModel.parse_obj(state)
+                output.output_text = [
+                    parse_bot_html(text)[1] for text in output.output_text or []
+                ]
                 self.queue.put(
                     FinalResponse(
                         run_id=self.run_id,
@@ -315,7 +319,7 @@ class ApiInterface(BotInterface):
                         run_time_sec=sr.run_time.total_seconds(),
                         status=self.page_cls.get_run_state(state),
                         detail=state.get(StateKeys.run_status) or "",
-                        output=VideoBotsPage.ResponseModel.parse_obj(state),
+                        output=output,
                     )
                 )
         except Exception as e:
@@ -346,7 +350,7 @@ class ApiInterface(BotInterface):
         )
         return None
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str | None = None,
@@ -354,7 +358,6 @@ class ApiInterface(BotInterface):
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
-        should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
         response = MessagePart(

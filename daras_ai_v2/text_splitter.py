@@ -41,6 +41,8 @@ threadlocal = threading.local()
 
 
 def default_length_function(text: str, model: str = "gpt-4") -> int:
+    if model.startswith("o3-mini-"):
+        model = "gpt-4o"
     try:
         enc = threadlocal.enc
     except AttributeError:

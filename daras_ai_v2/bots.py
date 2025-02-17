@@ -21,8 +21,10 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -30,7 +32,6 @@ from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
-
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -70,6 +71,9 @@ class ButtonPressed(BaseModel):
     )
     context_msg_id: str = Field(
         description="The message ID of the context message on which the button was pressed"
+    )
+    button_title: str | None = Field(
+        description="The title of the button that was pressed by the user"
     )
 
 
@@ -144,7 +148,7 @@ class BotInterface:
         text: str | None = None,
         audio: str = None,
         video: str = None,
-        buttons: list[ReplyButton] = None,
+        send_feedback_buttons: bool = False,
         documents: list[str] = None,
         update_msg_id: str = None,
         should_translate: bool = False,
@@ -155,7 +159,7 @@ class BotInterface:
         :param text: The text to send
         :param audio: The audio URL to send
         :param video: The video URL to send
-        :param buttons: The interactive reply buttons to send
+        :param send_feedback_buttons: Whether to send feedback buttons with the message
         :param documents: The document URLs to send
         :param update_msg_id: The message ID of the message to update in-place
         :param should_translate: The messages from the saved run itself should automatically be translated,
@@ -164,6 +168,23 @@ class BotInterface:
         """
         if should_translate:
             text = self.translate_response(text)
+
+        buttons, text = parse_bot_html(text)
+
+        if buttons and send_feedback_buttons:
+            self._send_msg(
+                text=text,
+                audio=audio,
+                video=video,
+                buttons=buttons,
+                documents=documents,
+                update_msg_id=update_msg_id,
+            )
+            text = ""
+
+        if send_feedback_buttons:
+            buttons = _feedback_start_buttons()
+
         return self._send_msg(
             text=text,
             audio=audio,
@@ -224,6 +245,38 @@ class BotInterface:
             return text or ""
 
 
+def parse_bot_html(
+    text: str | None,
+    max_title_len: int = 20,
+    max_id_len: int = 256,
+) -> tuple[list[ReplyButton], str]:
+    from pyquery import PyQuery as pq
+
+    if not text:
+        return [], text
+    doc = pq(f"<root>{text}</root>")
+    buttons = [
+        ReplyButton(
+            id=truncate_text_words(
+                # parsed by _handle_interactive_msg
+                csv_encode_row(
+                    idx + 1,
+                    btn.attrib.get("gui-target") or "input_prompt",
+                    btn.text,
+                ),
+                max_id_len,
+            ),
+            title=truncate_text_words(btn.text, max_title_len),
+        )
+        for idx, btn in enumerate(doc("button") or [])
+        if btn.text
+    ]
+    text = "\n\n".join(
+        s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
+    )
+    return buttons, text
+
+
 def _echo(bot, input_text):
     response_text = f"You said ```{input_text}```\nhttps://www.youtube.com/"
     if bot.get_input_audio():
@@ -263,10 +316,10 @@ def _msg_handler(bot: BotInterface):
     input_images = None
     input_documents = None
     match bot.input_type:
-        # handle button press
+        # handled button press
         case "interactive":
-            _handle_interactive_msg(bot)
-            return
+            if _handle_interactive_msg(bot):
+                return
         case "image":
             input_images = bot.get_input_images()
             if not input_images:
@@ -375,7 +428,7 @@ def _process_and_send_msg(
     if bot.user_language:
         body["user_language"] = bot.user_language
     if bot.request_overrides:
-        body = bot.request_overrides | body
+        body.update(bot.request_overrides)
         try:
             variables.update(bot.request_overrides["variables"])
         except KeyError:
@@ -389,10 +442,7 @@ def _process_and_send_msg(
     )
     bot.on_run_created(sr)
 
-    if bot.show_feedback_buttons:
-        buttons = _feedback_start_buttons()
-    else:
-        buttons = None
+    send_feedback_buttons = bot.show_feedback_buttons
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -424,7 +474,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                     last_idx = len(text)
                 else:
@@ -434,13 +484,13 @@ def _process_and_send_msg(
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
                     sent_msg_id = update_msg_id
                     # don't show buttons again
-                    buttons = None
+                    send_feedback_buttons = False
                 if streaming_done:
                     break  # we're done streaming, stop the loop
 
@@ -461,20 +511,20 @@ def _process_and_send_msg(
     video = state.get("output_video") and state.get("output_video")[0]
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or buttons):
+    if not (text or audio or video or documents or send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or buttons:
+    if text or audio or video or documents or send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
-            buttons=buttons,
+            send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
 
@@ -605,6 +655,7 @@ def _handle_interactive_msg(bot: BotInterface):
                 # buttons=_feedback_post_click_buttons(),
                 should_translate=True,
             )
+            return True
 
         # handle skip
         case ButtonIds.action_skip:
@@ -612,19 +663,24 @@ def _handle_interactive_msg(bot: BotInterface):
             # reset state
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
-            return
+            return True
 
         # not sure what button was pressed, ignore
         case _:
-            bot_name = str(bot.bi.name)
-            bot.send_msg(
-                text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
-                should_translate=True,
+            import glom
+
+            # encoded by parse_html
+            target, title = None, None
+            parts = csv_decode_row(button.button_id)
+            if len(parts) >= 3:
+                target, title = parts[1:3]
+            bot.request_overrides = bot.request_overrides or {}
+            glom.assign(
+                bot.request_overrides,
+                target or "input_prompt",
+                title or button.button_title,
             )
-            # reset state
-            bot.convo.state = ConvoState.INITIAL
-            bot.convo.save()
-            return
+            return False
 
 
 class ButtonIds:

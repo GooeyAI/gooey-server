@@ -265,7 +265,7 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
-
+MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
@@ -474,3 +474,6 @@ SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
 SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")
 SCRAPING_PROXY_PASSWORD = config("SCRAPING_PROXY_PASSWORD", "")
 SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")
+
+FIREWORKS_API_KEY = config("FIREWORKS_API_KEY", "")
+MISTRAL_API_KEY = config("MISTRAL_API_KEY", "")

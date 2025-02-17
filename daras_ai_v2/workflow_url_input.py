@@ -25,40 +25,36 @@ def workflow_url_input(
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 
-    col1, col2, col3, col4 = gui.columns([9, 1, 1, 1], responsive=False)
-    if not internal_state.get("workflow") and internal_state.get("url"):
-        with col1:
-            url = gui.text_input(
-                "",
-                key=key,
-                value=internal_state.get("url"),
-                placeholder="https://gooey.ai/.../?run_id=...",
-            )
-        with col2:
-            edit_done_button(key)
-    else:
-        internal_state["workflow"] = page_cls.workflow
-        with col1:
-            options = get_published_run_options(
-                page_cls, current_user=current_user, include_root=include_root
-            )
-            options.update(internal_state.get("--added_workflows", {}))
-            with gui.div(className="pt-1"):
-                url = gui.selectbox(
+    with gui.div(className="d-flex"):
+        if not internal_state.get("workflow") and internal_state.get("url"):
+            with gui.div(className="flex-grow-1"):
+                url = gui.text_input(
                     "",
                     key=key,
-                    options=options,
                     value=internal_state.get("url"),
-                    format_func=lambda x: options[x] if x else BLANK_OPTION,
-                    allow_none=allow_none,
+                    placeholder="https://gooey.ai/.../?run_id=...",
                 )
-                if not url:
-                    return
-        with col2:
+            edit_done_button(key)
+        else:
+            internal_state["workflow"] = page_cls.workflow
+            with gui.div(className="flex-grow-1"):
+                options = get_published_run_options(
+                    page_cls, current_user=current_user, include_root=include_root
+                )
+                options.update(internal_state.get("--added_workflows", {}))
+                with gui.div(className="pt-1"):
+                    url = gui.selectbox(
+                        "",
+                        key=key,
+                        options=options,
+                        value=internal_state.get("url"),
+                        format_func=lambda x: options[x] if x else BLANK_OPTION,
+                        allow_none=allow_none,
+                    )
+                    if not url:
+                        return
             edit_button(key)
-    with col3:
         gui.url_button(url)
-    with col4:
         if del_key:
             del_button(del_key)
 

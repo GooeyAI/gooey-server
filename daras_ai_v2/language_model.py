@@ -56,9 +56,11 @@ class LLMApis(Enum):
     gemini = 2
     openai = 3
     # together = 4
+    fireworks = 4
     groq = 5
     anthropic = 6
     self_hosted = 7
+    mistral = 8
 
 
 class LLMSpec(typing.NamedTuple):
@@ -66,7 +68,7 @@ class LLMSpec(typing.NamedTuple):
     model_id: str | tuple
     llm_api: LLMApis
     context_window: int
-    price: int
+    price: int = 1
     is_chat_model: bool = True
     is_vision_model: bool = False
     is_deprecated: bool = False
@@ -75,9 +77,33 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models#o3-mini
+    o3_mini = LLMSpec(
+        label="o3-mini (openai)",
+        model_id="o3-mini-2025-01-31",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        price=13,
+        is_vision_model=False,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models#o1
+    o1 = LLMSpec(
+        label="o1 (openai)",
+        model_id="o1-2024-12-17",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        price=50,
+        is_vision_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
-        label="o1-preview (openai)",
+        label="o1-preview (openai) [Deprecated]",
         model_id="o1-preview-2024-09-12",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -85,6 +111,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=False,
         supports_json=False,
         supports_temperature=False,
+        is_deprecated=True,
     )
 
     # https://platform.openai.com/docs/models#o1
@@ -141,12 +168,13 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision (openai) 🔻",
+        label="GPT-4 Vision (openai) [Deprecated]",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=6,
         is_vision_model=True,
+        is_deprecated=True,
     )
 
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
@@ -200,6 +228,14 @@ class LargeLanguageModels(Enum):
         is_chat_model=False,
     )
 
+    deepseek_r1 = LLMSpec(
+        label="DeepSeek R1",
+        model_id="accounts/fireworks/models/deepseek-r1",
+        llm_api=LLMApis.fireworks,
+        context_window=128_000,
+        supports_json=True,
+    )
+
     # https://console.groq.com/docs/models
     llama3_3_70b = LLMSpec(
         label="Llama 3.3 70B",
@@ -245,13 +281,22 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    llama3_1_405b = LLMSpec(
+        label="Llama 3.1 405B (Meta AI)",
+        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
+        llm_api=LLMApis.fireworks,
+        context_window=128_000,
+        price=1,
+        supports_json=True,
+    )
     llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B (Meta AI)",
+        label="Llama 3.1 70B (Meta AI) [Deprecated]",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
         price=1,
         supports_json=True,
+        is_deprecated=True,
     )
     llama3_1_8b = LLMSpec(
         label="Llama 3.1 8B (Meta AI)",
@@ -279,13 +324,37 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    pixtral_large = LLMSpec(
+        label="Pixtral Large 24/11",
+        model_id="pixtral-large-2411",
+        llm_api=LLMApis.mistral,
+        context_window=131_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    mistral_large = LLMSpec(
+        label="Mistral Large 24/11",
+        model_id="mistral-large-2411",
+        llm_api=LLMApis.mistral,
+        context_window=131_000,
+        supports_json=True,
+    )
+    mistral_small_24b_instruct = LLMSpec(
+        label="Mistral Small 25/01",
+        model_id="mistral-small-2501",
+        llm_api=LLMApis.mistral,
+        context_window=32_768,
+        price=1,
+        supports_json=True,
+    )
     mixtral_8x7b_instruct_0_1 = LLMSpec(
-        label="Mixtral 8x7b Instruct v0.1 (Mistral)",
+        label="Mixtral 8x7b Instruct v0.1 [Deprecated]",
         model_id="mixtral-8x7b-32768",
         llm_api=LLMApis.groq,
         context_window=32_768,
         price=1,
         supports_json=True,
+        is_deprecated=True,
     )
     gemma_2_9b_it = LLMSpec(
         label="Gemma 2 9B (Google)",
@@ -296,11 +365,22 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemma_7b_it = LLMSpec(
-        label="Gemma 7B (Google)",
+        label="Gemma 7B (Google) [Deprecated]",
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
         price=1,
+        supports_json=True,
+        is_deprecated=True,
+    )
+
+    gemini_2_flash = LLMSpec(
+        label="Gemini 2 Flash (Google)",
+        model_id="gemini-2.0-flash-001",
+        llm_api=LLMApis.gemini,
+        context_window=1_048_576,
+        price=20,
+        is_vision_model=True,
         supports_json=True,
     )
 
@@ -627,6 +707,8 @@ def run_language_model(
                 )
         if not model.supports_temperature:
             temperature = None
+        if not model.supports_json:
+            response_format_type = None
         result = _run_chat_model(
             api=model.llm_api,
             model=model.model_id,
@@ -774,6 +856,30 @@ def _run_chat_model(
         f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
     match api:
+        case LLMApis.mistral:
+            return _run_mistral_chat(
+                model=model,
+                avoid_repetition=avoid_repetition,
+                max_completion_tokens=max_tokens,
+                messages=messages,
+                num_outputs=num_outputs,
+                stop=stop,
+                temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
+            )
+        case LLMApis.fireworks:
+            return _run_fireworks_chat(
+                model=model,
+                avoid_repetition=avoid_repetition,
+                max_completion_tokens=max_tokens,
+                messages=messages,
+                num_outputs=num_outputs,
+                stop=stop,
+                temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
+            )
         case LLMApis.openai:
             return run_openai_chat(
                 model=model,
@@ -1042,18 +1148,24 @@ def run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
-    if model in (
+    if model in [
         LargeLanguageModels.o1_mini.model_id,
-        LargeLanguageModels.o1_preview.model_id,
-    ):
+        LargeLanguageModels.o1.model_id,
+        LargeLanguageModels.o3_mini.model_id,
+    ]:
+        # fuck you, openai
         for entry in messages:
             if entry["role"] == CHATML_ROLE_SYSTEM:
-                entry["role"] = CHATML_ROLE_USER
+                if model == LargeLanguageModels.o1_mini.model_id:
+                    entry["role"] = CHATML_ROLE_USER
+                else:
+                    entry["role"] = "developer"
 
         # unsupported API options
         max_tokens = NOT_GIVEN
-        response_format_type = None
         avoid_repetition = False
+        if model == LargeLanguageModels.o1.model_id:
+            stream = False
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
@@ -1120,8 +1232,10 @@ def _stream_openai_chunked(
     *,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
-    step_chunk_size: int = 150,
+    step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
+    from pyquery import PyQuery as pq
+
     ret = []
     chunk_size = start_chunk_size
 
@@ -1158,6 +1272,14 @@ def _stream_openai_chunked(
             chunk = entry["chunk"]
             if len(chunk) < chunk_size:
                 continue
+            # if chunk contains buttons we wait for the buttons to be complete
+            if "<button" in chunk:
+                doc = pq(f"<root>{chunk}</root>")
+                if doc("button"):
+                    last_part = doc.contents()[-1]
+                    # if the last part is not a string or is empty, we need to wait for more data
+                    if not (isinstance(last_part, str) and last_part.strip()):
+                        continue
 
             # iterate through the separators and find the best one that matches
             for sep in default_separators[:-1]:
@@ -1306,12 +1428,12 @@ def _run_groq_chat(
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
-    data = {
-        "model": model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-    }
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
     if tools:
         data["tools"] = [tool.spec for tool in tools]
     if avoid_repetition:
@@ -1323,10 +1445,8 @@ def _run_groq_chat(
         data["response_format"] = {"type": response_format_type}
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
         json=data,
-        headers={
-            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-        },
     )
     raise_for_status(r)
     out = r.json()
@@ -1340,6 +1460,135 @@ def _run_groq_chat(
         quantity=out["usage"]["completion_tokens"],
     )
     return [choice["message"] for choice in out["choices"]]
+
+
+@retry_if(aifail.http_should_retry)
+def _run_fireworks_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_completion_tokens: int,
+    num_outputs: int,
+    temperature: float | None = None,
+    stop: list[str] | None = None,
+    avoid_repetition: bool = False,
+    tools: list[LLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
+):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_completion_tokens,
+        n=num_outputs,
+        temperature=temperature,
+    )
+    if tools:
+        data["tools"] = [tool.spec for tool in tools]
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    if response_format_type:
+        data["response_format"] = {"type": response_format_type}
+    r = requests.post(
+        "https://api.fireworks.ai/inference/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.FIREWORKS_API_KEY}"},
+        json=data,
+    )
+    raise_for_status(r)
+    out = r.json()
+
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=out["usage"]["prompt_tokens"],
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
+    return [choice["message"] for choice in out["choices"]]
+
+
+@retry_if(aifail.http_should_retry)
+def _run_mistral_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_completion_tokens: int,
+    num_outputs: int,
+    temperature: float | None = None,
+    stop: list[str] | None = None,
+    avoid_repetition: bool = False,
+    tools: list[LLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
+):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    data = dict(
+        model=model,
+        messages=messages,
+        max_tokens=max_completion_tokens,
+        n=num_outputs,
+        temperature=temperature,
+    )
+    if tools:
+        data["tools"] = [tool.spec for tool in tools]
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    if response_format_type:
+        data["response_format"] = {"type": response_format_type}
+    r = requests.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.MISTRAL_API_KEY}"},
+        json=data,
+    )
+    raise_for_status(r)
+    out = r.json()
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=out["usage"]["prompt_tokens"],
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=out["usage"]["completion_tokens"],
+    )
+    return list(_parse_mistral_output(out))
+
+
+def _parse_mistral_output(out: dict) -> typing.Iterable[dict]:
+    for choice in out["choices"]:
+        message = choice["message"]
+        content = message.get("content")
+        # clean up the damn references
+        if isinstance(content, list):
+            message["content"] = "".join(
+                filter(None, map(_mistral_ref_chunk_to_str, content))
+            )
+        else:
+            message["content"] = content.replace("[REF]", " [").replace("[/REF]", "]")
+        yield message
+
+
+def _mistral_ref_chunk_to_str(chunk: dict) -> str | None:
+    text = chunk.get("text")
+    if text:
+        return text
+    ref_ids = chunk.get("reference_ids")
+    if ref_ids:
+        return " [" + ", ".join(map(str, ref_ids)) + "]"
+    return None
 
 
 # def _run_together_chat(
