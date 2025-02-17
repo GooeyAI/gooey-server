@@ -49,7 +49,7 @@ def onedrive_connect_redirect(request: Request):
     )
 
     redirect_url = sr.get_app_url({SUBMIT_AFTER_LOGIN_Q: "1"})
-    return RedirectResponse(redirect_url.url)
+    return RedirectResponse(redirect_url)
 
 
 def generate_onedrive_auth_url(sr_id: int) -> str:
