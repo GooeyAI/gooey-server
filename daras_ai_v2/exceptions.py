@@ -108,11 +108,11 @@ class OneDriveAuth(UserError):
     def __init__(self, auth_url):
         message = f"""
 <p>
-Onedrive access token or refresh token is missing for this workspace.
+OneDrive access is currently unavailable. 
 </p>
 
 <p>
-<a href="{auth_url}">Please login</a> to your Onedrive account to use Onedrive files.
+<a href="{auth_url}">LOGIN</a> to your OneDrive account to enable access to your files.
 </p>
 """
         super().__init__(message, status_code=HTTP_401_UNAUTHORIZED)

@@ -62,7 +62,9 @@ def onedrive_meta(f_url: str, sr: SavedRun, *, try_refresh: bool = True):
         metadata = r.json()
 
         if "folder" in metadata:
-            raise UserError("Folders / OneNote are not supported yet.")
+            raise UserError(
+                "Folders & OneNote files are not supported yet. Please remove them from your Knowledge base."
+            )
 
         return metadata
 
