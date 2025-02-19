@@ -194,18 +194,21 @@ def stream_response(request_id: str):
 
 
 def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
-    while True:
-        if not thread.is_alive():
-            return
-        try:
-            event: StreamEvent | None = api_queue.get(timeout=30)
-        except queue.Empty:
-            continue
-        if not event:
-            return
-        if isinstance(event, StreamError):
-            yield b"event: error\n"
-        yield b"data: " + event.json(exclude_none=True).encode() + b"\n\n"
+    try:
+        while True:
+            if not thread.is_alive():
+                return
+            try:
+                event: StreamEvent | None = api_queue.get(timeout=30)
+            except queue.Empty:
+                continue
+            if not event:
+                return
+            if isinstance(event, StreamError):
+                yield b"event: error\n"
+            yield b"data: " + event.json(exclude_none=True).encode() + b"\n\n"
+    finally:
+        yield b"event: close\ndata:\n\n"
 
 
 class ApiInterface(BotInterface):
