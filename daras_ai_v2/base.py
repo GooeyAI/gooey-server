@@ -2190,7 +2190,7 @@ class BasePage:
             return
 
         def _render(pr: PublishedRun):
-            self.render_published_run_full_width(published_run=pr)
+            self.render_published_run_full_width(published_run=pr, show_author=True)
 
         with gui.div(className="position-relative w-100"):
             for item in published_runs:
@@ -2293,6 +2293,7 @@ class BasePage:
     def render_published_run_full_width(self, published_run: PublishedRun, **kwargs):
         max_desc_words = 150
         max_desc_words_mobile = 100
+        hide_author_column = True if "hide_author_column" in kwargs else False
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
         pills = [
@@ -2340,7 +2341,10 @@ class BasePage:
                         unsafe_allow_html=True,
                     )
 
-        with gui.div(className="row align-items-center position-relative py-2"):
+        with gui.div(
+            className="row align-items-stretch position-relative py-2",
+            style={"minHeight": "78px"},
+        ):
             with gui.styled(
                 """
                     h4, h1 {
@@ -2353,20 +2357,27 @@ class BasePage:
 
                 """
             ):
+                # column 1
+                # web
                 with gui.div(
                     className="col-1 p-0 d-none d-md-flex align-items-center justify-content-center container-margin-reset"
                 ):
                     display_picture("80px")
+
+                center_column_width = 9 if hide_author_column else 7
                 with gui.div(
-                    className="col-12 col-md-7 p-0 position-relative container-margin-reset"
+                    className=f"col-12 col-md-{center_column_width} p-0 position-relative container-margin-reset"
                 ):
 
-                    with gui.div(className="d-flex align-items-center"):
+                    with gui.div(className="d-flex align-items-stretch"):
+
+                        # mobile
                         with gui.div(
-                            className="justify-content-center d-md-none",
+                            className="justify-content-center d-md-none pt-1",
                             style={"minWidth": "40px"},
                         ):
                             display_picture("40px")
+
                         with gui.div(className="ms-2 flex-grow-1"):
                             with gui.div(
                                 className="d-flex flex-column flex-md-row align-items-md-center"
@@ -2394,7 +2405,7 @@ class BasePage:
                                             published_run.notes, max_desc_words
                                         ),
                                     )
-                                # mobile version
+                                # mobile
                                 with gui.div(className="d-md-none"):
                                     gui.caption(
                                         truncate_text_words(
@@ -2402,32 +2413,40 @@ class BasePage:
                                         ),
                                         style={"fontSize": "14px"},
                                     )
-
-            with gui.div(className="d-none d-md-block col-12 col-md-2 flex-grow-1"):
-                self.render_author(
-                    published_run.last_edited_by,
-                    image_size="24px",
-                    text_size="0.9rem",
-                    responsive=False,
-                    show_as_link=False,
-                )
-                if version.change_notes:
-                    with gui.div(className="mt-2"):
-                        gui.caption(
-                            f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 20))}",
-                            unsafe_allow_html=True,
-                        )
-
-            with gui.div(className="col-12 col-md-2"):
+            # column 3
+            # web
+            if not hide_author_column:
                 with gui.div(
-                    className="d-flex d-md-none justify-content-between justify-content-md-end align-items-center"
+                    className="d-none d-md-block col-12 col-md-2 flex-grow-1 mt-2"
+                ):
+                    self.render_author(
+                        published_run.last_edited_by,
+                        image_size="24px",
+                        text_size="0.9rem",
+                        responsive=False,
+                        show_as_link=False,
+                    )
+                    if version.change_notes:
+                        with gui.div(className="mt-2"):
+                            gui.caption(
+                                f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 20))}",
+                                unsafe_allow_html=True,
+                            )
+
+            # column 4
+            with gui.div(
+                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex pt-2"
+            ):
+                # mobile
+                with gui.div(
+                    className="d-flex flex-grow-1 d-md-none justify-content-between justify-content-md-end align-items-center"
                 ):
                     with gui.div(
                         className="d-md-none mb-1 flex-grow-1 d-flex justify-content-between align-items-center container-margin-reset",
                     ):
                         with gui.div(
                             className="d-flex",
-                            style={"font-size": "0.7rem", "marginLeft": "42px"},
+                            style={"font-size": "0.7rem", "marginLeft": "36px"},
                         ):
                             for pill in pills:
                                 pill()
@@ -2445,11 +2464,20 @@ class BasePage:
                                     style={"fontSize": "0.8rem"},
                                 )
 
+                # web
                 with gui.div(className="d-none d-md-block text-end"):
+                    if hide_author_column:
+                        self.render_author(
+                            published_run.last_edited_by,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
                     if updated_at and isinstance(updated_at, datetime.datetime):
                         gui.caption(
                             f"{get_relative_time(updated_at)}",
-                            className="container-margin-reset",
+                            className="container-margin-reset mt-2 mb-2 d-block",
                         )
                     run_count()
 
