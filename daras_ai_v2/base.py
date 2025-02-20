@@ -2162,7 +2162,11 @@ class BasePage:
             cursor=self.request.query_params,
         )
 
-        grid_layout(3, example_runs, _render)
+        for pr in example_runs:
+            _render(pr)
+            # render divder only if not the last item
+            if pr != example_runs[-1]:
+                gui.div(className="mb-2 mt-2 border-bottom")
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2294,6 +2298,7 @@ class BasePage:
         max_desc_words = 150
         max_desc_words_mobile = 100
         hide_author_column = True if "hide_author_column" in kwargs else False
+        use_workspace_author = True if "use_workspace_author" in kwargs else False
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
         pills = [
@@ -2419,12 +2424,22 @@ class BasePage:
                 with gui.div(
                     className="d-none d-md-block col-12 col-md-2 flex-grow-1 mt-2"
                 ):
-                    self.render_author(
-                        published_run.last_edited_by,
-                        image_size="24px",
-                        text_size="0.9rem",
-                        responsive=False,
-                        show_as_link=False,
+                    (
+                        self.render_author(
+                            published_run.last_edited_by,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
+                        if not use_workspace_author
+                        else self.render_workspace_author(
+                            published_run.workspace,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
                     )
                     if version.change_notes:
                         with gui.div(className="mt-2"):
@@ -2435,7 +2450,7 @@ class BasePage:
 
             # column 4
             with gui.div(
-                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex pt-2"
+                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex p-0"
             ):
                 # mobile
                 with gui.div(
@@ -2450,7 +2465,8 @@ class BasePage:
                         ):
                             for pill in pills:
                                 pill()
-                        with gui.div(className="d-flex gap-1 align-items-center"):
+                    with gui.div(className="d-flex gap-1 align-items-center pt-2"):
+                        (
                             self.render_author(
                                 published_run.last_edited_by,
                                 image_size="14px",
@@ -2458,8 +2474,17 @@ class BasePage:
                                 responsive=False,
                                 show_as_link=False,
                             )
-                            if updated_at and isinstance(updated_at, datetime.datetime):
-                                gui.caption(
+                            if not use_workspace_author
+                            else self.render_workspace_author(
+                                published_run.workspace,
+                                image_size="14px",
+                                text_size="0.8rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                        )
+                        if updated_at and isinstance(updated_at, datetime.datetime):
+                            gui.caption(
                                     f" • {get_relative_time(updated_at)}",
                                     style={"fontSize": "0.8rem"},
                                 )
@@ -2467,12 +2492,22 @@ class BasePage:
                 # web
                 with gui.div(className="d-none d-md-block text-end"):
                     if hide_author_column:
-                        self.render_author(
-                            published_run.last_edited_by,
-                            image_size="24px",
-                            text_size="0.9rem",
-                            responsive=False,
-                            show_as_link=False,
+                        (
+                            self.render_author(
+                                published_run.last_edited_by,
+                                image_size="24px",
+                                text_size="0.9rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                            if not use_workspace_author
+                            else self.render_workspace_author(
+                                published_run.workspace,
+                                image_size="24px",
+                                text_size="0.9rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
                         )
                     if updated_at and isinstance(updated_at, datetime.datetime):
                         gui.caption(
@@ -2487,37 +2522,14 @@ class BasePage:
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
-        if published_run.workspace:
-            with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                self.render_workspace_author(
-                    published_run.workspace,
-                    image_size="20px",
-                    text_size="0.9rem",
-                )
-
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"#### {tb.h1_title}")
-
-        with gui.div(className="d-flex align-items-center justify-content-between"):
-            with gui.div():
-                updated_at = published_run.saved_run.updated_at
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
-
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
-            run_count = format_number_with_suffix(published_run.get_run_count())
-            gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
-
-        if published_run.notes:
-            gui.caption(published_run.notes, line_clamp=2)
-
+        self.render_published_run_full_width(
+            published_run, hide_author_column=True, use_workspace_author=True
+        )
         if allow_hide:
             self._example_hide_button(published_run=published_run)
 
-        doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
+        # doc = published_run.saved_run.to_dict()
+        # self.render_example(doc)
 
     def _example_hide_button(self, published_run: PublishedRun):
         pressed_delete = gui.button(
