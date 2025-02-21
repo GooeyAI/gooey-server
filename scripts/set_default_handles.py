@@ -1,18 +1,17 @@
 from loguru import logger
 
-from app_users.models import AppUser
+from workspaces.models import Workspace
 from handles.models import Handle
 
 
 def run():
-    registered_users = AppUser.objects.filter(
-        handle__isnull=True,
-        is_anonymous=False,
-    )
+    team_workspaces = Workspace.objects.filter(is_personal=False, handle__isnull=True)
 
-    for user in registered_users:
-        if handle := Handle.create_default_for_user(user):
-            user.handle = handle
-            user.save()
+    for workspace in team_workspaces:
+        if handle := Handle.create_default_for_workspace(workspace):
+            workspace.handle = handle
+            workspace.save()
         else:
-            logger.warning(f"unable to find acceptable handle for user: {user}")
+            logger.warning(
+                f"unable to find acceptable handle for workspace: {workspace}"
+            )

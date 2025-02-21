@@ -89,7 +89,15 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "onedrive_access_token",
         "onedrive_refresh_token",
     ]
-    search_fields = ["name", "created_by__display_name", "domain_name", "handle__name"]
+    search_fields = [
+        "name",
+        "domain_name",
+        "created_by__uid",
+        "created_by__display_name",
+        "created_by__email",
+        "created_by__phone_number",
+        "handle__name",
+    ]
     readonly_fields = [
         "is_personal",
         "created_at",

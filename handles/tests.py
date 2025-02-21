@@ -13,7 +13,8 @@ def create_default_handle_by_name_and_email(name, email):
         is_anonymous=False,
         uid=get_random_doc_id(),
     )
-    return Handle.create_default_for_user(user)
+    workspace, _ = user.get_or_create_personal_workspace()
+    return Handle.create_default_for_workspace(workspace)
 
 
 def test_default_handle_when_user_is_anonymous(transactional_db):
@@ -24,7 +25,8 @@ def test_default_handle_when_user_is_anonymous(transactional_db):
         is_anonymous=True,
         uid=get_random_doc_id(),
     )
-    handle = Handle.create_default_for_user(user)
+    workspace, _ = user.get_or_create_personal_workspace()
+    handle = Handle.create_default_for_workspace(workspace)
     assert handle is None
 
 

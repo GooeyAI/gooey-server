@@ -651,8 +651,6 @@ def render_handle_page(request: Request, name: str):
     handle = Handle.objects.get_by_name(name)
     if handle.has_workspace and handle.workspace.is_personal:
         user = handle.workspace.created_by
-    elif handle.has_user:
-        user = handle.user
     else:
         user = None
 

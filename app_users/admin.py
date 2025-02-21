@@ -53,7 +53,6 @@ class AppUserAdmin(admin.ModelAdmin):
             "Profile Options",
             {
                 "fields": [
-                    "handle",
                     "display_name",
                     "bio",
                     ("company", "github_username"),
@@ -72,7 +71,6 @@ class AppUserAdmin(admin.ModelAdmin):
     ]
     list_display = [
         "uid",
-        "handle",
         "display_name",
         "email",
         "phone_number",
@@ -84,7 +82,6 @@ class AppUserAdmin(admin.ModelAdmin):
         "display_name",
         "email",
         "phone_number",
-        "handle__name",
     ]
     list_filter = [
         "is_anonymous",
@@ -108,7 +105,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_stripe",
         "personal_workspace",
     ]
-    autocomplete_fields = ["handle", "subscription"]
+    autocomplete_fields = ["subscription"]
     inlines = [WorkspaceMembershipInline]
 
     @admin.display(description="User Runs")
