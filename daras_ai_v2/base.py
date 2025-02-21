@@ -70,7 +70,7 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
-from daras_ai_v2.utils import get_relative_time
+from daras_ai_v2.utils import get_relative_time, get_workflow_emoji
 
 DEFAULT_META_IMG = (
     # Small
@@ -2145,7 +2145,11 @@ class BasePage:
             cursor=self.request.query_params,
         )
 
-        grid_layout(3, example_runs, _render)
+        for pr in example_runs:
+            _render(pr)
+            # render divder only if not the last item
+            if pr != example_runs[-1]:
+                gui.div(className="mb-2 mt-2 border-bottom")
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2173,16 +2177,14 @@ class BasePage:
             return
 
         def _render(pr: PublishedRun):
-            with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
-                gui.pill(
-                    PublishedRunVisibility(pr.visibility).get_badge_html(),
-                    unsafe_allow_html=True,
-                    className="border border-dark",
-                )
+            self.render_published_run_full_width(published_run=pr, show_author=True)
 
-            self.render_published_run_preview(published_run=pr)
-
-        grid_layout(3, published_runs, _render)
+        with gui.div(className="position-relative w-100"):
+            for item in published_runs:
+                _render(item)
+                # render divder only if not the last item
+                if item != published_runs[-1]:
+                    gui.div(className="mb-2 mt-2 border-bottom")
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2275,43 +2277,242 @@ class BasePage:
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
 
+    def render_published_run_full_width(self, published_run: PublishedRun, **kwargs):
+        max_desc_words = 150
+        max_desc_words_mobile = 100
+        hide_author_column = True if "hide_author_column" in kwargs else False
+        use_workspace_author = True if "use_workspace_author" in kwargs else False
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+        version = published_run.versions.latest()
+        pills = [
+            lambda: gui.pill(
+                PublishedRunVisibility(published_run.visibility).get_badge_html(),
+                unsafe_allow_html=True,
+                className="border border-dark",
+            )
+        ]
+        if kwargs.get("workflow_pill"):
+            pills.append(
+                lambda: gui.pill(
+                    kwargs["workflow_pill"],
+                    unsafe_allow_html=True,
+                    className="border border-dark ms-2",
+                )
+            )
+        photo_url = published_run.photo_url
+        updated_at = published_run.saved_run.updated_at
+        display_picture = lambda size: (
+            gui.image(
+                src=photo_url,
+                className="m-0",
+                style={
+                    "width": size,
+                    "height": size,
+                    "objectFit": "cover",
+                    "borderRadius": "50%",
+                },
+            )
+            if photo_url
+            else gui.write(
+                f"# {get_workflow_emoji(Workflow(published_run.workflow))}",
+                className="m-0 container-margin-reset",
+            )
+        )
+
+        def run_count():
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                with gui.div():
+                    gui.caption(
+                        f"{run_icon} {run_count} runs",
+                        unsafe_allow_html=True,
+                    )
+
+        with gui.div(
+            className="row align-items-stretch position-relative py-2",
+            style={"minHeight": "78px"},
+        ):
+            with gui.styled(
+                """
+                    h4, h1 {
+                        margin: 0 !important;
+                    }
+                    @media (min-width: 768px) {
+                        h4, h1 {
+                        margin-bottom: 0.2rem !important;
+                        }
+
+                """
+            ):
+                # column 1
+                # web
+                with gui.div(
+                    className="col-1 p-0 d-none d-md-flex align-items-center justify-content-center container-margin-reset"
+                ):
+                    display_picture("80px")
+
+                center_column_width = 9 if hide_author_column else 7
+                with gui.div(
+                    className=f"col-12 col-md-{center_column_width} p-0 position-relative container-margin-reset"
+                ):
+
+                    with gui.div(className="d-flex align-items-stretch"):
+
+                        # mobile
+                        with gui.div(
+                            className="justify-content-center d-md-none pt-1",
+                            style={"minWidth": "40px"},
+                        ):
+                            display_picture("40px")
+
+                        with gui.div(className="ms-2 flex-grow-1"):
+                            with gui.div(
+                                className="d-flex flex-column flex-md-row align-items-md-center"
+                            ):
+                                with gui.div(className="d-md-block"):
+                                    with gui.link(
+                                        to=published_run.get_app_url(),
+                                    ):
+
+                                        gui.write(
+                                            f"#### {truncate_text_words(tb.h1_title, 50)}",
+                                        )
+                                with gui.div(
+                                    className="d-md-flex d-none align-items-center mb-1 ms-2",
+                                    style={"font-size": "0.9rem"},
+                                ):
+                                    for pill in pills:
+                                        pill()
+                            if published_run.notes:
+                                with gui.div(
+                                    className="d-none d-md-block container-margin-reset"
+                                ):
+                                    gui.caption(
+                                        truncate_text_words(
+                                            published_run.notes, max_desc_words
+                                        ),
+                                    )
+                                # mobile
+                                with gui.div(className="d-md-none"):
+                                    gui.caption(
+                                        truncate_text_words(
+                                            published_run.notes, max_desc_words_mobile
+                                        ),
+                                        style={"fontSize": "14px"},
+                                    )
+            # column 3
+            # web
+            if not hide_author_column:
+                with gui.div(
+                    className="d-none d-md-block col-12 col-md-2 flex-grow-1 mt-2"
+                ):
+                    (
+                        self.render_author(
+                            published_run.last_edited_by,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
+                        if not use_workspace_author
+                        else self.render_workspace_author(
+                            published_run.workspace,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
+                    )
+                    if version.change_notes:
+                        with gui.div(className="mt-2"):
+                            gui.caption(
+                                f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 20))}",
+                                unsafe_allow_html=True,
+                            )
+
+            # column 4
+            with gui.div(
+                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex p-0"
+            ):
+                # mobile
+                with gui.div(
+                    className="d-flex flex-grow-1 d-md-none justify-content-between justify-content-md-end align-items-center"
+                ):
+                    with gui.div(
+                        className="d-md-none mb-1 flex-grow-1 d-flex justify-content-between align-items-center container-margin-reset",
+                    ):
+                        with gui.div(
+                            className="d-flex",
+                            style={"font-size": "0.7rem", "marginLeft": "36px"},
+                        ):
+                            for pill in pills:
+                                pill()
+                    with gui.div(className="d-flex gap-1 align-items-center pt-2"):
+                        (
+                            self.render_author(
+                                published_run.last_edited_by,
+                                image_size="14px",
+                                text_size="0.8rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                            if not use_workspace_author
+                            else self.render_workspace_author(
+                                published_run.workspace,
+                                image_size="14px",
+                                text_size="0.8rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                        )
+                        if updated_at and isinstance(updated_at, datetime.datetime):
+                            gui.caption(
+                                    f" • {get_relative_time(updated_at)}",
+                                    style={"fontSize": "0.8rem"},
+                                )
+
+                # web
+                with gui.div(className="d-none d-md-block text-end"):
+                    if hide_author_column:
+                        (
+                            self.render_author(
+                                published_run.last_edited_by,
+                                image_size="24px",
+                                text_size="0.9rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                            if not use_workspace_author
+                            else self.render_workspace_author(
+                                published_run.workspace,
+                                image_size="24px",
+                                text_size="0.9rem",
+                                responsive=False,
+                                show_as_link=False,
+                            )
+                        )
+                    if updated_at and isinstance(updated_at, datetime.datetime):
+                        gui.caption(
+                            f"{get_relative_time(updated_at)}",
+                            className="container-margin-reset mt-2 mb-2 d-block",
+                        )
+                    run_count()
+
     def _render_example_preview(
         self,
         *,
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
-        if published_run.workspace:
-            with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                self.render_workspace_author(
-                    published_run.workspace,
-                    image_size="20px",
-                    text_size="0.9rem",
-                )
-
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"#### {tb.h1_title}")
-
-        with gui.div(className="d-flex align-items-center justify-content-between"):
-            with gui.div():
-                updated_at = published_run.saved_run.updated_at
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
-
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
-            run_count = format_number_with_suffix(published_run.get_run_count())
-            gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
-
-        if published_run.notes:
-            gui.caption(published_run.notes, line_clamp=2)
-
+        self.render_published_run_full_width(
+            published_run, hide_author_column=True, use_workspace_author=True
+        )
         if allow_hide:
             self._example_hide_button(published_run=published_run)
 
-        doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
+        # doc = published_run.saved_run.to_dict()
+        # self.render_example(doc)
 
     def _example_hide_button(self, published_run: PublishedRun):
         pressed_delete = gui.button(
