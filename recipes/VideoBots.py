@@ -1040,8 +1040,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     keyword_query = list(keyword_query.values())[0]
                 response.final_keyword_query = keyword_query
 
-            if response.final_search_query:
-                # perform doc search
+            if response.final_search_query:  # perform doc search
                 response.references = yield from get_top_k_references(
                     DocSearchRequest.parse_obj(
                         {
@@ -1780,7 +1779,7 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.WHATSAPP,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
-        label="Connect your own new mobile # (that's not already on WhatsApp) or [upgrade to Business](https://gooey.ai/pricing) for a number on us.",
+        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/account/billing/) for a number on us.",
     ),
     ConnectChoice(
         platform=Platform.SLACK,

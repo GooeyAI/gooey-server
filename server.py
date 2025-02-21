@@ -47,6 +47,7 @@ from routers import (
     bots_api,
     twilio_api,
     static_pages,
+    onedrive_api,
 )
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -58,6 +59,7 @@ app.include_router(api.app)
 app.include_router(broadcast_api.app)
 app.include_router(account.app, include_in_schema=False)
 app.include_router(facebook_api.app, include_in_schema=False)
+app.include_router(onedrive_api.app, include_in_schema=False)
 app.include_router(slack_api.router, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)

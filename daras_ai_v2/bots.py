@@ -21,7 +21,6 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
-from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
@@ -245,11 +244,7 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(
-    text: str | None,
-    max_title_len: int = 20,
-    max_id_len: int = 256,
-) -> tuple[list[ReplyButton], str]:
+def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
     from pyquery import PyQuery as pq
 
     if not text:
@@ -257,16 +252,13 @@ def parse_bot_html(
     doc = pq(f"<root>{text}</root>")
     buttons = [
         ReplyButton(
-            id=truncate_text_words(
-                # parsed by _handle_interactive_msg
-                csv_encode_row(
-                    idx + 1,
-                    btn.attrib.get("gui-target") or "input_prompt",
-                    btn.text,
-                ),
-                max_id_len,
+            # parsed by _handle_interactive_msg
+            id=csv_encode_row(
+                idx + 1,
+                btn.attrib.get("gui-target") or "input_prompt",
+                btn.text,
             ),
-            title=truncate_text_words(btn.text, max_title_len),
+            title=btn.text,
         )
         for idx, btn in enumerate(doc("button") or [])
         if btn.text
