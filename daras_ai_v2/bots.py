@@ -1,5 +1,6 @@
 import mimetypes
 import typing
+import requests
 from datetime import datetime
 
 import gooey_gui as gui
@@ -24,6 +25,7 @@ from bots.models import (
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -684,17 +686,31 @@ def _handle_interactive_msg(bot: BotInterface):
             return False
 
 
-def _handle_location_msg(input_text, input_location: dict[str, float]) -> str:
-    from geopy.geocoders import Nominatim
+def _handle_location_msg(input_text: str, input_location: dict[str, float]) -> str:
+    from daras_ai_v2.settings import GOOGLE_GEOCODING_API_KEY
 
-    if not input_location:
-        return input_text
-
-    geolocator = Nominatim(user_agent="my_geopy_app")
-    location = geolocator.reverse(
-        str(input_location["latitude"]) + "," + str(input_location["longitude"])
+    r = requests.post(
+        url=f"https://maps.googleapis.com/maps/api/geocode/json",
+        params={
+            "latlng": f"{input_location['latitude']},{input_location['longitude']}",
+            "key": GOOGLE_GEOCODING_API_KEY,
+        },
     )
-    input_text += "My present location is" + location.raw["address"].__str__()
+    raise_for_status(r)
+    data = r.json()
+    results = data.get("results", [])
+
+    if results:
+        location_info = results[0]
+        formatted_address = location_info.get(
+            "formatted_address", "Address unavailable"
+        )
+        input_text += (
+            f"My present location is {formatted_address}. {input_location.__str__()}"
+        )
+    else:
+        input_text += "Location details could not be retrieved."
+
     return input_text
 
 
