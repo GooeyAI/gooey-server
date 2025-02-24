@@ -21,7 +21,6 @@ from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.profiles import get_profile_image
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import COMMON_EMAIL_DOMAINS
 from .tasks import send_added_to_workspace_email, send_invitation_email
@@ -152,6 +151,7 @@ class Workspace(SafeDeleteModel):
         blank=True,
     )
     photo_url = CustomURLField(null=True, blank=True)
+    banner_url = CustomURLField(null=True, blank=True)
     description = models.TextField(blank=True, default="")
 
     # billing
@@ -229,6 +229,15 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
+            workspace_memberships__deleted__isnull=True,
+        )
+
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -376,11 +385,23 @@ class Workspace(SafeDeleteModel):
         else:
             return icons.company
 
-    def get_photo(self) -> str | None:
+    def get_photo(self) -> str:
         if self.is_personal:
-            return self.created_by and get_profile_image(self.created_by)
+            return self.created_by.get_photo()
         else:
             return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
+
+    def get_banner_url(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.banner_url
+        else:
+            return self.banner_url
+
+    def get_description(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.bio
+        else:
+            return self.description
 
     def add_domain_members(self):
         from app_users.models import AppUser

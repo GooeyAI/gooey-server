@@ -41,7 +41,7 @@ from daras_ai_v2.fastapi_tricks import (
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
+from daras_ai_v2.profiles import profile_page, get_meta_tags_for_profile
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -649,15 +649,10 @@ def recipe_or_handle_or_static(
 
 def render_handle_page(request: Request, name: str):
     handle = Handle.objects.get_by_name(name)
-    if handle.has_workspace and handle.workspace.is_personal:
-        user = handle.workspace.created_by
-    else:
-        user = None
-
-    if user:
+    if handle.has_workspace:
         with page_wrapper(request):
-            user_profile_page(request, user=user, handle=handle)
-        return dict(meta=get_meta_tags_for_profile(user))
+            profile_page(request, handle=handle)
+        return dict(meta=get_meta_tags_for_profile(handle))
     elif handle.has_redirect:
         return RedirectResponse(
             handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}
