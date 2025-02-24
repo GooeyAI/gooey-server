@@ -15,6 +15,8 @@ from routers.onedrive_api import (
 def is_onedrive_url(f: furl) -> bool:
     if f.host == "1drv.ms":
         return True
+    elif f.host.endswith(".sharepoint.com"):
+        return True
     elif f.host == "onedrive.live.com":
         raise UserError(
             "Direct onedrive.live.com links are not supported. Please provide a shareable OneDrive link (from Share > Copy Link) E.g. https://1drv.ms/xxx"
@@ -82,7 +84,8 @@ def onedrive_meta(f_url: str, sr: SavedRun, *, try_refresh: bool = True):
             except requests.HTTPError:
                 raise OneDriveAuth(generate_onedrive_auth_url(sr.id))
 
-        elif e.response.status_code == 403:
+        # https://learn.microsoft.com/en-us/graph/errors
+        elif e.response.status_code in [403, 400, 405, 410, 422]:
             raise UserError(
                 message=f"""
 <p>
@@ -94,7 +97,7 @@ Alternatively, <a href="{generate_onedrive_auth_url(sr.id)}" target="_blank">Log
 Note that you can only be logged in to one OneDrive account at a time.
 </p>
 """
-            )
+            ) from e
 
         else:
             raise
