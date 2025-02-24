@@ -23,6 +23,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
+from celeryapp.tasks import get_running_saved_run
 from daras_ai.image_input import (
     get_mimetype_from_response,
     safe_filename,
@@ -58,6 +59,11 @@ from daras_ai_v2.gdrive_downloader import (
     url_to_gdrive_file_id,
 )
 from daras_ai_v2.office_utils_pptx import pptx_to_text_pages
+from daras_ai_v2.onedrive_downloader import (
+    is_onedrive_url,
+    onedrive_meta,
+    onedrive_download,
+)
 from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.scraping_proxy import (
     SCRAPING_PROXIES,
@@ -123,7 +129,9 @@ Snippet: """
 
 
 def get_top_k_references(
-    request: DocSearchRequest, is_user_url: bool = True, current_user: AppUser = None
+    request: DocSearchRequest,
+    is_user_url: bool = True,
+    current_user: AppUser | None = None,
 ) -> typing.Generator[str, None, list[SearchReference]]:
     """
     Get the top k documents that ref the search query
@@ -376,6 +384,15 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         mime_type = meta["mimeType"]
         total_bytes = int(meta.get("size") or 0)
         export_links = meta.get("exportLinks", None)
+
+    elif is_onedrive_url(f):
+        meta = onedrive_meta(f_url, get_running_saved_run())
+        name = meta["name"]
+        etag = meta.get("eTag") or meta.get("lastModifiedDateTime")
+        mime_type = meta["file"]["mimeType"]
+        total_bytes = int(meta.get("size") or 0)
+        export_links = {mime_type: meta["@microsoft.graph.downloadUrl"]}
+
     else:
         if is_user_uploaded_url(f_url):
             kwargs = {}
@@ -835,14 +852,17 @@ def download_content_bytes(
     f_url: str,
     mime_type: str,
     is_user_url: bool = True,
-    export_links: dict[str, str] = {},
+    export_links: dict[str, str] | None = None,
 ) -> tuple[bytes, str]:
+    if export_links is None:
+        export_links = {}
     if is_yt_dlp_able_url(f_url):
         return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
-        # download from google drive
         return gdrive_download(f, mime_type, export_links)
+    elif is_onedrive_url(f):
+        return onedrive_download(mime_type, export_links)
     try:
         # download from url
         if is_user_uploaded_url(f_url):
@@ -990,7 +1010,7 @@ def tabular_bytes_to_any_df(
             df = pd.read_json(f, dtype=dtype)
         case "application/xml":
             df = pd.read_xml(f, dtype=dtype)
-        case _ if "excel" in mime_type or "spreadsheet" in mime_type:
+        case _ if "excel" in mime_type or "sheet" in mime_type:
             df = pd.read_excel(f, dtype=dtype)
         case _:
             raise UnsupportedDocumentError(

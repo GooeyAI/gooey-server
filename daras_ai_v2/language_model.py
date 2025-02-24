@@ -80,7 +80,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models#o3-mini
     o3_mini = LLMSpec(
         label="o3-mini (openai)",
-        model_id="o3-mini-2025-01-31",
+        model_id=("openai-o3-mini-prod-eastus2-1", "o3-mini-2025-01-31"),
         llm_api=LLMApis.openai,
         context_window=200_000,
         price=13,
@@ -92,7 +92,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models#o1
     o1 = LLMSpec(
         label="o1 (openai)",
-        model_id="o1-2024-12-17",
+        model_id=("openai-o1-prod-eastus2-1", "o1-2024-12-17"),
         llm_api=LLMApis.openai,
         context_window=200_000,
         price=50,
@@ -1395,14 +1395,14 @@ def get_openai_client(model: str):
         client = openai.AzureOpenAI(
             api_key=settings.AZURE_OPENAI_KEY_CA,
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_CA,
-            api_version="2023-10-01-preview",
+            api_version="2024-12-01-preview",
             max_retries=0,
         )
     elif model.startswith(AZURE_OPENAI_MODEL_PREFIX) and "-eastus2-" in model:
         client = openai.AzureOpenAI(
             api_key=settings.AZURE_OPENAI_KEY_EASTUS2,
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_EASTUS2,
-            api_version="2023-10-01-preview",
+            api_version="2024-12-01-preview",
             max_retries=0,
         )
     else:

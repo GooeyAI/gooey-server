@@ -121,6 +121,26 @@ class Workspace(SafeDeleteModel):
             validate_workspace_domain_name,
         ],
     )
+    onedrive_user_name = models.CharField(
+        blank=True,
+        default="",
+        max_length=100,
+        help_text="Onedrive Registered Account Name",
+        editable=True,
+    )
+
+    onedrive_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Onedrive OAuth2 access token",
+        editable=True,
+    )
+    onedrive_refresh_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="OneDrive OAuth2 refresh token",
+        editable=True,
+    )
 
     # profile
     handle = models.OneToOneField(

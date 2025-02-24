@@ -2,7 +2,11 @@ import requests
 from furl import furl
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    get_mimetype_from_response,
+    truncate_text_words,
+)
 from daras_ai.text_format import markdown_to_wa
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
@@ -281,24 +285,38 @@ def retrieve_wa_media_by_id(
     return content, media_info["mime_type"]
 
 
-def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> list[dict]:
+def _build_msg_buttons(
+    buttons: list[ReplyButton],
+    msg: dict,
+    *,
+    max_title_len: int = 20,
+    max_id_len: int = 256,
+) -> list[dict]:
     ret = []
     for i in range(0, len(buttons), 3):
+        buttons = [
+            {
+                "type": "reply",
+                "reply": {
+                    "id": truncate_text_words(
+                        button["id"],
+                        max_id_len,
+                    ),
+                    "title": truncate_text_words(
+                        button["title"],
+                        max_title_len,
+                    ),
+                },
+            }
+            for button in buttons[i : i + 3]
+        ]
         ret.append(
             {
                 "type": "interactive",
                 "interactive": {
                     "type": "button",
                     **msg,
-                    "action": {
-                        "buttons": [
-                            {
-                                "type": "reply",
-                                "reply": {"id": button["id"], "title": button["title"]},
-                            }
-                            for button in buttons[i : i + 3]
-                        ],
-                    },
+                    "action": {"buttons": buttons},
                 },
             }
         )

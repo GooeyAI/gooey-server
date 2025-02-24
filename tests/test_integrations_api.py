@@ -30,6 +30,9 @@ def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks
 
     actual_events = []
     for event in r.text.split("\n\n"):
+        if event.startswith("event: close"):
+            actual_events.append("close")
+            continue
         assert not event.startswith("event: error"), event
         data = event.removeprefix("data: ")
         if not data:
@@ -42,6 +45,7 @@ def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks
         "run_start",
         "message_part",
         "final_response",
+        "close",
     ]
 
     assert actual_events == expected_events
