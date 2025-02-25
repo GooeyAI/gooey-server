@@ -2347,7 +2347,7 @@ class BasePage:
                     )
 
         with gui.div(
-            className="row align-items-stretch position-relative py-2",
+            className="container-xxl row align-items-stretch position-relative py-2 pe-0",
             style={"minHeight": "78px"},
         ):
             with gui.styled(
@@ -2450,22 +2450,22 @@ class BasePage:
 
             # column 4
             with gui.div(
-                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex p-0"
+                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex p-0 pt-2"
             ):
                 # mobile
                 with gui.div(
                     className="d-flex flex-grow-1 d-md-none justify-content-between justify-content-md-end align-items-center"
                 ):
                     with gui.div(
-                        className="d-md-none mb-1 flex-grow-1 d-flex justify-content-between align-items-center container-margin-reset",
+                        className="d-md-none mb-1 flex-grow-1 align-items-center d-flex justify-content-between align-items-center container-margin-reset",
                     ):
                         with gui.div(
                             className="d-flex",
-                            style={"font-size": "0.7rem", "marginLeft": "36px"},
+                            style={"font-size": "0.7rem", "marginLeft": "46px"},
                         ):
                             for pill in pills:
                                 pill()
-                    with gui.div(className="d-flex gap-1 align-items-center pt-2"):
+                    with gui.div(className="d-flex gap-1 align-items-center"):
                         (
                             self.render_author(
                                 published_run.last_edited_by,
@@ -2485,12 +2485,16 @@ class BasePage:
                         )
                         if updated_at and isinstance(updated_at, datetime.datetime):
                             gui.caption(
-                                    f" • {get_relative_time(updated_at)}",
-                                    style={"fontSize": "0.8rem"},
-                                )
+                                f" • {get_relative_time(updated_at)}",
+                                style={"fontSize": "0.8rem"},
+                                className="container-margin-reset",
+                            )
 
                 # web
-                with gui.div(className="d-none d-md-block text-end"):
+                with gui.div(
+                    className="d-none d-md-block text-end white-space-nowrap container-margin-reset",
+                    style={"whiteSpace": "nowrap"},
+                ):
                     if hide_author_column:
                         (
                             self.render_author(
