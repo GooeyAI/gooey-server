@@ -2295,10 +2295,10 @@ class BasePage:
         self.render_example(doc)
 
     def render_published_run_full_width(self, published_run: PublishedRun, **kwargs):
-        max_desc_words = 150
-        max_desc_words_mobile = 100
         hide_author_column = True if "hide_author_column" in kwargs else False
         use_workspace_author = True if "use_workspace_author" in kwargs else False
+        max_desc_words = 230 if hide_author_column else 180
+        max_desc_words_mobile = 100
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
         pills = [
@@ -2500,27 +2500,29 @@ class BasePage:
                     style={"whiteSpace": "nowrap"},
                 ):
                     if hide_author_column:
-                        (
-                            self.render_author(
-                                published_run.last_edited_by,
-                                image_size="24px",
-                                text_size="0.9rem",
-                                responsive=False,
-                                show_as_link=False,
+                        with gui.div(className="mb-2"):
+                            (
+                                self.render_author(
+                                    published_run.last_edited_by,
+                                    image_size="24px",
+                                    text_size="0.9rem",
+                                    responsive=False,
+                                    show_as_link=False,
+                                    className="mb-2",
+                                )
+                                if not use_workspace_author
+                                else self.render_workspace_author(
+                                    published_run.workspace,
+                                    image_size="24px",
+                                    text_size="0.9rem",
+                                    responsive=False,
+                                    show_as_link=False,
+                                )
                             )
-                            if not use_workspace_author
-                            else self.render_workspace_author(
-                                published_run.workspace,
-                                image_size="24px",
-                                text_size="0.9rem",
-                                responsive=False,
-                                show_as_link=False,
-                            )
-                        )
                     if updated_at and isinstance(updated_at, datetime.datetime):
                         gui.caption(
                             f"{get_relative_time(updated_at)}",
-                            className="container-margin-reset mt-2 mb-2 d-block",
+                            className="container-margin-reset mb-2 d-block",
                         )
                     run_count()
 
