@@ -2302,11 +2302,15 @@ class BasePage:
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
         pills = [
-            lambda: gui.pill(
-                PublishedRunVisibility(published_run.visibility).get_badge_html(),
-                unsafe_allow_html=True,
-                className="border border-dark",
-            )
+            lambda: (
+                gui.pill(
+                    PublishedRunVisibility(published_run.visibility).get_badge_html(),
+                    unsafe_allow_html=True,
+                    className="border border-dark",
+                )
+                if not "hide_visibility_pill" in kwargs
+                else None
+            ),
         ]
         if kwargs.get("workflow_pill"):
             pills.append(
@@ -2527,7 +2531,10 @@ class BasePage:
         allow_hide: bool,
     ):
         self.render_published_run_full_width(
-            published_run, hide_author_column=True, use_workspace_author=True
+            published_run,
+            hide_author_column=True,
+            use_workspace_author=True,
+            hide_visibility_pill=True,
         )
         if allow_hide:
             self._example_hide_button(published_run=published_run)
