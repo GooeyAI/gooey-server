@@ -3,7 +3,7 @@ import typing
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import auth
 from furl import furl
@@ -221,9 +221,10 @@ class AppUser(models.Model):
         workspace, _ = self.get_or_create_personal_workspace()
 
         if not self.is_anonymous:
-            if handle := Handle.create_default_for_workspace(workspace):
-                workspace.handle = handle
-                workspace.save()
+            with transaction.atomic():
+                if handle := Handle.create_default_for_workspace(workspace):
+                    workspace.handle = handle
+                    workspace.save()
 
         return self
 
