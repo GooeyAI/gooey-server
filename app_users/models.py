@@ -1,8 +1,9 @@
+import hashlib
 import typing
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import auth
 from furl import furl
@@ -220,9 +221,10 @@ class AppUser(models.Model):
         workspace, _ = self.get_or_create_personal_workspace()
 
         if not self.is_anonymous:
-            if handle := Handle.create_default_for_workspace(workspace):
-                workspace.handle = handle
-                workspace.save()
+            with transaction.atomic():
+                if handle := Handle.create_default_for_workspace(workspace):
+                    workspace.handle = handle
+                    workspace.save()
 
         return self
 
@@ -247,6 +249,9 @@ class AppUser(models.Model):
 
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
+
+    def get_photo(self) -> str:
+        return self.photo_url or get_placeholder_profile_image(self.uid)
 
 
 class TransactionReason(models.IntegerChoices):
@@ -381,3 +386,8 @@ class AppUserTransaction(models.Model):
                     furl("https://www.paypal.com/unifiedtransactions/details/payment/")
                     / self.invoice_id
                 )
+
+
+def get_placeholder_profile_image(seed: str) -> str:
+    hash = hashlib.md5(seed.encode()).hexdigest()
+    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
