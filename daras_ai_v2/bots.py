@@ -3,6 +3,7 @@ import typing
 from datetime import datetime
 
 import gooey_gui as gui
+import requests
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -21,9 +22,11 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
@@ -223,6 +226,9 @@ class BotInterface:
     def get_interactive_msg_info(self) -> ButtonPressed:
         raise NotImplementedError("This bot does not support interactive messages.")
 
+    def get_location_info(self) -> dict:
+        raise NotImplementedError("This bot does not support location messages.")
+
     def on_run_created(self, sr: "SavedRun"):
         pass
 
@@ -256,12 +262,13 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
             id=csv_encode_row(
                 idx + 1,
                 btn.attrib.get("gui-target") or "input_prompt",
-                btn.text,
+                btn.attrib.get("gui-action"),
+                # title must be the last item because it might get truncated
+                btn.text or "",
             ),
-            title=btn.text,
+            title=btn.text or "",
         )
         for idx, btn in enumerate(doc("button") or [])
-        if btn.text
     ]
     text = "\n\n".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
@@ -287,7 +294,7 @@ def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
     except Exception as e:
-        # send error msg as repsonse
+        # send error msg as response
         bot.send_msg(text=ERROR_MSG.format(e))
         raise
 
@@ -333,6 +340,12 @@ def _msg_handler(bot: BotInterface):
             if not input_audio:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
+        case "location":
+            input_location = bot.get_location_info()
+            if not input_location:
+                bot.send_msg(text=DEFAULT_RESPONSE)
+                return
+            input_text = _handle_location_msg(input_text, input_location)
         case "text":
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
@@ -377,7 +390,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
         run_google_translate([input_text], "en", glossary_url=bot.input_glossary)
     )
     last_feedback.save()
-    # send back a confimation msg
+    # send back a confirmation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
     bot_name = str(bot.bi.name)
     # reset convo state
@@ -665,7 +678,8 @@ def _handle_interactive_msg(bot: BotInterface):
             target, title = None, None
             parts = csv_decode_row(button.button_id)
             if len(parts) >= 3:
-                target, title = parts[1:3]
+                target = parts[1]
+                title = parts[-1]
             bot.request_overrides = bot.request_overrides or {}
             glom.assign(
                 bot.request_overrides,
@@ -673,6 +687,29 @@ def _handle_interactive_msg(bot: BotInterface):
                 title or button.button_title,
             )
             return False
+
+
+def _handle_location_msg(input_text: str, input_location: dict[str, float]) -> str:
+
+    r = requests.post(
+        url=f"https://maps.googleapis.com/maps/api/geocode/json",
+        params={
+            "latlng": f"{input_location['latitude']},{input_location['longitude']}",
+            "key": settings.GOOGLE_GEOCODING_API_KEY,
+        },
+    )
+    raise_for_status(r)
+    data = r.json()
+
+    input_text = f"My present location is: {input_location}\n"
+    try:
+        formatted_address = [result["formatted_address"] for result in data["results"]]
+    except (KeyError, IndexError, TypeError):
+        input_text += "Geocoding Response could not be retrieved"
+    else:
+        input_text += f"Geocoding Response: {formatted_address}"
+
+    return input_text
 
 
 class ButtonIds:
