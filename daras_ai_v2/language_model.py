@@ -436,9 +436,18 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_3_7_sonnet = LLMSpec(
+        label="Claude 3.7 Sonnet (Anthropic)",
+        model_id="claude-3-7-sonnet-20250219",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=15,
+        is_vision_model=True,
+        supports_json=True,
+    )
     claude_3_5_sonnet = LLMSpec(
         label="Claude 3.5 Sonnet (Anthropic)",
-        model_id="claude-3-5-sonnet-20240620",
+        model_id="claude-3-5-sonnet-20241022",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
         price=15,
