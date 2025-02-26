@@ -27,6 +27,7 @@ from daras_ai_v2.meta_content import (
     TITLE_SUFFIX as META_TITLE_SUFFIX,
     raw_build_meta_tags,
 )
+from daras_ai_v2.urls import paginate_queryset, paginate_button
 from handles.models import Handle
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import set_current_workspace
@@ -58,7 +59,7 @@ def profile_page(request: Request, handle: Handle):
     with gui.div(className="mt-3"):
         profile_header(request=request, handle=handle)
     gui.html("\n<hr>\n")
-    render_public_runs_grid(handle.workspace)
+    render_public_runs_grid(request, handle.workspace)
 
 
 def profile_header(request: Request, handle: Handle):
@@ -249,11 +250,19 @@ def _render_member_photos(workspace: Workspace):
                     gui.image(src=member.user.get_photo())
 
 
-def render_public_runs_grid(workspace: Workspace):
-    public_runs = PublishedRun.objects.filter(
+def render_public_runs_grid(request: Request, workspace: Workspace):
+    qs = PublishedRun.objects.filter(
         workspace=workspace,
         visibility=PublishedRunVisibility.PUBLIC,
-    ).order_by("-updated_at")
+    )
+
+    prs, cursor = paginate_queryset(
+        qs=qs, ordering=["-updated_at"], cursor=request.query_params
+    )
+
+    if not prs:
+        gui.write("No public runs yet", className="text-muted")
+        return
 
     def _render(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
@@ -262,10 +271,8 @@ def render_public_runs_grid(workspace: Workspace):
         gui.pill(workflow.short_title, className="mb-2 border border-dark")
         page_cls().render_published_run_preview(pr)
 
-    if public_runs:
-        grid_layout(3, public_runs, _render)
-    else:
-        gui.write("No public runs yet", className="text-muted")
+    grid_layout(3, prs, _render)
+    paginate_button(url=request.url, cursor=cursor)
 
 
 def get_run_count(user: AppUser) -> int:
