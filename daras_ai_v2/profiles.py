@@ -216,38 +216,32 @@ def _render_team_profile_stats(workspace: Workspace):
             gui.html(f"{members_count} {members_text}")
 
 
+MEMBER_PHOTOS_STYLE = """
+&:first-child {
+    margin-left: 0;
+}
+& {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid white;
+    background-color: white;
+    overflow: hidden;
+    margin-left: -15px;
+    object-fit: cover;
+}
+"""
+
+
 def _render_member_photos(workspace: Workspace):
-    with gui.styled(
-        """
-        .avatar-group { display: flex; }
-        .avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 2px solid white;
-            background-color: white;
-            overflow: hidden;
-            margin-left: -15px;
-        }
-        .avatar:first-child {
-            margin-left: 0;
-        }
-        .avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        """
-    ):
-        with gui.div(className="avatar-group"):
-            members = reversed(
-                WorkspaceMembership.objects.select_related("user")
-                .filter(workspace=workspace)
-                .order_by("created_at")[:5]
-            )
-            for member in members:
-                with gui.div(className="avatar"):
-                    gui.image(src=member.user.get_photo())
+    members = reversed(
+        WorkspaceMembership.objects.select_related("user")
+        .filter(workspace=workspace)
+        .order_by("created_at")[:5]
+    )
+    with gui.div(className="d-flex"), gui.styled(MEMBER_PHOTOS_STYLE):
+        for member in members:
+            gui.image(src=member.user.get_photo())
 
 
 def render_public_runs_grid(request: Request, workspace: Workspace):
