@@ -8,7 +8,8 @@ def csv_encode_row(*csv_row) -> str:
     """
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(map(str, csv_row))
+    csv_row = [str(x) for x in csv_row if x is not None]
+    writer.writerow(csv_row)
     return output.getvalue().strip()  # Strip to remove trailing newline
 
 

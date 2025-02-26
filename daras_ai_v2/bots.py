@@ -1,9 +1,9 @@
 import mimetypes
 import typing
-import requests
 from datetime import datetime
 
 import gooey_gui as gui
+import requests
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -22,6 +22,7 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
@@ -261,12 +262,13 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
             id=csv_encode_row(
                 idx + 1,
                 btn.attrib.get("gui-target") or "input_prompt",
-                btn.text,
+                btn.attrib.get("gui-action"),
+                # title must be the last item because it might get truncated
+                btn.text or "",
             ),
-            title=btn.text,
+            title=btn.text or "",
         )
         for idx, btn in enumerate(doc("button") or [])
-        if btn.text
     ]
     text = "\n\n".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
@@ -676,7 +678,8 @@ def _handle_interactive_msg(bot: BotInterface):
             target, title = None, None
             parts = csv_decode_row(button.button_id)
             if len(parts) >= 3:
-                target, title = parts[1:3]
+                target = parts[1]
+                title = parts[-1]
             bot.request_overrides = bot.request_overrides or {}
             glom.assign(
                 bot.request_overrides,
@@ -687,29 +690,24 @@ def _handle_interactive_msg(bot: BotInterface):
 
 
 def _handle_location_msg(input_text: str, input_location: dict[str, float]) -> str:
-    from daras_ai_v2.settings import GOOGLE_GEOCODING_API_KEY
 
     r = requests.post(
         url=f"https://maps.googleapis.com/maps/api/geocode/json",
         params={
             "latlng": f"{input_location['latitude']},{input_location['longitude']}",
-            "key": GOOGLE_GEOCODING_API_KEY,
+            "key": settings.GOOGLE_GEOCODING_API_KEY,
         },
     )
     raise_for_status(r)
     data = r.json()
-    results = data.get("results", [])
 
-    if results:
-        location_info = results[0]
-        formatted_address = location_info.get(
-            "formatted_address", "Address unavailable"
-        )
-        input_text += (
-            f"My present location is {formatted_address}. {input_location.__str__()}"
-        )
+    input_text = f"My present location is: {input_location}\n"
+    try:
+        formatted_address = [result["formatted_address"] for result in data["results"]]
+    except (KeyError, IndexError, TypeError):
+        input_text += "Geocoding Response could not be retrieved"
     else:
-        input_text += "Location details could not be retrieved."
+        input_text += f"Geocoding Response: {formatted_address}"
 
     return input_text
 

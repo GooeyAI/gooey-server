@@ -106,10 +106,9 @@ class WhatsappBot(BotInterface):
 
     def get_location_info(self) -> dict | None:
         try:
-            location_info = self.input_message["location"]
+            return self.input_message["location"]
         except KeyError:
             return None
-        return location_info
 
     def _send_msg(
         self,
@@ -301,46 +300,47 @@ def _build_msg_buttons(
     max_id_len: int = 256,
 ) -> list[dict]:
     ret = []
-    button_grp = []
-    for i, button in enumerate(buttons):
-        _, button_type, *_ = csv_decode_row(button["id"])
-        match button_type:
-            case "send_location":
-                ret.append(
-                    {
-                        "type": "interactive",
-                        "interactive": {
-                            "type": "location_request_message",
-                            "body": {
-                                "text": truncate_text_words(
-                                    button["title"],
-                                    max_title_len,
-                                )
-                            },
-                            "action": {"name": "send_location"},
-                        },
-                    }
+    button_group = []
+    for button in buttons:
+        if "send_location" in csv_decode_row(button["id"]):
+            ret.append(_build_interactive_location_msg(button, msg, max_title_len))
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+        else:
+            button_group.append(button)
+            # group into 3 buttons per message
+            if len(button_group) < 3:
+                continue
+            ret.append(
+                _build_interactive_button_msg(
+                    button_group, msg, max_title_len, max_id_len
                 )
-            case "input_prompt":
-                button_grp.append(button)
-
-                if len(button_grp) == 3:
-                    ret.append(
-                        _process_reply_button(
-                            button_grp, msg, max_title_len, max_id_len
-                        )
-                    )
-                    button_grp = []
-                    # dont repeat text in subsequent messages
-                    msg = {"body": {"text": "\u200b"}}
-
-    if button_grp:
-        ret.append(_process_reply_button(button_grp, msg, max_title_len, max_id_len))
-
+            )
+            button_group = []
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+    # send remaining buttons
+    if button_group:
+        ret.append(
+            _build_interactive_button_msg(button_group, msg, max_title_len, max_id_len)
+        )
     return ret
 
 
-def _process_reply_button(
+def _build_interactive_location_msg(
+    button: ReplyButton, msg: dict, max_title_len: int
+) -> dict:
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            **msg,
+            "action": {"name": "send_location"},
+        },
+    }
+
+
+def _build_interactive_button_msg(
     button_grp: list[ReplyButton],
     msg: dict,
     max_title_len: int,
