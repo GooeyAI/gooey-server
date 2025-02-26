@@ -13,6 +13,7 @@ from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
+from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -102,6 +103,12 @@ class WhatsappBot(BotInterface):
             button_title=self.input_message["interactive"]["button_reply"]["title"],
             context_msg_id=self.input_message["context"]["id"],
         )
+
+    def get_location_info(self) -> dict | None:
+        try:
+            return self.input_message["location"]
+        except KeyError:
+            return None
 
     def _send_msg(
         self,
@@ -293,36 +300,71 @@ def _build_msg_buttons(
     max_id_len: int = 256,
 ) -> list[dict]:
     ret = []
-    for i in range(0, len(buttons), 3):
-        buttons = [
-            {
-                "type": "reply",
-                "reply": {
-                    "id": truncate_text_words(
-                        button["id"],
-                        max_id_len,
-                    ),
-                    "title": truncate_text_words(
-                        button["title"],
-                        max_title_len,
-                    ),
-                },
-            }
-            for button in buttons[i : i + 3]
-        ]
+    button_group = []
+    for button in buttons:
+        if "send_location" in csv_decode_row(button["id"]):
+            ret.append(_build_interactive_location_msg(button, msg, max_title_len))
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+        else:
+            button_group.append(button)
+            # group into 3 buttons per message
+            if len(button_group) < 3:
+                continue
+            ret.append(
+                _build_interactive_button_msg(
+                    button_group, msg, max_title_len, max_id_len
+                )
+            )
+            button_group = []
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+    # send remaining buttons
+    if button_group:
         ret.append(
-            {
-                "type": "interactive",
-                "interactive": {
-                    "type": "button",
-                    **msg,
-                    "action": {"buttons": buttons},
-                },
-            }
+            _build_interactive_button_msg(button_group, msg, max_title_len, max_id_len)
         )
-        # dont repeat text in subsequent messages
-        msg = {"body": {"text": "\u200b"}}
     return ret
+
+
+def _build_interactive_location_msg(
+    button: ReplyButton, msg: dict, max_title_len: int
+) -> dict:
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            **msg,
+            "action": {"name": "send_location"},
+        },
+    }
+
+
+def _build_interactive_button_msg(
+    button_grp: list[ReplyButton],
+    msg: dict,
+    max_title_len: int,
+    max_id_len: int,
+) -> dict:
+    buttons_wa = [
+        {
+            "type": "reply",
+            "reply": {
+                "id": truncate_text_words(btn["id"], max_id_len),
+                "title": truncate_text_words(btn["title"], max_title_len),
+            },
+        }
+        for btn in button_grp
+    ]
+    interactive_message = {
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            **msg,
+            "action": {"buttons": buttons_wa},
+        },
+    }
+    return interactive_message
 
 
 def send_wa_msgs_raw(

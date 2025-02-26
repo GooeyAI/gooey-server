@@ -23,6 +23,7 @@ def onedrive_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
+    sr = load_sr_from_state(request)
     code = request.query_params.get("code")
     if not code:
         error = request.query_params.get("error")
@@ -34,8 +35,6 @@ def onedrive_connect_redirect(request: Request):
 
     user_access_token, user_refresh_token = _get_access_token_from_code(code)
     user_display_name = _get_user_display_name(user_access_token)
-
-    sr = load_sr_from_state(request)
 
     sr.workspace.onedrive_access_token = user_access_token
     sr.workspace.onedrive_refresh_token = user_refresh_token
@@ -64,7 +63,7 @@ def generate_onedrive_auth_url(sr_id: int) -> str:
             "client_id": settings.ONEDRIVE_CLIENT_ID,
             "redirect_uri": onedrive_connect_redirect_url,
             "response_type": "code",
-            "scope": ",".join(
+            "scope": " ".join(
                 [
                     "Files.Read.All",
                     "offline_access",
