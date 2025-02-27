@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}Authorization Error{% endblock title %}
+
+{% block content %}
+<div style="text-align: center; margin: 2rem 0;">
+    <h1>Authorization Error</h1>
+
+    <div class="container border p-2">
+    <pre class="text-danger">{{ error }}</pre>
+    <pre class="text-center mx-4 mb-4 bg-light"> {{ error_description or "An error occurred during authentication." }}</pre>
+    </div>
+    <div style="margin-top: 2rem; display: flex; gap: 2rem ; justify-content: center;">
+        <a href="{{ retry_url }}">
+            Retry Authorization
+        </a>
+        <a href="{{ redirect_url | default('/') }}" >
+            Back to run
+        </a>
+    </div>
+</div>
+{% endblock content %}
