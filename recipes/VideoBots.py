@@ -15,6 +15,7 @@ from bots.models import (
     PublishedRun,
     PublishedRunVisibility,
     Workflow,
+    SavedRun,
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
@@ -317,6 +318,24 @@ Translation Glossary for LLM Language (English) -> User Langauge
             DeforumSDPage,
             CompareText2ImgPage,
         ]
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+        import langcodes
+
+        try:
+            lang = langcodes.Language.get(
+                sr.state.get("user_language") or sr.state.get("asr_language") or ""
+            ).display_name()
+        except (KeyError, langcodes.LanguageTagError):
+            lang = None
+        title = super().get_run_title(sr, pr)
+        return " ".join(filter(None, [lang, title]))
+
+    @classmethod
+    def get_prompt_title(cls, state: dict) -> str | None:
+        # don't show the input prompt in the run titles, instead show get_run_title()
+        return None
 
     def preview_description(self, state: dict) -> str:
         return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."

@@ -53,6 +53,7 @@ from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
+from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
 from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
@@ -70,7 +71,6 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
-from daras_ai_v2.utils import get_relative_time
 
 DEFAULT_META_IMG = (
     # Small
@@ -741,7 +741,7 @@ class BasePage:
 
         with form_container:
             if user_can_edit:
-                title = pr.title or self.title
+                title = self.get_run_title(self.current_sr, self.current_pr)
                 notes = pr.notes
             else:
                 title = self._get_default_pr_title()
@@ -879,8 +879,7 @@ class BasePage:
                 return self.current_workspace
 
     def _get_default_pr_title(self):
-        recipe_title = self.get_root_pr().title or self.title
-        return f"{self.request.user.first_name_possesive()} {recipe_title}"
+        return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -1095,6 +1094,17 @@ class BasePage:
                         change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
+
+    @classmethod
+    def get_prompt_title(cls, sr: SavedRun) -> str | None:
+        return truncate_text_words(
+            cls.preview_input(sr.to_dict()) or "",
+            maxlen=60,
+        ).replace("\n", " ")
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+        return pr.title or cls.get_recipe_title()
 
     @classmethod
     def get_recipe_title(cls) -> str:

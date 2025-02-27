@@ -117,7 +117,10 @@ class VideoBotsStatsPage(BasePage):
         gui.markdown("# " + self.get_dynamic_meta_title())
 
     def get_dynamic_meta_title(self):
-        return f"📊 {self.bi.name} Analytics" if self.bi else self.title
+        if self.bi:
+            return f"📊 {self.bi.name} Analytics"
+        else:
+            return self.title
 
     def render(self):
         self.setup_sentry()
