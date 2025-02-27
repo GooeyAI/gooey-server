@@ -117,7 +117,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models#o1
     o1_mini = LLMSpec(
         label="o1-mini (openai)",
-        model_id="o1-mini-2024-09-12",
+        model_id=("openai-o1-mini-prod-eastus2-1", "o1-mini-2024-09-12"),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=13,
@@ -129,7 +129,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models#gpt-4o
     gpt_4_o = LLMSpec(
         label="GPT-4o (openai)",
-        model_id="gpt-4o-2024-08-06",
+        model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o-2024-08-06"),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=10,
@@ -139,7 +139,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models#gpt-4o-mini
     gpt_4_o_mini = LLMSpec(
         label="GPT-4o-mini (openai)",
-        model_id="gpt-4o-mini",
+        model_id=("openai-gpt-4o-mini-prod-eastus2-1", "gpt-4o-mini-2024-07-18"),
         llm_api=LLMApis.openai,
         context_window=128_000,
         price=1,

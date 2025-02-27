@@ -62,6 +62,15 @@ def run():
     # o1-mini
 
     llm_pricing_create(
+        model_id="openai-o1-mini-prod-eastus2-1",
+        model_name=LargeLanguageModels.o1_mini.name,
+        unit_cost_input=3,
+        unit_cost_output=12,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+    llm_pricing_create(
         model_id="o1-mini-2024-09-12",
         model_name=LargeLanguageModels.o1_mini.name,
         unit_cost_input=3,
@@ -74,7 +83,16 @@ def run():
     # GPT-4o-mini
 
     llm_pricing_create(
-        model_id="gpt-4o-mini",
+        model_id="openai-gpt-4o-mini-prod-eastus2-1",
+        model_name=LargeLanguageModels.gpt_4_o_mini.name,
+        unit_cost_input=0.150,
+        unit_cost_output=0.600,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-mini-2024-07-18",
         model_name=LargeLanguageModels.gpt_4_o_mini.name,
         unit_cost_input=0.150,
         unit_cost_output=0.600,
@@ -94,24 +112,7 @@ def run():
         provider=ModelProvider.openai,
         pricing_url="https://openai.com/api/pricing",
     )
-    llm_pricing_create(
-        model_id="gpt-4o-2024-08-06",
-        model_name=LargeLanguageModels.gpt_4_o.name,
-        unit_cost_input=2.5,
-        unit_cost_output=10,
-        unit_quantity=10**6,
-        provider=ModelProvider.openai,
-        pricing_url="https://openai.com/api/pricing",
-    )
-    llm_pricing_create(
-        model_id="gpt-4o",
-        model_name=LargeLanguageModels.gpt_4_o.name,
-        unit_cost_input=5,
-        unit_cost_output=15,
-        unit_quantity=10**6,
-        provider=ModelProvider.openai,
-        pricing_url="https://openai.com/api/pricing",
-    )
+
     llm_pricing_create(
         model_id="openai-gpt-4o-prod-eastus2-1",
         model_name=LargeLanguageModels.gpt_4_o.name,
@@ -120,6 +121,15 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.azure_openai,
         pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-2024-08-06",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=2.5,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
     )
 
     # GPT-4-Turbo
