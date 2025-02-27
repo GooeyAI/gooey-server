@@ -18,7 +18,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
 

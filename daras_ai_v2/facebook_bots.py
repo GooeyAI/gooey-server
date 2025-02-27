@@ -2,14 +2,22 @@ import requests
 from furl import furl
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    get_mimetype_from_response,
+    truncate_text_words,
+)
+from daras_ai.text_format import markdown_to_wa
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
+from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
+
+WA_IMG_MAX_SIZE = 5 * 1024**2
 
 WA_MSG_MAX_SIZE = 1024
 
@@ -92,8 +100,15 @@ class WhatsappBot(BotInterface):
     def get_interactive_msg_info(self) -> ButtonPressed:
         return ButtonPressed(
             button_id=self.input_message["interactive"]["button_reply"]["id"],
+            button_title=self.input_message["interactive"]["button_reply"]["title"],
             context_msg_id=self.input_message["context"]["id"],
         )
+
+    def get_location_info(self) -> dict | None:
+        try:
+            return self.input_message["location"]
+        except KeyError:
+            return None
 
     def _send_msg(
         self,
@@ -135,7 +150,10 @@ class WhatsappBot(BotInterface):
         user_number: str,
         access_token: str | None = None,
     ) -> str | None:
-        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
+        if text:
+            text, images = markdown_to_wa(text)
+        else:
+            images = None
 
         # split text into chunks if too long
         if text and len(text) > WA_MSG_MAX_SIZE:
@@ -162,24 +180,23 @@ class WhatsappBot(BotInterface):
                 access_token=access_token,
             )
 
+        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
         messages = []
         if video:
             if buttons:
-                messages = [
-                    # interactive text msg + video in header
-                    _build_msg_buttons(
-                        buttons,
-                        {
-                            "body": {
-                                "text": text or "\u200b",
-                            },
-                            "header": {
-                                "type": "video",
-                                "video": {"link": video},
-                            },
+                # interactive text msg + video in header
+                messages = _build_msg_buttons(
+                    buttons,
+                    {
+                        "body": {
+                            "text": text or "\u200b",
                         },
-                    ),
-                ]
+                        "header": {
+                            "type": "video",
+                            "video": {"link": video},
+                        },
+                    },
+                )
             else:
                 messages = [
                     # simple video msg + text caption
@@ -191,25 +208,24 @@ class WhatsappBot(BotInterface):
                         },
                     },
                 ]
+
         elif buttons:
             # interactive text msg
-            messages = [
-                _build_msg_buttons(
-                    buttons,
-                    {
-                        "body": {
-                            "text": text or "\u200b",
-                        }
+            messages = _build_msg_buttons(
+                buttons,
+                {
+                    "body": {
+                        "text": text or "\u200b",
                     },
-                ),
-            ]
+                },
+            )
         elif text:
             # simple text msg
             messages = [
                 {
                     "type": "text",
                     "text": {
-                        "body": text,
+                        "body": text or "\u200b",
                         "preview_url": True,
                     },
                 },
@@ -237,6 +253,15 @@ class WhatsappBot(BotInterface):
                 }
                 for link in documents
             ] + messages
+
+        if images:
+            messages += [
+                {
+                    "type": "image",
+                    "image": {"link": wa_img_convert(img_url)},
+                }
+                for img_url in images
+            ]
 
         return send_wa_msgs_raw(
             bot_number=bot_number,
@@ -267,23 +292,79 @@ def retrieve_wa_media_by_id(
     return content, media_info["mime_type"]
 
 
-def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> dict:
+def _build_msg_buttons(
+    buttons: list[ReplyButton],
+    msg: dict,
+    *,
+    max_title_len: int = 20,
+    max_id_len: int = 256,
+) -> list[dict]:
+    ret = []
+    button_group = []
+    for button in buttons:
+        if "send_location" in csv_decode_row(button["id"]):
+            ret.append(_build_interactive_location_msg(button, msg, max_title_len))
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+        else:
+            button_group.append(button)
+            # group into 3 buttons per message
+            if len(button_group) < 3:
+                continue
+            ret.append(
+                _build_interactive_button_msg(
+                    button_group, msg, max_title_len, max_id_len
+                )
+            )
+            button_group = []
+            # dont repeat text in subsequent messages
+            msg = {"body": {"text": "\u200b"}}
+    # send remaining buttons
+    if button_group:
+        ret.append(
+            _build_interactive_button_msg(button_group, msg, max_title_len, max_id_len)
+        )
+    return ret
+
+
+def _build_interactive_location_msg(
+    button: ReplyButton, msg: dict, max_title_len: int
+) -> dict:
     return {
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            **msg,
+            "action": {"name": "send_location"},
+        },
+    }
+
+
+def _build_interactive_button_msg(
+    button_grp: list[ReplyButton],
+    msg: dict,
+    max_title_len: int,
+    max_id_len: int,
+) -> dict:
+    buttons_wa = [
+        {
+            "type": "reply",
+            "reply": {
+                "id": truncate_text_words(btn["id"], max_id_len),
+                "title": truncate_text_words(btn["title"], max_title_len),
+            },
+        }
+        for btn in button_grp
+    ]
+    interactive_message = {
         "type": "interactive",
         "interactive": {
             "type": "button",
             **msg,
-            "action": {
-                "buttons": [
-                    {
-                        "type": "reply",
-                        "reply": {"id": button["id"], "title": button["title"]},
-                    }
-                    for button in buttons
-                ],
-            },
+            "action": {"buttons": buttons_wa},
         },
     }
+    return interactive_message
 
 
 def send_wa_msgs_raw(
@@ -487,3 +568,29 @@ def send_fb_msgs_raw(
             },
         )
         print("send_fb_msgs_raw:", r.status_code, r.json())
+
+
+def wa_img_convert(f_url: str) -> str:
+    from wand.image import Image
+    from daras_ai_v2.vector_search import download_content_bytes
+    from daras_ai_v2.vector_search import doc_url_to_file_metadata
+
+    # check for mime type and size from metadata because whatsapp allows max 5MB png/jpeg
+    # https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media/#image
+    metadata = doc_url_to_file_metadata(f_url)
+    if (
+        metadata.mime_type in {"image/png", "image/jpeg"}
+        or metadata.total_bytes < WA_IMG_MAX_SIZE
+    ):
+        return f_url
+    else:
+        f_bytes, mime_type = download_content_bytes(
+            f_url=f_url,
+            mime_type=metadata.mime_type,
+            export_links=metadata.export_links,
+        )
+        with Image(blob=f_bytes) as img:
+            if len(f_bytes) > WA_IMG_MAX_SIZE:
+                img.options["jpeg:extent"] = "5MB"
+            f_bytes = img.make_blob(format="jpeg")
+        return upload_file_from_bytes(metadata.name + ".jpeg", f_bytes, "image/jpeg")

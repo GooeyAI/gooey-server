@@ -35,6 +35,7 @@ admin = '<i class="fa-solid fa-shield-halved"></i>'
 member = '<i class="fa-solid fa-user"></i>'
 chevron_right = '<i class="fa-sharp-duotone fa-solid fa-sm fa-chevron-right"></i>'
 check = '<i class="fa-solid fa-check"></i>'
+octopus = '<i class="fa-regular fa-octopus"></i>'
 analytics = '<i class="fa-regular fa-chart-pie-simple-circle-dollar"></i>'
 
 # brands

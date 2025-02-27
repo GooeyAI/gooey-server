@@ -1,15 +1,18 @@
 import html as html_lib
 from copy import copy
 
+from django.db import transaction
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
+from django.db.models import F
 from django.utils.translation import ngettext
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
+from daras_ai_v2.profiles import render_handle_input, update_handle
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
@@ -26,6 +29,15 @@ rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 def invitation_page(
     current_user: AppUser | None, session: dict, invite: WorkspaceInvite
 ):
+    from routers.root import login
+    from routers.account import members_route
+
+    if invite.status == WorkspaceInvite.Status.ACCEPTED:
+        set_current_workspace(session, int(invite.workspace_id))
+        raise gui.RedirectException(get_route_path(members_route))
+
+    WorkspaceInvite.objects.filter(id=invite.id).update(clicks=F("clicks") + 1)
+
     with (
         gui.div(
             className="position-absolute top-0 start-0 bottom-0 bg-black min-vw-100 min-vh-100",
@@ -82,6 +94,18 @@ def invitation_page(
             members_text = ngettext("member", "members", members_count)
             gui.caption(f"{members_count} {members_text}")
 
+            if not current_user or current_user.is_anonymous:
+                login_url = get_app_route_url(
+                    login, query_params={"next": invite.get_invite_url()}
+                )
+                with gui.tag(
+                    "a",
+                    className="my-2 w-100 btn btn-theme btn-primary",
+                    href=login_url,
+                ):
+                    gui.html("Join Workspace")
+                return
+
             if gui.button(
                 "Join Workspace",
                 className="my-2 w-100",
@@ -102,13 +126,8 @@ def _handle_invite_accepted(
     from routers.root import login, logout
 
     workspace_redirect_url = get_route_path(account_route)
-    if not current_user or current_user.is_anonymous:
-        login_url = get_app_route_url(
-            login, query_params={"next": invite.get_invite_url()}
-        )
-        raise gui.RedirectException(login_url)
 
-    if invite.email != current_user.email:
+    if not current_user.email or invite.email.lower() != current_user.email.lower():
         # logout current user, and redirect to login
         login_url = get_app_route_url(
             login, query_params={"next": invite.get_invite_url()}
@@ -299,16 +318,24 @@ def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
         confirm_label=f"{icons.save} Save",
     ):
         workspace_copy = render_workspace_edit_view_by_membership(ref, membership)
+        input_handle_name = gui.session_state.pop(
+            "workspace-handle-name",
+            workspace_copy.handle and workspace_copy.handle.name,
+        )
 
         if not ref.pressed_confirm:
             return
         try:
             workspace_copy.full_clean()
+            with transaction.atomic():
+                new_handle = update_handle(workspace_copy.handle, input_handle_name)
+                if new_handle != workspace_copy.handle:
+                    workspace_copy.handle = new_handle
+                workspace_copy.save()
         except ValidationError as e:
             # newlines in markdown
             gui.write("\n".join(e.messages), className="text-danger")
         else:
-            workspace_copy.save()
             membership.workspace.refresh_from_db()
             ref.set_open(False)
             gui.rerun()
@@ -332,17 +359,21 @@ def clear_invite_creation_form():
 def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
     gui.write(f"Invite to **{workspace.display_name()}**.")
 
-    email = gui.text_input(
-        "###### Email",
-        style=dict(minWidth="300px"),
-        key="invite-form-email",
-    ).strip()
+    email = (
+        gui.text_input(
+            "###### Email",
+            style=dict(minWidth="300px", textTransform="lowercase"),
+            key="invite-form-email",
+        )
+        .strip()
+        .lower()
+    )
 
     role = gui.selectbox(
         "###### Role",
         options=WorkspaceRole,
         format_func=WorkspaceRole.display_html,
-        value=WorkspaceRole.ADMIN.value,
+        value=WorkspaceRole.MEMBER.value,
         key="invite-form-role",
     )
 
@@ -443,8 +474,8 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                 with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
                         name = m.user.full_name(current_user=current_member.user)
-                        if m.user.handle_id:
-                            with gui.link(to=m.user.handle.get_app_url()):
+                        if handle := m.user.get_handle():
+                            with gui.link(to=handle.get_app_url()):
                                 gui.html(html_lib.escape(name))
                         else:
                             gui.html(html_lib.escape(name))
@@ -603,6 +634,11 @@ def render_workspace_create_or_edit_form(
         key="workspace-name",
         value=workspace.name,
     ).strip()
+    render_handle_input(
+        "###### Handle",
+        key="workspace-handle-name",
+        handle=workspace.handle,
+    )
     workspace.description = gui.text_area(
         "###### Description _(Optional)_",
         key="workspace-description",
@@ -629,6 +665,12 @@ def render_workspace_create_or_edit_form(
         accept=["image/*"],
         key="workspace-logo",
         value=workspace.photo_url,
+    )
+    workspace.banner_url = gui.file_uploader(
+        "###### Banner",
+        accept=["image/*"],
+        key="workspace-banner-url",
+        value=workspace.banner_url,
     )
 
 

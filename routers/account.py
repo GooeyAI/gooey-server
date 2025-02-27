@@ -8,7 +8,7 @@ from fastapi.requests import Request
 from furl import furl
 from loguru import logger
 from requests.models import HTTPError
-from starlette.responses import Response
+from starlette.exceptions import HTTPException
 
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, paypal
@@ -19,12 +19,13 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
+from managed_secrets.widgets import manage_secrets_table
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import get_current_workspace, SWITCH_WORKSPACE_KEY
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -117,10 +118,17 @@ def analytics_route(request: Request):
 
 @gui.route(app, "/account/profile/")
 def profile_route(request: Request):
+    is_switching_workspace = gui.session_state.get(SWITCH_WORKSPACE_KEY)
     with account_page_wrapper(request, AccountTabs.profile) as current_workspace:
         if not current_workspace.is_personal:
-            raise gui.RedirectException(get_route_path(members_route))
-        profile_tab(request)
+            if is_switching_workspace:
+                raise gui.RedirectException(get_route_path(members_route))
+            else:
+                gui.session_state[SWITCH_WORKSPACE_KEY] = str(
+                    request.user.get_or_create_personal_workspace()[0].id
+                )
+                gui.rerun()
+        profile_tab(request, current_workspace)
     url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
@@ -196,12 +204,7 @@ def invitation_route(
     workspace_slug: str | None,
     email: str | None,
 ):
-    try:
-        invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
-        invite = WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
-    except (IndexError, WorkspaceInvite.DoesNotExist):
-        return Response(status_code=404)
-
+    invite = load_invite_from_hashid_or_404(invite_id)
     invitation_page(current_user=request.user, session=request.session, invite=invite)
 
     description = invite.created_by.full_name()
@@ -220,6 +223,14 @@ def invitation_route(
             robots="noindex,nofollow",
         )
     )
+
+
+def load_invite_from_hashid_or_404(invite_id: str) -> WorkspaceInvite:
+    try:
+        invite_id = WorkspaceInvite.api_hashids.decode(invite_id)[0]
+        return WorkspaceInvite.objects.select_related("workspace").get(id=invite_id)
+    except (IndexError, WorkspaceInvite.DoesNotExist):
+        raise HTTPException(status_code=404)
 
 
 class TabData(typing.NamedTuple):
@@ -264,8 +275,8 @@ def billing_tab(request: Request, workspace: Workspace):
     return billing_page(workspace=workspace, user=request.user)
 
 
-def profile_tab(request: Request):
-    return edit_user_profile_page(user=request.user)
+def profile_tab(request: Request, workspace: Workspace):
+    return edit_user_profile_page(workspace=workspace)
 
 
 def all_saved_runs_tab(request: Request):
@@ -327,11 +338,11 @@ def all_saved_runs_tab(request: Request):
         return
 
     if workspace.is_personal:
-        if request.user.handle:
+        if handle := workspace.handle:
             gui.caption(
                 f"""
                 All your Saved workflows are here, with public ones listed on your \
-                profile page at {request.user.handle.get_app_url()}.
+                profile page at {handle.get_app_url()}.
                 """
             )
         else:
@@ -410,9 +421,13 @@ def analytics_tab(request: Request):
 
 
 def api_keys_tab(request: Request):
-    gui.write("# 🔐 API Keys")
     workspace = get_current_workspace(request.user, request.session)
+
+    gui.write("## 🔐 API Keys")
     manage_api_keys(workspace=workspace, user=request.user)
+
+    gui.write("## 🛡 Secrets")
+    manage_secrets_table(workspace, request.user)
 
 
 @contextmanager

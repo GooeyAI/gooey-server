@@ -6,12 +6,11 @@ from vespa.package import (
     Schema,
     Document,
     Field,
-    FieldSet,
     HNSW,
     RankProfile,
+    FieldSet,
     Function,
     GlobalPhaseRanking,
-    QueryTypeField,
 )
 
 from daras_ai_v2 import settings
@@ -35,9 +34,23 @@ package = ApplicationPackage(
                         rank="filter",
                     ),
                     Field(
-                        name="url",
+                        name="file_id",
                         type="string",
                         indexing=["attribute", "summary"],
+                        attribute=["fast-search"],
+                        rank="filter",
+                    ),
+                    Field(
+                        name="embedding",
+                        type=EMBEDDING_TYPE,
+                        indexing=["index", "attribute"],
+                        ann=HNSW(distance_metric="dotproduct"),
+                    ),
+                    Field(
+                        name="created_at",
+                        type="long",
+                        indexing=["attribute"],
+                        attribute=["fast-access"],
                     ),
                     Field(
                         name="title",
@@ -51,93 +64,40 @@ package = ApplicationPackage(
                         indexing=["index", "summary"],
                         index="enable-bm25",
                     ),
-                    Field(
-                        name="embedding",
-                        type=EMBEDDING_TYPE,
-                        indexing=["index", "attribute"],
-                        ann=HNSW(distance_metric="dotproduct"),
-                    ),
-                    Field(
-                        name="file_id",
-                        type="string",
-                        indexing=["attribute", "summary"],
-                        attribute=["fast-search"],
-                        rank="filter",
-                    ),
-                    Field(
-                        name="created_at",
-                        type="long",
-                        indexing=["attribute"],
-                        attribute=["fast-access"],
-                    ),
                 ]
             ),
             fieldsets=[FieldSet(name="default", fields=["title", "snippet"])],
             rank_profiles=[
                 RankProfile(
                     name="bm25",
-                    inputs=[
-                        ("query(q)", EMBEDDING_TYPE),
-                    ],
-                    functions=[
-                        Function(
-                            name="bm25sum", expression="bm25(title) + bm25(snippet)"
-                        )
-                    ],
-                    first_phase="bm25sum",
+                    first_phase="bm25(title) + bm25(snippet)",
                 ),
                 RankProfile(
                     name="semantic",
-                    inputs=[
-                        ("query(q)", EMBEDDING_TYPE),
-                    ],
+                    inputs=[("query(queryEmbedding)", EMBEDDING_TYPE)],
                     first_phase="closeness(field, embedding)",
                 ),
                 RankProfile(
                     name="fusion",
-                    inherits="bm25",
                     inputs=[
-                        ("query(q)", EMBEDDING_TYPE),
+                        ("query(queryEmbedding)", EMBEDDING_TYPE),
                         ("query(semanticWeight)", "double"),
                     ],
-                    first_phase="closeness(field, embedding)",
-                    global_phase=GlobalPhaseRanking(
-                        expression="""
-                        if (closeness(field, embedding)>0.6,
-                            reciprocal_rank(bm25sum) * (1 - query(semanticWeight)) +
-                            reciprocal_rank(closeness(field, embedding)) * query(semanticWeight),
-                            0)
-                    """,
-                        rerank_count=1000,
-                    ),
-                ),
-                RankProfile(
-                    name="fusion2",  # with bm25 first
-                    inherits="bm25",
-                    inputs=[
-                        ("query(q)", EMBEDDING_TYPE),
-                        ("query(semanticWeight)", "double"),
+                    functions=[
+                        Function(
+                            name="bm25sum",
+                            expression="bm25(title) + bm25(snippet)",
+                        ),
                     ],
-                    first_phase="closeness(field, embedding)",
+                    first_phase="bm25sum",
                     global_phase=GlobalPhaseRanking(
-                        expression="""
-                        if (bm25sum>0.6,
-                            reciprocal_rank(bm25sum) * (1 - query(semanticWeight)) +
-                            reciprocal_rank(closeness(field, embedding)) * query(semanticWeight),
-                            0)
-                    """,
+                        expression="reciprocal_rank(bm25sum) * (1 - query(semanticWeight)) + reciprocal_rank(closeness(field, embedding)) * query(semanticWeight)",
                         rerank_count=1000,
                     ),
                 ),
             ],
         )
     ],
-)
-package.query_profile_type.add_fields(
-    QueryTypeField(
-        name="ranking.features.query(q)",
-        type=EMBEDDING_TYPE,
-    ),
 )
 
 

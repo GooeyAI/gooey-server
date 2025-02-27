@@ -11,7 +11,7 @@ from daras_ai_v2.base import RecipeTabs
 
 
 def connect_bot_to_published_run(
-    bi: BotIntegration, published_run: PublishedRun | None
+    bi: BotIntegration, published_run: PublishedRun | None, *, overwrite: bool
 ) -> str:
     """
     Connect the bot integration to the provided saved and published runs.
@@ -21,13 +21,11 @@ def connect_bot_to_published_run(
     from daras_ai_v2.slack_bot import send_confirmation_msg
     from recipes.VideoBots import VideoBotsPage
 
-    print(f"Connecting {bi} to {published_run}")
-
-    bi.published_run = published_run
-    bi.save(update_fields=["published_run"])
-
-    if bi.platform == Platform.SLACK:
-        send_confirmation_msg(bi)
+    if not bi.published_run or overwrite:
+        bi.published_run = published_run
+        bi.save(update_fields=["published_run"])
+        if bi.platform == Platform.SLACK:
+            send_confirmation_msg(bi)
 
     return VideoBotsPage.app_url(
         tab=RecipeTabs.integrations,

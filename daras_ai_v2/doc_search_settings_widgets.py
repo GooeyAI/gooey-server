@@ -1,16 +1,20 @@
 import os
 import typing
 
+import gooey_gui as gui
+from app_users.models import AppUser
 from furl import furl
 from sentry_sdk import capture_exception
 
-import gooey_gui as gui
-from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.search_ref import CitationStyles
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+
 
 _user_media_url_prefix = os.path.join(
     "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
@@ -38,7 +42,7 @@ def bulk_documents_uploader(
     accept: typing.Iterable[str] = None,
     help: str | None = None,
 ) -> list[str]:
-    gui.write(label, className="gui-input", help=help)
+    gui.write(label, className="gui-input", help=help, unsafe_allow_html=True)
     documents = gui.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
@@ -71,7 +75,7 @@ def bulk_documents_uploader(
             accept=accept,
             accept_multiple_files=True,
         )
-    gui.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
+    gui.checkbox("Show as Links", key=f"__custom_checkbox_{key}")
     documents = gui.session_state.setdefault(key, [])
     try:
         documents = list(_expand_gdrive_folders(documents))
@@ -123,8 +127,33 @@ def keyword_instructions_widget():
     )
 
 
+def cache_knowledge_widget(page: "BasePage"):
+    gui.write("###### Cache")
+    gui.caption(
+        f"""
+        By default we embed your knowledge files & links and cache their contents for fast responses. 
+        """
+    )
+    col1, col2 = gui.columns(2, style={"alignItems": "center"})
+    with col1:
+        gui.checkbox(
+            "Always Check for Updates",
+            help="With each incoming message, documents and links will be checked for changes and re-indexed. Slower but useful for dynamic webpages, Google Sheets, Docs, etc that change often.",
+            tooltip_placement="bottom",
+            key="check_document_updates",
+        )
+    with col2, gui.tooltip("Check documents for changes, re-index if needed & Run"):
+        if gui.button("♻️ Refresh Cache", type="tertiary"):
+            if gui.session_state.get("check_document_updates"):
+                unsaved_state = {}
+            else:
+                unsaved_state = dict(check_document_updates=True)
+            page.submit_and_redirect(unsaved_state=unsaved_state)
+
+
 def doc_extract_selector(current_user: AppUser | None):
     from recipes.DocExtract import DocExtractPage
+
     from daras_ai_v2.workflow_url_input import workflow_url_input
 
     gui.write("###### Create Synthetic Data")

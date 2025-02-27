@@ -14,8 +14,9 @@ from bots.models import Platform, Conversation, BotIntegration, Message, SavedRu
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
-from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed
+from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_bot_html
 from daras_ai_v2.redis_cache import get_redis_cache
+from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import (
     AsyncApiResponseModelV3,
@@ -141,6 +142,8 @@ class MessagePart(BaseModel):
         description="Details about the status of the run as a human readable string"
     )
 
+    references: list[SearchReference] | None
+
     text: str | None
     audio: str | None
     video: str | None
@@ -191,18 +194,21 @@ def stream_response(request_id: str):
 
 
 def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
-    while True:
-        if not thread.is_alive():
-            return
-        try:
-            event: StreamEvent | None = api_queue.get(timeout=30)
-        except queue.Empty:
-            continue
-        if not event:
-            return
-        if isinstance(event, StreamError):
-            yield b"event: error\n"
-        yield b"data: " + event.json(exclude_none=True).encode() + b"\n\n"
+    try:
+        while True:
+            if not thread.is_alive():
+                return
+            try:
+                event: StreamEvent | None = api_queue.get(timeout=30)
+            except queue.Empty:
+                continue
+            if not event:
+                return
+            if isinstance(event, StreamError):
+                yield b"event: error\n"
+            yield b"data: " + event.json(exclude_none=True).encode() + b"\n\n"
+    finally:
+        yield b"event: close\ndata:\n\n"
 
 
 class ApiInterface(BotInterface):
@@ -304,6 +310,10 @@ class ApiInterface(BotInterface):
             if self.run_id and self.uid:
                 sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
+                output = VideoBotsPage.ResponseModel.parse_obj(state)
+                output.output_text = [
+                    parse_bot_html(text)[1] for text in output.output_text or []
+                ]
                 self.queue.put(
                     FinalResponse(
                         run_id=self.run_id,
@@ -312,7 +322,7 @@ class ApiInterface(BotInterface):
                         run_time_sec=sr.run_time.total_seconds(),
                         status=self.page_cls.get_run_state(state),
                         detail=state.get(StateKeys.run_status) or "",
-                        output=VideoBotsPage.ResponseModel.parse_obj(state),
+                        output=output,
                     )
                 )
         except Exception as e:
@@ -326,13 +336,24 @@ class ApiInterface(BotInterface):
         self.uid = sr.uid
         self.queue.put(RunStart(**build_async_api_response(sr)))
 
-    def send_run_status(self, update_msg_id: str | None) -> str | None:
+    def send_run_status(
+        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+    ) -> str | None:
         self.queue.put(
-            MessagePart(status=self.recipe_run_state, detail=self.run_status)
+            MessagePart(
+                status=self.recipe_run_state,
+                detail=self.run_status,
+                references=(
+                    #  avoid sending the entire snippet to save bandwidth
+                    [r | dict(snippet="") for r in references]
+                    if references
+                    else None
+                ),
+            )
         )
         return None
 
-    def send_msg(
+    def _send_msg(
         self,
         *,
         text: str | None = None,
@@ -340,7 +361,6 @@ class ApiInterface(BotInterface):
         video: str = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
-        should_translate: bool = False,
         update_msg_id: str = None,
     ) -> str | None:
         response = MessagePart(

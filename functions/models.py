@@ -1,10 +1,10 @@
 import typing
 
-from django.db import models
-from pydantic import BaseModel, Field
-
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from django.db import models
+from pydantic import BaseModel, Field
+from typing_extensions import NotRequired, TypedDict
 
 
 class _TriggerData(typing.NamedTuple):
@@ -13,8 +13,8 @@ class _TriggerData(typing.NamedTuple):
 
 
 class FunctionTrigger(_TriggerData, GooeyEnum):
-    pre = _TriggerData(label="⏪ Before", db_value=1)
     prompt = _TriggerData(label="✨ Prompt", db_value=3)
+    pre = _TriggerData(label="⏪ Before", db_value=1)
     post = _TriggerData(label="⏩ After", db_value=2)
 
 
@@ -27,6 +27,15 @@ class RecipeFunction(BaseModel):
         title="Trigger",
         description="When to run this function. `pre` runs before the recipe, `post` runs after the recipe.",
     )
+
+
+JsonTypes = typing.Literal["string", "number", "boolean", "array", "object"]
+
+
+class VariableSchema(TypedDict):
+    type: NotRequired[JsonTypes]
+    role: NotRequired[typing.Literal["user", "system"]]
+    description: NotRequired[str]
 
 
 class CalledFunctionResponse(BaseModel):

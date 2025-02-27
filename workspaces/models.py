@@ -22,7 +22,6 @@ from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings, icons
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.profiles import get_profile_image
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import COMMON_EMAIL_DOMAINS
 from .tasks import send_added_to_workspace_email, send_invitation_email
@@ -113,8 +112,6 @@ class Workspace(SafeDeleteModel):
         related_name="created_workspaces",
     )
 
-    photo_url = CustomURLField(null=True, blank=True)
-    description = models.TextField(blank=True, default="")
     domain_name = models.CharField(
         max_length=30,
         blank=True,
@@ -125,6 +122,38 @@ class Workspace(SafeDeleteModel):
             validate_workspace_domain_name,
         ],
     )
+    onedrive_user_name = models.CharField(
+        blank=True,
+        default="",
+        max_length=100,
+        help_text="Onedrive Registered Account Name",
+        editable=True,
+    )
+
+    onedrive_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Onedrive OAuth2 access token",
+        editable=True,
+    )
+    onedrive_refresh_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="OneDrive OAuth2 refresh token",
+        editable=True,
+    )
+
+    # profile
+    handle = models.OneToOneField(
+        "handles.Handle",
+        on_delete=models.SET_NULL,
+        related_name="workspace",
+        null=True,
+        blank=True,
+    )
+    photo_url = CustomURLField(null=True, blank=True)
+    banner_url = CustomURLField(null=True, blank=True)
+    description = models.TextField(blank=True, default="")
 
     # billing
     balance = models.IntegerField("bal", default=0)
@@ -201,6 +230,15 @@ class Workspace(SafeDeleteModel):
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
             workspace_memberships__role=WorkspaceRole.OWNER,
+            workspace_memberships__deleted__isnull=True,
+        )
+
+    def get_admins(self) -> models.QuerySet[AppUser]:
+        from app_users.models import AppUser
+
+        return AppUser.objects.filter(
+            workspace_memberships__workspace=self,
+            workspace_memberships__role=WorkspaceRole.ADMIN,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -377,11 +415,43 @@ class Workspace(SafeDeleteModel):
         else:
             return icons.company
 
-    def get_photo(self) -> str | None:
+    def get_photo(self) -> str:
         if self.is_personal:
-            return self.created_by and get_profile_image(self.created_by)
+            return self.created_by.get_photo()
         else:
             return self.photo_url or DEFAULT_WORKSPACE_PHOTO_URL
+
+    def get_banner_url(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.banner_url
+        else:
+            return self.banner_url
+
+    def get_description(self) -> str | None:
+        if self.is_personal:
+            return self.created_by.bio
+        else:
+            return self.description
+
+    def add_domain_members(self):
+        from app_users.models import AppUser
+
+        if not self.domain_name:
+            return
+        current_user = self.get_owners().first()
+        if not current_user:
+            return
+        for user_email in (
+            AppUser.objects.filter(email__iendswith=self.domain_name)
+            .exclude(workspace_memberships__workspace=self)
+            .values_list("email", flat=True)
+        )[:50]:
+            WorkspaceInvite.objects.create_and_send_invite(
+                workspace=self,
+                email=user_email,
+                current_user=current_user,
+                defaults=dict(role=WorkspaceRole.MEMBER),
+            )
 
 
 class WorkspaceMembership(SafeDeleteModel):
@@ -549,6 +619,8 @@ class WorkspaceInvite(models.Model):
         choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
 
+    clicks = models.IntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -628,13 +700,15 @@ class WorkspaceInvite(models.Model):
         self,
         invitee: AppUser,
         *,
-        updated_by: AppUser | None,
+        updated_by: AppUser | None = None,
         auto_accepted: bool = False,
     ) -> tuple[WorkspaceMembership, bool]:
         """
         Raises: ValidationError
         """
-        assert invitee.email == self.email, "Email mismatch"
+        assert (
+            invitee.email and invitee.email.lower() == self.email.lower()
+        ), "Email mismatch"
 
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
@@ -660,7 +734,7 @@ class WorkspaceInvite(models.Model):
         self.auto_accepted = auto_accepted
 
         self.full_clean()
-        self.save()
+        self.save(update_fields=["status", "updated_by", "auto_accepted", "updated_at"])
 
         return membership, created
 

@@ -4,7 +4,7 @@ import gooey_gui as gui
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
-from bots.models import Workflow
+from bots.models import Workflow, SavedRun, PublishedRun
 from daras_ai_v2.asr import (
     language_filter_selector,
     asr_language_selector,
@@ -92,6 +92,19 @@ class AsrPage(BasePage):
             "translation_model",
             "translation_target",
         ]
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+        import langcodes
+
+        try:
+            lang = langcodes.Language.get(sr.state["language"] or "").display_name()
+        except (KeyError, langcodes.LanguageTagError):
+            lang = None
+        model = AsrModels.get(sr.state.get("selected_model"))
+        lang_or_model = lang or (model and model.value)
+
+        return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG

@@ -5,16 +5,100 @@ category = ModelCategory.LLM
 
 
 def run():
+    # o3-mini
+
+    llm_pricing_create(
+        model_id="openai-o3-mini-prod-eastus2-1",
+        model_name=LargeLanguageModels.o3_mini.name,
+        unit_cost_input=1.10,
+        unit_cost_output=4.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.azure_openai,
+        pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+    )
+    llm_pricing_create(
+        model_id="o3-mini-2025-01-31",
+        model_name=LargeLanguageModels.o3_mini.name,
+        unit_cost_input=1.10,
+        unit_cost_output=4.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1
+
+    llm_pricing_create(
+        model_id="openai-o1-prod-eastus2-1",
+        model_name=LargeLanguageModels.o1.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.azure_openai,
+        pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+    )
+    llm_pricing_create(
+        model_id="o1-2024-12-17",
+        model_name=LargeLanguageModels.o1.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1-preview
+
+    llm_pricing_create(
+        model_id="o1-preview-2024-09-12",
+        model_name=LargeLanguageModels.o1_preview.name,
+        unit_cost_input=15,
+        unit_cost_output=60,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o1-mini
+
+    llm_pricing_create(
+        model_id="openai-o1-mini-prod-eastus2-1",
+        model_name=LargeLanguageModels.o1_mini.name,
+        unit_cost_input=3,
+        unit_cost_output=12,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+    llm_pricing_create(
+        model_id="o1-mini-2024-09-12",
+        model_name=LargeLanguageModels.o1_mini.name,
+        unit_cost_input=3,
+        unit_cost_output=12,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
     # GPT-4o-mini
 
     llm_pricing_create(
-        model_id="gpt-4o-mini",
+        model_id="openai-gpt-4o-mini-prod-eastus2-1",
         model_name=LargeLanguageModels.gpt_4_o_mini.name,
         unit_cost_input=0.150,
         unit_cost_output=0.600,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-mini-2024-07-18",
+        model_name=LargeLanguageModels.gpt_4_o_mini.name,
+        unit_cost_input=0.150,
+        unit_cost_output=0.600,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
     )
 
     # GPT-4o
@@ -26,26 +110,9 @@ def run():
         unit_cost_output=15,
         unit_quantity=10**6,
         provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
+        pricing_url="https://openai.com/api/pricing",
     )
-    llm_pricing_create(
-        model_id="gpt-4o-2024-08-06",
-        model_name=LargeLanguageModels.gpt_4_o.name,
-        unit_cost_input=2.5,
-        unit_cost_output=10,
-        unit_quantity=10**6,
-        provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
-    )
-    llm_pricing_create(
-        model_id="gpt-4o",
-        model_name=LargeLanguageModels.gpt_4_o.name,
-        unit_cost_input=5,
-        unit_cost_output=15,
-        unit_quantity=10**6,
-        provider=ModelProvider.openai,
-        pricing_url="https://openai.com/pricing",
-    )
+
     llm_pricing_create(
         model_id="openai-gpt-4o-prod-eastus2-1",
         model_name=LargeLanguageModels.gpt_4_o.name,
@@ -54,6 +121,15 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.azure_openai,
         pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-2024-08-06",
+        model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=2.5,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
     )
 
     # GPT-4-Turbo
@@ -68,7 +144,7 @@ def run():
                 unit_quantity=1000,
                 category=category,
                 provider=ModelProvider.openai,
-                pricing_url="https://openai.com/pricing",
+                pricing_url="https://openai.com/api/pricing",
             ),
         )
         ModelPricing.objects.get_or_create(
@@ -80,7 +156,7 @@ def run():
                 unit_quantity=1000,
                 category=category,
                 provider=ModelProvider.openai,
-                pricing_url="https://openai.com/pricing",
+                pricing_url="https://openai.com/api/pricing",
             ),
         )
 
@@ -120,7 +196,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -132,7 +208,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -147,7 +223,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -159,7 +235,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -174,7 +250,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -186,7 +262,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -226,7 +302,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -238,7 +314,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -278,7 +354,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -290,7 +366,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -305,7 +381,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -317,7 +393,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -332,7 +408,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -344,7 +420,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -384,7 +460,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
     ModelPricing.objects.get_or_create(
@@ -396,7 +472,7 @@ def run():
             unit_quantity=1000,
             category=category,
             provider=ModelProvider.openai,
-            pricing_url="https://openai.com/pricing",
+            pricing_url="https://openai.com/api/pricing",
         ),
     )
 
@@ -427,6 +503,15 @@ def run():
 
     # Gemini
 
+    llm_pricing_create(
+        model_id="gemini-2.0-flash-001",
+        model_name=LargeLanguageModels.gemini_2_flash.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/pricing",
+    )
     llm_pricing_create(
         model_id="gemini-1.5-flash",
         model_name=LargeLanguageModels.gemini_1_5_flash.name,
@@ -550,6 +635,15 @@ def run():
 
     # groq
 
+    llm_pricing_create(
+        model_id="llama-3.3-70b-versatile",
+        model_name=LargeLanguageModels.llama3_2_90b_vision.name,
+        unit_cost_input=0.59,
+        unit_cost_output=0.79,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://groq.com/pricing/",
+    )
     llm_pricing_create(
         model_id="llama-3.2-90b-vision-preview",
         model_name=LargeLanguageModels.llama3_2_90b_vision.name,
@@ -683,7 +777,16 @@ def run():
     # Claude
 
     llm_pricing_create(
-        model_id="claude-3-5-sonnet-20240620",
+        model_id="claude-3-7-sonnet-20250219",
+        model_name=LargeLanguageModels.claude_3_7_sonnet.name,
+        unit_cost_input=3,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+    )
+    llm_pricing_create(
+        model_id="claude-3-5-sonnet-20241022",
         model_name=LargeLanguageModels.claude_3_5_sonnet.name,
         unit_cost_input=3,
         unit_cost_output=15,
@@ -769,6 +872,68 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.aks,
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
+    )
+
+    # fireworks
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-r1",
+        model_name=LargeLanguageModels.deepseek_r1.name,
+        unit_cost_input=3,
+        unit_cost_output=8,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.90,
+        unit_cost_output=0.90,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
+        model_name=LargeLanguageModels.llama3_1_405b.name,
+        unit_cost_input=3,
+        unit_cost_output=3,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    # mistral
+
+    llm_pricing_create(
+        model_id="pixtral-large-2411",
+        model_name=LargeLanguageModels.pixtral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-large-2411",
+        model_name=LargeLanguageModels.mistral_large.name,
+        unit_cost_input=2,
+        unit_cost_output=6,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
+    )
+    llm_pricing_create(
+        model_id="mistral-small-2501",
+        model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.3,
+        unit_quantity=10**6,
+        provider=ModelProvider.mistral,
+        pricing_url="https://mistral.ai/en/products/la-plateforme#pricing",
     )
 
 

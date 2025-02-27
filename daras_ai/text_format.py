@@ -1,7 +1,11 @@
 import ast
 
+import markdown_it
+import markdown_it.presets
 import parse
 
+from daras_ai_v2.tts_markdown_renderer import RendererPlain
+from daras_ai_v2.wa_markdown_renderer import RendererWhatsApp
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
 
@@ -39,4 +43,29 @@ def format_number_with_suffix(num: int) -> str:
     return "{}{}".format(
         "{:f}".format(num_float).rstrip("0").rstrip("."),
         ["", "K", "M", "B", "T"][magnitude],
+    )
+
+
+def unmarkdown(text: str) -> str:
+    """markdown to plaintext"""
+    return markdown_it.MarkdownIt(renderer_cls=RendererPlain).render(text)
+
+
+def markdown_to_wa(text: str) -> tuple[str, list[str]]:
+    """markdown to whatsapp"""
+    md = markdown_it.MarkdownIt(renderer_cls=RendererWhatsApp)
+
+    def _render_line(line: str) -> str:
+        if not line:
+            return "\n"
+        content = line.lstrip()
+        whitespace = line[: -len(content)]
+        ret = md.render(content)
+        if not ret:
+            return whitespace
+        return whitespace + ret + "\n"
+
+    return (
+        "".join(map(_render_line, text.split("\n"))),
+        md.renderer.collected_img_urls,
     )

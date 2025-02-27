@@ -1,8 +1,9 @@
 from django.contrib import admin
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from safedelete.admin import SafeDeleteAdmin, SafeDeleteAdminFilter
 
 from bots.admin_links import change_obj_url, open_in_new_tab
+from payments.models import Subscription
 from usage_costs.models import UsageCost
 from . import models
 
@@ -22,13 +23,20 @@ class WorkspaceInviteAdmin(admin.ModelAdmin):
         "email",
         "status",
         "has_expired",
+        "clicks",
         "created_by",
         "updated_by",
         "created_at",
         "updated_at",
     ]
     list_filter = ["created_at", "status"]
-    readonly_fields = ["auto_accepted", "has_expired", "created_at", "updated_at"]
+    readonly_fields = [
+        "clicks",
+        "auto_accepted",
+        "has_expired",
+        "created_at",
+        "updated_at",
+    ]
     autocomplete_fields = ["workspace", "created_by", "updated_by"]
 
 
@@ -36,7 +44,7 @@ class WorkspaceInviteInline(admin.TabularInline):
     model = models.WorkspaceInvite
     extra = 0
     autocomplete_fields = WorkspaceInviteAdmin.autocomplete_fields
-    readonly_fields = ["auto_accepted", "created_at", "updated_at"]
+    readonly_fields = ["auto_accepted", "clicks", "created_at", "updated_at"]
     ordering = ["status", "-created_at"]
 
 
@@ -46,12 +54,16 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "display_name",
         "is_personal",
         "created_by",
+        "handle",
         "is_paying",
         "balance",
         "subscription",
         "domain_name",
         "created_at",
         "updated_at",
+        "onedrive_user_name",
+        "onedrive_access_token",
+        "onedrive_refresh_token",
     ] + list(SafeDeleteAdmin.list_display)
     list_filter = (
         [
@@ -65,6 +77,7 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "name",
         "description",
         "domain_name",
+        "handle",
         "created_by",
         "is_personal",
         ("is_paying", "stripe_customer_id"),
@@ -72,8 +85,19 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         ("total_payments", "total_charged", "total_usage_cost"),
         ("created_at", "updated_at"),
         "open_in_stripe",
+        "onedrive_user_name",
+        "onedrive_access_token",
+        "onedrive_refresh_token",
     ]
-    search_fields = ["name", "created_by__display_name", "domain_name"]
+    search_fields = [
+        "name",
+        "domain_name",
+        "created_by__uid",
+        "created_by__display_name",
+        "created_by__email",
+        "created_by__phone_number",
+        "handle__name",
+    ]
     readonly_fields = [
         "is_personal",
         "created_at",
@@ -85,7 +109,19 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     ]
     inlines = [WorkspaceMembershipInline, WorkspaceInviteInline]
     ordering = ["-created_at"]
-    autocomplete_fields = ["created_by", "subscription"]
+    autocomplete_fields = ["created_by", "handle"]
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        self.obj = obj
+        return super().get_form(request, obj, change, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "subscription" and self.obj:
+            kwargs["queryset"] = Subscription.objects.filter(
+                Q(workspace=self.obj) | Q(workspace__isnull=True)
+            )[:10]
+        return field
 
     @admin.display(description="Name")
     def display_name(self, workspace: models.Workspace):

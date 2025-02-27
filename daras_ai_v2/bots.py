@@ -3,6 +3,7 @@ import typing
 from datetime import datetime
 
 import gooey_gui as gui
+import requests
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -21,15 +22,18 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
-
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -69,6 +73,9 @@ class ButtonPressed(BaseModel):
     )
     context_msg_id: str = Field(
         description="The message ID of the context message on which the button was pressed"
+    )
+    button_title: str | None = Field(
+        description="The title of the button that was pressed by the user"
     )
 
 
@@ -143,7 +150,7 @@ class BotInterface:
         text: str | None = None,
         audio: str = None,
         video: str = None,
-        buttons: list[ReplyButton] = None,
+        send_feedback_buttons: bool = False,
         documents: list[str] = None,
         update_msg_id: str = None,
         should_translate: bool = False,
@@ -154,7 +161,7 @@ class BotInterface:
         :param text: The text to send
         :param audio: The audio URL to send
         :param video: The video URL to send
-        :param buttons: The interactive reply buttons to send
+        :param send_feedback_buttons: Whether to send feedback buttons with the message
         :param documents: The document URLs to send
         :param update_msg_id: The message ID of the message to update in-place
         :param should_translate: The messages from the saved run itself should automatically be translated,
@@ -163,6 +170,23 @@ class BotInterface:
         """
         if should_translate:
             text = self.translate_response(text)
+
+        buttons, text = parse_bot_html(text)
+
+        if buttons and send_feedback_buttons:
+            self._send_msg(
+                text=text,
+                audio=audio,
+                video=video,
+                buttons=buttons,
+                documents=documents,
+                update_msg_id=update_msg_id,
+            )
+            text = ""
+
+        if send_feedback_buttons:
+            buttons = _feedback_start_buttons()
+
         return self._send_msg(
             text=text,
             audio=audio,
@@ -202,10 +226,15 @@ class BotInterface:
     def get_interactive_msg_info(self) -> ButtonPressed:
         raise NotImplementedError("This bot does not support interactive messages.")
 
+    def get_location_info(self) -> dict:
+        raise NotImplementedError("This bot does not support location messages.")
+
     def on_run_created(self, sr: "SavedRun"):
         pass
 
-    def send_run_status(self, update_msg_id: str | None) -> str | None:
+    def send_run_status(
+        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+    ) -> str | None:
         pass
 
     def nice_filename(self, mime_type: str) -> str:
@@ -219,6 +248,32 @@ class BotInterface:
             )[0]
         else:
             return text or ""
+
+
+def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
+    from pyquery import PyQuery as pq
+
+    if not text:
+        return [], text
+    doc = pq(f"<root>{text}</root>")
+    buttons = [
+        ReplyButton(
+            # parsed by _handle_interactive_msg
+            id=csv_encode_row(
+                idx + 1,
+                btn.attrib.get("gui-target") or "input_prompt",
+                btn.attrib.get("gui-action"),
+                # title must be the last item because it might get truncated
+                btn.text or "",
+            ),
+            title=btn.text or "",
+        )
+        for idx, btn in enumerate(doc("button") or [])
+    ]
+    text = "\n\n".join(
+        s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
+    )
+    return buttons, text
 
 
 def _echo(bot, input_text):
@@ -239,7 +294,7 @@ def msg_handler(bot: BotInterface):
     try:
         _msg_handler(bot)
     except Exception as e:
-        # send error msg as repsonse
+        # send error msg as response
         bot.send_msg(text=ERROR_MSG.format(e))
         raise
 
@@ -260,10 +315,10 @@ def _msg_handler(bot: BotInterface):
     input_images = None
     input_documents = None
     match bot.input_type:
-        # handle button press
+        # handled button press
         case "interactive":
-            _handle_interactive_msg(bot)
-            return
+            if _handle_interactive_msg(bot):
+                return
         case "image":
             input_images = bot.get_input_images()
             if not input_images:
@@ -285,6 +340,12 @@ def _msg_handler(bot: BotInterface):
             if not input_audio:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
+        case "location":
+            input_location = bot.get_location_info()
+            if not input_location:
+                bot.send_msg(text=DEFAULT_RESPONSE)
+                return
+            input_text = _handle_location_msg(input_text, input_location)
         case "text":
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
@@ -329,7 +390,7 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
         run_google_translate([input_text], "en", glossary_url=bot.input_glossary)
     )
     last_feedback.save()
-    # send back a confimation msg
+    # send back a confirmation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
     bot_name = str(bot.bi.name)
     # reset convo state
@@ -356,9 +417,10 @@ def _process_and_send_msg(
     # get latest messages for context
     saved_msgs = bot.convo.msgs_for_llm_context()
 
-    variables = (bot.saved_run.state.get("variables") or {}) | build_run_vars(
-        bot.convo, bot.user_msg_id
-    )
+    system_vars, system_vars_schema = build_system_vars(bot.convo, bot.user_msg_id)
+    state = bot.saved_run.state
+    variables = (state.get("variables") or {}) | system_vars
+    variables_schema = (state.get("variables_schema") or {}) | system_vars_schema
     body = dict(
         input_prompt=input_text,
         input_audio=input_audio,
@@ -366,11 +428,12 @@ def _process_and_send_msg(
         input_documents=input_documents,
         messages=saved_msgs,
         variables=variables,
+        variables_schema=variables_schema,
     )
     if bot.user_language:
         body["user_language"] = bot.user_language
     if bot.request_overrides:
-        body = bot.request_overrides | body
+        body.update(bot.request_overrides)
         try:
             variables.update(bot.request_overrides["variables"])
         except KeyError:
@@ -384,10 +447,7 @@ def _process_and_send_msg(
     )
     bot.on_run_created(sr)
 
-    if bot.show_feedback_buttons:
-        buttons = _feedback_start_buttons()
-    else:
-        buttons = None
+    send_feedback_buttons = bot.show_feedback_buttons
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -409,7 +469,9 @@ def _process_and_send_msg(
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
                     # if no text, send the run status as text
-                    update_msg_id = bot.send_run_status(update_msg_id=update_msg_id)
+                    update_msg_id = bot.send_run_status(
+                        update_msg_id=update_msg_id, references=state.get("references")
+                    )
                     continue  # no text, wait for the next update
                 streaming_done = state.get("finish_reason")
                 # send the response to the user
@@ -417,7 +479,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                     last_idx = len(text)
                 else:
@@ -427,13 +489,13 @@ def _process_and_send_msg(
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
-                        buttons=buttons if streaming_done else None,
+                        send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
                     sent_msg_id = update_msg_id
                     # don't show buttons again
-                    buttons = None
+                    send_feedback_buttons = False
                 if streaming_done:
                     break  # we're done streaming, stop the loop
 
@@ -454,20 +516,20 @@ def _process_and_send_msg(
     video = state.get("output_video") and state.get("output_video")[0]
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or buttons):
+    if not (text or audio or video or documents or send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or buttons:
+    if text or audio or video or documents or send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
-            buttons=buttons,
+            send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
 
@@ -484,7 +546,7 @@ def _process_and_send_msg(
     )
 
 
-def build_run_vars(convo: Conversation, user_msg_id: str):
+def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict]:
     from routers.bots_api import MSG_ID_PREFIX
 
     bi = convo.bot_integration
@@ -524,7 +586,8 @@ def build_run_vars(convo: Conversation, user_msg_id: str):
             variables["bot_twilio_phone_number"] = (
                 bi.twilio_phone_number and bi.twilio_phone_number.as_international
             )
-    return variables
+    variables_schema = {var: {"role": "system"} for var in variables}
+    return variables, variables_schema
 
 
 def _save_msgs(
@@ -597,6 +660,7 @@ def _handle_interactive_msg(bot: BotInterface):
                 # buttons=_feedback_post_click_buttons(),
                 should_translate=True,
             )
+            return True
 
         # handle skip
         case ButtonIds.action_skip:
@@ -604,19 +668,48 @@ def _handle_interactive_msg(bot: BotInterface):
             # reset state
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
-            return
+            return True
 
         # not sure what button was pressed, ignore
         case _:
-            bot_name = str(bot.bi.name)
-            bot.send_msg(
-                text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
-                should_translate=True,
+            import glom
+
+            # encoded by parse_html
+            target, title = None, None
+            parts = csv_decode_row(button.button_id)
+            if len(parts) >= 3:
+                target = parts[1]
+                title = parts[-1]
+            bot.request_overrides = bot.request_overrides or {}
+            glom.assign(
+                bot.request_overrides,
+                target or "input_prompt",
+                title or button.button_title,
             )
-            # reset state
-            bot.convo.state = ConvoState.INITIAL
-            bot.convo.save()
-            return
+            return False
+
+
+def _handle_location_msg(input_text: str, input_location: dict[str, float]) -> str:
+
+    r = requests.post(
+        url=f"https://maps.googleapis.com/maps/api/geocode/json",
+        params={
+            "latlng": f"{input_location['latitude']},{input_location['longitude']}",
+            "key": settings.GOOGLE_GEOCODING_API_KEY,
+        },
+    )
+    raise_for_status(r)
+    data = r.json()
+
+    input_text = f"My present location is: {input_location}\n"
+    try:
+        formatted_address = [result["formatted_address"] for result in data["results"]]
+    except (KeyError, IndexError, TypeError):
+        input_text += "Geocoding Response could not be retrieved"
+    else:
+        input_text += f"Geocoding Response: {formatted_address}"
+
+    return input_text
 
 
 class ButtonIds:

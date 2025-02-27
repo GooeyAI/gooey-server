@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -6,6 +8,7 @@ import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, IntegerChoices, QuerySet
 from django.utils import timezone
@@ -17,7 +20,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2 import icons, urls
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_route_path, get_api_route_url
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -40,14 +43,20 @@ class PublishedRunVisibility(models.IntegerChoices):
     INTERNAL = 3
 
     @classmethod
-    def choices_for_workspace(
-        cls, workspace: typing.Optional["Workspace"]
-    ) -> typing.Iterable["PublishedRunVisibility"]:
-        if not workspace or workspace.is_personal:
-            return [cls.UNLISTED, cls.PUBLIC]
+    def choices_for_pr(
+        cls, pr: PublishedRun
+    ) -> typing.Iterable[PublishedRunVisibility]:
+        if not pr.workspace or pr.workspace.is_personal:
+            return {cls.UNLISTED, cls.PUBLIC, PublishedRunVisibility(pr.visibility)}
         else:
-            # TODO: Add cls.PUBLIC when team-handles are added
-            return [cls.UNLISTED, cls.INTERNAL]
+            return [cls.UNLISTED, cls.INTERNAL, cls.PUBLIC]
+
+    @classmethod
+    def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
+        if not workspace or workspace.is_personal:
+            return cls.UNLISTED
+        else:
+            return cls.INTERNAL
 
     def help_text(self, workspace: typing.Optional["Workspace"] = None):
         from routers.account import profile_route, saved_route
@@ -55,17 +64,15 @@ class PublishedRunVisibility(models.IntegerChoices):
         match self:
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Only me + people with a link"
-            case PublishedRunVisibility.PUBLIC if workspace and workspace.is_personal:
-                user = workspace.created_by
-                if user.handle:
-                    profile_url = user.handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{pretty_profile_url}" target="_blank">{profile_url}</a>'
-                else:
-                    edit_profile_url = get_route_path(profile_route)
-                    return f'{self.get_icon()} Public on <a href="{edit_profile_url}" target="_blank">my profile page</a>'
             case PublishedRunVisibility.PUBLIC:
-                return f"{self.get_icon()} Public"
+                if workspace and workspace.handle:
+                    profile_url = workspace.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a> (view only)'
+                elif workspace and workspace.is_personal:
+                    return f'{self.get_icon()} Public on <a href="{get_route_path(profile_route)}" target="_blank">my profile page</a>'
+                else:
+                    return f"{self.get_icon()} Public"
             case PublishedRunVisibility.INTERNAL if workspace:
                 saved_route_url = get_route_path(saved_route)
                 return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
@@ -403,7 +410,7 @@ class SavedRun(models.Model):
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
-        parent_pr: "PublishedRun" = None,
+        parent_pr: typing.Optional["PublishedRun"] = None,
         current_user: AppUser | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
@@ -827,6 +834,10 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+        if settings.DEBUG:
+            from routers.bots_api import stream_create
+
+            config["apiUrl"] = get_api_route_url(stream_create)
         return config
 
     def translate(self, text: str) -> str:
@@ -909,6 +920,65 @@ class BotIntegrationAnalysisRun(models.Model):
             return self.published_run.saved_run
         elif self.saved_run:
             return self.saved_run
+        else:
+            raise ValueError("No saved run found")
+
+
+class BotIntegrationScheduledRun(models.Model):
+    bot_integration = models.ForeignKey(
+        "BotIntegration",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+    )
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
+        on_delete=models.CASCADE,
+        related_name="scheduled_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
+    last_run_at = models.DateTimeField(null=True, blank=True, default=None)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            # ensure only one of saved_run or published_run is set
+            models.CheckConstraint(
+                check=models.Q(saved_run__isnull=False)
+                ^ models.Q(published_run__isnull=False),
+                name="bi_scheduled_runs_saved_run_xor_published_run",
+            )
+        ]
+
+    def clean(self):
+        if (self.published_run or self.saved_run).workflow != Workflow.FUNCTIONS:
+            raise ValidationError("Expected a Functions workflow")
+        return super().clean()
+
+    def get_app_url(self) -> str:
+        if self.published_run:
+            return self.published_run.get_app_url()
+        elif self.saved_run:
+            return self.saved_run.get_app_url()
+        else:
+            raise ValueError("No saved run found")
+
+    def get_runs(self) -> tuple[SavedRun, PublishedRun | None]:
+        if self.published_run:
+            return self.published_run.saved_run, self.published_run
+        elif self.saved_run:
+            return self.saved_run, None
         else:
             raise ValueError("No saved run found")
 
@@ -1296,9 +1366,8 @@ class MessageQuerySet(models.QuerySet):
                     else ""
                 ),
                 "Photo Input": ", ".join(
-                    message.attachments.filter(
-                        metadata__mime_type__startswith="image/"
-                    ).values_list("url", flat=True)
+                    (message.saved_run and message.saved_run.state.get("input_images"))
+                    or []
                 ),
                 "Audio Input": (
                     (message.saved_run and message.saved_run.state.get("input_audio"))
@@ -1674,7 +1743,7 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1701,13 +1770,16 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         workspace_id = (
             workspace
             and workspace.id
             or PublishedRun._meta.get_field("workspace").get_default()
         )
+        if not visibility:
+            visibility = PublishedRunVisibility.get_default_for_workspace(workspace)
+
         with transaction.atomic():
             pr = self.create(
                 workflow=workflow,
@@ -1840,7 +1912,7 @@ class PublishedRun(models.Model):
         workspace: "Workspace",
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ) -> "PublishedRun":
         return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
@@ -1863,13 +1935,14 @@ class PublishedRun(models.Model):
         *,
         user: AppUser | None,
         saved_run: SavedRun,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
         title: str = "",
         notes: str = "",
         change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
+        visibility = visibility or self.visibility
         with transaction.atomic():
             version = PublishedRunVersion(
                 published_run=self,

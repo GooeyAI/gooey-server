@@ -32,28 +32,27 @@ class TitleBreadCrumbs(typing.NamedTuple):
 
 
 def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = False):
-    gui.html(
-        """
-        <style>
-        @media (min-width: 1024px) {
-            .fs-lg-5 {
-                font-size: 1.25rem !important;
-            }
-        }
-        </style>
-        """
-    )
-
     if not (breadcrumbs.root_title or breadcrumbs.published_title):
         # avoid empty space when breadcrumbs are not rendered
         return
 
-    with gui.breadcrumbs():
+    with (
+        gui.styled(
+            """
+            @media (min-width: 1024px) {
+                & a {
+                    font-size: 1.25rem !important;
+                }
+            }
+            """
+        ),
+        gui.breadcrumbs(),
+    ):
         if breadcrumbs.root_title:
             gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
                 link_to=breadcrumbs.root_title.url,
-                className="text-muted fs-lg-5",
+                className="text-muted",
             )
         if breadcrumbs.published_title:
             gui.breadcrumb_item(
@@ -78,12 +77,6 @@ def get_title_breadcrumbs(
     is_example = not is_root and pr and pr.saved_run == sr
     is_run = not is_root and not is_example
 
-    recipe_title = page_cls.get_recipe_title()
-    prompt_title = truncate_text_words(
-        page_cls.preview_input(sr.to_dict()) or "",
-        maxlen=60,
-    ).replace("\n", " ")
-
     metadata = page_cls.workflow.get_or_create_metadata()
     root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
@@ -106,7 +99,9 @@ def get_title_breadcrumbs(
         case _ if is_example:
             assert pr is not None
             return TitleBreadCrumbs(
-                pr.title or prompt_title or recipe_title,
+                pr.title
+                or page_cls.get_prompt_title(sr)
+                or page_cls.get_run_title(sr, pr),
                 root_title=root_breadcrumb,
                 published_title=None,
             )
@@ -119,7 +114,8 @@ def get_title_breadcrumbs(
             else:
                 published_title = None
             return TitleBreadCrumbs(
-                prompt_title or f"Run: {recipe_title}",
+                page_cls.get_prompt_title(sr)
+                or f"Run: {page_cls.get_run_title(sr, pr)}",
                 root_title=root_breadcrumb,
                 published_title=published_title,
             )

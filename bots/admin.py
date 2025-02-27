@@ -14,6 +14,7 @@ from django.utils.timesince import timesince
 from app_users.models import AppUser
 from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
 from bots.models import (
+    BotIntegrationScheduledRun,
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
     SavedRun,
@@ -119,10 +120,17 @@ def create_personal_channels(modeladmin, request, queryset):
     )
 
 
-class BotIntegrationQuerySetInline(admin.TabularInline):
+class BotIntegrationAnalysisRunInline(admin.TabularInline):
     model = BotIntegrationAnalysisRun
     autocomplete_fields = ["saved_run", "published_run"]
     readonly_fields = ["last_run_at"]
+    extra = 0
+
+
+class BotIntegrationScheduledFunctionInline(admin.TabularInline):
+    model = BotIntegrationScheduledRun
+    autocomplete_fields = ["saved_run", "published_run"]
+    readonly_fields = ["created_at"]
     extra = 0
 
 
@@ -172,7 +180,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
-    inlines = [BotIntegrationQuerySetInline]
+    inlines = [BotIntegrationAnalysisRunInline, BotIntegrationScheduledFunctionInline]
 
     readonly_fields = [
         "fb_page_access_token",

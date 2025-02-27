@@ -27,6 +27,7 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
     LoraWeight,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/039110ba-1f72-11ef-8d23-02420a00015d/Compare%20image%20generators.jpg"
 
@@ -190,6 +191,8 @@ class CompareText2ImgPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        request.text_prompt = render_prompt_vars(request.text_prompt, gui.session_state)
 
         if not self.request.user.disable_safety_checker:
             yield "Running safety checker..."

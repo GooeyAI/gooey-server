@@ -120,7 +120,7 @@ def gfpgan(img: str, scale: int = 1) -> bytes:
     elif scale != 2:
         scale *= 2
 
-    # https://replicate.com/nightmareai/real-esrgan/versions/42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b#output-schema
+    # https://replicate.com/tencentarc/gfpgan/versions/9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3
     model = replicate.models.get(UpscalerModels.gfpgan.model_id)
     version = model.versions.get(
         "9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3"

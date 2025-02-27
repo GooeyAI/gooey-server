@@ -5,7 +5,7 @@ import typing
 from itertools import zip_longest
 
 import gooey_gui as gui
-from django.db.models import QuerySet, Q
+from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -14,24 +14,25 @@ from bots.models import (
     Platform,
     PublishedRun,
     PublishedRunVisibility,
+    Workflow,
+    SavedRun,
 )
-from bots.models import Workflow
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
-    language_filter_selector,
-    translation_model_selector,
-    translation_language_selector,
-    run_translate,
-    TranslationModels,
     AsrModels,
+    TranslationModels,
     asr_language_selector,
-    run_asr,
-    should_translate_lang,
     asr_model_selector,
+    language_filter_selector,
+    run_asr,
+    run_translate,
+    should_translate_lang,
+    translation_language_selector,
+    translation_model_selector,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -40,72 +41,78 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
+    broadcast_input,
     general_integration_settings,
+    get_bot_test_link,
+    integrations_welcome_screen,
     slack_specific_settings,
     twilio_specific_settings,
-    broadcast_input,
-    get_bot_test_link,
     web_widget_config,
-    integrations_welcome_screen,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    query_instructions_widget,
-    keyword_instructions_widget,
-    doc_search_advanced_settings,
-    doc_extract_selector,
     bulk_documents_uploader,
     citation_style_selector,
+    doc_extract_selector,
+    doc_search_advanced_settings,
+    keyword_instructions_widget,
+    query_instructions_widget,
+    cache_knowledge_widget,
     SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
+from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
+from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
-    run_language_model,
-    calc_gpt_tokens,
+    CHATML_ROLE_ASSISTANT,
+    CHATML_ROLE_SYSTEM,
+    CHATML_ROLE_USER,
+    SUPERSCRIPT,
     ConversationEntry,
     LargeLanguageModels,
-    CHATML_ROLE_ASSISTANT,
-    CHATML_ROLE_USER,
-    CHATML_ROLE_SYSTEM,
+    calc_gpt_tokens,
+    format_chat_entry,
     get_entry_images,
     get_entry_text,
-    format_chat_entry,
-    SUPERSCRIPT,
+    run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
-    language_model_settings,
     LanguageModelSettings,
     language_model_selector,
+    language_model_settings,
 )
-from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
+from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
-    parse_refs,
     CitationStyles,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
+    parse_refs,
 )
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
-    text_to_speech_settings,
+    elevenlabs_load_state,
     text_to_speech_provider_selector,
-    elevenlabs_init_state,
+    text_to_speech_settings,
 )
-from daras_ai_v2.vector_search import DocSearchRequest
+from daras_ai_v2.variables_widget import render_prompt_vars
+from daras_ai_v2.vector_search import (
+    DocSearchRequest,
+    doc_url_to_text_pages,
+    doc_or_yt_url_to_file_metas,
+)
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     LLMTool,
+    get_tools_from_state,
     render_called_functions,
-    call_recipe_functions,
 )
 from recipes.DocSearch import (
     get_top_k_references,
@@ -218,6 +225,7 @@ class VideoBotsPage(BasePage):
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
+        check_document_updates: bool | None
 
         asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
             title="Speech-to-Text Provider",
@@ -299,10 +307,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
-        from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
         from recipes.DocSearch import DocSearchPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
 
         return [
             LipsyncTTSPage,
@@ -310,6 +318,24 @@ Translation Glossary for LLM Language (English) -> User Langauge
             DeforumSDPage,
             CompareText2ImgPage,
         ]
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+        import langcodes
+
+        try:
+            lang = langcodes.Language.get(
+                sr.state.get("user_language") or sr.state.get("asr_language") or ""
+            ).display_name()
+        except (KeyError, langcodes.LanguageTagError):
+            lang = None
+        title = super().get_run_title(sr, pr)
+        return " ".join(filter(None, [lang, title]))
+
+    @classmethod
+    def get_prompt_title(cls, state: dict) -> str | None:
+        # don't show the input prompt in the run titles, instead show get_run_title()
+        return None
 
     def preview_description(self, state: dict) -> str:
         return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."
@@ -341,17 +367,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         gui.text_area(
             """
-            #### 📝 Instructions
+            #### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions
             """,
             key="bot_script",
             height=300,
             help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
         )
 
-        language_model_selector(label="#### 🧠 Language Model")
+        language_model_selector(
+            label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
+        )
 
         bulk_documents_uploader(
-            "#### 📄 Knowledge",
+            """ 
+            #### <i class="fa-light fa-books" style="fontSize:20px"></i> Knowledge
+            """,
             accept=["audio/*", "application/*", "video/*", "text/*"],
             help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
         )
@@ -582,8 +612,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
             citation_style_selector()
-            gui.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-
+            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
+            cache_knowledge_widget(self)
             doc_extract_selector(self.request.user)
 
             gui.write("---")
@@ -605,20 +635,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.write("##### 🔠 Language Model Settings")
         language_model_settings(gui.session_state.get("selected_model"))
 
-    def fields_not_to_save(self):
-        return ["elevenlabs_api_key"]
-
-    def fields_to_save(self) -> [str]:
-        fields = super().fields_to_save()
-        try:
-            fields.remove("elevenlabs_api_key")
-        except ValueError:
-            pass
-        return fields
-
     def run_as_api_tab(self):
-        elevenlabs_init_state(self)
+        elevenlabs_load_state(self)
         super().run_as_api_tab()
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "messages"]
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
@@ -746,6 +769,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.write("###### `references`")
             gui.json(references)
 
+        if gui.session_state.get("functions"):
+            try:
+                prompt_funcs = list(
+                    get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+                )
+            except:
+                prompt_funcs = None
+            if prompt_funcs:
+                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+                for tool in prompt_funcs:
+                    gui.json(tool.spec.get("function", tool.spec), depth=3)
+
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
@@ -756,21 +791,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     unsafe_allow_html=True,
                 )
                 gui.json(final_prompt, depth=5)
-
-        if gui.session_state.get("functions"):
-            prompt_funcs = call_recipe_functions(
-                saved_run=self.current_sr,
-                workspace=self.current_workspace,
-                current_user=self.request.user,
-                request_model=self.RequestModel,
-                response_model=self.ResponseModel,
-                state=gui.session_state,
-                trigger=FunctionTrigger.prompt,
-            )
-            if prompt_funcs:
-                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                for name, tool in prompt_funcs:
-                    gui.json(tool.spec.get("function", tool.spec), depth=3)
 
         for k in ["raw_output_text", "output_text", "raw_tts_text"]:
             for idx, text in enumerate(gui.session_state.get(k) or []):
@@ -832,7 +852,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
         llm_model = LargeLanguageModels[request.selected_model]
-        user_input = request.input_prompt.strip()
+        user_input = (request.input_prompt or "").strip()
         if not (
             user_input
             or request.input_audio
@@ -845,7 +865,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             request=request, response=response, user_input=user_input
         )
 
-        ocr_texts = yield from self.ocr_step(request=request)
+        ocr_texts = yield from self.document_understanding_step(request=request)
 
         request.translation_model = (
             request.translation_model or DEFAULT_TRANSLATION_MODEL
@@ -869,11 +889,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         yield from self.lipsync_step(request, response)
 
-    def ocr_step(self, request):
+    def document_understanding_step(self, request):
         ocr_texts = []
-        if request.document_model and (request.input_images or request.input_documents):
+        if request.document_model and request.input_images:
             yield "Running Azure Form Recognizer..."
-            for url in (request.input_images or []) + (request.input_documents or []):
+            for url in request.input_images:
                 ocr_text = (
                     azure_form_recognizer(url, model_id="prebuilt-read")
                     .get("content", "")
@@ -882,6 +902,26 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 if not ocr_text:
                     continue
                 ocr_texts.append(ocr_text)
+        if request.input_documents:
+            import pandas as pd
+
+            file_url_metas = yield from flatapply_parallel(
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
+                request.input_documents,
+                message="Extracting Input Documents...",
+            )
+            for f_url, file_meta in file_url_metas:
+                pages = doc_url_to_text_pages(
+                    f_url=f_url,
+                    file_meta=file_meta,
+                    selected_asr_model=request.asr_model,
+                )
+                if isinstance(pages, pd.DataFrame):
+                    ocr_texts.append(pages.to_csv(index=False))
+                elif len(pages) <= 1:
+                    ocr_texts.append("\n\n---\n\n".join(pages))
+                else:
+                    ocr_texts.append(json.dumps(pages))
         return ocr_texts
 
     def asr_step(self, request, response, user_input):
@@ -989,9 +1029,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 yield "Creating search query..."
                 response.final_search_query = generate_final_search_query(
                     request=request,
+                    response=response,
                     instructions=query_instructions,
-                    context={**gui.session_state, "messages": chat_history},
-                )
+                    context={"messages": chat_history},
+                ).strip()
             else:
                 query_msgs.reverse()
                 response.final_search_query = "\n---\n".join(
@@ -1003,12 +1044,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
-                k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
+                k_request.selected_model = LargeLanguageModels.gpt_4_o.name
+                k_request.max_tokens = 4096
                 keyword_query = json.loads(
                     generate_final_search_query(
                         request=k_request,
+                        response=response,
                         instructions=keyword_instructions,
-                        context={**gui.session_state, "messages": chat_history},
+                        context={"messages": chat_history},
                         response_format_type="json_object",
                     ),
                 )
@@ -1016,17 +1059,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     keyword_query = list(keyword_query.values())[0]
                 response.final_keyword_query = keyword_query
 
-            # perform doc search
-            response.references = yield from get_top_k_references(
-                DocSearchRequest.parse_obj(
-                    {
-                        **gui.session_state,
-                        "search_query": response.final_search_query,
-                        "keyword_query": response.final_keyword_query,
-                    },
-                ),
-                current_user=self.request.user,
-            )
+            if response.final_search_query:  # perform doc search
+                response.references = yield from get_top_k_references(
+                    DocSearchRequest.parse_obj(
+                        {
+                            **request.dict(),
+                            **response.dict(),
+                            "search_query": response.final_search_query,
+                            "keyword_query": response.final_keyword_query,
+                        },
+                    ),
+                    current_user=self.request.user,
+                )
             if request.use_url_shortener:
                 for reference in response.references:
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
@@ -1059,7 +1103,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         yield f"Summarizing with {model.value}..."
 
         tools = self.get_current_llm_tools()
-
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
             messages=response.final_prompt,
@@ -1149,6 +1192,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def output_translation_step(self, request, response, output_text):
+        from daras_ai_v2.bots import parse_bot_html
+
         # translate response text
         if should_translate_lang(request.user_language):
             yield f"Translating response to {request.user_language}..."
@@ -1164,6 +1209,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
+
+        # remove html tags from the output text for tts
+        raw_tts_text = [
+            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
+        ]
+        if raw_tts_text != output_text:
+            response.raw_tts_text = raw_tts_text
+
         return output_text
 
     def tts_step(self, request, response):
@@ -1319,7 +1372,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         workspace=self.current_workspace,
                         platform=Platform.WEB,
                     )
-                    redirect_url = connect_bot_to_published_run(bi, pr)
+                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.WHATSAPP:
                     redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:
@@ -1679,7 +1732,7 @@ def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
             mime_type = mimetypes.guess_type(f)[0] or ""
             if mime_type.startswith("image/"):
                 new_input_images.append(f)
-            if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+            elif mime_type.startswith("audio/") or mime_type.startswith("video/"):
                 new_input_audio = f
             else:
                 new_input_documents.append(f)
@@ -1727,7 +1780,7 @@ def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
     tool = tools[tool_name]
     yield f"🛠 {tool.label}..."
     kwargs = json.loads(call["function"]["arguments"])
-    return tool.fn(**kwargs)
+    return tool(**kwargs)
 
 
 class ConnectChoice(typing.NamedTuple):
@@ -1745,7 +1798,7 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.WHATSAPP,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
-        label="Connect your own new mobile # (that's not already on WhatsApp) or [upgrade to Business](https://gooey.ai/pricing) for a number on us.",
+        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/account/billing/) for a number on us.",
     ),
     ConnectChoice(
         platform=Platform.SLACK,

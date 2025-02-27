@@ -1,8 +1,9 @@
+import hashlib
 import typing
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import auth
 from furl import furl
@@ -122,15 +123,6 @@ class AppUser(models.Model):
 
     disable_safety_checker = models.BooleanField(default=False)
 
-    handle = models.OneToOneField(
-        "handles.Handle",
-        on_delete=models.SET_NULL,
-        default=None,
-        blank=True,
-        null=True,
-        related_name="user",
-    )
-
     banner_url = CustomURLField(blank=True, default="")
     bio = StrippedTextField(blank=True, default="")
     company = models.CharField(max_length=255, blank=True, default="")
@@ -184,8 +176,10 @@ class AppUser(models.Model):
         self.uid = user.uid
         self.is_disabled = user.disabled
         self.display_name = user.display_name or ""
-        self.email = str(user.email)
-        self.phone_number = str(user.phone_number)
+        if user.email:
+            self.email = str(user.email)
+        if user.phone_number:
+            self.phone_number = str(user.phone_number)
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
         )
@@ -223,11 +217,14 @@ class AppUser(models.Model):
         else:
             self.balance = 0
 
-        if handle := Handle.create_default_for_user(user=self):
-            self.handle = handle
-
         self.save()
-        self.get_or_create_personal_workspace()
+        workspace, _ = self.get_or_create_personal_workspace()
+
+        if not self.is_anonymous:
+            with transaction.atomic():
+                if handle := Handle.create_default_for_workspace(workspace):
+                    workspace.handle = handle
+                    workspace.save()
 
         return self
 
@@ -246,8 +243,15 @@ class AppUser(models.Model):
             ).order_by("-is_personal", "-created_at")
         ) or [self.get_or_create_personal_workspace()[0]]
 
+    def get_handle(self) -> Handle | None:
+        workspace, _ = self.get_or_create_personal_workspace()
+        return workspace.handle
+
     def get_anonymous_token(self):
         return auth.create_custom_token(self.uid).decode()
+
+    def get_photo(self) -> str:
+        return self.photo_url or get_placeholder_profile_image(self.uid)
 
 
 class TransactionReason(models.IntegerChoices):
@@ -382,3 +386,8 @@ class AppUserTransaction(models.Model):
                     furl("https://www.paypal.com/unifiedtransactions/details/payment/")
                     / self.invoice_id
                 )
+
+
+def get_placeholder_profile_image(seed: str) -> str:
+    hash = hashlib.md5(seed.encode()).hexdigest()
+    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"

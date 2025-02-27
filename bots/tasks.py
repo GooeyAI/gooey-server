@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from json import JSONDecodeError
 
 from celery import shared_task
@@ -8,6 +9,7 @@ from django.utils import timezone
 from loguru import logger
 
 from bots.models import (
+    BotIntegrationScheduledRun,
     Message,
     CHATML_ROLE_ASSISSTANT,
     BotIntegration,
@@ -25,6 +27,9 @@ from daras_ai_v2.slack_bot import (
 from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
 from recipes.VideoBots import ReplyButton, messages_as_prompt
+from recipes.VideoBotsStats import (
+    exec_export_fn,
+)
 
 MAX_PROMPT_LEN = 100_000
 
@@ -209,6 +214,21 @@ def send_broadcast_msg(
                     f"Platform {bi.platform} doesn't support broadcasts yet"
                 )
         # save_broadcast_message(convo, text, msg_id)
+
+
+@shared_task
+def exec_scheduled_runs():
+    for sched in BotIntegrationScheduledRun.objects.select_related(
+        "bot_integration__workspace__created_by"
+    ).exclude(last_run_at__gte=timezone.now() - timedelta(hours=23)):
+        fn_sr, fn_pr = sched.get_runs()
+        result, fn_sr = exec_export_fn(
+            bi=sched.bot_integration, fn_sr=fn_sr, fn_pr=fn_pr
+        )
+        sched.last_run_at = fn_sr.created_at
+        sched.save(update_fields=["last_run_at"])
+
+        logger.info(f"ran scheduled function {fn_sr.get_app_url()}")
 
 
 ## Disabled for now to prevent messing up the chat history

@@ -6,7 +6,7 @@ import json
 import math
 import typing
 import uuid
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from enum import Enum
 from functools import cached_property
 from itertools import pairwise
@@ -26,18 +26,18 @@ from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
-    SavedRun,
     PublishedRun,
     PublishedRunVersion,
     PublishedRunVisibility,
-    Workflow,
     RetentionPolicy,
+    SavedRun,
+    Workflow,
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
-from daras_ai_v2 import settings, icons
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -45,26 +45,28 @@ from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
-from daras_ai_v2.html_spinner_widget import html_spinner, scroll_into_view
+from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.prompt_vars import variables_input
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.ratelimits import ensure_rate_limits, RateLimitExceeded
+from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.urls import paginate_queryset, paginate_button
+from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
-from functions.models import RecipeFunction, FunctionTrigger
+from daras_ai_v2.utils import get_relative_time
+from daras_ai_v2.variables_widget import variables_input
+from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
-    functions_input,
+    LLMTool,
     call_recipe_functions,
+    functions_input,
+    get_tools_from_state,
     is_functions_enabled,
     render_called_functions,
-    LLMTool,
 )
 from payments.auto_recharge import (
-    should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
+    should_attempt_auto_recharge,
 )
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
@@ -140,6 +142,10 @@ class BasePage:
         variables: dict[str, typing.Any] | None = Field(
             title="⌥ Variables",
             description="Variables to be used as Jinja prompt templates and in functions as arguments",
+        )
+        variables_schema: dict[str, VariableSchema] | None = Field(
+            title="Variables Schema",
+            description="Schema for variables to be used in the variables input",
         )
 
     ResponseModel: typing.Type[BaseModel]
@@ -345,12 +351,14 @@ class BasePage:
 
         header_placeholder = gui.div()
         gui.newline()
+        with gui.div(className="position-relative"):
+            with gui.nav_tabs():
+                for tab in self.get_tabs():
+                    url = self.current_app_url(tab)
+                    with gui.nav_item(url, active=tab == self.tab):
+                        gui.html(tab.title)
 
-        with gui.nav_tabs():
-            for tab in self.get_tabs():
-                url = self.current_app_url(tab)
-                with gui.nav_item(url, active=tab == self.tab):
-                    gui.html(tab.title)
+                    self._render_saved_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
 
@@ -424,7 +432,8 @@ class BasePage:
             ):
                 if user := self.current_sr_user:
                     full_name = user.full_name()
-                    link = user.handle and user.handle.get_app_url()
+                    handle = user.get_handle()
+                    link = handle and handle.get_app_url()
                 else:
                     full_name = "Deleted User"
                     link = None
@@ -467,6 +476,28 @@ class BasePage:
         ):
             gui.html("Unpublished changes")
 
+    def _render_saved_timestamp(self):
+        sr, pr = self.current_sr_pr
+        if not (pr and self.tab == RecipeTabs.run):
+            return
+        if pr.saved_run_id == sr.id or pr.is_root():
+            dt = pr.updated_at
+        else:
+            dt = sr.updated_at
+        with (
+            gui.div(
+                className="container-margin-reset d-none d-md-block",
+                style=dict(
+                    position="absolute",
+                    top="50%",
+                    right="0",
+                    transform="translateY(-50%)",
+                ),
+            ),
+            gui.tag("span", className="text-muted"),
+        ):
+            gui.write(get_relative_time(dt))
+
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
         if gui.button(label=icons.more_options, className="mb-0", type="tertiary"):
@@ -479,22 +510,12 @@ class BasePage:
                     self._unsaved_options_modal()
 
     def render_social_buttons(self):
-        with gui.div(
-            className="d-flex align-items-start right-action-icons gap-lg-2 gap-1"
+        with (
+            gui.styled("& .btn { padding: 6px }"),
+            gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
         ):
-            gui.html(
-                # styling for buttons in this div
-                """
-                <style>
-                .right-action-icons .btn {
-                    padding: 6px;
-                }
-                </style>
-                """.strip()
-            )
-
             if self.tab == RecipeTabs.run:
-                if self.request.user and not self.request.user.is_anonymous:
+                if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 self._render_share_button()
                 self._render_save_button()
@@ -541,9 +562,7 @@ class BasePage:
 
             options = {
                 str(enum.value): enum.help_text(self.current_pr.workspace)
-                for enum in PublishedRunVisibility.choices_for_workspace(
-                    self.current_pr.workspace
-                )
+                for enum in PublishedRunVisibility.choices_for_pr(self.current_pr)
             }
             published_run_visibility = PublishedRunVisibility(
                 int(
@@ -620,17 +639,6 @@ class BasePage:
 
     def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
-            gui.html(
-                """
-                <style>
-                    .save-button-menu .gui-input label p { color: black; }
-                    .published-options-menu {
-                        z-index: 1;
-                    }
-                </style>
-                """
-            )
-
             if self.can_user_edit_published_run(self.current_pr):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
@@ -644,11 +652,11 @@ class BasePage:
                 className="mb-0 px-3 px-lg-4",
                 type="primary",
             ):
-                if not self.request.user or self.request.user.is_anonymous:
-                    self._publish_for_anonymous_user()
-                else:
+                if self.is_logged_in():
                     self.clear_publish_form()
                     ref.set_open(True)
+                else:
+                    self._publish_for_anonymous_user()
 
             if not ref.is_open:
                 return
@@ -672,7 +680,7 @@ class BasePage:
         Note: all input keys in this method should start with `published_run_*`
         (see: method clear_publish_form)
         """
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         sr = self.current_sr
         pr = self.current_pr
@@ -733,7 +741,7 @@ class BasePage:
 
         with form_container:
             if user_can_edit:
-                title = pr.title or self.title
+                title = self.get_run_title(self.current_sr, self.current_pr)
                 notes = pr.notes
             else:
                 title = self._get_default_pr_title()
@@ -746,7 +754,7 @@ class BasePage:
                 className="mt-1",
             )
             gui.write("Description", className="fs-5 container-margin-reset")
-            published_run_description = gui.text_input(
+            published_run_description = gui.text_area(
                 "",
                 key="published_run_description",
                 value=notes,
@@ -815,7 +823,6 @@ class BasePage:
                 workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
             )
         else:
             if not self.can_user_edit_published_run(self.current_pr):
@@ -825,7 +832,6 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -873,8 +879,7 @@ class BasePage:
                 return self.current_workspace
 
     def _get_default_pr_title(self):
-        recipe_title = self.get_root_pr().title or self.title
-        return f"{self.request.user.first_name_possesive()} {recipe_title}"
+        return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -895,12 +900,10 @@ class BasePage:
         saved_run: SavedRun,
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
-            or published_run.visibility != visibility
             or published_run.saved_run != saved_run
         )
 
@@ -924,7 +927,7 @@ class BasePage:
             return False
 
     def _saved_options_modal(self):
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         is_latest_version = self.current_pr.saved_run == self.current_sr
 
@@ -975,7 +978,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -989,7 +991,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=title,
                 notes=notes,
-                visibility=PublishedRunVisibility.UNLISTED,
             )
             raise gui.RedirectException(
                 self.app_url(example_id=new_pr.published_run_id)
@@ -1004,7 +1005,7 @@ class BasePage:
             self._render_version_history()
 
     def _unsaved_options_modal(self):
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         gui.write(
             "Like this AI workflow? Duplicate and then customize it for your use case."
@@ -1017,7 +1018,6 @@ class BasePage:
                 workspace=self.current_workspace,
                 title=f"{self.request.user.first_name_possesive()} {pr.title}",
                 notes=pr.notes,
-                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
             )
             raise gui.RedirectException(
                 self.app_url(example_id=duplicate_pr.published_run_id)
@@ -1096,6 +1096,17 @@ class BasePage:
                     raise gui.RedirectException(self.app_url())
 
     @classmethod
+    def get_prompt_title(cls, sr: SavedRun) -> str | None:
+        return truncate_text_words(
+            cls.preview_input(sr.to_dict()) or "",
+            maxlen=60,
+        ).replace("\n", " ")
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+        return pr.title or cls.get_recipe_title()
+
+    @classmethod
     def get_recipe_title(cls) -> str:
         return cls.get_root_pr().title or cls.title or cls.workflow.label
 
@@ -1118,7 +1129,7 @@ class BasePage:
         tabs = [RecipeTabs.run, RecipeTabs.examples, RecipeTabs.run_as_api]
         if self.request.user:
             tabs.extend([RecipeTabs.history])
-        if self.request.user and not self.request.user.is_anonymous:
+        if self.is_logged_in():
             tabs.extend([RecipeTabs.saved])
         return tabs
 
@@ -1168,15 +1179,6 @@ class BasePage:
         version: PublishedRunVersion,
         older_version: PublishedRunVersion | None,
     ):
-        gui.html(
-            """
-            <style>
-            .disable-p-margin p {
-                margin-bottom: 0;
-            }
-            </style>
-            """
-        )
         url = self.app_url(
             example_id=version.published_run.published_run_id,
             run_id=version.saved_run.run_id,
@@ -1192,7 +1194,7 @@ class BasePage:
                             version.changed_by, responsive=False, show_as_link=False
                         )
                 else:
-                    gui.write("###### Deleted User", className="disable-p-margin")
+                    gui.write("###### Deleted User", className="container-margin-reset")
                 with gui.tag("h6", className="mb-0"):
                     gui.html(
                         "Loading...",
@@ -1201,7 +1203,7 @@ class BasePage:
                             date_options={"month": "short", "day": "numeric"},
                         ),
                     )
-            with gui.div(className="disable-p-margin"):
+            with gui.div(className="container-margin-reset"):
                 is_first_version = not older_version
                 if is_first_version:
                     with gui.tag("span", className="badge bg-secondary px-3"):
@@ -1347,8 +1349,8 @@ class BasePage:
         gui.session_state["is_flagged"] = is_flagged
 
     def get_current_llm_tools(self) -> dict[str, LLMTool]:
-        return dict(
-            call_recipe_functions(
+        return {
+            tool.name: tool.bind(
                 saved_run=self.current_sr,
                 workspace=self.current_workspace,
                 current_user=self.request.user,
@@ -1357,13 +1359,16 @@ class BasePage:
                 state=gui.session_state,
                 trigger=FunctionTrigger.prompt,
             )
-        )
+            for tool in get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+        }
 
     @cached_property
-    def current_workspace(self) -> typing.Optional["Workspace"]:
-        return self.request.user and get_current_workspace(
-            self.request.user, self.request.session
-        )
+    def current_workspace(self) -> Workspace:
+        if not self.request.user:
+            raise Workspace.DoesNotExist(
+                "User must be logged in to get their workspace"
+            )
+        return get_current_workspace(self.request.user, self.request.session)
 
     @cached_property
     def current_sr_user(self) -> AppUser | None:
@@ -1457,7 +1462,7 @@ class BasePage:
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility,
+        visibility: PublishedRunVisibility | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1507,8 +1512,8 @@ class BasePage:
             name = workspace.created_by.display_name
         else:
             name = workspace.display_name()
-        if show_as_link and workspace.is_personal and workspace.created_by.handle:
-            link = workspace.created_by.handle.get_app_url()
+        if show_as_link and workspace.is_personal and workspace.handle_id:
+            link = workspace.handle.get_app_url()
         else:
             link = None
         return cls._render_author(
@@ -1534,8 +1539,8 @@ class BasePage:
             return
         photo = user.photo_url
         name = user.full_name()
-        if show_as_link and user.handle:
-            link = user.handle.get_app_url()
+        if show_as_link and (handle := user.get_handle()):
+            link = handle.get_app_url()
         else:
             link = None
         return cls._render_author(
@@ -1561,40 +1566,36 @@ class BasePage:
         if not photo and not name:
             return
 
-        responsive_image_size = (
-            f"calc({image_size} * 0.67)" if responsive else image_size
-        )
-
-        # new class name so that different ones don't conflict
-        class_name = f"author-image-{image_size}"
         if responsive:
-            class_name += "-responsive"
+            responsive_image_size = f"calc({image_size} * 0.67)"
+        else:
+            responsive_image_size = image_size
 
         linkto = link and gui.link(to=link) or gui.dummy()
         with linkto, gui.div(className="d-flex align-items-center"):
             if photo:
-                gui.html(
-                    f"""
-                    <style>
-                    .{class_name} {{
-                        width: {responsive_image_size};
-                        height: {responsive_image_size};
-                        margin-right: 6px;
-                        border-radius: 50%;
-                        object-fit: cover;
-                        pointer-events: none;
-                    }}
-
-                    @media (min-width: 1024px) {{
-                        .{class_name} {{
-                            width: {image_size};
-                            height: {image_size};
-                        }}
-                    }}
-                    </style>
-                """
-                )
-                gui.image(photo, className=class_name)
+                with gui.styled(
+                    """
+                    @media (min-width: 1024px) {
+                        & {
+                            width: %(image_size)s;
+                            height: %(image_size)s;
+                        }
+                    }
+                    """
+                    % dict(image_size=image_size)
+                ):
+                    gui.image(
+                        photo,
+                        style=dict(
+                            width=responsive_image_size,
+                            height=responsive_image_size,
+                            marginRight="6px",
+                            borderRadius="50%",
+                            objectFit="cover",
+                            pointerEvents="none",
+                        ),
+                    )
 
             if name:
                 name_style = {"fontSize": text_size} if text_size else {}
@@ -1807,7 +1808,9 @@ class BasePage:
         if not self.functions_in_settings:
             functions_input(self.request.user)
         variables_input(
-            template_keys=self.template_keys, allow_add=is_functions_enabled()
+            template_keys=self.template_keys,
+            allow_add=is_functions_enabled(),
+            exclude=self.fields_to_save(),
         )
 
     @classmethod
@@ -1908,14 +1911,16 @@ class BasePage:
     def estimate_run_duration(self) -> int | None:
         pass
 
-    def submit_and_redirect(self) -> typing.NoReturn | None:
-        sr = self.on_submit()
+    def submit_and_redirect(
+        self, unsaved_state: dict[str, typing.Any] = None
+    ) -> typing.NoReturn | None:
+        sr = self.on_submit(unsaved_state=unsaved_state)
         if not sr:
             return
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
-        assert self.request.user and not self.request.user.is_anonymous
+        assert self.is_logged_in()
 
         updated_count = SavedRun.objects.filter(
             id=self.current_sr.id,
@@ -1936,30 +1941,35 @@ class BasePage:
             workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
-            visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
         )
         raise gui.RedirectException(pr.get_app_url())
 
-    def on_submit(self):
+    def on_submit(self, unsaved_state: dict[str, typing.Any] = None):
         sr = self.create_and_validate_new_run(enable_rate_limits=True)
         if not sr:
             return
-        scroll_into_view(".gooey-spinner-top")
-        self.call_runner_task(sr)
+        self.call_runner_task(sr, unsaved_state=unsaved_state)
         return sr
 
     def should_submit_after_login(self) -> bool:
-        return bool(
-            self.request.query_params.get(SUBMIT_AFTER_LOGIN_Q)
-            and self.request.user
-            and not self.request.user.is_anonymous
-        )
+        should_submit = bool(self.request.query_params.get(SUBMIT_AFTER_LOGIN_Q))
+
+        if should_submit:
+            # if the user is already logged in, then submit the run, otherwise ignore this flag
+            return self.is_logged_in()
+
+        # if the user is not logged in and the error is due to insufficient credits,
+        # then flag to submit the run after the user logs in
+        if (
+            self.current_sr.error_type == InsufficientCredits.__name__
+            and not self.is_logged_in()
+        ):
+            self.request.query_params[SUBMIT_AFTER_LOGIN_Q] = "1"
+            raise gui.QueryParamsRedirectException(self.request.query_params)
 
     def should_publish_after_login(self) -> bool:
         return bool(
-            self.request.query_params.get(PUBLISH_AFTER_LOGIN_Q)
-            and self.request.user
-            and not self.request.user.is_anonymous
+            self.request.query_params.get(PUBLISH_AFTER_LOGIN_Q) and self.is_logged_in()
         )
 
     def create_and_validate_new_run(
@@ -2050,7 +2060,12 @@ class BasePage:
             }
         )
 
-    def call_runner_task(self, sr: SavedRun, deduct_credits: bool = True):
+    def call_runner_task(
+        self,
+        sr: SavedRun,
+        deduct_credits: bool = True,
+        unsaved_state: dict[str, typing.Any] = None,
+    ):
         from celeryapp.tasks import runner_task
 
         return runner_task.delay(
@@ -2059,45 +2074,13 @@ class BasePage:
             run_id=sr.run_id,
             uid=sr.uid,
             channel=self.realtime_channel_name(sr.run_id, sr.uid),
-            unsaved_state=self._unsaved_state(),
+            unsaved_state=unsaved_state,
             deduct_credits=deduct_credits,
         )
 
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
-
-    def generate_credit_error_message(self, run_id, uid) -> str:
-        account_url = furl(settings.APP_BASE_URL) / "account/"
-        if self.request.user.is_anonymous:
-            account_url.query.params["next"] = self.app_url(
-                run_id=run_id,
-                uid=uid,
-                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
-            )
-            # language=HTML
-            error_msg = f"""
-<p data-{SUBMIT_AFTER_LOGIN_Q}>
-Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
-</p>
-
-You’ll receive {settings.VERIFIED_EMAIL_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
-and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
-            """
-        else:
-            # language=HTML
-            error_msg = f"""
-<p>
-Doh! You’re out of Gooey.AI credits.
-</p>
-
-<p>
-Please <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
-</p>
-
-We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
-            """
-        return error_msg
 
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
@@ -2151,18 +2134,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             StateKeys.run_status,
             StateKeys.run_time,
         ]
-
-    def _unsaved_state(self) -> dict[str, typing.Any]:
-        result = {}
-        for field in self.fields_not_to_save():
-            try:
-                result[field] = gui.session_state[field]
-            except KeyError:
-                pass
-        return result
-
-    def fields_not_to_save(self) -> list[str]:
-        return []
 
     def _examples_tab(self):
         allow_hide = self.is_current_user_admin()
@@ -2246,6 +2217,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):
             raise gui.RedirectException(self.get_auth_url(next_url))
+
+    def is_logged_in(self) -> bool:
+        return bool(self.request.user and not self.request.user.is_anonymous)
 
     def get_auth_url(self, next_url: str | None = None) -> str:
         from routers.root import login
@@ -2418,17 +2392,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_form_data = gui.checkbox("##### Upload Files via Form Data")
 
         api_url, request_body = self.get_example_request(
-            gui.session_state,
+            self.current_sr.state,
             include_all=include_all,
             pr=self.current_pr,
         )
         response_body = self.get_example_response_body(
-            gui.session_state, as_async=as_async, include_all=include_all
+            self.current_sr.state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
             api_url=api_url,
-            request_body=request_body | self._unsaved_state(),
+            request_body=request_body,
             as_form_data=as_form_data,
             as_async=as_async,
         )
@@ -2437,7 +2411,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         gui.write("#### 🎁 Example Response")
         gui.json(response_body, expanded=True)
 
-        if not self.request.user or self.request.user.is_anonymous:
+        if not self.is_logged_in():
             gui.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
@@ -2581,11 +2555,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
 
     def is_current_user_paying(self) -> bool:
-        return bool(
-            self.request.user
-            and self.current_workspace
-            and self.current_workspace.is_paying
-        )
+        try:
+            return self.current_workspace.is_paying
+        except Workspace.DoesNotExist:
+            return False
 
     def is_current_user_owner(self) -> bool:
         return bool(self.request.user and self.current_sr_user == self.request.user)
@@ -2637,7 +2610,8 @@ def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
     include_all: bool = True,
-    preferred_fields: list[str] = None,
+    preferred_fields: typing.Iterable[str] | None = None,
+    unpreferred_fields: typing.Iterable[str] = ("variables_schema",),
     diff_from: dict | None = None,
 ) -> dict:
     """
@@ -2656,6 +2630,7 @@ def extract_model_fields(
             or (preferred_fields and field_name in preferred_fields)
             or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )
+        and field_name not in unpreferred_fields
     }
 
 

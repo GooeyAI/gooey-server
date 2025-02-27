@@ -8,27 +8,27 @@ from time import time
 import gooey_gui as gui
 import requests
 import sentry_sdk
-from django.db.models import Sum
-from django.utils import timezone
-from fastapi import HTTPException
-from loguru import logger
-
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
-from bots.models import SavedRun, Platform, Workflow
-from celeryapp.celeryconfig import app
+from bots.models import Platform, SavedRun, Workflow
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.base import StateKeys, BasePage
+from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
+from django.db.models import Sum
+from django.utils import timezone
+from fastapi import HTTPException
 from gooeysite.bg_db_conn import db_middleware
+from loguru import logger
 from payments.auto_recharge import (
-    should_attempt_auto_recharge,
     run_auto_recharge_gracefully,
+    should_attempt_auto_recharge,
 )
 from workspaces.widgets import set_current_workspace
+
+from celeryapp.celeryconfig import app
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -92,8 +92,13 @@ def runner_task(
 
         # send outputs to ui
         gui.realtime_push(channel, output)
+        # dont save unsaved_state
+        saved_state = gui.session_state | output
+        if unsaved_state:
+            for k in unsaved_state:
+                saved_state.pop(k, None)
         # save to db
-        page.dump_state_to_sr(gui.session_state | output, sr)
+        page.dump_state_to_sr(saved_state, sr)
 
     page = page_cls(
         user=AppUser.objects.get(id=user_id),

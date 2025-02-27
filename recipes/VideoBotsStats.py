@@ -1,8 +1,11 @@
 import base64
 from datetime import datetime, timedelta
+from functools import partial
+from textwrap import dedent
 
 import gooey_gui as gui
 from dateutil.relativedelta import relativedelta
+from django.db import transaction
 from django.db.models import Count, Avg, Q, CharField
 from django.db.models.functions import (
     TruncMonth,
@@ -12,11 +15,17 @@ from django.db.models.functions import (
     Concat,
 )
 from django.utils import timezone
+from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
-from pydantic import BaseModel
+from loguru import logger
+from pydantic import BaseModel, ValidationError
 
+from app_users.models import AppUser
 from bots.models import (
+    BotIntegrationScheduledRun,
+    PublishedRun,
+    SavedRun,
     Workflow,
     Platform,
     BotIntegration,
@@ -27,12 +36,14 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
-from daras_ai_v2 import settings
+from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage, RecipeTabs
-from daras_ai_v2.language_model import (
-    CHATML_ROLE_ASSISTANT,
-    CHATML_ROLE_USER,
-)
+from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
+from daras_ai_v2.workflow_url_input import workflow_url_input
+from functions.recipe_functions import FUNCTIONS_HELP_TEXT
+from recipes.BulkRunner import list_view_editor
+from recipes.Functions import FunctionsPage
 from recipes.VideoBots import VideoBotsPage
 
 
@@ -106,7 +117,10 @@ class VideoBotsStatsPage(BasePage):
         gui.markdown("# " + self.get_dynamic_meta_title())
 
     def get_dynamic_meta_title(self):
-        return f"📊 {self.bi.name} Analytics" if self.bi else self.title
+        if self.bi:
+            return f"📊 {self.bi.name} Analytics"
+        else:
+            return self.title
 
     def render(self):
         self.setup_sentry()
@@ -151,6 +165,12 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
 
+        self.render_stats(bi)
+
+        with gui.expander("Export Options"):
+            self.render_scheduled_export_options(bi)
+
+    def render_stats(self, bi: BotIntegration):
         run_url = VideoBotsPage.app_url(
             example_id=bi.published_run and bi.published_run.published_run_id,
         )
@@ -163,8 +183,13 @@ class VideoBotsStatsPage(BasePage):
         col1, col2 = gui.columns([1, 2])
 
         with col1:
-            conversations, messages = calculate_overall_stats(
-                bi=bi, run_title=run_title, run_url=run_url
+            conversations, messages = get_conversations_and_messages(bi=bi)
+            calculate_overall_stats(
+                bi=bi,
+                conversations=conversations,
+                messages=messages,
+                run_title=run_title,
+                run_url=run_url,
             )
 
             (
@@ -279,25 +304,34 @@ class VideoBotsStatsPage(BasePage):
             end_date=end_date,
         )
 
-        if not df.empty:
-            columns = df.columns.tolist()
-            gui.data_table(
-                [columns]
-                + [
-                    [
-                        dict(
-                            readonly=True,
-                            displayData=str(df.iloc[idx, col]),
-                            data=str(df.iloc[idx, col]),
-                        )
-                        for col in range(len(columns))
-                    ]
-                    for idx in range(min(500, len(df)))
+        if df.empty:
+            gui.write("No data to show yet.")
+            self.update_url(view, details, start_date, end_date, sort_by)
+            return
+
+        columns = df.columns.tolist()
+        gui.data_table(
+            [columns]
+            + [
+                [
+                    dict(
+                        readonly=True,
+                        displayData=str(df.iloc[idx, col]),
+                        data=str(df.iloc[idx, col]),
+                    )
+                    for col in range(len(columns))
                 ]
-            )
-            # download as csv button
-            gui.html("<br/>")
-            if gui.checkbox("Export"):
+                for idx in range(min(500, len(df)))
+            ]
+        )
+
+        gui.html("<br>")
+
+        with (
+            gui.div(className="d-flex align-items-center gap-2"),
+            gui.tooltip("Includes full data (UI only shows first 500 rows)"),
+        ):
+            if gui.button("Download CSV file"):
                 df = get_tabular_data(
                     bi=bi,
                     conversations=conversations,
@@ -309,14 +343,92 @@ class VideoBotsStatsPage(BasePage):
                 )
                 csv = df.to_csv()
                 b64 = base64.b64encode(csv.encode()).decode()
-                gui.html(
-                    f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv" class="btn btn-theme btn-secondary">Download CSV File</a>'
+                gui.js(
+                    dedent(
+                        # language=javscript
+                        f"""
+                        (function() {{
+                            let el = document.createElement("a");
+                            el.setAttribute("href", "data:file/csv;base64,{b64}");
+                            el.setAttribute("download", "{slugify(bi.name)}.csv");
+                            document.body.appendChild(el);
+                            el.click();
+                            document.body.removeChild(el);
+                        }})();
+                        """
+                    )
                 )
-                gui.caption("Includes full data (UI only shows first 500 rows)")
-        else:
-            gui.write("No data to show yet.")
 
         self.update_url(view, details, start_date, end_date, sort_by)
+
+    def render_scheduled_export_options(self, bi: BotIntegration):
+        scheduled_runs = bi.scheduled_runs.select_related(
+            "published_run", "saved_run"
+        ).all()
+        export_daily_switch = gui.switch(
+            "##### Export Daily",
+            value=bool(scheduled_runs),
+        )
+        gui.write(
+            "Once per day, functions listed below will be called with the variable "
+            "`messages_export_url`, the publicly accessible link of the day's messages as a csv file."
+        )
+        gui.caption(
+            "Run history for these functions can be found on your "
+            f"[Functions page]({FunctionsPage.app_url(tab=RecipeTabs.history)})."
+        )
+
+        if not export_daily_switch:
+            if scheduled_runs:
+                # user disabled the switch now, delete all scheduled functions
+                scheduled_runs.delete()
+            return
+
+        with gui.div(className="col-12 col-md-8"):
+            gui.session_state.setdefault(
+                "scheduled_runs", [f.get_app_url() for f in scheduled_runs]
+            )
+            with gui.div(className="d-flex align-items-center gap-3 mb-2"):
+                gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
+                if gui.button(
+                    f"{icons.add} Add",
+                    type="tertiary",
+                    className="p-1 mb-2",
+                    key="add-to-scheduled-functions",
+                ):
+                    gui.session_state.setdefault(
+                        "--list-view:scheduled_runs", []
+                    ).append({})
+
+            input_functions: list[dict] = []
+
+            list_view_editor(
+                key="scheduled_runs",
+                render_inputs=partial(
+                    render_scheduled_run_input,
+                    current_user=self.request.user,
+                    bi=bi,
+                    input_functions=input_functions,
+                ),
+                flatten_dict_key="url",
+            )
+
+            if gui.button("Save", type="primary"):
+                try:
+                    with transaction.atomic():
+                        # save scheduled runs
+                        sched_run_ids = [
+                            BotIntegrationScheduledRun.objects.get_or_create(
+                                bot_integration=bi, **data
+                            )[0].id
+                            for data in input_functions
+                        ]
+                        # delete any scheduled runs that were removed
+                        bi.scheduled_runs.exclude(id__in=sched_run_ids).delete()
+                except ValidationError as e:
+                    gui.error(str(e))
+                else:
+                    gui.success("Saved!")
 
     # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
     # this also allows them to share the url (once organizations are supported)
@@ -394,13 +506,65 @@ class VideoBotsStatsPage(BasePage):
         return start_date, end_date, view, factor, trunc_fn
 
 
-def calculate_overall_stats(*, bi, run_title, run_url):
+def render_scheduled_run_input(
+    key: str,
+    del_key: str | None,
+    d: dict,
+    *,
+    current_user: AppUser,
+    bi: BotIntegration,
+    input_functions: list[dict],
+):
+    with gui.div(className="d-lg-flex"):
+        with gui.div(className="flex-lg-grow-1"):
+            input_workflow = workflow_url_input(
+                page_cls=FunctionsPage,
+                key=key,
+                internal_state=d,
+                del_key=del_key,
+                current_user=current_user,
+            )
+        if not input_workflow:
+            return
+        _, sr, pr = input_workflow
+        if pr and pr.saved_run_id == sr.id:
+            input_functions.append(dict(saved_run=None, published_run=pr))
+        else:
+            input_functions.append(dict(saved_run=sr, published_run=None))
+
+        run_export_key = key + ":run_export"
+        if gui.button(
+            f"{icons.run} Run Now",
+            help="Run this function now to test it.",
+            key=run_export_key + ":btn",
+            type="tertiary",
+        ):
+            d[run_export_key] = True
+
+    if d.get(run_export_key) and (
+        url := gui.run_in_thread(
+            jsonable_exec_export_fn,
+            args=[bi.id, sr.id, pr and pr.id],
+            placeholder="Starting function...",
+        )
+    ):
+        gui.success(
+            f'Function started. View <a href="{url}">here</a>.', unsafe_allow_html=True
+        )
+        d.pop(run_export_key)
+
+
+def get_conversations_and_messages(bi) -> tuple[ConversationQuerySet, MessageQuerySet]:
     conversations: ConversationQuerySet = Conversation.objects.filter(
         bot_integration=bi
     ).order_by()  # type: ignore
+    messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
+    return conversations, messages
+
+
+def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
     # due to things like personal convos for slack, each user can have multiple conversations
     users = conversations.distinct_by_user_id().order_by()
-    messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
     user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
     bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
     num_active_users_last_7_days = (
@@ -451,8 +615,6 @@ def calculate_overall_stats(*, bi, run_title, run_url):
             """,
         unsafe_allow_html=True,
     )
-
-    return conversations, messages
 
 
 def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn):
@@ -907,3 +1069,48 @@ def get_tabular_data(
         df.sort_values(by=[sort_by], ascending=False, inplace=True)
 
     return df
+
+
+def jsonable_exec_export_fn(bi_id: id, sr_id: id, pr_id: id) -> str:
+    result, fn_sr = exec_export_fn(
+        bi=BotIntegration.objects.get(id=bi_id),
+        fn_sr=SavedRun.objects.get(id=sr_id),
+        fn_pr=pr_id and PublishedRun.objects.get(id=pr_id),
+    )
+    return fn_sr.get_app_url()
+
+
+def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | None):
+    today = timezone.now().date()
+    conversations, messages = get_conversations_and_messages(bi)
+    df = get_tabular_data(
+        bi=bi,
+        conversations=conversations,
+        messages=messages,
+        details="Messages",
+        sort_by=None,
+        start_date=today,
+        end_date=today,
+    )
+    csv = df.to_csv()
+    csv_url = upload_file_from_bytes(
+        filename=f"stats-{today.strftime('%Y-%m-%d')}.csv",
+        data=csv,
+        content_type="text/csv",
+    )
+
+    logger.info(f"exported stats for {bi} -> {csv_url}")
+
+    result, fn_sr = fn_sr.submit_api_call(
+        workspace=bi.workspace,
+        request_body=dict(
+            variables=(
+                fn_sr.state.get("variables", {}) | dict(messages_export_url=csv_url)
+            ),
+            variables_schema=fn_sr.state.get("variables_schema", {}),
+        ),
+        parent_pr=fn_pr,
+        current_user=bi.workspace.created_by,
+    )
+
+    return result, fn_sr

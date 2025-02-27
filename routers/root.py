@@ -1,12 +1,14 @@
 import datetime
 import json
 import tempfile
+import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
 from time import time
 
 import gooey_gui as gui
+import sentry_sdk
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
@@ -34,11 +36,12 @@ from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     fastapi_request_form,
     get_route_path,
+    resolve_url,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
+from daras_ai_v2.profiles import profile_page, get_meta_tags_for_profile
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -99,6 +102,9 @@ async def favicon():
 
 @app.get("/login/")
 def login(request: Request):
+    from routers.account import invitation_route
+    from routers.account import load_invite_from_hashid_or_404
+
     if request.user and not request.user.is_anonymous:
         return RedirectResponse(
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
@@ -106,6 +112,19 @@ def login(request: Request):
     context = {
         "request": request,
     }
+
+    try:
+        if (
+            (next_url := request.query_params.get("next"))
+            and (match := resolve_url(next_url))
+            and match.route.name == invitation_route.__name__
+            and (invite_id := match.matched_params.get("invite_id"))
+        ):
+            context["invite"] = load_invite_from_hashid_or_404(invite_id)
+    except Exception as e:
+        traceback.print_exc()
+        sentry_sdk.capture_exception(e)
+
     return templates.TemplateResponse(
         "login_options.html",
         context=context,
@@ -200,6 +219,12 @@ def file_upload(form_data: FormData = fastapi_request_form):
                 filename += ".png"
             img.transform(resize=form_data.get("resize", f"{1024 ** 2}@>"))
             data = img.make_blob()
+
+    if len(data) > settings.MAX_UPLOAD_SIZE:
+        return Response(
+            content=f"File size exceeds the maximum allowed size of {settings.MAX_UPLOAD_SIZE} bytes",
+            status_code=400,
+        )
 
     return {"url": upload_file_from_bytes(filename, data, content_type)}
 
@@ -624,10 +649,10 @@ def recipe_or_handle_or_static(
 
 def render_handle_page(request: Request, name: str):
     handle = Handle.objects.get_by_name(name)
-    if handle.has_user:
+    if handle.has_workspace:
         with page_wrapper(request):
-            user_profile_page(request, handle.user)
-        return dict(meta=get_meta_tags_for_profile(handle.user))
+            profile_page(request, handle=handle)
+        return dict(meta=get_meta_tags_for_profile(handle))
     elif handle.has_redirect:
         return RedirectResponse(
             handle.redirect_url, status_code=301, headers={"Cache-Control": "no-cache"}
@@ -753,7 +778,8 @@ def page_wrapper(request: Request, className=""):
 
 
 def anonymous_login_container(request: Request, context: dict):
-    login_url = str(furl("/login/", query_params=dict(next=request.url.path)))
+    next_url = str(furl(request.url).set(origin=None))
+    login_url = str(furl("/login/", query_params=dict(next=next_url)))
 
     with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
         gui.html("Sign In")

@@ -13,6 +13,8 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function
 
+from aifail import retry_if
+
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
@@ -54,7 +56,18 @@ def azure_form_recognizer_models() -> dict[str, str]:
     return {value["modelId"]: value["description"] for value in r.json()["value"]}
 
 
+def azure_should_retry(e: Exception) -> bool:
+    return isinstance(
+        e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)
+    ) or (
+        isinstance(e, requests.exceptions.HTTPError)
+        and e.response is not None
+        and e.response.status_code in [408, 429, 502, 503, 504]
+    )
+
+
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+@retry_if(azure_should_retry, max_retries=2)
 def azure_form_recognizer(url: str, model_id: str, params: dict = None) -> dict:
     r = requests.post(
         str(

@@ -154,7 +154,7 @@ def slack_connect_redirect(request: Request):
     if bi.slack_create_personal_channels:
         create_personal_channels_for_all_members.delay(bi.id)
 
-    redirect_url = connect_bot_to_published_run(bi, pr)
+    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
     return RedirectResponse(redirect_url)
 
 

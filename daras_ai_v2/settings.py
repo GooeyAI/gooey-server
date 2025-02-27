@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "functions",
     "workspaces",
     "api_keys",
+    "managed_secrets",
 ]
 
 MIDDLEWARE = [
@@ -264,7 +265,7 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
-
+MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
@@ -302,6 +303,7 @@ HEADER_LINKS = [
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
 SERPER_API_KEY = config("SERPER_API_KEY", None)
+GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
 
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
@@ -395,6 +397,10 @@ SLACK_VERIFICATION_TOKEN = config("SLACK_VERIFICATION_TOKEN", "")
 SLACK_CLIENT_ID = config("SLACK_CLIENT_ID", "")
 SLACK_CLIENT_SECRET = config("SLACK_CLIENT_SECRET", "")
 
+ONEDRIVE_CLIENT_ID = config("ONEDRIVE_CLIENT_ID", "")
+ONEDRIVE_CLIENT_SECRET = config("ONEDRIVE_CLIENT_SECRET", "")
+
+
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
 
@@ -423,6 +429,8 @@ AZURE_SPEECH_REGION = config("AZURE_SPEECH_REGION", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.api.cognitive.microsoft.com"
 AZURE_TTS_ENDPOINT = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com"
+
+AZURE_KEY_VAULT_ENDPOINT = config("AZURE_KEY_VAULT_ENDPOINT", "")
 
 AZURE_OPENAI_ENDPOINT_CA = config("AZURE_OPENAI_ENDPOINT_CA", "")
 AZURE_OPENAI_KEY_CA = config("AZURE_OPENAI_KEY_CA", "")
@@ -471,3 +479,6 @@ SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")
 SCRAPING_PROXY_USERNAME = config("SCRAPING_PROXY_USERNAME", "")
 SCRAPING_PROXY_PASSWORD = config("SCRAPING_PROXY_PASSWORD", "")
 SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")
+
+FIREWORKS_API_KEY = config("FIREWORKS_API_KEY", "")
+MISTRAL_API_KEY = config("MISTRAL_API_KEY", "")

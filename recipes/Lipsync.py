@@ -12,6 +12,7 @@ from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from payments.plans import PricingPlan
+from workspaces.models import Workspace
 
 DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
 
@@ -148,15 +149,16 @@ class LipsyncPage(BasePage):
             credits = 12
         else:
             credits = 6
-        if (
-            self.current_workspace
-            and self.current_workspace.subscription
-            and self.current_workspace.subscription.plan
-            == PricingPlan.ENTERPRISE.db_value
-        ):
+
+        try:
+            subscription = self.current_workspace.subscription
+        except Workspace.DoesNotExist:
+            subscription = None
+        if subscription and subscription.plan == PricingPlan.ENTERPRISE.db_value:
             seconds = 3
         else:
             seconds = 5
+
         return LipsyncPrice(credits, seconds)
 
 

@@ -1,19 +1,19 @@
 import gooey_gui as gui
-from django.core.exceptions import ValidationError
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS
-from .models import Workspace, WorkspaceInvite, WorkspaceRole
+from .models import Workspace
 
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
+SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
     from daras_ai_v2.base import BasePage
-    from routers.account import members_route
+    from routers.account import members_route, profile_route, saved_route
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -21,7 +21,12 @@ def global_workspace_selector(user: AppUser, session: dict):
         pass
     workspaces = user.cached_workspaces
 
-    if switch_workspace_id := gui.session_state.pop("--switch-workspace", None):
+    if switch_workspace_id := gui.session_state.pop(SWITCH_WORKSPACE_KEY, None):
+        try:
+            if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
+                raise gui.RedirectException(get_route_path(saved_route))
+        except KeyError:
+            pass
         set_current_workspace(session, int(switch_workspace_id))
 
     try:
@@ -31,7 +36,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    popover, content = gui.popover(interactive=True)
+    popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
@@ -60,7 +65,7 @@ def global_workspace_selector(user: AppUser, session: dict):
             with gui.tag(
                 "button",
                 className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                name="--switch-workspace",
+                name=SWITCH_WORKSPACE_KEY,
                 type="submit",
                 value=str(workspace.id),
                 style=dict(height=row_height),
@@ -91,19 +96,19 @@ def global_workspace_selector(user: AppUser, session: dict):
                 ):
                     with gui.div(className="row align-items-center"):
                         with gui.div(className="col-2 d-flex justify-content-center"):
-                            gui.html('<i class="fa-regular fa-octopus"></i>')
+                            gui.html(icons.octopus)
                         with gui.div(className="col-10"):
                             gui.html("New Team Workspace")
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_route_path(members_route),
+                to=get_route_path(saved_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html('<i class="fa-regular fa-octopus"></i>')
+                        gui.html(icons.octopus)
                     with gui.div(className="col-10"):
                         if current.memberships.get(user=user).can_edit_workspace():
                             gui.html("Manage Workspace")
@@ -120,7 +125,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         gui.html('<hr class="my-1"/>')
 
         with gui.link(
-            to="/account/profile/",
+            to=get_route_path(profile_route),
             className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
             style=dict(height=row_height),
         ):

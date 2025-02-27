@@ -1,9 +1,7 @@
-import json
-
 import gooey_gui as gui
 
 
-def html_spinner(text: str):
+def html_spinner(text: str, scroll_into_view=True):
     gui.html(
         # language=HTML
         f"""
@@ -14,6 +12,8 @@ def html_spinner(text: str):
         """
     )
 
-
-def scroll_into_view(selector: str):
-    gui.js("document.querySelector(%s).scrollIntoView();" % json.dumps(selector))
+    if scroll_into_view:
+        gui.js(
+            # language=JavaScript
+            """document.querySelector(".gooey-spinner-top").scrollIntoView()"""
+        )

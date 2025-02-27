@@ -1,28 +1,27 @@
 import typing
 
-from furl import furl
-from pydantic import BaseModel, Field
-
 import gooey_gui as gui
+from furl import furl
+from pydantic import BaseModel
+
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    query_instructions_widget,
+    cache_knowledge_widget,
     doc_search_advanced_settings,
+    query_instructions_widget,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.language_model import (
-    run_language_model,
     LargeLanguageModels,
-    ResponseFormatType,
+    run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
-    language_model_settings,
-    language_model_selector,
     LanguageModelSettings,
+    language_model_selector,
+    language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -31,16 +30,17 @@ from daras_ai_v2.search_ref import (
 from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     GoogleSearchMixin,
-    serp_search_settings,
     SerpSearchLocation,
     SerpSearchType,
+    serp_search_settings,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
     DocSearchRequest,
-    references_as_prompt,
-    get_top_k_references,
     EmptySearchResults,
+    get_top_k_references,
+    references_as_prompt,
 )
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85ed60a2-9405-11ee-9747-02420a0001ce/Web%20search%20GPT.jpg.png"
@@ -51,8 +51,6 @@ class GoogleGPTPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
-
-    price = 175
 
     sane_defaults = dict(
         search_query="rugs",
@@ -88,7 +86,7 @@ class GoogleGPTPage(BasePage):
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-
+        check_document_updates: bool | None
         max_search_urls: int | None
 
         max_references: int | None
@@ -114,8 +112,33 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        gui.text_area("#### Google Search Query", key="search_query")
-        gui.text_input("Search on a specific site *(optional)*", key="site_filter")
+        gui.text_area("#### Search Query", key="search_query")
+        gui.text_input("Only show results from site: *(optional)*", key="site_filter")
+
+        if gui.switch(
+            "##### 💬 Generate Answer",
+            key="_generate_answer",
+            value=bool(gui.session_state.get("task_instructions")),
+        ):
+            if gui.session_state.get("task_instructions") is None:
+                gui.session_state["task_instructions"] = self.current_sr.state.get(
+                    "task_instructions", ""
+                )
+            gui.text_area("### Instructions", key="task_instructions", height=300)
+            gui.caption(
+                "Instruct the LLM model on how to interpret the results to create an answer."
+            )
+        else:
+            gui.session_state["task_instructions"] = None
+
+        gui.switch(
+            "#####  🕵️‍♀️ Activate Deep Search",
+            key="_activate_deep_search",
+            value=bool(gui.session_state.get("embedding_model")),
+        )
+        gui.caption(
+            "Download and embed the webpages for enhanced understanding. Slower but powerful."
+        )
 
     def validate_form_v2(self):
         assert gui.session_state.get(
@@ -137,27 +160,28 @@ class GoogleGPTPage(BasePage):
         render_output_with_refs(state, 200)
 
     def render_settings(self):
-        gui.text_area(
-            "### Task Instructions",
-            key="task_instructions",
-            height=300,
-        )
-        gui.write("---")
-        selected_model = language_model_selector()
-        language_model_settings(selected_model)
-        gui.write("---")
+        if gui.session_state.get("task_instructions"):
+            selected_model = language_model_selector()
+            language_model_settings(selected_model)
+            gui.write("---")
+
         serp_search_settings()
         gui.write("---")
-        gui.write("##### 🔎 Document Search Settings")
-        query_instructions_widget()
-        gui.write("---")
-        doc_search_advanced_settings()
+
+        if gui.session_state.get("_activate_deep_search"):
+            gui.write("##### 🔎 Document Search Settings")
+            query_instructions_widget()
+            cache_knowledge_widget(self)
+            gui.write("---")
+            doc_search_advanced_settings()
+        else:
+            gui.session_state["embedding_model"] = None
 
     def related_workflows(self) -> list:
-        from recipes.SEOSummary import SEOSummaryPage
         from recipes.DocSearch import DocSearchPage
-        from recipes.VideoBots import VideoBotsPage
+        from recipes.SEOSummary import SEOSummaryPage
         from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.VideoBots import VideoBotsPage
 
         return [
             DocSearchPage,
@@ -201,7 +225,7 @@ class GoogleGPTPage(BasePage):
         output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
             gui.text_area(
-                f"**Output Text**",
+                "**Output Text**",
                 help=f"output {idx}",
                 disabled=True,
                 value=text,
@@ -242,30 +266,38 @@ class GoogleGPTPage(BasePage):
         # extract links & their corresponding titles
         link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}
         if not link_titles:
-            raise EmptySearchResults(response.final_search_query)
+            response.references = []
+            response.final_prompt = ""
+            response.output_text = []
+            return
 
-        # run vector search on links
-        response.references = yield from get_top_k_references(
-            DocSearchRequest.parse_obj(
-                {
-                    **request.dict(),
-                    "documents": list(link_titles.keys()),
-                    "search_query": request.search_query,
-                },
-            ),
-            is_user_url=False,
-            current_user=self.request.user,
-        )
+        if request.embedding_model:
+            # run vector search on links
+            response.references = yield from get_top_k_references(
+                DocSearchRequest.parse_obj(
+                    {
+                        **request.dict(),
+                        "documents": list(link_titles.keys()),
+                        "search_query": request.search_query,
+                    },
+                ),
+                is_user_url=False,
+                current_user=self.request.user,
+            )
+            # add pretty titles to references
+            for ref in response.references:
+                key = furl(ref["url"]).remove(fragment=True).url
+                ref["title"] = link_titles.get(key, "")
+        else:
+            response.references = [
+                SearchReference(url=item.url, title=item.title, snippet=item.snippet)
+                for item in links
+            ]
 
-        # add pretty titles to references
-
-        for ref in response.references:
-            key = furl(ref["url"]).remove(fragment=True).url
-            ref["title"] = link_titles.get(key, "")
-
-        # empty search result, abort!
-        if not response.references:
-            raise EmptySearchResults(request.search_query)
+        if not (response.references and request.task_instructions):
+            response.final_prompt = ""
+            response.output_text = []
+            return
 
         response.final_prompt = ""
         # add search results to the prompt
@@ -289,3 +321,11 @@ class GoogleGPTPage(BasePage):
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
         )
+
+    def get_raw_price(self, state: dict) -> float:
+        price = 1
+        if state.get("embedding_model"):
+            price += 87
+        if state.get("task_instructions"):
+            price += 87
+        return price

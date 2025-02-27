@@ -9,6 +9,7 @@ from bots.models import (
     PublishedRun,
     PublishedRunVisibility,
 )
+from daras_ai_v2 import settings
 from workspaces.models import Workspace
 
 
@@ -30,14 +31,25 @@ def run(*args):
 
 def get_objects(*args):
     # export all root recipes and 100 latest examples
-    pr_qs = list(
-        PublishedRun.objects.filter(published_run_id=""),
-    ) + list(
-        PublishedRun.objects.filter(
-            PublishedRun.approved_example_q(),
-        ).order_by(
-            "-updated_at"
-        )[:200],
+    pr_qs = (
+        list(
+            PublishedRun.objects.filter(published_run_id=""),
+        )
+        + list(
+            PublishedRun.objects.filter(
+                PublishedRun.approved_example_q(),
+            ).order_by(
+                "-updated_at"
+            )[:200],
+        )
+        + list(
+            PublishedRun.objects.filter(
+                published_run_id__in=[
+                    settings.SAFETY_CHECKER_EXAMPLE_ID,
+                    settings.INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID,
+                ]
+            )
+        )
     )
     for pr in pr_qs:
         yield from export_pr(pr)
@@ -78,6 +90,10 @@ def get_objects(*args):
             },
         )
 
+    user_qs = AppUser.objects.filter(email=settings.SAFETY_CHECKER_BILLING_EMAIL)
+    for user in user_qs:
+        yield from export_user(user)
+
 
 def export_pr(pr: PublishedRun):
     if pr.workspace_id:
@@ -99,11 +115,12 @@ def export_pr(pr: PublishedRun):
 
 def export_workspace(workspace: Workspace):
     yield from export_user(workspace.created_by)
-    yield export(workspace, include_fks={"created_by"})
+    if workspace.handle_id:
+        yield export(workspace.handle)
+    yield export(workspace, include_fks={"created_by", "handle"})
 
 
 def export_user(user: AppUser):
-    yield user.handle
     yield export(
         user,
         only_include={

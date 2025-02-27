@@ -1,46 +1,46 @@
 import math
 import typing
 
-from furl import furl
-from pydantic import BaseModel
-
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
-    is_user_uploaded_url,
+    cache_knowledge_widget,
     citation_style_selector,
-    doc_search_advanced_settings,
-    query_instructions_widget,
     doc_extract_selector,
+    doc_search_advanced_settings,
+    is_user_uploaded_url,
+    query_instructions_widget,
 )
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
-    run_language_model,
     LargeLanguageModels,
+    run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
-    language_model_settings,
-    language_model_selector,
     LanguageModelSettings,
+    language_model_selector,
+    language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.prompt_vars import render_prompt_vars
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
-    SearchReference,
-    render_output_with_refs,
     CitationStyles,
+    SearchReference,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
+    render_output_with_refs,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
     get_top_k_references,
     references_as_prompt,
     render_sources_widget,
 )
+from furl import furl
+from pydantic import BaseModel
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc7aa58-93fe-11ee-a083-02420a0001c8/Search%20your%20docs.jpg.png"
 
@@ -70,7 +70,7 @@ class DocSearchPage(BasePage):
     class RequestModelBase(DocSearchRequest, BasePage.RequestModel):
         task_instructions: str | None
         query_instructions: str | None
-
+        check_document_updates: bool | None
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
@@ -102,9 +102,9 @@ class DocSearchPage(BasePage):
 
     def related_workflows(self) -> list:
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+        from recipes.GoogleGPT import GoogleGPTPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
-        from recipes.GoogleGPT import GoogleGPTPage
 
         return [
             GoogleGPTPage,
@@ -138,6 +138,7 @@ class DocSearchPage(BasePage):
         citation_style_selector()
         doc_extract_selector(self.request.user)
         query_instructions_widget()
+        cache_knowledge_widget(self)
         gui.write("---")
         doc_search_advanced_settings()
 
@@ -269,7 +270,7 @@ def render_doc_search_step(state: dict):
     output_text = state.get("output_text", [])
     for idx, text in enumerate(output_text):
         gui.text_area(
-            f"**Output Text**",
+            "**Output Text**",
             help=f"output {idx}",
             disabled=True,
             value=text,
