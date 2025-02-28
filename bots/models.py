@@ -49,8 +49,7 @@ class PublishedRunVisibility(models.IntegerChoices):
         if not pr.workspace or pr.workspace.is_personal:
             return {cls.UNLISTED, cls.PUBLIC, PublishedRunVisibility(pr.visibility)}
         else:
-            # TODO: Add cls.PUBLIC when team-handles are added
-            return {cls.UNLISTED, cls.INTERNAL, PublishedRunVisibility(pr.visibility)}
+            return [cls.UNLISTED, cls.INTERNAL, cls.PUBLIC]
 
     @classmethod
     def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
@@ -65,16 +64,15 @@ class PublishedRunVisibility(models.IntegerChoices):
         match self:
             case PublishedRunVisibility.UNLISTED:
                 return f"{self.get_icon()} Only me + people with a link"
-            case PublishedRunVisibility.PUBLIC if workspace and workspace.is_personal:
-                if handle := workspace.handle:
-                    profile_url = handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{pretty_profile_url}" target="_blank">{profile_url}</a>'
-                else:
-                    edit_profile_url = get_route_path(profile_route)
-                    return f'{self.get_icon()} Public on <a href="{edit_profile_url}" target="_blank">my profile page</a>'
             case PublishedRunVisibility.PUBLIC:
-                return f"{self.get_icon()} Public"
+                if workspace and workspace.handle:
+                    profile_url = workspace.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a> (view only)'
+                elif workspace and workspace.is_personal:
+                    return f'{self.get_icon()} Public on <a href="{get_route_path(profile_route)}" target="_blank">my profile page</a>'
+                else:
+                    return f"{self.get_icon()} Public"
             case PublishedRunVisibility.INTERNAL if workspace:
                 saved_route_url = get_route_path(saved_route)
                 return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
