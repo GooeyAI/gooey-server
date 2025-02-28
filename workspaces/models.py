@@ -519,9 +519,6 @@ class WorkspaceInviteQuerySet(models.QuerySet):
         current_user: typing.Optional["AppUser"] = None,
         defaults: dict | None = None,
     ) -> "WorkspaceInvite":
-        """
-        auto_accept: If True, the user will be automatically added if they have an account
-        """
         from app_users.models import AppUser
 
         if workspace.memberships.filter(user__email=email).exists():

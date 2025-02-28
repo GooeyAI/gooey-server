@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import itertools
 import re
-import warnings
 import typing
 
 from django.core.exceptions import ValidationError
@@ -158,6 +158,18 @@ class Handle(models.Model):
                 return handle
         return None
 
+    @classmethod
+    def get_suggestion_for_team_workspace(cls, display_name: str) -> str | None:
+        options_generator = _generate_handle_options_for_team_workspace(display_name)
+        while options_generator:
+            options = list(itertools.islice(options_generator, 10))
+            existing_handles = set(
+                cls.objects.filter(name__in=options).values_list("name", flat=True)
+            )
+            for option in options:
+                if option not in existing_handles:
+                    return option
+
     def get_app_url(self):
         return str(furl(settings.APP_BASE_URL) / self.name / "/")
 
@@ -180,10 +192,9 @@ def _generate_handle_options(workspace: "Workspace") -> typing.Iterator[str]:
     if workspace.is_personal:
         yield from _generate_handle_options_for_personal_workspace(workspace.created_by)
     else:
-        handle_name = _make_handle_from(workspace.display_name())
-        yield handle_name[:HANDLE_MAX_LENGTH]
-        for i in range(1, 10):
-            yield f"{handle_name[:HANDLE_MAX_LENGTH-1]}{i}"
+        yield from _generate_handle_options_for_team_workspace(
+            display_name=workspace.display_name()
+        )
 
 
 def _generate_handle_options_for_personal_workspace(
@@ -228,6 +239,15 @@ def _generate_handle_options_for_personal_workspace(
         yield email_handle
         for i in range(1, 10):
             yield f"{email_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+
+
+def _generate_handle_options_for_team_workspace(
+    display_name: str,
+) -> typing.Iterator[str]:
+    handle_name = _make_handle_from(display_name)
+    yield handle_name[:HANDLE_MAX_LENGTH]
+    for i in range(1, 10):
+        yield f"{handle_name[:HANDLE_MAX_LENGTH-1]}{i}"
 
 
 def _attempt_create_handle(handle_name: str):

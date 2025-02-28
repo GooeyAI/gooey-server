@@ -1,10 +1,12 @@
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 import gooey_gui as gui
 
 from app_users.models import AppUser
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.fastapi_tricks import get_route_path
-from handles.models import COMMON_EMAIL_DOMAINS
-from .models import Workspace
+from handles.models import COMMON_EMAIL_DOMAINS, Handle
+from .models import Workspace, WorkspaceInvite
 
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
@@ -115,12 +117,16 @@ def global_workspace_selector(user: AppUser, session: dict):
                         else:
                             gui.html("Open Workspace")
 
+        workspace_creation_dialog = gui.use_alert_dialog(
+            key="--create-workspace:dialog"
+        )
         if gui.session_state.pop("--create-workspace", None):
-            name = get_default_workspace_name_for_user(user)
-            workspace = Workspace(name=name, created_by=user)
-            workspace.create_with_owner()
-            session[SESSION_SELECTED_WORKSPACE] = workspace.id
-            raise gui.RedirectException(get_route_path(members_route))
+            workspace_creation_dialog.set_open(True)
+
+        if workspace_creation_dialog.is_open:
+            render_workspace_create_dialog(
+                user=user, session=session, ref=workspace_creation_dialog
+            )
 
         gui.html('<hr class="my-1"/>')
 
@@ -172,6 +178,149 @@ def global_workspace_selector(user: AppUser, session: dict):
     return current
 
 
+def render_workspace_create_dialog(
+    user: AppUser, session: dict, ref: gui.AlertDialogRef
+):
+    step = gui.session_state.setdefault("workspace:create:step", 1)
+    if step == 1:
+        title = "# Create Team Workspace"
+        caption = "Workspaces allow you to collaborate with team members with a shared payment method"
+        render_fn = lambda: render_workspace_create_step1(
+            user=user, session=session, ref=ref
+        )
+    else:
+        workspace = get_current_workspace(user, session)
+        title = f"# Invite Members to {workspace.display_name(user)}"
+        caption = "This workspace is private and only members can access its workflows and shared billing."
+        render_fn = lambda: render_workspace_create_step2(
+            user=user, session=session, workspace=workspace, ref=ref
+        )
+
+    with gui.alert_dialog(ref=ref, modal_title=title, large=True):
+        gui.caption(caption)
+        render_fn()
+
+
+def clear_workspace_create_form():
+    keys = [k for k in gui.session_state if k.startswith("workspace:create:")]
+    for k in keys:
+        gui.session_state.pop(k, None)
+
+
+def render_workspace_create_step1(
+    user: AppUser, session: dict, ref: gui.AlertDialogRef
+):
+    from daras_ai_v2.profiles import render_handle_input, update_handle
+
+    if "workspace:create:name" not in gui.session_state:
+        gui.session_state["workspace:create:name"] = (
+            get_default_workspace_name_for_user(user)
+        )
+    name = gui.text_input(label="#### Name", key=f":name")
+
+    gui.write("#### Your workspace's URL")
+
+    handle_div = gui.div(className="d-flex align-items-center mt-3")
+    handle_msg_div = gui.div()
+    with handle_div:
+        with gui.div(
+            className="d-flex justify-content-center align-items-center mb-3 me-2"
+        ):
+            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
+        if "workspace:create:handle_name" not in gui.session_state:
+            gui.session_state["workspace:create:handle_name"] = (
+                Handle.get_suggestion_for_team_workspace(display_name=name)
+            )
+        handle_name = render_handle_input(
+            label="", key="workspace:create:handle_name", msg_div=handle_msg_div
+        )
+
+    description = gui.text_input(
+        "#### Describe your team",
+        key="workspace:create:description",
+        placeholder="A plucky team of intrepid folks working to change the world",
+    )
+
+    with gui.div(className="d-flex justify-content-end align-items-center gap-3"):
+        gui.caption("Next: Invite Team Members")
+
+        if gui.button("Cancel", key="workspace:create:cancel", type="secondary"):
+            clear_workspace_create_form()
+            ref.set_open(False)
+            raise gui.RerunException()
+
+        if gui.button(
+            "Create Workspace", key="workspace:create:submit", type="primary"
+        ):
+            workspace = Workspace(name=name, description=description, created_by=user)
+            try:
+                with transaction.atomic():
+                    workspace.handle = update_handle(handle=None, name=handle_name)
+                    workspace.create_with_owner()
+            except (ValidationError, IntegrityError) as e:
+                gui.error(str(e))
+                return
+            else:
+                set_current_workspace(session, workspace.id)
+                gui.session_state["workspace:create:step"] = 2
+                gui.session_state["workspace:create:workspace_id"] = workspace.id
+                raise gui.RerunException()
+
+
+def render_workspace_create_step2(
+    user: AppUser, session: dict, workspace: Workspace, ref: gui.AlertDialogRef
+):
+    from routers.account import account_route
+
+    with gui.div(className="container-margin-reset d-flex flex-column gap-3"):
+        with gui.div():
+            gui.write("##### Emails")
+            gui.caption("Add email addresses for members, separated by commas.")
+            emails = gui.text_area(label="Emails", key="workspace:create:emails")
+
+        with gui.div():
+            gui.write("##### Allowed email domain")
+            gui.caption(
+                "Anyone with this domain will be automatically added as a member to this workspace."
+            )
+            options = get_workspace_domain_name_options(workspace, user)
+            if options:
+                workspace.domain_name = gui.selectbox(
+                    label="", options=options, key="workspace:create:domain_name"
+                )
+            else:
+                gui.caption(
+                    "Sign in with your work email to automatically add members."
+                )
+
+    if gui.button("Close", key=f"workspace:create:close", type="secondary"):
+        workspace.save(update_fields=["domain_name"])
+        clear_workspace_create_form()
+        ref.set_open(False)
+        raise gui.RerunException()
+
+    if gui.button("Choose a Plan", type="primary"):
+        emails = emails.split(",")
+        emails = list(filter(bool, [email.strip() for email in emails]))
+
+        try:
+            for email in emails[:10]:
+                key = f"workspace:create:email:{email}"
+                if key in gui.session_state:
+                    continue
+                WorkspaceInvite.objects.create_and_send_invite(
+                    workspace=workspace,
+                    email=email,
+                    current_user=user,
+                )
+                gui.session_state[key] = 1
+        except ValidationError as e:
+            gui.error(str(e))
+        else:
+            workspace.save(update_fields=["domain_name"])
+            raise gui.RedirectException(get_route_path(account_route))
+
+
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
     try:
         workspace_id = session[SESSION_SELECTED_WORKSPACE]
@@ -203,3 +352,15 @@ def get_default_workspace_name_for_user(user: AppUser) -> str:
 
     suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
     return f"{user.first_name_possesive()} Team Workspace" + suffix
+
+
+def get_workspace_domain_name_options(
+    workspace: Workspace, current_user: AppUser
+) -> set | None:
+    current_user_domain = (
+        current_user.email
+        and current_user.email not in COMMON_EMAIL_DOMAINS
+        and current_user.email.split("@")[-1]
+    )
+    options = {workspace.domain_name, current_user_domain, None}
+    return len(options) > 1 and options or None

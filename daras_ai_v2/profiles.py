@@ -619,7 +619,11 @@ def _get_meta_description_for_profile(handle: Handle) -> str:
 
 
 def render_handle_input(
-    label: str, *, handle: Handle | None = None, **kwargs
+    label: str,
+    *,
+    handle: Handle | None = None,
+    msg_div: gui.core.NestingCtx | None = None,
+    **kwargs,
 ) -> str | None:
     handle_style: dict[str, str] = {}
     new_handle = gui.text_input(
@@ -635,10 +639,12 @@ def render_handle_input(
     try:
         Handle(name=new_handle).full_clean()
     except ValidationError as e:
-        gui.error(e.messages[0], icon="")
+        with msg_div or gui.dummy():
+            gui.error(e.messages[0], icon="")
         handle_style["border"] = "1px solid var(--bs-danger)"
     else:
-        gui.success("Handle is available", icon="")
+        with msg_div or gui.dummy():
+            gui.success("Handle is available", icon="")
         handle_style["border"] = "1px solid var(--bs-success)"
 
     return new_handle
