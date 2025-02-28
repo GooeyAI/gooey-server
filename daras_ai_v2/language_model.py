@@ -77,6 +77,17 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models#gpt-4-5
+    gpt_4_5 = LLMSpec(
+        label="GPT-4.5 (openai)",
+        model_id="gpt-4.5-preview-2025-02-27",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=1,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://platform.openai.com/docs/models#o3-mini
     o3_mini = LLMSpec(
         label="o3-mini (openai)",
