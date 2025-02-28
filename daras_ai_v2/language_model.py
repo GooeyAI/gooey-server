@@ -68,7 +68,7 @@ class LLMSpec(typing.NamedTuple):
     model_id: str | tuple
     llm_api: LLMApis
     context_window: int
-    max_output_tokens: int = 4096
+    max_output_tokens: int | None = None
     price: int = 1
     is_chat_model: bool = True
     is_vision_model: bool = False
@@ -171,6 +171,7 @@ class LargeLanguageModels(Enum):
         ),
         llm_api=LLMApis.openai,
         context_window=128_000,
+        max_output_tokens=4096,
         price=6,
         is_vision_model=True,
         supports_json=True,
@@ -180,6 +181,7 @@ class LargeLanguageModels(Enum):
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
+        max_output_tokens=4096,
         price=6,
         is_vision_model=True,
         is_deprecated=True,
@@ -191,6 +193,7 @@ class LargeLanguageModels(Enum):
         model_id=("openai-gpt-4-turbo-prod-ca-1", "gpt-4-1106-preview"),
         llm_api=LLMApis.openai,
         context_window=128_000,
+        max_output_tokens=4096,
         price=5,
         supports_json=True,
     )
@@ -201,6 +204,7 @@ class LargeLanguageModels(Enum):
         model_id=("openai-gpt-4-prod-ca-1", "gpt-4"),
         llm_api=LLMApis.openai,
         context_window=8192,
+        max_output_tokens=8192,
         price=10,
     )
     gpt_4_32k = LLMSpec(
@@ -208,6 +212,7 @@ class LargeLanguageModels(Enum):
         model_id="openai-gpt-4-32k-prod-ca-1",
         llm_api=LLMApis.openai,
         context_window=32_768,
+        max_output_tokens=8192,
         price=20,
     )
 
@@ -225,6 +230,7 @@ class LargeLanguageModels(Enum):
         model_id=("openai-gpt-35-turbo-16k-prod-ca-1", "gpt-3.5-turbo-16k-0613"),
         llm_api=LLMApis.openai,
         context_window=16_384,
+        max_output_tokens=4096,
         price=2,
     )
     gpt_3_5_turbo_instruct = LLMSpec(
@@ -251,6 +257,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.3-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=32_768,
         price=1,
         supports_json=True,
     )
@@ -259,6 +266,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.2-90b-vision-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=8192,
         price=1,
         supports_json=True,
         is_vision_model=True,
@@ -268,6 +276,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.2-11b-vision-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=8192,
         price=1,
         supports_json=True,
         is_vision_model=True,
@@ -278,6 +287,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.2-3b-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=8192,
         price=1,
         supports_json=True,
     )
@@ -286,6 +296,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.2-1b-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=8192,
         price=1,
         supports_json=True,
     )
@@ -295,6 +306,7 @@ class LargeLanguageModels(Enum):
         model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
         llm_api=LLMApis.fireworks,
         context_window=128_000,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
     )
@@ -303,6 +315,7 @@ class LargeLanguageModels(Enum):
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
         is_deprecated=True,
@@ -311,7 +324,8 @@ class LargeLanguageModels(Enum):
         label="Llama 3.1 8B (Meta AI)",
         model_id="llama-3.1-8b-instant",
         llm_api=LLMApis.groq,
-        context_window=128_00,
+        context_window=128_000,
+        max_output_tokens=8192,
         price=1,
         supports_json=True,
     )
@@ -338,6 +352,7 @@ class LargeLanguageModels(Enum):
         model_id="pixtral-large-2411",
         llm_api=LLMApis.mistral,
         context_window=131_000,
+        max_output_tokens=4096,
         is_vision_model=True,
         supports_json=True,
     )
@@ -346,6 +361,7 @@ class LargeLanguageModels(Enum):
         model_id="mistral-large-2411",
         llm_api=LLMApis.mistral,
         context_window=131_000,
+        max_output_tokens=4096,
         supports_json=True,
     )
     mistral_small_24b_instruct = LLMSpec(
@@ -353,6 +369,7 @@ class LargeLanguageModels(Enum):
         model_id="mistral-small-2501",
         llm_api=LLMApis.mistral,
         context_window=32_768,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
     )
@@ -361,6 +378,7 @@ class LargeLanguageModels(Enum):
         model_id="mixtral-8x7b-32768",
         llm_api=LLMApis.groq,
         context_window=32_768,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
         is_deprecated=True,
@@ -370,6 +388,7 @@ class LargeLanguageModels(Enum):
         model_id="gemma2-9b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
     )
@@ -378,6 +397,7 @@ class LargeLanguageModels(Enum):
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
         is_deprecated=True,
@@ -419,7 +439,6 @@ class LargeLanguageModels(Enum):
         model_id="gemini-1.0-pro-vision",
         llm_api=LLMApis.gemini,
         context_window=2048,
-        max_output_tokens=8192,
         price=25,
         is_vision_model=True,
         is_chat_model=False,
@@ -436,6 +455,7 @@ class LargeLanguageModels(Enum):
         model_id="chat-bison",
         llm_api=LLMApis.palm2,
         context_window=4096,
+        max_output_tokens=1024,
         price=10,
     )
     palm2_text = LLMSpec(
@@ -443,6 +463,7 @@ class LargeLanguageModels(Enum):
         model_id="text-bison",
         llm_api=LLMApis.palm2,
         context_window=8192,
+        max_output_tokens=1024,
         price=15,
         is_chat_model=False,
     )
@@ -463,6 +484,7 @@ class LargeLanguageModels(Enum):
         model_id="claude-3-opus-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
+        max_output_tokens=4096,
         price=75,
         is_vision_model=True,
         supports_json=True,
@@ -472,6 +494,7 @@ class LargeLanguageModels(Enum):
         model_id="claude-3-sonnet-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
+        max_output_tokens=4096,
         price=15,
         is_vision_model=True,
         supports_json=True,
@@ -481,6 +504,7 @@ class LargeLanguageModels(Enum):
         model_id="claude-3-haiku-20240307",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
+        max_output_tokens=4096,
         price=2,
         is_vision_model=True,
         supports_json=True,
@@ -514,6 +538,7 @@ class LargeLanguageModels(Enum):
         model_id="llama3-groq-70b-8192-tool-use-preview",
         llm_api=LLMApis.groq,
         context_window=8192,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
         is_deprecated=True,
@@ -523,6 +548,7 @@ class LargeLanguageModels(Enum):
         model_id="llama3-groq-8b-8192-tool-use-preview",
         llm_api=LLMApis.groq,
         context_window=8192,
+        max_output_tokens=4096,
         price=1,
         supports_json=True,
         is_deprecated=True,
