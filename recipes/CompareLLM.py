@@ -93,7 +93,9 @@ class CompareLLMPage(BasePage):
         youtube_video("dhexRRDAuY8")
 
     def render_settings(self):
-        language_model_settings()
+        language_model_settings(
+            selected_models=gui.session_state.get("selected_models")
+        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
