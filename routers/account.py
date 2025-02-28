@@ -20,6 +20,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
 from managed_secrets.widgets import manage_secrets_table
+from payments.plans import PricingPlan
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -175,7 +176,7 @@ def api_keys_route(request: Request):
 @gui.route(app, "/workspaces/members/")
 def members_route(request: Request):
     with account_page_wrapper(request, AccountTabs.members) as current_workspace:
-        if current_workspace.is_personal:
+        if not current_workspace or current_workspace.is_personal:
             raise gui.RedirectException(get_route_path(profile_route))
         workspaces_page(request.user, request.session)
 
@@ -189,6 +190,16 @@ def members_route(request: Request):
             robots="noindex,nofollow",
         )
     )
+
+
+@gui.route(app, "/workspaces/analytics/")
+def analytics_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.analytics) as current_workspace:
+        if AccountTabs.analytics not in AccountTabs.get_tabs_for_user(
+            request.user, workspace=current_workspace
+        ):
+            raise gui.RedirectException(get_route_path(account_route))
+        analytics_tab(request, current_workspace)
 
 
 @gui.route(app, "/workspaces/{workspace_slug}/invite/{email}-{invite_id}")
@@ -238,6 +249,7 @@ class AccountTabs(TabData, Enum):
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+    analytics = TabData(title=f"{icons.analytics} Analytics", route=analytics_route)
 
     @property
     def url_path(self) -> str:
@@ -245,17 +257,25 @@ class AccountTabs(TabData, Enum):
 
     @classmethod
     def get_tabs_for_user(
-        cls, user: typing.Optional["AppUser"], workspace: Workspace | None
+        cls, user: "AppUser", workspace: Workspace | None
     ) -> list["AccountTabs"]:
 
         ret = list(cls)
 
-        if workspace.is_personal:
+        if not workspace or workspace.is_personal:
             ret.remove(cls.members)
+            ret.remove(cls.analytics)
         else:
             ret.remove(cls.profile)
             if not workspace.memberships.get(user=user).can_edit_workspace():
                 ret.remove(cls.billing)
+                ret.remove(cls.analytics)
+            elif not workspace.subscription or workspace.subscription.plan not in (
+                PricingPlan.BUSINESS.value,
+                PricingPlan.ENTERPRISE.value,
+            ):
+                # only for business and enterprise plans
+                ret.remove(cls.analytics)
 
         return ret
 
@@ -264,6 +284,9 @@ def billing_tab(request: Request, workspace: Workspace):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
     return billing_page(workspace=workspace, user=request.user)
+
+
+def analytics_tab(request: Request, workspace: Workspace): ...
 
 
 def profile_tab(request: Request, workspace: Workspace):
