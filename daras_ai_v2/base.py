@@ -2343,12 +2343,14 @@ class BasePage:
         def run_count():
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
                 run_icon = '<i class="fa-regular fa-person-running"></i>'
-                run_count = format_number_with_suffix(published_run.get_run_count())
-                with gui.div():
-                    gui.caption(
-                        f"{run_icon} {run_count} runs",
-                        unsafe_allow_html=True,
-                    )
+                count = published_run.get_run_count()
+                if count > 0:
+                    run_count = format_number_with_suffix(count)
+                    with gui.div():
+                        gui.caption(
+                            f"{run_icon} {run_count} runs",
+                            unsafe_allow_html=True,
+                        )
 
         with gui.div(
             className="container-xxl row align-items-stretch position-relative py-2 pe-0",
@@ -2541,8 +2543,8 @@ class BasePage:
         if allow_hide:
             self._example_hide_button(published_run=published_run)
 
-        # doc = published_run.saved_run.to_dict()
-        # self.render_example(doc)
+        doc = published_run.saved_run.to_dict()
+        self.render_example(doc)
 
     def _example_hide_button(self, published_run: PublishedRun):
         pressed_delete = gui.button(
