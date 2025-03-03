@@ -94,7 +94,7 @@ class AsrPage(BasePage):
         ]
 
     @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
         try:

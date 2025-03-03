@@ -4,16 +4,18 @@ import datetime
 import typing
 from multiprocessing.pool import ThreadPool
 
+import phonenumber_field.formfields
+import phonenumber_field.modelfields
 import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, IntegerChoices, QuerySet
 from django.utils import timezone
 from django.utils.text import Truncator
-from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
@@ -510,6 +512,52 @@ class BotIntegrationQuerySet(models.QuerySet):
         return saved
 
 
+def validate_phonenumber(value):
+    from phonenumber_field.phonenumber import to_python
+
+    phone_number = to_python(value)
+    if _is_invalid_phone_number(phone_number):
+        raise ValidationError(
+            "The phone number entered is not valid.", code="invalid_phone_number"
+        )
+
+
+class WhatsappPhoneNumberFormField(phonenumber_field.formfields.PhoneNumberField):
+    default_validators = [validate_phonenumber]
+
+    def to_python(self, value):
+        from phonenumber_field.phonenumber import to_python
+
+        phone_number = to_python(value, region=self.region)
+
+        if phone_number in validators.EMPTY_VALUES:
+            return self.empty_value
+
+        if _is_invalid_phone_number(phone_number):
+            raise ValidationError(self.error_messages["invalid"])
+
+        return phone_number
+
+
+def _is_invalid_phone_number(phone_number) -> bool:
+    from phonenumber_field.phonenumber import PhoneNumber
+
+    return (
+        isinstance(phone_number, PhoneNumber)
+        and not phone_number.is_valid()
+        # facebook test numbers
+        and not str(phone_number.as_e164).startswith("+1555")
+    )
+
+
+class WhatsappPhoneNumberField(phonenumber_field.modelfields.PhoneNumberField):
+    default_validators = [validate_phonenumber]
+
+    def formfield(self, **kwargs):
+        kwargs["form_class"] = WhatsappPhoneNumberFormField
+        return super().formfield(**kwargs)
+
+
 class BotIntegration(models.Model):
     name = models.CharField(
         max_length=1024,
@@ -601,10 +649,11 @@ class BotIntegration(models.Model):
         help_text="Bot's Instagram username (only for display)",
     )
 
-    wa_phone_number = PhoneNumberField(
+    wa_phone_number = WhatsappPhoneNumberField(
         blank=True,
         default="",
         help_text="Bot's WhatsApp phone number (only for display)",
+        validators=[validate_phonenumber],
     )
     wa_phone_number_id = models.CharField(
         max_length=256,
@@ -702,7 +751,7 @@ class BotIntegration(models.Model):
         help_text="Extra configuration for the bot's web integration",
     )
 
-    twilio_phone_number = PhoneNumberField(
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
         blank=True,
         null=True,
         default=None,
@@ -1142,7 +1191,7 @@ class Conversation(models.Model):
         help_text="User's Instagram username (only for display)",
     )
 
-    wa_phone_number = PhoneNumberField(
+    wa_phone_number = WhatsappPhoneNumberField(
         blank=True,
         default="",
         db_index=True,
@@ -1185,7 +1234,7 @@ class Conversation(models.Model):
         help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
-    twilio_phone_number = PhoneNumberField(
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
         blank=True,
         default="",
         help_text="User's Twilio phone number (mandatory)",

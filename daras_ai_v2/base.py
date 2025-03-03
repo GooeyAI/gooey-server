@@ -1109,7 +1109,7 @@ class BasePage:
         ).replace("\n", " ")
 
     @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         return (pr and pr.title) or cls.get_recipe_title()
 
     @classmethod
