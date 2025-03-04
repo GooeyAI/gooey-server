@@ -2295,9 +2295,8 @@ class BasePage:
         self.render_example(doc)
 
     def render_published_run_full_width(self, published_run: PublishedRun, **kwargs):
-        hide_author_column = True if "hide_author_column" in kwargs else False
         use_workspace_author = True if "use_workspace_author" in kwargs else False
-        max_desc_words = 230 if hide_author_column else 180
+        max_desc_words = 280
         max_desc_words_mobile = 100
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
@@ -2320,25 +2319,31 @@ class BasePage:
                     className="border border-dark ms-2",
                 )
             )
-        photo_url = published_run.photo_url
+
         updated_at = published_run.saved_run.updated_at
-        display_picture = lambda size: (
-            gui.image(
-                src=photo_url,
-                className="m-0",
-                style={
-                    "width": size,
-                    "height": size,
-                    "objectFit": "cover",
-                    "borderRadius": "50%",
-                },
-            )
-            if photo_url
-            else gui.write(
-                f"# {get_workflow_emoji(Workflow(published_run.workflow))}",
-                className="m-0 container-margin-reset",
-            )
-        )
+
+        def display_picture(size: str):
+            photo_url = published_run.photo_url
+            if photo_url:
+                gui.image(
+                    src=photo_url,
+                    className="m-0",
+                    style={
+                        "width": size,
+                        "height": size,
+                        "objectFit": "cover",
+                        "borderRadius": "50%",
+                    },
+                )
+            else:
+                with gui.div(
+                    style={"width": size, "height": size},
+                    className="d-flex align-items-center justify-content-center",
+                ):
+                    gui.write(
+                        f"# {get_workflow_emoji(Workflow(published_run.workflow))}",
+                        className="m-0 container-margin-reset",
+                    )
 
         def run_count():
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
@@ -2346,9 +2351,51 @@ class BasePage:
                 count = published_run.get_run_count()
                 if count > 0:
                     run_count = format_number_with_suffix(count)
+                    gui.write(" • ")
                     with gui.div():
                         gui.caption(
                             f"{run_icon} {run_count} runs",
+                            unsafe_allow_html=True,
+                        )
+
+        def render_meta(is_mobile: bool):
+            with gui.div(
+                className={f"row {'d-md-none' if is_mobile else 'd-none d-md-flex'}"},
+            ):
+                with gui.div(
+                    className="col-12 col-md-6 d-flex gap-2 align-items-center container-margin-reset"
+                ):
+                    (
+                        self.render_author(
+                            published_run.last_edited_by,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
+                        if not use_workspace_author
+                        else self.render_workspace_author(
+                            published_run.workspace,
+                            image_size="24px",
+                            text_size="0.9rem",
+                            responsive=False,
+                            show_as_link=False,
+                        )
+                    )
+                    gui.write(" • ")
+                    if updated_at and isinstance(updated_at, datetime.datetime):
+                        gui.caption(
+                            f"{get_relative_time(updated_at)}",
+                            style={"fontSize": "0.9rem"},
+                            className="container-margin-reset",
+                        )
+                    run_count()
+                with gui.div(
+                    className="col-12 col-md-6 container-margin-reset mt-2 mt-md-0"
+                ):
+                    if version.change_notes:
+                        gui.caption(
+                            f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 40))}",
                             unsafe_allow_html=True,
                         )
 
@@ -2368,38 +2415,14 @@ class BasePage:
 
                 """
             ):
-                # column 1
-                # web
-                with gui.div(
-                    className="col-1 p-0 d-none d-md-flex align-items-center justify-content-center container-margin-reset"
-                ):
-                    display_picture("80px")
-
-                center_column_width = 9 if hide_author_column else 7
-                with gui.div(
-                    className=f"col-12 col-md-{center_column_width} p-0 position-relative container-margin-reset"
-                ):
-
-                    with gui.div(className="d-flex align-items-stretch"):
-
-                        # mobile
-                        with gui.div(
-                            className="justify-content-center d-md-none pt-1",
-                            style={"minWidth": "40px"},
-                        ):
-                            display_picture("40px")
-
+                with gui.div(className=f"col-12 col-md-8 p-0 position-relative"):
+                    with gui.div(className="d-flex align-items-center"):
                         with gui.div(className="ms-2 flex-grow-1"):
-                            with gui.div(
-                                className="d-flex flex-column flex-md-row align-items-md-center"
-                            ):
-                                with gui.div(className="d-md-block"):
-                                    with gui.link(
-                                        to=published_run.get_app_url(),
-                                    ):
-
+                            with gui.div(className="d-flex align-items-center"):
+                                with gui.div():
+                                    with gui.link(to=published_run.get_app_url()):
                                         gui.write(
-                                            f"#### {truncate_text_words(tb.h1_title, 50)}",
+                                            f"#### {truncate_text_words(tb.h1_title, 50)}"
                                         )
                                 with gui.div(
                                     className="d-md-flex d-none align-items-center mb-1 ms-2",
@@ -2408,15 +2431,12 @@ class BasePage:
                                     for pill in pills:
                                         pill()
                             if published_run.notes:
-                                with gui.div(
-                                    className="d-none d-md-block container-margin-reset"
-                                ):
+                                with gui.div(className="d-none d-md-block"):
                                     gui.caption(
                                         truncate_text_words(
                                             published_run.notes, max_desc_words
                                         ),
                                     )
-                                # mobile
                                 with gui.div(className="d-md-none"):
                                     gui.caption(
                                         truncate_text_words(
@@ -2424,109 +2444,15 @@ class BasePage:
                                         ),
                                         style={"fontSize": "14px"},
                                     )
-            # column 3
-            # web
-            if not hide_author_column:
+                                render_meta(is_mobile=False)
+                        with gui.div(className="d-md-none ps-3"):
+                            display_picture("74px")
+                # render display_picture
                 with gui.div(
-                    className="d-none d-md-block col-12 col-md-2 flex-grow-1 mt-2"
+                    className="d-none d-md-flex justify-content-end col-4 flex-grow-1 mt-2 align-items-center ps-1 m-0"
                 ):
-                    (
-                        self.render_author(
-                            published_run.last_edited_by,
-                            image_size="24px",
-                            text_size="0.9rem",
-                            responsive=False,
-                            show_as_link=False,
-                        )
-                        if not use_workspace_author
-                        else self.render_workspace_author(
-                            published_run.workspace,
-                            image_size="24px",
-                            text_size="0.9rem",
-                            responsive=False,
-                            show_as_link=False,
-                        )
-                    )
-                    if version.change_notes:
-                        with gui.div(className="mt-2"):
-                            gui.caption(
-                                f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 20))}",
-                                unsafe_allow_html=True,
-                            )
-
-            # column 4
-            with gui.div(
-                className=f"col-12 col-md-{(11 if hide_author_column else 9) - center_column_width} justify-content-between justify-content-md-end d-flex p-0 pt-2"
-            ):
-                # mobile
-                with gui.div(
-                    className="d-flex flex-grow-1 d-md-none justify-content-between justify-content-md-end align-items-center"
-                ):
-                    with gui.div(
-                        className="d-md-none mb-1 flex-grow-1 align-items-center d-flex justify-content-between align-items-center container-margin-reset",
-                    ):
-                        with gui.div(
-                            className="d-flex",
-                            style={"font-size": "0.7rem", "marginLeft": "46px"},
-                        ):
-                            for pill in pills:
-                                pill()
-                    with gui.div(className="d-flex gap-1 align-items-center"):
-                        (
-                            self.render_author(
-                                published_run.last_edited_by,
-                                image_size="14px",
-                                text_size="0.8rem",
-                                responsive=False,
-                                show_as_link=False,
-                            )
-                            if not use_workspace_author
-                            else self.render_workspace_author(
-                                published_run.workspace,
-                                image_size="14px",
-                                text_size="0.8rem",
-                                responsive=False,
-                                show_as_link=False,
-                            )
-                        )
-                        if updated_at and isinstance(updated_at, datetime.datetime):
-                            gui.caption(
-                                f" • {get_relative_time(updated_at)}",
-                                style={"fontSize": "0.8rem"},
-                                className="container-margin-reset",
-                            )
-
-                # web
-                with gui.div(
-                    className="d-none d-md-block text-end white-space-nowrap container-margin-reset",
-                    style={"whiteSpace": "nowrap"},
-                ):
-                    if hide_author_column:
-                        with gui.div(className="mb-2"):
-                            (
-                                self.render_author(
-                                    published_run.last_edited_by,
-                                    image_size="24px",
-                                    text_size="0.9rem",
-                                    responsive=False,
-                                    show_as_link=False,
-                                    className="mb-2",
-                                )
-                                if not use_workspace_author
-                                else self.render_workspace_author(
-                                    published_run.workspace,
-                                    image_size="24px",
-                                    text_size="0.9rem",
-                                    responsive=False,
-                                    show_as_link=False,
-                                )
-                            )
-                    if updated_at and isinstance(updated_at, datetime.datetime):
-                        gui.caption(
-                            f"{get_relative_time(updated_at)}",
-                            className="container-margin-reset mb-2 d-block",
-                        )
-                    run_count()
+                    display_picture("96px")
+            render_meta(is_mobile=True)
 
     def _render_example_preview(
         self,
