@@ -183,14 +183,14 @@ def render_workspace_create_dialog(
 ):
     step = gui.session_state.setdefault("workspace:create:step", 1)
     if step == 1:
-        title = "# Create Team Workspace"
-        caption = "Workspaces allow you to collaborate with team members with a shared payment method"
+        title = "#### Create Team Workspace"
+        caption = "Workspaces allow you to collaborate with team members with a shared payment method."
         render_fn = lambda: render_workspace_create_step1(
             user=user, session=session, ref=ref
         )
     else:
         workspace = get_current_workspace(user, session)
-        title = f"# Invite Members to {workspace.display_name(user)}"
+        title = f"#### Invite Members to {workspace.display_name(user)}"
         caption = "This workspace is private and only members can access its workflows and shared billing."
         render_fn = lambda: render_workspace_create_step2(
             user=user, session=session, workspace=workspace, ref=ref
@@ -212,34 +212,35 @@ def render_workspace_create_step1(
 ):
     from daras_ai_v2.profiles import render_handle_input, update_handle
 
-    if "workspace:create:name" not in gui.session_state:
-        gui.session_state["workspace:create:name"] = (
-            get_default_workspace_name_for_user(user)
-        )
-    name = gui.text_input(label="#### Name", key=f":name")
+    form_div = gui.div()
+    error_msg_div = gui.div()
 
-    gui.write("#### Your workspace's URL")
-
-    handle_div = gui.div(className="d-flex align-items-center mt-3")
-    handle_msg_div = gui.div()
-    with handle_div:
-        with gui.div(
-            className="d-flex justify-content-center align-items-center mb-3 me-2"
-        ):
-            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
-        if "workspace:create:handle_name" not in gui.session_state:
-            gui.session_state["workspace:create:handle_name"] = (
-                Handle.get_suggestion_for_team_workspace(display_name=name)
+    with form_div:
+        if "workspace:create:name" not in gui.session_state:
+            gui.session_state["workspace:create:name"] = (
+                get_default_workspace_name_for_user(user)
             )
-        handle_name = render_handle_input(
-            label="", key="workspace:create:handle_name", msg_div=handle_msg_div
-        )
+        name = gui.text_input(label="###### Name", key=f"workspace:create:name")
 
-    description = gui.text_input(
-        "#### Describe your team",
-        key="workspace:create:description",
-        placeholder="A plucky team of intrepid folks working to change the world",
-    )
+        gui.write("###### Your workspace's URL")
+        with gui.div(className="d-flex align-items-start gap-2"):
+            with gui.div(className="mt-2 pt-1"):
+                gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
+            with gui.div():
+                # separate div for input & error msg for handle field
+                if "workspace:create:handle_name" not in gui.session_state:
+                    gui.session_state["workspace:create:handle_name"] = (
+                        Handle.get_suggestion_for_team_workspace(display_name=name)
+                    )
+                handle_name = render_handle_input(
+                    label="", key="workspace:create:handle_name"
+                )
+
+        description = gui.text_input(
+            "###### Describe your team",
+            key="workspace:create:description",
+            placeholder="A plucky team of intrepid folks working to change the world",
+        )
 
     with gui.div(className="d-flex justify-content-end align-items-center gap-3"):
         gui.caption("Next: Invite Team Members")
@@ -257,8 +258,13 @@ def render_workspace_create_step1(
                 with transaction.atomic():
                     workspace.handle = update_handle(handle=None, name=handle_name)
                     workspace.create_with_owner()
-            except (ValidationError, IntegrityError) as e:
-                gui.error(str(e))
+            except ValidationError as e:
+                with error_msg_div:
+                    gui.error("\n".join(e.messages))
+                return
+            except IntegrityError as e:
+                with error_msg_div:
+                    gui.error(str(e))
                 return
             else:
                 set_current_workspace(session, workspace.id)
@@ -274,12 +280,12 @@ def render_workspace_create_step2(
 
     with gui.div(className="container-margin-reset d-flex flex-column gap-3"):
         with gui.div():
-            gui.write("##### Emails")
+            gui.write("###### Emails")
             gui.caption("Add email addresses for members, separated by commas.")
             emails = gui.text_area(label="Emails", key="workspace:create:emails")
 
         with gui.div():
-            gui.write("##### Allowed email domain")
+            gui.write("###### Allowed email domain")
             gui.caption(
                 "Anyone with this domain will be automatically added as a member to this workspace."
             )
