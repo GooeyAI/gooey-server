@@ -278,52 +278,63 @@ def render_workspace_create_step2(
 ):
     from routers.account import account_route
 
-    with gui.div(className="container-margin-reset d-flex flex-column gap-3"):
-        with gui.div():
-            gui.write("###### Emails")
-            gui.caption("Add email addresses for members, separated by commas.")
-            emails = gui.text_area(label="Emails", key="workspace:create:emails")
+    emails = gui.text_area(
+        label=(
+            "###### Emails\n"
+            "Add email addresses for members, separated by commas (up to 10)."
+        ),
+        placeholder="foo@gooey.ai, bar@gooey.ai, baz@gooey.ai, ...",
+        height=5,
+        key="workspace:create:emails",
+    )
 
-        with gui.div():
-            gui.write("###### Allowed email domain")
-            gui.caption(
+    options = get_workspace_domain_name_options(workspace, user)
+    if options:
+        workspace.domain_name = gui.selectbox(
+            label=(
+                "###### Allowed email domain\n"
                 "Anyone with this domain will be automatically added as a member to this workspace."
-            )
-            options = get_workspace_domain_name_options(workspace, user)
-            if options:
-                workspace.domain_name = gui.selectbox(
-                    label="", options=options, key="workspace:create:domain_name"
-                )
-            else:
-                gui.caption(
-                    "Sign in with your work email to automatically add members."
-                )
+            ),
+            format_func=lambda x: x and f"@{x}" or "---",
+            options=options,
+            key="workspace:create:domain_name",
+        )
+    else:
+        gui.caption("Sign in with your work email to automatically add members.")
 
-    if gui.button("Close", key=f"workspace:create:close", type="secondary"):
-        workspace.save(update_fields=["domain_name"])
-        clear_workspace_create_form()
-        ref.set_open(False)
-        raise gui.RerunException()
-
-    if gui.button("Choose a Plan", type="primary"):
-        emails = emails.split(",")
-        emails = list(filter(bool, [email.strip() for email in emails]))
-
-        try:
-            for email in emails[:10]:
-                key = f"workspace:create:email:{email}"
-                if key in gui.session_state:
-                    continue
-                WorkspaceInvite.objects.create_and_send_invite(
-                    workspace=workspace,
-                    email=email,
-                    current_user=user,
-                )
-                gui.session_state[key] = 1
-        except ValidationError as e:
-            gui.error(str(e))
-        else:
+    with gui.div(className="d-flex justify-content-end gap-2"):
+        if gui.button("Close", key=f"workspace:create:close", type="secondary"):
             workspace.save(update_fields=["domain_name"])
+            clear_workspace_create_form()
+            ref.set_open(False)
+            raise gui.RerunException()
+
+        if gui.button("Choose a Plan", type="primary"):
+            emails = emails.split(",")
+            emails = list(filter(bool, [email.strip() for email in emails]))
+
+            try:
+                for email in emails[:10]:
+                    email_invited_key = f"workspace:create:email:{email}"
+                    if email_invited_key in gui.session_state:
+                        continue
+                    WorkspaceInvite.objects.create_and_send_invite(
+                        workspace=workspace,
+                        email=email,
+                        current_user=user,
+                    )
+                    gui.session_state[email_invited_key] = 1
+            except ValidationError as e:
+                gui.error(str(e))
+                return
+
+            try:
+                workspace.save(update_fields=["domain_name"])
+            except ValidationError as e:
+                gui.error("\n".join(e.messages))
+            except IntegrityError as e:
+                gui.error(str(e))
+
             raise gui.RedirectException(get_route_path(account_route))
 
 

@@ -641,7 +641,6 @@ class WorkspaceInvite(models.Model):
         )
 
     def send_email(self):
-        # pre-emptively set last_email_sent_at to avoid sending multiple emails concurrently
         if not self.can_resend_email():
             raise ValidationError("This user has already been invited recently.")
 
