@@ -212,36 +212,33 @@ def render_workspace_create_step1(
 ):
     from daras_ai_v2.profiles import render_handle_input, update_handle
 
-    form_div = gui.div()
-    error_msg_div = gui.div()
-
-    with form_div:
-        if "workspace:create:name" not in gui.session_state:
-            gui.session_state["workspace:create:name"] = (
-                get_default_workspace_name_for_user(user)
-            )
-        name = gui.text_input(label="###### Name", key=f"workspace:create:name")
-
-        gui.write("###### Your workspace's URL")
-        with gui.div(className="d-flex align-items-start gap-2"):
-            with gui.div(className="mt-2 pt-1"):
-                gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
-            with gui.div():
-                # separate div for input & error msg for handle field
-                if "workspace:create:handle_name" not in gui.session_state:
-                    gui.session_state["workspace:create:handle_name"] = (
-                        Handle.get_suggestion_for_team_workspace(display_name=name)
-                    )
-                handle_name = render_handle_input(
-                    label="", key="workspace:create:handle_name"
-                )
-
-        description = gui.text_input(
-            "###### Describe your team",
-            key="workspace:create:description",
-            placeholder="A plucky team of intrepid folks working to change the world",
+    if "workspace:create:name" not in gui.session_state:
+        gui.session_state["workspace:create:name"] = (
+            get_default_workspace_name_for_user(user)
         )
+    name = gui.text_input(label="###### Name", key=f"workspace:create:name")
 
+    gui.write("###### Your workspace's URL")
+    with gui.div(className="d-flex align-items-start gap-2"):
+        with gui.div(className="mt-2 pt-1"):
+            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
+        with gui.div(className="flex-grow-1"):
+            # separate div for input & error msg for handle field
+            if "workspace:create:handle_name" not in gui.session_state:
+                gui.session_state["workspace:create:handle_name"] = (
+                    Handle.get_suggestion_for_team_workspace(display_name=name)
+                )
+            handle_name = render_handle_input(
+                label="", key="workspace:create:handle_name"
+            )
+
+    description = gui.text_input(
+        "###### Describe your team",
+        key="workspace:create:description",
+        placeholder="A plucky team of intrepid folks working to change the world",
+    )
+
+    error_msg_div = gui.div()
     with gui.div(className="d-flex justify-content-end align-items-center gap-3"):
         gui.caption("Next: Invite Team Members")
 
@@ -315,7 +312,7 @@ def render_workspace_create_step2(
 
             try:
                 for email in emails[:10]:
-                    email_invited_key = f"workspace:create:email:{email}"
+                    email_invited_key = f"workspace:create:emails:{email}"
                     if email_invited_key in gui.session_state:
                         continue
                     WorkspaceInvite.objects.create_and_send_invite(
