@@ -962,8 +962,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 glossary_url=request.input_glossary_document,
                 model=request.translation_model,
             )[0]
-        if ocr_texts:
-            yield "Translating Image Text to English..."
+        if ocr_texts and request.user_language:
+            yield "Translating Input Documents to English..."
             ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
