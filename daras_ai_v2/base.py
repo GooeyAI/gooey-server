@@ -714,9 +714,13 @@ class BasePage:
         form_container = gui.div()
 
         with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
-            selected_workspace = self._render_workspace_selector(
-                key="published_run_workspace"
-            )
+            if len(self.request.user.cached_workspaces) == 1:
+                selected_workspace = self.current_workspace
+            else:
+                selected_workspace = self._render_workspace_selector(
+                    key="published_run_workspace"
+                )
+
             user_can_edit = selected_workspace.id == self.current_pr.workspace_id
 
             with gui.div(className="mt-4 mt-lg-0 text-end"):
@@ -842,9 +846,6 @@ class BasePage:
         raise gui.RedirectException(pr.get_app_url())
 
     def _render_workspace_selector(self, *, key: str) -> "Workspace":
-        if not self.can_user_see_workspaces():
-            return self.current_workspace
-
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
 
         if self.current_pr.workspace_id and self.can_user_edit_published_run(

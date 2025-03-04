@@ -21,7 +21,11 @@ from .models import (
     WorkspaceMembership,
     WorkspaceRole,
 )
-from .widgets import get_current_workspace, set_current_workspace
+from .widgets import (
+    get_current_workspace,
+    get_workspace_domain_name_options,
+    set_current_workspace,
+)
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
@@ -345,7 +349,7 @@ def render_workspace_edit_view_by_membership(
     dialog_ref: gui.ConfirmDialogRef, membership: WorkspaceMembership
 ):
     workspace = copy(membership.workspace)
-    render_workspace_create_or_edit_form(workspace, membership.user)
+    render_workspace_edit_form(workspace, membership.user)
     render_danger_zone_by_membership(dialog_ref, membership)
     return workspace
 
@@ -625,7 +629,7 @@ def clear_workspace_create_or_edit_form():
         gui.session_state.pop(k, None)
 
 
-def render_workspace_create_or_edit_form(
+def render_workspace_edit_form(
     workspace: Workspace,
     current_user: AppUser,
 ):
@@ -645,14 +649,14 @@ def render_workspace_create_or_edit_form(
         placeholder="Tell the world about your team!",
         value=workspace.description,
     )
-    if current_user.email or workspace.domain_name:
+
+    domain_name_options = get_workspace_domain_name_options(
+        workspace=workspace, current_user=current_user
+    )
+    if len(domain_name_options) > 1:
         workspace.domain_name = gui.selectbox(
             "###### Domain Name _(Optional)_",
-            options={
-                workspace.domain_name,
-                current_user.email and current_user.email.split("@")[-1],
-            }
-            | {None},
+            options=domain_name_options,
             key="workspace-domain-name",
             value=workspace.domain_name,
         )
