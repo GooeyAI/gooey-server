@@ -653,7 +653,7 @@ def render_workspace_edit_form(
     domain_name_options = get_workspace_domain_name_options(
         workspace=workspace, current_user=current_user
     )
-    if len(domain_name_options) > 1:
+    if domain_name_options:
         workspace.domain_name = gui.selectbox(
             "###### Domain Name _(Optional)_",
             options=domain_name_options,
