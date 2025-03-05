@@ -385,7 +385,7 @@ def get_workspace_domain_name_options(
     current_user_domain = (
         current_user.email
         and current_user.email not in COMMON_EMAIL_DOMAINS
-        and current_user.email.split("@")[-1]
+        and current_user.email.rsplit("@", maxsplit=1)[-1]
     )
     options = {workspace.domain_name, current_user_domain, None}
     return len(options) > 1 and options or None
