@@ -1,6 +1,8 @@
-from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
 import gooey_gui as gui
+import sentry_sdk
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db import IntegrityError, transaction
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings, urls
@@ -189,7 +191,11 @@ def render_workspace_create_dialog(
             user=user, session=session, ref=ref
         )
     else:
-        workspace = get_current_workspace(user, session)
+        if workspace_id := gui.session_state.get("workspace:create:workspace_id"):
+            workspace = Workspace.objects.get(id=workspace_id)
+        else:
+            workspace = get_current_workspace(user, session)
+
         title = f"#### Invite Members to {workspace.display_name(user)}"
         caption = "This workspace is private and only members can access its workflows and shared billing."
         render_fn = lambda: render_workspace_create_step2(
@@ -264,7 +270,6 @@ def render_workspace_create_step1(
                     gui.error(str(e))
                 return
             else:
-                set_current_workspace(session, workspace.id)
                 gui.session_state["workspace:create:step"] = 2
                 gui.session_state["workspace:create:workspace_id"] = workspace.id
                 raise gui.RerunException()
@@ -275,7 +280,7 @@ def render_workspace_create_step2(
 ):
     from routers.account import account_route
 
-    emails = gui.text_area(
+    emails_csv = gui.text_area(
         label=(
             "###### Emails\n"
             "Add email addresses for members, separated by commas (up to 10)."
@@ -299,40 +304,46 @@ def render_workspace_create_step2(
     else:
         gui.caption("Sign in with your work email to automatically add members.")
 
+    error_msg_div = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2"):
-        if gui.button("Close", key=f"workspace:create:close", type="secondary"):
-            workspace.save(update_fields=["domain_name"])
-            clear_workspace_create_form()
-            ref.set_open(False)
-            raise gui.RerunException()
+        close_btn = gui.button("Close", key=f"workspace:create:close", type="secondary")
+        submit_btn = gui.button("Choose a Plan", type="primary")
+        if not close_btn and not submit_btn:
+            return
 
-        if gui.button("Choose a Plan", type="primary"):
-            emails = emails.split(",")
-            emails = list(filter(bool, [email.strip() for email in emails]))
-
+        if submit_btn and emails_csv:
             try:
-                for email in emails[:10]:
-                    email_invited_key = f"workspace:create:emails:{email}"
-                    if email_invited_key in gui.session_state:
-                        continue
+                emails = validate_emails_csv(emails_csv)
+            except ValidationError as e:
+                with error_msg_div:
+                    gui.error("\n".join(e.messages))
+                return
+
+            for email in emails:
+                try:
                     WorkspaceInvite.objects.create_and_send_invite(
                         workspace=workspace,
                         email=email,
                         current_user=user,
                     )
-                    gui.session_state[email_invited_key] = 1
-            except ValidationError as e:
-                gui.error(str(e))
-                return
+                except (ValidationError, IntegrityError) as e:
+                    # log and continue
+                    sentry_sdk.capture_exception(e)
 
-            try:
-                workspace.save(update_fields=["domain_name"])
-            except ValidationError as e:
+        try:
+            workspace.full_clean()
+            workspace.save(update_fields=["domain_name"])
+        except ValidationError as e:
+            with error_msg_div:
                 gui.error("\n".join(e.messages))
-            except IntegrityError as e:
-                gui.error(str(e))
-
-            raise gui.RedirectException(get_route_path(account_route))
+        else:
+            set_current_workspace(session, workspace.id)
+            if submit_btn:
+                raise gui.RedirectException(get_route_path(account_route))
+            else:
+                clear_workspace_create_form()
+                ref.set_open(False)
+                raise gui.RerunException()
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
@@ -378,3 +389,24 @@ def get_workspace_domain_name_options(
     )
     options = {workspace.domain_name, current_user_domain, None}
     return len(options) > 1 and options or None
+
+
+def validate_emails_csv(emails_csv: str):
+    """Raises ValidationError if an email is invalid"""
+
+    emails = [email.lower().strip() for email in emails_csv.split(",")]
+    emails = filter(bool, emails)  # remove empty strings
+    emails = set(emails)  # remove duplicates
+    emails = list(emails)[:10]  # take first 10 emails from list
+
+    error_messages = []
+    for email in emails:
+        try:
+            validate_email(email)
+        except ValidationError as e:
+            error_messages.append(f"{email}: {e.messages[0]}")
+
+    if error_messages:
+        raise ValidationError(error_messages)
+
+    return emails
