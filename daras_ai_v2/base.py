@@ -738,13 +738,13 @@ class BasePage:
                             workspace_create_ref.set_open(True)
                         gui.write("to edit with others")
             selected_workspace = self.current_workspace
-            form_buttons_div = gui.div()
+            form_buttons_container = gui.div()
         else:
             with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
                 selected_workspace = self._render_workspace_selector(
                     key="published_run_workspace"
                 )
-                form_buttons_div = gui.div()
+                form_buttons_container = gui.div()
 
         if workspace_create_ref.is_open:
             render_workspace_create_dialog(
@@ -754,7 +754,7 @@ class BasePage:
             )
 
         user_can_edit = selected_workspace.id == self.current_pr.workspace_id
-        with form_buttons_div, gui.div(className="mt-4 mt-lg-0 text-end"):
+        with form_buttons_container, gui.div(className="mt-4 mt-lg-0 text-end"):
             if user_can_edit:
                 pressed_save_as_new = gui.button(
                     f"{icons.fork} Save as New",
