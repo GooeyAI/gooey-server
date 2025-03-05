@@ -244,7 +244,7 @@ def render_workspace_create_step1(
         placeholder="A plucky team of intrepid folks working to change the world",
     )
 
-    error_msg_div = gui.div()
+    error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end align-items-center gap-3"):
         gui.caption("Next: Invite Team Members")
 
@@ -262,11 +262,11 @@ def render_workspace_create_step1(
                     workspace.handle = update_handle(handle=None, name=handle_name)
                     workspace.create_with_owner()
             except ValidationError as e:
-                with error_msg_div:
+                with error_msg_container:
                     gui.error("\n".join(e.messages))
                 return
             except IntegrityError as e:
-                with error_msg_div:
+                with error_msg_container:
                     gui.error(str(e))
                 return
             else:
@@ -304,7 +304,7 @@ def render_workspace_create_step2(
     else:
         gui.caption("Sign in with your work email to automatically add members.")
 
-    error_msg_div = gui.div()
+    error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2"):
         close_btn = gui.button("Close", key=f"workspace:create:close", type="secondary")
         submit_btn = gui.button("Choose a Plan", type="primary")
@@ -315,7 +315,7 @@ def render_workspace_create_step2(
             try:
                 emails = validate_emails_csv(emails_csv)
             except ValidationError as e:
-                with error_msg_div:
+                with error_msg_container:
                     gui.error("\n".join(e.messages))
                 return
 
@@ -334,7 +334,7 @@ def render_workspace_create_step2(
             workspace.full_clean()
             workspace.save(update_fields=["domain_name"])
         except ValidationError as e:
-            with error_msg_div:
+            with error_msg_container:
                 gui.error("\n".join(e.messages))
         else:
             set_current_workspace(session, workspace.id)
