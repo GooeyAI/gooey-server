@@ -280,10 +280,11 @@ def render_workspace_create_step2(
 ):
     from routers.account import account_route
 
+    max_emails = 5
     emails_csv = gui.text_area(
         label=(
             "###### Emails\n"
-            "Add email addresses for members, separated by commas (up to 10)."
+            f"Add email addresses for members, separated by commas (up to {max_emails})."
         ),
         placeholder="foo@gooey.ai, bar@gooey.ai, baz@gooey.ai, ...",
         height=5,
@@ -313,7 +314,7 @@ def render_workspace_create_step2(
 
         if submit_btn and emails_csv:
             try:
-                emails = validate_emails_csv(emails_csv)
+                emails = validate_emails_csv(emails_csv, max_emails=max_emails)
             except ValidationError as e:
                 with error_msg_container:
                     gui.error("\n".join(e.messages))
@@ -391,13 +392,13 @@ def get_workspace_domain_name_options(
     return len(options) > 1 and options or None
 
 
-def validate_emails_csv(emails_csv: str):
+def validate_emails_csv(emails_csv: str, max_emails: int = 5) -> list[str]:
     """Raises ValidationError if an email is invalid"""
 
     emails = [email.lower().strip() for email in emails_csv.split(",")]
     emails = filter(bool, emails)  # remove empty strings
     emails = set(emails)  # remove duplicates
-    emails = list(emails)[:10]  # take first 10 emails from list
+    emails = list(emails)[:max_emails]  # take up to max_emails from the list
 
     error_messages = []
     for email in emails:
