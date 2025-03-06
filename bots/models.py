@@ -1348,9 +1348,11 @@ class MessageQuerySet(models.QuerySet):
                 "Name": message.conversation.get_display_name(),
                 "Role": message.role,
                 "Message (EN)": message.content,
-                "Sent": message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Sent": (
+                    message.created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                    .strftime(settings.SHORT_DATETIME_FORMAT)
+                ),
                 "Message (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
                 "Feedback": (
@@ -1374,6 +1376,8 @@ class MessageQuerySet(models.QuerySet):
                     (message.saved_run and message.saved_run.state.get("input_audio"))
                     or ""
                 ),
+                "Message ID": message.platform_msg_id,
+                "Conversation ID": message.conversation.api_integration_id(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1390,6 +1394,8 @@ class MessageQuerySet(models.QuerySet):
                 "Run URL",
                 "Photo Input",
                 "Audio Input",
+                "Message ID",
+                "Conversation ID",
             ],
         )
         return df
