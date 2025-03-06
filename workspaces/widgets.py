@@ -88,21 +88,20 @@ def global_workspace_selector(user: AppUser, session: dict):
                             )
 
         if current.is_personal:
-            if BasePage.is_user_admin(user):
-                gui.html('<hr class="my-1"/>')
-                with gui.tag(
-                    "button",
-                    className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                    name="--create-workspace",
-                    type="submit",
-                    value="yes",
-                    style=dict(height=row_height),
-                ):
-                    with gui.div(className="row align-items-center"):
-                        with gui.div(className="col-2 d-flex justify-content-center"):
-                            gui.html(icons.octopus)
-                        with gui.div(className="col-10"):
-                            gui.html("New Team Workspace")
+            gui.html('<hr class="my-1"/>')
+            with gui.tag(
+                "button",
+                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
+                name="--create-workspace",
+                type="submit",
+                value="yes",
+                style=dict(height=row_height),
+            ):
+                with gui.div(className="row align-items-center"):
+                    with gui.div(className="col-2 d-flex justify-content-center"):
+                        gui.html(icons.octopus)
+                    with gui.div(className="col-10"):
+                        gui.html("New Team Workspace")
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(

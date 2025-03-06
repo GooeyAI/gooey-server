@@ -2568,11 +2568,6 @@ class BasePage:
     def get_cost_note(self) -> str | None:
         pass
 
-    def can_user_see_workspaces(self) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin() or len(self.request.user.cached_workspaces) > 1
-        )
-
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)
 
