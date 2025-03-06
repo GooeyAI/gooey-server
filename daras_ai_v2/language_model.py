@@ -718,7 +718,8 @@ def run_language_model(
     ), "Pleave provide exactly one of { prompt, messages }"
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
-    max_tokens = min(max_tokens, model.max_output_tokens)
+    if model.max_output_tokens:
+        max_tokens = min(max_tokens, model.max_output_tokens)
     if model.is_chat_model:
         if prompt and not messages:
             # convert text prompt to chat messages
