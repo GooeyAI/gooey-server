@@ -2369,12 +2369,12 @@ class BasePage:
         ):
             with gui.styled(
                 """
-                    & .pr-full-width h4, h1 {
+                    & h4, & h1 {
                         margin: 0 !important;
                     }
 
                     @media (min-width: 768px) {
-                        & .pr-full-width h4, h1 {
+                        & h4, & h1 {
                         margin-bottom: 0.2rem !important;
                         }
                     }
@@ -2395,13 +2395,14 @@ class BasePage:
                     }
                 """
             ):
-                with gui.div(className=f"position-relative"):
+                with gui.div(className=f"position-relative overflow-hidden"):
                     with gui.div(
                         className="d-flex flex-column justify-content-between"
                     ):
                         with gui.div(className="d-flex align-items-stretch"):
                             with gui.div(
-                                className="me-5 flex-grow-1 d-flex flex-column justify-content-between"
+                                className="flex-grow-1 d-flex flex-column justify-content-between",
+                                style={"maxWidth": "80%"},
                             ):
                                 with gui.div(className="d-flex align-items-center"):
                                     with gui.div():
@@ -2444,7 +2445,6 @@ class BasePage:
                                                     f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 40))}",
                                                     unsafe_allow_html=True,
                                                 )
-
                             with gui.div(
                                 className="flex-grow-1 d-flex justify-content-end gui_example_media"
                             ):
