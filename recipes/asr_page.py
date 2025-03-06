@@ -232,7 +232,7 @@ class AsrPage(BasePage):
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
         text_outputs("**Transcription**", value=state.get("output_text"))
 

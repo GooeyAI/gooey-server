@@ -13,7 +13,7 @@ from pyzbar import pyzbar
 
 import gooey_gui as gui
 from app_users.models import AppUser
-from bots.models import Workflow
+from bots.models import PublishedRun, Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
@@ -438,7 +438,12 @@ Here is the final output:
         state = gui.session_state
         self._render_outputs(state)
 
-    def render_example(self, state: dict):
+    def render_example_preview_media(self, published_run: PublishedRun):
+        output_images = list(published_run.saved_run.state.get("output_images", []))
+        if output_images:
+            gui.image(output_images[0])
+
+    def render_run_preview_output(self, state: dict):
         self._render_outputs(state, max_count=1)
 
     def _render_outputs(self, state: dict, max_count: int | None = None):

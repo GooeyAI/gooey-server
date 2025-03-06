@@ -80,7 +80,7 @@ class RelatedQnAPage(BasePage):
     def render_output(self):
         render_qna_outputs(gui.session_state, 300)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write("**Search Query**")
         gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         site_filter = state.get("site_filter")

@@ -128,7 +128,7 @@ Prompt for merging several outputs together
     def render_output(self):
         render_output_with_refs(gui.session_state)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
         gui.write("**Instructions**")
         gui.write("```properties\n" + state.get("task_instructions", "") + "\n```")

@@ -276,7 +276,7 @@ Here's what you uploaded:
     # def render_settings(self):
     #     language_model_settings()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
 
     def render_output(self):

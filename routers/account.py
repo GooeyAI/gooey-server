@@ -295,9 +295,7 @@ def all_saved_runs_tab(request: Request):
         workflow = Workflow(pr.workflow)
         visibility = PublishedRunVisibility(pr.visibility)
 
-        workflow.page_cls().render_published_run_full_width(
-            pr, workflow_pill=workflow.short_title
-        )
+        workflow.page_cls().render_example(pr, workflow_pill=workflow.short_title)
 
     gui.write("# Saved Workflows")
     explore_path = get_route_path(explore_page)

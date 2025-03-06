@@ -463,7 +463,7 @@ class TextToSpeechPage(BasePage):
             CompareText2ImgPage,
         ]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col1:
             text = state.get("text_prompt")

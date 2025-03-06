@@ -263,11 +263,14 @@ class DeforumSDPage(BasePage):
         # in seconds
         return gui.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         display = self.preview_input(state)
         gui.markdown("```lua\n" + display + "\n```")
 
         gui.video(state.get("output_video"), autoplay=True)
+
+    def render_example_preview_media(self, published_run: dict):
+        gui.video(published_run.saved_run.state.get("output_video"))
 
     @classmethod
     def preview_input(cls, state: dict) -> str:

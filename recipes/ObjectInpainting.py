@@ -292,7 +292,7 @@ class ObjectInpaintingPage(BasePage):
         )
         state["output_images"] = diffusion_images
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col2:
             output_images = state.get("output_images")

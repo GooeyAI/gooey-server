@@ -156,7 +156,7 @@ class CompareUpscalerPage(BasePage):
     def render_output(self):
         _render_outputs(gui.session_state)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col1:
             gui.image(state.get("input_image"), caption="Input Image")

@@ -298,7 +298,7 @@ class ImageSegmentationPage(BasePage):
         yield
 
     def render_output(self):
-        self.render_example(gui.session_state)
+        self.render_run_preview_output(gui.session_state)
 
     def render_steps(self):
         col1, col2, col3, col4 = gui.columns(4)
@@ -337,7 +337,7 @@ class ImageSegmentationPage(BasePage):
             else:
                 gui.div()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
 
         with col1:

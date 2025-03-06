@@ -226,7 +226,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         else:
             gui.div()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write(
             f"""
             **Google Search Query** `{state.get("search_query", '')}` \\
