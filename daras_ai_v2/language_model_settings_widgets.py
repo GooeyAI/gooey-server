@@ -49,17 +49,16 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
     with col1:
         gui.checkbox("Avoid Repetition", key="avoid_repetition")
 
-    if any(map(lambda llm: llm.supports_json, llms)):
-        with col2:
-            gui.selectbox(
-                f"###### {field_title_desc(LanguageModelSettings, 'response_format_type')}",
-                options=[None, "json_object"],
-                key="response_format_type",
-                format_func={
-                    None: BLANK_OPTION,
-                    "json_object": "JSON Object",
-                }.__getitem__,
-            )
+    with col2:
+        gui.selectbox(
+            f"###### {field_title_desc(LanguageModelSettings, 'response_format_type')}",
+            options=[None, "json_object"],
+            key="response_format_type",
+            format_func={
+                None: BLANK_OPTION,
+                "json_object": "JSON Object",
+            }.__getitem__,
+        )
 
     col1, col2 = gui.columns(2)
     with col1:
@@ -81,7 +80,7 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
             step=2,
         )
 
-    if any(map(lambda llm: llm.supports_temperature, llms)):
+    if any(llm.supports_temperature for llm in llms):
         with col2:
             gui.slider(
                 label="""
@@ -105,9 +104,7 @@ How many answers should the copilot generate? Additional answer outputs increase
             min_value=1,
             max_value=4,
         )
-    if llms and any(
-        map(lambda llm: not llm.is_chat_model and llm.llm_api == LLMApis.openai, llms)
-    ):
+    if any(not llm.is_chat_model and llm.llm_api == LLMApis.openai for llm in llms):
         with col2:
             gui.slider(
                 label="""
