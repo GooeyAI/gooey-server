@@ -969,8 +969,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 source_language="auto",
                 target_language="en",
             )
-            for text in ocr_texts:
-                user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+        for text in ocr_texts:
+            user_input = f"Exracted Text: {text!r}\n\n{user_input}"
         return user_input
 
     def build_final_prompt(self, request, response, user_input, model):
