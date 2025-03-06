@@ -153,7 +153,7 @@ class DocExtractPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Transcribe YouTube videos in any language with Whisper, Google Chirp & more, run your own GPT4 prompt on each transcript and save it all to a Google Sheet. Perfect for making a YouTube-based dataset to create your own chatbot or enterprise copilot (ie. just add the finished Google sheet url to the doc section in https://gooey.ai/copilot)."
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         if sheet_url := state.get("sheet_url"):
             render_documents(state, label="**Input Documents**")
             gui.write("**Google Sheets URL**")

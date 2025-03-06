@@ -151,7 +151,7 @@ class GoogleGPTPage(BasePage):
         refs = gui.session_state.get("references", [])
         render_sources_widget(refs)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write("**Search Query**")
         gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         site_filter = state.get("site_filter")

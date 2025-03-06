@@ -49,7 +49,7 @@ class EmbeddingsPage(BasePage):
             gui.write(f"##### `embeddings[{i}]`")
             gui.json(embedding, depth=0)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         texts = gui.session_state.setdefault("texts", [""])
         for i, text in enumerate(texts):
             texts[i] = gui.text_area(f"`texts[{i}]`", value=text, disabled=True)

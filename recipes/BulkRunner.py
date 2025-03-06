@@ -253,7 +253,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             flatten_dict_key="url",
         )
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
 
     def render_output(self):
