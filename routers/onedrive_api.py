@@ -10,6 +10,7 @@ from starlette.responses import HTMLResponse
 from bots.models import SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.settings import templates
 from routers.custom_api_router import CustomAPIRouter
 
 app = CustomAPIRouter()
@@ -26,12 +27,21 @@ def onedrive_connect_redirect(request: Request):
     sr = load_sr_from_state(request)
     code = request.query_params.get("code")
     if not code:
-        error = request.query_params.get("error")
-        error_description = request.query_params.get("error_description")
-        return HTMLResponse(
-            f"Authorization code missing! {error} : {error_description}",
-            status_code=400,
+        error = request.query_params.get("error", "Authentication failed")
+        error_description = request.query_params.get(
+            "error_description", "An error occurred during authentication."
         )
+        sr_id = json.loads(request.query_params.get("state") or "{}").get("sr_id")
+        redirect_url = sr.get_app_url()
+
+        context = {
+            "request": request,
+            "error": error,
+            "error_description": error_description,
+            "redirect_url": redirect_url,
+            "retry_url": generate_onedrive_auth_url(sr_id=sr_id),
+        }
+        return templates.TemplateResponse("authorization_error.html", context=context)
 
     user_access_token, user_refresh_token = _get_access_token_from_code(code)
     user_display_name = _get_user_display_name(user_access_token)
