@@ -22,6 +22,7 @@ from daras_ai_v2.exceptions import (
     UserError,
 )
 from daras_ai_v2.extract_face import rgb_img_to_rgba
+from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.gpu_server import (
     b64_img_decode,
     call_sd_multi,
@@ -309,7 +310,7 @@ def text2img(
             payload = dict(
                 prompt=prompt,
                 image_size=dict(width=width, height=height),
-                num_inference_steps=num_inference_steps,
+                num_inference_steps=min(num_inference_steps, 50),
                 seed=seed,
                 guidance_scale=guidance_scale,
                 num_images=num_outputs,
@@ -317,10 +318,11 @@ def text2img(
             )
             if loras:
                 payload["loras"] = [lora.dict() for lora in loras]
-            return generate_fal_images(
+            output_images = yield from generate_fal_images(
                 model_id=text2img_model_ids[model],
                 payload=payload,
             )
+            return output_images
         case Text2ImgModels.dall_e_3:
             from openai import OpenAI
 
@@ -377,32 +379,11 @@ def text2img(
     ]
 
 
-def generate_fal_images(model_id: str, payload: dict) -> list[str]:
-    r = requests.post(
-        str(furl("https://queue.fal.run") / model_id),
-        headers=_fal_auth_headers(),
-        json=payload,
-    )
-    raise_for_status(r)
-    result = r.json()
-    status_url = result["status_url"]
-
-    for _ in range(600):
-        r = requests.get(status_url, headers=_fal_auth_headers())
-        raise_for_status(r)
-        result = r.json()
-
-        if result["status"] != "COMPLETED":
-            sleep(1)
-        else:
-            repsonse_url = result["response_url"]
-            r = requests.get(repsonse_url, headers=_fal_auth_headers())
-            raise_for_status(r)
-            result = r.json()
-
-            return [r["url"] for r in result["images"]]
-
-    raise TimeoutError("Timeout waiting for image to be generated from fal.ai")
+def generate_fal_images(
+    model_id: str, payload: dict
+) -> typing.Generator[str, None, list[str]]:
+    result = yield from generate_on_fal(model_id, payload)
+    return [r["url"] for r in result["images"]]
 
 
 def _fal_auth_headers():

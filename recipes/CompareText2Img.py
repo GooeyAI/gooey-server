@@ -204,7 +204,7 @@ class CompareText2ImgPage(BasePage):
             model = Text2ImgModels[selected_model]
             yield f"Running {model.value}..."
 
-            output_images[selected_model] = text2img(
+            output_images[selected_model] = yield from text2img(
                 model=model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,

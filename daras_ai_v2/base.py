@@ -4,6 +4,7 @@ import html
 import inspect
 import json
 import math
+import traceback
 import typing
 import uuid
 from copy import copy, deepcopy
@@ -1984,6 +1985,7 @@ class BasePage:
                 enable_rate_limits=enable_rate_limits, run_status=run_status, **defaults
             )
         except ValidationError as e:
+            traceback.print_exc()
             gui.session_state[StateKeys.run_status] = None
             gui.session_state[StateKeys.error_msg] = str(e)
             return
