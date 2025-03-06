@@ -1105,7 +1105,14 @@ def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | No
         workspace=bi.workspace,
         request_body=dict(
             variables=(
-                fn_sr.state.get("variables", {}) | dict(messages_export_url=csv_url)
+                fn_sr.state.get("variables", {})
+                | dict(
+                    messages_export_url=csv_url,
+                    saved_copilot_url=(
+                        bi.published_run and bi.published_run.get_app_url()
+                    ),
+                    integration_id=bi.api_integration_id(),
+                )
             ),
             variables_schema=fn_sr.state.get("variables_schema", {}),
         ),
