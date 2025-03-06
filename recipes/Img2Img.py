@@ -5,7 +5,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_gui as gui
-from bots.models import Workflow
+from bots.models import PublishedRun, Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -137,7 +137,7 @@ class Img2ImgPage(BasePage):
         for img in output_images:
             gui.image(img, show_download_button=True)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col2:
             output_images = state.get("output_images", [])
@@ -148,6 +148,14 @@ class Img2ImgPage(BasePage):
             gui.image(input_image, caption="Input Image")
             gui.write("**Prompt**")
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
+
+    def render_example_preview_media(self, published_run: PublishedRun):
+        state = published_run.saved_run.state
+        input_image = state.get("input_image", None)
+        output_images = state.get("output_images", [])
+        with gui.div(className="d-flex gap-2"):
+            gui.image(input_image)
+            gui.image(output_images[0])
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
