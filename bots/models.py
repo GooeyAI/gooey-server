@@ -1440,8 +1440,8 @@ class MessageQuerySet(models.QuerySet):
         for i, msg in enumerate(reversed(msgs)):
             entries[i] = format_chat_entry(
                 role=msg.role,
-                content=msg.content,
-                images=msg.attachments.filter(
+                content_text=msg.content,
+                input_images=msg.attachments.filter(
                     metadata__mime_type__startswith="image/"
                 ).values_list("url", flat=True),
             )

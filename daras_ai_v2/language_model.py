@@ -702,7 +702,7 @@ def run_language_model(
         if prompt and not messages:
             # convert text prompt to chat messages
             messages = [
-                format_chat_entry(role=CHATML_ROLE_USER, content=prompt),
+                format_chat_entry(role=CHATML_ROLE_USER, content_text=prompt),
             ]
         if not model.is_vision_model:
             # remove images from the messages
@@ -718,7 +718,7 @@ def run_language_model(
                 messages.insert(
                     0,
                     format_chat_entry(
-                        role=CHATML_ROLE_SYSTEM, content=DEFAULT_JSON_PROMPT
+                        role=CHATML_ROLE_SYSTEM, content_text=DEFAULT_JSON_PROMPT
                     ),
                 )
             else:
@@ -781,7 +781,7 @@ def run_language_model(
         if stream:
             ret = [
                 [
-                    format_chat_entry(role=CHATML_ROLE_ASSISTANT, content=msg)
+                    format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text=msg)
                     for msg in ret
                 ]
             ]
@@ -1228,7 +1228,7 @@ def run_openai_chat(
     if stream:
         return _stream_openai_chunked(completion, used_model, messages)
     if not completion or not completion.choices:
-        return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content="")]
+        return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
     else:
         ret = [choice.message.dict() for choice in completion.choices]
         record_openai_llm_usage(used_model, completion, messages, ret)
@@ -1964,11 +1964,27 @@ def entry_to_prompt_str(entry: ConversationEntry) -> str:
 
 
 def format_chat_entry(
-    *, role: str, content: str, images: list[str] = None
+    *,
+    role: str,
+    content_text: str,
+    input_images: typing.Optional[list[str]] = None,
+    input_audio: typing.Optional[str] = None,
+    input_documents: typing.Optional[list[str]] = None,
+    render_input_urls: typing.Optional[bool] = False,
 ) -> ConversationEntry:
-    if images:
+
+    input_urls = []
+    if input_images and not render_input_urls:
+        input_urls.append(f"Image URLs: {', '.join(input_images)}")
+    if input_audio and not render_input_urls:
+        input_urls.append(f"Audio URL: {input_audio}")
+    if input_documents and not render_input_urls:
+        input_urls.append(f"Document URLs: {', '.join(input_documents)}")
+
+    content = content_text + ("\n" + "\n".join(input_urls) if input_urls else "")
+    if input_images:
         content = [
-            {"type": "image_url", "image_url": {"url": url}} for url in images
+            {"type": "image_url", "image_url": {"url": url}} for url in input_images
         ] + [
             {"type": "text", "text": content},
         ]
