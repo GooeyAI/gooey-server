@@ -70,7 +70,7 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import get_current_workspace, set_current_workspace
-from daras_ai_v2.utils import get_relative_time, get_workflow_emoji
+from daras_ai_v2.utils import get_relative_time
 
 DEFAULT_META_IMG = (
     # Small
@@ -2527,6 +2527,7 @@ class BasePage:
                         },
                     )
                 else:
+                    workflow = Workflow(self.current_pr.workflow)
                     preview_image = self.get_example_preview_image(
                         published_run.saved_run.to_dict()
                     )
@@ -2542,7 +2543,7 @@ class BasePage:
                         )
                     else:
                         gui.write(
-                            f"# {get_workflow_emoji(Workflow(self.current_pr.workflow))}",
+                            f"# {workflow.get_or_create_metadata().emoji}",
                             className="m-0 container-margin-reset",
                         )
 
