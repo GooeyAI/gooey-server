@@ -293,7 +293,6 @@ def all_saved_runs_tab(request: Request):
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        visibility = PublishedRunVisibility(pr.visibility)
 
         workflow.page_cls().render_example(pr, workflow_pill=workflow.short_title)
 
