@@ -2291,7 +2291,8 @@ class BasePage:
         self,
         published_run: PublishedRun,
         use_workspace_author: bool = False,
-        **kwargs,
+        workflow_pill: str | None = None,
+        hide_visibility_pill: bool = False,
     ):
         max_desc_words = 280
         max_desc_words_mobile = 100
@@ -2299,19 +2300,19 @@ class BasePage:
         version = published_run.versions.latest()
         pills = [
             lambda: (
-                gui.pill(
+                None
+                if hide_visibility_pill
+                else gui.pill(
                     PublishedRunVisibility(published_run.visibility).get_badge_html(),
                     unsafe_allow_html=True,
                     className="border border-dark",
                 )
-                if not "hide_visibility_pill" in kwargs
-                else None
             ),
         ]
-        if kwargs.get("workflow_pill"):
+        if workflow_pill:
             pills.append(
                 lambda: gui.pill(
-                    kwargs["workflow_pill"],
+                    workflow_pill,
                     unsafe_allow_html=True,
                     className="border border-dark ms-2",
                 )
@@ -2474,7 +2475,6 @@ class BasePage:
     ):
         self.render_example(
             published_run,
-            hide_author_column=True,
             use_workspace_author=True,
             hide_visibility_pill=True,
         )
