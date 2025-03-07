@@ -2386,6 +2386,7 @@ class BasePage:
                     & .gui_example_media .gui-img, .gui-video {
                         max-width: 150px !important;
                         height: 100% !important;
+                        width: unset !important;
                     }
 
                     @media (max-width: 768px) {
@@ -2450,7 +2451,7 @@ class BasePage:
                                                     unsafe_allow_html=True,
                                                 )
                             with gui.div(
-                                className="flex-grow-1 d-flex justify-content-end"
+                                className="flex-grow-1 d-flex justify-content-end ms-2"
                             ):
                                 with gui.div(className="gui_example_media"):
                                     self.render_example_preview_media(
