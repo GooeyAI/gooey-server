@@ -2543,6 +2543,7 @@ class BasePage:
                         },
                     )
                 else:
+                    workflow = Workflow(self.current_pr.workflow)
                     preview_image = self.get_example_preview_image(
                         published_run.saved_run.to_dict()
                     )
@@ -2558,7 +2559,7 @@ class BasePage:
                         )
                     else:
                         gui.write(
-                            f"# {get_workflow_emoji(Workflow(self.current_pr.workflow))}",
+                            f"# {workflow.get_or_create_metadata().emoji}",
                             className="m-0 container-margin-reset",
                         )
 
