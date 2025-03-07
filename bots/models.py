@@ -1339,10 +1339,16 @@ class MessageQuerySet(models.QuerySet):
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
     ) -> "pd.DataFrame":
         import pandas as pd
+        from routers.bots_api import MSG_ID_PREFIX
 
         qs = self.all().prefetch_related("feedbacks")
         rows = []
         for message in qs[:row_limit]:
+            if message.conversation.bot_integration.platform == Platform.WEB:
+                message_id = message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
+            else:
+                message_id = message.platform_msg_id
+
             message: Message
             row = {
                 "Name": message.conversation.get_display_name(),
@@ -1376,7 +1382,7 @@ class MessageQuerySet(models.QuerySet):
                     (message.saved_run and message.saved_run.state.get("input_audio"))
                     or ""
                 ),
-                "Message ID": message.platform_msg_id,
+                "Message ID": message_id,
                 "Conversation ID": message.conversation.api_integration_id(),
             }
             rows.append(row)

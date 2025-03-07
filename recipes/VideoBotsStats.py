@@ -1,4 +1,5 @@
 import base64
+import typing
 from datetime import datetime, timedelta
 from functools import partial
 from textwrap import dedent
@@ -41,6 +42,7 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from daras_ai_v2.workflow_url_input import workflow_url_input
+from functions.models import VariableSchema
 from functions.recipe_functions import FUNCTIONS_HELP_TEXT
 from recipes.BulkRunner import list_view_editor
 from recipes.Functions import FunctionsPage
@@ -1101,23 +1103,49 @@ def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | No
 
     logger.info(f"exported stats for {bi} -> {csv_url}")
 
+    variables, variables_schema = get_export_fn_vars(
+        bi=bi, fn_sr=fn_sr, messages_export_url=csv_url
+    )
     result, fn_sr = fn_sr.submit_api_call(
         workspace=bi.workspace,
-        request_body=dict(
-            variables=(
-                fn_sr.state.get("variables", {})
-                | dict(
-                    messages_export_url=csv_url,
-                    saved_copilot_url=(
-                        bi.published_run and bi.published_run.get_app_url()
-                    ),
-                    integration_id=bi.api_integration_id(),
-                )
-            ),
-            variables_schema=fn_sr.state.get("variables_schema", {}),
-        ),
+        request_body=dict(variables=variables, variables_schema=variables_schema),
         parent_pr=fn_pr,
         current_user=bi.workspace.created_by,
     )
 
     return result, fn_sr
+
+
+def get_export_fn_vars(
+    bi: BotIntegration, fn_sr: SavedRun, messages_export_url: str
+) -> tuple[dict[str, typing.Any], dict[str, VariableSchema]]:
+    # system variables
+    variables = dict(
+        messages_export_url=messages_export_url,
+        saved_copilot_url=(bi.published_run and bi.published_run.get_app_url()),
+        platform=Platform(bi.platform).name,
+        integration_id=bi.api_integration_id(),
+        integration_name=bi.name,
+    )
+    match bi.platform:
+        case Platform.FACEBOOK:
+            variables["bot_fb_page_name"] = bi.fb_page_name
+        case Platform.INSTAGRAM:
+            variables["bot_ig_username "] = bi.ig_username
+        case Platform.WHATSAPP:
+            variables["bot_wa_phone_number"] = (
+                bi.wa_phone_number and bi.wa_phone_number.as_international
+            )
+        case Platform.SLACK:
+            variables["slack_team_name"] = bi.slack_team_name
+        case Platform.TWILIO:
+            variables["bot_twilio_phone_number"] = (
+                bi.twilio_phone_number and bi.twilio_phone_number.as_international
+            )
+    variables_schema = {var: {"role": "system"} for var in variables}
+
+    # existing user defined variables
+    variables = (fn_sr.state.get("variables") or {}) | variables
+    variables_schema = (fn_sr.state.get("variables_schema") or {}) | variables_schema
+
+    return variables, variables_schema
