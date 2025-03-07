@@ -2384,13 +2384,17 @@ class BasePage:
                     }
 
                     & .gui_example_media .gui-img, .gui-video {
-                        width: fit-content !important;
+                        max-width: 150px !important;
                         height: 100% !important;
                     }
 
                     @media (max-width: 768px) {
                         & .gui_example_media {
                             height: 86px;
+                        }
+                        & .gui_example_media .gui-img, .gui-video {
+                            max-width:  86px !important;
+                            height: 100% !important;
                         }
                     }
                 """
@@ -2446,11 +2450,12 @@ class BasePage:
                                                     unsafe_allow_html=True,
                                                 )
                             with gui.div(
-                                className="flex-grow-1 d-flex justify-content-end gui_example_media"
+                                className="flex-grow-1 d-flex justify-content-end"
                             ):
-                                self.render_example_preview_media(
-                                    published_run=published_run
-                                )
+                                with gui.div(className="gui_example_media"):
+                                    self.render_example_preview_media(
+                                        published_run=published_run
+                                    )
             with gui.div(className="d-md-none"):
                 render_example_author_meta()
                 with gui.div(className="container-margin-reset mt-2 mt-md-0"):
