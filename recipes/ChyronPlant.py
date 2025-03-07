@@ -19,13 +19,6 @@ class ChyronPlantPage(BasePage):
         midi_notes_prompt: str | None
         chyron_prompt: str | None
 
-        class Config:
-            schema_extra = {
-                "example": {
-                    "midi_notes": "C#1 B6 A2 A1 A3 A2",
-                }
-            }
-
     class ResponseModel(BaseModel):
         midi_translation: str
         chyron_output: str
