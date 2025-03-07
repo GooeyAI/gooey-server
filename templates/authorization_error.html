@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Authorization Error{% endblock title %}
+
+{% block content %}
+<div style="text-align: center; margin: 2rem 0;">
+
+  <h1>Authorization Error</h1>
+  <div class="container border p-2">
+    <pre class="text-danger">{{ error }}</pre>
+    <pre class="text-center mx-4 mb-4 bg-light">
+      {{ error_description or "An error occurred during authentication." }}
+    </pre>
+  </div>
+
+  <div style="margin-top: 2rem; display: flex; gap: 2rem; justify-content: center;">
+    <a
+      href="{{ redirect_url | default('/') }}"style="
+        display: inline-block;
+        text-decoration: none;
+        padding: 12px;
+        background-color: #fff;
+        color: #000;
+        border-radius: 6px;
+        transition: all 0.1s ease;"
+      onmouseover="
+        this.style.borderColor='#000';
+        this.style.color='#000';
+        this.style.backgroundColor='#FEF1F5'"
+      onmouseout="
+        this.style.borderColor='#c9c9c9';
+        this.style.color='#c9c9c9';
+        this.style.backgroundColor='#FFF';"
+    > Back to Run
+    </a>
+          <a
+      href="{{ retry_url }}"
+      style="
+        display: inline-block;
+        text-decoration: none;
+        padding: 12px;
+        border: 1px solid #000;
+        background-color: #000;
+        color: #fff;
+        border-radius: 6px;
+        transition: all 0.1s ease;"
+      onmouseover="
+        this.style.backgroundColor='#3EFFEA';
+        this.style.color='#000';
+        this.style.borderColor='#000';"
+      onmouseout="
+        this.style.backgroundColor='#000';
+        this.style.color='#fff';
+        this.style.borderColor='#000';"
+
+    > Retry Authorization
+    </a>
+  </div>
+</div>
+
+{% endblock content %}
