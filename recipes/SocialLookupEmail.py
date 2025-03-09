@@ -217,7 +217,7 @@ class SocialLookupEmailPage(BasePage):
         else:
             gui.div()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write("**Email Address**")
         gui.write(state.get("email_address", ""))
         gui.write("**Email Body Output**")

@@ -149,7 +149,7 @@ class TranslationPage(BasePage):
     def render_output(self):
         text_outputs("**Translations**", key="output_texts", height=300)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         text_outputs("**Translations**", value=state.get("output_texts", []))
 
     def render_steps(self):
