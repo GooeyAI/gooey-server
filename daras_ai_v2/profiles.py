@@ -619,7 +619,10 @@ def _get_meta_description_for_profile(handle: Handle) -> str:
 
 
 def render_handle_input(
-    label: str, *, handle: Handle | None = None, **kwargs
+    label: str,
+    *,
+    handle: Handle | None = None,
+    **kwargs,
 ) -> str | None:
     handle_style: dict[str, str] = {}
     new_handle = gui.text_input(
