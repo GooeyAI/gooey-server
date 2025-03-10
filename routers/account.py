@@ -293,17 +293,8 @@ def all_saved_runs_tab(request: Request):
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        visibility = PublishedRunVisibility(pr.visibility)
 
-        with gui.div(className="mb-2 d-flex justify-content-between align-items-start"):
-            gui.pill(
-                visibility.get_badge_html(),
-                unsafe_allow_html=True,
-                className="border border-dark",
-            )
-            gui.pill(workflow.short_title, className="border border-dark")
-
-        workflow.page_cls().render_published_run_preview(pr)
+        workflow.page_cls().render_example(pr, workflow_pill=workflow.short_title)
 
     gui.write("# Saved Workflows")
     explore_path = get_route_path(explore_page)
@@ -350,8 +341,11 @@ def all_saved_runs_tab(request: Request):
             f"Saved workflows of **{workspace_name}** are here and visible & editable by other workspace members."
         )
 
-    with gui.div(className="mt-4"):
-        grid_layout(3, prs, _render_run)
+    for pr in prs:
+        _render_run(pr)
+        # render divder only if not the last item
+        if pr != prs[-1]:
+            gui.div(className="mb-2 mt-2 border-bottom")
 
     paginate_button(url=request.url, cursor=cursor)
 
