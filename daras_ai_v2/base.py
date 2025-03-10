@@ -1105,7 +1105,7 @@ class BasePage:
 
     @classmethod
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
-        return pr.title or cls.get_recipe_title()
+        return (pr and pr.title) or cls.get_recipe_title()
 
     @classmethod
     def get_recipe_title(cls) -> str:
