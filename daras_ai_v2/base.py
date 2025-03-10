@@ -851,9 +851,14 @@ class BasePage:
         if self.current_pr.workspace_id and self.can_user_edit_published_run(
             self.current_pr
         ):
-            # make current_pr.workspace the first option
+            # default to current_pr.workspace for an editor
             workspace_options = {
                 self.current_pr.workspace_id: self.current_pr.workspace
+            } | workspace_options
+        else:
+            # default to current workspace for everyone else
+            workspace_options = {
+                self.current_workspace.id: self.current_workspace
             } | workspace_options
 
         with gui.div(className="d-flex gap-3"):
