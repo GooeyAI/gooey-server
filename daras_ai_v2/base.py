@@ -2298,6 +2298,11 @@ class BasePage:
         max_desc_words_mobile = 100
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
+        photo_url = published_run.photo_url
+        preview_image = self.get_example_preview_image(
+            published_run.saved_run.to_dict()
+        )
+        has_preview_image = bool(preview_image or photo_url)
         pills = [
             lambda: (
                 None
@@ -2392,11 +2397,11 @@ class BasePage:
 
                     @media (max-width: 768px) {
                         & .gui_example_media {
-                            height: 86px;
+                            height: auto;
                         }
                         & .gui_example_media .gui-img, .gui-video {
-                            max-width:  86px !important;
-                            height: 100% !important;
+                            max-width:  100% !important;
+                            max-height: 200px !important;
                         }
                     }
                 """
@@ -2405,10 +2410,17 @@ class BasePage:
                     with gui.div(
                         className="d-flex flex-column justify-content-between"
                     ):
+                        if has_preview_image:
+                            with gui.div(className="flex-grow-1 d-md-none"):
+                                with gui.div(
+                                    className="gui_example_media flex-grow-1 position-relative d-flex justify-content-center"
+                                ):
+                                    self.render_example_preview_media(
+                                        published_run=published_run
+                                    )
                         with gui.div(className="d-flex align-items-stretch"):
                             with gui.div(
-                                className="flex-grow-1 d-flex flex-column justify-content-between",
-                                style={"maxWidth": "80%"},
+                                className="flex-grow-3 d-flex flex-column justify-content-between",
                             ):
                                 with gui.div(className="d-flex align-items-center"):
                                     with gui.div():
@@ -2452,12 +2464,13 @@ class BasePage:
                                                     unsafe_allow_html=True,
                                                 )
                             with gui.div(
-                                className="flex-grow-1 d-flex justify-content-end ms-2"
+                                className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
                             ):
                                 with gui.div(className="gui_example_media"):
                                     self.render_example_preview_media(
                                         published_run=published_run
                                     )
+
             with gui.div(className="d-md-none"):
                 render_example_author_meta()
                 with gui.div(className="container-margin-reset mt-2 mt-md-0"):
@@ -2513,6 +2526,10 @@ class BasePage:
     # examples / saved tab
     def render_example_preview_media(self, published_run: PublishedRun):
         photo_url = published_run.photo_url
+        workflow = Workflow(self.current_pr.workflow)
+        preview_image = self.get_example_preview_image(
+            published_run.saved_run.to_dict()
+        )
         with gui.styled(
             """
             &.gui_example_default_media {
@@ -2531,37 +2548,22 @@ class BasePage:
             with gui.div(
                 className="d-flex align-items-center justify-content-center gui_example_default_media",
             ):
-                if photo_url:
+                if preview_image or photo_url:
                     gui.image(
-                        src=photo_url,
+                        src=preview_image or photo_url,
                         className="m-0",
                         style={
                             "width": "100%",
                             "height": "100%",
                             "objectFit": "cover",
-                            "borderRadius": "50%",
+                            "borderRadius": "50%" if not preview_image else "0",
                         },
                     )
                 else:
-                    workflow = Workflow(self.current_pr.workflow)
-                    preview_image = self.get_example_preview_image(
-                        published_run.saved_run.to_dict()
+                    gui.write(
+                        f"# {workflow.get_or_create_metadata().emoji}",
+                        className="m-0 container-margin-reset",
                     )
-                    if preview_image:
-                        gui.image(
-                            src=preview_image,
-                            className="m-0",
-                            style={
-                                "width": "100%",
-                                "height": "100%",
-                                "objectFit": "cover",
-                            },
-                        )
-                    else:
-                        gui.write(
-                            f"# {workflow.get_or_create_metadata().emoji}",
-                            className="m-0 container-margin-reset",
-                        )
 
     def render_steps(self):
         raise NotImplementedError
