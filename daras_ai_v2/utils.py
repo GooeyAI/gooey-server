@@ -1,6 +1,8 @@
 from django.utils import timezone
 from datetime import timedelta, datetime
 
+from bots.models import Workflow
+
 THRESHOLDS = [
     (timedelta(days=365), "y"),
     (timedelta(days=30), "mo"),

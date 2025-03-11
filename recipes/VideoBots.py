@@ -643,7 +643,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "messages"]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
             gui.write(

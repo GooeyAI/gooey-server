@@ -245,7 +245,7 @@ SearchSEO > Page Parsing > GPT3
         else:
             gui.div()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write(
             f"""
             Search Query `{state.get('search_query', '')}` \\
