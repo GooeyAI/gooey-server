@@ -1470,6 +1470,8 @@ class MessageQuerySet(models.QuerySet):
                 "Conversation ID",
             ],
         )
+        # drop rows for which either user or assistant message is missing
+        df.dropna(subset=["User Message (EN)", "Assistant Message (EN)"], inplace=True)
         return df
 
     def to_df_analysis_format(
