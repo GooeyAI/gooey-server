@@ -1392,64 +1392,81 @@ class MessageQuerySet(models.QuerySet):
 
         qs = self.all().prefetch_related("feedbacks")
         rows = []
+        last_row_by_conversation_id = {}
         for message in qs[:row_limit]:
+            message: Message
+
             if message.conversation.bot_integration.platform == Platform.WEB:
                 message_id = message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
             else:
                 message_id = message.platform_msg_id
 
-            message: Message
-            row = {
-                "Name": message.conversation.get_display_name(),
-                "Role": message.role,
-                "Message (EN)": message.content,
-                "Sent": (
-                    message.created_at.astimezone(tz)
-                    .replace(tzinfo=None)
-                    .strftime(settings.SHORT_DATETIME_FORMAT)
-                ),
-                "Message (Local)": message.display_content,
-                "Analysis JSON": message.analysis_result,
-                "Feedback": (
-                    message.feedbacks.first().get_display_text()
-                    if message.feedbacks.first()
-                    else None
-                ),  # only show first feedback as per Sean's request
-                "Run Time": (
-                    message.saved_run.run_time if message.saved_run else 0
-                ),  # user messages have no run/run_time
-                "Run URL": (
-                    message.saved_run.get_app_url()
-                    if message.saved_run and message.role == CHATML_ROLE_ASSISSTANT
-                    else ""
-                ),
-                "Photo Input": ", ".join(
-                    (message.saved_run and message.saved_run.state.get("input_images"))
-                    or []
-                ),
-                "Audio Input": (
-                    (message.saved_run and message.saved_run.state.get("input_audio"))
-                    or ""
-                ),
-                "Message ID": message_id,
-                "Conversation ID": message.conversation.api_integration_id(),
-            }
-            rows.append(row)
+            try:
+                row = last_row_by_conversation_id.pop(message.conversation.id)
+            except KeyError:
+                row = {}
+                rows.append(row)
+                last_row_by_conversation_id[message.conversation.id] = row
+
+            if message.role == CHATML_ROLE_USER:
+                row |= {
+                    "Name": message.conversation.get_display_name(),
+                    "User Message (EN)": message.content,
+                    "Sent": (
+                        message.created_at.astimezone(tz)
+                        .replace(tzinfo=None)
+                        .strftime(settings.SHORT_DATETIME_FORMAT)
+                    ),
+                    "User Message (Local)": message.display_content,
+                    "Photo Input": ", ".join(
+                        (
+                            message.saved_run
+                            and message.saved_run.state.get("input_images")
+                        )
+                        or []
+                    ),
+                    "Audio Input": (
+                        (
+                            message.saved_run
+                            and message.saved_run.state.get("input_audio")
+                        )
+                        or ""
+                    ),
+                    "User Message ID": message_id,
+                    "Conversation ID": message.conversation.api_integration_id(),
+                }
+            else:
+                row |= {
+                    "Assistant Message (EN)": message.content,
+                    "Assistant Message (Local)": message.display_content,
+                    "Analysis JSON": message.analysis_result,
+                    "Feedback": (
+                        message.feedbacks.first().get_display_text()
+                        if message.feedbacks.first()
+                        else None
+                    ),  # only show first feedback as per Sean's request
+                    "Run Time": message.saved_run and message.saved_run.run_time or 0,
+                    "Run URL": (
+                        message.saved_run and message.saved_run.get_app_url() or ""
+                    ),
+                }
+
         df = pd.DataFrame.from_records(
             rows,
             columns=[
                 "Name",
-                "Role",
-                "Message (EN)",
+                "User Message (EN)",
+                "Assistant Message (EN)",
                 "Sent",
-                "Message (Local)",
+                "User Message (Local)",
+                "Assistant Message (Local)",
                 "Analysis JSON",
                 "Feedback",
                 "Run Time",
                 "Run URL",
                 "Photo Input",
                 "Audio Input",
-                "Message ID",
+                "User Message ID",
                 "Conversation ID",
             ],
         )
