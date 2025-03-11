@@ -2290,7 +2290,7 @@ class BasePage:
     def render_example(
         self,
         published_run: PublishedRun,
-        use_workspace_author: bool = False,
+        show_workspace_author: bool = False,
         workflow_pill: str | None = None,
         hide_visibility_pill: bool = False,
     ):
@@ -2303,71 +2303,6 @@ class BasePage:
             published_run.saved_run.to_dict()
         )
         has_preview_image = bool(preview_image or photo_url)
-        pills = [
-            lambda: (
-                None
-                if hide_visibility_pill
-                else gui.pill(
-                    PublishedRunVisibility(published_run.visibility).get_badge_html(),
-                    unsafe_allow_html=True,
-                    className="border border-dark",
-                )
-            ),
-        ]
-        if workflow_pill:
-            pills.append(
-                lambda: gui.pill(
-                    workflow_pill,
-                    unsafe_allow_html=True,
-                    className="border border-dark ms-2",
-                )
-            )
-
-        updated_at = published_run.saved_run.updated_at
-
-        def run_count():
-            if published_run.visibility == PublishedRunVisibility.PUBLIC:
-                run_icon = '<i class="fa-regular fa-person-running"></i>'
-                count = published_run.get_run_count()
-                if count > 0:
-                    run_count = format_number_with_suffix(count)
-                    gui.write(" • ")
-                    with gui.div():
-                        gui.caption(
-                            f"{run_icon} {run_count} runs",
-                            unsafe_allow_html=True,
-                        )
-
-        def render_example_author_meta():
-            with gui.div(
-                className="d-flex gap-2 align-items-center container-margin-reset"
-            ):
-                (
-                    self.render_author(
-                        published_run.last_edited_by,
-                        image_size="24px",
-                        text_size="0.9rem",
-                        responsive=False,
-                        show_as_link=False,
-                    )
-                    if not use_workspace_author
-                    else self.render_workspace_author(
-                        published_run.workspace,
-                        image_size="24px",
-                        text_size="0.9rem",
-                        responsive=False,
-                        show_as_link=False,
-                    )
-                )
-                if published_run.last_edited_by:
-                    gui.write(" • ")
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption(
-                        f"{get_relative_time(updated_at)}",
-                        style={"fontSize": "0.9rem"},
-                        className="container-margin-reset",
-                    )
-                run_count()
 
         with gui.div(
             className="align-items-stretch position-relative py-2 pe-0 pr-full-width",
@@ -2432,8 +2367,20 @@ class BasePage:
                                         className="d-md-flex d-none align-items-center mb-1 ms-2",
                                         style={"font-size": "0.9rem"},
                                     ):
-                                        for pill in pills:
-                                            pill()
+                                        if not hide_visibility_pill:
+                                            gui.pill(
+                                                PublishedRunVisibility(
+                                                    published_run.visibility
+                                                ).get_badge_html(),
+                                                unsafe_allow_html=True,
+                                                className="border border-dark",
+                                            )
+                                        if workflow_pill:
+                                            gui.pill(
+                                                workflow_pill,
+                                                unsafe_allow_html=True,
+                                                className="border border-dark ms-2",
+                                            )
                                 if published_run.notes:
                                     with gui.div(className="d-none d-md-block pe-5"):
                                         gui.caption(
@@ -2453,7 +2400,10 @@ class BasePage:
                                     className="d-none d-md-flex flex-1 align-items-center"
                                 ):
                                     with gui.div(className="flex-grow-1"):
-                                        render_example_author_meta()
+                                        self._render_example_author_meta(
+                                            published_run=published_run,
+                                            show_workspace_author=show_workspace_author,
+                                        )
                                     with gui.div(className="flex-grow-1"):
                                         with gui.div(
                                             className="container-margin-reset mt-2 mt-md-0"
@@ -2472,7 +2422,10 @@ class BasePage:
                                     )
 
             with gui.div(className="d-md-none"):
-                render_example_author_meta()
+                self._render_example_author_meta(
+                    published_run=published_run,
+                    show_workspace_author=show_workspace_author,
+                )
                 with gui.div(className="container-margin-reset mt-2 mt-md-0"):
                     if version.change_notes:
                         gui.caption(
@@ -2488,7 +2441,7 @@ class BasePage:
     ):
         self.render_example(
             published_run,
-            use_workspace_author=True,
+            show_workspace_author=True,
             hide_visibility_pill=True,
         )
         if allow_hide:
@@ -2522,6 +2475,52 @@ class BasePage:
             or state.get("output_video")
         )
         return extract_nested_str(out)
+
+    def _render_example_author_meta(
+        self, published_run: PublishedRun, show_workspace_author: bool = True
+    ):
+        updated_at = published_run.saved_run.updated_at or ""
+        with gui.div(
+            className="d-flex gap-2 align-items-center container-margin-reset"
+        ):
+            if show_workspace_author:
+                self.render_workspace_author(
+                    published_run.workspace,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=False,
+                )
+            else:
+                self.render_author(
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=False,
+                )
+
+            if published_run.last_edited_by:
+                gui.write(" • ")
+
+            if updated_at and isinstance(updated_at, datetime.datetime):
+                gui.caption(
+                    f"{get_relative_time(updated_at)}",
+                    style={"fontSize": "0.9rem"},
+                    className="container-margin-reset",
+                )
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                count = published_run.get_run_count()
+                if count > 0:
+                    run_count = format_number_with_suffix(count)
+                    gui.write(" • ")
+                    with gui.div():
+                        gui.caption(
+                            f"{run_icon} {run_count} runs",
+                            unsafe_allow_html=True,
+                        )
 
     # examples / saved tab
     def render_example_preview_media(self, published_run: PublishedRun):
