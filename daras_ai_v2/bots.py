@@ -339,10 +339,6 @@ def _msg_handler(bot: BotInterface):
                 raise HTTPException(
                     status_code=400, detail="No documents found in request."
                 )
-            filenames = ", ".join(
-                furl(url.strip("/")).path.segments[-1] for url in input_documents
-            )
-            input_text = f"Files: {filenames}\n\n{input_text}"
         case "audio" | "video":
             input_audio = bot.get_input_audio()
             if not input_audio:
