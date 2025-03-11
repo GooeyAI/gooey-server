@@ -732,11 +732,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ]
 
         # add new input to the state
-        if new_input_documents:
-            filenames = ", ".join(
-                furl(url.strip("/")).path.segments[-1] for url in new_input_documents
-            )
-            new_input_text = f"Files: {filenames}\n\n{new_input_text}"
         gui.session_state["input_prompt"] = new_input_text
         gui.session_state["input_audio"] = new_input_audio or None
         gui.session_state["input_images"] = new_input_images or None
@@ -1661,15 +1656,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 input_prompt = gui.session_state.get("input_prompt")
             input_images = gui.session_state.get("input_images")
             input_audio = gui.session_state.get("input_audio")
-            if input_prompt or input_images or input_audio:
-                messages += [
-                    format_chat_entry(
-                        role=CHATML_ROLE_USER,
-                        content_text=input_prompt,
-                        input_images=input_images,
-                        render_input_urls=True,
-                    ),
-                ]
+            input_documents = gui.session_state.get("input_documents")
+            messages += [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER,
+                    content_text=input_prompt,
+                    input_images=input_images,
+                    input_audio=input_audio,
+                    input_documents=input_documents,
+                ),
+            ]
             # render history
             for entry in reversed(messages):
                 with msg_container_widget(entry["role"]):

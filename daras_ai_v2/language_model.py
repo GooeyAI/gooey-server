@@ -1970,18 +1970,17 @@ def format_chat_entry(
     input_images: typing.Optional[list[str]] = None,
     input_audio: typing.Optional[str] = None,
     input_documents: typing.Optional[list[str]] = None,
-    render_input_urls: typing.Optional[bool] = False,
 ) -> ConversationEntry:
+    parts = []
+    if input_images:
+        parts.append(f"Image URLs: {', '.join(input_images)}")
+    if input_audio:
+        parts.append(f"Audio URL: {input_audio}")
+    if input_documents:
+        parts.append(f"Document URLs: {', '.join(input_documents)}")
+    parts.append(content_text)
 
-    input_urls = []
-    if input_images and not render_input_urls:
-        input_urls.append(f"Image URLs: {', '.join(input_images)}")
-    if input_audio and not render_input_urls:
-        input_urls.append(f"Audio URL: {input_audio}")
-    if input_documents and not render_input_urls:
-        input_urls.append(f"Document URLs: {', '.join(input_documents)}")
-
-    content = content_text + ("\n" + "\n".join(input_urls) if input_urls else "")
+    content = "\n\n".join(filter(None, parts))
     if input_images:
         content = [
             {"type": "image_url", "image_url": {"url": url}} for url in input_images
