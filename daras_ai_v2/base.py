@@ -717,62 +717,33 @@ class BasePage:
     ):
         form_container = gui.div()
 
-        workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
-        if len(self._get_workspace_options()) <= 1:
-            with gui.div(className="my-4 d-flex gap-3"):
-                with gui.div(className="text-nowrap"):
-                    gui.write("Workspace")
-                with gui.div(className="flex-grow-1"):
-                    self.render_workspace_author(
-                        workspace=self.current_workspace,
-                        image_size="40px",
-                        show_as_link=False,
-                    )
-                    with gui.div(
-                        className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline gap-2 container-margin-reset"
-                    ):
-                        gui.html(icons.company)
-                        if gui.button(
-                            "Create a team workspace", type="link", className="m-0 p-0"
-                        ):
-                            workspace_create_ref.set_open(True)
-                        gui.write("to edit with others")
-            selected_workspace = self.current_workspace
-            form_buttons_container = gui.div()
-        else:
-            with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
-                selected_workspace = self._render_workspace_selector(
-                    key="published_run_workspace"
-                )
-                form_buttons_container = gui.div()
-
-        if workspace_create_ref.is_open:
-            render_workspace_create_dialog(
-                user=self.request.user,
-                session=self.request.session,
-                ref=workspace_create_ref,
+        with gui.div(
+            className="mt-2 d-block d-lg-flex justify-content-between align-items-end"
+        ):
+            selected_workspace = self._render_workspace_selector(
+                key="published_run_workspace"
             )
 
-        user_can_edit = selected_workspace.id == self.current_pr.workspace_id
-        with form_buttons_container, gui.div(className="mt-4 mt-lg-0 text-end"):
-            if user_can_edit:
-                pressed_save_as_new = gui.button(
-                    f"{icons.fork} Save as New",
-                    type="secondary",
-                    className="mb-0 py-2 px-4",
-                )
-                pressed_save = gui.button(
-                    f"{icons.save} Save",
-                    type="primary",
-                    className="mb-0 ms-2 py-2 px-4",
-                )
-            else:
-                pressed_save_as_new = gui.button(
-                    f"{icons.fork} Save as New",
-                    type="primary",
-                    className="mb-0 py-2 px-4",
-                )
-                pressed_save = False
+            user_can_edit = selected_workspace.id == self.current_pr.workspace_id
+            with gui.div(className="mt-4 mt-lg-0 text-end"):
+                if user_can_edit:
+                    pressed_save_as_new = gui.button(
+                        f"{icons.fork} Save as New",
+                        type="secondary",
+                        className="mb-0 py-2 px-4",
+                    )
+                    pressed_save = gui.button(
+                        f"{icons.save} Save",
+                        type="primary",
+                        className="mb-0 ms-2 py-2 px-4",
+                    )
+                else:
+                    pressed_save_as_new = gui.button(
+                        f"{icons.fork} Save as New",
+                        type="primary",
+                        className="mb-0 py-2 px-4",
+                    )
+                    pressed_save = False
 
         with form_container:
             if user_can_edit:
@@ -889,20 +860,44 @@ class BasePage:
 
     def _render_workspace_selector(self, *, key: str) -> "Workspace":
         workspace_options = self._get_workspace_options()
-        with gui.div(className="d-flex gap-3"):
-            with gui.div(className="mt-2 text-nowrap"):
-                gui.write("Workspace")
+        workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
 
-            with gui.div(style=dict(maxWidth="300px", width="100%")):
-                workspace_id = gui.selectbox(
-                    "",
-                    key=key,
-                    options=workspace_options,
-                    format_func=lambda w_id: workspace_options[w_id].display_html(
-                        self.request.user
-                    ),
-                )
-                return workspace_options[workspace_id]
+        print("workspace_options", workspace_options)
+        if len(workspace_options) <= 1 or workspace_create_ref.is_open:
+            with gui.div(className="alert alert-warning my-0 container-margin-reset"):
+                if gui.button(
+                    f"{icons.company} Create a team workspace",
+                    type="link",
+                    className="d-inline mb-1 me-1 p-0",
+                ):
+                    workspace_create_ref.set_open(True)
+                gui.html("to edit with others", className="d-inline")
+
+            if workspace_create_ref.is_open:
+                print(f"{workspace_create_ref} is open")
+                if new_workspace := render_workspace_create_dialog(
+                    user=self.request.user,
+                    session=self.request.session,
+                    ref=workspace_create_ref,
+                ):
+                    gui.session_state[key] = new_workspace.id
+
+            return self.current_workspace
+        else:
+            with gui.div(className="d-flex gap-3"):
+                with gui.div(className="mt-2 text-nowrap"):
+                    gui.write("Workspace")
+
+                with gui.div(style=dict(maxWidth="300px", width="100%")):
+                    workspace_id = gui.selectbox(
+                        "",
+                        key=key,
+                        options=workspace_options,
+                        format_func=lambda w_id: workspace_options[w_id].display_html(
+                            self.request.user
+                        ),
+                    )
+                    return workspace_options[workspace_id]
 
     def _get_default_pr_title(self):
         return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"

@@ -181,7 +181,7 @@ def global_workspace_selector(user: AppUser, session: dict):
 
 def render_workspace_create_dialog(
     user: AppUser, session: dict, ref: gui.AlertDialogRef
-):
+) -> Workspace | None:
     step = gui.session_state.setdefault("workspace:create:step", 1)
     if step == 1:
         title = "#### Create Team Workspace"
@@ -189,6 +189,7 @@ def render_workspace_create_dialog(
         render_fn = lambda: render_workspace_create_step1(
             user=user, session=session, ref=ref
         )
+        workspace = None
     else:
         if workspace_id := gui.session_state.get("workspace:create:workspace_id"):
             workspace = Workspace.objects.get(id=workspace_id)
@@ -204,6 +205,7 @@ def render_workspace_create_dialog(
     with gui.alert_dialog(ref=ref, modal_title=title, large=True):
         gui.caption(caption)
         render_fn()
+        return workspace
 
 
 def clear_workspace_create_form():
@@ -227,7 +229,7 @@ def render_workspace_create_step1(
     with gui.div(className="d-flex align-items-start gap-2"):
         with gui.div(className="mt-2 pt-1"):
             gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
-        with gui.div(className="flex-grow-1"):
+        with gui.div(className="d-block d-lg-flex gap-3"):
             # separate div for input & error msg for handle field
             if "workspace:create:handle_name" not in gui.session_state:
                 gui.session_state["workspace:create:handle_name"] = (
@@ -301,11 +303,9 @@ def render_workspace_create_step2(
             options=options,
             key="workspace:create:domain_name",
         )
-    else:
-        gui.caption("Sign in with your work email to automatically add members.")
 
     error_msg_container = gui.div()
-    with gui.div(className="d-flex justify-content-end gap-2"):
+    with gui.div(className="d-flex justify-content-end gap-2 mt-2"):
         close_btn = gui.button("Close", key=f"workspace:create:close", type="secondary")
         submit_btn = gui.button("Choose a Plan", type="primary")
         if not close_btn and not submit_btn:
@@ -404,7 +404,7 @@ def validate_emails_csv(emails_csv: str, max_emails: int = 5) -> list[str]:
         try:
             validate_email(email)
         except ValidationError as e:
-            error_messages.append(f"{email}: {e.messages[0]}")
+            error_messages.append(f'"{email}": {e.messages[0]}')
 
     if error_messages:
         raise ValidationError(error_messages)

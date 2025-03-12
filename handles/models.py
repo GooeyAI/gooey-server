@@ -118,7 +118,7 @@ class Handle(models.Model):
             models.UniqueConstraint(
                 Upper("name"),
                 name="handle_upper_name_is_unique",
-                violation_error_message="A handle with this name already exists",
+                violation_error_message="This handle is already taken",
             )
         ]
 
@@ -161,14 +161,13 @@ class Handle(models.Model):
     @classmethod
     def get_suggestion_for_team_workspace(cls, display_name: str) -> str | None:
         options_generator = _generate_handle_options_for_team_workspace(display_name)
-        while options_generator:
-            options = list(itertools.islice(options_generator, 10))
-            existing_handles = set(
-                cls.objects.filter(name__in=options).values_list("name", flat=True)
-            )
-            for option in options:
-                if option not in existing_handles:
-                    return option
+        options = list(itertools.islice(options_generator, 10))
+        existing_handles = set(
+            cls.objects.filter(name__in=options).values_list("name", flat=True)
+        )
+        for option in options:
+            if option not in existing_handles:
+                return option
 
     def get_app_url(self):
         return str(furl(settings.APP_BASE_URL) / self.name / "/")
