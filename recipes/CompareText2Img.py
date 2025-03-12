@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, extract_nested_str
 from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
@@ -88,6 +88,8 @@ class CompareText2ImgPage(BasePage):
         return ["selected_models"]
 
     def preview_image(self, state: dict) -> str | None:
+        if state.get("output_images", {}) and any(state["output_images"].values()):
+            return extract_nested_str(state["output_images"])
         return DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
     def related_workflows(self) -> list:
