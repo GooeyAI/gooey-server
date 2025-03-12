@@ -73,14 +73,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         seed: int | None
 
-        class Config:
-            schema_extra = {
-                "example": {
-                    "text_prompt": "winter's day in paris",
-                    "email_address": "sean@dara.network",
-                }
-            }
-
     class ResponseModel(BaseModel):
         input_image: FieldHttpUrl
         resized_image: FieldHttpUrl

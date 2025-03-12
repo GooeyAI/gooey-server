@@ -67,14 +67,6 @@ class FaceInpaintingPage(BasePage):
 
         seed: int | None
 
-        class Config:
-            schema_extra = {
-                "example": {
-                    "text_prompt": "tony stark from the iron man",
-                    "input_photo": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2bcf31e8-48ef-11ed-8fe1-02420a00005c/_DSC0030_1.jpg",
-                }
-            }
-
     class ResponseModel(BaseModel):
         resized_image: FieldHttpUrl
         face_mask: FieldHttpUrl

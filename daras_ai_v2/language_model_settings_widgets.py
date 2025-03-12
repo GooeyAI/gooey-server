@@ -32,49 +32,66 @@ def language_model_selector(
     )
 
 
-def language_model_settings(selected_model: str = None):
-    try:
-        llm = LargeLanguageModels[selected_model]
-    except KeyError:
-        llm = None
+def language_model_settings(selected_models: str | list[str] | None = None) -> None:
+    if isinstance(selected_models, str):
+        selected_models = [selected_models]
+    elif not selected_models:
+        selected_models = []
+
+    llms = []
+    for model in selected_models:
+        try:
+            llms.append(LargeLanguageModels[model])
+        except KeyError:
+            pass
 
     col1, col2 = gui.columns(2)
     with col1:
         gui.checkbox("Avoid Repetition", key="avoid_repetition")
-    if not llm or llm.supports_json:
-        with col2:
-            gui.selectbox(
-                f"###### {field_title_desc(LanguageModelSettings, 'response_format_type')}",
-                options=[None, "json_object"],
-                key="response_format_type",
-                format_func={
-                    None: BLANK_OPTION,
-                    "json_object": "JSON Object",
-                }.__getitem__,
-            )
+
+    with col2:
+        gui.selectbox(
+            f"###### {field_title_desc(LanguageModelSettings, 'response_format_type')}",
+            options=[None, "json_object"],
+            key="response_format_type",
+            format_func={
+                None: BLANK_OPTION,
+                "json_object": "JSON Object",
+            }.__getitem__,
+        )
 
     col1, col2 = gui.columns(2)
     with col1:
-        gui.number_input(
+        if llms:
+            max_output_tokens = min(
+                [llm.max_output_tokens or llm.context_window for llm in llms]
+            )
+        else:
+            max_output_tokens = 4096
+
+        gui.slider(
             label="""
             ###### Max Output Tokens
             The maximum number of tokens to generate in the completion. Increase to generate longer responses.
             """,
             key="max_tokens",
             min_value=10,
-            step=10,
+            max_value=max_output_tokens,
+            step=2,
         )
-    with col2:
-        gui.slider(
-            label="""
-            ###### Creativity (aka Sampling Temperature)
-    
-            Higher values allow the LLM to take more risks. Try values larger than 1 for more creative applications or 0 to ensure that LLM gives the same answer when given the same user input. 
-            """,
-            key="sampling_temperature",
-            min_value=0.0,
-            max_value=2.0,
-        )
+
+    if any(llm.supports_temperature for llm in llms):
+        with col2:
+            gui.slider(
+                label="""
+                ###### Creativity (aka Sampling Temperature)
+
+                Higher values allow the LLM to take more risks. Try values larger than 1 for more creative applications or 0 to ensure that LLM gives the same answer when given the same user input. 
+                """,
+                key="sampling_temperature",
+                min_value=0.0,
+                max_value=2.0,
+            )
 
     col1, col2 = gui.columns(2)
     with col1:
@@ -87,7 +104,7 @@ How many answers should the copilot generate? Additional answer outputs increase
             min_value=1,
             max_value=4,
         )
-    if llm and not llm.is_chat_model and llm.llm_api == LLMApis.openai:
+    if any(not llm.is_chat_model and llm.llm_api == LLMApis.openai for llm in llms):
         with col2:
             gui.slider(
                 label="""

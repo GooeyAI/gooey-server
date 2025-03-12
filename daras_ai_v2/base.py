@@ -4,6 +4,7 @@ import html
 import inspect
 import json
 import math
+import traceback
 import typing
 import uuid
 from copy import copy, deepcopy
@@ -852,9 +853,14 @@ class BasePage:
         if self.current_pr.workspace_id and self.can_user_edit_published_run(
             self.current_pr
         ):
-            # make current_pr.workspace the first option
+            # default to current_pr.workspace for an editor
             workspace_options = {
                 self.current_pr.workspace_id: self.current_pr.workspace
+            } | workspace_options
+        else:
+            # default to current workspace for everyone else
+            workspace_options = {
+                self.current_workspace.id: self.current_workspace
             } | workspace_options
         return workspace_options
 
@@ -1123,7 +1129,7 @@ class BasePage:
 
     @classmethod
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
-        return pr.title or cls.get_recipe_title()
+        return (pr and pr.title) or cls.get_recipe_title()
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -2003,6 +2009,7 @@ class BasePage:
                 enable_rate_limits=enable_rate_limits, run_status=run_status, **defaults
             )
         except ValidationError as e:
+            traceback.print_exc()
             gui.session_state[StateKeys.run_status] = None
             gui.session_state[StateKeys.error_msg] = str(e)
             return

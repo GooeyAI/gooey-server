@@ -613,7 +613,9 @@ class WorkspaceInvite(models.Model):
 
     @admin.display(description="Expired")
     def has_expired(self):
-        return timezone.now() - self.updated_at > timedelta(
+        if not self.updated_at:
+            return False
+        return (timezone.now() - self.updated_at) > timedelta(
             days=settings.WORKSPACE_INVITE_EXPIRY_DAYS
         )
 

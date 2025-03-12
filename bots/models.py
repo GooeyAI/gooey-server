@@ -150,6 +150,7 @@ class Workflow(models.IntegerChoices):
     BULK_EVAL = (31, "Bulk Evaluator")
     FUNCTIONS = (32, "Functions")
     TRANSLATION = (33, "Translation")
+    MODEL_TRAINER = (34, "Translation")
 
     @property
     def short_slug(self):
@@ -1338,18 +1339,26 @@ class MessageQuerySet(models.QuerySet):
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
     ) -> "pd.DataFrame":
         import pandas as pd
+        from routers.bots_api import MSG_ID_PREFIX
 
         qs = self.all().prefetch_related("feedbacks")
         rows = []
         for message in qs[:row_limit]:
+            if message.conversation.bot_integration.platform == Platform.WEB:
+                message_id = message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
+            else:
+                message_id = message.platform_msg_id
+
             message: Message
             row = {
                 "Name": message.conversation.get_display_name(),
                 "Role": message.role,
                 "Message (EN)": message.content,
-                "Sent": message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Sent": (
+                    message.created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                    .strftime(settings.SHORT_DATETIME_FORMAT)
+                ),
                 "Message (Local)": message.display_content,
                 "Analysis JSON": message.analysis_result,
                 "Feedback": (
@@ -1373,6 +1382,8 @@ class MessageQuerySet(models.QuerySet):
                     (message.saved_run and message.saved_run.state.get("input_audio"))
                     or ""
                 ),
+                "Message ID": message_id,
+                "Conversation ID": message.conversation.api_integration_id(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1389,6 +1400,8 @@ class MessageQuerySet(models.QuerySet):
                 "Run URL",
                 "Photo Input",
                 "Audio Input",
+                "Message ID",
+                "Conversation ID",
             ],
         )
         return df
@@ -1440,8 +1453,8 @@ class MessageQuerySet(models.QuerySet):
         for i, msg in enumerate(reversed(msgs)):
             entries[i] = format_chat_entry(
                 role=msg.role,
-                content=msg.content,
-                images=msg.attachments.filter(
+                content_text=msg.content,
+                input_images=msg.attachments.filter(
                     metadata__mime_type__startswith="image/"
                 ).values_list("url", flat=True),
             )

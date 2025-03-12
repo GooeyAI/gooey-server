@@ -23,6 +23,7 @@ from recipes.Img2Img import Img2ImgPage
 from recipes.LetterWriter import LetterWriterPage
 from recipes.Lipsync import LipsyncPage
 from recipes.LipsyncTTS import LipsyncTTSPage
+from recipes.ModelTrainer import ModelTrainerPage
 from recipes.ObjectInpainting import ObjectInpaintingPage
 from recipes.QRCodeGenerator import QRCodeGeneratorPage
 from recipes.RelatedQnA import RelatedQnAPage
@@ -78,6 +79,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         GoogleImageGenPage,
         ImageSegmentationPage,
         CompareUpscalerPage,
+        ModelTrainerPage,
     ],
 }
 

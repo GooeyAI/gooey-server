@@ -720,21 +720,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["messages"] = gui.session_state.get("messages", []) + [
                 format_chat_entry(
                     role=CHATML_ROLE_USER,
-                    content=prev_input,
-                    images=prev_input_images,
+                    content_text=prev_input,
+                    input_images=prev_input_images,
+                    input_audio=prev_input_audio,
+                    input_documents=prev_input_documents,
                 ),
                 format_chat_entry(
                     role=CHATML_ROLE_ASSISTANT,
-                    content=prev_output,
+                    content_text=prev_output,
                 ),
             ]
 
         # add new input to the state
-        if new_input_documents:
-            filenames = ", ".join(
-                furl(url.strip("/")).path.segments[-1] for url in new_input_documents
-            )
-            new_input_text = f"Files: {filenames}\n\n{new_input_text}"
         gui.session_state["input_prompt"] = new_input_text
         gui.session_state["input_audio"] = new_input_audio or None
         gui.session_state["input_images"] = new_input_images or None
@@ -962,19 +959,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 glossary_url=request.input_glossary_document,
                 model=request.translation_model,
             )[0]
-        if ocr_texts:
-            yield "Translating Image Text to English..."
+        if ocr_texts and request.user_language:
+            yield "Translating Input Documents to English..."
             ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
                 target_language="en",
             )
-            for text in ocr_texts:
-                user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+        for text in ocr_texts:
+            user_input = f"Exracted Text: {text!r}\n\n{user_input}"
         return user_input
 
     def build_final_prompt(self, request, response, user_input, model):
-        # consturct the system prompt
+        # construct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
             bot_script = render_prompt_vars(bot_script, gui.session_state)
@@ -987,7 +984,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         user_input = yield from self.search_step(request, response, user_input, model)
         # construct user prompt
         user_prompt = format_chat_entry(
-            role=CHATML_ROLE_USER, content=user_input, images=request.input_images
+            role=CHATML_ROLE_USER,
+            content_text=user_input,
+            input_images=request.input_images,
+            input_audio=request.input_audio,
+            input_documents=request.input_documents,
         )
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
@@ -1017,7 +1018,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if request.documents:
             # formulate the search query as a history of all the messages
             query_msgs = request.messages + [
-                format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
+                format_chat_entry(role=CHATML_ROLE_USER, content_text=user_input)
             ]
             clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
             query_msgs = query_msgs[clip_idx:]
@@ -1655,12 +1656,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 input_prompt = gui.session_state.get("input_prompt")
             input_images = gui.session_state.get("input_images")
             input_audio = gui.session_state.get("input_audio")
-            if input_prompt or input_images or input_audio:
-                messages += [
-                    format_chat_entry(
-                        role=CHATML_ROLE_USER, content=input_prompt, images=input_images
-                    ),
-                ]
+            input_documents = gui.session_state.get("input_documents")
+            messages += [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER,
+                    content_text=input_prompt,
+                    input_images=input_images,
+                    input_audio=input_audio,
+                    input_documents=input_documents,
+                ),
+            ]
             # render history
             for entry in reversed(messages):
                 with msg_container_widget(entry["role"]):
