@@ -173,7 +173,7 @@ def render_all_plans(workspace: "Workspace") -> PaymentProvider:
                 )
 
     with plans_div:
-        grid_layout(4, all_plans, _render_plan, separator=False)
+        grid_layout(len(all_plans), all_plans, _render_plan, separator=False)
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
@@ -184,9 +184,9 @@ def render_all_plans(workspace: "Workspace") -> PaymentProvider:
 
 
 def _render_plan_details(plan: PricingPlan):
-    with gui.div(className="flex-grow-1"):
-        with gui.div(className="mb-4"):
-            with gui.tag("h4", className="mb-0"):
+    with gui.div(className="flex-grow-1 d-flex flex-column"):
+        with gui.div():
+            with gui.tag("h2", className="mb-1"):
                 gui.html(plan.title)
             gui.caption(
                 plan.description,
@@ -195,12 +195,20 @@ def _render_plan_details(plan: PricingPlan):
                     "display": "block",
                 },
             )
-        with gui.div(className="my-3 w-100"):
-            with gui.tag("h4", className="my-0 d-inline me-2"):
-                gui.html(plan.pricing_title())
-            with gui.tag("span", className="text-muted my-0"):
-                gui.html(plan.pricing_caption())
-        gui.write(plan.long_description, unsafe_allow_html=True)
+
+        with gui.div(className="my-3"):
+            with gui.tag("h3", className="my-0 d-inline me-2"):
+                gui.html(plan.get_pricing_title())
+            with gui.tag("p", className="text-muted my-0"):
+                gui.html(plan.get_pricing_caption())
+
+        with gui.div(
+            className="flex-grow-1 d-flex flex-column justify-content-between"
+        ):
+            with gui.div():
+                gui.write(plan.long_description, unsafe_allow_html=True)
+            with gui.div(className="mt-3"):
+                gui.write(plan.footer, unsafe_allow_html=True)
 
 
 def _render_plan_action_button(
@@ -209,32 +217,32 @@ def _render_plan_action_button(
     current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
 ):
-    btn_classes = "w-100 mt-3"
-    if plan == current_plan:
-        gui.button("Your Plan", className=btn_classes, disabled=True, type="tertiary")
-    elif plan.contact_us_link:
-        with gui.link(
-            to=plan.contact_us_link,
-            className=btn_classes + " btn btn-theme btn-primary",
+    with gui.div(className="mt-3 d-flex flex-column"):
+        if plan == current_plan:
+            gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
+        elif plan.contact_us_link:
+            with gui.link(
+                to=plan.contact_us_link,
+                className="w-100 btn btn-theme btn-primary",
+            ):
+                gui.html("Contact Us")
+        elif (
+            workspace.subscription
+            and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
         ):
-            gui.html("Contact Us")
-    elif (
-        workspace.subscription
-        and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
-    ):
-        # don't show upgrade/downgrade buttons for enterprise customers
-        return
-    elif workspace.subscription and workspace.subscription.is_paid():
-        render_change_subscription_button(
-            workspace=workspace, plan=plan, current_plan=current_plan
-        )
-    else:
-        assert payment_provider is not None  # for sanity
-        _render_create_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            payment_provider=payment_provider,
-        )
+            # don't show upgrade/downgrade buttons for enterprise customers
+            return
+        elif workspace.subscription and workspace.subscription.is_paid():
+            render_change_subscription_button(
+                workspace=workspace, plan=plan, current_plan=current_plan
+            )
+        else:
+            assert payment_provider is not None  # for sanity
+            _render_create_subscription_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=payment_provider,
+            )
 
 
 def render_change_subscription_button(
