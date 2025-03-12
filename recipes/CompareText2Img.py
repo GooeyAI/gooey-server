@@ -88,7 +88,8 @@ class CompareText2ImgPage(BasePage):
         return ["selected_models"]
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COMPARE_TEXT2IMG_META_IMG
+        result_image = super().preview_image(state)
+        return result_image or DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage
