@@ -862,7 +862,6 @@ class BasePage:
         workspace_options = self._get_workspace_options()
         workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
 
-        print("workspace_options", workspace_options)
         if len(workspace_options) <= 1 or workspace_create_ref.is_open:
             with gui.div(className="alert alert-warning my-0 container-margin-reset"):
                 if gui.button(
@@ -874,7 +873,6 @@ class BasePage:
                 gui.html("to edit with others", className="d-inline")
 
             if workspace_create_ref.is_open:
-                print(f"{workspace_create_ref} is open")
                 if new_workspace := render_workspace_create_dialog(
                     user=self.request.user,
                     session=self.request.session,
