@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import typing
+from collections import defaultdict
 from multiprocessing.pool import ThreadPool
 
 import phonenumber_field.formfields
@@ -13,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q, IntegerChoices, QuerySet
+from django.db.models import Q, IntegerChoices, QuerySet, Subquery, OuterRef
 from django.utils import timezone
 from django.utils.text import Truncator
 
@@ -1355,161 +1356,112 @@ class Conversation(models.Model):
 
 
 class MessageQuerySet(models.QuerySet):
+    def previous_by_created_at(self):
+        return self.model.objects.filter(
+            id__in=self.annotate(
+                prev_id=Subquery(
+                    self.model.objects.filter(
+                        created_at__lt=OuterRef("created_at"),
+                    ).values("id")[:1]
+                )
+            ).values("prev_id")
+        )
+
     def distinct_by_user_id(self) -> QuerySet["Message"]:
         """Get unique users"""
         return self.distinct(*Message.convo_user_id_fields)
 
-    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+    def to_df(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
         import pandas as pd
 
-        qs = self.all().prefetch_related("feedbacks")
-        rows = []
-        for message in qs[:10000]:
-            message: Message
-            row = {
-                "USER": message.conversation.get_display_name(),
-                "BOT": str(message.conversation.bot_integration),
-                "CREATED AT": message.created_at.astimezone(tz).replace(tzinfo=None),
-                "MESSAGE (ENGLISH)": message.content,
-                "MESSAGE (ORIGINAL)": message.display_content,
-                "ROLE": message.get_role_display(),
-                "QUESTION_ANSWERED": message.question_answered,
-                "QUESTION_SUBJECT": message.question_subject,
+        rows = [
+            {
+                "Sent": (
+                    row["sent"]
+                    .replace(tzinfo=None)
+                    .strftime(settings.SHORT_DATETIME_FORMAT)
+                ),
+                "Name": row.get("name"),
+                "User Message (EN)": row.get("user_message"),
+                "Assistant Message (EN)": row.get("assistant_message"),
+                "User Message (Local)": row.get("user_message_local"),
+                "Assistant Message (Local)": row.get("assistant_message_local"),
+                "Analysis Result": row.get("analysis_result"),
+                "Feedback": row.get("feedback"),
+                "Run Time": row.get("run_time_sec"),
+                "Run URL": row.get("run_url"),
+                "Input Images": ", ".join(row.get("input_images") or []),
+                "Input Audio": row.get("input_audio"),
+                "User Message ID": row.get("user_message_id"),
+                "Conversation ID": row.get("conversation_id"),
             }
-            row |= {
-                f"FEEDBACK {i + 1}": feedback.get_display_text()
-                for i, feedback in enumerate(message.feedbacks.all())
-            }
-            rows.append(row)
+            for row in self.to_json(tz=tz, row_limit=row_limit)
+            if row.get("sent")
+        ]
         df = pd.DataFrame.from_records(rows)
         return df
 
-    def to_df_format(
+    def to_json(
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
-    ) -> "pd.DataFrame":
-        import pandas as pd
+    ) -> list[dict]:
         from routers.bots_api import MSG_ID_PREFIX
 
-        qs = self.all().prefetch_related("feedbacks")
-        rows = []
-        last_row_by_conversation_id = {}
+        conversations = defaultdict(list)
+
+        qs = self.order_by("-created_at").prefetch_related(
+            "feedbacks", "conversation", "saved_run"
+        )
         for message in qs[:row_limit]:
             message: Message
+            rows = conversations[message.conversation_id]
 
-            if message.conversation.bot_integration.platform == Platform.WEB:
-                message_id = message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
-            else:
-                message_id = message.platform_msg_id
-
-            try:
-                row = last_row_by_conversation_id.pop(message.conversation.id)
-            except KeyError:
-                row = {}
+            # since we've sorted by -created_at, we'll get alternating assistant and user messages
+            if message.role == CHATML_ROLE_ASSISSTANT:
+                row = {
+                    "assistant_message": message.content,
+                    "assistant_message_local": message.display_content,
+                    "analysis_result": message.analysis_result,
+                }
                 rows.append(row)
-                last_row_by_conversation_id[message.conversation.id] = row
+                if message.feedbacks.first():
+                    row["feedback"] = message.feedbacks.first().get_display_text()
+                saved_run = message.saved_run
+                if saved_run:
+                    row["run_time_sec"] = int(saved_run.run_time.total_seconds())
+                    row["run_url"] = saved_run.get_app_url()
+                    input_images = saved_run.state.get("input_images")
+                    if input_images:
+                        row["input_images"] = input_images
+                    input_audio = saved_run.state.get("input_audio")
+                    if input_audio:
+                        row["input_audio"] = input_audio
 
-            if message.role == CHATML_ROLE_USER:
-                row |= {
-                    "Name": message.conversation.get_display_name(),
-                    "User Message (EN)": message.content,
-                    "Sent": (
-                        message.created_at.astimezone(tz)
-                        .replace(tzinfo=None)
-                        .strftime(settings.SHORT_DATETIME_FORMAT)
-                    ),
-                    "User Message (Local)": message.display_content,
-                    "Photo Input": ", ".join(
-                        (
-                            message.saved_run
-                            and message.saved_run.state.get("input_images")
-                        )
-                        or []
-                    ),
-                    "Audio Input": (
-                        (
-                            message.saved_run
-                            and message.saved_run.state.get("input_audio")
-                        )
-                        or ""
-                    ),
-                    "User Message ID": message_id,
-                    "Conversation ID": message.conversation.api_integration_id(),
-                }
-            else:
-                row |= {
-                    "Assistant Message (EN)": message.content,
-                    "Assistant Message (Local)": message.display_content,
-                    "Analysis JSON": message.analysis_result,
-                    "Feedback": (
-                        message.feedbacks.first().get_display_text()
-                        if message.feedbacks.first()
-                        else None
-                    ),  # only show first feedback as per Sean's request
-                    "Run Time": message.saved_run and message.saved_run.run_time or 0,
-                    "Run URL": (
-                        message.saved_run and message.saved_run.get_app_url() or ""
-                    ),
-                }
+            elif message.role == CHATML_ROLE_USER and rows:
+                row = rows[-1]
+                row.update(
+                    {
+                        "sent": message.created_at.astimezone(tz),
+                        "name": message.conversation.get_display_name(),
+                        "user_message": message.content,
+                        "user_message_local": message.display_content,
+                        "user_message_id": (
+                            message.platform_msg_id
+                            and message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
+                        ),
+                        "conversation_id": message.conversation.api_integration_id(),
+                    }
+                )
 
-        df = pd.DataFrame.from_records(
-            rows,
-            columns=[
-                "Name",
-                "User Message (EN)",
-                "Assistant Message (EN)",
-                "Sent",
-                "User Message (Local)",
-                "Assistant Message (Local)",
-                "Analysis JSON",
-                "Feedback",
-                "Run Time",
-                "Run URL",
-                "Photo Input",
-                "Audio Input",
-                "User Message ID",
-                "Conversation ID",
-            ],
-        )
-        # drop rows for which either user or assistant message is missing
-        df.dropna(subset=["User Message (EN)", "Assistant Message (EN)"], inplace=True)
-        return df
-
-    def to_df_analysis_format(
-        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
-    ) -> "pd.DataFrame":
-        import pandas as pd
-
-        qs = self.filter(role=CHATML_ROLE_ASSISSTANT).prefetch_related("feedbacks")
-        rows = []
-        for message in qs[:row_limit]:
-            message: Message
-            row = {
-                "Name": message.conversation.get_display_name(),
-                "Question (EN)": message.get_previous_by_created_at().content,
-                "Answer (EN)": message.content,
-                "Sent": message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Question (Local)": message.get_previous_by_created_at().display_content,
-                "Answer (Local)": message.display_content,
-                "Analysis JSON": message.analysis_result,
-                "Run URL": (message.saved_run and message.saved_run.get_app_url()),
-            }
-            rows.append(row)
-        df = pd.DataFrame.from_records(
-            rows,
-            columns=[
-                "Name",
-                "Question (EN)",
-                "Answer (EN)",
-                "Sent",
-                "Question (Local)",
-                "Answer (Local)",
-                "Analysis JSON",
-                "Run URL",
-            ],
-        )
-        return df
+        return [
+            row
+            for rows in conversations.values()
+            # reversed so that user message is first and easier to read
+            for row in reversed(rows)
+            # drop rows that have only one of user/assistant message
+            if "user_message" in row and "assistant_message" in row
+        ]
 
     def as_llm_context(
         self, limit: int = 50, reset_at: datetime.datetime = None

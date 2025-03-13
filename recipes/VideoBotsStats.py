@@ -1,4 +1,5 @@
 import base64
+import json
 import typing
 from datetime import datetime, timedelta
 from functools import partial
@@ -18,6 +19,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, ValidationError
@@ -34,7 +36,6 @@ from bots.models import (
     Message,
     Feedback,
     ConversationQuerySet,
-    FeedbackQuerySet,
     MessageQuerySet,
 )
 from daras_ai.image_input import upload_file_from_bytes
@@ -1005,27 +1006,9 @@ def get_tabular_data(
             messages = messages.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = messages.order_by("-created_at", "conversation__id").to_df_format(
-            row_limit=rows
-        )
-        most_recent = (
-            df.groupby("Name")["Sent"]
-            .max()
-            .reset_index()
-            .rename(columns={"Sent": "Last Sent"})
-        )
-        df = df.merge(
-            most_recent,
-            how="left",
-            left_on="Name",
-            right_on="Name",
-        )
-        df = df.sort_values(
-            by=["Last Sent", "Name", "Sent"], ascending=False
-        ).reset_index()
-        df.drop(columns=["index", "Last Sent"], inplace=True)
+        df = messages.to_df(row_limit=rows)
     elif details == "Feedback Positive":
-        pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
+        pos_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
             rating=Feedback.Rating.RATING_THUMBS_UP,
         )  # type: ignore
@@ -1035,7 +1018,7 @@ def get_tabular_data(
             )
         df = pos_feedbacks.to_df_format(row_limit=rows)
     elif details == "Feedback Negative":
-        neg_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
+        neg_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
             rating=Feedback.Rating.RATING_THUMBS_DOWN,
         )  # type: ignore
@@ -1045,27 +1028,29 @@ def get_tabular_data(
             )
         df = neg_feedbacks.to_df_format(row_limit=rows)
     elif details == "Answered Successfully":
-        successful_messages: MessageQuerySet = Message.objects.filter(
+        qs = Message.objects.filter(
             Q(analysis_result__contains={"Answered": True})
             | Q(analysis_result__contains={"assistant": {"answer": "Found"}}),
             conversation__bot_integration=bi,
-        )  # type: ignore
+        )
         if start_date and end_date:
-            successful_messages = successful_messages.filter(
+            qs = qs.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = successful_messages.to_df_analysis_format(row_limit=rows)
+        qs |= qs.previous_by_created_at()
+        df = qs.to_df(row_limit=rows)
     elif details == "Answered Unsuccessfully":
-        unsuccessful_messages: MessageQuerySet = Message.objects.filter(
+        qs = Message.objects.filter(
             Q(analysis_result__contains={"Answered": False})
             | Q(analysis_result__contains={"assistant": {"answer": "Missing"}}),
             conversation__bot_integration=bi,
         )  # type: ignore
         if start_date and end_date:
-            unsuccessful_messages = unsuccessful_messages.filter(
+            qs = qs.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = unsuccessful_messages.to_df_analysis_format(row_limit=rows)
+        qs |= qs.previous_by_created_at()
+        df = qs.to_df(row_limit=rows)
 
     if sort_by and sort_by in df.columns:
         df.sort_values(by=[sort_by], ascending=False, inplace=True)
@@ -1083,37 +1068,29 @@ def jsonable_exec_export_fn(bi_id: id, sr_id: id, pr_id: id) -> str:
 
 
 def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | None):
-    today = timezone.now().date()
-    conversations, messages = get_conversations_and_messages(bi)
-    df = get_tabular_data(
-        bi=bi,
-        conversations=conversations,
-        messages=messages,
-        details="Messages",
-        sort_by=None,
-        start_date=today,
-        end_date=today,
+    now = timezone.now()
+    qs = Message.objects.filter(
+        conversation__bot_integration=bi,
+        created_at__date__gte=now - timezone.timedelta(days=2),
+        created_at__date__lte=now,
     )
-    csv = df.to_csv()
-    csv_url = upload_file_from_bytes(
-        filename=f"stats-{today.strftime('%Y-%m-%d')}.csv",
-        data=csv,
-        content_type="text/csv",
+    messages = qs.to_json()
+    data = json.dumps(jsonable_encoder(messages)).encode()
+    json_url = upload_file_from_bytes(
+        filename=f"messages-{now.strftime('%Y-%m-%d')}.json",
+        data=data,
+        content_type="application/json",
     )
-
-    logger.info(f"exported stats for {bi} -> {csv_url}")
-
+    logger.info(f"exported stats for {bi} -> {json_url}")
     variables, variables_schema = get_export_fn_vars(
-        bi=bi, fn_sr=fn_sr, messages_export_url=csv_url
+        bi=bi, fn_sr=fn_sr, messages_export_url=json_url
     )
-    result, fn_sr = fn_sr.submit_api_call(
+    return fn_sr.submit_api_call(
         workspace=bi.workspace,
         request_body=dict(variables=variables, variables_schema=variables_schema),
         parent_pr=fn_pr,
         current_user=bi.workspace.created_by,
     )
-
-    return result, fn_sr
 
 
 def get_export_fn_vars(

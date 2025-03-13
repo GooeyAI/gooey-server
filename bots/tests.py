@@ -135,7 +135,6 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
         sort_by="Name",
     )
     assert df.shape[0] == 0
-    assert "Name" in df.columns
 
     # valid option and data
     convo = Conversation.objects.create(
