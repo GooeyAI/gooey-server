@@ -17,6 +17,7 @@ from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
 from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
+from workspaces.widgets import render_workspace_create_dialog
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -26,7 +27,7 @@ if typing.TYPE_CHECKING:
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
 
-def billing_page(workspace: "Workspace", user: "AppUser"):
+def billing_page(workspace: "Workspace", user: "AppUser", session: dict):
     from daras_ai_v2.base import BasePage
 
     render_payments_setup()
@@ -44,7 +45,9 @@ def billing_page(workspace: "Workspace", user: "AppUser"):
         render_credit_balance(workspace)
 
     with gui.div(className="mb-5"):
-        selected_payment_provider = render_all_plans(workspace)
+        selected_payment_provider = render_all_plans(
+            workspace, user=user, session=session
+        )
 
     with gui.div(className="mb-5"):
         render_addon_section(workspace, selected_payment_provider)
@@ -136,7 +139,9 @@ def render_credit_balance(workspace: "Workspace"):
     )
 
 
-def render_all_plans(workspace: "Workspace") -> PaymentProvider:
+def render_all_plans(
+    workspace: "Workspace", user: "AppUser", session: dict
+) -> PaymentProvider:
     current_plan = (
         PricingPlan.from_sub(workspace.subscription)
         if workspace.subscription
@@ -170,10 +175,12 @@ def render_all_plans(workspace: "Workspace") -> PaymentProvider:
                     plan=plan,
                     current_plan=current_plan,
                     payment_provider=selected_payment_provider,
+                    user=user,
+                    session=session,
                 )
 
     with plans_div:
-        grid_layout(4, all_plans, _render_plan, separator=False)
+        grid_layout(len(all_plans), all_plans, _render_plan, separator=False)
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
@@ -184,9 +191,9 @@ def render_all_plans(workspace: "Workspace") -> PaymentProvider:
 
 
 def _render_plan_details(plan: PricingPlan):
-    with gui.div(className="flex-grow-1"):
-        with gui.div(className="mb-4"):
-            with gui.tag("h4", className="mb-0"):
+    with gui.div(className="flex-grow-1 d-flex flex-column"):
+        with gui.div():
+            with gui.tag("h2", className="mb-1"):
                 gui.html(plan.title)
             gui.caption(
                 plan.description,
@@ -195,46 +202,69 @@ def _render_plan_details(plan: PricingPlan):
                     "display": "block",
                 },
             )
-        with gui.div(className="my-3 w-100"):
-            with gui.tag("h4", className="my-0 d-inline me-2"):
-                gui.html(plan.pricing_title())
-            with gui.tag("span", className="text-muted my-0"):
-                gui.html(plan.pricing_caption())
-        gui.write(plan.long_description, unsafe_allow_html=True)
+
+        with gui.div(className="my-3"):
+            with gui.tag("h3", className="my-0 d-inline me-2"):
+                gui.html(plan.get_pricing_title())
+            with gui.tag("p", className="text-muted my-0"):
+                gui.html(plan.get_pricing_caption())
+
+        with gui.div(
+            className="flex-grow-1 d-flex flex-column justify-content-between"
+        ):
+            with gui.div():
+                gui.write(plan.long_description, unsafe_allow_html=True)
+            with gui.div(className="mt-3"):
+                gui.write(plan.footer, unsafe_allow_html=True)
 
 
 def _render_plan_action_button(
+    *,
     workspace: "Workspace",
+    user: "AppUser",
     plan: PricingPlan,
     current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
+    session: dict,
 ):
-    btn_classes = "w-100 mt-3"
-    if plan == current_plan:
-        gui.button("Your Plan", className=btn_classes, disabled=True, type="tertiary")
-    elif plan.contact_us_link:
-        with gui.link(
-            to=plan.contact_us_link,
-            className=btn_classes + " btn btn-theme btn-primary",
+    with gui.div(className="mt-3 d-flex flex-column"):
+        workspace_create_dialog = gui.use_alert_dialog("workspace-create-dialog")
+        if workspace_create_dialog.is_open or (
+            plan == PricingPlan.STARTER
+            and current_plan == plan
+            and len(user.cached_workspaces) == 1
         ):
-            gui.html("Contact Us")
-    elif (
-        workspace.subscription
-        and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
-    ):
-        # don't show upgrade/downgrade buttons for enterprise customers
-        return
-    elif workspace.subscription and workspace.subscription.is_paid():
-        render_change_subscription_button(
-            workspace=workspace, plan=plan, current_plan=current_plan
-        )
-    else:
-        assert payment_provider is not None  # for sanity
-        _render_create_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            payment_provider=payment_provider,
-        )
+            if gui.button("Create Public Workspace", className="w-100", type="primary"):
+                workspace_create_dialog.set_open(True)
+            if workspace_create_dialog.is_open:
+                render_workspace_create_dialog(
+                    user=user, session=session, ref=workspace_create_dialog
+                )
+        elif plan == current_plan:
+            gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
+        elif plan.contact_us_link:
+            with gui.link(
+                to=plan.contact_us_link,
+                className="w-100 btn btn-theme btn-primary",
+            ):
+                gui.html("Let's Talk")
+        elif (
+            workspace.subscription
+            and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
+        ):
+            # don't show upgrade/downgrade buttons for enterprise customers
+            return
+        elif workspace.subscription and workspace.subscription.is_paid():
+            render_change_subscription_button(
+                workspace=workspace, plan=plan, current_plan=current_plan
+            )
+        else:
+            assert payment_provider is not None  # for sanity
+            _render_create_subscription_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=payment_provider,
+            )
 
 
 def render_change_subscription_button(
@@ -244,11 +274,11 @@ def render_change_subscription_button(
     current_plan: PricingPlan,
 ):
     # subscription exists, show upgrade/downgrade button
-    if plan.credits > current_plan.credits:
+    if plan.credits > current_plan.credits or current_plan.deprecated:
         ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
         gui.button_with_confirm_dialog(
             ref=ref,
-            trigger_label="Upgrade",
+            trigger_label="Go Private",
             trigger_type="primary",
             modal_title="#### Upgrade Plan",
             modal_content=f"""
@@ -280,10 +310,14 @@ will be refreshed to {plan.credits:,} Credits.
                 workspace.subscription.cancel()
                 stripe_subscription_create(workspace, plan)
     else:
+        if plan == PricingPlan.STARTER:
+            label = "Downgrade to Public"
+        else:
+            label = "Downgrade"
         ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
         gui.button_with_confirm_dialog(
             ref=ref,
-            trigger_label="Downgrade",
+            trigger_label=label,
             modal_title="#### Downgrade Plan",
             modal_content=f"""
 Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
@@ -534,7 +568,7 @@ def render_stripe_subscription_button(
 
     ref = gui.use_confirm_dialog(key=f"--change-sub-confirm-dialog-{plan.key}")
 
-    if gui.button(key=f"--change-sub-{plan.key}", label="Upgrade", type="primary"):
+    if gui.button(key=f"--change-sub-{plan.key}", label="Go Private", type="primary"):
         if (
             workspace.subscription
             and workspace.subscription.stripe_get_default_payment_method()
