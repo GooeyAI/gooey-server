@@ -112,6 +112,15 @@ def run():
         provider=ModelProvider.openai,
         pricing_url="https://openai.com/api/pricing",
     )
+    llm_pricing_create(
+        model_id="gpt-4o-mini-realtime-preview-2024-12-17",
+        model_name=LargeLanguageModels.gpt_4_o_mini_audio.name,
+        unit_cost_input=0.150,
+        unit_cost_output=0.600,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/pricing",
+    )
 
     # GPT-4o
 
@@ -137,6 +146,15 @@ def run():
     llm_pricing_create(
         model_id="gpt-4o-2024-08-06",
         model_name=LargeLanguageModels.gpt_4_o.name,
+        unit_cost_input=2.5,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
+    )
+    llm_pricing_create(
+        model_id="gpt-4o-realtime-preview-2024-12-17",
+        model_name=LargeLanguageModels.gpt_4_o_audio.name,
         unit_cost_input=2.5,
         unit_cost_output=10,
         unit_quantity=10**6,

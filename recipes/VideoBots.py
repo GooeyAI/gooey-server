@@ -859,7 +859,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             return
 
         asr_msg, user_input = yield from self.asr_step(
-            request=request, response=response, user_input=user_input
+            model=llm_model, request=request, response=response, user_input=user_input
         )
 
         ocr_texts = yield from self.document_understanding_step(request=request)
@@ -921,8 +921,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ocr_texts.append(json.dumps(pages))
         return ocr_texts
 
-    def asr_step(self, request, response, user_input):
-        if request.input_audio:
+    def asr_step(self, model, request, response, user_input):
+        if request.input_audio and not model.supports_audio:
             if not request.asr_model:
                 request.asr_model, request.asr_language = infer_asr_model_and_language(
                     request.user_language or ""
@@ -1114,6 +1114,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             response_format_type=request.response_format_type,
             tools=list(tools.values()),
             stream=True,
+            audio_url=request.input_audio,
         )
 
         tool_calls = None
@@ -1130,6 +1131,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
+
+            try:
+                response.raw_input_text = choices[0]["input_audio_transcript"]
+            except KeyError:
+                pass
+            try:
+                response.output_audio += [choices[0]["audio_url"]]
+                print(response.output_audio)
+            except KeyError:
+                pass
 
             # save raw model response without citations and translation for history
             response.raw_output_text = [
@@ -1632,15 +1643,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     render_called_functions(
                         saved_run=self.current_sr, trigger=FunctionTrigger.prompt
                     )
-                    for idx, text in enumerate(output_text):
+                    for text in output_text:
                         gui.write(text)
-                        try:
-                            gui.video(output_video[idx])
-                        except IndexError:
-                            try:
-                                gui.audio(output_audio[idx])
-                            except IndexError:
-                                pass
+                    for video in output_video:
+                        gui.video(video)
+                    for audio in output_audio:
+                        gui.audio(audio)
                     render_called_functions(
                         saved_run=self.current_sr, trigger=FunctionTrigger.post
                     )
@@ -1782,9 +1790,13 @@ def convo_window_clipper(
 
 def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
     tool_name = call["function"]["name"]
+    tool_args = call["function"]["arguments"]
     tool = tools[tool_name]
     yield f"🛠 {tool.label}..."
-    kwargs = json.loads(call["function"]["arguments"])
+    try:
+        kwargs = json.loads(tool_args)
+    except json.JSONDecodeError as e:
+        return dict(error=repr(e))
     return tool(**kwargs)
 
 
