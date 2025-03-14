@@ -535,6 +535,13 @@ def _process_and_send_msg(
             send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
+        # in case there are multiple outputs, send the remaining ones
+        if audio:
+            for a in state["output_audio"][1:]:
+                bot.send_msg(audio=a)
+        if video:
+            for v in state["output_video"][1:]:
+                bot.send_msg(video=v)
 
     # save msgs to db
     _save_msgs(
