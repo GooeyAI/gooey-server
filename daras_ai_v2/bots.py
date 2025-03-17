@@ -171,9 +171,9 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text, send_feedback_buttons = parse_bot_html(
-            text, send_feedback_buttons
-        )
+        buttons, text, disable_feedback = parse_bot_html(text)
+        if disable_feedback:
+            send_feedback_buttons = False
 
         if buttons and send_feedback_buttons:
             self._send_msg(
@@ -252,21 +252,17 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(
-    text: str | None, send_feedback_buttons: bool = False
-) -> tuple[list[ReplyButton], str, bool]:
+def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
-        return [], text, send_feedback_buttons
+        return [], text, False
     doc = pq(f"<root>{text}</root>")
     buttons = []
+    disable_feedback = False
     for idx, btn in enumerate(doc("button") or []):
-
-        if send_feedback_buttons and "disable_feedback" in (
-            btn.attrib.get("gui-action") or ""
-        ):
-            send_feedback_buttons = False
+        if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
+            disable_feedback = True
         buttons.append(
             ReplyButton(
                 # parsed by _handle_interactive_msg
@@ -285,7 +281,7 @@ def parse_bot_html(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
     )
 
-    return buttons, text, send_feedback_buttons
+    return buttons, text, disable_feedback
 
 
 def _echo(bot, input_text):
