@@ -302,11 +302,14 @@ def _build_msg_buttons(
     ret = []
     button_group = []
     for button in buttons:
-        if "send_location" in csv_decode_row(button["id"]):
+        if any("send_location" in action for action in csv_decode_row(button["id"])):
             ret.append(_build_interactive_location_msg(button, msg, max_title_len))
             # dont repeat text in subsequent messages
             msg = {"body": {"text": "\u200b"}}
         else:
+
+            if not button.get("title"):
+                continue
             button_group.append(button)
             # group into 3 buttons per message
             if len(button_group) < 3:
