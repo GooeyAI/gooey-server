@@ -171,7 +171,9 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text = parse_bot_html(text)
+        buttons, text, send_feedback_buttons = parse_bot_html(
+            text, send_feedback_buttons
+        )
 
         if buttons and send_feedback_buttons:
             self._send_msg(
@@ -250,30 +252,40 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
+def parse_bot_html(
+    text: str | None, send_feedback_buttons: bool = False
+) -> tuple[list[ReplyButton], str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
-        return [], text
+        return [], text, send_feedback_buttons
     doc = pq(f"<root>{text}</root>")
-    buttons = [
-        ReplyButton(
-            # parsed by _handle_interactive_msg
-            id=csv_encode_row(
-                idx + 1,
-                btn.attrib.get("gui-target") or "input_prompt",
-                btn.attrib.get("gui-action"),
-                # title must be the last item because it might get truncated
-                btn.text or "",
-            ),
-            title=btn.text or "",
+    buttons = []
+    for idx, btn in enumerate(doc("button") or []):
+
+        if send_feedback_buttons and "disable_feedback" in (
+            btn.attrib.get("gui-action") or ""
+        ):
+            send_feedback_buttons = False
+        buttons.append(
+            ReplyButton(
+                # parsed by _handle_interactive_msg
+                id=csv_encode_row(
+                    idx + 1,
+                    btn.attrib.get("gui-target") or "input_prompt",
+                    btn.attrib.get("gui-action"),
+                    # title must be the last item because it might get truncated
+                    btn.text or "",
+                ),
+                title=btn.text or "",
+            )
         )
-        for idx, btn in enumerate(doc("button") or [])
-    ]
+
     text = "\n\n".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
     )
-    return buttons, text
+
+    return buttons, text, send_feedback_buttons
 
 
 def _echo(bot, input_text):
