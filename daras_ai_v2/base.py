@@ -2314,6 +2314,14 @@ class BasePage:
                         height: 100% !important;
                         width: unset !important;
                     }
+         
+                    & .gui_example_media > a {
+                        text-decoration: none !important;
+                    }
+                    
+                    & .render_example_author_meta > a {
+                        text-decoration: none !important;
+                    }
 
                     @media (max-width: 768px) {
                         & .gui_example_media {
@@ -2333,9 +2341,10 @@ class BasePage:
                                 with gui.div(
                                     className="gui_example_media flex-grow-1 position-relative d-flex justify-content-center"
                                 ):
-                                    self.render_example_preview_media(
-                                        published_run=published_run
-                                    )
+                                    with gui.link(to=published_run.get_app_url()):
+                                        self.render_example_preview_media(
+                                            published_run=published_run
+                                        )
                         with gui.div(className="d-flex align-items-stretch"):
                             with gui.div(
                                 className="flex-grow-1 d-flex flex-column gap-md-2"
@@ -2383,7 +2392,7 @@ class BasePage:
                                                 style={"fontSize": "0.9rem"},
                                             )
                                 with gui.div(
-                                    className="d-none d-md-flex flex-1 align-items-center"
+                                    className="d-none d-md-flex flex-1 align-items-center render_example_author_meta"
                                 ):
                                     self._render_example_author_meta(
                                         published_run=published_run,
@@ -2405,9 +2414,10 @@ class BasePage:
                                 className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
                             ):
                                 with gui.div(className="gui_example_media"):
-                                    self.render_example_preview_media(
-                                        published_run=published_run
-                                    )
+                                    with gui.link(to=published_run.get_app_url()):
+                                        self.render_example_preview_media(
+                                            published_run=published_run
+                                        )
 
             with gui.div(className="d-md-none mt-2"):
                 self._render_example_author_meta(
@@ -2473,7 +2483,7 @@ class BasePage:
     ):
         updated_at = published_run.saved_run.updated_at or ""
         with gui.div(
-            className="d-flex gap-2 align-items-center container-margin-reset"
+            className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta"
         ):
             if show_workspace_author:
                 self.render_workspace_author(
@@ -2481,7 +2491,7 @@ class BasePage:
                     image_size="24px",
                     text_size="0.9rem",
                     responsive=False,
-                    show_as_link=False,
+                    show_as_link=True,
                 )
             else:
                 self.render_author(
@@ -2489,7 +2499,7 @@ class BasePage:
                     image_size="24px",
                     text_size="0.9rem",
                     responsive=False,
-                    show_as_link=False,
+                    show_as_link=True,
                 )
 
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
@@ -2554,7 +2564,7 @@ class BasePage:
                 else:
                     gui.write(
                         f"# {workflow.get_or_create_metadata().emoji}",
-                        className="m-0 container-margin-reset",
+                        className="m-0 container-margin-reset ",
                     )
 
     def render_steps(self):
