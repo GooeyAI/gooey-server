@@ -2293,9 +2293,8 @@ class BasePage:
         show_workspace_author: bool = False,
         workflow_pill: str | None = None,
         hide_visibility_pill: bool = False,
+        hide_version_notes: bool = False,
     ):
-        max_desc_words = 280
-        max_desc_words_mobile = 100
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
         version = published_run.versions.latest()
         photo_url = published_run.photo_url
@@ -2304,28 +2303,19 @@ class BasePage:
         )
         has_preview_image = bool(preview_image or photo_url)
 
-        with gui.div(
-            className="align-items-stretch position-relative py-2 pe-0 pr-full-width",
-            style={"minHeight": "78px"},
-        ):
+        with gui.div(className="position-relative py-2 pe-0"):
             with gui.styled(
                 """
-                    & h4, & h1 {
+                    & h4, & h1, & p {
                         margin: 0 !important;
                     }
 
-                    @media (min-width: 768px) {
-                        & h4, & h1 {
-                        margin-bottom: 0.2rem !important;
-                        }
-                    }
-
                     & .gui_example_media {
-                        height: 150px;
+                        height: 120px;
                     }
 
                     & .gui_example_media .gui-img, .gui-video {
-                        max-width: 150px !important;
+                        max-width: 120px !important;
                         height: 100% !important;
                         width: unset !important;
                     }
@@ -2342,9 +2332,7 @@ class BasePage:
                 """
             ):
                 with gui.div(className=f"position-relative overflow-hidden"):
-                    with gui.div(
-                        className="d-flex flex-column justify-content-between"
-                    ):
+                    with gui.div(className="d-flex flex-column gap-2"):
                         if has_preview_image:
                             with gui.div(className="flex-grow-1 d-md-none"):
                                 with gui.div(
@@ -2355,63 +2343,68 @@ class BasePage:
                                     )
                         with gui.div(className="d-flex align-items-stretch"):
                             with gui.div(
-                                className="flex-grow-3 d-flex flex-column justify-content-between",
+                                className="flex-grow-1 d-flex flex-column gap-md-2"
                             ):
-                                with gui.div(className="d-flex align-items-center"):
-                                    with gui.div():
-                                        with gui.link(to=published_run.get_app_url()):
-                                            gui.write(
-                                                f"#### {truncate_text_words(tb.h1_title, 50)}"
+                                with gui.div(
+                                    className="flex-grow-1 d-flex flex-column gap-md-2"
+                                ):
+                                    with gui.div(className="d-flex align-items-center"):
+                                        with gui.div():
+                                            with gui.link(
+                                                to=published_run.get_app_url()
+                                            ):
+                                                gui.write(
+                                                    f"#### {truncate_text_words(tb.h1_title, 50)}"
+                                                )
+                                        with gui.div(
+                                            className="d-md-flex d-none align-items-center ms-2 mt-1",
+                                            style={"font-size": "0.9rem"},
+                                        ):
+                                            if not hide_visibility_pill:
+                                                gui.pill(
+                                                    PublishedRunVisibility(
+                                                        published_run.visibility
+                                                    ).get_badge_html(),
+                                                    unsafe_allow_html=True,
+                                                    className="border border-dark",
+                                                )
+                                            if workflow_pill:
+                                                gui.pill(
+                                                    workflow_pill,
+                                                    unsafe_allow_html=True,
+                                                    className="border border-dark ms-2",
+                                                )
+                                    if published_run.notes:
+                                        with gui.div(
+                                            className="d-none d-md-block pe-5"
+                                        ):
+                                            gui.caption(
+                                                published_run.notes, line_clamp=2
                                             )
-                                    with gui.div(
-                                        className="d-md-flex d-none align-items-center mb-1 ms-2",
-                                        style={"font-size": "0.9rem"},
-                                    ):
-                                        if not hide_visibility_pill:
-                                            gui.pill(
-                                                PublishedRunVisibility(
-                                                    published_run.visibility
-                                                ).get_badge_html(),
-                                                unsafe_allow_html=True,
-                                                className="border border-dark",
-                                            )
-                                        if workflow_pill:
-                                            gui.pill(
-                                                workflow_pill,
-                                                unsafe_allow_html=True,
-                                                className="border border-dark ms-2",
-                                            )
-                                if published_run.notes:
-                                    with gui.div(className="d-none d-md-block pe-5"):
-                                        gui.caption(
-                                            truncate_text_words(
-                                                published_run.notes, max_desc_words
-                                            ),
-                                        )
-                                    with gui.div(className="d-md-none"):
-                                        gui.caption(
-                                            truncate_text_words(
+                                        with gui.div(className="d-md-none"):
+                                            gui.caption(
                                                 published_run.notes,
-                                                max_desc_words_mobile,
-                                            ),
-                                            style={"fontSize": "14px"},
-                                        )
+                                                line_clamp=2,
+                                                style={"fontSize": "0.9rem"},
+                                            )
                                 with gui.div(
                                     className="d-none d-md-flex flex-1 align-items-center"
                                 ):
-                                    with gui.div(className="flex-grow-1"):
-                                        self._render_example_author_meta(
-                                            published_run=published_run,
-                                            show_workspace_author=show_workspace_author,
-                                        )
-                                    with gui.div(className="flex-grow-1"):
+                                    self._render_example_author_meta(
+                                        published_run=published_run,
+                                        show_workspace_author=show_workspace_author,
+                                    )
+                                    if not hide_version_notes:
                                         with gui.div(
-                                            className="container-margin-reset mt-2 mt-md-0"
+                                            className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
                                         ):
                                             if version.change_notes:
+                                                gui.write(" • ")
                                                 gui.caption(
-                                                    f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 40))}",
+                                                    f"{icons.notes} {version.change_notes}",
                                                     unsafe_allow_html=True,
+                                                    style={"fontSize": "0.9rem"},
+                                                    line_clamp=1,
                                                 )
                             with gui.div(
                                 className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
@@ -2421,17 +2414,20 @@ class BasePage:
                                         published_run=published_run
                                     )
 
-            with gui.div(className="d-md-none"):
+            with gui.div(className="d-md-none mt-2"):
                 self._render_example_author_meta(
                     published_run=published_run,
                     show_workspace_author=show_workspace_author,
                 )
-                with gui.div(className="container-margin-reset mt-2 mt-md-0"):
-                    if version.change_notes:
-                        gui.caption(
-                            f"{icons.notes} {html.escape(truncate_text_words(version.change_notes, 40))}",
-                            unsafe_allow_html=True,
-                        )
+                if not hide_version_notes:
+                    with gui.div(className="container-margin-reset mt-2 mt-md-0"):
+                        if version.change_notes:
+                            gui.caption(
+                                f"{icons.notes} {version.change_notes}",
+                                unsafe_allow_html=True,
+                                style={"fontSize": "0.9rem"},
+                                line_clamp=1,
+                            )
 
     def _render_example_preview(
         self,
@@ -2443,6 +2439,7 @@ class BasePage:
             published_run,
             show_workspace_author=True,
             hide_visibility_pill=True,
+            hide_version_notes=True,
         )
         if allow_hide:
             self._example_hide_button(published_run=published_run)
@@ -2500,6 +2497,19 @@ class BasePage:
                     show_as_link=False,
                 )
 
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                count = published_run.get_run_count()
+                if count > 0:
+                    run_count = format_number_with_suffix(count)
+                    gui.write(" • ")
+                    gui.caption(
+                        f"{run_icon} {run_count} runs",
+                        unsafe_allow_html=True,
+                        style={"fontSize": "0.9rem"},
+                        className="text-dark",
+                    )
+
             if published_run.last_edited_by:
                 gui.write(" • ")
 
@@ -2509,18 +2519,6 @@ class BasePage:
                     style={"fontSize": "0.9rem"},
                     className="container-margin-reset",
                 )
-
-            if published_run.visibility == PublishedRunVisibility.PUBLIC:
-                run_icon = '<i class="fa-regular fa-person-running"></i>'
-                count = published_run.get_run_count()
-                if count > 0:
-                    run_count = format_number_with_suffix(count)
-                    gui.write(" • ")
-                    with gui.div():
-                        gui.caption(
-                            f"{run_icon} {run_count} runs",
-                            unsafe_allow_html=True,
-                        )
 
     # examples / saved tab
     def render_example_preview_media(self, published_run: PublishedRun):
@@ -2532,8 +2530,8 @@ class BasePage:
         with gui.styled(
             """
             &.gui_example_default_media {
-                height: 150px;
-                width: 150px;
+                height: 120px;
+                width: 120px;
             }
 
             @media (max-width: 768px) {
@@ -2555,7 +2553,7 @@ class BasePage:
                             "width": "100%",
                             "height": "100%",
                             "objectFit": "cover",
-                            "borderRadius": "50%" if not preview_image else "0",
+                            # "borderRadius": "50%" if not preview_image else "0",
                         },
                     )
                 else:

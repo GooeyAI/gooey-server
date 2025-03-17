@@ -293,8 +293,10 @@ def all_saved_runs_tab(request: Request):
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-
-        workflow.page_cls().render_example(pr, workflow_pill=workflow.short_title)
+        workflow.page_cls().render_example(
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+        )
 
     gui.write("# Saved Workflows")
     explore_path = get_route_path(explore_page)
