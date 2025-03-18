@@ -1543,7 +1543,7 @@ class BasePage:
     ):
         if not user:
             return
-        photo = user.photo_url
+        photo = user.get_photo()
         name = user.full_name()
         if show_as_link and (handle := user.get_handle()):
             link = handle.get_app_url()
@@ -2321,7 +2321,7 @@ class BasePage:
 
                     @media (min-width: 768px) {
                         & .gui_example_media{
-                            width: 200px;
+                            width: 130px;
                         }
                     }
 
@@ -2380,7 +2380,7 @@ class BasePage:
                                             className="d-none d-md-block pe-5"
                                         ):
                                             gui.caption(
-                                                published_run.notes, line_clamp=2
+                                                published_run.notes, line_clamp=3
                                             )
                                         with gui.div(className="d-md-none"):
                                             gui.caption(
