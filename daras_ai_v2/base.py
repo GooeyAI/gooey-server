@@ -2310,32 +2310,23 @@ class BasePage:
                         margin: 0 !important;
                     }
 
-                    & .gui_example_media {
-                        height: 120px;
-                    }
-
-                    & .gui_example_media .gui-img, .gui-video {
-                        max-width: 120px !important;
-                        height: 100% !important;
-                        width: unset !important;
-                    }
-         
                     & .gui_example_media > a {
                         text-decoration: none !important;
                     }
                     
-                    & .render_example_author_meta > a {
-                        text-decoration: none !important;
+                    & .gui_example_media {
+                        width: 100%;
+                        min-width: 100px;
                     }
 
-                    @media (max-width: 768px) {
-                        & .gui_example_media {
-                            height: auto;
+                    @media (min-width: 768px) {
+                        & .gui_example_media{
+                            width: 200px;
                         }
-                        & .gui_example_media .gui-img, .gui-video {
-                            max-width:  100% !important;
-                            max-height: 200px !important;
-                        }
+                    }
+
+                    & .render_example_author_meta > a {
+                        text-decoration: none !important;
                     }
                 """
             ):
@@ -2344,12 +2335,13 @@ class BasePage:
                         if has_preview_image:
                             with gui.div(className="flex-grow-1 d-md-none"):
                                 with gui.div(
-                                    className="gui_example_media flex-grow-1 position-relative d-flex justify-content-center"
+                                    className="flex-grow-1 position-relative d-flex justify-content-center"
                                 ):
                                     with gui.link(to=published_run.get_app_url()):
-                                        self.render_example_preview_media(
-                                            published_run=published_run
-                                        )
+                                        with gui.div(className="gui_example_media"):
+                                            self.render_example_preview_media(
+                                                published_run=published_run
+                                            )
                         with gui.div(className="d-flex align-items-stretch"):
                             with gui.div(
                                 className="flex-grow-1 d-flex flex-column gap-md-2"
@@ -2418,8 +2410,13 @@ class BasePage:
                             with gui.div(
                                 className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
                             ):
-                                with gui.div(className="gui_example_media"):
-                                    with gui.link(to=published_run.get_app_url()):
+                                with gui.div(
+                                    className="gui_example_media d-flex align-items-center justify-content-center",
+                                ):
+                                    with gui.link(
+                                        to=published_run.get_app_url(),
+                                        className="d-flex",
+                                    ):
                                         self.render_example_preview_media(
                                             published_run=published_run
                                         )
@@ -2488,7 +2485,7 @@ class BasePage:
     ):
         updated_at = published_run.saved_run.updated_at or ""
         with gui.div(
-            className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta"
+            className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta",
         ):
             if show_workspace_author:
                 self.render_workspace_author(
@@ -2537,40 +2534,23 @@ class BasePage:
         preview_image = self.get_example_preview_image(
             published_run.saved_run.to_dict()
         )
-        with gui.styled(
-            """
-            &.gui_example_default_media {
-                height: 120px;
-                width: 120px;
-            }
 
-            @media (max-width: 768px) {
-                &.gui_example_default_media {
-                    height: 86px;
-                    width: 86px;
-                }
-            }
-        """
-        ):
-            with gui.div(
-                className="d-flex align-items-center justify-content-center gui_example_default_media",
-            ):
-                if preview_image or photo_url:
-                    gui.image(
-                        src=preview_image or photo_url,
-                        className="m-0",
-                        style={
-                            "width": "100%",
-                            "height": "100%",
-                            "objectFit": "cover",
-                            # "borderRadius": "50%" if not preview_image else "0",
-                        },
-                    )
-                else:
-                    gui.write(
-                        f"# {workflow.get_or_create_metadata().emoji}",
-                        className="m-0 container-margin-reset ",
-                    )
+        if preview_image or photo_url:
+            gui.image(
+                src=preview_image or photo_url,
+                className="m-0",
+                style={
+                    "maxWidth": "100%",
+                    "height": "100%",
+                    "objectFit": "cover",
+                    "pointerEvents": "none",
+                },
+            )
+        else:
+            gui.write(
+                f"# {workflow.get_or_create_metadata().emoji}",
+                className="m-0 container-margin-reset ",
+            )
 
     def render_steps(self):
         raise NotImplementedError
