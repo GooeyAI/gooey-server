@@ -520,6 +520,8 @@ class BasePage:
                     self._render_options_button_with_dialog()
                 self._render_share_button()
                 self._render_save_button()
+            elif self.tab != RecipeTabs.examples:
+                self._render_copy_link_button(label="Copy Link")
 
     def _render_share_button(self):
         if (
