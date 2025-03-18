@@ -180,47 +180,11 @@ class WhatsappBot(BotInterface):
                 access_token=access_token,
             )
 
-        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
-        messages = []
-        if video:
-            if buttons:
-                # interactive text msg + video in header
-                messages = _build_msg_buttons(
-                    buttons,
-                    {
-                        "body": {
-                            "text": text or "\u200b",
-                        },
-                        "header": {
-                            "type": "video",
-                            "video": {"link": video},
-                        },
-                    },
-                )
-            else:
-                messages = [
-                    # simple video msg + text caption
-                    {
-                        "type": "video",
-                        "video": {
-                            "link": video,
-                            "caption": text,
-                        },
-                    },
-                ]
-
-        elif buttons:
+        if buttons:
             # interactive text msg
-            messages = _build_msg_buttons(
-                buttons,
-                {
-                    "body": {
-                        "text": text or "\u200b",
-                    },
-                },
-            )
+            messages = _build_msg_buttons(buttons, text)
         elif text:
-            # simple text msg
+            # plain text msg
             messages = [
                 {
                     "type": "text",
@@ -230,9 +194,22 @@ class WhatsappBot(BotInterface):
                     },
                 },
             ]
+        else:
+            messages = []
 
-        if audio and not video:  # video already has audio
-            # simple audio msg
+        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
+        if video:
+            # video msg at the start
+            messages.insert(
+                0,
+                {
+                    "type": "video",
+                    "video": {"link": video},
+                },
+            )
+        # video already has audio, so skip audio if video is present
+        elif audio:
+            # audio msg at the start
             messages.insert(
                 0,
                 {
@@ -240,10 +217,9 @@ class WhatsappBot(BotInterface):
                     "audio": {"link": audio},
                 },
             )
-
         if documents:
             messages = [
-                # simple document msg
+                # document msg at the start
                 {
                     "type": "document",
                     "document": {
@@ -253,8 +229,8 @@ class WhatsappBot(BotInterface):
                 }
                 for link in documents
             ] + messages
-
         if images:
+            # image msg at the end
             messages += [
                 {
                     "type": "image",
@@ -294,7 +270,7 @@ def retrieve_wa_media_by_id(
 
 def _build_msg_buttons(
     buttons: list[ReplyButton],
-    msg: dict,
+    text: str | None = None,
     *,
     max_title_len: int = 20,
     max_id_len: int = 256,
@@ -303,49 +279,53 @@ def _build_msg_buttons(
     button_group = []
     for button in buttons:
         if any("send_location" in action for action in csv_decode_row(button["id"])):
-            ret.append(_build_interactive_location_msg(button, msg, max_title_len))
-            # dont repeat text in subsequent messages
-            msg = {"body": {"text": "\u200b"}}
+            ret.append(_build_interactive_location_msg(text))
+        elif not button.get("title"):
+            # skip button and only send the text
+            ret.append(
+                {
+                    "type": "text",
+                    "text": {
+                        "body": text or "\u200b",
+                        "preview_url": True,
+                    },
+                }
+            )
         else:
-
-            if not button.get("title"):
-                continue
             button_group.append(button)
             # group into 3 buttons per message
             if len(button_group) < 3:
                 continue
             ret.append(
                 _build_interactive_button_msg(
-                    button_group, msg, max_title_len, max_id_len
+                    button_group, text, max_title_len, max_id_len
                 )
             )
             button_group = []
-            # dont repeat text in subsequent messages
-            msg = {"body": {"text": "\u200b"}}
+        # dont repeat text in subsequent messages
+        text = "\u200b"
     # send remaining buttons
     if button_group:
         ret.append(
-            _build_interactive_button_msg(button_group, msg, max_title_len, max_id_len)
+            _build_interactive_button_msg(button_group, text, max_title_len, max_id_len)
         )
     return ret
 
 
-def _build_interactive_location_msg(
-    button: ReplyButton, msg: dict, max_title_len: int
-) -> dict:
+def _build_interactive_location_msg(text: str | None) -> dict:
     return {
         "type": "interactive",
         "interactive": {
             "type": "location_request_message",
-            **msg,
             "action": {"name": "send_location"},
+            "body": {"text": text or "\u200b"},
         },
     }
 
 
 def _build_interactive_button_msg(
-    button_grp: list[ReplyButton],
-    msg: dict,
+    buttons: list[ReplyButton],
+    text: str | None,
     max_title_len: int,
     max_id_len: int,
 ) -> dict:
@@ -357,14 +337,14 @@ def _build_interactive_button_msg(
                 "title": truncate_text_words(btn["title"], max_title_len),
             },
         }
-        for btn in button_grp
+        for btn in buttons
     ]
     interactive_message = {
         "type": "interactive",
         "interactive": {
             "type": "button",
-            **msg,
             "action": {"buttons": buttons_wa},
+            "body": {"text": text or "\u200b"},
         },
     }
     return interactive_message
