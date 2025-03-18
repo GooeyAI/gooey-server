@@ -2448,18 +2448,6 @@ class BasePage:
             hide_visibility_pill=True,
             hide_version_notes=True,
         )
-        if allow_hide:
-            self._example_hide_button(published_run=published_run)
-
-    def _example_hide_button(self, published_run: PublishedRun):
-        pressed_delete = gui.button(
-            "🙈️ Hide",
-            key=f"delete_example_{published_run.published_run_id}",
-            style={"color": "red"},
-        )
-        if not pressed_delete:
-            return
-        self.set_hidden(published_run=published_run, hidden=True)
 
     def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
         with gui.spinner("Hiding..."):
