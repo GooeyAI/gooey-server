@@ -153,9 +153,16 @@ class Img2ImgPage(BasePage):
         state = published_run.saved_run.state
         input_image = state.get("input_image", None)
         output_images = state.get("output_images", [])
-        with gui.div(className="d-flex gap-2"):
-            gui.image(input_image)
-            gui.image(output_images[0])
+        with gui.styled(
+            """
+            & img {
+                max-width: 50%;
+            }
+        """
+        ):
+            with gui.div(className="d-flex gap-2"):
+                gui.image(input_image)
+                gui.image(output_images[0])
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
