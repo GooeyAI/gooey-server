@@ -139,6 +139,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         else:
             gui.div()
 
+    def render_example_preview_media(self, published_run: dict):
+        gui.video(published_run.saved_run.state.get("output_video"))
+
     def render_output(self):
         self.render_run_preview_output(gui.session_state)
 
