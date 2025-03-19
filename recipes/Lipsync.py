@@ -117,6 +117,9 @@ class LipsyncPage(BasePage):
     def render_output(self):
         self.render_run_preview_output(gui.session_state)
 
+    def render_example_preview_media(self, published_run: dict):
+        gui.video(published_run.saved_run.state.get("output_video"))
+
     def related_workflows(self) -> list:
         from recipes.DeforumSD import DeforumSDPage
         from recipes.LipsyncTTS import LipsyncTTSPage
