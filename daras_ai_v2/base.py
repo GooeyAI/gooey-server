@@ -2314,6 +2314,10 @@ class BasePage:
                         text-decoration: none !important;
                     }
                     
+                    & .gui_example_media > a > img {
+                        pointer-events: none !important;
+                    }
+
                     & .gui_example_media {
                         width: 100%;
                         min-width: 100px;
@@ -2531,7 +2535,6 @@ class BasePage:
                     "maxWidth": "100%",
                     "height": "100%",
                     "objectFit": "cover",
-                    "pointerEvents": "none",
                 },
             )
         else:
