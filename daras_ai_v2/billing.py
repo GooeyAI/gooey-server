@@ -8,7 +8,7 @@ from loguru import logger
 
 from app_users.models import AppUserTransaction, PaymentProvider
 from daras_ai_v2 import icons, settings, paypal
-from daras_ai_v2.fastapi_tricks import get_app_route_url
+from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.settings import templates
@@ -17,7 +17,7 @@ from payments.models import PaymentMethodSummary
 from payments.plans import PricingPlan
 from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
-from workspaces.widgets import render_workspace_create_dialog
+from workspaces.widgets import render_workspace_create_dialog, set_current_workspace
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -116,7 +116,7 @@ def render_current_plan(workspace: "Workspace"):
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
         with left:
-            gui.write(f"# {plan.pricing_title()}", className="no-margin")
+            gui.write(f"# {plan.get_pricing_title()}", className="no-margin")
             if plan.monthly_charge:
                 if provider:
                     provider_text = f" **via {provider.label}**"
@@ -170,14 +170,15 @@ def render_all_plans(
                 className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
             ):
                 _render_plan_details(plan)
-                _render_plan_action_button(
-                    workspace=workspace,
-                    plan=plan,
-                    current_plan=current_plan,
-                    payment_provider=selected_payment_provider,
-                    user=user,
-                    session=session,
-                )
+                with gui.div(className="mt-3 d-flex flex-column"):
+                    _render_plan_action_button(
+                        workspace=workspace,
+                        plan=plan,
+                        current_plan=current_plan,
+                        payment_provider=selected_payment_provider,
+                        user=user,
+                        session=session,
+                    )
 
     with plans_div:
         grid_layout(len(all_plans), all_plans, _render_plan, separator=False)
@@ -227,44 +228,96 @@ def _render_plan_action_button(
     payment_provider: PaymentProvider | None,
     session: dict,
 ):
-    with gui.div(className="mt-3 d-flex flex-column"):
-        workspace_create_dialog = gui.use_alert_dialog("workspace-create-dialog")
-        if workspace_create_dialog.is_open or (
-            plan == PricingPlan.STARTER
-            and current_plan == plan
-            and len(user.cached_workspaces) == 1
-        ):
-            if gui.button("Create Public Workspace", className="w-100", type="primary"):
-                workspace_create_dialog.set_open(True)
-            if workspace_create_dialog.is_open:
-                render_workspace_create_dialog(
-                    user=user, session=session, ref=workspace_create_dialog
-                )
-        elif plan == current_plan:
-            gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
-        elif plan.contact_us_link:
-            with gui.link(
-                to=plan.contact_us_link,
-                className="w-100 btn btn-theme btn-primary",
-            ):
-                gui.html("Let's Talk")
-        elif (
-            workspace.subscription
-            and workspace.subscription.plan == PricingPlan.ENTERPRISE.db_value
-        ):
-            # don't show upgrade/downgrade buttons for enterprise customers
-            return
-        elif workspace.subscription and workspace.subscription.is_paid():
-            render_change_subscription_button(
-                workspace=workspace, plan=plan, current_plan=current_plan
-            )
+    workspace_create_dialog = gui.use_alert_dialog("workspace-create-dialog")
+    is_user_in_team_workspace = len(user.cached_workspaces) > 1
+
+    if (
+        plan == current_plan
+        and current_plan == PricingPlan.STARTER
+        and not is_user_in_team_workspace
+    ):
+        if gui.button("Create Public Workspace", type="primary"):
+            workspace_create_dialog.set_open(True)
+
+    elif plan == current_plan:
+        gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
+
+    elif current_plan == PricingPlan.ENTERPRISE:
+        # don't show upgrade/downgrade buttons for enterprise customers
+        pass
+
+    elif plan.contact_us_link:
+        with gui.link(to=plan.contact_us_link, className="btn btn-theme btn-primary"):
+            gui.html("Let's Talk")
+
+    elif (
+        plan == PricingPlan.BUSINESS
+        and workspace.is_personal
+        and any(
+            w.subscription_id and w.subscription.plan == plan.db_value
+            for w in user.cached_workspaces
+            if w != workspace
+        )
+    ):
+        _render_switch_workspace_button(workspace=workspace, user=user, session=session)
+
+    elif workspace.subscription and workspace.subscription.is_paid():
+        render_change_subscription_button(
+            workspace=workspace,
+            plan=plan,
+            current_plan=current_plan,
+            session=session,
+            user=user,
+        )
+
+    else:
+        assert payment_provider is not None
+        _render_create_subscription_button(
+            workspace=workspace,
+            plan=plan,
+            payment_provider=payment_provider,
+            session=session,
+            user=user,
+        )
+
+    if workspace_create_dialog.is_open:
+        render_workspace_create_dialog(
+            user=user, session=session, ref=workspace_create_dialog
+        )
+
+
+def _render_switch_workspace_button(
+    workspace: "Workspace", user: "AppUser", session: dict
+):
+    from routers.account import members_route
+
+    workspace_select_dialog = gui.use_confirm_dialog(
+        "workspace-select-dialog", close_on_confirm=False
+    )
+    options: dict[int, Workspace] = {
+        w.id: w for w in user.cached_workspaces if w != workspace
+    }
+    if gui.button("Switch to a Workspace", type="secondary"):
+        if len(options) == 1:
+            set_current_workspace(session=session, workspace_id=options.popitem()[0])
+            raise gui.RedirectException(get_route_path(members_route))
         else:
-            assert payment_provider is not None  # for sanity
-            _render_create_subscription_button(
-                workspace=workspace,
-                plan=plan,
-                payment_provider=payment_provider,
+            workspace_select_dialog.set_open(True)
+
+    if workspace_select_dialog.is_open:
+        with gui.confirm_dialog(
+            ref=workspace_select_dialog,
+            modal_title="#### Switch Workspace",
+            confirm_label="Switch",
+        ):
+            selected_workspace_id = gui.selectbox(
+                "###### Select a Workspace",
+                options=options,
+                format_func=lambda w: options[w].display_html(current_user=user),
             )
+        if workspace_select_dialog.pressed_confirm:
+            set_current_workspace(session=session, workspace_id=selected_workspace_id)
+            raise gui.RedirectException(get_route_path(members_route))
 
 
 def render_change_subscription_button(
@@ -272,43 +325,20 @@ def render_change_subscription_button(
     workspace: "Workspace",
     plan: PricingPlan,
     current_plan: PricingPlan,
+    session: dict,
+    user: "AppUser",
 ):
     # subscription exists, show upgrade/downgrade button
-    if plan.credits > current_plan.credits or current_plan.deprecated:
-        ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
-        gui.button_with_confirm_dialog(
-            ref=ref,
-            trigger_label="Go Private",
-            trigger_type="primary",
-            modal_title="#### Upgrade Plan",
-            modal_content=f"""
-Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
-
-Your payment method will be charged ${plan.monthly_charge:,} today and again every month until you cancel.
-
-**{plan.credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
-will be refreshed to {plan.credits:,} Credits.
-                """,
-            confirm_label="Upgrade",
+    if plan.credits > current_plan.credits or (
+        current_plan.deprecated and plan != PricingPlan.STARTER
+    ):
+        _render_upgrade_subscription_button(
+            workspace=workspace,
+            plan=plan,
+            current_plan=current_plan,
+            session=session,
+            user=user,
         )
-        if ref.pressed_confirm:
-            try:
-                change_subscription(
-                    workspace,
-                    plan,
-                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                    billing_cycle_anchor="now",
-                    payment_behavior="error_if_incomplete",
-                )
-            except (stripe.CardError, stripe.InvalidRequestError) as e:
-                if isinstance(e, stripe.InvalidRequestError):
-                    sentry_sdk.capture_exception(e)
-                    logger.warning(e)
-
-                # only handle error if it's related to mandates
-                # cancel current subscription & redirect user to new subscription page
-                workspace.subscription.cancel()
-                stripe_subscription_create(workspace, plan)
     else:
         if plan == PricingPlan.STARTER:
             label = "Downgrade to Public"
@@ -331,17 +361,111 @@ This will take effect from the next billing cycle.
             change_subscription(workspace, plan)
 
 
-def _render_create_subscription_button(
+def _render_upgrade_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    payment_provider: PaymentProvider,
+    current_plan: PricingPlan,
+    session: dict,
+    user: "AppUser",
 ):
-    match payment_provider:
-        case PaymentProvider.STRIPE:
-            render_stripe_subscription_button(workspace=workspace, plan=plan)
-        case PaymentProvider.PAYPAL:
-            render_paypal_subscription_button(plan=plan)
+    label = "Upgrade & Go Private"
+    create_workspace_dialog = gui.use_alert_dialog(
+        f"create-workspace-dialog-plan-{plan.key}"
+    )
+    upgrade_dialog = gui.use_confirm_dialog(
+        key=f"--modal-workspace-{workspace.id}-plan-{plan.key}"
+    )
+    if workspace.is_personal or create_workspace_dialog.is_open:
+        if gui.button(label, type="primary"):
+            create_workspace_dialog.set_open(True)
+
+        if create_workspace_dialog.is_open:
+            new_workspace = render_workspace_create_dialog(
+                user=user,
+                session=session,
+                ref=create_workspace_dialog,
+                selected_plan=plan,
+            )
+            if new_workspace:
+                gui.use_confirm_dialog(
+                    key=f"--modal-workspace-{new_workspace.id}-plan-{plan.key}"
+                ).set_open(True)
+    else:
+        gui.button_with_confirm_dialog(
+            ref=upgrade_dialog,
+            trigger_label=label,
+            trigger_type="primary",
+            modal_title="#### Upgrade Plan",
+            modal_content=f"""
+Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
+
+Your payment method will be charged ${plan.monthly_charge:,} today and again every month until you cancel.
+
+**{plan.credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
+will be refreshed to {plan.credits:,} Credits.
+                """,
+            confirm_label="Upgrade",
+        )
+
+        if upgrade_dialog.pressed_confirm:
+            try:
+                change_subscription(
+                    workspace,
+                    plan,
+                    # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
+                    billing_cycle_anchor="now",
+                    payment_behavior="error_if_incomplete",
+                )
+            except (stripe.CardError, stripe.InvalidRequestError) as e:
+                if isinstance(e, stripe.InvalidRequestError):
+                    sentry_sdk.capture_exception(e)
+                    logger.warning(e)
+
+                # only handle error if it's related to mandates
+                # cancel current subscription & redirect user to new subscription page
+                workspace.subscription.cancel()
+                stripe_subscription_create(workspace, plan)
+
+
+def _render_create_subscription_button(
+    *,
+    user: "AppUser",
+    workspace: "Workspace",
+    plan: PricingPlan,
+    payment_provider: PaymentProvider,
+    session: dict,
+):
+    label = "Go Private"
+    workspace_create_dialog = gui.use_alert_dialog(
+        f"create-workspace-dialog-plan-{plan.key}"
+    )
+    if workspace.is_personal or workspace_create_dialog.is_open:
+        if gui.button(label, type="primary"):
+            workspace_create_dialog.set_open(True)
+
+        if workspace_create_dialog.is_open:
+            new_workspace = render_workspace_create_dialog(
+                user=user,
+                session=session,
+                ref=workspace_create_dialog,
+                selected_plan=plan,
+            )
+            if new_workspace:
+                gui.session_state[f"upgrade-workspace-{new_workspace.id}"] = 1
+    else:
+        match payment_provider:
+            case PaymentProvider.STRIPE:
+                render_stripe_subscription_button(
+                    label=label,
+                    workspace=workspace,
+                    plan=plan,
+                    pressed=gui.session_state.pop(
+                        f"upgrade-workspace-{workspace.id}", False
+                    ),
+                )
+            case PaymentProvider.PAYPAL:
+                render_paypal_subscription_button(plan=plan)
 
 
 def fmt_price(plan: PricingPlan) -> str:
@@ -558,9 +682,11 @@ def stripe_addon_checkout_redirect(
 
 
 def render_stripe_subscription_button(
+    label: str,
     *,
     workspace: "Workspace",
     plan: PricingPlan,
+    pressed: bool = False,
 ):
     if not plan.supports_stripe():
         gui.write("Stripe subscription not available")
@@ -568,7 +694,7 @@ def render_stripe_subscription_button(
 
     ref = gui.use_confirm_dialog(key=f"--change-sub-confirm-dialog-{plan.key}")
 
-    if gui.button(key=f"--change-sub-{plan.key}", label="Go Private", type="primary"):
+    if gui.button(label, key=f"--change-sub-{plan.key}", type="primary") or pressed:
         if (
             workspace.subscription
             and workspace.subscription.stripe_get_default_payment_method()

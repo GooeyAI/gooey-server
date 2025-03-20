@@ -1,3 +1,5 @@
+import typing
+
 import gooey_gui as gui
 import sentry_sdk
 from django.core.exceptions import ValidationError
@@ -9,6 +11,9 @@ from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS, Handle
 from .models import Workspace, WorkspaceInvite
+
+if typing.TYPE_CHECKING:
+    from payments.plans import PricingPlan
 
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
@@ -180,7 +185,10 @@ def global_workspace_selector(user: AppUser, session: dict):
 
 
 def render_workspace_create_dialog(
-    user: AppUser, session: dict, ref: gui.AlertDialogRef
+    user: AppUser,
+    session: dict,
+    ref: gui.AlertDialogRef,
+    selected_plan: typing.Optional["PricingPlan"] = None,
 ) -> Workspace | None:
     step = gui.session_state.setdefault("workspace:create:step", 1)
     if step == 1:
@@ -199,7 +207,11 @@ def render_workspace_create_dialog(
         title = f"#### Invite Members to {workspace.display_name(user)}"
         caption = "This workspace is private and only members can access its workflows and shared billing."
         render_fn = lambda: render_workspace_create_step2(
-            user=user, session=session, workspace=workspace, ref=ref
+            user=user,
+            session=session,
+            workspace=workspace,
+            ref=ref,
+            selected_plan=selected_plan,
         )
 
     with gui.alert_dialog(ref=ref, modal_title=title, large=True):
@@ -277,7 +289,11 @@ def render_workspace_create_step1(
 
 
 def render_workspace_create_step2(
-    user: AppUser, session: dict, workspace: Workspace, ref: gui.AlertDialogRef
+    user: AppUser,
+    session: dict,
+    workspace: Workspace,
+    ref: gui.AlertDialogRef,
+    selected_plan: typing.Optional["PricingPlan"],
 ):
     from routers.account import account_route
 
@@ -307,7 +323,12 @@ def render_workspace_create_step2(
     error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2 mt-2"):
         close_btn = gui.button("Close", key=f"workspace:create:close", type="secondary")
-        submit_btn = gui.button("Choose a Plan", type="primary")
+        if selected_plan:
+            label = "Add Payment Method"
+        else:
+            label = "Choose a Plan"
+
+        submit_btn = gui.button(label, type="primary")
         if not close_btn and not submit_btn:
             return
 
@@ -338,7 +359,7 @@ def render_workspace_create_step2(
                 gui.error("\n".join(e.messages))
         else:
             set_current_workspace(session, workspace.id)
-            if submit_btn:
+            if submit_btn and not selected_plan:
                 raise gui.RedirectException(get_route_path(account_route))
             else:
                 clear_workspace_create_form()
