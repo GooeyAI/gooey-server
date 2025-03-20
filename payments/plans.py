@@ -26,21 +26,22 @@ class PricingPlanData(typing.NamedTuple):
     monthly_charge: int
     credits: int
     long_description: str = ""
+    footer: str = ""
     deprecated: bool = False
     contact_us_link: str | None = None  # For Special/Enterprise plans
 
-    title_override: str | None = None
-    caption_override: str | None = None
+    pricing_title: str | None = None
+    pricing_caption: str | None = None
 
-    def pricing_title(self) -> str:
-        if self.title_override is not None:
-            return self.title_override
+    def get_pricing_title(self) -> str:
+        if self.pricing_title is not None:
+            return self.pricing_title
         else:
-            return f"${self.monthly_charge}"
+            return f"${self.monthly_charge} / month"
 
-    def pricing_caption(self) -> str:
-        if self.caption_override is not None:
-            return self.caption_override
+    def get_pricing_caption(self) -> str:
+        if self.pricing_caption is not None:
+            return self.pricing_caption
         else:
             return f"{self.credits:,} Credits / month"
 
@@ -64,42 +65,8 @@ class PricingPlan(PricingPlanData, Enum):
         credits=10_000,
         monthly_charge=50,
         deprecated=True,
-        caption_override="10,000 Credits / month + Bots",
+        pricing_caption="10,000 Credits / month + Bots",
     )
-
-    # -- active
-    STARTER = PricingPlanData(
-        db_value=3,
-        key="starter",
-        title="Starter",
-        description="The best of private & open source AI",
-        credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
-        monthly_charge=0,
-        long_description=dedent(
-            """
-            **Includes (est.)**
-            <ul class="text-muted">
-              <li>100 Copilot Conversations  </li>
-              <li>10 Lipsync minutes  </li>
-              <li>33 Animation seconds  </li>
-              <li>15 AI QR Codes  </li>
-              <li>Non-commercial terms  </li>
-            </ul>
-
-            **Features**
-            <ul class="text-muted">
-              <li>Access every public workflow  </li>
-              <li>WhatsApp, Slack, FB or Web Copilots  </li>
-              <li>Top LLMs (GPT3.5, Mistral, LLaMA3)  </li>
-              <li>API access  </li>
-              <li>Community Support on Discord</li>
-            </ul>
-            """
-        ),
-        title_override="Free",
-        caption_override=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} Credits to start",
-    )
-
     CREATOR = PricingPlanData(
         db_value=4,
         key="creator",
@@ -129,12 +96,13 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
+        deprecated=True,
     )
 
-    BUSINESS = PricingPlanData(
+    BUSINESS_2024 = PricingPlanData(
         db_value=5,
         key="business",
-        title="Business",
+        title="Business (2024)",
         description="For teams & commercial licenses",
         monthly_charge=199,
         credits=20_000,
@@ -159,43 +127,124 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
+        deprecated=True,
+    )
+
+    # -- active
+    STARTER = PricingPlanData(
+        db_value=3,
+        key="starter",
+        title="Pay as you go",
+        description="Everyone at first, cash-strapped startups, open source developers.",
+        credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
+        monthly_charge=0,
+        long_description=dedent(
+            f"""
+            #### Features
+            <ul class="text-muted">
+              <li>Public Workflows</li>
+              <li>One public workspace (up to 5 members)</li>
+              <li>Run all frontier models</li>
+              <li>Explore, fork & run any public workflow</li>
+              <li>Best in class RAG & agentic flows</li>
+              <li>Run any code via <a href="/functions/" target="_blank">functions</a></li>
+              <li>Test and deploy via <a href="/copilot/" target="_blank">Copilot</a> Web Widget</li>
+              <li><a href="/speech/" target="_blank">Speech Recognition</a> and translation for 1000+ languages</li>
+              <li>API access</li>
+              <li>Use-case specific, golden QnA based <a href="/bulk/">bulk evaluation</a></li>
+              <li>Basic usage and interaction history export and dashboards</li>
+              <li>
+                Broad selection of <a href="/tts/">Text to Speech voices</a> and custom 11Labs voices for
+                <a href="/Lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a>
+              </li>
+            </ul>
+            """
+        ),
+        footer=dedent(
+            """
+            <ul class="text-muted">
+              <li>Non-commercial license</li>
+              <li>Community Support in Discord</li>
+              <li>Up to 5,000 runs of any Workflow</li>
+              <br/>
+            </ul>
+            """
+        ),
+        pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} free credits. 1000 for $10 thereafter.",
+    )
+
+    BUSINESS = PricingPlanData(
+        db_value=7,
+        key="business_2025",
+        title="Business",
+        description="Small to mid-sized organizations, DIY teams with awesome AI ambition.",
+        pricing_caption="One Private Workspace + 10,000 credits/month",
+        monthly_charge=399,
+        credits=10_000,
+        long_description=dedent(
+            """
+            #### Everything in Free +
+            <ul class="text-muted">
+              <li>Private Workflows</li>
+              <li>1 Private Workspace (up to 5 members)</li>
+              <li>Collaborate on Workflows with version history</li>
+              <li>SOC2, GDPR compliance, Level 5 API support from OpenAI and others</li>
+              <li>API secrets for secure connections to external services</li>
+              <li>Higher submission rate and concurrency limits</li>
+              <li>Bring your own WhatsApp number</li>
+            </ul>
+            """
+        ),
+        footer=dedent(
+            """
+            <ul class="text-muted">
+              <li>Commercial license</li>
+              <li>Premium support via dedicated Discord Channel</li>
+              <li>Up to 20,000 runs of any Workflow</li>
+            </ul>
+            """
+        ),
     )
 
     ENTERPRISE = PricingPlanData(
         db_value=6,
         key="enterprise",
-        title="Enterprise / Agency",
-        description="Unlimited access, enterprise SLAs & support",
+        title="Enterprise",
+        description="For organizations ready for transformation with Gooey.AI as the foundation of their AI strategy.",
         monthly_charge=0,
         credits=999_999,
+        pricing_title="Custom",
+        pricing_caption="Typically $25,000 - $500,000 annually",
         long_description=dedent(
             """
-            **Includes**
+            #### Everything in Business +
             <ul class="text-muted">
-              <li>Unlimited Copilots & Conversations  </li>
-              <li>Unlimited HD Lipsync  </li>
-              <li>Unlimited Animations  </li>
-              <li>Bespoke QR codes & unlimited scans  </li>
-              <li>Reseller rights  </li>
+              <li>Unlimited Workspaces for private collaboration among teams and clients</li>
+              <li>Custom inference queues and rate limits</li>
+              <li>Strategic AI consulting</li>
+              <li>Accelerator and GoTo Market partnerships</li>
+              <li>Organizational onboarding with founders</li>
+              <li>White label Workspaces for client engagement</li>
+              <li>Custom Workflow evaluation and optimization</li>
+              <li>Custom model training, tuning, and hosting</li>
+              <li>Tailored usage and interaction analytics</li>
+              <li>SMS and TTS Telephony for Copilots</li>
+              <li>Use your own keys for OpenAI, Azure, and others</li>
+              <li>On-prem deployment</li>
+              <li>Custom workflows & feature development</li>
             </ul>
-
-            **Everything in Business, plus**
+            """
+        ),
+        footer=dedent(
+            """
             <ul class="text-muted">
-              <li>Customized workflows</li>
-              <li>Knowledge with 1000s of files</li>
-              <li>Managed WhatsApp Numbers</li>
-              <li>AI Consulting & Training</li>
-              <li>Access Gooey.AI code & submit changes</li>
-              <li>Dedicated Account Manager</li>
-              <li>Group level access control</li>
-              <li>On-prem & VPC installs</li>
-              <li>Support via Zoom</li>
+              <li>Commercial & reseller license</li>
+              <li>Support via Zoom, dedicated support channels, and SLA</li>
+              <li>Unlimited API calls</li>
             </ul>
             """
         ),
         contact_us_link=str(furl("mailto:") / settings.SALES_EMAIL),
-        title_override="Let's talk",
-        caption_override="",
     )
 
     def __ge__(self, other: PricingPlan) -> bool:
