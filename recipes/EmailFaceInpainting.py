@@ -325,7 +325,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         return email_body
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         if state.get("email_address"):
             gui.write("**Input Email** -", state.get("email_address"))
         elif state.get("twitter_handle"):

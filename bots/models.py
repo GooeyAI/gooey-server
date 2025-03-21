@@ -207,6 +207,7 @@ class WorkflowMetadata(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     price_multiplier = models.FloatField(default=1)
+    emoji = models.TextField(blank=True, default="")
 
     def __str__(self):
         return self.meta_title
@@ -1933,6 +1934,7 @@ class PublishedRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = PublishedRunQuerySet.as_manager()
+    photo_url = CustomURLField(default="", blank=True)
 
     class Meta:
         get_latest_by = "updated_at"

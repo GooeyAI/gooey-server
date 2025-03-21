@@ -59,7 +59,8 @@ def profile_page(request: Request, handle: Handle):
     with gui.div(className="mt-3"):
         profile_header(request=request, handle=handle)
     gui.html("\n<hr>\n")
-    render_public_runs_grid(request, handle.workspace)
+    with gui.div(className="pb-3"):
+        render_public_runs_list(request, handle.workspace)
 
 
 def profile_header(request: Request, handle: Handle):
@@ -244,7 +245,7 @@ def _render_member_photos(workspace: Workspace):
             gui.image(src=member.user.get_photo())
 
 
-def render_public_runs_grid(request: Request, workspace: Workspace):
+def render_public_runs_list(request: Request, workspace: Workspace):
     qs = PublishedRun.objects.filter(
         workspace=workspace,
         visibility=PublishedRunVisibility.PUBLIC,
@@ -261,11 +262,17 @@ def render_public_runs_grid(request: Request, workspace: Workspace):
     def _render(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
         page_cls = workflow.page_cls
+        page_cls().render_example(
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+        )
 
-        gui.pill(workflow.short_title, className="mb-2 border border-dark")
-        page_cls().render_published_run_preview(pr)
+    for pr in prs:
+        _render(pr)
+        # render divder only if not the last item
+        if pr != prs[-1]:
+            gui.div(className="mb-2 mt-2 border-bottom")
 
-    grid_layout(3, prs, _render)
     paginate_button(url=request.url, cursor=cursor)
 
 

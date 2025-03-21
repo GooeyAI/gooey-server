@@ -520,7 +520,7 @@ class BasePage:
                     self._render_options_button_with_dialog()
                 self._render_share_button()
                 self._render_save_button()
-            else:
+            elif self.tab != RecipeTabs.examples:
                 self._render_copy_link_button(label="Copy Link")
 
     def _render_share_button(self):
@@ -1493,7 +1493,7 @@ class BasePage:
         pass
 
     def render_output(self):
-        self.render_example(gui.session_state)
+        self.render_run_preview_output(gui.session_state)
 
     def render_form_v2(self):
         pass
@@ -1543,7 +1543,7 @@ class BasePage:
     ):
         if not user:
             return
-        photo = user.photo_url
+        photo = user.get_photo()
         name = user.full_name()
         if show_as_link and (handle := user.get_handle()):
             link = handle.get_app_url()
@@ -2162,7 +2162,11 @@ class BasePage:
             cursor=self.request.query_params,
         )
 
-        grid_layout(3, example_runs, _render)
+        for pr in example_runs:
+            _render(pr)
+            # render divder only if not the last item
+            if pr != example_runs[-1]:
+                gui.div(className="mb-2 mt-2 border-bottom")
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2189,17 +2193,8 @@ class BasePage:
             gui.write("No published runs yet")
             return
 
-        def _render(pr: PublishedRun):
-            with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
-                gui.pill(
-                    PublishedRunVisibility(pr.visibility).get_badge_html(),
-                    unsafe_allow_html=True,
-                    className="border border-dark",
-                )
-
-            self.render_published_run_preview(published_run=pr)
-
-        grid_layout(3, published_runs, _render)
+        with gui.div(className="position-relative w-100"):
+            render_list(published_runs, self.render_example)
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2268,7 +2263,7 @@ class BasePage:
         elif saved_run.error_msg:
             gui.error(saved_run.error_msg, unsafe_allow_html=True)
 
-        return self.render_example(saved_run.to_dict())
+        return self.render_run_preview_output(saved_run.to_dict())
 
     def render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
@@ -2290,7 +2285,164 @@ class BasePage:
             gui.caption(published_run.notes, line_clamp=2)
 
         doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
+        self.render_run_preview_output(doc)
+
+    def render_example(
+        self,
+        published_run: PublishedRun,
+        show_workspace_author: bool = False,
+        workflow_pill: str | None = None,
+        hide_visibility_pill: bool = False,
+        hide_version_notes: bool = False,
+    ):
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+        version = published_run.versions.latest()
+        photo_url = published_run.photo_url
+        preview_image = self.get_example_preview_image(
+            published_run.saved_run.to_dict()
+        )
+        has_preview_image = bool(preview_image or photo_url)
+
+        with gui.div(className="position-relative py-2 pe-0"):
+            with gui.styled(
+                """
+                    & h4, & h1, & p {
+                        margin: 0 !important;
+                    }
+
+                    & .gui_example_media > a {
+                        text-decoration: none !important;
+                    }
+                    
+                    & .gui_example_media > a > img {
+                        pointer-events: none !important;
+                    }
+
+                    & .gui_example_media {
+                        width: 100%;
+                        min-width: 100px;
+                    }
+
+                    @media (min-width: 768px) {
+                        & .gui_example_media{
+                            width: 130px;
+                        }
+                    }
+
+                    & .render_example_author_meta > a {
+                        text-decoration: none !important;
+                    }
+                """
+            ):
+                with gui.div(className=f"position-relative overflow-hidden"):
+                    with gui.div(className="d-flex flex-column gap-2"):
+                        if has_preview_image:
+                            with gui.div(className="flex-grow-1 d-md-none"):
+                                with gui.div(
+                                    className="flex-grow-1 position-relative d-flex justify-content-center"
+                                ):
+                                    with gui.link(to=published_run.get_app_url()):
+                                        with gui.div(className="gui_example_media"):
+                                            self.render_example_preview_media(
+                                                published_run=published_run
+                                            )
+                        with gui.div(className="d-flex align-items-stretch"):
+                            with gui.div(
+                                className="flex-grow-1 d-flex flex-column gap-md-2"
+                            ):
+                                with gui.div(
+                                    className="flex-grow-1 d-flex flex-column gap-md-2"
+                                ):
+                                    with gui.div(className="d-flex align-items-center"):
+                                        with gui.div():
+                                            with gui.link(
+                                                to=published_run.get_app_url()
+                                            ):
+                                                gui.write(
+                                                    f"#### {truncate_text_words(tb.h1_title, 50)}"
+                                                )
+                                        with gui.div(
+                                            className="d-md-flex d-none align-items-center ms-2 mt-1",
+                                            style={"font-size": "0.9rem"},
+                                        ):
+                                            if not hide_visibility_pill:
+                                                gui.pill(
+                                                    PublishedRunVisibility(
+                                                        published_run.visibility
+                                                    ).get_badge_html(),
+                                                    unsafe_allow_html=True,
+                                                    className="border border-dark",
+                                                )
+                                            if workflow_pill:
+                                                gui.pill(
+                                                    workflow_pill,
+                                                    unsafe_allow_html=True,
+                                                    className="border border-dark ms-2",
+                                                )
+                                    if published_run.notes:
+                                        with gui.div(
+                                            className="d-none d-md-block pe-5"
+                                        ):
+                                            gui.caption(
+                                                published_run.notes,
+                                                line_clamp=3,
+                                                lineClampExpand=False,
+                                            )
+                                        with gui.div(className="d-md-none"):
+                                            gui.caption(
+                                                published_run.notes,
+                                                line_clamp=2,
+                                                lineClampExpand=False,
+                                                style={"fontSize": "0.9rem"},
+                                            )
+                                with gui.div(
+                                    className="d-none d-md-flex flex-1 align-items-center render_example_author_meta"
+                                ):
+                                    self._render_example_author_meta(
+                                        published_run=published_run,
+                                        show_workspace_author=show_workspace_author,
+                                    )
+                                    if not hide_version_notes:
+                                        with gui.div(
+                                            className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
+                                        ):
+                                            if version.change_notes:
+                                                gui.write(" • ")
+                                                gui.caption(
+                                                    f"{icons.notes} {version.change_notes}",
+                                                    unsafe_allow_html=True,
+                                                    style={"fontSize": "0.9rem"},
+                                                    line_clamp=1,
+                                                    lineClampExpand=False,
+                                                )
+                            with gui.div(
+                                className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
+                            ):
+                                with gui.div(
+                                    className="gui_example_media d-flex align-items-center justify-content-center",
+                                ):
+                                    with gui.link(
+                                        to=published_run.get_app_url(),
+                                        className="d-flex",
+                                    ):
+                                        self.render_example_preview_media(
+                                            published_run=published_run
+                                        )
+
+            with gui.div(className="d-md-none mt-2"):
+                self._render_example_author_meta(
+                    published_run=published_run,
+                    show_workspace_author=show_workspace_author,
+                )
+                if not hide_version_notes:
+                    with gui.div(className="container-margin-reset mt-2 mt-md-0"):
+                        if version.change_notes:
+                            gui.caption(
+                                f"{icons.notes} {version.change_notes}",
+                                unsafe_allow_html=True,
+                                style={"fontSize": "0.9rem"},
+                                line_clamp=1,
+                            )
 
     def _render_example_preview(
         self,
@@ -2298,47 +2450,12 @@ class BasePage:
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
-        if published_run.workspace:
-            with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                self.render_workspace_author(
-                    published_run.workspace,
-                    image_size="20px",
-                    text_size="0.9rem",
-                )
-
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"#### {tb.h1_title}")
-
-        with gui.div(className="d-flex align-items-center justify-content-between"):
-            with gui.div():
-                updated_at = published_run.saved_run.updated_at
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
-
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
-            run_count = format_number_with_suffix(published_run.get_run_count())
-            gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
-
-        if published_run.notes:
-            gui.caption(published_run.notes, line_clamp=2)
-
-        if allow_hide:
-            self._example_hide_button(published_run=published_run)
-
-        doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
-
-    def _example_hide_button(self, published_run: PublishedRun):
-        pressed_delete = gui.button(
-            "🙈️ Hide",
-            key=f"delete_example_{published_run.published_run_id}",
-            style={"color": "red"},
+        self.render_example(
+            published_run,
+            show_workspace_author=True,
+            hide_visibility_pill=True,
+            hide_version_notes=True,
         )
-        if not pressed_delete:
-            return
-        self.set_hidden(published_run=published_run, hidden=True)
 
     def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
         with gui.spinner("Hiding..."):
@@ -2347,8 +2464,88 @@ class BasePage:
 
         gui.rerun()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         pass
+
+    def get_example_preview_image(self, state: dict) -> str | None:
+        out = (
+            state.get("cutout_image")
+            or state.get("output_images")
+            or state.get("output_image")
+            or state.get("output_video")
+        )
+        return extract_nested_str(out)
+
+    def _render_example_author_meta(
+        self, published_run: PublishedRun, show_workspace_author: bool = True
+    ):
+        updated_at = published_run.saved_run.updated_at or ""
+        with gui.div(
+            className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta",
+        ):
+            if show_workspace_author:
+                self.render_workspace_author(
+                    published_run.workspace,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=True,
+                )
+            else:
+                self.render_author(
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=True,
+                )
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                count = published_run.get_run_count()
+                if count > 0:
+                    run_count = format_number_with_suffix(count)
+                    gui.write(" • ")
+                    gui.caption(
+                        f"{run_icon} {run_count} runs",
+                        unsafe_allow_html=True,
+                        style={"fontSize": "0.9rem"},
+                        className="text-dark",
+                    )
+
+            if published_run.last_edited_by:
+                gui.write(" • ")
+
+            if updated_at and isinstance(updated_at, datetime.datetime):
+                gui.caption(
+                    f"{get_relative_time(updated_at)}",
+                    style={"fontSize": "0.9rem"},
+                    className="container-margin-reset",
+                )
+
+    # examples / saved tab
+    def render_example_preview_media(self, published_run: PublishedRun):
+        photo_url = published_run.photo_url
+        workflow = Workflow(self.current_pr.workflow)
+        preview_image = self.get_example_preview_image(
+            published_run.saved_run.to_dict()
+        )
+
+        if preview_image or photo_url:
+            gui.image(
+                src=preview_image or photo_url,
+                className="m-0",
+                style={
+                    "maxWidth": "100%",
+                    "height": "100%",
+                    "objectFit": "cover",
+                },
+            )
+        else:
+            gui.write(
+                f"# {workflow.get_or_create_metadata().emoji}",
+                className="m-0 container-margin-reset ",
+            )
 
     def render_steps(self):
         raise NotImplementedError
@@ -2655,6 +2852,13 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
+
+
+def render_list(items: list, render_component):
+    for item in items:
+        render_component(item)
+        if item != items[-1]:
+            gui.div(className="mb-2 mt-2 border-bottom")
 
 
 class TitleValidationError(Exception):
