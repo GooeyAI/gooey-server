@@ -2,6 +2,7 @@ import base64
 import multiprocessing
 import os.path
 import tempfile
+import threading
 import typing
 from enum import Enum
 
@@ -873,9 +874,6 @@ def _translate_text(
     return result.strip()
 
 
-_session = None
-
-
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
@@ -894,18 +892,27 @@ def _MinT_translate_one_text(
     return tanslation.get("translation", text)
 
 
-def get_google_auth_session():
+_session = None
+_session_lock = threading.Lock()
+
+
+def get_google_auth_session(scopes: typing.Optional[list[str]] = None):
     global _session
 
     if _session is None:
-        import google.auth
-        from google.auth.transport.requests import AuthorizedSession
+        with _session_lock:
+            if _session is None:
+                import google.auth
+                from google.auth.transport.requests import AuthorizedSession
 
-        creds, project = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        # takes care of refreshing the token and adding it to request headers
-        _session = AuthorizedSession(credentials=creds), project
+                if not scopes:
+                    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+
+                creds, project = google.auth.default(
+                    scopes=scopes,
+                )
+                # takes care of refreshing the token and adding it to request headers
+                _session = AuthorizedSession(credentials=creds), project
 
     return _session
 
