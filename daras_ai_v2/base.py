@@ -2384,12 +2384,15 @@ class BasePage:
                                             className="d-none d-md-block pe-5"
                                         ):
                                             gui.caption(
-                                                published_run.notes, line_clamp=3
+                                                published_run.notes,
+                                                line_clamp=3,
+                                                lineClampExpand=False,
                                             )
                                         with gui.div(className="d-md-none"):
                                             gui.caption(
                                                 published_run.notes,
                                                 line_clamp=2,
+                                                lineClampExpand=False,
                                                 style={"fontSize": "0.9rem"},
                                             )
                                 with gui.div(
@@ -2410,6 +2413,7 @@ class BasePage:
                                                     unsafe_allow_html=True,
                                                     style={"fontSize": "0.9rem"},
                                                     line_clamp=1,
+                                                    lineClampExpand=False,
                                                 )
                             with gui.div(
                                 className=f"flex-grow-1 {'d-none d-md-flex'if has_preview_image else 'd-flex'} justify-content-end ms-2"
