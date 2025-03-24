@@ -1,4 +1,3 @@
-import base64
 import multiprocessing
 import os.path
 import tempfile
@@ -248,7 +247,8 @@ class AsrModels(Enum):
     whisper_chichewa_large_v3 = (
         "Whisper Large v3 chichewa [Deprecated] (opportunity.org)"
     )
-    gpt_4_o_audio = "GPT-4o Audio (openai)"
+    gpt_4_o_audio = "GPT-4o (openai)"
+    gpt_4_o_mini_audio = "GPT-4o mini (openai)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
@@ -290,11 +290,12 @@ class AsrModels(Enum):
         }
 
     def supports_input_prompt(self) -> bool:
-        return self in {self.gpt_4_o_audio}
+        return self in {self.gpt_4_o_audio, self.gpt_4_o_mini_audio}
 
 
 asr_model_ids = {
-    AsrModels.gpt_4_o_audio: "gpt-4o-audio-preview",
+    AsrModels.gpt_4_o_audio: "gpt-4o-transcribe",
+    AsrModels.gpt_4_o_mini_audio: "gpt-4o-mini-transcribe",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
@@ -317,8 +318,9 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
-    AsrModels.gpt_4_o_audio: {},
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
+    AsrModels.gpt_4_o_audio: WHISPER_LARGE_V2_SUPPORTED,  # https://platform.openai.com/docs/guides/speech-to-text#supported-languages
+    AsrModels.gpt_4_o_mini_audio: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_telugu_large_v2: {"te"},
     AsrModels.whisper_chichewa_large_v3: {"shona"},
@@ -1125,36 +1127,20 @@ def run_asr(
         )
         raise_for_status(r)
         data = r.json()
-    elif selected_model == AsrModels.gpt_4_o_audio:
-        from daras_ai_v2.language_model import run_openai_chat
+    elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
+        from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
         raise_for_status(audio_r, is_user_url=True)
 
-        return run_openai_chat(
-            model=asr_model_ids[selected_model],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": input_prompt,
-                        },
-                        {
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": base64.b64encode(audio_r.content).decode(),
-                                "format": "wav",
-                            },
-                        },
-                    ],
-                },
-            ],
-            max_completion_tokens=4096,
-            num_outputs=1,
-            temperature=1,
-        )[0]["content"]
+        model_id = asr_model_ids[selected_model]
+        client = get_openai_client(model_id)
+        return client.audio.transcriptions.create(
+            model=model_id,
+            file=(audio_url, audio_r.content),
+            prompt=input_prompt,
+            response_format="text",
+        )
     # call one of the self-hosted models
     else:
         kwargs = {}
