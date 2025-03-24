@@ -35,17 +35,23 @@ UBERDUCK_VOICES = {
 
 
 class OpenAI_TTS_Models(GooeyEnum):
+    gpt_4_o_mini = "gpt-4o-mini-tts"
     tts_1 = "tts-1"
     tts_1_hd = "tts-1-hd"
 
 
 class OpenAI_TTS_Voices(GooeyEnum):
-    alloy = "alloy"
-    echo = "echo"
-    fable = "fable"
-    onyx = "onyx"
     nova = "nova"
     shimmer = "shimmer"
+    echo = "echo"
+    onyx = "onyx"
+    fable = "fable"
+    alloy = "alloy"
+    ash = "ash"
+    sage = "sage"
+    coral = "coral"
+    ballad = "ballad (gpt-4o only)"
+    verse = "verse (gpt-4o only)"
 
 
 class GHANA_NLP_TTS_LANGUAGES(GooeyEnum):
