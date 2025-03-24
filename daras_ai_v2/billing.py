@@ -329,9 +329,7 @@ def render_change_subscription_button(
     user: "AppUser",
 ):
     # subscription exists, show upgrade/downgrade button
-    if plan.credits > current_plan.credits or (
-        current_plan.deprecated and plan != PricingPlan.STARTER
-    ):
+    if plan > current_plan:
         _render_upgrade_subscription_button(
             workspace=workspace,
             plan=plan,

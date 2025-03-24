@@ -17,6 +17,9 @@ STRIPE_PRODUCT_NAMES = {
 }
 REVERSE_STRIPE_PRODUCT_NAMES = {v: k for k, v in STRIPE_PRODUCT_NAMES.items()}
 
+if typing.TYPE_CHECKING:
+    from payments.models import Subscription
+
 
 class PricingPlanData(typing.NamedTuple):
     db_value: int
@@ -248,16 +251,18 @@ class PricingPlan(PricingPlanData, Enum):
     )
 
     def __ge__(self, other: PricingPlan) -> bool:
-        return self.monthly_charge >= other.monthly_charge
+        return self == other or self > other
 
     def __gt__(self, other: PricingPlan) -> bool:
-        return self.monthly_charge > other.monthly_charge
+        return not self == other and (
+            self == PricingPlan.ENTERPRISE or self.monthly_charge > other.monthly_charge
+        )
 
     def __le__(self, other: PricingPlan) -> bool:
-        return self.monthly_charge <= other.monthly_charge
+        return not self > other
 
     def __lt__(self, other: PricingPlan) -> bool:
-        return self.monthly_charge < other.monthly_charge
+        return not self >= other
 
     @classmethod
     def db_choices(cls):
