@@ -2,9 +2,10 @@ import json
 from collections import Counter
 from functools import partial
 
-from django.db.models import IntegerChoices
-
 import gooey_gui as gui
+from django.db.models import IntegerChoices
+from gooey_gui import QueryParamsRedirectException
+
 from app_users.models import AppUser
 from bots.models import BotIntegration, Message
 from daras_ai_v2 import icons
@@ -12,7 +13,6 @@ from daras_ai_v2.base import RecipeTabs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
-from gooey_gui import QueryParamsRedirectException
 from gooeysite.custom_filters import related_json_field_summary, JSONBExtractPath
 from recipes.BulkRunner import list_view_editor
 from recipes.VideoBots import VideoBotsPage
@@ -265,8 +265,10 @@ def render_table_count(values):
         gui.write("No analysis results found")
         return
     gui.div(className="p-1")
+    total = sum(result[1] for result in values)
     gui.data_table(
-        [["Value", "Count"]] + [[result[0], result[1]] for result in values],
+        [["Value", "Count"], ["Total", total]]
+        + [result[:2] for result in values if result[0]],
     )
 
 
