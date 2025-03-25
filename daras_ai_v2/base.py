@@ -37,6 +37,7 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings
+from daras_ai_v2 import urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -70,7 +71,7 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from routers.root import RecipeTabs
-from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 from workspaces.widgets import (
     get_current_workspace,
     render_workspace_create_dialog,
@@ -466,10 +467,27 @@ class BasePage:
             )
         )
 
-    def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin()
-            or published_run.workspace_id == self.current_workspace.id
+    def can_user_edit_published_run(
+        self, published_run: PublishedRun, selected_workspace: Workspace | None = None
+    ) -> bool:
+        selected_workspace = selected_workspace or self.current_workspace
+        if not self.request.user:
+            return False
+        if self.is_current_user_admin():
+            return True
+        if selected_workspace.id != published_run.workspace_id:
+            return False
+        if (
+            published_run.visibility == PublishedRunVisibility.INTERNAL_AND_EDITABLE
+            or published_run.created_by_id == self.request.user.id
+        ):
+            return True
+        membership = WorkspaceMembership.objects.filter(
+            workspace_id=published_run.workspace_id, user_id=self.request.user.id
+        ).first()
+        return bool(membership) and membership.role in (
+            WorkspaceRole.ADMIN,
+            WorkspaceRole.OWNER,
         )
 
     def _render_title(self, title: str):
@@ -558,6 +576,8 @@ class BasePage:
         # modal is only valid for logged in users
         assert self.request.user and self.current_workspace
 
+        from routers.account import profile_route, members_route
+
         with gui.alert_dialog(
             ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
         ):
@@ -580,6 +600,36 @@ class BasePage:
                     )
                 )
             )
+            with gui.div(className="mt-4"):
+                profile_url = (
+                    self.current_pr.workspace
+                    and self.current_pr.workspace.handle
+                    and self.current_pr.workspace.handle.get_app_url()
+                )
+                if profile_url:
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    label = f"Display on [{pretty_profile_url}]({profile_url})"
+                else:
+                    if (
+                        self.current_pr.workspace
+                        and not self.current_pr.workspace.is_personal
+                    ):
+                        route = members_route
+                    else:
+                        route = profile_route
+                    route_url = get_route_path(route)
+                    label = f"Display on [your profile page]({route_url})"
+
+                is_public = gui.checkbox(
+                    f"{icons.globe} {label}",
+                    value=(
+                        self.current_pr.is_public
+                        or self.current_pr.visibility == PublishedRunVisibility.PUBLIC
+                    ),
+                    disabled=(
+                        published_run_visibility == PublishedRunVisibility.UNLISTED
+                    ),
+                )
 
             if self.current_pr.visibility != published_run_visibility:
                 visibility = PublishedRunVisibility(published_run_visibility)
@@ -589,6 +639,7 @@ class BasePage:
                     title=self.current_pr.title,
                     notes=self.current_pr.notes,
                     visibility=visibility,
+                    is_public=is_public,
                     change_notes=f"Visibility changed to {visibility.name.title()}",
                 )
 
@@ -611,7 +662,7 @@ class BasePage:
                     if ref.is_open:
                         return self._render_publish_dialog(ref=ref)
 
-            with gui.div(className="d-flex justify-content-between pt-5"):
+            with gui.div(className="d-flex justify-content-between pt-3"):
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
                     value=self.current_app_url(self.tab),
@@ -625,7 +676,7 @@ class BasePage:
     def _render_workspace_with_invite_button(self, workspace: Workspace):
         from workspaces.views import member_invite_button_with_dialog
 
-        col1, col2 = gui.columns([9, 3])
+        col1, col2 = gui.columns([9, 3], responsive=False)
         with col1:
             with gui.tag("p", className="mb-1 text-muted"):
                 gui.html("WORKSPACE")
@@ -725,7 +776,9 @@ class BasePage:
                 key="published_run_workspace"
             )
 
-            user_can_edit = selected_workspace.id == self.current_pr.workspace_id
+            user_can_edit = self.can_user_edit_published_run(
+                pr, selected_workspace=selected_workspace
+            )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
                 if user_can_edit:
                     pressed_save_as_new = gui.button(
@@ -2192,12 +2245,17 @@ class BasePage:
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         else:
-            pr_filter &= Q(
-                visibility__in=(
-                    PublishedRunVisibility.PUBLIC,
-                    PublishedRunVisibility.INTERNAL,
+            pr_filter &= (
+                Q(
+                    visibility__in=(
+                        PublishedRunVisibility.PUBLIC,
+                        PublishedRunVisibility.INTERNAL_AND_EDITABLE,
+                        PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY,
+                    )
                 )
-            ) | Q(created_by=self.request.user)
+                | Q(created_by=self.request.user)
+                | Q(is_public=True)
+            )
         qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
 
         published_runs, cursor = paginate_queryset(

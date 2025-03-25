@@ -40,30 +40,43 @@ EPOCH = datetime.datetime.utcfromtimestamp(0)
 class PublishedRunVisibility(models.IntegerChoices):
     UNLISTED = 1
     PUBLIC = 2
-    INTERNAL = 3
+    INTERNAL_AND_EDITABLE = 3
+    INTERNAL_AND_VIEW_ONLY = 4
 
     @classmethod
     def choices_for_pr(
         cls, pr: PublishedRun
     ) -> typing.Iterable[PublishedRunVisibility]:
         if not pr.workspace or pr.workspace.is_personal:
-            return {cls.UNLISTED, cls.PUBLIC, PublishedRunVisibility(pr.visibility)}
+            ret = [cls.UNLISTED]
+        elif pr.workspace.subscription and pr.workspace.subscription.is_paid():
+            ret = [cls.UNLISTED, cls.INTERNAL_AND_VIEW_ONLY, cls.INTERNAL_AND_EDITABLE]
         else:
-            return [cls.UNLISTED, cls.INTERNAL, cls.PUBLIC]
+            ret = [cls.INTERNAL_AND_VIEW_ONLY, cls.INTERNAL_AND_EDITABLE]
+
+        if PublishedRunVisibility(pr.visibility) not in ret:
+            ret.append(PublishedRunVisibility(pr.visibility))
+        return ret
 
     @classmethod
     def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
         if not workspace or workspace.is_personal:
             return cls.UNLISTED
         else:
-            return cls.INTERNAL
+            return cls.INTERNAL_AND_EDITABLE
 
     def help_text(self, workspace: typing.Optional["Workspace"] = None):
         from routers.account import profile_route, saved_route
 
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return f"{self.get_icon()} Only me + people with a link"
+                return f"{self.get_icon()} Unlisted: Only members with a link can view"
+            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
+                saved_route_url = get_route_path(saved_route)
+                return f'{self.get_icon()} Visible: Members <a href="{saved_route_url}" target="_blank">can find</a> and view'
+            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
+                saved_route_url = get_route_path(saved_route)
+                return f'{self.get_icon()} Edit: Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
             case PublishedRunVisibility.PUBLIC:
                 if workspace and workspace.handle:
                     profile_url = workspace.handle.get_app_url()
@@ -73,20 +86,17 @@ class PublishedRunVisibility(models.IntegerChoices):
                     return f'{self.get_icon()} Public on <a href="{get_route_path(profile_route)}" target="_blank">my profile page</a>'
                 else:
                     return f"{self.get_icon()} Public"
-            case PublishedRunVisibility.INTERNAL if workspace:
-                saved_route_url = get_route_path(saved_route)
-                return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
-            case PublishedRunVisibility.INTERNAL:
-                return f"{self.get_icon()} Members can find and edit"
 
     def get_icon(self):
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return icons.lock
+                return icons.eye_slash
             case PublishedRunVisibility.PUBLIC:
                 return icons.globe
-            case PublishedRunVisibility.INTERNAL:
+            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
                 return icons.company_solid
+            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
+                return icons.eye
 
     def get_badge_html(self) -> str:
         match self:
@@ -94,8 +104,10 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return f"{self.get_icon()} Private"
             case PublishedRunVisibility.PUBLIC:
                 return f"{self.get_icon()} Public"
-            case PublishedRunVisibility.INTERNAL:
+            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
                 return f"{self.get_icon()} Internal"
+            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
+                return f"{self.get_icon()} Internal (view only)"
 
 
 class Platform(models.IntegerChoices):
@@ -1854,6 +1866,7 @@ class PublishedRun(models.Model):
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
     )
+    is_public = models.BooleanField(default=False)
     is_approved_example = models.BooleanField(default=False)
     example_priority = models.IntegerField(
         default=1,
@@ -1949,6 +1962,7 @@ class PublishedRun(models.Model):
         user: AppUser | None,
         saved_run: SavedRun,
         visibility: PublishedRunVisibility | None = None,
+        is_public: bool = False,
         title: str = "",
         notes: str = "",
         change_notes: str = "",
@@ -1965,6 +1979,7 @@ class PublishedRun(models.Model):
                 title=title,
                 notes=notes,
                 visibility=visibility,
+                is_public=is_public,
                 change_notes=change_notes,
             )
             version.save()
@@ -1980,6 +1995,7 @@ class PublishedRun(models.Model):
         self.title = latest_version.title
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
+        self.is_public = latest_version.is_public
 
         self.save()
 
@@ -2047,6 +2063,7 @@ class PublishedRunVersion(models.Model):
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
     )
+    is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

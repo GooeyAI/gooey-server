@@ -376,7 +376,7 @@ def _render_upgrade_subscription_button(
         f"create-workspace-dialog-plan-{plan.key}"
     )
     upgrade_dialog = gui.use_confirm_dialog(
-        key=f"--modal-workspace-{workspace.id}-plan-{plan.key}"
+        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}"
     )
     if workspace.is_personal or create_workspace_dialog.is_open:
         if gui.button(label, type="primary"):
@@ -391,7 +391,7 @@ def _render_upgrade_subscription_button(
             )
             if new_workspace:
                 gui.use_confirm_dialog(
-                    key=f"--modal-workspace-{new_workspace.id}-plan-{plan.key}"
+                    key=f"upgrade-workspace-{new_workspace.id}-plan-{plan.key}"
                 ).set_open(True)
     else:
         gui.button_with_confirm_dialog(
@@ -454,17 +454,20 @@ def _render_create_subscription_button(
                 selected_plan=plan,
             )
             if new_workspace:
-                gui.session_state[f"upgrade-workspace-{new_workspace.id}"] = 1
+                gui.session_state[
+                    f"upgrade-workspace-{new_workspace.id}-plan-{plan.key}"
+                ] = True
     else:
         match payment_provider:
             case PaymentProvider.STRIPE:
+                pressed = gui.session_state.pop(
+                    f"upgrade-workspace-{workspace.id}-plan-{plan.key}", False
+                )
                 render_stripe_subscription_button(
                     label=label,
                     workspace=workspace,
                     plan=plan,
-                    pressed=gui.session_state.pop(
-                        f"upgrade-workspace-{workspace.id}", False
-                    ),
+                    pressed=pressed,
                 )
             case PaymentProvider.PAYPAL:
                 render_paypal_subscription_button(plan=plan)

@@ -276,12 +276,17 @@ def all_saved_runs_tab(request: Request):
     if workspace.is_personal:
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
     else:
-        pr_filter &= Q(
-            visibility__in=(
-                PublishedRunVisibility.PUBLIC,
-                PublishedRunVisibility.INTERNAL,
+        pr_filter &= (
+            Q(
+                visibility__in=(
+                    PublishedRunVisibility.PUBLIC,
+                    PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY,
+                    PublishedRunVisibility.INTERNAL_AND_EDITABLE,
+                )
             )
-        ) | Q(created_by=request.user)
+            | Q(created_by=request.user)
+            | Q(is_public=True)
+        )
 
     qs = PublishedRun.objects.select_related(
         "workspace", "created_by", "saved_run"
