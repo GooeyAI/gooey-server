@@ -948,9 +948,9 @@ def run_asr(
         )
         wavbytes, size = audio_bytes_to_wav(anybytes)
         audio_url = upload_file_from_bytes(
-            filename=meta.get("name", "gdrive_audio"),
+            filename=meta.get("name", "gdrive_audio") + ".wav",
             data=wavbytes,
-            content_type=meta.get("mimeType", "audio/wav"),
+            content_type="audio/wav",
         )
     else:
         audio_url, size = audio_url_to_wav(audio_url)
@@ -1278,22 +1278,23 @@ def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
         r = requests.get(audio_url)
         raise_for_status(r, is_user_url=True)
 
-    wavdata, size = audio_bytes_to_wav(r.content)
-    if not wavdata:
+    audio_bytes = r.content
+    wavdata, size = audio_bytes_to_wav(audio_bytes)
+    if wavdata is audio_bytes:  # no change, don't re-upload
         return audio_url, size
+    else:
+        filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
+        return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
 
-    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
-    return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
 
-
-def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
+def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes, int]:
     with tempfile.NamedTemporaryFile() as infile:
         infile.write(audio_bytes)
         infile.flush()
 
         if check_wav_audio_format(infile.name):
             # already a wav file
-            return None, os.path.getsize(infile.name)
+            return audio_bytes, os.path.getsize(infile.name)
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
