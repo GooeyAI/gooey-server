@@ -37,7 +37,11 @@ def billing_page(workspace: "Workspace", user: "AppUser", session: dict):
         with gui.div(className="mb-3"):
             BasePage.render_workspace_author(workspace, show_as_link=False)
 
-    if workspace.subscription and workspace.subscription.is_paid():
+    if (
+        workspace.subscription
+        and workspace.subscription.is_paid()
+        and workspace.subscription.plan != PricingPlan.ENTERPRISE.db_value
+    ):
         with gui.div(className="mb-5"):
             render_current_plan(workspace)
 

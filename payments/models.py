@@ -134,7 +134,7 @@ class Subscription(models.Model):
             return True
 
     def is_paid(self) -> bool:
-        return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
+        return PricingPlan.from_sub(self) > PricingPlan.STARTER
 
     @property
     def has_workspace(self) -> bool:
