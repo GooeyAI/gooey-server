@@ -7,7 +7,6 @@ import requests
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
-from furl import furl
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
@@ -39,7 +38,7 @@ PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
     "Please go to the Integrations Tab and connect this page."
 )
-RESET_KEYWORD = "reset"
+RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
 
 DEFAULT_RESPONSE = (
@@ -358,7 +357,7 @@ def _msg_handler(bot: BotInterface):
             bot.send_msg(text=INVALID_INPUT_FORMAT.format(bot.input_type))
             return
     # handle reset keyword
-    if input_text.lower() == RESET_KEYWORD:
+    if input_text.lower().strip("/ ") in RESET_KEYWORDS:
         # record the reset time so we don't send context
         bot.convo.reset_at = timezone.now()
         # reset convo state
