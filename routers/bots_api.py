@@ -68,6 +68,12 @@ class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
         None, deprecated=True, description="Use `input_prompt` instead"
     )
 
+    input_location: dict = Field(
+        None,
+        description="Location information including latitude, longitude, and accuracy.",
+        example={"latitude": 0.0, "longitude": 0.0, "accuracy": 0.0},
+    )
+
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self.input_prompt = self.input_prompt or self.input_text
@@ -388,5 +394,6 @@ class ApiInterface(BotInterface):
     def get_input_documents(self) -> list[str] | None:
         return self.request.input_documents
 
-    def get_interactive_msg_info(self) -> ButtonPressed | None:
-        return self.request.button_pressed
+    def get_interactive_msg_info(self) -> tuple[ButtonPressed, dict | None]:
+        input_location = self.request.input_location or None
+        return self.request.button_pressed, input_location
