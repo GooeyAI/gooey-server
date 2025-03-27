@@ -15,8 +15,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 
-DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13b4d352-9456-11ee-8edd-02420a0001c7/Lipsync%20TTS.jpg.png"
-
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
@@ -90,9 +88,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         ).strip(), "Text input cannot be empty"
         assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_LIPSYNC_TTS_META_IMG
-
     def preview_description(self, state: dict) -> str:
         return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."
 
@@ -138,9 +133,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             )
         else:
             gui.div()
-
-    def render_example_preview_media(self, published_run: dict):
-        gui.video(published_run.saved_run.state.get("output_video"))
 
     def render_output(self):
         self.render_run_preview_output(gui.session_state)

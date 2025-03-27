@@ -38,7 +38,6 @@ from recipes.GoogleGPT import GoogleSearchMixin
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
 STOP_SEQ = "$" * 10
-SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13d3ab1e-9457-11ee-98a6-02420a0001c9/SEO.jpg.png"
 
 BANNED_HOSTS = [
     # youtube generally returns garbage
@@ -61,9 +60,6 @@ class SEOSummaryPage(BasePage):
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85f38b42-88d6-11ee-ad97-02420a00016c/Create%20SEO%20optimized%20content%20option%202.png.png"
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
-
-    def preview_image(self, state: dict) -> str | None:
-        return SEO_SUMMARY_DEFAULT_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Input a Google search query + your website & keywords to get AI search engine optimized content. This workflow parses the current top ranked sites and generates the best page summary for your site using OpenAI’s GPT3."

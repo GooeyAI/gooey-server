@@ -25,8 +25,6 @@ from daras_ai_v2.repositioning import (
 )
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
-DEFAULT_OBJECT_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4bca6982-9456-11ee-bc12-02420a0001cc/Product%20photo%20backgrounds.jpg.png"
-
 
 class ObjectInpaintingPage(BasePage):
     title = "Generate Product Photo Backgrounds"
@@ -76,9 +74,6 @@ class ObjectInpaintingPage(BasePage):
         obj_mask: FieldHttpUrl
         # diffusion_images: list[FieldHttpUrl]
         output_images: list[FieldHttpUrl]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_OBJECT_INPAINTING_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage

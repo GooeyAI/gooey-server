@@ -12,8 +12,6 @@ from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
 from daras_ai_v2.upscaler_models import UpscalerModels, run_upscaler_model
 
-DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2e8ee512-93fe-11ee-a083-02420a0001c8/Image%20upscaler.jpg.png"
-
 
 class CompareUpscalerPage(BasePage):
     title = "Compare AI Image Upscalers"
@@ -142,9 +140,6 @@ class CompareUpscalerPage(BasePage):
             max_value=4,
             step=1,
         )
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COMPARE_UPSCALER_META_IMG
 
     def render_description(self):
         gui.write(

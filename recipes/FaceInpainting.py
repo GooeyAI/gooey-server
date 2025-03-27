@@ -25,8 +25,6 @@ from daras_ai_v2.repositioning import repositioning_preview_img
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
-DEFAULT_FACE_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a146bfc0-93ff-11ee-b86c-02420a0001c7/Face%20in%20painting.jpg.png"
-
 
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
@@ -72,9 +70,6 @@ class FaceInpaintingPage(BasePage):
         face_mask: FieldHttpUrl
         diffusion_images: list[FieldHttpUrl]
         output_images: list[FieldHttpUrl]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."

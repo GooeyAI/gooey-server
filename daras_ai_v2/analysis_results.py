@@ -16,6 +16,7 @@ from daras_ai_v2.workflow_url_input import del_button
 from gooeysite.custom_filters import related_json_field_summary, JSONBExtractPath
 from recipes.BulkRunner import list_view_editor
 from recipes.VideoBots import VideoBotsPage
+from widgets.author import render_author_from_user
 
 
 class GraphType(IntegerChoices):
@@ -165,7 +166,7 @@ def render_title_breadcrumb_share(
                         ),
                     )
 
-            VideoBotsPage.render_author(
+            render_author_from_user(
                 bi.created_by,
                 show_as_link=current_user and VideoBotsPage.is_user_admin(current_user),
             )

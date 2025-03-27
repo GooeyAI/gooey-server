@@ -62,8 +62,6 @@ from recipes.asr_page import AsrPage
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
 
-DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
-
 
 class Columns(IntegerChoices):
     webpage_url = 1, "url"
@@ -134,9 +132,6 @@ class DocExtractPage(BasePage):
             "translation_model",
             "translation_target",
         ]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_YOUTUBE_BOT_META_IMG
 
     def render_form_v2(self):
         bulk_documents_uploader(

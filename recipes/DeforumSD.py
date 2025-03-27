@@ -18,9 +18,6 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from recipes.BulkRunner import list_view_editor
 
-DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
-DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
-
 
 CREDITS_PER_FRAME = 1.5
 MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
@@ -71,9 +68,6 @@ class DeforumSDPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_DEFORUMSD_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
@@ -191,9 +185,6 @@ class DeforumSDPage(BasePage):
     #             ],
     #         )
 
-    def fallback_preivew_image(self) -> str:
-        return DEFAULT_ANIMATION_META_IMG
-
     def preview_description(self, state: dict) -> str:
         return "Create AI-generated Animation without relying on complex CoLab notebooks. Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum. For more help on how to use the tool visit https://www.help.gooey.ai/learn-animation"
 
@@ -268,9 +259,6 @@ class DeforumSDPage(BasePage):
         gui.markdown("```lua\n" + display + "\n```")
 
         gui.video(state.get("output_video"), autoplay=True)
-
-    def render_example_preview_media(self, published_run: dict):
-        gui.video(published_run.saved_run.state.get("output_video"))
 
     @classmethod
     def preview_input(cls, state: dict) -> str:

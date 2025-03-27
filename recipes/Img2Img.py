@@ -1,14 +1,15 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+import gooey_gui as gui
 import requests
 from pydantic import BaseModel
 
-import gooey_gui as gui
 from bots.models import PublishedRun, Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     img2img,
@@ -17,9 +18,6 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
 )
-from daras_ai_v2.safety_checker import safety_checker
-
-DEFAULT_IMG2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cc2804ea-9401-11ee-940a-02420a0001c7/Edit%20an%20image.jpg.png"
 
 
 class Img2ImgPage(BasePage):
@@ -75,9 +73,6 @@ class Img2ImgPage(BasePage):
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:
         return ["text_prompt"]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_IMG2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.QRCodeGenerator import QRCodeGeneratorPage
@@ -148,21 +143,6 @@ class Img2ImgPage(BasePage):
             gui.image(input_image, caption="Input Image")
             gui.write("**Prompt**")
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
-
-    def render_example_preview_media(self, published_run: PublishedRun):
-        state = published_run.saved_run.state
-        input_image = state.get("input_image", None)
-        output_images = state.get("output_images", [])
-        with gui.styled(
-            """
-            & img {
-                max-width: 50%;
-            }
-        """
-        ):
-            with gui.div(className="d-flex gap-2"):
-                gui.image(input_image)
-                gui.image(output_images[0])
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)

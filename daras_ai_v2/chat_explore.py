@@ -9,6 +9,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from recipes.VideoBots import VideoBotsPage
+from widgets.author import render_author_from_user
 
 
 def render():
@@ -37,7 +38,7 @@ def _render_bi(bi: BotIntegration):
 
     if bi.published_run.created_by:
         with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-            VideoBotsPage.render_author(
+            render_author_from_user(
                 bi.published_run.created_by,
                 image_size="20px",
                 text_size="0.9rem",

@@ -21,8 +21,6 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.pt import PromptTree
 from recipes.GoogleGPT import render_output_with_refs
 
-DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3d71b434-9457-11ee-8edd-02420a0001c7/Smart%20GPT.jpg.png"
-
 
 class SmartGPTPage(BasePage):
     title = "SmartGPT"
@@ -49,9 +47,6 @@ class SmartGPTPage(BasePage):
         output_text: list[str]
 
         prompt_tree: PromptTree | None
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_SMARTGPT_META_IMG
 
     def render_form_v2(self):
         gui.text_area(
