@@ -13,7 +13,7 @@ from bots.models import (
     BotIntegration,
     Platform,
     PublishedRun,
-    PublishedRunVisibility,
+    PublishedRunPermission,
     Workflow,
     SavedRun,
 )
@@ -1362,7 +1362,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
-                    visibility=PublishedRunVisibility.UNLISTED,
+                    visibility=PublishedRunPermission.CAN_VIEW,
                 )
 
             match pressed_platform:

@@ -25,6 +25,7 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
+from workspaces.models import WorkspaceMembership
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -37,77 +38,133 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 
-class PublishedRunVisibility(models.IntegerChoices):
-    UNLISTED = 1
-    PUBLIC = 2
-    INTERNAL_AND_EDITABLE = 3
-    INTERNAL_AND_VIEW_ONLY = 4
+class PublishedRunPermission(models.IntegerChoices):
+    CAN_VIEW = 1
+    CAN_FIND = 2
+    INTERNAL = 3  # deprecated. migration: set pr.team_permission to CAN_EDIT
+    CAN_EDIT = 4
 
     @classmethod
-    def choices_for_pr(
-        cls, pr: PublishedRun
-    ) -> typing.Iterable[PublishedRunVisibility]:
-        if not pr.workspace or pr.workspace.is_personal:
-            ret = [cls.UNLISTED]
-        elif pr.workspace.subscription and pr.workspace.subscription.is_paid():
-            ret = [cls.UNLISTED, cls.INTERNAL_AND_VIEW_ONLY, cls.INTERNAL_AND_EDITABLE]
-        else:
-            ret = [cls.INTERNAL_AND_VIEW_ONLY, cls.INTERNAL_AND_EDITABLE]
+    def get_team_sharing_options(
+        cls, pr: "PublishedRun", current_user: "AppUser"
+    ) -> typing.List[PublishedRunPermission]:
+        from daras_ai_v2.base import BasePage
 
-        if PublishedRunVisibility(pr.visibility) not in ret:
-            ret.append(PublishedRunVisibility(pr.visibility))
-        return ret
+        if not BasePage(user=current_user).can_user_delete_published_run(
+            pr, selected_workspace=pr.workspace
+        ):
+            print("here!")
+            options = [PublishedRunPermission(pr.team_permission)]
+        elif pr.workspace.can_have_private_published_runs():
+            options = [cls.CAN_VIEW, cls.CAN_FIND, cls.CAN_EDIT]
+        else:
+            options = [cls.CAN_FIND, cls.CAN_EDIT]
+
+        if (perm := PublishedRunPermission(pr.team_permission)) not in options:
+            options.append(perm)
+        return options
 
     @classmethod
-    def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
-        if not workspace or workspace.is_personal:
-            return cls.UNLISTED
+    def get_public_sharing_options(
+        cls, pr: "PublishedRun"
+    ) -> typing.List[PublishedRunPermission]:
+        if pr.workspace.can_have_private_published_runs():
+            options = [cls.CAN_VIEW, cls.CAN_FIND]
         else:
-            return cls.INTERNAL_AND_EDITABLE
+            options = [cls.CAN_FIND]
 
-    def help_text(self, workspace: typing.Optional["Workspace"] = None):
-        from routers.account import profile_route, saved_route
+        if (perm := PublishedRunPermission(pr.visibility)) not in options:
+            options.append(perm)
+        return options
 
+    def get_team_sharing_icon(self) -> str:
         match self:
-            case PublishedRunVisibility.UNLISTED:
-                return f"{self.get_icon()} Unlisted: Only members with a link can view"
-            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
-                saved_route_url = get_route_path(saved_route)
-                return f'{self.get_icon()} Visible: Members <a href="{saved_route_url}" target="_blank">can find</a> and view'
-            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
-                saved_route_url = get_route_path(saved_route)
-                return f'{self.get_icon()} Edit: Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
-            case PublishedRunVisibility.PUBLIC:
-                if workspace and workspace.handle:
-                    profile_url = workspace.handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a> (view only)'
-                elif workspace and workspace.is_personal:
-                    return f'{self.get_icon()} Public on <a href="{get_route_path(profile_route)}" target="_blank">my profile page</a>'
-                else:
-                    return f"{self.get_icon()} Public"
-
-    def get_icon(self):
-        match self:
-            case PublishedRunVisibility.UNLISTED:
+            case PublishedRunPermission.CAN_VIEW:
                 return icons.eye_slash
-            case PublishedRunVisibility.PUBLIC:
-                return icons.globe
-            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
-                return icons.company_solid
-            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
+            case PublishedRunPermission.CAN_FIND:
                 return icons.eye
+            case PublishedRunPermission.CAN_EDIT:
+                return icons.company_solid
+            case _:
+                raise ValueError("Invalid permission for team sharing")
 
-    def get_badge_html(self) -> str:
+    def get_public_sharing_icon(self):
         match self:
-            case PublishedRunVisibility.UNLISTED:
-                return f"{self.get_icon()} Private"
-            case PublishedRunVisibility.PUBLIC:
-                return f"{self.get_icon()} Public"
-            case PublishedRunVisibility.INTERNAL_AND_EDITABLE:
-                return f"{self.get_icon()} Internal"
-            case PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY:
-                return f"{self.get_icon()} Internal (view only)"
+            case PublishedRunPermission.CAN_VIEW | PublishedRunPermission.INTERNAL:
+                return icons.eye_slash
+            case PublishedRunPermission.CAN_FIND:
+                return icons.globe
+            case _:
+                raise ValueError("Invalid permission for public sharing")
+
+    def get_team_sharing_label(self):
+        match self:
+            case PublishedRunPermission.CAN_VIEW:
+                return "Unlisted"
+            case PublishedRunPermission.CAN_FIND:
+                return "Visible"
+            case PublishedRunPermission.CAN_EDIT:
+                return "Edit"
+            case _:
+                raise ValueError("Invalid permission for team sharing")
+
+    def get_public_sharing_label(self):
+        match self:
+            case PublishedRunPermission.CAN_VIEW | PublishedRunPermission.INTERNAL:
+                return "Unlisted"
+            case PublishedRunPermission.CAN_FIND:
+                return "Public"
+            case _:
+                raise ValueError("Invalid permission for public sharing")
+
+    def get_team_sharing_text(self, pr: "PublishedRun", current_user: "AppUser"):
+        from daras_ai_v2.base import BasePage
+        from routers.account import saved_route
+
+        match self:
+            case PublishedRunPermission.CAN_VIEW:
+                text = "Only members with a link can view"
+            case PublishedRunPermission.CAN_FIND:
+                if BasePage(user=current_user).can_user_delete_published_run(
+                    published_run=pr, selected_workspace=pr.workspace
+                ):
+                    text = f"Members [can find]({get_route_path(saved_route)}) but can't update"
+                else:
+                    text = (
+                        f"Members [can find]({get_route_path(saved_route)}) and view."
+                    )
+                    if pr.created_by_id:
+                        text += f"<br/>{pr.created_by.full_name()} + admins can update."
+                    else:
+                        text += "<br/>Admins can update."
+            case PublishedRunPermission.CAN_EDIT:
+                text = f"Members [can find]({get_route_path(saved_route)}) and edit"
+            case _:
+                raise ValueError("Invalid permission for team sharing")
+
+        icon, label = self.get_team_sharing_icon(), self.get_team_sharing_label()
+        return f"{icon} **{label}** {text}"
+
+    def get_public_sharing_text(self, pr: "PublishedRun") -> str:
+        from routers.account import profile_route
+
+        match self:
+            case PublishedRunPermission.CAN_VIEW | PublishedRunPermission.INTERNAL:
+                text = "Only people with a link can view"
+            case PublishedRunPermission.CAN_FIND:
+                profile_url = (
+                    pr.workspace.handle_id and pr.workspace.handle.get_app_url()
+                )
+                if profile_url:
+                    pretty_url = urls.remove_scheme(profile_url).rstrip("/")
+                    text = f"on [{pretty_url}]({profile_url}) (view only)"
+                else:
+                    text = f"on [your profile page]({get_route_path(profile_route)})"
+            case PublishedRunPermission.CAN_EDIT:
+                raise ValueError("Invalid permission for public sharing")
+
+        icon, label = self.get_public_sharing_icon(), self.get_public_sharing_label()
+        return f"{icon} **{label}** {text}"
 
 
 class Platform(models.IntegerChoices):
@@ -121,7 +178,7 @@ class Platform(models.IntegerChoices):
     def get_icon(self):
         match self:
             case Platform.WEB:
-                return '<i class="fa-regular fa-globe"></i>'
+                return icons.globe
             case Platform.TWILIO:
                 return '<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
             case _:
@@ -1768,7 +1825,7 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        visibility: PublishedRunPermission | None = None,
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1795,7 +1852,7 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        visibility: PublishedRunPermission | None = None,
     ):
         workspace_id = (
             workspace
@@ -1803,7 +1860,10 @@ class PublishedRunQuerySet(models.QuerySet):
             or PublishedRun._meta.get_field("workspace").get_default()
         )
         if not visibility:
-            visibility = PublishedRunVisibility.get_default_for_workspace(workspace)
+            if workspace and workspace.can_have_private_published_runs():
+                visibility = PublishedRunPermission.CAN_VIEW
+            else:
+                visibility = PublishedRunPermission.CAN_FIND
 
         with transaction.atomic():
             pr = self.create(
@@ -1863,10 +1923,13 @@ class PublishedRun(models.Model):
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
     visibility = models.IntegerField(
-        choices=PublishedRunVisibility.choices,
-        default=PublishedRunVisibility.UNLISTED,
+        choices=PublishedRunPermission.choices,
+        default=PublishedRunPermission.CAN_FIND,
     )
-    is_public = models.BooleanField(default=False)
+    team_permission = models.IntegerField(
+        choices=PublishedRunPermission.choices,
+        default=PublishedRunPermission.CAN_EDIT,
+    )
     is_approved_example = models.BooleanField(default=False)
     example_priority = models.IntegerField(
         default=1,
@@ -1875,14 +1938,14 @@ class PublishedRun(models.Model):
 
     created_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         related_name="published_runs",
         blank=True,
     )
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -1913,6 +1976,7 @@ class PublishedRun(models.Model):
                 fields=[
                     "is_approved_example",
                     "visibility",
+                    "team_permission",
                     "published_run_id",
                     "updated_at",
                     "workflow",
@@ -1920,7 +1984,13 @@ class PublishedRun(models.Model):
                 ]
             ),
             models.Index(
-                fields=["-updated_at", "workspace", "created_by", "visibility"]
+                fields=[
+                    "-updated_at",
+                    "workspace",
+                    "created_by",
+                    "visibility",
+                    "team_permission",
+                ]
             ),
         ]
 
@@ -1938,7 +2008,7 @@ class PublishedRun(models.Model):
         workspace: "Workspace",
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        visibility: PublishedRunPermission | None = None,
     ) -> "PublishedRun":
         return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
@@ -1961,15 +2031,18 @@ class PublishedRun(models.Model):
         *,
         user: AppUser | None,
         saved_run: SavedRun,
-        visibility: PublishedRunVisibility | None = None,
-        is_public: bool = False,
+        visibility: PublishedRunPermission | None = None,
+        team_permission: PublishedRunPermission | None = None,
         title: str = "",
         notes: str = "",
         change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
-        visibility = visibility or self.visibility
+        if visibility is None:
+            visibility = self.visibility
+        if team_permission is None:
+            team_permission = self.team_permission
         with transaction.atomic():
             version = PublishedRunVersion(
                 published_run=self,
@@ -1979,7 +2052,7 @@ class PublishedRun(models.Model):
                 title=title,
                 notes=notes,
                 visibility=visibility,
-                is_public=is_public,
+                team_permission=team_permission,
                 change_notes=change_notes,
             )
             version.save()
@@ -1995,9 +2068,23 @@ class PublishedRun(models.Model):
         self.title = latest_version.title
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
-        self.is_public = latest_version.is_public
+        self.team_permission = latest_version.team_permission
 
         self.save()
+
+    def get_share_icon(self):
+        if self.workspace.is_personal:
+            return PublishedRunPermission(self.visibility).get_public_sharing_icon()
+        else:
+            return PublishedRunPermission(self.team_permission).get_team_sharing_icon()
+
+    def get_share_badge_html(self):
+        if self.workspace.is_personal:
+            perm = PublishedRunPermission(self.visibility)
+            return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
+        else:
+            perm = PublishedRunPermission(self.team_permission)
+            return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
 
     def get_run_count(self):
         annotated_versions = self.versions.annotate(
@@ -2032,7 +2119,7 @@ class PublishedRun(models.Model):
     def approved_example_q(cls):
         return (
             Q(is_approved_example=True)
-            & ~Q(visibility=PublishedRunVisibility.UNLISTED)
+            & ~Q(visibility=PublishedRunPermission.CAN_VIEW.value)
             & ~Q(published_run_id="")
         )
 
@@ -2052,7 +2139,7 @@ class PublishedRunVersion(models.Model):
     )
     changed_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -2060,10 +2147,13 @@ class PublishedRunVersion(models.Model):
     notes = models.TextField(blank=True, default="")
     change_notes = models.TextField(blank=True, default="")
     visibility = models.IntegerField(
-        choices=PublishedRunVisibility.choices,
-        default=PublishedRunVisibility.UNLISTED,
+        choices=PublishedRunPermission.choices,
+        default=PublishedRunPermission.CAN_VIEW,
     )
-    is_public = models.BooleanField(default=False)
+    team_permission = models.IntegerField(
+        choices=PublishedRunPermission.choices,
+        default=PublishedRunPermission.CAN_EDIT,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

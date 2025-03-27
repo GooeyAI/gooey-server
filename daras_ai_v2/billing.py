@@ -247,8 +247,13 @@ def _render_plan_action_button(
         gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
 
     elif current_plan == PricingPlan.ENTERPRISE:
-        # don't show upgrade/downgrade buttons for enterprise customers
-        pass
+        # for even bottom-padding on the pricing card, we add a hidden button
+        gui.button(
+            "N/A",
+            className="d-none d-lg-inline w-100 opacity-0",
+            disabled=True,
+            type="tertiary",
+        )
 
     elif plan.contact_us_link:
         with gui.link(to=plan.contact_us_link, className="btn btn-theme btn-primary"):

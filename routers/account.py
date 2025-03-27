@@ -10,7 +10,7 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.exceptions import HTTPException
 
-from bots.models import PublishedRun, PublishedRunVisibility, Workflow
+from bots.models import PublishedRun, PublishedRunPermission, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
@@ -278,14 +278,13 @@ def all_saved_runs_tab(request: Request):
     else:
         pr_filter &= (
             Q(
-                visibility__in=(
-                    PublishedRunVisibility.PUBLIC,
-                    PublishedRunVisibility.INTERNAL_AND_VIEW_ONLY,
-                    PublishedRunVisibility.INTERNAL_AND_EDITABLE,
+                team_permission__in=(
+                    PublishedRunPermission.CAN_FIND,
+                    PublishedRunPermission.CAN_EDIT,
                 )
             )
             | Q(created_by=request.user)
-            | Q(is_public=True)
+            | Q(visibility=PublishedRunPermission.CAN_FIND)
         )
 
     qs = PublishedRun.objects.select_related(
@@ -298,11 +297,10 @@ def all_saved_runs_tab(request: Request):
 
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        visibility = PublishedRunVisibility(pr.visibility)
 
         with gui.div(className="mb-2 d-flex justify-content-between align-items-start"):
             gui.pill(
-                visibility.get_badge_html(),
+                pr.get_share_badge_html(),
                 unsafe_allow_html=True,
                 className="border border-dark",
             )

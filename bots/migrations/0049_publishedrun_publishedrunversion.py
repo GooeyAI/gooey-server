@@ -3,7 +3,7 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
-from bots.models import PublishedRunVisibility
+from bots.models import PublishedRunPermission
 from daras_ai_v2.crypto import get_random_doc_id
 
 
@@ -30,7 +30,7 @@ def create_published_run_from_example(
         saved_run=saved_run,
         title=saved_run.page_title,
         notes=saved_run.page_notes,
-        visibility=PublishedRunVisibility.PUBLIC,
+        visibility=PublishedRunPermission.CAN_FIND,
         is_approved_example=not saved_run.hidden,
     )
     set_field_attribute(published_run, "created_at", auto_now_add=False)
@@ -48,7 +48,7 @@ def create_published_run_from_example(
         changed_by=user,
         title=saved_run.page_title,
         notes=saved_run.page_notes,
-        visibility=PublishedRunVisibility.PUBLIC,
+        visibility=PublishedRunPermission.CAN_FIND,
     )
     set_field_attribute(published_run, "created_at", auto_now_add=False)
     version.created_at = saved_run.updated_at
