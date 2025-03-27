@@ -28,8 +28,8 @@ from starlette.datastructures import URL
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     PublishedRun,
+    PublishedRunPermission,
     PublishedRunVersion,
-    PublishedRunVisibility,
     RetentionPolicy,
     SavedRun,
     Workflow,
@@ -70,8 +70,12 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from routers.root import RecipeTabs
-from workspaces.models import Workspace, WorkspaceMembership
-from workspaces.widgets import get_current_workspace, set_current_workspace
+from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
+from workspaces.widgets import (
+    get_current_workspace,
+    render_workspace_create_dialog,
+    set_current_workspace,
+)
 
 DEFAULT_META_IMG = (
     # Small
@@ -462,10 +466,38 @@ class BasePage:
             )
         )
 
-    def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin()
-            or published_run.workspace_id == self.current_workspace.id
+    def can_user_delete_published_run(
+        self, published_run: PublishedRun, selected_workspace: Workspace | None = None
+    ) -> bool:
+        if published_run.is_root():
+            return False
+
+        selected_workspace = selected_workspace or self.current_workspace
+        if self.is_current_user_admin():
+            return True
+        return bool(
+            self.request.user
+            and selected_workspace.id == published_run.workspace_id
+            and (
+                published_run.created_by_id == self.request.user.id
+                or self.request.user in published_run.workspace.get_admins()
+            )
+        )
+
+    def can_user_edit_published_run(
+        self, published_run: PublishedRun, selected_workspace: Workspace | None = None
+    ) -> bool:
+        selected_workspace = selected_workspace or self.current_workspace
+        if self.is_current_user_admin():
+            return True
+        return bool(
+            self.request.user
+            and selected_workspace.id == published_run.workspace_id
+            and (
+                published_run.team_permission == PublishedRunPermission.CAN_EDIT
+                or published_run.created_by_id == self.request.user.id
+                or self.request.user in published_run.workspace.get_admins()
+            )
         )
 
     def _render_title(self, title: str):
@@ -527,10 +559,13 @@ class BasePage:
         if (
             not self.current_pr.is_root()
             and self.current_pr.saved_run_id == self.current_sr.id
-            and self.can_user_edit_published_run(self.current_pr)
+            and (
+                self.is_current_user_admin()
+                or self.current_workspace.id == self.current_pr.workspace_id
+            )
         ):
             dialog = gui.use_alert_dialog(key="share-modal")
-            icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
+            icon = self.current_pr.get_share_icon()
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">Share</span>',
                 className="mb-0 px-2 px-lg-4",
@@ -550,42 +585,129 @@ class BasePage:
             className="mb-0 px-2",
         )
 
-    def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        # modal is only valid for logged in users
-        assert self.request.user and self.current_workspace
+    def _render_share_options_for_team_workspace(
+        self,
+    ) -> dict[str, PublishedRunPermission]:
+        with gui.div(className="mb-4"):
+            self._render_workspace_with_invite_button(self.current_pr.workspace)
 
-        with gui.alert_dialog(
-            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
-        ):
-            if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
-                with gui.div(className="mb-4"):
-                    self._render_workspace_with_invite_button(self.current_pr.workspace)
+        # we check for same privilege level for "sharing" as "deletion"
+        # because share-settings can be used to hide the published run
+        can_user_edit = self.can_user_delete_published_run(
+            self.current_pr, selected_workspace=self.current_pr.workspace
+        )
 
-            options = {
-                str(enum.value): enum.help_text(self.current_pr.workspace)
-                for enum in PublishedRunVisibility.choices_for_pr(self.current_pr)
-            }
-            published_run_visibility = PublishedRunVisibility(
+        updates = {}
+        options = {
+            str(perm.value): perm.get_team_sharing_text(
+                self.current_pr, current_user=self.request.user
+            )
+            for perm in PublishedRunPermission.get_team_sharing_options(
+                self.current_pr, current_user=self.request.user
+            )
+        }
+
+        with gui.div(className="mb-4"):
+            updates["team_permission"] = PublishedRunPermission(
                 int(
                     gui.radio(
                         "",
                         options=options,
                         format_func=options.__getitem__,
-                        key="published_run_visibility",
-                        value=str(self.current_pr.visibility),
+                        key="published-run-team-permission",
+                        value=str(self.current_pr.team_permission),
+                        disabled=not can_user_edit,
                     )
                 )
             )
 
-            if self.current_pr.visibility != published_run_visibility:
-                visibility = PublishedRunVisibility(published_run_visibility)
+        if (
+            can_user_edit
+            and self.current_pr.workspace.can_have_private_published_runs()
+        ):
+            is_public = gui.checkbox(
+                label=PublishedRunPermission.CAN_FIND.get_public_sharing_text(
+                    self.current_pr
+                ),
+                value=(
+                    self.current_pr.visibility == PublishedRunPermission.CAN_FIND.value
+                ),
+                disabled=(
+                    updates["team_permission"] == PublishedRunPermission.CAN_VIEW
+                ),
+            )
+            if (
+                is_public
+                and updates["team_permission"] != PublishedRunPermission.CAN_VIEW
+            ):
+                updates["visibility"] = PublishedRunPermission.CAN_FIND
+            else:
+                updates["visibility"] = PublishedRunPermission.CAN_VIEW
+        elif self.current_pr.visibility == PublishedRunPermission.CAN_FIND:
+            gui.write(
+                PublishedRunPermission.CAN_FIND.get_public_sharing_text(
+                    pr=self.current_pr
+                ),
+                unsafe_allow_html=True,
+            )
+
+        if can_user_edit:
+            return updates
+        else:
+            return {}
+
+    def _render_share_options_for_personal_workspace(
+        self,
+    ) -> dict[str, PublishedRunPermission]:
+        updates = {}
+        options = {
+            str(perm.value): perm.get_public_sharing_text(self.current_pr)
+            for perm in PublishedRunPermission.get_public_sharing_options(
+                self.current_pr
+            )
+        }
+
+        with gui.div(className="mb-4"):
+            updates["visibility"] = PublishedRunPermission(
+                int(
+                    gui.radio(
+                        "",
+                        options=options,
+                        format_func=options.__getitem__,
+                        key="published-run-personal-permission",
+                        value=str(self.current_pr.visibility),
+                    )
+                )
+            )
+        return updates
+
+    def _render_share_modal(self, dialog: gui.AlertDialogRef):
+        # modal is only valid for logged in users
+        assert self.request.user and self.current_workspace
+
+        from routers.account import account_route
+
+        with gui.alert_dialog(
+            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
+        ):
+            with gui.styled(
+                "& .gui-input-radio { display: flex; align-items: center; }"
+            ):
+                if not self.current_pr.workspace.is_personal:
+                    updates = self._render_share_options_for_team_workspace()
+                else:
+                    updates = self._render_share_options_for_personal_workspace()
+
+            changed = any(getattr(self.current_pr, k) != v for k, v in updates.items())
+            if changed:
                 self.current_pr.add_version(
                     user=self.request.user,
                     saved_run=self.current_pr.saved_run,
                     title=self.current_pr.title,
                     notes=self.current_pr.notes,
-                    visibility=visibility,
-                    change_notes=f"Visibility changed to {visibility.name.title()}",
+                    visibility=updates.get("visibility"),
+                    team_permission=updates.get("team_permission"),
+                    change_notes="Share settings updated",
                 )
 
             workspaces = self.request.user.cached_workspaces
@@ -606,8 +728,21 @@ class BasePage:
                         ref.set_open(True)
                     if ref.is_open:
                         return self._render_publish_dialog(ref=ref)
+            elif (
+                self.current_pr.visibility == PublishedRunPermission.CAN_FIND
+                and not self.current_pr.workspace.is_personal
+                and not self.current_pr.workspace.can_have_private_published_runs()
+                and self.request.user in self.current_pr.workspace.get_admins()
+            ):
+                with gui.div(
+                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline container-margin-reset"
+                ):
+                    gui.write(
+                        f"{icons.company_solid} [Upgrade]({get_route_path(account_route)}) to make your team & workflows **private**.",
+                        unsafe_allow_html=True,
+                    )
 
-            with gui.div(className="d-flex justify-content-between pt-5"):
+            with gui.div(className="d-flex justify-content-between mt-4"):
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
                     value=self.current_app_url(self.tab),
@@ -621,7 +756,7 @@ class BasePage:
     def _render_workspace_with_invite_button(self, workspace: Workspace):
         from workspaces.views import member_invite_button_with_dialog
 
-        col1, col2 = gui.columns([9, 3])
+        col1, col2 = gui.columns([9, 3], responsive=False)
         with col1:
             with gui.tag("p", className="mb-1 text-muted"):
                 gui.html("WORKSPACE")
@@ -714,12 +849,16 @@ class BasePage:
     ):
         form_container = gui.div()
 
-        with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
+        with gui.div(
+            className="mt-2 d-block d-lg-flex justify-content-between align-items-end"
+        ):
             selected_workspace = self._render_workspace_selector(
                 key="published_run_workspace"
             )
-            user_can_edit = selected_workspace.id == self.current_pr.workspace_id
 
+            user_can_edit = self.can_user_edit_published_run(
+                pr, selected_workspace=selected_workspace
+            )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
                 if user_can_edit:
                     pressed_save_as_new = gui.button(
@@ -842,12 +981,8 @@ class BasePage:
             )
         raise gui.RedirectException(pr.get_app_url())
 
-    def _render_workspace_selector(self, *, key: str) -> "Workspace":
-        if not self.can_user_see_workspaces():
-            return self.current_workspace
-
+    def _get_workspace_options(self) -> dict[int, Workspace]:
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
-
         if self.current_pr.workspace_id and self.can_user_edit_published_run(
             self.current_pr
         ):
@@ -860,12 +995,36 @@ class BasePage:
             workspace_options = {
                 self.current_workspace.id: self.current_workspace
             } | workspace_options
+        return workspace_options
 
-        with gui.div(className="d-flex gap-3"):
-            with gui.div(className="mt-2 text-nowrap"):
-                gui.write("Workspace")
+    def _render_workspace_selector(self, *, key: str) -> "Workspace":
+        workspace_options = self._get_workspace_options()
+        workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
 
-            if len(workspace_options) > 1:
+        if len(workspace_options) <= 1 or workspace_create_ref.is_open:
+            with gui.div(className="alert alert-warning my-0 container-margin-reset"):
+                if gui.button(
+                    f"{icons.company} Create a team workspace",
+                    type="link",
+                    className="d-inline mb-1 me-1 p-0",
+                ):
+                    workspace_create_ref.set_open(True)
+                gui.html("to edit with others", className="d-inline")
+
+            if workspace_create_ref.is_open:
+                if new_workspace := render_workspace_create_dialog(
+                    user=self.request.user,
+                    session=self.request.session,
+                    ref=workspace_create_ref,
+                ):
+                    gui.session_state[key] = new_workspace.id
+
+            return self.current_workspace
+        else:
+            with gui.div(className="d-flex gap-3"):
+                with gui.div(className="mt-2 text-nowrap"):
+                    gui.html("Workspace")
+
                 with gui.div(style=dict(maxWidth="300px", width="100%")):
                     workspace_id = gui.selectbox(
                         "",
@@ -874,15 +1033,9 @@ class BasePage:
                         format_func=lambda w_id: workspace_options[w_id].display_html(
                             self.request.user
                         ),
+                        className="mb-0",
                     )
                     return workspace_options[workspace_id]
-            else:
-                with gui.div(className="p-2 mb-2"):
-                    self.render_workspace_author(
-                        self.current_workspace,
-                        show_as_link=False,
-                    )
-                return self.current_workspace
 
     def _get_default_pr_title(self):
         return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
@@ -951,7 +1104,10 @@ class BasePage:
                     f"{icons.fork} Save as New", className="w-100"
                 )
 
-            if not self.current_pr.is_root():
+            if (
+                self.can_user_delete_published_run(self.current_pr)
+                and not self.current_pr.is_root()
+            ):
                 ref = gui.use_confirm_dialog(key="--delete-run-modal")
                 gui.button_with_confirm_dialog(
                     ref=ref,
@@ -1096,7 +1252,7 @@ class BasePage:
                         title=published_run.title,
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
-                        visibility=PublishedRunVisibility.PUBLIC,
+                        visibility=PublishedRunPermission.CAN_FIND,
                         change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
@@ -1455,7 +1611,7 @@ class BasePage:
             workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
-            visibility=PublishedRunVisibility.PUBLIC,
+            visibility=PublishedRunPermission.CAN_FIND,
         )[0]
 
     @classmethod
@@ -1468,7 +1624,7 @@ class BasePage:
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        visibility: PublishedRunPermission | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -2173,12 +2329,16 @@ class BasePage:
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         else:
-            pr_filter &= Q(
-                visibility__in=(
-                    PublishedRunVisibility.PUBLIC,
-                    PublishedRunVisibility.INTERNAL,
+            pr_filter &= (
+                Q(
+                    team_permission__in=(
+                        PublishedRunPermission.CAN_FIND,
+                        PublishedRunPermission.CAN_EDIT,
+                    )
                 )
-            ) | Q(created_by=self.request.user)
+                | Q(created_by=self.request.user)
+                | Q(visibility=PublishedRunPermission.CAN_FIND)
+            )
         qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
 
         published_runs, cursor = paginate_queryset(
@@ -2192,7 +2352,7 @@ class BasePage:
         def _render(pr: PublishedRun):
             with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
                 gui.pill(
-                    PublishedRunVisibility(pr.visibility).get_badge_html(),
+                    pr.get_share_badge_html(),
                     unsafe_allow_html=True,
                     className="border border-dark",
                 )
@@ -2245,9 +2405,7 @@ class BasePage:
             with gui.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
                     gui.pill(
-                        PublishedRunVisibility(
-                            published_run.visibility
-                        ).get_badge_html(),
+                        published_run.get_share_badge_html(),
                         unsafe_allow_html=True,
                         className="border border-dark",
                     )
@@ -2281,7 +2439,7 @@ class BasePage:
                 if updated_at and isinstance(updated_at, datetime.datetime):
                     gui.caption("Loading...", **render_local_dt_attrs(updated_at))
 
-            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+            if published_run.visibility == PublishedRunPermission.CAN_FIND:
                 run_icon = '<i class="fa-regular fa-person-running"></i>'
                 run_count = format_number_with_suffix(published_run.get_run_count())
                 gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
@@ -2548,11 +2706,6 @@ class BasePage:
 
     def get_cost_note(self) -> str | None:
         pass
-
-    def can_user_see_workspaces(self) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin() or len(self.request.user.cached_workspaces) > 1
-        )
 
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)

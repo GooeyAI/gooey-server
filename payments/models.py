@@ -134,7 +134,7 @@ class Subscription(models.Model):
             return True
 
     def is_paid(self) -> bool:
-        return PricingPlan.from_sub(self).monthly_charge > 0 and self.external_id
+        return PricingPlan.from_sub(self) > PricingPlan.STARTER
 
     @property
     def has_workspace(self) -> bool:
@@ -146,7 +146,7 @@ class Subscription(models.Model):
             return True
 
     def cancel(self):
-        from payments.webhooks import StripeWebhookHandler
+        from payments.webhooks import set_workspace_subscription
 
         if not self.is_paid():
             return
@@ -157,8 +157,13 @@ class Subscription(models.Model):
                     stripe.Subscription.cancel(self.external_id)
                 except stripe.error.InvalidRequestError as e:
                     if e.code == "resource_missing":
-                        StripeWebhookHandler.handle_subscription_cancelled(
-                            self.workspace
+                        # already cancelled
+                        set_workspace_subscription(
+                            workspace=self.workspace,
+                            plan=PricingPlan.STARTER,
+                            provider=PaymentProvider.STRIPE,
+                            external_id=None,
+                            cancel_old=False,
                         )
                     else:
                         raise

@@ -13,7 +13,7 @@ from app_users.models import AppUser
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
-    PublishedRunVisibility,
+    PublishedRunPermission,
     SavedRun,
     Workflow,
 )
@@ -88,7 +88,7 @@ def profile_header(request: Request, handle: Handle):
             with gui.tag("h1", className="d-inline my-0 me-2"):
                 gui.html(escape_html(get_profile_title(workspace)))
 
-            if request.user in (workspace.get_owners() | workspace.get_admins()):
+            if request.user in workspace.get_admins():
                 _render_edit_profile_button(request=request, workspace=workspace)
 
         with gui.tag("p", className="lead text-secondary mb-0"):
@@ -198,7 +198,7 @@ def _render_user_profile_stats(user: AppUser):
 
 def _render_team_profile_stats(workspace: Workspace):
     public_workflow_count = PublishedRun.objects.filter(
-        workspace=workspace, visibility=PublishedRunVisibility.PUBLIC
+        workspace=workspace, visibility=PublishedRunPermission.CAN_FIND
     ).count()
     members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
 
@@ -247,7 +247,7 @@ def _render_member_photos(workspace: Workspace):
 def render_public_runs_grid(request: Request, workspace: Workspace):
     qs = PublishedRun.objects.filter(
         workspace=workspace,
-        visibility=PublishedRunVisibility.PUBLIC,
+        visibility=PublishedRunPermission.CAN_FIND,
     )
 
     prs, cursor = paginate_queryset(
@@ -292,7 +292,7 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 def get_public_runs_summary(user: AppUser, *, top_n: int = 3) -> PublicRunsSummary:
     count_by_workflow = (
-        user.published_runs.filter(visibility=PublishedRunVisibility.PUBLIC)
+        user.published_runs.filter(visibility=PublishedRunPermission.CAN_FIND)
         .values("workflow")
         .annotate(count=Count("id"))
         .order_by("-count")
@@ -619,7 +619,10 @@ def _get_meta_description_for_profile(handle: Handle) -> str:
 
 
 def render_handle_input(
-    label: str, *, handle: Handle | None = None, **kwargs
+    label: str,
+    *,
+    handle: Handle | None = None,
+    **kwargs,
 ) -> str | None:
     handle_style: dict[str, str] = {}
     new_handle = gui.text_input(
@@ -638,7 +641,7 @@ def render_handle_input(
         gui.error(e.messages[0], icon="")
         handle_style["border"] = "1px solid var(--bs-danger)"
     else:
-        gui.success("Handle is available", icon="")
+        gui.success("Available", icon="")
         handle_style["border"] = "1px solid var(--bs-success)"
 
     return new_handle
