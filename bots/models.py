@@ -53,7 +53,6 @@ class PublishedRunPermission(models.IntegerChoices):
         if not BasePage(user=current_user).can_user_delete_published_run(
             pr, selected_workspace=pr.workspace
         ):
-            print("here!")
             options = [PublishedRunPermission(pr.team_permission)]
         elif pr.workspace.can_have_private_published_runs():
             options = [cls.CAN_VIEW, cls.CAN_FIND, cls.CAN_EDIT]
