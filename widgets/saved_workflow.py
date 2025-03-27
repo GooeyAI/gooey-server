@@ -94,7 +94,7 @@ def render_saved_workflow_preview(
                         with gui.div(className="d-flex align-items-center"):
                             with gui.div(), gui.link(to=published_run.get_app_url()):
                                 gui.write(
-                                    f"#### {truncate_text_words(tb.h1_title, 50)}"
+                                    f"#### {truncate_text_words(tb.h1_title, 80)}"
                                 )
                             with gui.div(
                                 className="d-md-flex d-none align-items-center ms-2 mt-1",
