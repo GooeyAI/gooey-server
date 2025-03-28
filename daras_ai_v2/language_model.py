@@ -83,7 +83,7 @@ class LLMSpec(typing.NamedTuple):
     is_deprecated: bool = False
     supports_json: bool = False
     supports_temperature: bool = True
-    supports_audio: bool = False
+    is_audio_model: bool = False
 
 
 class LargeLanguageModels(Enum):
@@ -182,7 +182,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         max_output_tokens=16_384,
         price=10,
-        supports_audio=True,
+        is_audio_model=True,
     )
     # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
     gpt_4_o_mini_audio = LLMSpec(
@@ -192,7 +192,7 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         max_output_tokens=16_384,
         price=10,
-        supports_audio=True,
+        is_audio_model=True,
     )
 
     chatgpt_4_o = LLMSpec(
@@ -693,7 +693,7 @@ class LargeLanguageModels(Enum):
         self.is_vision_model = spec.is_vision_model
         self.supports_json = spec.supports_json
         self.supports_temperature = spec.supports_temperature
-        self.supports_audio = spec.supports_audio
+        self.is_audio_model = spec.is_audio_model
 
     @property
     def value(self):
@@ -788,6 +788,9 @@ def run_language_model(
             messages = [
                 format_chat_entry(role=CHATML_ROLE_USER, content_text=prompt),
             ]
+        if model.is_audio_model and not stream:
+            # audio is only supported in streaming mode, fall back to text
+            model = LargeLanguageModels.gpt_4_o
         if not model.is_vision_model:
             # remove images from the messages
             for entry in messages:

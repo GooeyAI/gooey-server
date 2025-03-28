@@ -922,7 +922,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         return ocr_texts
 
     def asr_step(self, model, request, response, user_input):
-        if request.input_audio and not model.supports_audio:
+        if request.input_audio and not model.is_audio_model:
             if not request.asr_model:
                 request.asr_model, request.asr_language = infer_asr_model_and_language(
                     request.user_language or ""
