@@ -770,6 +770,7 @@ def run_language_model(
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
     audio_url: str | None = None,
+    audio_session_extra: dict | None = None,
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
@@ -828,6 +829,7 @@ def run_language_model(
             # we can't stream with tools or json yet
             stream=stream and not response_format_type,
             audio_url=audio_url,
+            audio_session_extra=audio_session_extra,
         )
         if stream:
             return output_stream_generator(result)
@@ -957,6 +959,7 @@ def _run_chat_model(
     response_format_type: ResponseFormatType | None,
     stream: bool = False,
     audio_url: str | None = None,
+    audio_session_extra: dict | None = None,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
         f"{model.llm_api=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
@@ -990,6 +993,7 @@ def _run_chat_model(
             return run_openai_audio(
                 model=model,
                 audio_url=audio_url,
+                audio_session_extra=audio_session_extra,
                 messages=messages,
                 temperature=temperature,
                 tools=tools,

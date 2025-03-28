@@ -41,15 +41,17 @@ class OpenAI_TTS_Models(GooeyEnum):
 
 
 class OpenAI_TTS_Voices(GooeyEnum):
-    nova = "nova"
-    shimmer = "shimmer"
-    echo = "echo"
-    onyx = "onyx"
-    fable = "fable"
     alloy = "alloy"
     ash = "ash"
-    sage = "sage"
     coral = "coral"
+    echo = "echo"
+    sage = "sage"
+    shimmer = "shimmer"
+
+    nova = "nova (tts only)"
+    onyx = "onyx (tts only)"
+    fable = "fable (tts only)"
+
     ballad = "ballad (gpt-4o only)"
     verse = "verse (gpt-4o only)"
 

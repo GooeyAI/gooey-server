@@ -882,7 +882,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             asr_msg=asr_msg,
         )
 
-        yield from self.tts_step(request, response)
+        yield from self.tts_step(model=llm_model, request=request, response=response)
 
         yield from self.lipsync_step(request, response)
 
@@ -1103,6 +1103,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.value}..."
 
+        audio_session_extra = None
+        if model.is_audio_model:
+            audio_session_extra = {}
+            if request.openai_voice_name:
+                audio_session_extra["voice"] = request.openai_voice_name
+
         tools = self.get_current_llm_tools()
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
@@ -1115,6 +1121,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tools=list(tools.values()),
             stream=True,
             audio_url=request.input_audio,
+            audio_session_extra=audio_session_extra,
         )
 
         tool_calls = None
@@ -1231,8 +1238,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         return output_text
 
-    def tts_step(self, request, response):
-        if request.tts_provider:
+    def tts_step(self, model, request, response):
+        if request.tts_provider and not model.is_audio_model:
             response.output_audio = []
             for text in response.raw_tts_text or response.raw_output_text:
                 tts_state = TextToSpeechPage.RequestModel.parse_obj(

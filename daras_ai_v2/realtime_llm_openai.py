@@ -27,7 +27,8 @@ threadlocal = threading.local()
 def run_openai_audio(
     *,
     model: LargeLanguageModels,
-    audio_url: str,
+    audio_url: str | None,
+    audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
     tools: list[LLMTool] | None = None,
@@ -52,6 +53,7 @@ def run_openai_audio(
             ws=ws,
             created=created,
             audio_data=audio_data,
+            audio_session_extra=audio_session_extra,
             messages=messages,
             temperature=temperature,
             tools=tools,
@@ -102,6 +104,7 @@ def init_ws_session(
     ws: ClientConnection,
     created: bool,
     audio_data: str | None,
+    audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
     tools: list[LLMTool] | None = None,
@@ -143,12 +146,13 @@ def init_ws_session(
 
     session_data = {
         "instructions": system_message,
-        "voice": "ash",
         "input_audio_transcription": {"model": "whisper-1"},
         "turn_detection": None,
         "temperature": temperature,
         # "max_response_output_tokens": "inf",
     }
+    if audio_session_extra:
+        session_data |= audio_session_extra
     if tools:
         session_data["tools"] = [
             tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
