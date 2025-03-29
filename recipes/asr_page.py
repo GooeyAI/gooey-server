@@ -33,8 +33,6 @@ from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
 
-DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
-
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
@@ -105,9 +103,6 @@ class AsrPage(BasePage):
         lang_or_model = lang or (model and model.value)
 
         return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_ASR_META_IMG
 
     def preview_description(self, state: dict):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."
@@ -232,7 +227,7 @@ class AsrPage(BasePage):
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
         text_outputs("**Transcription**", value=state.get("output_text"))
 

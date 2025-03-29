@@ -20,8 +20,6 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.variables_widget import render_prompt_vars
 
-DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/fef06d86-1f70-11ef-b8ee-02420a00015b/LLMs.jpg"
-
 
 class CompareLLMPage(BasePage):
     PROFIT_CREDITS = 1
@@ -54,9 +52,6 @@ class CompareLLMPage(BasePage):
         output_text: dict[
             typing.Literal[tuple(e.name for e in LargeLanguageModels)], list[str]
         ]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COMPARE_LM_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
@@ -124,7 +119,7 @@ class CompareLLMPage(BasePage):
     def render_output(self):
         _render_outputs(gui.session_state, 450)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col1:
             gui.write("**Prompt**")

@@ -62,8 +62,6 @@ from recipes.asr_page import AsrPage
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
 
-DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
-
 
 class Columns(IntegerChoices):
     webpage_url = 1, "url"
@@ -135,9 +133,6 @@ class DocExtractPage(BasePage):
             "translation_target",
         ]
 
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_YOUTUBE_BOT_META_IMG
-
     def render_form_v2(self):
         bulk_documents_uploader(
             "#### 🤖 Youtube/PDF/Drive/Web URLs",
@@ -153,7 +148,7 @@ class DocExtractPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Transcribe YouTube videos in any language with Whisper, Google Chirp & more, run your own GPT4 prompt on each transcript and save it all to a Google Sheet. Perfect for making a YouTube-based dataset to create your own chatbot or enterprise copilot (ie. just add the finished Google sheet url to the doc section in https://gooey.ai/copilot)."
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         if sheet_url := state.get("sheet_url"):
             render_documents(state, label="**Input Documents**")
             gui.write("**Google Sheets URL**")

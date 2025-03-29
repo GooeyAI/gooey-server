@@ -142,9 +142,6 @@ class BulkEvalPage(BasePage):
 
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
 
-    def preview_image(self, state: dict) -> str | None:
-        return "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9631fb74-9a97-11ee-971f-02420a0001c4/evaluator.png.png"
-
     def render_description(self):
         gui.write(
             """
@@ -276,7 +273,7 @@ Here's what you uploaded:
     # def render_settings(self):
     #     language_model_settings()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
 
     def render_output(self):

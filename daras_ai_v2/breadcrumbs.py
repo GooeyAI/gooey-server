@@ -78,7 +78,9 @@ def get_title_breadcrumbs(
     is_run = not is_root and not is_example
 
     metadata = page_cls.workflow.get_or_create_metadata()
-    root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
+    root_breadcrumb = TitleUrl(
+        f"{metadata.emoji} {metadata.short_title}", page_cls.app_url()
+    )
 
     match tab:
         case RecipeTabs.examples | RecipeTabs.history | RecipeTabs.saved:

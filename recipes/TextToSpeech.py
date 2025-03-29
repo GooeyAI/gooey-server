@@ -32,8 +32,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 from managed_secrets.models import ManagedSecret
 from workspaces.models import Workspace
 
-DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
-
 
 class TextToSpeechSettings(BaseModel):
     tts_provider: typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
@@ -96,9 +94,6 @@ class TextToSpeechPage(BasePage):
 
     class ResponseModel(BaseModel):
         audio_url: FieldHttpUrl
-
-    def fallback_preivew_image(self) -> str | None:
-        return DEFAULT_TTS_META_IMG
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
@@ -463,7 +458,7 @@ class TextToSpeechPage(BasePage):
             CompareText2ImgPage,
         ]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col1:
             text = state.get("text_prompt")

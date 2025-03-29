@@ -29,8 +29,6 @@ from daras_ai_v2.stable_diffusion import (
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
 
-DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/039110ba-1f72-11ef-8d23-02420a00015d/Compare%20image%20generators.jpg"
-
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
@@ -86,10 +84,6 @@ class CompareText2ImgPage(BasePage):
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["selected_models"]
-
-    def preview_image(self, state: dict) -> str | None:
-        result_image = super().preview_image(state)
-        return result_image or DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage
@@ -252,7 +246,7 @@ class CompareText2ImgPage(BasePage):
                     )
                 ]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col1:
             gui.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")

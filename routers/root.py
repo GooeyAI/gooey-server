@@ -272,7 +272,7 @@ def api_docs_page(request: Request):
             description="Explore resources, tutorials, API docs, and dynamic examples to get the most out of GooeyAI's developer platform.",
             image=meta_preview_url(
                 "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/API%20Docs.png.png"
-            ),
+            )[0],
         )
     )
 

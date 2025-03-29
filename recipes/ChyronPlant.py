@@ -119,7 +119,7 @@ class ChyronPlantPage(BasePage):
                 return text
         return ""
 
-    def render_example(self, state):
+    def render_run_preview_output(self, state):
         col1, col2 = gui.columns(2)
         with col1:
             gui.write(state.get("midi_translation", ""))
