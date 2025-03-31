@@ -145,7 +145,7 @@ class PublishedRunPermission(models.IntegerChoices):
                 raise ValueError("Invalid permission for team sharing")
 
         icon, label = self.get_team_sharing_icon(), self.get_team_sharing_label()
-        return f"{icon} **{label}** {text}"
+        return f"{icon} **{label}**" + text
 
     def get_public_sharing_text(self, pr: "PublishedRun") -> str:
         from routers.account import profile_route
@@ -159,14 +159,14 @@ class PublishedRunPermission(models.IntegerChoices):
                 )
                 if profile_url:
                     pretty_url = urls.remove_scheme(profile_url).rstrip("/")
-                    text = f"on [{pretty_url}]({profile_url}) (view only)"
+                    text = f" on [{pretty_url}]({profile_url}) (view only)"
                 else:
-                    text = f"on [your profile page]({get_route_path(profile_route)})"
+                    text = f" on [your profile page]({get_route_path(profile_route)})"
             case PublishedRunPermission.CAN_EDIT:
                 raise ValueError("Invalid permission for public sharing")
 
         icon, label = self.get_public_sharing_icon(), self.get_public_sharing_label()
-        return f"{icon} **{label}** {text}"
+        return f"{icon} **{label}**" + text
 
 
 class Platform(models.IntegerChoices):
