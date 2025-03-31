@@ -123,7 +123,6 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 
-DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 
@@ -302,9 +301,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         reply_buttons: list[ReplyButton] | None
 
         finish_reason: list[str] | None
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -643,7 +639,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "messages"]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
             gui.write(

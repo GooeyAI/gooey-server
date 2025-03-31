@@ -13,7 +13,7 @@ from pyzbar import pyzbar
 
 import gooey_gui as gui
 from app_users.models import AppUser
-from bots.models import Workflow
+from bots.models import PublishedRun, Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
@@ -42,7 +42,6 @@ from url_shortener.models import ShortenedURL
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 
 ATTEMPTS = 1
-DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
 
 
 class QrSources(Enum):
@@ -123,11 +122,6 @@ class QRCodeGeneratorPage(BasePage):
         raw_images: list[FieldHttpUrl]
         shortened_url: FieldHttpUrl | None
         cleaned_qr_code: FieldHttpUrl
-
-    def preview_image(self, state: dict) -> str | None:
-        if len(state.get("output_images") or []) > 0:
-            return state["output_images"][0]
-        return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -438,7 +432,7 @@ Here is the final output:
         state = gui.session_state
         self._render_outputs(state)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         self._render_outputs(state, max_count=1)
 
     def _render_outputs(self, state: dict, max_count: int | None = None):

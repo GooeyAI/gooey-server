@@ -48,6 +48,7 @@ from functions.recipe_functions import FUNCTIONS_HELP_TEXT
 from recipes.BulkRunner import list_view_editor
 from recipes.Functions import FunctionsPage
 from recipes.VideoBots import VideoBotsPage
+from widgets.author import render_author_from_user
 
 
 class VideoBotsStatsPage(BasePage):
@@ -109,7 +110,7 @@ class VideoBotsStatsPage(BasePage):
                             ),
                         )
 
-                VideoBotsPage.render_author(
+                render_author_from_user(
                     bi.created_by,
                     show_as_link=self.is_current_user_admin(),
                 )

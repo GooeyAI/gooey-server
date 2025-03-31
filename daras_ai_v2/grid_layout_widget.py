@@ -2,24 +2,30 @@ import typing
 
 import gooey_gui as gui
 
+SEPARATOR_STYLE = """
+&:not(:last-of-type)::after {
+    content: "";
+    width: 100%;
+    margin: 1rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+}
+"""
+
 
 def grid_layout(
     column_spec,
     iterable: typing.Iterable,
     render,
     separator=True,
-    column_props: dict[str, typing.Any] | None = None,
 ):
-    # make a copy so it can be modified
-    column_props = dict(column_props or {})
-    extra_classes = column_props.pop("className", "mb-4 pb-2")
-
-    for item, col in zip(iterable, infinte_cols(column_spec)):
-        if separator:
-            col.node.props["className"] += f" border-bottom " + extra_classes
-            col.node.props.update(column_props)
-        with col:
-            render(item)
+    if separator:
+        parent = gui.styled(SEPARATOR_STYLE)
+    else:
+        parent = gui.dummy()
+    with parent:
+        for item, col in zip(iterable, infinte_cols(column_spec)):
+            with col:
+                render(item)
 
 
 def infinte_cols(spec):

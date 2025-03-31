@@ -43,8 +43,6 @@ from recipes.DocSearch import (
     references_as_prompt,
 )
 
-DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85ed60a2-9405-11ee-9747-02420a0001ce/Web%20search%20GPT.jpg.png"
-
 
 class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
@@ -151,7 +149,7 @@ class GoogleGPTPage(BasePage):
         refs = gui.session_state.get("references", [])
         render_sources_widget(refs)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         gui.write("**Search Query**")
         gui.write("```properties\n" + state.get("search_query", "") + "\n```")
         site_filter = state.get("site_filter")
@@ -189,9 +187,6 @@ class GoogleGPTPage(BasePage):
             VideoBotsPage,
             SocialLookupEmailPage,
         ]
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_GOOGLE_GPT_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.  Filter  results to your own website so users can ask anything and get answers based only on your site's pages."

@@ -35,8 +35,6 @@ from recipes.DocSearch import (
 )
 from recipes.GoogleGPT import render_output_with_refs, GoogleGPTPage
 
-DEFAULT_DOC_SUMMARY_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f35796d2-93fe-11ee-b86c-02420a0001c7/Summarize%20with%20GPT.jpg.png"
-
 
 class CombineDocumentsChains(Enum):
     map_reduce = "Map Reduce"
@@ -90,9 +88,6 @@ class DocSummaryPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["task_instructions", "merge_instructions"]
 
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_DOC_SUMMARY_META_IMG
-
     def render_form_v2(self):
         bulk_documents_uploader("#### 📎 Documents")
         gui.text_area("#### 👩‍💻 Instructions", key="task_instructions")
@@ -128,7 +123,7 @@ Prompt for merging several outputs together
     def render_output(self):
         render_output_with_refs(gui.session_state)
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
         gui.write("**Instructions**")
         gui.write("```properties\n" + state.get("task_instructions", "") + "\n```")

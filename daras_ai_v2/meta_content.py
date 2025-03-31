@@ -178,12 +178,8 @@ def meta_image_for_page(
     if pr and pr.saved_run == sr and pr.is_root():
         file_url = metadata.meta_image or page.preview_image(state)
     else:
-        file_url = page.preview_image(state)
-
-    return meta_preview_url(
-        file_url=file_url,
-        fallback_img=page.fallback_preivew_image(),
-    )
+        file_url = page.preview_image(state) or metadata.meta_image
+    return meta_preview_url(file_url)[0]
 
 
 def canonical_url_for_page(

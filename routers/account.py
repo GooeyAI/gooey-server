@@ -23,6 +23,7 @@ from managed_secrets.widgets import manage_secrets_table
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
+from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace, SWITCH_WORKSPACE_KEY
@@ -291,20 +292,6 @@ def all_saved_runs_tab(request: Request):
         qs=qs, ordering=["-updated_at"], cursor=request.query_params
     )
 
-    def _render_run(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-        visibility = PublishedRunVisibility(pr.visibility)
-
-        with gui.div(className="mb-2 d-flex justify-content-between align-items-start"):
-            gui.pill(
-                visibility.get_badge_html(),
-                unsafe_allow_html=True,
-                className="border border-dark",
-            )
-            gui.pill(workflow.short_title, className="border border-dark")
-
-        workflow.page_cls().render_published_run_preview(pr)
-
     gui.write("# Saved Workflows")
     explore_path = get_route_path(explore_page)
 
@@ -350,8 +337,15 @@ def all_saved_runs_tab(request: Request):
             f"Saved workflows of **{workspace_name}** are here and visible & editable by other workspace members."
         )
 
-    with gui.div(className="mt-4"):
-        grid_layout(3, prs, _render_run)
+    def _render_run(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+        render_saved_workflow_preview(
+            workflow.page_cls,
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+        )
+
+    grid_layout(1, prs, _render_run)
 
     paginate_button(url=request.url, cursor=cursor)
 

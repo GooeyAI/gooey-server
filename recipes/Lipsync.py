@@ -14,8 +14,6 @@ from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from payments.plans import PricingPlan
 from workspaces.models import Workspace
 
-DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
-
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
@@ -32,9 +30,6 @@ class LipsyncPage(BasePage):
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
         duration_sec: float | None
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_LIPSYNC_META_IMG
 
     def render_form_v2(self):
         gui.file_uploader(
@@ -106,7 +101,7 @@ class LipsyncPage(BasePage):
                     max_frames=max_frames,
                 )
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
             gui.write("#### Output Video")
@@ -115,7 +110,7 @@ class LipsyncPage(BasePage):
             gui.div()
 
     def render_output(self):
-        self.render_example(gui.session_state)
+        self.render_run_preview_output(gui.session_state)
 
     def related_workflows(self) -> list:
         from recipes.DeforumSD import DeforumSDPage

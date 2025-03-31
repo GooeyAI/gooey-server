@@ -35,8 +35,6 @@ from daras_ai_v2.workflow_url_input import (
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
-DEFAULT_BULK_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png"
-
 
 class BulkRunnerPage(BasePage):
     title = "Bulk Runner"
@@ -91,9 +89,6 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
 List of URLs to the evaluation runs that you requested.
             """,
         )
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_BULK_META_IMG
 
     def render_form_v2(self):
         gui.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
@@ -253,7 +248,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             flatten_dict_key="url",
         )
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         render_documents(state)
 
     def render_output(self):
