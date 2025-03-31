@@ -4,6 +4,7 @@ import datetime
 import typing
 
 import gooey_gui as gui
+from furl import furl
 
 from bots.models import PublishedRun
 from bots.models import (
@@ -245,10 +246,11 @@ def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
     with placeholder:
         preview_url, is_video = meta_preview_url(output_url)
         if is_video:
+            output_url = furl(output_url).add(fragment_args={"t": "0.001"}).url
             gui.html(
                 f"""
                 <object data={preview_url!r} class="gui-video">
-                  <video src={output_url!r} autoplay loop muted class="gui-video">
+                  <video src={output_url!r} class="gui-video" autoplay playsInline loop muted>
                 </object>
                 """
             )
@@ -256,7 +258,7 @@ def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
             gui.html(
                 f"""
                 <object data={preview_url!r} class="gui-image">
-                  <img src={output_url!r} autoplay loop muted class="gui-image">
+                  <img src={output_url!r} class="gui-image" autoplay playsInline loop muted>
                 </object>
                 """
             )
