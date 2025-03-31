@@ -1463,6 +1463,7 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility | None = None,
+        photo_url: str | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1473,6 +1474,7 @@ class BasePage:
             title=title,
             notes=notes,
             visibility=visibility,
+            photo_url=photo_url,
         )
 
     @classmethod
