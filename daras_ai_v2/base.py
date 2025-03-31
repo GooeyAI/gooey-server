@@ -1397,6 +1397,7 @@ class BasePage:
         title: str,
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
+        photo_url: str | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1407,6 +1408,7 @@ class BasePage:
             title=title,
             notes=notes,
             public_access=public_access,
+            photo_url=photo_url,
         )
 
     @classmethod
