@@ -378,20 +378,18 @@ class TextToSpeechPage(BasePage):
 
                 client = OpenAI()
 
-                model = OpenAI_TTS_Models[
-                    gui.session_state.get(
-                        "openai_tts_model", OpenAI_TTS_Models.tts_1.name
-                    )
-                ].value
-                voice = OpenAI_TTS_Voices[
-                    gui.session_state.get(
-                        "openai_voice_name", OpenAI_TTS_Voices.alloy.name
-                    )
-                ].value
+                model = (
+                    OpenAI_TTS_Models.get(gui.session_state.get("openai_tts_model"))
+                    or OpenAI_TTS_Models.tts_1.name
+                )
+                voice = (
+                    OpenAI_TTS_Voices.get(gui.session_state.get("openai_voice_name"))
+                    or OpenAI_TTS_Voices.alloy
+                )
 
                 response = client.audio.speech.create(
-                    model=model,
-                    voice=voice,
+                    model=model.value,
+                    voice=voice.voice_id,
                     input=text.strip(),
                 )
 

@@ -40,20 +40,25 @@ class OpenAI_TTS_Models(GooeyEnum):
     tts_1_hd = "tts-1-hd"
 
 
-class OpenAI_TTS_Voices(GooeyEnum):
-    alloy = "alloy"
-    ash = "ash"
-    coral = "coral"
-    echo = "echo"
-    sage = "sage"
-    shimmer = "shimmer"
+class OpenAI_Voice(typing.NamedTuple):
+    label: str
+    voice_id: str
 
-    nova = "nova (tts only)"
-    onyx = "onyx (tts only)"
-    fable = "fable (tts only)"
 
-    ballad = "ballad (gpt-4o only)"
-    verse = "verse (gpt-4o only)"
+class OpenAI_TTS_Voices(OpenAI_Voice, GooeyEnum):
+    alloy = OpenAI_Voice(label="Alloy", voice_id="alloy")
+    ash = OpenAI_Voice(label="Ash", voice_id="ash")
+    coral = OpenAI_Voice(label="Coral", voice_id="coral")
+    echo = OpenAI_Voice(label="Echo", voice_id="echo")
+    sage = OpenAI_Voice(label="Sage", voice_id="sage")
+    shimmer = OpenAI_Voice(label="Shimmer", voice_id="shimmer")
+
+    nova = OpenAI_Voice(label="Nova (TTS only)", voice_id="nova")
+    onyx = OpenAI_Voice(label="Onyx (TTS only)", voice_id="onyx")
+    fable = OpenAI_Voice(label="Fable (TTS only)", voice_id="fable")
+
+    ballad = OpenAI_Voice(label="Ballad (GPT-4o only)", voice_id="ballad")
+    verse = OpenAI_Voice(label="Verse (GPT-4o only)", voice_id="verse")
 
 
 class GHANA_NLP_TTS_LANGUAGES(GooeyEnum):
