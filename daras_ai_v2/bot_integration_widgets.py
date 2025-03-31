@@ -329,10 +329,7 @@ def broadcast_input(bi: BotIntegration):
 
 def get_bot_test_link(bi: BotIntegration) -> str | None:
     if bi.wa_phone_number:
-        return (
-            furl("https://wa.me/", query_params={"text": "Hi"})
-            / bi.wa_phone_number.as_e164
-        ).tostr()
+        return (furl("https://wa.me/") / bi.wa_phone_number.as_e164).tostr()
     elif bi.slack_team_id:
         return (
             furl("https://app.slack.com/client")

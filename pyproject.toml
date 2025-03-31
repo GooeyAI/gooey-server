@@ -9,7 +9,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 streamlit = "^1.15.2"
-openai = "^1.52.2"
+openai = "^1.68.2"
 python-decouple = "^3.6"
 requests = "^2.28.1"
 glom = "^22.1.0"
@@ -91,6 +91,7 @@ python-pptx = "^1.0.2"
 azure-identity = "^1.19.0"
 azure-keyvault-secrets = "^4.9.0"
 xlrd = "^2.0.1"
+websockets = "^15.0.1"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

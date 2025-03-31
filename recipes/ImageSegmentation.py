@@ -29,8 +29,6 @@ from daras_ai_v2.repositioning import (
     repositioning_preview_widget,
 )
 
-DEFAULT_IMG_SEGMENTATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8363ed50-9401-11ee-878f-02420a0001cb/AI%20bg%20changer.jpg.png"
-
 
 class ImageSegmentationPage(BasePage):
     title = "AI Background Changer"
@@ -67,9 +65,6 @@ class ImageSegmentationPage(BasePage):
         cutout_image: FieldHttpUrl
         resized_image: FieldHttpUrl
         resized_mask: FieldHttpUrl
-
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_IMG_SEGMENTATION_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -298,7 +293,7 @@ class ImageSegmentationPage(BasePage):
         yield
 
     def render_output(self):
-        self.render_example(gui.session_state)
+        self.render_run_preview_output(gui.session_state)
 
     def render_steps(self):
         col1, col2, col3, col4 = gui.columns(4)
@@ -337,7 +332,7 @@ class ImageSegmentationPage(BasePage):
             else:
                 gui.div()
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
 
         with col1:

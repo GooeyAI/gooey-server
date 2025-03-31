@@ -123,7 +123,6 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 
-DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7a3127ec-1f71-11ef-aa2b-02420a00015d/Copilot.jpg"
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 
@@ -303,9 +302,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         finish_reason: list[str] | None
 
-    def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COPILOT_META_IMG
-
     def related_workflows(self):
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
@@ -320,7 +316,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         ]
 
     @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
         try:
@@ -643,7 +639,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "messages"]
 
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
             gui.write(
@@ -859,7 +855,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             return
 
         asr_msg, user_input = yield from self.asr_step(
-            request=request, response=response, user_input=user_input
+            model=llm_model, request=request, response=response, user_input=user_input
         )
 
         ocr_texts = yield from self.document_understanding_step(request=request)
@@ -882,7 +878,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             asr_msg=asr_msg,
         )
 
-        yield from self.tts_step(request, response)
+        yield from self.tts_step(model=llm_model, request=request, response=response)
 
         yield from self.lipsync_step(request, response)
 
@@ -921,8 +917,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     ocr_texts.append(json.dumps(pages))
         return ocr_texts
 
-    def asr_step(self, request, response, user_input):
-        if request.input_audio:
+    def asr_step(self, model, request, response, user_input):
+        if request.input_audio and not model.is_audio_model:
             if not request.asr_model:
                 request.asr_model, request.asr_language = infer_asr_model_and_language(
                     request.user_language or ""
@@ -1103,6 +1099,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.value}..."
 
+        audio_session_extra = None
+        if model.is_audio_model:
+            audio_session_extra = {}
+            if request.openai_voice_name:
+                audio_session_extra["voice"] = request.openai_voice_name
+
         tools = self.get_current_llm_tools()
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
@@ -1114,6 +1116,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             response_format_type=request.response_format_type,
             tools=list(tools.values()),
             stream=True,
+            audio_url=request.input_audio,
+            audio_session_extra=audio_session_extra,
         )
 
         tool_calls = None
@@ -1130,6 +1134,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
+
+            try:
+                response.raw_input_text = choices[0]["input_audio_transcript"]
+            except KeyError:
+                pass
+            try:
+                response.output_audio += [choices[0]["audio_url"]]
+                print(response.output_audio)
+            except KeyError:
+                pass
 
             # save raw model response without citations and translation for history
             response.raw_output_text = [
@@ -1220,8 +1234,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         return output_text
 
-    def tts_step(self, request, response):
-        if request.tts_provider:
+    def tts_step(self, model, request, response):
+        if request.tts_provider and not model.is_audio_model:
             response.output_audio = []
             for text in response.raw_tts_text or response.raw_output_text:
                 tts_state = TextToSpeechPage.RequestModel.parse_obj(
@@ -1632,15 +1646,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     render_called_functions(
                         saved_run=self.current_sr, trigger=FunctionTrigger.prompt
                     )
-                    for idx, text in enumerate(output_text):
+                    for text in output_text:
                         gui.write(text)
-                        try:
-                            gui.video(output_video[idx])
-                        except IndexError:
-                            try:
-                                gui.audio(output_audio[idx])
-                            except IndexError:
-                                pass
+                    for video in output_video:
+                        gui.video(video)
+                    for audio in output_audio:
+                        gui.audio(audio)
                     render_called_functions(
                         saved_run=self.current_sr, trigger=FunctionTrigger.post
                     )
@@ -1782,9 +1793,13 @@ def convo_window_clipper(
 
 def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
     tool_name = call["function"]["name"]
+    tool_args = call["function"]["arguments"]
     tool = tools[tool_name]
     yield f"🛠 {tool.label}..."
-    kwargs = json.loads(call["function"]["arguments"])
+    try:
+        kwargs = json.loads(tool_args)
+    except json.JSONDecodeError as e:
+        return dict(error=repr(e))
     return tool(**kwargs)
 
 

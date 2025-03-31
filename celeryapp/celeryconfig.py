@@ -19,11 +19,11 @@ app.conf.update(
     task_serializer="pickle",
     accept_content=["pickle"],
     result_serializer="pickle",
-    timezone=settings.TIME_ZONE,
+    timezone="UTC",
     beat_schedule={
         "exec_scheduled_runs": {
             "task": "bots.tasks.exec_scheduled_runs",
-            "schedule": crontab(minute="0"),  # Executes every hour
+            "schedule": crontab(hour="0", minute="5"),  # every day at 00:05
         },
     },
 )

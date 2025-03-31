@@ -8,6 +8,13 @@ T = typing.TypeVar("T", bound="GooeyEnum")
 
 class GooeyEnum(Enum):
     @classmethod
+    def get(cls, key, default=None):
+        try:
+            return cls[key]
+        except KeyError:
+            return default
+
+    @classmethod
     def db_choices(cls):
         return [(e.db_value, e.label) for e in cls]
 

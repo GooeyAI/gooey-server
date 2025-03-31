@@ -24,10 +24,17 @@ from openai.types.chat import (
     ChatCompletionMessageToolCallParam,
 )
 
-from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
-from daras_ai_v2.asr import get_google_auth_session
+from daras_ai.image_input import (
+    gs_url_to_uri,
+    bytes_to_cv2_img,
+    cv2_img_to_bytes,
+)
+from daras_ai_v2.asr import (
+    get_google_auth_session,
+)
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
+from daras_ai_v2.realtime_llm_openai import run_openai_audio
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
@@ -61,6 +68,7 @@ class LLMApis(Enum):
     anthropic = 6
     self_hosted = 7
     mistral = 8
+    openai_audio = 9
 
 
 class LLMSpec(typing.NamedTuple):
@@ -75,6 +83,7 @@ class LLMSpec(typing.NamedTuple):
     is_deprecated: bool = False
     supports_json: bool = False
     supports_temperature: bool = True
+    is_audio_model: bool = False
 
 
 class LargeLanguageModels(Enum):
@@ -164,6 +173,28 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
     )
+
+    # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
+    gpt_4_o_audio = LLMSpec(
+        label="GPT-4o Audio (openai)",
+        model_id="gpt-4o-realtime-preview-2024-12-17",
+        llm_api=LLMApis.openai_audio,
+        context_window=128_000,
+        max_output_tokens=16_384,
+        price=10,
+        is_audio_model=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
+    gpt_4_o_mini_audio = LLMSpec(
+        label="GPT-4o-mini Audio (openai)",
+        model_id="gpt-4o-mini-realtime-preview-2024-12-17",
+        llm_api=LLMApis.openai_audio,
+        context_window=128_000,
+        max_output_tokens=16_384,
+        price=10,
+        is_audio_model=True,
+    )
+
     chatgpt_4_o = LLMSpec(
         label="ChatGPT-4o (openai) 🧪",
         model_id="chatgpt-4o-latest",
@@ -662,6 +693,7 @@ class LargeLanguageModels(Enum):
         self.is_vision_model = spec.is_vision_model
         self.supports_json = spec.supports_json
         self.supports_temperature = spec.supports_temperature
+        self.is_audio_model = spec.is_audio_model
 
     @property
     def value(self):
@@ -691,6 +723,15 @@ class ConversationEntry(typing_extensions.TypedDict, total=False):
     tool_call_id: typing_extensions.NotRequired[str]
 
     display_name: typing_extensions.NotRequired[str]
+
+
+def pop_entry_images(entry: ConversationEntry) -> list[str]:
+    contents = entry.get("content") or ""
+    if isinstance(contents, str):
+        return []
+    return list(
+        filter(None, (part.pop("image_url", {}).get("url") for part in contents)),
+    )
 
 
 def get_entry_images(entry: ConversationEntry) -> list[str]:
@@ -728,6 +769,8 @@ def run_language_model(
     tools: list[LLMTool] = None,
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
+    audio_url: str | None = None,
+    audio_session_extra: dict | None = None,
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
@@ -746,11 +789,13 @@ def run_language_model(
             messages = [
                 format_chat_entry(role=CHATML_ROLE_USER, content_text=prompt),
             ]
+        if model.is_audio_model and not stream:
+            # audio is only supported in streaming mode, fall back to text
+            model = LargeLanguageModels.gpt_4_o
         if not model.is_vision_model:
             # remove images from the messages
-            messages = [
-                entry | dict(content=get_entry_text(entry)) for entry in messages
-            ]
+            for entry in messages:
+                pop_entry_images(entry)
         if (
             messages
             and response_format_type == "json_object"
@@ -772,8 +817,7 @@ def run_language_model(
         if not model.supports_json:
             response_format_type = None
         result = _run_chat_model(
-            api=model.llm_api,
-            model=model.model_id,
+            model=model,
             messages=messages,  # type: ignore
             max_tokens=max_tokens,
             num_outputs=num_outputs,
@@ -784,6 +828,8 @@ def run_language_model(
             response_format_type=response_format_type,
             # we can't stream with tools or json yet
             stream=stream and not response_format_type,
+            audio_url=audio_url,
+            audio_session_extra=audio_session_extra,
         )
         if stream:
             return output_stream_generator(result)
@@ -902,8 +948,7 @@ def _run_text_model(
 
 def _run_chat_model(
     *,
-    api: LLMApis = LLMApis.openai,
-    model: str | tuple,
+    model: LargeLanguageModels,
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
@@ -913,14 +958,16 @@ def _run_chat_model(
     tools: list[LLMTool] | None,
     response_format_type: ResponseFormatType | None,
     stream: bool = False,
+    audio_url: str | None = None,
+    audio_session_extra: dict | None = None,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
-        f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
+        f"{model.llm_api=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
-    match api:
+    match model.llm_api:
         case LLMApis.mistral:
             return _run_mistral_chat(
-                model=model,
+                model=model.model_id,
                 avoid_repetition=avoid_repetition,
                 max_completion_tokens=max_tokens,
                 messages=messages,
@@ -932,7 +979,7 @@ def _run_chat_model(
             )
         case LLMApis.fireworks:
             return _run_fireworks_chat(
-                model=model,
+                model=model.model_id,
                 avoid_repetition=avoid_repetition,
                 max_completion_tokens=max_tokens,
                 messages=messages,
@@ -941,6 +988,15 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+            )
+        case LLMApis.openai_audio:
+            return run_openai_audio(
+                model=model,
+                audio_url=audio_url,
+                audio_session_extra=audio_session_extra,
+                messages=messages,
+                temperature=temperature,
+                tools=tools,
             )
         case LLMApis.openai:
             return run_openai_chat(
@@ -959,7 +1015,7 @@ def _run_chat_model(
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
             return _run_gemini_pro(
-                model_id=model,
+                model_id=model.model_id,
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 temperature=temperature,
@@ -969,7 +1025,7 @@ def _run_chat_model(
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
             return _run_palm_chat(
-                model_id=model,
+                model_id=model.model_id,
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 candidate_count=num_outputs,
@@ -977,7 +1033,7 @@ def _run_chat_model(
             )
         case LLMApis.groq:
             return _run_groq_chat(
-                model=model,
+                model=model.model_id,
                 messages=messages,
                 max_tokens=max_tokens,
                 tools=tools,
@@ -988,7 +1044,7 @@ def _run_chat_model(
             )
         case LLMApis.anthropic:
             return _run_anthropic_chat(
-                model=model,
+                model=model.model_id,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -1000,7 +1056,7 @@ def _run_chat_model(
                 {
                     "role": CHATML_ROLE_ASSISTANT,
                     "content": _run_self_hosted_llm(
-                        model=model,
+                        model=model.model_id,
                         text_inputs=messages,
                         max_tokens=max_tokens,
                         temperature=temperature,
@@ -1021,7 +1077,7 @@ def _run_chat_model(
         #         repetition_penalty=1.15 if avoid_repetition else 1,
         #     )
         case _:
-            raise UserError(f"Unsupported chat api: {api}")
+            raise UserError(f"Unsupported chat api: {model.llm_api}")
 
 
 def _run_self_hosted_llm(
@@ -1197,7 +1253,7 @@ def _run_anthropic_chat(
 @retry_if(openai_should_retry)
 def run_openai_chat(
     *,
-    model: str,
+    model: LargeLanguageModels,
     messages: list[ConversationEntry],
     max_completion_tokens: int,
     num_outputs: int,
@@ -1211,14 +1267,14 @@ def run_openai_chat(
     from openai._types import NOT_GIVEN
 
     if model in [
-        LargeLanguageModels.o1_mini.model_id,
-        LargeLanguageModels.o1.model_id,
-        LargeLanguageModels.o3_mini.model_id,
+        LargeLanguageModels.o1_mini,
+        LargeLanguageModels.o1,
+        LargeLanguageModels.o3_mini,
     ]:
         # fuck you, openai
         for entry in messages:
             if entry["role"] == CHATML_ROLE_SYSTEM:
-                if model == LargeLanguageModels.o1_mini.model_id:
+                if model == LargeLanguageModels.o1_mini:
                     entry["role"] = CHATML_ROLE_USER
                 else:
                     entry["role"] = "developer"
@@ -1226,7 +1282,7 @@ def run_openai_chat(
         # unsupported API options
         max_tokens = NOT_GIVEN
         avoid_repetition = False
-        if model == LargeLanguageModels.o1.model_id:
+        if model == LargeLanguageModels.o1:
             stream = False
 
         # reserved tokens for reasoning...
@@ -1242,29 +1298,39 @@ def run_openai_chat(
     else:
         frequency_penalty = 0
         presence_penalty = 0
-    if isinstance(model, str):
-        model = [model]
+    if temperature is not None:
+        temperature = temperature
+    else:
+        temperature = NOT_GIVEN
+    if tools:
+        tools = [tool.spec for tool in tools]
+    else:
+        tools = NOT_GIVEN
+    if response_format_type:
+        response_format = {"type": response_format_type}
+    else:
+        response_format = NOT_GIVEN
+
+    model_ids = model.model_id
+    if isinstance(model_ids, str):
+        model_ids = [model_ids]
     completion, used_model = try_all(
         *[
             _get_chat_completions_create(
-                model=model_str,
+                model=model_id,
                 messages=messages,
                 max_tokens=max_tokens,
                 max_completion_tokens=max_completion_tokens,
                 stop=stop or NOT_GIVEN,
                 n=num_outputs,
-                temperature=temperature if temperature is not None else NOT_GIVEN,
+                temperature=temperature,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
-                tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
-                response_format=(
-                    {"type": response_format_type}
-                    if response_format_type
-                    else NOT_GIVEN
-                ),
+                tools=tools,
+                response_format=response_format,
                 stream=stream,
             )
-            for model_str in model
+            for model_id in model_ids
         ],
     )
     if stream:
@@ -1296,7 +1362,6 @@ def _stream_openai_chunked(
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
-    from pyquery import PyQuery as pq
 
     ret = []
     chunk_size = start_chunk_size
@@ -1330,40 +1395,11 @@ def _stream_openai_chunked(
             if not delta.content:
                 continue
             entry["chunk"] += delta.content
-            # if the chunk is too small, we need to wait for more data
-            chunk = entry["chunk"]
-            if len(chunk) < chunk_size:
-                continue
-            # if chunk contains buttons we wait for the buttons to be complete
-            if "<button" in chunk:
-                doc = pq(f"<root>{chunk}</root>")
-                if doc("button"):
-                    last_part = doc.contents()[-1]
-                    # if the last part is not a string or is empty, we need to wait for more data
-                    if not (isinstance(last_part, str) and last_part.strip()):
-                        continue
-
-            # iterate through the separators and find the best one that matches
-            for sep in default_separators[:-1]:
-                # find the last occurrence of the separator
-                match = None
-                for match in re.finditer(sep, chunk):
-                    pass
-                if not match:
-                    continue  # no match, try the next separator or wait for more data
-                # append text before the separator to the content
-                part = chunk[: match.end()]
-                if len(part) < chunk_size:
-                    continue  # not enough text, try the next separator or wait for more data
-                entry["content"] += part
-                # set text after the separator as the next chunk
-                entry["chunk"] = chunk[match.end() :]
-                # increase the chunk size, but don't go over the max
-                chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
-                # we found a separator, so we can stop looking and yield the partial result
-                changed = True
-                break
+            changed = is_llm_chunk_large_enough(entry, chunk_size)
         if changed:
+            # increase the chunk size, but don't go over the max
+            chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
+            # stream the chunk
             yield ret
 
     # add the leftover chunks
@@ -1374,6 +1410,44 @@ def _stream_openai_chunked(
     if not completion_chunk:
         return
     record_openai_llm_usage(used_model, completion_chunk, messages, ret)
+
+
+def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:
+    from pyquery import PyQuery as pq
+
+    # if the chunk is too small, we need to wait for more data
+    chunk = entry["chunk"]
+    if len(chunk) < chunk_size:
+        return False
+
+    # if chunk contains buttons we wait for the buttons to be complete
+    if "<button" in chunk:
+        doc = pq(f"<root>{chunk}</root>")
+        if doc("button"):
+            last_part = doc.contents()[-1]
+            # if the last part is not a string or is empty, we need to wait for more data
+            if not (isinstance(last_part, str) and last_part.strip()):
+                return False
+
+    # iterate through the separators and find the best one that matches
+    for sep in default_separators[:-1]:
+        # find the last occurrence of the separator
+        match = None
+        for match in re.finditer(sep, chunk):
+            pass
+        if not match:
+            continue  # no match, try the next separator or wait for more data
+        # append text before the separator to the content
+        part = chunk[: match.end()]
+        if len(part) < chunk_size:
+            continue  # not enough text, try the next separator or wait for more data
+        entry["content"] += part
+        # set text after the separator as the next chunk
+        entry["chunk"] = chunk[match.end() :]
+        # we found a separator, so we can stop looking and yield the partial result
+        return True
+
+    return False
 
 
 def record_openai_llm_usage(
@@ -2016,8 +2090,8 @@ def format_chat_entry(
     parts = []
     if input_images:
         parts.append(f"Image URLs: {', '.join(input_images)}")
-    if input_audio:
-        parts.append(f"Audio URL: {input_audio}")
+    # if input_audio:
+    #     parts.append(f"Audio URL: {input_audio}")
     if input_documents:
         parts.append(f"Document URLs: {', '.join(input_documents)}")
     parts.append(content_text)

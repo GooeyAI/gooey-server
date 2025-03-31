@@ -1,11 +1,11 @@
 import typing
 from html import escape as escape_html
 
-from django.utils.translation import ngettext
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count
+from django.utils.translation import ngettext
 from fastapi import Request
 from furl import furl
 
@@ -29,6 +29,7 @@ from daras_ai_v2.meta_content import (
 )
 from daras_ai_v2.urls import paginate_queryset, paginate_button
 from handles.models import Handle
+from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import set_current_workspace
 
@@ -59,7 +60,8 @@ def profile_page(request: Request, handle: Handle):
     with gui.div(className="mt-3"):
         profile_header(request=request, handle=handle)
     gui.html("\n<hr>\n")
-    render_public_runs_grid(request, handle.workspace)
+    with gui.div(className="pb-3"):
+        render_public_runs_list(request, handle.workspace)
 
 
 def profile_header(request: Request, handle: Handle):
@@ -244,7 +246,7 @@ def _render_member_photos(workspace: Workspace):
             gui.image(src=member.user.get_photo())
 
 
-def render_public_runs_grid(request: Request, workspace: Workspace):
+def render_public_runs_list(request: Request, workspace: Workspace):
     qs = PublishedRun.objects.filter(
         workspace=workspace,
         visibility=PublishedRunPermission.CAN_FIND,
@@ -260,12 +262,14 @@ def render_public_runs_grid(request: Request, workspace: Workspace):
 
     def _render(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        page_cls = workflow.page_cls
+        render_saved_workflow_preview(
+            workflow.page_cls,
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+        )
 
-        gui.pill(workflow.short_title, className="mb-2 border border-dark")
-        page_cls().render_published_run_preview(pr)
+    grid_layout(1, prs, _render)
 
-    grid_layout(3, prs, _render)
     paginate_button(url=request.url, cursor=cursor)
 
 

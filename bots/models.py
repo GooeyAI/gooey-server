@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import datetime
 import typing
+from collections import defaultdict
 from multiprocessing.pool import ThreadPool
 
+import phonenumber_field.formfields
+import phonenumber_field.modelfields
 import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q, IntegerChoices, QuerySet
+from django.db.models import Q, IntegerChoices, QuerySet, Subquery, OuterRef
 from django.utils import timezone
 from django.utils.text import Truncator
-from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
@@ -122,22 +125,22 @@ class PublishedRunPermission(models.IntegerChoices):
 
         match self:
             case PublishedRunPermission.CAN_VIEW:
-                text = "Only members with a link can view"
+                text = ": Only members with a link can view"
             case PublishedRunPermission.CAN_FIND:
                 if BasePage(user=current_user).can_user_delete_published_run(
                     published_run=pr, selected_workspace=pr.workspace
                 ):
-                    text = f"Members [can find]({get_route_path(saved_route)}) but can't update"
+                    text = f": Members [can find]({get_route_path(saved_route)}) but can't update"
                 else:
                     text = (
-                        f"Members [can find]({get_route_path(saved_route)}) and view."
+                        f": Members [can find]({get_route_path(saved_route)}) and view."
                     )
                     if pr.created_by_id:
                         text += f"<br/>{pr.created_by.full_name()} + admins can update."
                     else:
                         text += "<br/>Admins can update."
             case PublishedRunPermission.CAN_EDIT:
-                text = f"Members [can find]({get_route_path(saved_route)}) and edit"
+                text = f": Members [can find]({get_route_path(saved_route)}) and edit"
             case _:
                 raise ValueError("Invalid permission for team sharing")
 
@@ -149,7 +152,7 @@ class PublishedRunPermission(models.IntegerChoices):
 
         match self:
             case PublishedRunPermission.CAN_VIEW | PublishedRunPermission.INTERNAL:
-                text = "Only people with a link can view"
+                text = ": Only people with a link can view"
             case PublishedRunPermission.CAN_FIND:
                 profile_url = (
                     pr.workspace.handle_id and pr.workspace.handle.get_app_url()
@@ -273,6 +276,7 @@ class WorkflowMetadata(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     price_multiplier = models.FloatField(default=1)
+    emoji = models.TextField(blank=True, default="")
 
     def __str__(self):
         return self.meta_title
@@ -578,6 +582,52 @@ class BotIntegrationQuerySet(models.QuerySet):
         return saved
 
 
+def validate_phonenumber(value):
+    from phonenumber_field.phonenumber import to_python
+
+    phone_number = to_python(value)
+    if _is_invalid_phone_number(phone_number):
+        raise ValidationError(
+            "The phone number entered is not valid.", code="invalid_phone_number"
+        )
+
+
+class WhatsappPhoneNumberFormField(phonenumber_field.formfields.PhoneNumberField):
+    default_validators = [validate_phonenumber]
+
+    def to_python(self, value):
+        from phonenumber_field.phonenumber import to_python
+
+        phone_number = to_python(value, region=self.region)
+
+        if phone_number in validators.EMPTY_VALUES:
+            return self.empty_value
+
+        if _is_invalid_phone_number(phone_number):
+            raise ValidationError(self.error_messages["invalid"])
+
+        return phone_number
+
+
+def _is_invalid_phone_number(phone_number) -> bool:
+    from phonenumber_field.phonenumber import PhoneNumber
+
+    return (
+        isinstance(phone_number, PhoneNumber)
+        and not phone_number.is_valid()
+        # facebook test numbers
+        and not str(phone_number.as_e164).startswith("+1555")
+    )
+
+
+class WhatsappPhoneNumberField(phonenumber_field.modelfields.PhoneNumberField):
+    default_validators = [validate_phonenumber]
+
+    def formfield(self, **kwargs):
+        kwargs["form_class"] = WhatsappPhoneNumberFormField
+        return super().formfield(**kwargs)
+
+
 class BotIntegration(models.Model):
     name = models.CharField(
         max_length=1024,
@@ -669,10 +719,11 @@ class BotIntegration(models.Model):
         help_text="Bot's Instagram username (only for display)",
     )
 
-    wa_phone_number = PhoneNumberField(
+    wa_phone_number = WhatsappPhoneNumberField(
         blank=True,
         default="",
         help_text="Bot's WhatsApp phone number (only for display)",
+        validators=[validate_phonenumber],
     )
     wa_phone_number_id = models.CharField(
         max_length=256,
@@ -770,7 +821,7 @@ class BotIntegration(models.Model):
         help_text="Extra configuration for the bot's web integration",
     )
 
-    twilio_phone_number = PhoneNumberField(
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
         blank=True,
         null=True,
         default=None,
@@ -1210,7 +1261,7 @@ class Conversation(models.Model):
         help_text="User's Instagram username (only for display)",
     )
 
-    wa_phone_number = PhoneNumberField(
+    wa_phone_number = WhatsappPhoneNumberField(
         blank=True,
         default="",
         db_index=True,
@@ -1253,7 +1304,7 @@ class Conversation(models.Model):
         help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
-    twilio_phone_number = PhoneNumberField(
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
         blank=True,
         default="",
         help_text="User's Twilio phone number (mandatory)",
@@ -1374,142 +1425,112 @@ class Conversation(models.Model):
 
 
 class MessageQuerySet(models.QuerySet):
+    def previous_by_created_at(self):
+        return self.model.objects.filter(
+            id__in=self.annotate(
+                prev_id=Subquery(
+                    self.model.objects.filter(
+                        created_at__lt=OuterRef("created_at"),
+                    ).values("id")[:1]
+                )
+            ).values("prev_id")
+        )
+
     def distinct_by_user_id(self) -> QuerySet["Message"]:
         """Get unique users"""
         return self.distinct(*Message.convo_user_id_fields)
 
-    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
-        import pandas as pd
-
-        qs = self.all().prefetch_related("feedbacks")
-        rows = []
-        for message in qs[:10000]:
-            message: Message
-            row = {
-                "USER": message.conversation.get_display_name(),
-                "BOT": str(message.conversation.bot_integration),
-                "CREATED AT": message.created_at.astimezone(tz).replace(tzinfo=None),
-                "MESSAGE (ENGLISH)": message.content,
-                "MESSAGE (ORIGINAL)": message.display_content,
-                "ROLE": message.get_role_display(),
-                "QUESTION_ANSWERED": message.question_answered,
-                "QUESTION_SUBJECT": message.question_subject,
-            }
-            row |= {
-                f"FEEDBACK {i + 1}": feedback.get_display_text()
-                for i, feedback in enumerate(message.feedbacks.all())
-            }
-            rows.append(row)
-        df = pd.DataFrame.from_records(rows)
-        return df
-
-    def to_df_format(
+    def to_df(
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
     ) -> "pd.DataFrame":
         import pandas as pd
-        from routers.bots_api import MSG_ID_PREFIX
 
-        qs = self.all().prefetch_related("feedbacks")
-        rows = []
-        for message in qs[:row_limit]:
-            if message.conversation.bot_integration.platform == Platform.WEB:
-                message_id = message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
-            else:
-                message_id = message.platform_msg_id
-
-            message: Message
-            row = {
-                "Name": message.conversation.get_display_name(),
-                "Role": message.role,
-                "Message (EN)": message.content,
+        rows = [
+            {
                 "Sent": (
-                    message.created_at.astimezone(tz)
+                    row["sent"]
                     .replace(tzinfo=None)
                     .strftime(settings.SHORT_DATETIME_FORMAT)
                 ),
-                "Message (Local)": message.display_content,
-                "Analysis JSON": message.analysis_result,
-                "Feedback": (
-                    message.feedbacks.first().get_display_text()
-                    if message.feedbacks.first()
-                    else None
-                ),  # only show first feedback as per Sean's request
-                "Run Time": (
-                    message.saved_run.run_time if message.saved_run else 0
-                ),  # user messages have no run/run_time
-                "Run URL": (
-                    message.saved_run.get_app_url()
-                    if message.saved_run and message.role == CHATML_ROLE_ASSISSTANT
-                    else ""
-                ),
-                "Photo Input": ", ".join(
-                    (message.saved_run and message.saved_run.state.get("input_images"))
-                    or []
-                ),
-                "Audio Input": (
-                    (message.saved_run and message.saved_run.state.get("input_audio"))
-                    or ""
-                ),
-                "Message ID": message_id,
-                "Conversation ID": message.conversation.api_integration_id(),
+                "Name": row.get("name"),
+                "User Message (EN)": row.get("user_message"),
+                "Assistant Message (EN)": row.get("assistant_message"),
+                "User Message (Local)": row.get("user_message_local"),
+                "Assistant Message (Local)": row.get("assistant_message_local"),
+                "Analysis Result": row.get("analysis_result"),
+                "Feedback": row.get("feedback"),
+                "Run Time": row.get("run_time_sec"),
+                "Run URL": row.get("run_url"),
+                "Input Images": ", ".join(row.get("input_images") or []),
+                "Input Audio": row.get("input_audio"),
+                "User Message ID": row.get("user_message_id"),
+                "Conversation ID": row.get("conversation_id"),
             }
-            rows.append(row)
-        df = pd.DataFrame.from_records(
-            rows,
-            columns=[
-                "Name",
-                "Role",
-                "Message (EN)",
-                "Sent",
-                "Message (Local)",
-                "Analysis JSON",
-                "Feedback",
-                "Run Time",
-                "Run URL",
-                "Photo Input",
-                "Audio Input",
-                "Message ID",
-                "Conversation ID",
-            ],
-        )
+            for row in self.to_json(tz=tz, row_limit=row_limit)
+            if row.get("sent")
+        ]
+        df = pd.DataFrame.from_records(rows)
         return df
 
-    def to_df_analysis_format(
+    def to_json(
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
-    ) -> "pd.DataFrame":
-        import pandas as pd
+    ) -> list[dict]:
+        from routers.bots_api import MSG_ID_PREFIX
 
-        qs = self.filter(role=CHATML_ROLE_ASSISSTANT).prefetch_related("feedbacks")
-        rows = []
+        conversations = defaultdict(list)
+
+        qs = self.order_by("-created_at").prefetch_related(
+            "feedbacks", "conversation", "saved_run"
+        )
         for message in qs[:row_limit]:
             message: Message
-            row = {
-                "Name": message.conversation.get_display_name(),
-                "Question (EN)": message.get_previous_by_created_at().content,
-                "Answer (EN)": message.content,
-                "Sent": message.created_at.astimezone(tz)
-                .replace(tzinfo=None)
-                .strftime(settings.SHORT_DATETIME_FORMAT),
-                "Question (Local)": message.get_previous_by_created_at().display_content,
-                "Answer (Local)": message.display_content,
-                "Analysis JSON": message.analysis_result,
-                "Run URL": (message.saved_run and message.saved_run.get_app_url()),
-            }
-            rows.append(row)
-        df = pd.DataFrame.from_records(
-            rows,
-            columns=[
-                "Name",
-                "Question (EN)",
-                "Answer (EN)",
-                "Sent",
-                "Question (Local)",
-                "Answer (Local)",
-                "Analysis JSON",
-                "Run URL",
-            ],
-        )
-        return df
+            rows = conversations[message.conversation_id]
+
+            # since we've sorted by -created_at, we'll get alternating assistant and user messages
+            if message.role == CHATML_ROLE_ASSISSTANT:
+                row = {
+                    "assistant_message": message.content,
+                    "assistant_message_local": message.display_content,
+                    "analysis_result": message.analysis_result,
+                }
+                rows.append(row)
+                if message.feedbacks.first():
+                    row["feedback"] = message.feedbacks.first().get_display_text()
+                saved_run = message.saved_run
+                if saved_run:
+                    row["run_time_sec"] = int(saved_run.run_time.total_seconds())
+                    row["run_url"] = saved_run.get_app_url()
+                    input_images = saved_run.state.get("input_images")
+                    if input_images:
+                        row["input_images"] = input_images
+                    input_audio = saved_run.state.get("input_audio")
+                    if input_audio:
+                        row["input_audio"] = input_audio
+
+            elif message.role == CHATML_ROLE_USER and rows:
+                row = rows[-1]
+                row.update(
+                    {
+                        "sent": message.created_at.astimezone(tz),
+                        "name": message.conversation.get_display_name(),
+                        "user_message": message.content,
+                        "user_message_local": message.display_content,
+                        "user_message_id": (
+                            message.platform_msg_id
+                            and message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
+                        ),
+                        "conversation_id": message.conversation.api_integration_id(),
+                    }
+                )
+
+        return [
+            row
+            for rows in conversations.values()
+            # reversed so that user message is first and easier to read
+            for row in reversed(rows)
+            # drop rows that have only one of user/assistant message
+            if "user_message" in row and "assistant_message" in row
+        ]
 
     def as_llm_context(
         self, limit: int = 50, reset_at: datetime.datetime = None
@@ -1959,6 +1980,7 @@ class PublishedRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = PublishedRunQuerySet.as_manager()
+    photo_url = CustomURLField(default="", blank=True)
 
     class Meta:
         get_latest_by = "updated_at"

@@ -7,7 +7,6 @@ import requests
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
-from furl import furl
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
@@ -39,7 +38,7 @@ PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
     "Please go to the Integrations Tab and connect this page."
 )
-RESET_KEYWORD = "reset"
+RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
 
 DEFAULT_RESPONSE = (
@@ -171,7 +170,9 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text = parse_bot_html(text)
+        buttons, text, disable_feedback = parse_bot_html(text)
+        if disable_feedback:
+            send_feedback_buttons = False
 
         if buttons and send_feedback_buttons:
             self._send_msg(
@@ -250,30 +251,36 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str]:
+def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
-        return [], text
+        return [], text, False
     doc = pq(f"<root>{text}</root>")
-    buttons = [
-        ReplyButton(
-            # parsed by _handle_interactive_msg
-            id=csv_encode_row(
-                idx + 1,
-                btn.attrib.get("gui-target") or "input_prompt",
-                btn.attrib.get("gui-action"),
-                # title must be the last item because it might get truncated
-                btn.text or "",
-            ),
-            title=btn.text or "",
+    buttons = []
+    disable_feedback = False
+    for idx, btn in enumerate(doc("button") or []):
+        if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
+            disable_feedback = True
+        buttons.append(
+            ReplyButton(
+                # parsed by _handle_interactive_msg
+                id=csv_encode_row(
+                    idx + 1,
+                    btn.attrib.get("gui-target") or "input_prompt",
+                    btn.attrib.get("gui-action"),
+                    # title must be the last item because it might get truncated
+                    btn.text or "",
+                ),
+                title=btn.text or "",
+            )
         )
-        for idx, btn in enumerate(doc("button") or [])
-    ]
+
     text = "\n\n".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
     )
-    return buttons, text
+
+    return buttons, text, disable_feedback
 
 
 def _echo(bot, input_text):
@@ -331,10 +338,6 @@ def _msg_handler(bot: BotInterface):
                 raise HTTPException(
                     status_code=400, detail="No documents found in request."
                 )
-            filenames = ", ".join(
-                furl(url.strip("/")).path.segments[-1] for url in input_documents
-            )
-            input_text = f"Files: {filenames}\n\n{input_text}"
         case "audio" | "video":
             input_audio = bot.get_input_audio()
             if not input_audio:
@@ -354,7 +357,7 @@ def _msg_handler(bot: BotInterface):
             bot.send_msg(text=INVALID_INPUT_FORMAT.format(bot.input_type))
             return
     # handle reset keyword
-    if input_text.lower() == RESET_KEYWORD:
+    if input_text.lower().strip("/ ") in RESET_KEYWORDS:
         # record the reset time so we don't send context
         bot.convo.reset_at = timezone.now()
         # reset convo state
@@ -532,6 +535,13 @@ def _process_and_send_msg(
             send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
+        # in case there are multiple outputs, send the remaining ones
+        if audio:
+            for a in state["output_audio"][1:]:
+                bot.send_msg(audio=a)
+        if video:
+            for v in state["output_video"][1:]:
+                bot.send_msg(video=v)
 
     # save msgs to db
     _save_msgs(

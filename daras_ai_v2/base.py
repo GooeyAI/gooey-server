@@ -9,7 +9,7 @@ import typing
 import uuid
 from copy import copy, deepcopy
 from enum import Enum
-from functools import cached_property
+from functools import cached_property, partial
 from itertools import pairwise
 from random import Random
 from time import sleep
@@ -70,6 +70,8 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from routers.root import RecipeTabs
+from widgets.author import render_author_from_user, render_author_from_workspace
+from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 from workspaces.widgets import (
     get_current_workspace,
@@ -77,13 +79,6 @@ from workspaces.widgets import (
     set_current_workspace,
 )
 
-DEFAULT_META_IMG = (
-    # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec2100aa-1f6e-11ef-ba0b-02420a000159/Main.jpg"
-    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
-    # Big
-    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
-)
 MAX_SEED = 4294967294
 gooey_rng = Random()
 
@@ -424,7 +419,7 @@ class BasePage:
             className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
         ):
             with gui.tag("li"):
-                self.render_workspace_author(workspace)
+                render_author_from_workspace(workspace)
 
             # don't render the user's name for examples and personal workspaces
             if is_example or workspace.is_personal:
@@ -552,7 +547,7 @@ class BasePage:
                     self._render_options_button_with_dialog()
                 self._render_share_button()
                 self._render_save_button()
-            else:
+            elif self.tab != RecipeTabs.examples:
                 self._render_copy_link_button(label="Copy Link")
 
     def _render_share_button(self):
@@ -760,7 +755,7 @@ class BasePage:
         with col1:
             with gui.tag("p", className="mb-1 text-muted"):
                 gui.html("WORKSPACE")
-            self.render_workspace_author(workspace)
+            render_author_from_workspace(workspace)
         with col2:
             try:
                 membership = workspace.memberships.get(user_id=self.request.user.id)
@@ -1020,22 +1015,22 @@ class BasePage:
                     gui.session_state[key] = new_workspace.id
 
             return self.current_workspace
-        else:
-            with gui.div(className="d-flex gap-3"):
-                with gui.div(className="mt-2 text-nowrap"):
-                    gui.html("Workspace")
 
-                with gui.div(style=dict(maxWidth="300px", width="100%")):
-                    workspace_id = gui.selectbox(
-                        "",
-                        key=key,
-                        options=workspace_options,
-                        format_func=lambda w_id: workspace_options[w_id].display_html(
-                            self.request.user
-                        ),
-                        className="mb-0",
-                    )
-                    return workspace_options[workspace_id]
+        with gui.div(className="d-flex gap-3"):
+            with gui.div(className="mt-2 text-nowrap"):
+                gui.html("Workspace")
+
+            with gui.div(style=dict(maxWidth="300px", width="100%")):
+                workspace_id = gui.selectbox(
+                    "",
+                    key=key,
+                    options=workspace_options,
+                    format_func=lambda w_id: workspace_options[w_id].display_html(
+                        self.request.user
+                    ),
+                    className="mb-0",
+                )
+                return workspace_options[workspace_id]
 
     def _get_default_pr_title(self):
         return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
@@ -1265,7 +1260,7 @@ class BasePage:
         ).replace("\n", " ")
 
     @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun) -> str:
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         return (pr and pr.title) or cls.get_recipe_title()
 
     @classmethod
@@ -1275,8 +1270,7 @@ class BasePage:
     def get_explore_image(self) -> str:
         meta = self.workflow.get_or_create_metadata()
         img = meta.default_image or self.explore_image or ""
-        fallback_img = self.fallback_preivew_image()
-        return meta_preview_url(img, fallback_img)
+        return meta_preview_url(img)[0]
 
     def _user_disabled_check(self):
         if self.current_sr_user and self.current_sr_user.is_disabled:
@@ -1352,7 +1346,7 @@ class BasePage:
             ):
                 if version.changed_by:
                     with gui.tag("h6"):
-                        self.render_author(
+                        render_author_from_user(
                             version.changed_by, responsive=False, show_as_link=False
                         )
                 else:
@@ -1649,120 +1643,13 @@ class BasePage:
         pass
 
     def render_output(self):
-        self.render_example(gui.session_state)
+        self.render_run_preview_output(gui.session_state)
 
     def render_form_v2(self):
         pass
 
     def validate_form_v2(self):
         pass
-
-    @classmethod
-    def render_workspace_author(
-        cls,
-        workspace: Workspace | None,
-        *,
-        image_size: str = "30px",
-        responsive: bool = True,
-        show_as_link: bool = True,
-        text_size: str | None = None,
-    ):
-        if not workspace:
-            return
-        photo = workspace.get_photo()
-        if workspace.is_personal:
-            name = workspace.created_by.display_name
-        else:
-            name = workspace.display_name()
-        if show_as_link and workspace.is_personal and workspace.handle_id:
-            link = workspace.handle.get_app_url()
-        else:
-            link = None
-        return cls._render_author(
-            photo=photo,
-            name=name,
-            link=link,
-            image_size=image_size,
-            responsive=responsive,
-            text_size=text_size,
-        )
-
-    @classmethod
-    def render_author(
-        cls,
-        user: AppUser | None,
-        *,
-        image_size: str = "30px",
-        responsive: bool = True,
-        show_as_link: bool = True,
-        text_size: str | None = None,
-    ):
-        if not user:
-            return
-        photo = user.photo_url
-        name = user.full_name()
-        if show_as_link and (handle := user.get_handle()):
-            link = handle.get_app_url()
-        else:
-            link = None
-        return cls._render_author(
-            photo=photo,
-            name=name,
-            link=link,
-            image_size=image_size,
-            responsive=responsive,
-            text_size=text_size,
-        )
-
-    @classmethod
-    def _render_author(
-        cls,
-        photo: str | None,
-        name: str | None,
-        link: str | None,
-        *,
-        image_size: str,
-        responsive: bool,
-        text_size: str | None,
-    ):
-        if not photo and not name:
-            return
-
-        if responsive:
-            responsive_image_size = f"calc({image_size} * 0.67)"
-        else:
-            responsive_image_size = image_size
-
-        linkto = link and gui.link(to=link) or gui.dummy()
-        with linkto, gui.div(className="d-flex align-items-center"):
-            if photo:
-                with gui.styled(
-                    """
-                    @media (min-width: 1024px) {
-                        & {
-                            width: %(image_size)s;
-                            height: %(image_size)s;
-                        }
-                    }
-                    """
-                    % dict(image_size=image_size)
-                ):
-                    gui.image(
-                        photo,
-                        style=dict(
-                            width=responsive_image_size,
-                            height=responsive_image_size,
-                            marginRight="6px",
-                            borderRadius="50%",
-                            objectFit="cover",
-                            pointerEvents="none",
-                        ),
-                    )
-
-            if name:
-                name_style = {"fontSize": text_size} if text_size else {}
-                with gui.tag("span", style=name_style):
-                    gui.html(html.escape(name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -2299,14 +2186,6 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        allow_hide = self.is_current_user_admin()
-
-        def _render(pr: PublishedRun):
-            self._render_example_preview(
-                published_run=pr,
-                allow_hide=allow_hide,
-            )
-
         qs = PublishedRun.objects.filter(
             PublishedRun.approved_example_q(),
             workflow=self.workflow,
@@ -2318,7 +2197,16 @@ class BasePage:
             cursor=self.request.query_params,
         )
 
-        grid_layout(3, example_runs, _render)
+        def _render(pr: PublishedRun):
+            render_saved_workflow_preview(
+                self,
+                pr,
+                show_workspace_author=True,
+                hide_visibility_pill=True,
+                hide_version_notes=True,
+            )
+
+        grid_layout(1, example_runs, _render)
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2349,17 +2237,8 @@ class BasePage:
             gui.write("No published runs yet")
             return
 
-        def _render(pr: PublishedRun):
-            with gui.div(className="mb-2", style={"font-size": "0.9rem"}):
-                gui.pill(
-                    pr.get_share_badge_html(),
-                    unsafe_allow_html=True,
-                    className="border border-dark",
-                )
-
-            self.render_published_run_preview(published_run=pr)
-
-        grid_layout(3, published_runs, _render)
+        with gui.div(className="position-relative w-100"):
+            grid_layout(1, published_runs, partial(render_saved_workflow_preview, self))
 
         paginate_button(url=self.request.url, cursor=cursor)
 
@@ -2426,86 +2305,9 @@ class BasePage:
         elif saved_run.error_msg:
             gui.error(saved_run.error_msg, unsafe_allow_html=True)
 
-        return self.render_example(saved_run.to_dict())
+        return self.render_run_preview_output(saved_run.to_dict())
 
-    def render_published_run_preview(self, published_run: PublishedRun):
-        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"#### {tb.h1_title}")
-
-        with gui.div(className="d-flex align-items-center justify-content-between"):
-            with gui.div():
-                updated_at = published_run.saved_run.updated_at
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
-
-            if published_run.visibility == PublishedRunPermission.CAN_FIND:
-                run_icon = '<i class="fa-regular fa-person-running"></i>'
-                run_count = format_number_with_suffix(published_run.get_run_count())
-                gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
-
-        if published_run.notes:
-            gui.caption(published_run.notes, line_clamp=2)
-
-        doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
-
-    def _render_example_preview(
-        self,
-        *,
-        published_run: PublishedRun,
-        allow_hide: bool,
-    ):
-        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
-        if published_run.workspace:
-            with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                self.render_workspace_author(
-                    published_run.workspace,
-                    image_size="20px",
-                    text_size="0.9rem",
-                )
-
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"#### {tb.h1_title}")
-
-        with gui.div(className="d-flex align-items-center justify-content-between"):
-            with gui.div():
-                updated_at = published_run.saved_run.updated_at
-                if updated_at and isinstance(updated_at, datetime.datetime):
-                    gui.caption("Loading...", **render_local_dt_attrs(updated_at))
-
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
-            run_count = format_number_with_suffix(published_run.get_run_count())
-            gui.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
-
-        if published_run.notes:
-            gui.caption(published_run.notes, line_clamp=2)
-
-        if allow_hide:
-            self._example_hide_button(published_run=published_run)
-
-        doc = published_run.saved_run.to_dict()
-        self.render_example(doc)
-
-    def _example_hide_button(self, published_run: PublishedRun):
-        pressed_delete = gui.button(
-            "🙈️ Hide",
-            key=f"delete_example_{published_run.published_run_id}",
-            style={"color": "red"},
-        )
-        if not pressed_delete:
-            return
-        self.set_hidden(published_run=published_run, hidden=True)
-
-    def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
-        with gui.spinner("Hiding..."):
-            published_run.is_approved_example = not hidden
-            published_run.save()
-
-        gui.rerun()
-
-    def render_example(self, state: dict):
+    def render_run_preview_output(self, state: dict):
         pass
 
     def render_steps(self):
@@ -2524,7 +2326,8 @@ class BasePage:
     def preview_description(self, state: dict) -> str:
         return ""
 
-    def preview_image(self, state: dict) -> str | None:
+    @classmethod
+    def preview_image(cls, state: dict) -> str | None:
         out = (
             state.get("cutout_image")
             or state.get("output_images")
@@ -2532,9 +2335,6 @@ class BasePage:
             or state.get("output_video")
         )
         return extract_nested_str(out)
-
-    def fallback_preivew_image(self) -> str:
-        return DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(

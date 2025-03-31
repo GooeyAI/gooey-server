@@ -1,5 +1,6 @@
-from django.utils import timezone
 from datetime import timedelta, datetime
+
+from django.utils import timezone
 
 THRESHOLDS = [
     (timedelta(days=365), "y"),

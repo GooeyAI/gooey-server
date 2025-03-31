@@ -18,6 +18,7 @@ from payments.plans import PricingPlan
 from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 from workspaces.widgets import render_workspace_create_dialog, set_current_workspace
+from widgets.author import render_author_from_workspace
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -35,12 +36,12 @@ def billing_page(workspace: "Workspace", user: "AppUser", session: dict):
     if len(user.cached_workspaces) > 1:
         # when user has multiple workspaces, remind them of the one they are currently on
         with gui.div(className="mb-3"):
-            BasePage.render_workspace_author(workspace, show_as_link=False)
+            render_author_from_workspace(workspace, show_as_link=False)
 
     if (
         workspace.subscription
         and workspace.subscription.is_paid()
-        and workspace.subscription.plan != PricingPlan.ENTERPRISE.db_value
+        and workspace.subscription.plan != PricingPlan.ENTERPRISE
     ):
         with gui.div(className="mb-5"):
             render_current_plan(workspace)

@@ -135,7 +135,6 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
         sort_by="Name",
     )
     assert df.shape[0] == 0
-    assert "Name" in df.columns
 
     # valid option and data
     convo = Conversation.objects.create(
@@ -179,3 +178,24 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     )
     assert df.shape[0] == 1
     assert "Name" in df.columns
+
+
+def test_create_fb_test_bot_integration(transactional_db):
+    # Create a new BotIntegration with WhatsApp as the platform
+    user = AppUser.objects.create(is_anonymous=False)
+    bot_integration = BotIntegration.objects.create(
+        name="FB dev app test",
+        created_by=user,
+        workspace=Workspace.objects.create(
+            name="myteam",
+            created_by=user,
+            is_personal=True,
+        ),
+        saved_run=None,
+        user_language="en",
+        show_feedback_buttons=True,
+        platform=Platform.WHATSAPP,
+        wa_phone_number="+1 (555) 017-9180",
+        wa_phone_number_id="my_whatsapp_number_id",
+    )
+    bot_integration.full_clean()
