@@ -37,6 +37,10 @@ member = '<i class="fa-solid fa-user"></i>'
 chevron_right = '<i class="fa-sharp-duotone fa-solid fa-sm fa-chevron-right"></i>'
 check = '<i class="fa-solid fa-check"></i>'
 octopus = '<i class="fa-regular fa-octopus"></i>'
+photo = '<i class="fa-solid fa-image"></i>'
+upload = '<i class="fa-solid fa-upload"></i>'
+sparkles = '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
+stars = '<i class="fa-solid fa-stars"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

@@ -584,7 +584,7 @@ def integration_details_generator(bi: BotIntegration, user: AppUser | None):
             return
 
     gui.button(
-        '<i class="fa-regular fa-sparkles" aria-hidden="true"></i> Improve',
+        f"{icons.sparkles} Improve",
         style=dict(float="right"),
         type="tertiary",
         key="generate_details_btn",
