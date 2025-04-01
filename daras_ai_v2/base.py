@@ -15,6 +15,7 @@ from random import Random
 from time import sleep
 
 import gooey_gui as gui
+from daras_ai_v2.functional import flatten
 import sentry_sdk
 from django.db.models import Q, Sum
 from django.utils.text import slugify
@@ -42,7 +43,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_route_path, request_body
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -399,13 +400,30 @@ class BasePage:
                 self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs():
-            self._render_title(tbreadcrumbs.h1_title)
+            if self.tab == RecipeTabs.run:
+                with gui.div(
+                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                ):
+                    gui.image(
+                        src=pr.photo_url,
+                        style=dict(
+                            width="150px",
+                            height="150px",
+                            margin=0,
+                            minHeight="150px",
+                            objectFit="cover",
+                        ),
+                    )
+                    with gui.div():
+                        self._render_title(tbreadcrumbs.h1_title)
+                        if pr and pr.notes and self.tab is RecipeTabs.run:
+                            gui.write(pr.notes, line_clamp=2)
+            else:
+                self._render_title(tbreadcrumbs.h1_title)
 
         if self.tab != RecipeTabs.run:
             return
-        if pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
-        elif is_root_example and self.tab != RecipeTabs.integrations:
+        if is_root_example and self.tab != RecipeTabs.integrations:
             gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
 
     def _render_author_as_breadcrumb(self, *, is_example: bool, is_root_example: bool):
@@ -661,30 +679,37 @@ class BasePage:
             else:
                 title = self._get_default_pr_title()
                 notes = ""
-            gui.write("Title", className="fs-5 container-margin-reset")
-            published_run_title = gui.text_input(
-                "",
-                key="published_run_title",
-                value=title,
-                className="mt-1",
-            )
-            gui.write("Description", className="fs-5 container-margin-reset")
-            published_run_description = gui.text_area(
-                "",
-                key="published_run_description",
-                value=notes,
-                placeholder="An excellent but one line description",
-                className="mt-1",
-            )
-            with gui.div(className="d-flex align-items-center gap-2"):
-                gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
-                with gui.div(className="flex-grow-1"):
-                    change_notes = gui.text_input(
-                        "",
-                        key="published_run_change_notes",
-                        placeholder="Add change notes",
-                    )
 
+            with gui.div(className="d-flex flex-md-row flex-column gap-3"):
+                with gui.div(className="flex-grow-1"):
+                    gui.write("Title", className="fs-5 container-margin-reset")
+                    published_run_title = gui.text_input(
+                        "",
+                        key="published_run_title",
+                        value=title,
+                        className="mt-1",
+                    )
+                    gui.write("Description", className="fs-5 container-margin-reset")
+                    published_run_description = gui.text_area(
+                        "",
+                        key="published_run_description",
+                        value=notes,
+                        placeholder="An excellent but one line description",
+                        className="mt-1",
+                        rows=5,
+                    )
+                # mobile only
+                with gui.div(
+                    className="d-flex d-md-none mb-3 align-items-center gap-2"
+                ):
+                    change_notes = _render_change_notes_input(
+                        "published_run_change_notes"
+                    )
+                self._render_workflow_photo_uploader(pr)
+
+            # desktop only
+            with gui.div(className="align-items-center gap-2 d-none d-md-flex"):
+                change_notes = _render_change_notes_input("published_run_change_notes")
         self._render_admin_options(sr, pr)
 
         # add friction for saving root workflows
@@ -738,6 +763,7 @@ class BasePage:
                 workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
+                photo_url=gui.session_state.get("photo_url", ""),
             )
         else:
             if not WorkflowAccessLevel.can_user_edit_published_run(
@@ -751,6 +777,7 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
+                photo_url=gui.session_state.get("photo_url", ""),
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -759,6 +786,104 @@ class BasePage:
                 user=self.request.user, change_notes=change_notes.strip(), **updates
             )
         raise gui.RedirectException(pr.get_app_url())
+
+    def _render_workflow_photo_uploader(self, pr: PublishedRun):
+        _GENERATING_IMAGE_STATE = "_generating_workflow_image"
+        _UPLOADING_IMAGE_STATE = "_is_uploading_photo"
+        _IS_GENERATING_WORKFLOW_IMAGE = gui.session_state.get(_GENERATING_IMAGE_STATE)
+
+        # image generation workflow
+        if _IS_GENERATING_WORKFLOW_IMAGE:
+            success = gui.run_in_thread(
+                _generate_worflow_image,
+                args=[
+                    gui.session_state.get("published_run_description"),
+                    self.current_workspace,
+                    self.request.user,
+                ],
+                placeholder="",
+                cache=True,
+            )
+            if success:
+                gui.session_state["photo_url"] = success
+                gui.session_state.pop(_GENERATING_IMAGE_STATE, None)
+                gui.rerun()
+
+        def _get_uploaded_workflow_photo() -> str | None:
+            if pr.photo_url:
+                gui.session_state["photo_url"] = pr.photo_url
+            return gui.session_state.get("photo_url", None)
+
+        photo_url = _get_uploaded_workflow_photo()
+        show_default = not photo_url and not _IS_GENERATING_WORKFLOW_IMAGE
+        with gui.div(
+            className="d-flex gap-2 flex-row flex-md-column justify-content-between align-items-center"
+        ):
+            with _workflow_photo_div(photo_url):
+                if show_default:
+                    gui.write(
+                        f"# {icons.photo}",
+                        className="text-muted",
+                        unsafe_allow_html=True,
+                    )
+                if _IS_GENERATING_WORKFLOW_IMAGE:
+                    with gui.styled(
+                        """
+                                &.generating_workflow_photo_spinner i {
+                                    animation: spin 1s ease-in-out infinite;
+                                }
+                                @keyframes spin {
+                                    0% { transform: rotate(0deg); }
+                                    100% { transform: rotate(360deg); }
+                                }
+                            """
+                    ):
+                        gui.write(
+                            f"## {icons.stars}",
+                            className="text-muted generating_workflow_photo_spinner",
+                            unsafe_allow_html=True,
+                        )
+
+                if gui.session_state.get(_UPLOADING_IMAGE_STATE):
+                    ref = gui.use_alert_dialog(key="publish-modal")
+                    with gui.alert_dialog(
+                        ref=ref,
+                        modal_title=f"### Upload Workflow Image",
+                    ):
+                        photo_url = gui.file_uploader(
+                            "", accept=["image/*"], key="photo_url"
+                        )
+                    gui.session_state.pop(_UPLOADING_IMAGE_STATE, None)
+
+            with gui.div(
+                className="d-flex align-items-center justify-content-center gap-2 flex-column flex-md-row"
+            ):
+                if show_default:
+                    if gui.button(f"{icons.upload} Upload", type="tertiary"):
+                        gui.session_state[_UPLOADING_IMAGE_STATE] = True
+                        gui.rerun()
+
+                    if gui.button(
+                        f"{icons.sparkles} Generate",
+                        type="tertiary",
+                    ):
+                        gui.session_state[_GENERATING_IMAGE_STATE] = True
+                        gui.rerun()
+
+                if photo_url and gui.button(f"{icons.clear} Clear", type="tertiary"):
+                    if pr.photo_url:
+                        pr.photo_url = ""
+                        pr.save(update_fields=["photo_url"])
+                    photo_url = ""
+                    gui.session_state.pop("photo_url", None)
+                    gui.rerun()
+
+                if _IS_GENERATING_WORKFLOW_IMAGE:
+                    gui.button(
+                        f"{icons.sparkles} Generating...",
+                        type="tertiary",
+                        disabled=True,
+                    )
 
     def _get_workspace_options(self) -> dict[int, Workspace]:
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
@@ -827,11 +952,13 @@ class BasePage:
         saved_run: SavedRun,
         title: str,
         notes: str,
+        photo_url: str,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
+            or published_run.photo_url != photo_url
         )
 
     def _has_request_changed(self) -> bool:
@@ -2383,6 +2510,79 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
+
+
+def _workflow_photo_div(url: str | None, **props):
+    style = {
+        "width": "250px",
+        "height": "250px",
+        "backgroundImage": f"url({url})" if url else "none",
+        "backgroundSize": "cover",
+        "backgroundPosition": "center",
+    }
+    className = ("d-flex align-items-center justify-content-center p-5 bg-light b-1",)
+    style |= props.pop("style", {})
+    return gui.div(style=style, className=className)
+
+
+def _generate_worflow_image(
+    published_run_description: str,
+    current_workspace: Workspace,
+    current_user: AppUser,
+):
+    from recipes.CompareLLM import CompareLLMPage
+    from recipes.CompareText2Img import CompareText2ImgPage
+
+    # Generate a prompt to be used in image generation
+    llm_photo_prompt_pr = CompareLLMPage.get_pr_from_example_id(
+        example_id=settings.WORKFLOW_ICON_PROMPT_GENERATOR_EXAMPLE_ID
+    )
+    variables = llm_photo_prompt_pr.saved_run.state.get("variables") or {}
+    variables |= dict(prompt=published_run_description)
+
+    result, prompt_gen_sr = llm_photo_prompt_pr.submit_api_call(
+        workspace=current_workspace,
+        current_user=current_user,
+        request_body=dict(variables=variables),
+        deduct_credits=False,
+    )
+    prompt_gen_sr.wait_for_celery_result(result)
+    # if failed, show error and abort
+    if prompt_gen_sr.error_msg:
+        gui.error(f"Error generating image: {image_gen_sr.error_msg}")
+
+    image_gen_prompt = ""
+    for text in flatten(prompt_gen_sr.state["output_text"].values()):
+        image_gen_prompt = text
+
+    # Generate the image using the prompt
+    text2img_pr = CompareText2ImgPage.get_pr_from_example_id(
+        example_id=settings.WORKFLOW_ICON_IMAGE_GENERATOR_EXAMPLE_ID
+    )
+    request_body = dict(text_prompt=image_gen_prompt)
+    result, image_gen_sr = text2img_pr.submit_api_call(
+        workspace=current_user,
+        current_user=current_user,
+        request_body=request_body,
+        deduct_credits=False,
+    )
+    image_gen_sr.wait_for_celery_result(result)
+    # if failed, show error and abort
+    if image_gen_sr.error_msg:
+        gui.error(f"Error generating image: {image_gen_sr.error_msg}")
+
+    for photo in flatten(image_gen_sr.state["output_images"].values()):
+        return photo  # Return the first generated image URL
+
+
+def _render_change_notes_input(key: str):
+    gui.html('<i class="fa-light fa-xl fa-money-check-pen"></i>')
+    with gui.div(className="flex-grow-1"):
+        return gui.text_input(
+            "",
+            key=key,
+            placeholder="Add change notes",
+        )
 
 
 class TitleValidationError(Exception):

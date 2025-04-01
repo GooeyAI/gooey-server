@@ -39,6 +39,10 @@ check = '<i class="fa-solid fa-check"></i>'
 octopus = '<i class="fa-regular fa-octopus"></i>'
 eye = '<i class="fa-solid fa-eye"></i>'
 eye_slash = '<i class="fa-solid fa-eye-slash"></i>'
+photo = '<i class="fa-solid fa-image"></i>'
+upload = '<i class="fa-solid fa-upload"></i>'
+sparkles = '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
+stars = '<i class="fa-solid fa-stars"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
