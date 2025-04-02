@@ -223,7 +223,7 @@ def is_queue_not_found(exc: Exception):
     return isinstance(exc, TwilioRestException) and exc.code == 20404
 
 
-@aifail.retry_if(is_queue_not_found, max_retry_delay=1, max_retries=5)
+@aifail.retry_if(is_queue_not_found, max_retry_delay=3, max_retries=5)
 def send_msg_to_queue(
     queue, *, convo_id: int, text: str | None, audio: list[str] | None
 ):
