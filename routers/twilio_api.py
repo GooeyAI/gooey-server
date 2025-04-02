@@ -1,11 +1,13 @@
 import random
 import traceback
+import typing
 from time import sleep
 
-from fastapi import Response
+from fastapi import Response, Query
 from loguru import logger
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
+from starlette.requests import Request
 from twilio.twiml import TwiML
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
@@ -83,7 +85,7 @@ def twilio_voice_call(
         initial_text = DEFAULT_INITIAL_TEXT.format(bot_name=bi.name)
 
     resp = create_voice_call_response(
-        bot, text=initial_text, audio_url=initial_audio_url, should_translate=True
+        bot, text=initial_text, audio=initial_audio_url, should_translate=True
     )
 
     if bi.twilio_use_missed_call:
@@ -103,19 +105,22 @@ def callback_after_missed_call(*, bot: TwilioVoice, resp: VoiceResponse):
 @router.post("/__/twilio/voice/response/")
 def twilio_voice_call_response(
     background_tasks: BackgroundTasks,
-    convo_id: str,
-    text: str = None,
-    audio_url: str = None,
+    request: Request,
+    convo_id: int,
     data: dict = fastapi_request_urlencoded_body,
 ):
     """Response is ready, user has been dequeued, send the response and ask for the next one."""
     logger.debug(data)
     try:
-        convo = Conversation.objects.get(id=int(convo_id))
+        convo = Conversation.objects.get(id=convo_id)
     except Conversation.DoesNotExist:
         return Response(status_code=404)
     bot = TwilioVoice(convo=convo)
-    resp = create_voice_call_response(bot, text=text, audio_url=audio_url)
+    resp = create_voice_call_response(
+        bot,
+        text=request.query_params.get("text"),
+        audio=request.query_params.getlist("audio"),
+    )
     background_tasks.add_task(delete_queue, bi=bot.bi, queue_sid=data["QueueSid"][0])
     return twiml_response(resp)
 
@@ -125,8 +130,14 @@ def delete_queue(bi: BotIntegration, queue_sid: str):
 
 
 def create_voice_call_response(
-    bot: TwilioVoice, *, text: str, audio_url: str, should_translate: bool = False
+    bot: TwilioVoice,
+    *,
+    text: str | None,
+    audio: str | list[str] | None,
+    should_translate: bool = False,
 ) -> VoiceResponse:
+    if audio and isinstance(audio, str):
+        audio = [audio]
     resp = VoiceResponse()
 
     # the URL to send the user's question to
@@ -147,16 +158,18 @@ def create_voice_call_response(
         )
 
         # by attaching to gather, we allow the user to interrupt with the next question while the response is playing
-        if audio_url:
-            gather.play(audio_url)
+        if audio:
+            for url in audio:
+                gather.play(url)
         elif text:
             resp_say_or_tts_play(bot, gather, text, should_translate=should_translate)
 
         resp.append(gather)
     else:
         # record does not support nesting, so we can't support interrupting the response with the next question
-        if audio_url:
-            resp.play(audio_url)
+        if audio:
+            for url in audio:
+                resp.play(url)
         elif text:
             resp_say_or_tts_play(bot, resp, text, should_translate=should_translate)
 

@@ -48,18 +48,18 @@ class TwilioSMS(BotInterface):
         self,
         *,
         text: str | None = None,
-        audio: str | None = None,
-        video: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
         assert not buttons, "Interactive mode is not implemented yet"
-        assert not update_msg_id, "Twilio does not support un-sms-ing things"
+        media = audio or video or documents
         return send_sms_message(
             self.convo,
             text=text,
-            media_url=audio or video or (documents[0] if documents else None),
+            media_url=media and media[0] or None,
         ).sid
 
     def mark_read(self):
@@ -184,8 +184,8 @@ class TwilioVoice(BotInterface):
         self,
         *,
         text: str | None = None,
-        audio: str | None = None,
-        video: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
@@ -194,7 +194,6 @@ class TwilioVoice(BotInterface):
         assert not documents, "Twilio does not support sending documents via Voice"
         assert not video, "Twilio does not support sending videos via Voice"
         assert not buttons, "Interactive mode is not implemented yet"
-        assert not update_msg_id, "Twilio does not support un-saying things"
 
         try:
             return send_msg_to_queue(
@@ -225,14 +224,16 @@ def is_queue_not_found(exc: Exception):
 
 
 @aifail.retry_if(is_queue_not_found, max_retry_delay=1, max_retries=5)
-def send_msg_to_queue(queue, *, convo_id: int, text: str | None, audio: str | None):
+def send_msg_to_queue(
+    queue, *, convo_id: int, text: str | None, audio: list[str] | None
+):
     from routers.twilio_api import twilio_voice_call_response
 
     return queue.members("Front").update(
         url=get_api_route_url(
             twilio_voice_call_response,
-            query_params=dict(convo_id=convo_id, text=text, audio_url=audio),
-        ),
+            query_params=dict(convo_id=convo_id, text=text, audio=audio),
+        )
     )
 
 

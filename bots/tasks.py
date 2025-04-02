@@ -184,8 +184,8 @@ def send_broadcast_msg(
             case Platform.WHATSAPP:
                 msg_id = WhatsappBot.send_msg_to(
                     text=text,
-                    audio=audio,
-                    video=video,
+                    audio=audio and [audio],
+                    video=video and [video],
                     buttons=buttons,
                     documents=documents,
                     bot_number=bi.wa_phone_number_id,
@@ -195,8 +195,8 @@ def send_broadcast_msg(
             case Platform.SLACK:
                 msg_id = SlackBot.send_msg_to(
                     text=text,
-                    audio=audio,
-                    video=video,
+                    audio=audio and [audio],
+                    video=video and [video],
                     buttons=buttons,
                     documents=documents,
                     channel=convo.slack_channel_id,

@@ -147,11 +147,11 @@ class BotInterface:
         self,
         *,
         text: str | None = None,
-        audio: str = None,
-        video: str = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         send_feedback_buttons: bool = False,
-        documents: list[str] = None,
-        update_msg_id: str = None,
+        documents: list[str] | None = None,
+        update_msg_id: str | None = None,
         should_translate: bool = False,
     ) -> str | None:
         """
@@ -201,11 +201,11 @@ class BotInterface:
         self,
         *,
         text: str | None = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
-        update_msg_id: str = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
+        update_msg_id: str | None = None,
     ) -> str | None:
         raise NotImplementedError
 
@@ -515,8 +515,8 @@ def _process_and_send_msg(
         return
 
     text = state.get("output_text") and state.get("output_text")[0]
-    audio = state.get("output_audio") and state.get("output_audio")[0]
-    video = state.get("output_video") and state.get("output_video")[0]
+    audio = state.get("output_audio")
+    video = state.get("output_video")
     documents = state.get("output_documents")
     # check for empty response
     if not (text or audio or video or documents or send_feedback_buttons):
@@ -535,13 +535,6 @@ def _process_and_send_msg(
             send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
-        # in case there are multiple outputs, send the remaining ones
-        if audio:
-            for a in state["output_audio"][1:]:
-                bot.send_msg(audio=a)
-        if video:
-            for v in state["output_video"][1:]:
-                bot.send_msg(video=v)
 
     # save msgs to db
     _save_msgs(
