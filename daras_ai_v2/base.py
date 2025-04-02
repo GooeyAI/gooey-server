@@ -791,10 +791,11 @@ class BasePage:
         _GENERATING_IMAGE_STATE = "_generating_workflow_image"
         _UPLOADING_IMAGE_STATE = "_is_uploading_photo"
         _IS_GENERATING_WORKFLOW_IMAGE = gui.session_state.get(_GENERATING_IMAGE_STATE)
+        _IS_GENERATION_ERROR = gui.session_state.get("workflow_image_generation_error")
 
         # image generation workflow
         if _IS_GENERATING_WORKFLOW_IMAGE:
-            success = gui.run_in_thread(
+            result = gui.run_in_thread(
                 _generate_worflow_image,
                 args=[
                     gui.session_state.get("published_run_description"),
@@ -802,11 +803,13 @@ class BasePage:
                     self.request.user,
                 ],
                 placeholder="",
-                cache=True,
             )
-            if success:
-                gui.session_state["photo_url"] = success
+            if result:
                 gui.session_state.pop(_GENERATING_IMAGE_STATE, None)
+                if result.startswith("ERROR"):
+                    gui.session_state["workflow_image_generation_error"] = result[6:]
+                else:
+                    gui.session_state["photo_url"] = result
                 gui.rerun()
 
         def _get_uploaded_workflow_photo() -> str | None:
@@ -816,6 +819,16 @@ class BasePage:
 
         photo_url = _get_uploaded_workflow_photo()
         show_default = not photo_url and not _IS_GENERATING_WORKFLOW_IMAGE
+        if _IS_GENERATION_ERROR:
+            gui.session_state.pop("workflow_image_generation_error", None)
+            error_dialog_ref = gui.use_alert_dialog(key="generation-error-modal")
+            with gui.alert_dialog(
+                ref=error_dialog_ref,
+                modal_title="### Error",
+            ):
+                with gui.tag("code"):
+                    gui.write(_IS_GENERATION_ERROR, className="text-danger")
+                gui.write("Please try again or upload a photo manually.")
         with gui.div(
             className="d-flex gap-2 flex-row flex-md-column justify-content-between align-items-center"
         ):
@@ -829,14 +842,14 @@ class BasePage:
                 if _IS_GENERATING_WORKFLOW_IMAGE:
                     with gui.styled(
                         """
-                                &.generating_workflow_photo_spinner i {
-                                    animation: spin 1s ease-in-out infinite;
-                                }
-                                @keyframes spin {
-                                    0% { transform: rotate(0deg); }
-                                    100% { transform: rotate(360deg); }
-                                }
-                            """
+                            &.generating_workflow_photo_spinner i {
+                                animation: spin 0.7s ease-in-out infinite;
+                            }
+                            @keyframes spin {
+                                0% { transform: rotate(0deg); }
+                                100% { transform: rotate(360deg); }
+                            }
+                        """
                     ):
                         gui.write(
                             f"## {icons.stars}",
@@ -845,7 +858,7 @@ class BasePage:
                         )
 
                 if gui.session_state.get(_UPLOADING_IMAGE_STATE):
-                    ref = gui.use_alert_dialog(key="publish-modal")
+                    ref = gui.use_alert_dialog(key="image-upload-modal")
                     with gui.alert_dialog(
                         ref=ref,
                         modal_title=f"### Upload Workflow Image",
@@ -2549,7 +2562,7 @@ def _generate_worflow_image(
     prompt_gen_sr.wait_for_celery_result(result)
     # if failed, show error and abort
     if prompt_gen_sr.error_msg:
-        gui.error(f"Error generating image: {image_gen_sr.error_msg}")
+        return f"ERROR,{prompt_gen_sr.error_msg}"
 
     image_gen_prompt = ""
     for text in flatten(prompt_gen_sr.state["output_text"].values()):
@@ -2561,7 +2574,7 @@ def _generate_worflow_image(
     )
     request_body = dict(text_prompt=image_gen_prompt)
     result, image_gen_sr = text2img_pr.submit_api_call(
-        workspace=current_user,
+        workspace=current_workspace,
         current_user=current_user,
         request_body=request_body,
         deduct_credits=False,
@@ -2569,7 +2582,7 @@ def _generate_worflow_image(
     image_gen_sr.wait_for_celery_result(result)
     # if failed, show error and abort
     if image_gen_sr.error_msg:
-        gui.error(f"Error generating image: {image_gen_sr.error_msg}")
+        return f"ERROR,{image_gen_sr.error_msg}"
 
     for photo in flatten(image_gen_sr.state["output_images"].values()):
         return photo  # Return the first generated image URL
