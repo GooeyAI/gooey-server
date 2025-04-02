@@ -1268,16 +1268,7 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    try:
-        raise_for_status(r, is_user_url=True)
-    except requests.HTTPError:
-        # wait 3 seconds and try again (handles cases where the url has just been uploaded but cache is not updated yet, e.g. for Twilio)
-        from time import sleep
-
-        sleep(3)
-        r = requests.get(audio_url)
-        raise_for_status(r, is_user_url=True)
-
+    raise_for_status(r, is_user_url=True)
     audio_bytes = r.content
     wavdata, size = audio_bytes_to_wav(audio_bytes)
     if wavdata is audio_bytes:  # no change, don't re-upload

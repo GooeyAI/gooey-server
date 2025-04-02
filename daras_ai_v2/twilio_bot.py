@@ -1,7 +1,9 @@
 import uuid
 from functools import cached_property
+from time import sleep
 
 import aifail
+import requests
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
@@ -165,6 +167,8 @@ class TwilioVoice(BotInterface):
         elif audio_url:
             self.input_type = "audio"
             self._audio_url = audio_url
+            if requests.head(audio_url).status_code == 404:
+                sleep(1)  # wait for the recording to be available
         else:
             self.input_type = "interactive"
 
