@@ -52,8 +52,8 @@ class TwilioSMS(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        assert buttons is None, "Interactive mode is not implemented yet"
-        assert update_msg_id is None, "Twilio does not support un-sms-ing things"
+        assert not buttons, "Interactive mode is not implemented yet"
+        assert not update_msg_id, "Twilio does not support un-sms-ing things"
         return send_sms_message(
             self.convo,
             text=text,
@@ -187,10 +187,10 @@ class TwilioVoice(BotInterface):
         update_msg_id: str | None = None,
     ) -> str | None:
 
-        assert documents is None, "Twilio does not support sending documents via Voice"
-        assert video is None, "Twilio does not support sending videos via Voice"
-        assert buttons is None, "Interactive mode is not implemented yet"
-        assert update_msg_id is None, "Twilio does not support un-saying things"
+        assert not documents, "Twilio does not support sending documents via Voice"
+        assert not video, "Twilio does not support sending videos via Voice"
+        assert not buttons, "Interactive mode is not implemented yet"
+        assert not update_msg_id, "Twilio does not support un-saying things"
 
         try:
             return send_msg_to_queue(
