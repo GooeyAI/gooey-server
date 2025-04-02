@@ -623,7 +623,7 @@ def create_file_block(
         parse_slack_response(res)
         yield {
             "type": "file",
-            "external_id": urls,
+            "external_id": url,
             "source": "remote",
         }
 
