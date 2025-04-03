@@ -17,6 +17,7 @@ from payments.plans import PricingPlan
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
+    from phonenumber_field.phonenumber import PhoneNumber
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -164,7 +165,7 @@ class AppUser(models.Model):
         elif self.email:
             name = self.email.split("@")[0]
         elif self.phone_number:
-            name = str(self.phone_number)
+            name = obscure_phone_number(self.phone_number)
         else:
             return fallback
         if current_user and self == current_user:
@@ -391,3 +392,20 @@ class AppUserTransaction(models.Model):
 def get_placeholder_profile_image(seed: str) -> str:
     hash = hashlib.md5(seed.encode()).hexdigest()
     return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
+
+
+def obscure_phone_number(phone_number: "PhoneNumber") -> str:
+    """
+    Obscure the phone number by replacing the middle digits with asterisks.
+    """
+    country_code = phone_number.country_code
+    national_number = str(phone_number.national_number)
+
+    return "".join(
+        [
+            (country_code and f"+{country_code}" or ""),
+            national_number[:3],
+            "*" * len(national_number[3:-3]),
+            national_number[-3:],
+        ]
+    )

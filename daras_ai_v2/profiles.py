@@ -9,7 +9,7 @@ from django.utils.translation import ngettext
 from fastapi import Request
 from furl import furl
 
-from app_users.models import AppUser
+from app_users.models import AppUser, obscure_phone_number
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
@@ -373,17 +373,18 @@ def _edit_user_profile_header(workspace: Workspace):
                 )
 
         if handle:
-            copy_to_clipboard_button(
-                f"{icons.copy_solid} Copy",
-                value=handle.get_app_url(),
-                type="tertiary",
-                className="m-0",
-            )
-            with gui.link(
-                to=handle.get_app_url(),
-                className="btn btn-theme btn-tertiary m-0",
-            ):
-                gui.html(f"{icons.preview} Preview")
+            render_profile_link_buttons(handle)
+
+
+def render_profile_link_buttons(handle: Handle):
+    copy_to_clipboard_button(
+        f"{icons.copy_solid} Copy",
+        value=handle.get_app_url(),
+        type="tertiary",
+        className="m-0",
+    )
+    with gui.link(to=handle.get_app_url(), className="btn btn-theme btn-tertiary m-0"):
+        gui.html(f"{icons.preview} Preview")
 
 
 def _banner_image_div(url: str | None, **props):
@@ -684,7 +685,7 @@ def get_profile_title(workspace: Workspace) -> str:
     elif user.email:
         return user.email.split("@")[0]
     elif user.phone_number:
-        return user.phone_number.as_e164[:-4] + "XXXX"
+        return obscure_phone_number(user.phone_number)
     else:
         return ""
 

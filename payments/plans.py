@@ -148,7 +148,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Public Workflows</li>
               <li>One public workspace (up to 5 members)</li>
               <li>Run all frontier models</li>
-              <li>Explore, fork & run any public workflow</li>
+              <li><a href="/explore">Explore, fork & run</a> any public workflow</li>
               <li>Best in class RAG & agentic flows</li>
               <li>Run any code via <a href="/functions/" target="_blank">functions</a></li>
               <li>Test and deploy via <a href="/copilot/" target="_blank">Copilot</a> Web Widget</li>
