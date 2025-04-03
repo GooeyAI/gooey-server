@@ -9,10 +9,14 @@ from django.db.models import F
 from django.utils.translation import ngettext
 
 from app_users.models import AppUser
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
-from daras_ai_v2.profiles import render_handle_input, update_handle
+from daras_ai_v2.profiles import (
+    render_handle_input,
+    render_profile_link_buttons,
+    update_handle,
+)
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
@@ -174,9 +178,9 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
     workspace = membership.workspace
 
-    with gui.div(className="d-block d-sm-flex justify-content-between"):
+    with gui.div(className="mt-3 d-block d-sm-flex justify-content-between"):
         col1 = gui.div(
-            className="d-block d-md-flex text-center text-sm-start align-items-center"
+            className="d-block d-md-flex text-center text-sm-start align-items-start"
         )
         col2 = gui.div()
 
@@ -186,35 +190,51 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
             className="my-0 me-4 rounded",
             style={"width": "128px", "height": "128px", "object-fit": "contain"},
         )
-        with gui.div(className="d-flex flex-column justify-content-end"):
+        with gui.div(className="d-flex flex-column justify-content-start"):
             plan = (
                 workspace.subscription
                 and PricingPlan.from_sub(workspace.subscription)
                 or PricingPlan.STARTER
             )
 
-            with gui.tag("h1", className="mb-0" if workspace.domain_name else ""):
+            with gui.tag("h1", className="my-0"):
                 gui.html(html_lib.escape(workspace.display_name(membership.user)))
             if workspace.domain_name:
-                gui.caption(f"Domain: `@{workspace.domain_name}`")
-
-            billing_info = f"""
-                <span class="text-muted">Credits:</span> {workspace.balance}
-                <span class="text-muted">Plan:</span> {plan.title}
-            """.strip()
-            if membership.can_edit_workspace() and plan in (
-                PricingPlan.STARTER,
-                PricingPlan.CREATOR,
-            ):
-                billing_info += (
-                    f'<span className="ms-4 text-primary text-decoration-none">'
-                    f"[Upgrade]({get_route_path(account_route)})"
-                    f"</span>"
+                gui.write(
+                    f"Domain: `@{workspace.domain_name}`",
+                    className="container-margin-reset text-muted",
                 )
-            gui.write(billing_info, unsafe_allow_html=True)
+
+            if workspace.description:
+                gui.write(workspace.description, className="container-margin-reset")
+
+            with gui.div(className="mt-2"):
+                if workspace.handle:
+                    with gui.div(className="d-flex align-items-baseline gap-3"):
+                        pretty_handle_url = urls.remove_scheme(
+                            workspace.handle.get_app_url().rstrip("/")
+                        )
+                        gui.write(pretty_handle_url, className="container-margin-reset")
+                        render_profile_link_buttons(workspace.handle)
+
+                with gui.div(className="d-flex gap-3"):
+                    gui.html(
+                        f'<div><span class="text-muted">Credits:</span> {workspace.balance}</div>'
+                    )
+                    gui.html(
+                        f'<div><span class="text-muted">Plan:</span> {plan.title}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if membership.can_edit_workspace() and plan in (
+                        PricingPlan.STARTER,
+                        PricingPlan.CREATOR,
+                    ):
+                        gui.html(
+                            f'<a class="link-primary" href="{get_route_path(account_route)}">Upgrade</a>'
+                        )
 
     if membership.can_edit_workspace():
-        with col2, gui.div(className="mt-2 text-center"):
+        with col2, gui.div(className="text-center"):
             edit_workspace_button_with_dialog(membership)
 
     gui.newline()

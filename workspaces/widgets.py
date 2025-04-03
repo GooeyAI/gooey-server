@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 
-from app_users.models import AppUser
+from app_users.models import AppUser, obscure_phone_number
 from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS, Handle
@@ -152,7 +152,11 @@ def global_workspace_selector(user: AppUser, session: dict):
                         className="d-inline-block",
                     )
                     gui.html(
-                        str(user.email or user.phone_number),
+                        user.email
+                        or str(
+                            user.phone_number
+                            and obscure_phone_number(user.phone_number)
+                        ),
                         className="d-inline-block text-muted small ms-2",
                         style=dict(marginBottom="0.1rem"),
                     )
