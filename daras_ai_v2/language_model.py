@@ -754,7 +754,7 @@ def calc_gpt_tokens(
 
 
 class ConversationEntry(typing_extensions.TypedDict, total=False):
-    role: typing.Literal["user", "system", "assistant", "tool"]
+    role: typing.Literal["user", "system", "assistant", "tool", "developer"]
     content: str | list[ChatCompletionContentPartParam]
 
     tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
