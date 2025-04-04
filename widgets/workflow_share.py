@@ -1,7 +1,7 @@
 import gooey_gui as gui
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunPermission, SavedRun
+from bots.models import PublishedRun, WorkflowAccessLevel, SavedRun
 from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
@@ -83,8 +83,8 @@ def render_share_modal(
                 saved_run=pr.saved_run,
                 title=pr.title,
                 notes=pr.notes,
-                visibility=updates.get("visibility"),
-                team_permission=updates.get("team_permission"),
+                public_access=updates.get("public_access"),
+                workspace_access=updates.get("workspace_access"),
                 change_notes="Share settings updated",
             )
 
@@ -117,7 +117,7 @@ def render_share_modal(
                 if publish_dialog_ref.is_open:
                     return
         elif (
-            pr.visibility == PublishedRunPermission.CAN_FIND
+            pr.public_access == WorkflowAccessLevel.FIND_AND_VIEW
             and not pr.workspace.is_personal
             and not pr.workspace.can_have_private_published_runs()
             and user in pr.workspace.get_admins()
@@ -145,13 +145,13 @@ def render_share_modal(
 def render_share_options_for_team_workspace(
     user: AppUser,
     pr: PublishedRun,
-) -> dict[str, PublishedRunPermission]:
+) -> dict[str, WorkflowAccessLevel]:
     with gui.div(className="mb-4"):
         render_workspace_with_invite_button(pr.workspace, user.id)
 
     # we check for same privilege level for "sharing" as "deletion"
     # because share-settings can be used to hide the published run
-    can_user_edit = PublishedRunPermission.can_user_delete_published_run(
+    can_user_edit = WorkflowAccessLevel.can_user_delete_published_run(
         workspace=pr.workspace,
         user=user,
         pr=pr,
@@ -160,20 +160,18 @@ def render_share_options_for_team_workspace(
     updates = {}
     options = {
         str(perm.value): perm.get_team_sharing_text(pr, current_user=user)
-        for perm in PublishedRunPermission.get_team_sharing_options(
-            pr, current_user=user
-        )
+        for perm in WorkflowAccessLevel.get_team_sharing_options(pr, current_user=user)
     }
 
     with gui.div(className="mb-4"):
-        updates["team_permission"] = PublishedRunPermission(
+        updates["workspace_access"] = WorkflowAccessLevel(
             int(
                 gui.radio(
                     "",
                     options=options,
                     format_func=options.__getitem__,
                     key="published-run-team-permission",
-                    value=str(pr.team_permission),
+                    value=str(pr.workspace_access),
                     disabled=not can_user_edit,
                 )
             )
@@ -181,17 +179,17 @@ def render_share_options_for_team_workspace(
 
     if can_user_edit and pr.workspace.can_have_private_published_runs():
         is_public = gui.checkbox(
-            label=PublishedRunPermission.CAN_FIND.get_public_sharing_text(pr),
-            value=(pr.visibility == PublishedRunPermission.CAN_FIND.value),
-            disabled=(updates["team_permission"] == PublishedRunPermission.CAN_VIEW),
+            label=WorkflowAccessLevel.FIND_AND_VIEW.get_public_sharing_text(pr),
+            value=(pr.public_access == WorkflowAccessLevel.FIND_AND_VIEW.value),
+            disabled=(updates["workspace_access"] == WorkflowAccessLevel.VIEW_ONLY),
         )
-        if is_public and updates["team_permission"] != PublishedRunPermission.CAN_VIEW:
-            updates["visibility"] = PublishedRunPermission.CAN_FIND
+        if is_public and updates["workspace_access"] != WorkflowAccessLevel.VIEW_ONLY:
+            updates["public_access"] = WorkflowAccessLevel.FIND_AND_VIEW
         else:
-            updates["visibility"] = PublishedRunPermission.CAN_VIEW
-    elif pr.visibility == PublishedRunPermission.CAN_FIND:
+            updates["public_access"] = WorkflowAccessLevel.VIEW_ONLY
+    elif pr.public_access == WorkflowAccessLevel.FIND_AND_VIEW:
         gui.write(
-            PublishedRunPermission.CAN_FIND.get_public_sharing_text(pr=pr),
+            WorkflowAccessLevel.FIND_AND_VIEW.get_public_sharing_text(pr=pr),
             unsafe_allow_html=True,
         )
 
@@ -229,22 +227,22 @@ def render_workspace_with_invite_button(workspace: Workspace, user_id: int) -> N
 
 def render_share_options_for_personal_workspace(
     pr: PublishedRun,
-) -> dict[str, PublishedRunPermission]:
+) -> dict[str, WorkflowAccessLevel]:
     updates = {}
     options = {
         str(perm.value): perm.get_public_sharing_text(pr)
-        for perm in PublishedRunPermission.get_public_sharing_options(pr)
+        for perm in WorkflowAccessLevel.get_public_sharing_options(pr)
     }
 
     with gui.div(className="mb-4"):
-        updates["visibility"] = PublishedRunPermission(
+        updates["public_access"] = WorkflowAccessLevel(
             int(
                 gui.radio(
                     "",
                     options=options,
                     format_func=options.__getitem__,
                     key="published-run-personal-permission",
-                    value=str(pr.visibility),
+                    value=str(pr.public_access),
                 )
             )
         )

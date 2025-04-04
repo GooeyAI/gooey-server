@@ -28,7 +28,7 @@ from starlette.datastructures import URL
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     PublishedRun,
-    PublishedRunPermission,
+    WorkflowAccessLevel,
     PublishedRunVersion,
     RetentionPolicy,
     SavedRun,
@@ -461,7 +461,7 @@ class BasePage:
                 published_run
                 and published_run.saved_run == current_run
                 and self.request.user
-                and PublishedRunPermission.can_user_edit_published_run(
+                and WorkflowAccessLevel.can_user_edit_published_run(
                     workspace=self.current_workspace,
                     user=self.request.user,
                     pr=published_run,
@@ -508,7 +508,7 @@ class BasePage:
             with gui.alert_dialog(ref=ref, modal_title="### Options"):
                 if (
                     self.request.user
-                    and PublishedRunPermission.can_user_edit_published_run(
+                    and WorkflowAccessLevel.can_user_edit_published_run(
                         workspace=self.current_workspace,
                         user=self.request.user,
                         pr=self.current_pr,
@@ -551,13 +551,10 @@ class BasePage:
 
     def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
         with gui.div(className="d-flex justify-content-end"):
-            if (
-                self.request.user
-                and PublishedRunPermission.can_user_edit_published_run(
-                    workspace=self.current_workspace,
-                    user=self.request.user,
-                    pr=self.current_pr,
-                )
+            if self.request.user and WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=self.current_workspace,
+                user=self.request.user,
+                pr=self.current_pr,
             ):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
@@ -599,7 +596,7 @@ class BasePage:
         sr = self.current_sr
         pr = self.current_pr
 
-        if self.request.user and PublishedRunPermission.can_user_edit_published_run(
+        if self.request.user and WorkflowAccessLevel.can_user_edit_published_run(
             workspace=self.current_workspace,
             user=self.request.user,
             pr=self.current_pr,
@@ -632,7 +629,7 @@ class BasePage:
                 key="published_run_workspace"
             )
 
-            user_can_edit = PublishedRunPermission.can_user_edit_published_run(
+            user_can_edit = WorkflowAccessLevel.can_user_edit_published_run(
                 workspace=selected_workspace,
                 user=self.request.user,
                 pr=pr,
@@ -743,7 +740,7 @@ class BasePage:
                 notes=published_run_description.strip(),
             )
         else:
-            if not PublishedRunPermission.can_user_edit_published_run(
+            if not WorkflowAccessLevel.can_user_edit_published_run(
                 workspace=selected_workspace,
                 user=self.request.user,
                 pr=self.current_pr,
@@ -768,7 +765,7 @@ class BasePage:
         if (
             self.current_pr.workspace_id
             and self.request.user
-            and PublishedRunPermission.can_user_edit_published_run(
+            and WorkflowAccessLevel.can_user_edit_published_run(
                 workspace=self.current_pr.workspace,
                 user=self.request.user,
                 pr=self.current_pr,
@@ -885,7 +882,7 @@ class BasePage:
 
             if (
                 self.request.user
-                and PublishedRunPermission.can_user_delete_published_run(
+                and WorkflowAccessLevel.can_user_delete_published_run(
                     workspace=self.current_workspace,
                     user=self.request.user,
                     pr=self.current_pr,
@@ -1036,7 +1033,7 @@ class BasePage:
                         title=published_run.title,
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
-                        visibility=PublishedRunPermission.CAN_FIND,
+                        public_access=WorkflowAccessLevel.FIND_AND_VIEW,
                         change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
@@ -1394,7 +1391,7 @@ class BasePage:
             workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
-            visibility=PublishedRunPermission.CAN_FIND,
+            public_access=WorkflowAccessLevel.FIND_AND_VIEW,
         )[0]
 
     @classmethod
@@ -1407,7 +1404,7 @@ class BasePage:
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunPermission | None = None,
+        public_access: WorkflowAccessLevel | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1417,7 +1414,7 @@ class BasePage:
             workspace=workspace,
             title=title,
             notes=notes,
-            visibility=visibility,
+            public_access=public_access,
         )
 
     @classmethod
@@ -2007,14 +2004,9 @@ class BasePage:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         else:
             pr_filter &= (
-                Q(
-                    team_permission__in=(
-                        PublishedRunPermission.CAN_FIND,
-                        PublishedRunPermission.CAN_EDIT,
-                    )
-                )
+                ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
                 | Q(created_by=self.request.user)
-                | Q(visibility=PublishedRunPermission.CAN_FIND)
+                | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
             )
         qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
 

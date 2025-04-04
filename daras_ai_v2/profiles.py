@@ -13,7 +13,7 @@ from app_users.models import AppUser, obscure_phone_number
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
-    PublishedRunPermission,
+    WorkflowAccessLevel,
     SavedRun,
     Workflow,
 )
@@ -199,9 +199,11 @@ def _render_user_profile_stats(user: AppUser):
 
 
 def _render_team_profile_stats(workspace: Workspace):
-    public_workflow_count = PublishedRun.objects.filter(
-        workspace=workspace, visibility=PublishedRunPermission.CAN_FIND
-    ).count()
+    public_workflow_count = (
+        PublishedRun.objects.filter(workspace=workspace)
+        .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
+        .count()
+    )
     members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
 
     with gui.div(className="d-flex align-items-center mt-3 text-secondary"):
@@ -247,9 +249,8 @@ def _render_member_photos(workspace: Workspace):
 
 
 def render_public_runs_list(request: Request, workspace: Workspace):
-    qs = PublishedRun.objects.filter(
-        workspace=workspace,
-        visibility=PublishedRunPermission.CAN_FIND,
+    qs = PublishedRun.objects.filter(workspace=workspace).exclude(
+        public_access=WorkflowAccessLevel.VIEW_ONLY
     )
 
     prs, cursor = paginate_queryset(
@@ -296,7 +297,7 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 def get_public_runs_summary(user: AppUser, *, top_n: int = 3) -> PublicRunsSummary:
     count_by_workflow = (
-        user.published_runs.filter(visibility=PublishedRunPermission.CAN_FIND)
+        user.published_runs.exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
         .values("workflow")
         .annotate(count=Count("id"))
         .order_by("-count")

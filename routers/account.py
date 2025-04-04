@@ -10,7 +10,7 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.exceptions import HTTPException
 
-from bots.models import PublishedRun, PublishedRunPermission, Workflow
+from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
@@ -278,14 +278,9 @@ def all_saved_runs_tab(request: Request):
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
     else:
         pr_filter &= (
-            Q(
-                team_permission__in=(
-                    PublishedRunPermission.CAN_FIND,
-                    PublishedRunPermission.CAN_EDIT,
-                )
-            )
+            ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
             | Q(created_by=request.user)
-            | Q(visibility=PublishedRunPermission.CAN_FIND)
+            | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
         )
 
     qs = PublishedRun.objects.select_related(
