@@ -70,6 +70,7 @@ from payments.auto_recharge import (
 )
 from routers.root import RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
+from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_share import (
     render_share_options_for_team_workspace,
@@ -637,7 +638,7 @@ class BasePage:
                     gui.html("&nbsp;" + "this workflow to edit with others")
                     ref = gui.use_alert_dialog(key="publish-modal")
                     if duplicate:
-                        self.clear_publish_form()
+                        clear_publish_form()
                         gui.session_state["published_run_workspace"] = workspaces[-1].id
                         ref.set_open(True)
                     if ref.is_open:
@@ -687,7 +688,7 @@ class BasePage:
                 type="primary",
             ):
                 if self.is_logged_in():
-                    self.clear_publish_form()
+                    clear_publish_form()
                     ref.set_open(True)
                 else:
                     self._publish_for_anonymous_user()
@@ -736,12 +737,6 @@ class BasePage:
             large=True,
         ):
             self._render_publish_form(sr=sr, pr=pr, dialog=ref)
-
-    @staticmethod
-    def clear_publish_form():
-        keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
-        for k in keys:
-            gui.session_state.pop(k, None)
 
     def _render_publish_form(
         self,
