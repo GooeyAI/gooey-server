@@ -72,6 +72,7 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.workflow_share import render_workspace_with_invite_button
 from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
 from workspaces.widgets import (
     get_current_workspace,
@@ -584,7 +585,9 @@ class BasePage:
         self,
     ) -> dict[str, PublishedRunPermission]:
         with gui.div(className="mb-4"):
-            self._render_workspace_with_invite_button(self.current_pr.workspace)
+            render_workspace_with_invite_button(
+                self.current_pr.workspace, self.request.user.id
+            )
 
         # we check for same privilege level for "sharing" as "deletion"
         # because share-settings can be used to hide the published run
@@ -754,26 +757,6 @@ class BasePage:
                 if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
                     dialog.set_open(False)
                     gui.rerun()
-
-    def _render_workspace_with_invite_button(self, workspace: Workspace):
-        from workspaces.views import member_invite_button_with_dialog
-
-        col1, col2 = gui.columns([9, 3], responsive=False)
-        with col1:
-            with gui.tag("p", className="mb-1 text-muted"):
-                gui.html("WORKSPACE")
-            render_author_from_workspace(workspace)
-        with col2:
-            try:
-                membership = workspace.memberships.get(user_id=self.request.user.id)
-            except WorkspaceMembership.DoesNotExist:
-                return
-            member_invite_button_with_dialog(
-                membership,
-                close_on_confirm=False,
-                type="tertiary",
-                className="mb-0",
-            )
 
     def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
