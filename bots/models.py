@@ -51,10 +51,10 @@ class PublishedRunPermission(models.IntegerChoices):
     def get_team_sharing_options(
         cls, pr: "PublishedRun", current_user: "AppUser"
     ) -> typing.List[PublishedRunPermission]:
-        from daras_ai_v2.base import BasePage
-
-        if not BasePage(user=current_user).can_user_delete_published_run(
-            pr, selected_workspace=pr.workspace
+        if not cls.can_user_delete_published_run(
+            workspace=pr.workspace,
+            user=current_user,
+            pr=pr,
         ):
             options = [PublishedRunPermission(pr.team_permission)]
         elif pr.workspace.can_have_private_published_runs():
@@ -120,15 +120,16 @@ class PublishedRunPermission(models.IntegerChoices):
                 raise ValueError("Invalid permission for public sharing")
 
     def get_team_sharing_text(self, pr: "PublishedRun", current_user: "AppUser"):
-        from daras_ai_v2.base import BasePage
         from routers.account import saved_route
 
         match self:
             case PublishedRunPermission.CAN_VIEW:
                 text = ": Only members with a link can view"
             case PublishedRunPermission.CAN_FIND:
-                if BasePage(user=current_user).can_user_delete_published_run(
-                    published_run=pr, selected_workspace=pr.workspace
+                if self.can_user_delete_published_run(
+                    workspace=pr.workspace,
+                    user=current_user,
+                    pr=pr,
                 ):
                     text = f": Members [can find]({get_route_path(saved_route)}) but can't update"
                 else:
@@ -167,6 +168,27 @@ class PublishedRunPermission(models.IntegerChoices):
 
         icon, label = self.get_public_sharing_icon(), self.get_public_sharing_label()
         return f"{icon} **{label}**" + text
+
+    @classmethod
+    def can_user_delete_published_run(
+        cls,
+        *,
+        workspace: Workspace,
+        user: typing.Optional["AppUser"],
+        pr: "PublishedRun",
+    ) -> bool:
+        if pr.is_root():
+            return False
+        if user and user.is_admin():
+            return True
+        return bool(
+            user
+            and workspace.id == pr.workspace_id
+            and (
+                pr.created_by_id == user.id
+                or pr.workspace.get_admins().filter(id=user.id).exists()
+            )
+        )
 
 
 class Platform(models.IntegerChoices):

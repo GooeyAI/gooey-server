@@ -462,24 +462,6 @@ class BasePage:
             )
         )
 
-    def can_user_delete_published_run(
-        self, published_run: PublishedRun, selected_workspace: Workspace | None = None
-    ) -> bool:
-        if published_run.is_root():
-            return False
-
-        selected_workspace = selected_workspace or self.current_workspace
-        if self.is_current_user_admin():
-            return True
-        return bool(
-            self.request.user
-            and selected_workspace.id == published_run.workspace_id
-            and (
-                published_run.created_by_id == self.request.user.id
-                or self.request.user in published_run.workspace.get_admins()
-            )
-        )
-
     def can_user_edit_published_run(
         self, published_run: PublishedRun, selected_workspace: Workspace | None = None
     ) -> bool:
@@ -591,8 +573,10 @@ class BasePage:
 
         # we check for same privilege level for "sharing" as "deletion"
         # because share-settings can be used to hide the published run
-        can_user_edit = self.can_user_delete_published_run(
-            self.current_pr, selected_workspace=self.current_pr.workspace
+        can_user_edit = PublishedRunPermission.can_user_delete_published_run(
+            workspace=self.current_pr.workspace,
+            user=self.request.user,
+            pr=self.current_pr,
         )
 
         updates = {}
@@ -1099,7 +1083,11 @@ class BasePage:
                 )
 
             if (
-                self.can_user_delete_published_run(self.current_pr)
+                PublishedRunPermission.can_user_delete_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                )
                 and not self.current_pr.is_root()
             ):
                 ref = gui.use_confirm_dialog(key="--delete-run-modal")
@@ -2511,7 +2499,7 @@ class BasePage:
 
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:
-        return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
+        return bool(user and user.is_admin())
 
     def is_current_user_paying(self) -> bool:
         try:

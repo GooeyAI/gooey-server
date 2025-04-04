@@ -254,6 +254,9 @@ class AppUser(models.Model):
     def get_photo(self) -> str:
         return self.photo_url or get_placeholder_profile_image(self.uid)
 
+    def is_admin(self) -> bool:
+        return bool(self.email and self.email in settings.ADMIN_EMAILS)
+
 
 class TransactionReason(models.IntegerChoices):
     DEDUCT = 1, "Deduct"
