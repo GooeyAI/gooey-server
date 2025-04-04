@@ -74,6 +74,7 @@ from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_share import (
     render_share_options_for_team_workspace,
+    render_share_options_for_personal_workspace,
 )
 from workspaces.models import Workspace
 from workspaces.widgets import (
@@ -557,31 +558,6 @@ class BasePage:
             className="mb-0 px-2",
         )
 
-    def _render_share_options_for_personal_workspace(
-        self,
-    ) -> dict[str, PublishedRunPermission]:
-        updates = {}
-        options = {
-            str(perm.value): perm.get_public_sharing_text(self.current_pr)
-            for perm in PublishedRunPermission.get_public_sharing_options(
-                self.current_pr
-            )
-        }
-
-        with gui.div(className="mb-4"):
-            updates["visibility"] = PublishedRunPermission(
-                int(
-                    gui.radio(
-                        "",
-                        options=options,
-                        format_func=options.__getitem__,
-                        key="published-run-personal-permission",
-                        value=str(self.current_pr.visibility),
-                    )
-                )
-            )
-        return updates
-
     def _render_share_modal(self, dialog: gui.AlertDialogRef):
         # modal is only valid for logged in users
         assert self.request.user and self.current_workspace
@@ -600,7 +576,9 @@ class BasePage:
                         pr=self.current_pr,
                     )
                 else:
-                    updates = self._render_share_options_for_personal_workspace()
+                    updates = render_share_options_for_personal_workspace(
+                        pr=self.current_pr,
+                    )
 
             changed = any(getattr(self.current_pr, k) != v for k, v in updates.items())
             if changed:

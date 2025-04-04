@@ -90,3 +90,27 @@ def render_share_options_for_team_workspace(
         return updates
     else:
         return {}
+
+
+def render_share_options_for_personal_workspace(
+    pr: PublishedRun,
+) -> dict[str, PublishedRunPermission]:
+    updates = {}
+    options = {
+        str(perm.value): perm.get_public_sharing_text(pr)
+        for perm in PublishedRunPermission.get_public_sharing_options(pr)
+    }
+
+    with gui.div(className="mb-4"):
+        updates["visibility"] = PublishedRunPermission(
+            int(
+                gui.radio(
+                    "",
+                    options=options,
+                    format_func=options.__getitem__,
+                    key="published-run-personal-permission",
+                    value=str(pr.visibility),
+                )
+            )
+        )
+    return updates
