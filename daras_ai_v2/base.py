@@ -73,8 +73,7 @@ from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_share import (
-    render_share_options_for_team_workspace,
-    render_share_options_for_personal_workspace,
+    render_share_modal,
 )
 from workspaces.models import Workspace
 from workspaces.widgets import (
@@ -551,8 +550,13 @@ class BasePage:
                 dialog.set_open(True)
 
             if dialog.is_open:
-                self._render_share_modal(
-                    dialog=dialog, publish_dialog_ref=publish_dialog_ref
+                render_share_modal(
+                    dialog=dialog,
+                    publish_dialog_ref=publish_dialog_ref,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                    current_app_url=self.current_app_url(self.tab),
+                    session=self.request.session,
                 )
         else:
             self._render_copy_link_button()
@@ -564,95 +568,6 @@ class BasePage:
             type="secondary",
             className="mb-0 px-2",
         )
-
-    def _render_share_modal(
-        self, dialog: gui.AlertDialogRef, publish_dialog_ref: gui.AlertDialogRef
-    ):
-        # modal is only valid for logged in users
-        assert self.request.user and self.current_workspace
-
-        from routers.account import account_route
-
-        with gui.alert_dialog(
-            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
-        ):
-            with gui.styled(
-                "& .gui-input-radio { display: flex; align-items: center; }"
-            ):
-                if not self.current_pr.workspace.is_personal:
-                    updates = render_share_options_for_team_workspace(
-                        user=self.request.user,
-                        pr=self.current_pr,
-                    )
-                else:
-                    updates = render_share_options_for_personal_workspace(
-                        pr=self.current_pr,
-                    )
-
-            changed = any(getattr(self.current_pr, k) != v for k, v in updates.items())
-            if changed:
-                self.current_pr.add_version(
-                    user=self.request.user,
-                    saved_run=self.current_pr.saved_run,
-                    title=self.current_pr.title,
-                    notes=self.current_pr.notes,
-                    visibility=updates.get("visibility"),
-                    team_permission=updates.get("team_permission"),
-                    change_notes="Share settings updated",
-                )
-
-            workspace_create_dialog = gui.use_alert_dialog(
-                key="create-workspace-modal--from-share-dialog"
-            )
-            workspaces = self.request.user.cached_workspaces
-            if (
-                self.current_pr.workspace.is_personal and len(workspaces) == 1
-            ) or workspace_create_dialog.is_open:
-                render_alert_to_create_team_workspace(
-                    dialog_ref=workspace_create_dialog,
-                    user=self.request.user,
-                    session=self.request.session,
-                )
-            elif self.current_pr.workspace.is_personal and len(workspaces) > 1:
-                with gui.div(
-                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
-                ):
-                    duplicate = gui.button(
-                        f"{icons.fork} Duplicate",
-                        type="link",
-                        className="d-inline m-0 p-0",
-                    )
-                    gui.html("&nbsp;" + "this workflow to edit with others")
-                    if duplicate:
-                        clear_publish_form()
-                        gui.session_state["published_run_workspace"] = workspaces[-1].id
-                        publish_dialog_ref.set_open(True)
-                    if publish_dialog_ref.is_open:
-                        return
-            elif (
-                self.current_pr.visibility == PublishedRunPermission.CAN_FIND
-                and not self.current_pr.workspace.is_personal
-                and not self.current_pr.workspace.can_have_private_published_runs()
-                and self.request.user in self.current_pr.workspace.get_admins()
-            ):
-                with gui.div(
-                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline container-margin-reset"
-                ):
-                    gui.write(
-                        f"{icons.company_solid} [Upgrade]({get_route_path(account_route)}) to make your team & workflows **private**.",
-                        unsafe_allow_html=True,
-                    )
-
-            with gui.div(className="d-flex justify-content-between mt-4"):
-                copy_to_clipboard_button(
-                    label=f"{icons.link} Copy Link",
-                    value=self.current_app_url(self.tab),
-                    type="secondary",
-                    className="py-2 px-3 m-0",
-                )
-                if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
-                    dialog.set_open(False)
-                    gui.rerun()
 
     def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
         with gui.div(className="d-flex justify-content-end"):
