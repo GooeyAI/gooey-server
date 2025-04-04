@@ -1,7 +1,7 @@
 import gooey_gui as gui
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunPermission
+from bots.models import PublishedRun, PublishedRunPermission, SavedRun
 from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_route_path
@@ -13,6 +13,46 @@ from workspaces.views import member_invite_button_with_dialog
 from workspaces.widgets import render_alert_to_create_team_workspace
 
 
+def render_share_button(
+    publish_dialog_ref: gui.AlertDialogRef,
+    workspace_id: int | None,
+    user: AppUser | None,
+    sr: SavedRun,
+    pr: PublishedRun,
+    current_app_url: str,
+    session: dict,
+) -> None:
+    if (
+        not pr.is_root()
+        and pr.saved_run_id == sr.id
+        and user
+        and (user.is_admin() or workspace_id == pr.workspace_id)
+    ):
+        dialog = gui.use_alert_dialog(key="share-modal")
+        icon = pr.get_share_icon()
+        if gui.button(
+            f'{icon} <span class="d-none d-lg-inline">Share</span>',
+            className="mb-0 px-2 px-lg-4",
+        ):
+            dialog.set_open(True)
+        if dialog.is_open:
+            render_share_modal(
+                dialog=dialog,
+                publish_dialog_ref=publish_dialog_ref,
+                user=user,
+                pr=pr,
+                current_app_url=current_app_url,
+                session=session,
+            )
+    else:
+        copy_to_clipboard_button(
+            label=icons.link,
+            value=current_app_url,
+            type="secondary",
+            className="mb-0 px-2",
+        )
+
+
 def render_share_modal(
     dialog: gui.AlertDialogRef,
     publish_dialog_ref: gui.AlertDialogRef,
@@ -20,7 +60,7 @@ def render_share_modal(
     pr: PublishedRun,
     current_app_url: str,
     session: dict,
-) -> None:
+):
     # modal is only valid for logged in users
     assert user and pr.workspace
 

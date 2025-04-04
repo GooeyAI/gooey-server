@@ -171,15 +171,11 @@ class PublishedRunPermission(models.IntegerChoices):
 
     @classmethod
     def can_user_delete_published_run(
-        cls,
-        *,
-        workspace: Workspace,
-        user: typing.Optional["AppUser"],
-        pr: "PublishedRun",
+        cls, *, workspace: Workspace, user: AppUser, pr: PublishedRun
     ) -> bool:
         if pr.is_root():
             return False
-        if user and user.is_admin():
+        if user.is_admin():
             return True
         return bool(
             user
@@ -192,13 +188,9 @@ class PublishedRunPermission(models.IntegerChoices):
 
     @classmethod
     def can_user_edit_published_run(
-        cls,
-        *,
-        workspace: Workspace,
-        user: typing.Optional["AppUser"],
-        pr: "PublishedRun",
+        cls, *, workspace: Workspace, user: AppUser, pr: PublishedRun
     ) -> bool:
-        if user and user.is_admin():
+        if user.is_admin():
             return True
         return bool(
             user

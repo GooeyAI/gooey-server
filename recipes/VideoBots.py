@@ -1342,8 +1342,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
         can_edit = (
-            self.is_current_user_admin()
-            or PublishedRunPermission.can_user_edit_published_run(
+            self.request.user
+            and PublishedRunPermission.can_user_edit_published_run(
                 workspace=self.current_workspace,
                 user=self.request.user,
                 pr=pr,

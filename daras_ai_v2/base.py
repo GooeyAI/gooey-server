@@ -73,7 +73,7 @@ from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_share import (
-    render_share_modal,
+    render_share_button,
 )
 from workspaces.models import Workspace
 from workspaces.widgets import (
@@ -460,6 +460,7 @@ class BasePage:
             or bool(
                 published_run
                 and published_run.saved_run == current_run
+                and self.request.user
                 and PublishedRunPermission.can_user_edit_published_run(
                     workspace=self.current_workspace,
                     user=self.request.user,
@@ -505,10 +506,13 @@ class BasePage:
             ref.set_open(True)
         if ref.is_open:
             with gui.alert_dialog(ref=ref, modal_title="### Options"):
-                if PublishedRunPermission.can_user_edit_published_run(
-                    workspace=self.current_workspace,
-                    user=self.request.user,
-                    pr=self.current_pr,
+                if (
+                    self.request.user
+                    and PublishedRunPermission.can_user_edit_published_run(
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        pr=self.current_pr,
+                    )
                 ):
                     self._saved_options_modal()
                 else:
@@ -524,57 +528,36 @@ class BasePage:
             if self.tab == RecipeTabs.run:
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
-                self._render_share_button(publish_dialog_ref=publish_dialog_ref)
-                self._render_save_button(publish_dialog_ref=publish_dialog_ref)
-            elif self.tab != RecipeTabs.examples:
-                self._render_copy_link_button(label="Copy Link")
-
-            if publish_dialog_ref.is_open:
-                self._render_publish_dialog(ref=publish_dialog_ref)
-
-    def _render_share_button(self, publish_dialog_ref: gui.AlertDialogRef):
-        if (
-            not self.current_pr.is_root()
-            and self.current_pr.saved_run_id == self.current_sr.id
-            and (
-                self.is_current_user_admin()
-                or self.current_workspace.id == self.current_pr.workspace_id
-            )
-        ):
-            dialog = gui.use_alert_dialog(key="share-modal")
-            icon = self.current_pr.get_share_icon()
-            if gui.button(
-                f'{icon} <span class="d-none d-lg-inline">Share</span>',
-                className="mb-0 px-2 px-lg-4",
-            ):
-                dialog.set_open(True)
-
-            if dialog.is_open:
-                render_share_modal(
-                    dialog=dialog,
+                render_share_button(
                     publish_dialog_ref=publish_dialog_ref,
+                    workspace_id=self.request.user and self.current_workspace.id,
                     user=self.request.user,
+                    sr=self.current_sr,
                     pr=self.current_pr,
                     current_app_url=self.current_app_url(self.tab),
                     session=self.request.session,
                 )
-        else:
-            self._render_copy_link_button()
+                self._render_save_button(publish_dialog_ref)
+            elif self.tab != RecipeTabs.examples:
+                copy_to_clipboard_button(
+                    label=f"{icons.link} Copy Link",
+                    value=self.current_app_url(self.tab),
+                    type="secondary",
+                    className="mb-0 px-2",
+                )
 
-    def _render_copy_link_button(self, label: str = ""):
-        copy_to_clipboard_button(
-            label=f"{icons.link} {label}".strip(),
-            value=self.current_app_url(self.tab),
-            type="secondary",
-            className="mb-0 px-2",
-        )
+            if publish_dialog_ref.is_open:
+                self._render_publish_dialog(ref=publish_dialog_ref)
 
     def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
         with gui.div(className="d-flex justify-content-end"):
-            if PublishedRunPermission.can_user_edit_published_run(
-                workspace=self.current_workspace,
-                user=self.request.user,
-                pr=self.current_pr,
+            if (
+                self.request.user
+                and PublishedRunPermission.can_user_edit_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                )
             ):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
@@ -616,7 +599,7 @@ class BasePage:
         sr = self.current_sr
         pr = self.current_pr
 
-        if PublishedRunPermission.can_user_edit_published_run(
+        if self.request.user and PublishedRunPermission.can_user_edit_published_run(
             workspace=self.current_workspace,
             user=self.request.user,
             pr=self.current_pr,
@@ -784,6 +767,7 @@ class BasePage:
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
         if (
             self.current_pr.workspace_id
+            and self.request.user
             and PublishedRunPermission.can_user_edit_published_run(
                 workspace=self.current_pr.workspace,
                 user=self.request.user,
@@ -900,7 +884,8 @@ class BasePage:
                 )
 
             if (
-                PublishedRunPermission.can_user_delete_published_run(
+                self.request.user
+                and PublishedRunPermission.can_user_delete_published_run(
                     workspace=self.current_workspace,
                     user=self.request.user,
                     pr=self.current_pr,
