@@ -77,8 +77,8 @@ from widgets.workflow_share import (
 from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
-    render_workspace_create_dialog,
     set_current_workspace,
+    render_alert_to_create_team_workspace,
 )
 
 MAX_SEED = 4294967294
@@ -620,7 +620,11 @@ class BasePage:
             if (
                 self.current_pr.workspace.is_personal and len(workspaces) == 1
             ) or workspace_create_dialog.is_open:
-                self._render_alert_to_create_team_workspace(workspace_create_dialog)
+                render_alert_to_create_team_workspace(
+                    dialog_ref=workspace_create_dialog,
+                    user=self.request.user,
+                    session=self.request.session,
+                )
             elif self.current_pr.workspace.is_personal and len(workspaces) > 1:
                 with gui.div(
                     className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
@@ -906,33 +910,15 @@ class BasePage:
             } | workspace_options
         return workspace_options
 
-    def _render_alert_to_create_team_workspace(
-        self, workspace_create_ref: gui.AlertDialogRef
-    ) -> Workspace | None:
-        with gui.div(className="alert alert-warning my-0 container-margin-reset"):
-            if gui.button(
-                f"{icons.company} Create a team workspace",
-                type="link",
-                className="d-inline mb-1 me-1 p-0",
-            ):
-                workspace_create_ref.set_open(True)
-            gui.html("to edit with others", className="d-inline")
-
-        if workspace_create_ref.is_open:
-            if new_workspace := render_workspace_create_dialog(
-                user=self.request.user,
-                session=self.request.session,
-                ref=workspace_create_ref,
-            ):
-                return new_workspace
-
     def _render_workspace_selector(self, *, key: str) -> "Workspace":
         workspace_options = self._get_workspace_options()
         workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
 
         if len(workspace_options) <= 1 or workspace_create_ref.is_open:
-            if new_workspace := self._render_alert_to_create_team_workspace(
-                workspace_create_ref
+            if new_workspace := render_alert_to_create_team_workspace(
+                dialog_ref=workspace_create_ref,
+                user=self.request.user,
+                session=self.request.session,
             ):
                 gui.session_state[key] = new_workspace
                 return new_workspace

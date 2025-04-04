@@ -21,8 +21,7 @@ SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
-    from daras_ai_v2.base import BasePage
-    from routers.account import members_route, profile_route, saved_route
+    from routers.account import profile_route, saved_route
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -186,6 +185,30 @@ def global_workspace_selector(user: AppUser, session: dict):
                     gui.html("Log out")
 
     return current
+
+
+def render_alert_to_create_team_workspace(
+    *,
+    dialog_ref: gui.AlertDialogRef,
+    user: AppUser,
+    session: dict,
+) -> Workspace | None:
+    with gui.div(className="alert alert-warning my-0 container-margin-reset"):
+        if gui.button(
+            f"{icons.company} Create a team workspace",
+            type="link",
+            className="d-inline mb-1 me-1 p-0",
+        ):
+            dialog_ref.set_open(True)
+        gui.html("to edit with others", className="d-inline")
+
+    if dialog_ref.is_open:
+        if new_workspace := render_workspace_create_dialog(
+            user=user,
+            session=session,
+            ref=dialog_ref,
+        ):
+            return new_workspace
 
 
 def render_workspace_create_dialog(
