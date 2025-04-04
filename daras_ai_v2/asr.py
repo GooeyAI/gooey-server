@@ -240,8 +240,6 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
 
 # https://docs.lelapa.ai/getting-started/language-support
 LELAPA_ASR_SUPPORTED = {"eng", "afr", "zul", "sot", "fra"}
-LELAPA_ASR_TIMEOUT = 300  # 5 minutes
-
 LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn", "tsn_Latn", "xho_Latn", "zul_Latn", "eng_Latn", "swh_Latn", "sna_Latn", "yor_Latn", "hau_Latn"}  # fmt: skip
 
 
