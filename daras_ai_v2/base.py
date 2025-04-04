@@ -458,23 +458,11 @@ class BasePage:
             or bool(
                 published_run
                 and published_run.saved_run == current_run
-                and self.can_user_edit_published_run(published_run)
-            )
-        )
-
-    def can_user_edit_published_run(
-        self, published_run: PublishedRun, selected_workspace: Workspace | None = None
-    ) -> bool:
-        selected_workspace = selected_workspace or self.current_workspace
-        if self.is_current_user_admin():
-            return True
-        return bool(
-            self.request.user
-            and selected_workspace.id == published_run.workspace_id
-            and (
-                published_run.team_permission == PublishedRunPermission.CAN_EDIT
-                or published_run.created_by_id == self.request.user.id
-                or self.request.user in published_run.workspace.get_admins()
+                and PublishedRunPermission.can_user_edit_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=published_run,
+                )
             )
         )
 
@@ -515,7 +503,11 @@ class BasePage:
             ref.set_open(True)
         if ref.is_open:
             with gui.alert_dialog(ref=ref, modal_title="### Options"):
-                if self.can_user_edit_published_run(self.current_pr):
+                if PublishedRunPermission.can_user_edit_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                ):
                     self._saved_options_modal()
                 else:
                     self._unsaved_options_modal()
@@ -744,7 +736,11 @@ class BasePage:
 
     def _render_save_button(self):
         with gui.div(className="d-flex justify-content-end"):
-            if self.can_user_edit_published_run(self.current_pr):
+            if PublishedRunPermission.can_user_edit_published_run(
+                workspace=self.current_workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            ):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
                 icon, label = icons.save, "Save and Run"
@@ -790,7 +786,11 @@ class BasePage:
         sr = self.current_sr
         pr = self.current_pr
 
-        if self.can_user_edit_published_run(self.current_pr):
+        if PublishedRunPermission.can_user_edit_published_run(
+            workspace=self.current_workspace,
+            user=self.request.user,
+            pr=self.current_pr,
+        ):
             label = "Update"
         elif self._has_request_changed():
             label = "Save and Run"
@@ -825,8 +825,10 @@ class BasePage:
                 key="published_run_workspace"
             )
 
-            user_can_edit = self.can_user_edit_published_run(
-                pr, selected_workspace=selected_workspace
+            user_can_edit = PublishedRunPermission.can_user_edit_published_run(
+                workspace=selected_workspace,
+                user=self.request.user,
+                pr=pr,
             )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
                 if user_can_edit:
@@ -934,7 +936,11 @@ class BasePage:
                 notes=published_run_description.strip(),
             )
         else:
-            if not self.can_user_edit_published_run(self.current_pr):
+            if not PublishedRunPermission.can_user_edit_published_run(
+                workspace=selected_workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            ):
                 gui.error("You don't have permission to update this workflow")
                 return
             updates = dict(
@@ -952,8 +958,13 @@ class BasePage:
 
     def _get_workspace_options(self) -> dict[int, Workspace]:
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
-        if self.current_pr.workspace_id and self.can_user_edit_published_run(
-            self.current_pr
+        if (
+            self.current_pr.workspace_id
+            and PublishedRunPermission.can_user_edit_published_run(
+                workspace=self.current_pr.workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            )
         ):
             # default to current_pr.workspace for an editor
             workspace_options = {

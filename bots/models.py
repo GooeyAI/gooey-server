@@ -190,6 +190,26 @@ class PublishedRunPermission(models.IntegerChoices):
             )
         )
 
+    @classmethod
+    def can_user_edit_published_run(
+        cls,
+        *,
+        workspace: Workspace,
+        user: typing.Optional["AppUser"],
+        pr: "PublishedRun",
+    ) -> bool:
+        if user and user.is_admin():
+            return True
+        return bool(
+            user
+            and workspace.id == pr.workspace_id
+            and (
+                pr.team_permission == PublishedRunPermission.CAN_EDIT
+                or pr.created_by_id == user.id
+                or pr.workspace.get_admins().filter(id=user.id).exists()
+            )
+        )
+
 
 class Platform(models.IntegerChoices):
     FACEBOOK = (1, "Facebook Messenger")
