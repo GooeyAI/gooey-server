@@ -35,7 +35,6 @@ from bots.models import (
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
-from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
@@ -72,8 +71,10 @@ from payments.auto_recharge import (
 from routers.root import RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.saved_workflow import render_saved_workflow_preview
-from widgets.workflow_share import render_workspace_with_invite_button
-from workspaces.models import Workspace, WorkspaceMembership, WorkspaceRole
+from widgets.workflow_share import (
+    render_share_options_for_team_workspace,
+)
+from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
     render_workspace_create_dialog,
@@ -555,81 +556,6 @@ class BasePage:
             className="mb-0 px-2",
         )
 
-    def _render_share_options_for_team_workspace(
-        self,
-    ) -> dict[str, PublishedRunPermission]:
-        with gui.div(className="mb-4"):
-            render_workspace_with_invite_button(
-                self.current_pr.workspace, self.request.user.id
-            )
-
-        # we check for same privilege level for "sharing" as "deletion"
-        # because share-settings can be used to hide the published run
-        can_user_edit = PublishedRunPermission.can_user_delete_published_run(
-            workspace=self.current_pr.workspace,
-            user=self.request.user,
-            pr=self.current_pr,
-        )
-
-        updates = {}
-        options = {
-            str(perm.value): perm.get_team_sharing_text(
-                self.current_pr, current_user=self.request.user
-            )
-            for perm in PublishedRunPermission.get_team_sharing_options(
-                self.current_pr, current_user=self.request.user
-            )
-        }
-
-        with gui.div(className="mb-4"):
-            updates["team_permission"] = PublishedRunPermission(
-                int(
-                    gui.radio(
-                        "",
-                        options=options,
-                        format_func=options.__getitem__,
-                        key="published-run-team-permission",
-                        value=str(self.current_pr.team_permission),
-                        disabled=not can_user_edit,
-                    )
-                )
-            )
-
-        if (
-            can_user_edit
-            and self.current_pr.workspace.can_have_private_published_runs()
-        ):
-            is_public = gui.checkbox(
-                label=PublishedRunPermission.CAN_FIND.get_public_sharing_text(
-                    self.current_pr
-                ),
-                value=(
-                    self.current_pr.visibility == PublishedRunPermission.CAN_FIND.value
-                ),
-                disabled=(
-                    updates["team_permission"] == PublishedRunPermission.CAN_VIEW
-                ),
-            )
-            if (
-                is_public
-                and updates["team_permission"] != PublishedRunPermission.CAN_VIEW
-            ):
-                updates["visibility"] = PublishedRunPermission.CAN_FIND
-            else:
-                updates["visibility"] = PublishedRunPermission.CAN_VIEW
-        elif self.current_pr.visibility == PublishedRunPermission.CAN_FIND:
-            gui.write(
-                PublishedRunPermission.CAN_FIND.get_public_sharing_text(
-                    pr=self.current_pr
-                ),
-                unsafe_allow_html=True,
-            )
-
-        if can_user_edit:
-            return updates
-        else:
-            return {}
-
     def _render_share_options_for_personal_workspace(
         self,
     ) -> dict[str, PublishedRunPermission]:
@@ -668,7 +594,10 @@ class BasePage:
                 "& .gui-input-radio { display: flex; align-items: center; }"
             ):
                 if not self.current_pr.workspace.is_personal:
-                    updates = self._render_share_options_for_team_workspace()
+                    updates = render_share_options_for_team_workspace(
+                        user=self.request.user,
+                        pr=self.current_pr,
+                    )
                 else:
                     updates = self._render_share_options_for_personal_workspace()
 
