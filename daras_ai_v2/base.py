@@ -635,7 +635,7 @@ class BasePage:
                 pr=pr,
             )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
-                if user_can_edit:
+                if user_can_edit and pr.workspace_id == selected_workspace.id:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="secondary",
