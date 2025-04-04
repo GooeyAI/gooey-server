@@ -520,15 +520,20 @@ class BasePage:
             gui.styled("& .btn { padding: 6px }"),
             gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
         ):
+            publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
+
             if self.tab == RecipeTabs.run:
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
-                self._render_share_button()
-                self._render_save_button()
+                self._render_share_button(publish_dialog_ref=publish_dialog_ref)
+                self._render_save_button(publish_dialog_ref=publish_dialog_ref)
             elif self.tab != RecipeTabs.examples:
                 self._render_copy_link_button(label="Copy Link")
 
-    def _render_share_button(self):
+            if publish_dialog_ref.is_open:
+                self._render_publish_dialog(ref=publish_dialog_ref)
+
+    def _render_share_button(self, publish_dialog_ref: gui.AlertDialogRef):
         if (
             not self.current_pr.is_root()
             and self.current_pr.saved_run_id == self.current_sr.id
@@ -546,7 +551,9 @@ class BasePage:
                 dialog.set_open(True)
 
             if dialog.is_open:
-                self._render_share_modal(dialog=dialog)
+                self._render_share_modal(
+                    dialog=dialog, publish_dialog_ref=publish_dialog_ref
+                )
         else:
             self._render_copy_link_button()
 
@@ -558,7 +565,9 @@ class BasePage:
             className="mb-0 px-2",
         )
 
-    def _render_share_modal(self, dialog: gui.AlertDialogRef):
+    def _render_share_modal(
+        self, dialog: gui.AlertDialogRef, publish_dialog_ref: gui.AlertDialogRef
+    ):
         # modal is only valid for logged in users
         assert self.request.user and self.current_workspace
 
@@ -614,13 +623,12 @@ class BasePage:
                         className="d-inline m-0 p-0",
                     )
                     gui.html("&nbsp;" + "this workflow to edit with others")
-                    ref = gui.use_alert_dialog(key="publish-modal")
                     if duplicate:
                         clear_publish_form()
                         gui.session_state["published_run_workspace"] = workspaces[-1].id
-                        ref.set_open(True)
-                    if ref.is_open:
-                        return self._render_publish_dialog(ref=ref)
+                        publish_dialog_ref.set_open(True)
+                    if publish_dialog_ref.is_open:
+                        return
             elif (
                 self.current_pr.visibility == PublishedRunPermission.CAN_FIND
                 and not self.current_pr.workspace.is_personal
@@ -646,7 +654,7 @@ class BasePage:
                     dialog.set_open(False)
                     gui.rerun()
 
-    def _render_save_button(self):
+    def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
         with gui.div(className="d-flex justify-content-end"):
             if PublishedRunPermission.can_user_edit_published_run(
                 workspace=self.current_workspace,
@@ -659,7 +667,6 @@ class BasePage:
             else:
                 icon, label = icons.fork, "Save as New"
 
-            ref = gui.use_alert_dialog(key="publish-modal")
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">{label}</span>',
                 className="mb-0 px-3 px-lg-4",
@@ -667,13 +674,9 @@ class BasePage:
             ):
                 if self.is_logged_in():
                     clear_publish_form()
-                    ref.set_open(True)
+                    publish_dialog_ref.set_open(True)
                 else:
                     self._publish_for_anonymous_user()
-
-            if not ref.is_open:
-                return
-            self._render_publish_dialog(ref=ref)
 
     def _publish_for_anonymous_user(self):
         query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
