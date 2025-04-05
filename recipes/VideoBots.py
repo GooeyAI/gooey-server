@@ -13,7 +13,7 @@ from bots.models import (
     BotIntegration,
     Platform,
     PublishedRun,
-    PublishedRunVisibility,
+    WorkflowAccessLevel,
     Workflow,
     SavedRun,
 )
@@ -1341,7 +1341,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
-        can_edit = self.is_current_user_admin() or self.can_user_edit_published_run(pr)
+        can_edit = (
+            self.request.user
+            and WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=self.current_workspace,
+                user=self.request.user,
+                pr=pr,
+            )
+        )
 
         gui.newline()
 
@@ -1376,7 +1383,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
-                    visibility=PublishedRunVisibility.UNLISTED,
+                    public_access=WorkflowAccessLevel.VIEW_ONLY,
                 )
 
             match pressed_platform:

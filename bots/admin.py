@@ -322,7 +322,7 @@ class PublishedRunVersionInline(admin.TabularInline):
 class PublishedRunAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
-        "visibility",
+        "public_access",
         "view_user",
         "open_in_gooey",
         "linked_saved_run",
@@ -330,7 +330,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
-    list_filter = ["workflow", "visibility", "created_by__is_paying"]
+    list_filter = ["workflow", "public_access", "created_by__is_paying"]
     search_fields = ["workflow", "published_run_id", "title", "notes"]
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by", "workspace"]
     readonly_fields = [

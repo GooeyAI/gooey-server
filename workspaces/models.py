@@ -23,6 +23,7 @@ from daras_ai_v2 import settings, icons
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.bg_db_conn import db_middleware
 from handles.models import COMMON_EMAIL_DOMAINS
+from payments.plans import PricingPlan
 from .tasks import send_added_to_workspace_email, send_invitation_email
 
 if typing.TYPE_CHECKING:
@@ -203,6 +204,15 @@ class Workspace(SafeDeleteModel):
     def get_slug(self):
         return slugify(self.display_name())
 
+    def can_have_private_published_runs(self):
+        if self.is_personal:
+            return True
+        elif not self.subscription_id:
+            return False
+        else:
+            plan = PricingPlan.from_sub(self.subscription)
+            return plan in (PricingPlan.ENTERPRISE, PricingPlan.BUSINESS)
+
     @transaction.atomic()
     def create_with_owner(self):
         # free credits for first team created by a user
@@ -232,12 +242,17 @@ class Workspace(SafeDeleteModel):
             workspace_memberships__deleted__isnull=True,
         )
 
-    def get_admins(self) -> models.QuerySet[AppUser]:
+    def get_admins(self, exclude_owners: bool = False) -> models.QuerySet[AppUser]:
         from app_users.models import AppUser
+
+        if exclude_owners:
+            role_filter = [WorkspaceRole.ADMIN]
+        else:
+            role_filter = [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]
 
         return AppUser.objects.filter(
             workspace_memberships__workspace=self,
-            workspace_memberships__role=WorkspaceRole.ADMIN,
+            workspace_memberships__role__in=role_filter,
             workspace_memberships__deleted__isnull=True,
         )
 
@@ -519,9 +534,6 @@ class WorkspaceInviteQuerySet(models.QuerySet):
         current_user: typing.Optional["AppUser"] = None,
         defaults: dict | None = None,
     ) -> "WorkspaceInvite":
-        """
-        auto_accept: If True, the user will be automatically added if they have an account
-        """
         from app_users.models import AppUser
 
         if workspace.memberships.filter(user__email=email).exists():
@@ -646,7 +658,6 @@ class WorkspaceInvite(models.Model):
         )
 
     def send_email(self):
-        # pre-emptively set last_email_sent_at to avoid sending multiple emails concurrently
         if not self.can_resend_email():
             raise ValidationError("This user has already been invited recently.")
 
