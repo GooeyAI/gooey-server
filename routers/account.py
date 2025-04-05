@@ -20,6 +20,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
 from managed_secrets.widgets import manage_secrets_table
+from payments.plans import PricingPlan
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -176,7 +177,7 @@ def api_keys_route(request: Request):
 @gui.route(app, "/workspaces/members/")
 def members_route(request: Request):
     with account_page_wrapper(request, AccountTabs.members) as current_workspace:
-        if current_workspace.is_personal:
+        if not current_workspace or current_workspace.is_personal:
             raise gui.RedirectException(get_route_path(profile_route))
         workspaces_page(request.user, request.session)
 
@@ -190,6 +191,16 @@ def members_route(request: Request):
             robots="noindex,nofollow",
         )
     )
+
+
+@gui.route(app, "/workspaces/analytics/")
+def analytics_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.analytics) as current_workspace:
+        if AccountTabs.analytics not in AccountTabs.get_tabs_for_user(
+            request.user, workspace=current_workspace
+        ):
+            raise gui.RedirectException(get_route_path(account_route))
+        analytics_tab(request=request, workspace=current_workspace)
 
 
 @gui.route(app, "/workspaces/{workspace_slug}/invite/{email}-{invite_id}")
@@ -239,6 +250,7 @@ class AccountTabs(TabData, Enum):
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+    analytics = TabData(title=f"{icons.analytics} Analytics", route=analytics_route)
 
     @property
     def url_path(self) -> str:
@@ -246,17 +258,25 @@ class AccountTabs(TabData, Enum):
 
     @classmethod
     def get_tabs_for_user(
-        cls, user: typing.Optional["AppUser"], workspace: Workspace | None
+        cls, user: "AppUser", workspace: Workspace | None
     ) -> list["AccountTabs"]:
 
         ret = list(cls)
 
-        if workspace.is_personal:
+        if not workspace or workspace.is_personal:
             ret.remove(cls.members)
+            ret.remove(cls.analytics)
         else:
             ret.remove(cls.profile)
             if not workspace.memberships.get(user=user).can_edit_workspace():
                 ret.remove(cls.billing)
+                ret.remove(cls.analytics)
+            elif not workspace.subscription or (
+                PricingPlan.from_db_value(workspace.subscription.plan)
+                not in (PricingPlan.BUSINESS, PricingPlan.ENTERPRISE)
+            ):
+                # only for business and enterprise plans
+                ret.remove(cls.analytics)
 
         return ret
 
@@ -348,6 +368,60 @@ def all_saved_runs_tab(request: Request):
     grid_layout(1, prs, _render_run)
 
     paginate_button(url=request.url, cursor=cursor)
+
+
+def analytics_tab(request: Request, workspace: Workspace):
+    gui.write("# Usage & Limits")
+    gui.caption(
+        f"Member, API & Integration usage for **{workspace.display_name(request.user)}**."
+    )
+
+    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
+        with gui.tag("thead"), gui.tag("tr"):
+            with gui.tag("th", scope="col"):
+                gui.html("Name")
+            with gui.tag("th", scope="col"):
+                gui.html("Type")
+            with gui.tag("th", scope="col"):
+                gui.html("Runs")
+            with gui.tag("th", scope="col"):
+                gui.html("Credits Used")
+            with gui.tag("th", scope="col"):
+                gui.html("")
+
+        with gui.tag("tbody"):
+            for m in workspace.memberships.all():
+                with gui.tag("tr", className="no-margin"):
+                    with gui.tag("td"):
+                        gui.write(m.user.full_name())
+                    with gui.tag("td"):
+                        gui.html("User")
+                    with gui.tag("td"):
+                        gui.html(f"{m.get_run_count()}")
+                    with gui.tag("td"):
+                        gui.html(f"{m.get_credit_usage()} Cr")
+                    with gui.tag("td"):
+                        gui.html("")
+
+            with gui.tag("tr", className="no-margin"):
+                with gui.tag("td"):
+                    gui.write(f"[API Keys]({get_route_path(api_keys_route)})")
+                with gui.tag("td"):
+                    gui.html("API Key")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_api_key_run_count()}")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_api_key_credit_usage()} Cr")
+
+            with gui.tag("tr", className="no-margin"):
+                with gui.tag("td"):
+                    gui.write("Bot Integrations")
+                with gui.tag("td"):
+                    gui.html("Bot")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_bot_run_count()}")
+                with gui.tag("td"):
+                    gui.html(f"{workspace.get_bot_credit_usage()} Cr")
 
 
 def api_keys_tab(request: Request):
