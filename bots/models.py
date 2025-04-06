@@ -46,7 +46,8 @@ class WorkflowAccessLevel(models.IntegerChoices):
     FIND_AND_VIEW = 2
     EDIT = 4
 
-    INTERNAL = 3  # deprecated. migration: set pr.public_access=VIEW_ONLY, pr.workspace_access=EDIT
+    # migration: set pr.public_access=VIEW_ONLY, pr.workspace_access=EDIT
+    INTERNAL = (3, "Internal (Deprecated)")
 
     @classmethod
     def get_team_sharing_options(
