@@ -402,7 +402,7 @@ def send_recv_json(ws: ClientConnection, event: dict) -> dict:
 def send_json(ws: ClientConnection, event: dict):
     try:
         ws.send(json.dumps(event))
-        print(f"> {event=}")
+        # print(f"> {event=}")
     except ConnectionClosed:
         drain(ws)
         raise
@@ -418,7 +418,7 @@ def drain(ws: ClientConnection):
 
 def recv_json(ws: ClientConnection, **kwargs) -> dict:
     event = json.loads(ws.recv(**kwargs))
-    print(f"< {event=}")
+    # print(f"< {event=}")
     if event.get("type") in {
         "error",
         "response.failed",
