@@ -134,7 +134,7 @@ async def _pipe_ws(source_ws: WebSocket, call_sid: str, *, is_twilio: bool):
     try:
         while True:
             msg = await source_ws.receive_text()
-            # print(f"> {msg=}")
+            print(f"> {msg=}")
             if not msg:
                 return
             await target_ws.send_text(msg)
