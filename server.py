@@ -1,5 +1,4 @@
 __import__("gooeysite.wsgi")  # Note: this must always be at the top
-
 import logging
 import traceback
 from time import time
@@ -49,6 +48,7 @@ from routers import (
     static_pages,
     onedrive_api,
 )
+from routers import twilio_ws_api
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
@@ -66,6 +66,7 @@ app.include_router(paypal.router, include_in_schema=False)
 app.include_router(stripe.router, include_in_schema=False)
 app.include_router(twilio_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
+app.include_router(twilio_ws_api.app, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(

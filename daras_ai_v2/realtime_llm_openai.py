@@ -36,21 +36,29 @@ def run_openai_audio(
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
 ):
-    ws, created = get_or_create_ws(model)
+    openai_ws, created = get_or_create_ws(model)
 
-    # only send audio if we are creating a new session
-    if audio_url and created:
+    twilio_ws = None
+    audio_data = None
+    if audio_url and audio_url.startswith("ws"):
+        # if the audio_url is a websocket url, connect to it
+        twilio_ws = connect(audio_url)
+        audio_session_extra = (audio_session_extra or {}) | {
+            "input_audio_format": "g711_ulaw",
+            "output_audio_format": "g711_ulaw",
+            "turn_detection": {"type": "server_vad"},
+        }
+    elif audio_url and created:
+        # only send audio if we are creating a new session
         response = requests.get(audio_url)
         raise_for_status(response, is_user_url=True)
         wav_bytes = audio_bytes_to_wav(response.content)[0] or response.content
         audio_data = base64.b64encode(wav_bytes).decode()
-    else:
-        audio_data = None
 
     has_tool_calls = False
     try:
         init_ws_session(
-            ws=ws,
+            ws=openai_ws,
             created=created,
             audio_data=audio_data,
             audio_session_extra=audio_session_extra,
@@ -58,27 +66,164 @@ def run_openai_audio(
             temperature=temperature,
             tools=tools,
         )
-        send_json(ws, {"type": "response.create"})
-        for entry in stream_ws_resposne(
-            ws=ws,
-            model=model,
-            wait_for_transcript=bool(audio_data),
-            start_chunk_size=start_chunk_size,
-            stop_chunk_size=stop_chunk_size,
-            step_chunk_size=step_chunk_size,
-        ):
-            if entry.get("tool_calls"):
-                has_tool_calls = True
-            yield [entry]
+        if twilio_ws:
+            handle_twilio_ws(twilio_ws, openai_ws, tools)
+        else:
+            send_json(openai_ws, {"type": "response.create"})
+            for entry in stream_ws_response(
+                ws=openai_ws,
+                model=model,
+                wait_for_transcript=bool(audio_data),
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
+            ):
+                if entry.get("tool_calls"):
+                    has_tool_calls = True
+                yield [entry]
+    except ConnectionClosed:
+        pass
     finally:
         if has_tool_calls:
-            threadlocal._realtime_ws = ws
+            threadlocal._realtime_ws = openai_ws
         else:
-            ws.close()
+            openai_ws.close()
             try:
                 del threadlocal._realtime_ws
             except AttributeError:
                 pass
+        if twilio_ws:
+            twilio_ws.close()
+
+
+# adapted from: https://github.com/openai/openai-realtime-twilio-demo/blob/main/websocket-server/src/sessionManager.ts
+def handle_twilio_ws(
+    twilio_ws: ClientConnection,
+    openai_ws: ClientConnection,
+    tools: list[LLMTool] | None = None,
+):
+    stream_sid = None
+    while not stream_sid:
+        msg = recv_json(twilio_ws)
+        stream_sid = msg.get("streamSid")
+
+    last_assistant_item_id = None
+    response_start_ts = None
+    latest_media_ts = {"val": 0}
+
+    # pipe audio from Twilio to OpenAI
+    threading.Thread(
+        target=pipe_audio, args=(twilio_ws, openai_ws, latest_media_ts)
+    ).start()
+
+    while True:
+        event = recv_json(openai_ws)
+        match event.get("type"):
+            case "input_audio_buffer.speech_started":
+                if not (last_assistant_item_id and response_start_ts):
+                    continue
+                # send_json(
+                #     openai_ws,
+                #     {
+                #         "type": "conversation.item.truncate",
+                #         "item_id": last_assistant_item_id,
+                #         "content_index": 0,
+                #         "audio_end_ms": max(
+                #             latest_media_ts["val"] - response_start_ts, 0
+                #         ),
+                #     },
+                # )
+                send_json(
+                    twilio_ws,
+                    {"event": "clear", "streamSid": stream_sid},
+                )
+                last_assistant_item_id = None
+                response_start_ts = None
+
+            case "response.audio.delta":
+                if response_start_ts is None:
+                    response_start_ts = latest_media_ts["val"]
+                item_id = event.get("item_id")
+                if item_id:
+                    last_assistant_item_id = item_id
+                send_json(
+                    twilio_ws,
+                    {
+                        "event": "media",
+                        "streamSid": stream_sid,
+                        "media": {"payload": event["delta"]},
+                    },
+                )
+                send_json(
+                    twilio_ws,
+                    {"event": "mark", "streamSid": stream_sid},
+                )
+
+            case "response.output_item.done":
+                from recipes.VideoBots import exec_tool_call
+
+                if not tools:
+                    continue
+                item = event.get("item")
+                if not item or item.get("type") != "function_call":
+                    continue
+                result = yield_from(
+                    exec_tool_call(
+                        {"function": item},
+                        {tool.name: tool for tool in tools},
+                    )
+                )
+                send_json(
+                    openai_ws,
+                    {
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "function_call_output",
+                            "call_id": item["call_id"],
+                            "output": json.dumps(result),
+                        },
+                    },
+                )
+                send_json(openai_ws, {"type": "response.create"})
+
+
+T = typing.TypeVar("T")
+
+
+def yield_from(gen: typing.Generator[typing.Any, None, T]) -> T:
+    """Same as `yield from` but returns the value of the generator."""
+    while True:
+        try:
+            next(gen)
+        except StopIteration as e:
+            return e.value
+
+
+def pipe_audio(
+    twilio_ws: ClientConnection, openai_ws: ClientConnection, latest_media_ts: dict
+):
+    try:
+        while True:
+            msg = recv_json(twilio_ws)
+            match msg.get("event"):
+                case "stop":
+                    break
+                case "media":
+                    media = msg.get("media")
+                    if not media:
+                        continue
+                    latest_media_ts["val"] = int(media["timestamp"])
+                    send_json(
+                        openai_ws,
+                        {
+                            "type": "input_audio_buffer.append",
+                            "audio": media["payload"],
+                        },
+                    )
+    except ConnectionClosed:
+        pass
+    finally:
+        openai_ws.close()
 
 
 def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
@@ -164,7 +309,7 @@ def init_ws_session(
         send_recv_json(ws, {"type": "input_audio_buffer.commit"})
 
 
-def stream_ws_resposne(
+def stream_ws_response(
     ws: ClientConnection,
     model: LargeLanguageModels,
     wait_for_transcript: bool,

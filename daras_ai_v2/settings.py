@@ -284,6 +284,7 @@ FAL_API_KEY = config("FAL_API_KEY", default="")
 
 APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
+API_INTERNAL_BASE_URL = config("API_INTERNAL_BASE_URL", API_BASE_URL)
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
