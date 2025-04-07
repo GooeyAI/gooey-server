@@ -142,5 +142,8 @@ async def _pipe_ws(source_ws: WebSocket, call_sid: str, *, is_twilio: bool):
         pass
     finally:
         if is_twilio:
-            await target_ws.close()
+            try:
+                await target_ws.close()
+            except RuntimeError:
+                pass
         connections.pop(call_sid, None)
