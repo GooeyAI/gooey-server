@@ -37,7 +37,7 @@ class TwilioVoiceWs(TwilioVoice):
 
         self.input_type = "audio"
         self._audio_url = str(
-            furl(settings.WS_API_BASE_URL)
+            furl(settings.WS_PROXY_API_BASE_URL)
             / get_route_path(twilio_ws_proxy, path_params=dict(call_sid=self.call_sid))
         )
 
@@ -74,7 +74,7 @@ def twilio_voice_ws(
     connect = Connect()
     connect.stream(
         url=str(
-            furl(settings.WS_API_BASE_URL)
+            furl(settings.WS_STREAM_API_BASE_URL)
             / get_route_path(twilio_ws_stream, path_params=dict(call_sid=bot.call_sid))
         )
     )
