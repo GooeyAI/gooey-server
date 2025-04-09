@@ -1055,7 +1055,7 @@ def _run_chat_model(
             return _run_gemini_pro(
                 model_id=model.model_id,
                 messages=messages,
-                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
+                max_output_tokens=max_tokens,
                 temperature=temperature,
                 response_format_type=response_format_type,
             )
