@@ -110,7 +110,7 @@ def render_create_workspace_form(
     with gui.div(className="d-flex align-items-start gap-2"):
         with gui.div(className="mt-2 pt-1"):
             gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
-        with gui.div(className="d-block d-lg-flex gap-3"):
+        with gui.div(className="d-block d-lg-flex gap-3 w-100"):
             # separate div for input & error msg for handle field
             if "handle_name" not in gui.session_state:
                 gui.session_state["handle_name"] = (

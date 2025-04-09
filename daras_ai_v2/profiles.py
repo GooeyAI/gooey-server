@@ -631,12 +631,13 @@ def render_handle_input(
     **kwargs,
 ) -> str | None:
     handle_style: dict[str, str] = {}
-    new_handle = gui.text_input(
-        label,
-        value=handle and handle.name or "",
-        style=handle_style,
-        **kwargs,
-    )
+    with gui.div(style=dict(maxWidth="300px", width="100%")):
+        new_handle = gui.text_input(
+            label,
+            value=handle and handle.name or "",
+            style=handle_style,
+            **kwargs,
+        )
     if not new_handle or (handle and handle.name == new_handle):
         # nothing to validate
         return new_handle
@@ -647,7 +648,11 @@ def render_handle_input(
         gui.error(e.messages[0], icon="")
         handle_style["border"] = "1px solid var(--bs-danger)"
     else:
-        gui.success("Available", icon="")
+        with (
+            gui.div(style=dict(maxWidth="300px")),
+            gui.styled("& { padding: 0.8rem 1rem 0 !important } "),
+        ):
+            gui.success("Available", icon="")
         handle_style["border"] = "1px solid var(--bs-success)"
 
     return new_handle
