@@ -198,7 +198,10 @@ class WorkflowAccessLevel(models.IntegerChoices):
             user
             and workspace.id == pr.workspace_id
             and (
-                pr.workspace_access == WorkflowAccessLevel.EDIT
+                (
+                    pr.workspace_access == WorkflowAccessLevel.EDIT
+                    and pr.workspace.memberships.filter(user=user).exists()
+                )
                 or pr.created_by_id == user.id
                 or pr.workspace.get_admins().filter(id=user.id).exists()
             )
