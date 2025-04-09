@@ -10,7 +10,7 @@ from widgets.author import render_author_from_workspace
 from widgets.publish_form import clear_publish_form
 from workspaces.models import Workspace
 from workspaces.views import member_invite_button_with_dialog
-from workspaces.widgets import render_alert_to_create_team_workspace
+from workspaces.widgets import render_create_workspace_alert
 
 
 def render_share_button(
@@ -88,18 +88,9 @@ def render_share_modal(
                 change_notes="Share settings updated",
             )
 
-        workspace_create_dialog = gui.use_alert_dialog(
-            key="create-workspace-modal--from-share-dialog"
-        )
         workspaces = user.cached_workspaces
-        if (
-            pr.workspace.is_personal and len(workspaces) == 1
-        ) or workspace_create_dialog.is_open:
-            render_alert_to_create_team_workspace(
-                dialog_ref=workspace_create_dialog,
-                user=user,
-                session=session,
-            )
+        if pr.workspace.is_personal and len(workspaces) == 1:
+            render_create_workspace_alert()
         elif pr.workspace.is_personal and len(workspaces) > 1:
             with gui.div(
                 className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"

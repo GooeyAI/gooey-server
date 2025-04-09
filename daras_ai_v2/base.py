@@ -79,7 +79,7 @@ from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
     set_current_workspace,
-    render_alert_to_create_team_workspace,
+    render_create_workspace_alert,
 )
 
 MAX_SEED = 4294967294
@@ -784,17 +784,9 @@ class BasePage:
 
     def _render_workspace_selector(self, *, key: str) -> "Workspace":
         workspace_options = self._get_workspace_options()
-        workspace_create_ref = gui.use_alert_dialog(key="create-workspace-modal")
 
-        if len(workspace_options) <= 1 or workspace_create_ref.is_open:
-            if new_workspace := render_alert_to_create_team_workspace(
-                dialog_ref=workspace_create_ref,
-                user=self.request.user,
-                session=self.request.session,
-            ):
-                gui.session_state[key] = new_workspace
-                return new_workspace
-
+        if len(workspace_options) <= 1:
+            render_create_workspace_alert()
             return self.current_workspace
 
         with gui.div(className="d-flex gap-3"):

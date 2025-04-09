@@ -72,7 +72,7 @@ def payment_processing_route(
         # language=JavaScript
         """
         setTimeout(() => {
-            window.location.href = redirectUrl;
+            gui.navigate(redirectUrl);
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
