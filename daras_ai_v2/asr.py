@@ -278,7 +278,15 @@ class AsrModels(Enum):
 
     @classmethod
     def _deprecated(cls):
-        return {cls.seamless_m4t, cls.whisper_chichewa_large_v3}
+        return {
+            cls.seamless_m4t,
+            cls.whisper_chichewa_large_v3,
+            cls.nemo_english,
+            cls.nemo_hindi,
+            cls.whisper_hindi_large_v2,
+            cls.whisper_telugu_large_v2,
+            cls.vakyansh_bhojpuri,
+        }
 
     @classmethod
     def get(cls, key, default=None):
