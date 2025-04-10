@@ -33,7 +33,6 @@ def _render_bi(bi: BotIntegration):
             <a href="{get_bot_test_link(bi)}">{bi.name}</a>
         </h4>
         """,
-        unsafe_allow_html=True,
     )
 
     if bi.published_run.created_by:

@@ -59,8 +59,8 @@ def invitation_page(
             style={
                 "width": "min(400px, 75vw)",
                 "height": "auto",
-                "object-fit": "cover",
-                "aspect-ratio": "8/3",
+                "objectFit": "cover",
+                "aspectRatio": "8/3",
             },
         )
         with gui.div(
@@ -77,7 +77,7 @@ def invitation_page(
             gui.image(
                 src=invite.created_by.photo_url,
                 className="rounded-circle m-0",
-                style={"width": "150px", "height": "150px", "object-fit": "cover"},
+                style={"width": "150px", "height": "150px", "objectFit": "cover"},
             )
 
             invite_creator = invite.created_by.full_name()
@@ -93,7 +93,7 @@ def invitation_page(
                 gui.image(
                     src=invite.workspace.get_photo(),
                     className="rounded",
-                    style={"height": "70px", "width": "70px", "object-fit": "contain"},
+                    style={"height": "70px", "width": "70px", "objectFit": "contain"},
                 )
                 with gui.tag("h1", className="my-0 ms-md-2 text-center text-md-start"):
                     gui.html(html_lib.escape(invite.workspace.display_name()))
@@ -188,7 +188,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         gui.image(
             workspace.get_photo(),
             className="my-0 me-4 rounded",
-            style={"width": "128px", "height": "128px", "object-fit": "contain"},
+            style={"width": "128px", "height": "128px", "objectFit": "contain"},
         )
         with gui.div(className="d-flex flex-column justify-content-start"):
             plan = (
@@ -222,8 +222,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                         f'<div><span class="text-muted">Credits:</span> {workspace.balance}</div>'
                     )
                     gui.html(
-                        f'<div><span class="text-muted">Plan:</span> {plan.title}</div>',
-                        unsafe_allow_html=True,
+                        f'<div><span class="text-muted">Plan:</span> {plan.title}</div>'
                     )
                     if membership.can_edit_workspace() and plan in (
                         PricingPlan.STARTER,
