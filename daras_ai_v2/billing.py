@@ -428,10 +428,8 @@ def _render_create_subscription_button(
             type="primary",
             onClick=open_create_workspace_popup_js(selected_plan=plan),
         ):
-            print("hey??")
             gui.session_state["pressed_create_workspace"] = True
     else:
-        print(gui.session_state.get("pressed_create_workspace"))
         match payment_provider:
             case PaymentProvider.STRIPE:
                 pressed = gui.session_state.pop("pressed_create_workspace", False)
