@@ -1,10 +1,16 @@
-import gooey_gui as gui
+import typing
 
-from app_users.models import AppUser
+import gooey_gui as gui
+from furl import furl
+
+from app_users.models import AppUser, obscure_phone_number
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS
 from .models import Workspace
+
+if typing.TYPE_CHECKING:
+    from payments.plans import PricingPlan
 
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
@@ -12,8 +18,7 @@ SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
-    from daras_ai_v2.base import BasePage
-    from routers.account import members_route, profile_route, saved_route
+    from routers.account import profile_route, saved_route
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -84,21 +89,21 @@ def global_workspace_selector(user: AppUser, session: dict):
                             )
 
         if current.is_personal:
-            if BasePage.is_user_admin(user):
-                gui.html('<hr class="my-1"/>')
-                with gui.tag(
-                    "button",
-                    className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                    name="--create-workspace",
-                    type="submit",
-                    value="yes",
-                    style=dict(height=row_height),
-                ):
-                    with gui.div(className="row align-items-center"):
-                        with gui.div(className="col-2 d-flex justify-content-center"):
-                            gui.html(icons.octopus)
-                        with gui.div(className="col-10"):
-                            gui.html("New Team Workspace")
+            gui.html('<hr class="my-1"/>')
+            with gui.tag(
+                "button",
+                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
+                name="--create-workspace",
+                type="submit",
+                value="yes",
+                style=dict(height=row_height),
+                onClick=open_create_workspace_popup_js(),
+            ):
+                with gui.div(className="row align-items-center"):
+                    with gui.div(className="col-2 d-flex justify-content-center"):
+                        gui.html(icons.octopus)
+                    with gui.div(className="col-10"):
+                        gui.html("New Team Workspace")
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
@@ -114,13 +119,6 @@ def global_workspace_selector(user: AppUser, session: dict):
                             gui.html("Manage Workspace")
                         else:
                             gui.html("Open Workspace")
-
-        if gui.session_state.pop("--create-workspace", None):
-            name = get_default_workspace_name_for_user(user)
-            workspace = Workspace(name=name, created_by=user)
-            workspace.create_with_owner()
-            session[SESSION_SELECTED_WORKSPACE] = workspace.id
-            raise gui.RedirectException(get_route_path(members_route))
 
         gui.html('<hr class="my-1"/>')
 
@@ -140,7 +138,11 @@ def global_workspace_selector(user: AppUser, session: dict):
                         className="d-inline-block",
                     )
                     gui.html(
-                        str(user.email or user.phone_number),
+                        user.email
+                        or str(
+                            user.phone_number
+                            and obscure_phone_number(user.phone_number)
+                        ),
                         className="d-inline-block text-muted small ms-2",
                         style=dict(marginBottom="0.1rem"),
                     )
@@ -190,16 +192,69 @@ def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
 
 
-def get_default_workspace_name_for_user(user: AppUser) -> str:
-    workspace_count = len(user.cached_workspaces)
-    email_domain = user.email and user.email.split("@", maxsplit=1)[1] or ""
-    if (
-        email_domain
-        and email_domain not in COMMON_EMAIL_DOMAINS
-        and workspace_count <= 1
-    ):
-        email_domain_prefix = email_domain.split(".")[0].title()
-        return f"{email_domain_prefix} Team"
+def render_create_workspace_alert():
+    with gui.div(className="alert alert-warning my-0 container-margin-reset"):
+        gui.button(
+            f"{icons.company} Create a team workspace",
+            type="link",
+            className="d-inline mb-1 me-1 p-0",
+            onClick=open_create_workspace_popup_js(),
+        )
+        gui.html("to edit with others", className="d-inline")
 
-    suffix = f" {workspace_count - 1}" if workspace_count > 1 else ""
-    return f"{user.first_name_possesive()} Team Workspace" + suffix
+
+def open_create_workspace_popup_js(
+    selected_plan: typing.Optional["PricingPlan"] = None,
+):
+    from routers.workspace import create_workspace_route
+    from routers.account import account_route
+
+    next_url = get_route_path(account_route)
+    popup_url = furl(
+        get_route_path(create_workspace_route), query_params={"next": next_url}
+    )
+    if selected_plan:
+        popup_url.query.params["selected_plan"] = selected_plan.db_value
+        next_url = ""  # don't redirect as we are already on the account page
+
+    # language=javascript
+    return """
+        let popupUrl = %r;
+        let nextUrl = %r;
+        
+        window.addEventListener("message", function(event) {
+            if (!event.data.workspaceCreated) return;
+            if (nextUrl) { 
+                gui.navigate(nextUrl);
+            } else {
+                gui.rerun()
+            } 
+        });
+        
+        // try to open the popup
+        let popup = window.open(popupUrl, "create_workspace", "width=1000,height=600,scrollbars=yes,resizable=yes");
+        // if the popup was blocked, open it in a new tab
+        if (!popup) {
+           popup = window.open(popupUrl, "_blank");
+        }
+        // if the popup was blocked, redirect to the url
+        if (!popup)  {
+            event.preventDefault();
+            gui.navigate(popupUrl);
+        }
+        """ % (
+        str(popup_url),
+        next_url,
+    )
+
+
+def get_workspace_domain_name_options(
+    workspace: Workspace, current_user: AppUser
+) -> set | None:
+    current_user_domain = (
+        current_user.email and current_user.email.lower().rsplit("@", maxsplit=1)[-1]
+    )
+    options = {workspace.domain_name, None}
+    if current_user_domain not in COMMON_EMAIL_DOMAINS:
+        options.add(current_user_domain)
+    return len(options) > 1 and options or None

@@ -28,14 +28,13 @@ from starlette.datastructures import URL
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     PublishedRun,
+    WorkflowAccessLevel,
     PublishedRunVersion,
-    PublishedRunVisibility,
     RetentionPolicy,
     SavedRun,
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
-from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
@@ -71,9 +70,17 @@ from payments.auto_recharge import (
 )
 from routers.root import RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
+from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
-from workspaces.models import Workspace, WorkspaceMembership
-from workspaces.widgets import get_current_workspace, set_current_workspace
+from widgets.workflow_share import (
+    render_share_button,
+)
+from workspaces.models import Workspace
+from workspaces.widgets import (
+    get_current_workspace,
+    set_current_workspace,
+    render_create_workspace_alert,
+)
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -453,14 +460,13 @@ class BasePage:
             or bool(
                 published_run
                 and published_run.saved_run == current_run
-                and self.can_user_edit_published_run(published_run)
+                and self.request.user
+                and WorkflowAccessLevel.can_user_edit_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=published_run,
+                )
             )
-        )
-
-    def can_user_edit_published_run(self, published_run: PublishedRun) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin()
-            or published_run.workspace_id == self.current_workspace.id
         )
 
     def _render_title(self, title: str):
@@ -500,7 +506,14 @@ class BasePage:
             ref.set_open(True)
         if ref.is_open:
             with gui.alert_dialog(ref=ref, modal_title="### Options"):
-                if self.can_user_edit_published_run(self.current_pr):
+                if (
+                    self.request.user
+                    and WorkflowAccessLevel.can_user_edit_published_run(
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        pr=self.current_pr,
+                    )
+                ):
                     self._saved_options_modal()
                 else:
                     self._unsaved_options_modal()
@@ -510,153 +523,55 @@ class BasePage:
             gui.styled("& .btn { padding: 6px }"),
             gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
         ):
+            publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
+
             if self.tab == RecipeTabs.run:
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
-                self._render_share_button()
-                self._render_save_button()
-            elif self.tab != RecipeTabs.examples:
-                self._render_copy_link_button(label="Copy Link")
-
-    def _render_share_button(self):
-        if (
-            not self.current_pr.is_root()
-            and self.current_pr.saved_run_id == self.current_sr.id
-            and self.can_user_edit_published_run(self.current_pr)
-        ):
-            dialog = gui.use_alert_dialog(key="share-modal")
-            icon = PublishedRunVisibility(self.current_pr.visibility).get_icon()
-            if gui.button(
-                f'{icon} <span class="d-none d-lg-inline">Share</span>',
-                className="mb-0 px-2 px-lg-4",
-            ):
-                dialog.set_open(True)
-
-            if dialog.is_open:
-                self._render_share_modal(dialog=dialog)
-        else:
-            self._render_copy_link_button()
-
-    def _render_copy_link_button(self, label: str = ""):
-        copy_to_clipboard_button(
-            label=f"{icons.link} {label}".strip(),
-            value=self.current_app_url(self.tab),
-            type="secondary",
-            className="mb-0 px-2",
-        )
-
-    def _render_share_modal(self, dialog: gui.AlertDialogRef):
-        # modal is only valid for logged in users
-        assert self.request.user and self.current_workspace
-
-        with gui.alert_dialog(
-            ref=dialog, modal_title=f"#### Share: {self.current_pr.title}"
-        ):
-            if self.current_pr.workspace and not self.current_pr.workspace.is_personal:
-                with gui.div(className="mb-4"):
-                    self._render_workspace_with_invite_button(self.current_pr.workspace)
-
-            options = {
-                str(enum.value): enum.help_text(self.current_pr.workspace)
-                for enum in PublishedRunVisibility.choices_for_pr(self.current_pr)
-            }
-            published_run_visibility = PublishedRunVisibility(
-                int(
-                    gui.radio(
-                        "",
-                        options=options,
-                        format_func=options.__getitem__,
-                        key="published_run_visibility",
-                        value=str(self.current_pr.visibility),
-                    )
-                )
-            )
-
-            if self.current_pr.visibility != published_run_visibility:
-                visibility = PublishedRunVisibility(published_run_visibility)
-                self.current_pr.add_version(
+                render_share_button(
+                    publish_dialog_ref=publish_dialog_ref,
+                    workspace_id=self.request.user and self.current_workspace.id,
                     user=self.request.user,
-                    saved_run=self.current_pr.saved_run,
-                    title=self.current_pr.title,
-                    notes=self.current_pr.notes,
-                    visibility=visibility,
-                    change_notes=f"Visibility changed to {visibility.name.title()}",
+                    sr=self.current_sr,
+                    pr=self.current_pr,
+                    current_app_url=self.current_app_url(self.tab),
+                    session=self.request.session,
                 )
-
-            workspaces = self.request.user.cached_workspaces
-            if self.current_pr.workspace.is_personal and len(workspaces) > 1:
-                with gui.div(
-                    className="alert alert-warning mb-0 mt-4 d-flex align-items-baseline"
-                ):
-                    duplicate = gui.button(
-                        f"{icons.fork} Duplicate",
-                        type="link",
-                        className="d-inline m-0 p-0",
-                    )
-                    gui.html("&nbsp;" + "this workflow to edit with others")
-                    ref = gui.use_alert_dialog(key="publish-modal")
-                    if duplicate:
-                        self.clear_publish_form()
-                        gui.session_state["published_run_workspace"] = workspaces[-1].id
-                        ref.set_open(True)
-                    if ref.is_open:
-                        return self._render_publish_dialog(ref=ref)
-
-            with gui.div(className="d-flex justify-content-between pt-5"):
+                self._render_save_button(publish_dialog_ref)
+            elif self.tab != RecipeTabs.examples:
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
                     value=self.current_app_url(self.tab),
                     type="secondary",
-                    className="py-2 px-3 m-0",
+                    className="mb-0 px-2",
                 )
-                if gui.button("Done", type="primary", className="py-2 px-5 m-0"):
-                    dialog.set_open(False)
-                    gui.rerun()
 
-    def _render_workspace_with_invite_button(self, workspace: Workspace):
-        from workspaces.views import member_invite_button_with_dialog
+            if publish_dialog_ref.is_open:
+                self._render_publish_dialog(ref=publish_dialog_ref)
 
-        col1, col2 = gui.columns([9, 3])
-        with col1:
-            with gui.tag("p", className="mb-1 text-muted"):
-                gui.html("WORKSPACE")
-            render_author_from_workspace(workspace)
-        with col2:
-            try:
-                membership = workspace.memberships.get(user_id=self.request.user.id)
-            except WorkspaceMembership.DoesNotExist:
-                return
-            member_invite_button_with_dialog(
-                membership,
-                close_on_confirm=False,
-                type="tertiary",
-                className="mb-0",
-            )
-
-    def _render_save_button(self):
+    def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
         with gui.div(className="d-flex justify-content-end"):
-            if self.can_user_edit_published_run(self.current_pr):
+            if self.request.user and WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=self.current_workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            ):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
                 icon, label = icons.save, "Save and Run"
             else:
                 icon, label = icons.fork, "Save as New"
 
-            ref = gui.use_alert_dialog(key="publish-modal")
             if gui.button(
                 f'{icon} <span class="d-none d-lg-inline">{label}</span>',
                 className="mb-0 px-3 px-lg-4",
                 type="primary",
             ):
                 if self.is_logged_in():
-                    self.clear_publish_form()
-                    ref.set_open(True)
+                    clear_publish_form()
+                    publish_dialog_ref.set_open(True)
                 else:
                     self._publish_for_anonymous_user()
-
-            if not ref.is_open:
-                return
-            self._render_publish_dialog(ref=ref)
 
     def _publish_for_anonymous_user(self):
         query_params = {PUBLISH_AFTER_LOGIN_Q: "1"}
@@ -681,7 +596,11 @@ class BasePage:
         sr = self.current_sr
         pr = self.current_pr
 
-        if self.can_user_edit_published_run(self.current_pr):
+        if self.request.user and WorkflowAccessLevel.can_user_edit_published_run(
+            workspace=self.current_workspace,
+            user=self.request.user,
+            pr=self.current_pr,
+        ):
             label = "Update"
         elif self._has_request_changed():
             label = "Save and Run"
@@ -695,12 +614,6 @@ class BasePage:
         ):
             self._render_publish_form(sr=sr, pr=pr, dialog=ref)
 
-    @staticmethod
-    def clear_publish_form():
-        keys = {k for k in gui.session_state.keys() if k.startswith("published_run_")}
-        for k in keys:
-            gui.session_state.pop(k, None)
-
     def _render_publish_form(
         self,
         sr: SavedRun,
@@ -709,14 +622,20 @@ class BasePage:
     ):
         form_container = gui.div()
 
-        with gui.div(className="mt-4 d-block d-lg-flex justify-content-between"):
+        with gui.div(
+            className="mt-2 d-block d-lg-flex justify-content-between align-items-end"
+        ):
             selected_workspace = self._render_workspace_selector(
                 key="published_run_workspace"
             )
-            user_can_edit = selected_workspace.id == self.current_pr.workspace_id
 
+            user_can_edit = WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=selected_workspace,
+                user=self.request.user,
+                pr=pr,
+            )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
-                if user_can_edit:
+                if user_can_edit and pr.workspace_id == selected_workspace.id:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="secondary",
@@ -821,7 +740,11 @@ class BasePage:
                 notes=published_run_description.strip(),
             )
         else:
-            if not self.can_user_edit_published_run(self.current_pr):
+            if not WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=selected_workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            ):
                 gui.error("You don't have permission to update this workflow")
                 return
             updates = dict(
@@ -837,14 +760,16 @@ class BasePage:
             )
         raise gui.RedirectException(pr.get_app_url())
 
-    def _render_workspace_selector(self, *, key: str) -> "Workspace":
-        if not self.can_user_see_workspaces():
-            return self.current_workspace
-
+    def _get_workspace_options(self) -> dict[int, Workspace]:
         workspace_options = {w.id: w for w in self.request.user.cached_workspaces}
-
-        if self.current_pr.workspace_id and self.can_user_edit_published_run(
-            self.current_pr
+        if (
+            self.current_pr.workspace_id
+            and self.request.user
+            and WorkflowAccessLevel.can_user_edit_published_run(
+                workspace=self.current_pr.workspace,
+                user=self.request.user,
+                pr=self.current_pr,
+            )
         ):
             # default to current_pr.workspace for an editor
             workspace_options = {
@@ -855,29 +780,30 @@ class BasePage:
             workspace_options = {
                 self.current_workspace.id: self.current_workspace
             } | workspace_options
+        return workspace_options
+
+    def _render_workspace_selector(self, *, key: str) -> "Workspace":
+        workspace_options = self._get_workspace_options()
+
+        if len(workspace_options) <= 1:
+            render_create_workspace_alert()
+            return self.current_workspace
 
         with gui.div(className="d-flex gap-3"):
             with gui.div(className="mt-2 text-nowrap"):
-                gui.write("Workspace")
+                gui.html("Workspace")
 
-            if len(workspace_options) > 1:
-                with gui.div(style=dict(maxWidth="300px", width="100%")):
-                    workspace_id = gui.selectbox(
-                        "",
-                        key=key,
-                        options=workspace_options,
-                        format_func=lambda w_id: workspace_options[w_id].display_html(
-                            self.request.user
-                        ),
-                    )
-                    return workspace_options[workspace_id]
-            else:
-                with gui.div(className="p-2 mb-2"):
-                    render_author_from_workspace(
-                        self.current_workspace,
-                        show_as_link=False,
-                    )
-                return self.current_workspace
+            with gui.div(style=dict(maxWidth="300px", width="100%")):
+                workspace_id = gui.selectbox(
+                    "",
+                    key=key,
+                    options=workspace_options,
+                    format_func=lambda w_id: workspace_options[w_id].display_html(
+                        self.request.user
+                    ),
+                    className="mb-0",
+                )
+                return workspace_options[workspace_id]
 
     def _get_default_pr_title(self):
         return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
@@ -946,7 +872,15 @@ class BasePage:
                     f"{icons.fork} Save as New", className="w-100"
                 )
 
-            if not self.current_pr.is_root():
+            if (
+                self.request.user
+                and WorkflowAccessLevel.can_user_delete_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                )
+                and not self.current_pr.is_root()
+            ):
                 ref = gui.use_confirm_dialog(key="--delete-run-modal")
                 gui.button_with_confirm_dialog(
                     ref=ref,
@@ -1091,7 +1025,7 @@ class BasePage:
                         title=published_run.title,
                         notes=published_run.notes,
                         saved_run=published_run.saved_run,
-                        visibility=PublishedRunVisibility.PUBLIC,
+                        public_access=WorkflowAccessLevel.FIND_AND_VIEW,
                         change_notes=change_notes,
                     )
                     raise gui.RedirectException(self.app_url())
@@ -1449,7 +1383,7 @@ class BasePage:
             workspace=None,
             title=cls.title,
             notes=cls().preview_description(state=cls.sane_defaults),
-            visibility=PublishedRunVisibility.PUBLIC,
+            public_access=WorkflowAccessLevel.FIND_AND_VIEW,
         )[0]
 
     @classmethod
@@ -1462,7 +1396,7 @@ class BasePage:
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        public_access: WorkflowAccessLevel | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1472,7 +1406,7 @@ class BasePage:
             workspace=workspace,
             title=title,
             notes=notes,
-            visibility=visibility,
+            public_access=public_access,
         )
 
     @classmethod
@@ -2061,12 +1995,11 @@ class BasePage:
         if self.current_workspace.is_personal:
             pr_filter |= Q(created_by=self.request.user, workspace__isnull=True)
         else:
-            pr_filter &= Q(
-                visibility__in=(
-                    PublishedRunVisibility.PUBLIC,
-                    PublishedRunVisibility.INTERNAL,
-                )
-            ) | Q(created_by=self.request.user)
+            pr_filter &= (
+                ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
+                | Q(created_by=self.request.user)
+                | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
+            )
         qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
 
         published_runs, cursor = paginate_queryset(
@@ -2124,9 +2057,7 @@ class BasePage:
             with gui.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
                     gui.pill(
-                        PublishedRunVisibility(
-                            published_run.visibility
-                        ).get_badge_html(),
+                        published_run.get_share_badge_html(),
                         unsafe_allow_html=True,
                         className="border border-dark",
                     )
@@ -2148,13 +2079,6 @@ class BasePage:
             gui.error(saved_run.error_msg, unsafe_allow_html=True)
 
         return self.render_run_preview_output(saved_run.to_dict())
-
-    def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
-        with gui.spinner("Hiding..."):
-            published_run.is_approved_example = not hidden
-            published_run.save()
-
-        gui.rerun()
 
     def render_run_preview_output(self, state: dict):
         pass
@@ -2356,17 +2280,12 @@ class BasePage:
     def get_cost_note(self) -> str | None:
         pass
 
-    def can_user_see_workspaces(self) -> bool:
-        return bool(self.request.user) and (
-            self.is_current_user_admin() or len(self.request.user.cached_workspaces) > 1
-        )
-
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)
 
     @classmethod
     def is_user_admin(cls, user: AppUser | None) -> bool:
-        return bool(user and user.email and user.email in settings.ADMIN_EMAILS)
+        return bool(user and user.is_admin())
 
     def is_current_user_paying(self) -> bool:
         try:

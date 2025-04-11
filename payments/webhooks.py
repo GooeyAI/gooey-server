@@ -4,7 +4,7 @@ import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import PaymentProvider, TransactionReason, AppUser
+from app_users.models import PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal
 from workspaces.models import Workspace
 from .models import Subscription
@@ -253,6 +253,7 @@ def set_workspace_subscription(
     external_id: str | None,
     amount: int | None = None,
     charged_amount: int | None = None,
+    cancel_old: bool = True,
 ) -> Subscription:
     with transaction.atomic():
         old_sub = workspace.subscription
@@ -273,7 +274,7 @@ def set_workspace_subscription(
             workspace.save(update_fields=["subscription"])
 
     # cancel previous subscription if it's not the same as the new one
-    if old_sub and old_sub.external_id != external_id:
+    if cancel_old and old_sub and old_sub.external_id != external_id:
         old_sub.cancel()
 
     return new_sub

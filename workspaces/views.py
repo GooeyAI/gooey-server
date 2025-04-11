@@ -9,10 +9,14 @@ from django.db.models import F
 from django.utils.translation import ngettext
 
 from app_users.models import AppUser
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
-from daras_ai_v2.profiles import render_handle_input, update_handle
+from daras_ai_v2.profiles import (
+    render_handle_input,
+    render_profile_link_buttons,
+    update_handle,
+)
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.plans import PricingPlan
 from .models import (
@@ -21,7 +25,11 @@ from .models import (
     WorkspaceMembership,
     WorkspaceRole,
 )
-from .widgets import get_current_workspace, set_current_workspace
+from .widgets import (
+    get_current_workspace,
+    get_workspace_domain_name_options,
+    set_current_workspace,
+)
 
 rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
 
@@ -51,8 +59,8 @@ def invitation_page(
             style={
                 "width": "min(400px, 75vw)",
                 "height": "auto",
-                "object-fit": "cover",
-                "aspect-ratio": "8/3",
+                "objectFit": "cover",
+                "aspectRatio": "8/3",
             },
         )
         with gui.div(
@@ -69,7 +77,7 @@ def invitation_page(
             gui.image(
                 src=invite.created_by.photo_url,
                 className="rounded-circle m-0",
-                style={"width": "150px", "height": "150px", "object-fit": "cover"},
+                style={"width": "150px", "height": "150px", "objectFit": "cover"},
             )
 
             invite_creator = invite.created_by.full_name()
@@ -85,7 +93,7 @@ def invitation_page(
                 gui.image(
                     src=invite.workspace.get_photo(),
                     className="rounded",
-                    style={"height": "70px", "width": "70px", "object-fit": "contain"},
+                    style={"height": "70px", "width": "70px", "objectFit": "contain"},
                 )
                 with gui.tag("h1", className="my-0 ms-md-2 text-center text-md-start"):
                     gui.html(html_lib.escape(invite.workspace.display_name()))
@@ -170,9 +178,9 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
 
     workspace = membership.workspace
 
-    with gui.div(className="d-block d-sm-flex justify-content-between"):
+    with gui.div(className="mt-3 d-block d-sm-flex justify-content-between"):
         col1 = gui.div(
-            className="d-block d-md-flex text-center text-sm-start align-items-center"
+            className="d-block d-md-flex text-center text-sm-start align-items-start"
         )
         col2 = gui.div()
 
@@ -180,37 +188,52 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
         gui.image(
             workspace.get_photo(),
             className="my-0 me-4 rounded",
-            style={"width": "128px", "height": "128px", "object-fit": "contain"},
+            style={"width": "128px", "height": "128px", "objectFit": "contain"},
         )
-        with gui.div(className="d-flex flex-column justify-content-end"):
+        with gui.div(className="d-flex flex-column justify-content-start"):
             plan = (
                 workspace.subscription
                 and PricingPlan.from_sub(workspace.subscription)
                 or PricingPlan.STARTER
             )
 
-            with gui.tag("h1", className="mb-0" if workspace.domain_name else ""):
+            with gui.tag("h1", className="my-0"):
                 gui.html(html_lib.escape(workspace.display_name(membership.user)))
             if workspace.domain_name:
-                gui.caption(f"Domain: `@{workspace.domain_name}`")
-
-            billing_info = f"""
-                <span class="text-muted">Credits:</span> {workspace.balance}
-                <span class="text-muted">Plan:</span> {plan.title}
-            """.strip()
-            if membership.can_edit_workspace() and plan in (
-                PricingPlan.STARTER,
-                PricingPlan.CREATOR,
-            ):
-                billing_info += (
-                    f'<span className="ms-4 text-primary text-decoration-none">'
-                    f"[Upgrade]({get_route_path(account_route)})"
-                    f"</span>"
+                gui.write(
+                    f"Domain: `@{workspace.domain_name}`",
+                    className="container-margin-reset text-muted",
                 )
-            gui.write(billing_info, unsafe_allow_html=True)
+
+            if workspace.description:
+                gui.write(workspace.description, className="container-margin-reset")
+
+            with gui.div(className="mt-2"):
+                if workspace.handle:
+                    with gui.div(className="d-flex align-items-baseline gap-3"):
+                        pretty_handle_url = urls.remove_scheme(
+                            workspace.handle.get_app_url().rstrip("/")
+                        )
+                        gui.write(pretty_handle_url, className="container-margin-reset")
+                        render_profile_link_buttons(workspace.handle)
+
+                with gui.div(className="d-flex gap-3"):
+                    gui.html(
+                        f'<div><span class="text-muted">Credits:</span> {workspace.balance}</div>'
+                    )
+                    gui.html(
+                        f'<div><span class="text-muted">Plan:</span> {plan.title}</div>'
+                    )
+                    if membership.can_edit_workspace() and plan in (
+                        PricingPlan.STARTER,
+                        PricingPlan.CREATOR,
+                    ):
+                        gui.html(
+                            f'<a class="link-primary" href="{get_route_path(account_route)}">Upgrade</a>'
+                        )
 
     if membership.can_edit_workspace():
-        with col2, gui.div(className="mt-2 text-center"):
+        with col2, gui.div(className="text-center"):
             edit_workspace_button_with_dialog(membership)
 
     gui.newline()
@@ -345,7 +368,7 @@ def render_workspace_edit_view_by_membership(
     dialog_ref: gui.ConfirmDialogRef, membership: WorkspaceMembership
 ):
     workspace = copy(membership.workspace)
-    render_workspace_create_or_edit_form(workspace, membership.user)
+    render_workspace_edit_form(workspace, membership.user)
     render_danger_zone_by_membership(dialog_ref, membership)
     return workspace
 
@@ -625,7 +648,7 @@ def clear_workspace_create_or_edit_form():
         gui.session_state.pop(k, None)
 
 
-def render_workspace_create_or_edit_form(
+def render_workspace_edit_form(
     workspace: Workspace,
     current_user: AppUser,
 ):
@@ -645,14 +668,14 @@ def render_workspace_create_or_edit_form(
         placeholder="Tell the world about your team!",
         value=workspace.description,
     )
-    if current_user.email or workspace.domain_name:
+
+    domain_name_options = get_workspace_domain_name_options(
+        workspace=workspace, current_user=current_user
+    )
+    if domain_name_options:
         workspace.domain_name = gui.selectbox(
             "###### Domain Name _(Optional)_",
-            options={
-                workspace.domain_name,
-                current_user.email and current_user.email.split("@")[-1],
-            }
-            | {None},
+            options=domain_name_options,
             key="workspace-domain-name",
             value=workspace.domain_name,
         )

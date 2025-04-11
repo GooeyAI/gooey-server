@@ -9,11 +9,11 @@ from django.utils.translation import ngettext
 from fastapi import Request
 from furl import furl
 
-from app_users.models import AppUser
+from app_users.models import AppUser, obscure_phone_number
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
-    PublishedRunVisibility,
+    WorkflowAccessLevel,
     SavedRun,
     Workflow,
 )
@@ -90,7 +90,7 @@ def profile_header(request: Request, handle: Handle):
             with gui.tag("h1", className="d-inline my-0 me-2"):
                 gui.html(escape_html(get_profile_title(workspace)))
 
-            if request.user in (workspace.get_owners() | workspace.get_admins()):
+            if request.user in workspace.get_admins():
                 _render_edit_profile_button(request=request, workspace=workspace)
 
         with gui.tag("p", className="lead text-secondary mb-0"):
@@ -199,9 +199,11 @@ def _render_user_profile_stats(user: AppUser):
 
 
 def _render_team_profile_stats(workspace: Workspace):
-    public_workflow_count = PublishedRun.objects.filter(
-        workspace=workspace, visibility=PublishedRunVisibility.PUBLIC
-    ).count()
+    public_workflow_count = (
+        PublishedRun.objects.filter(workspace=workspace)
+        .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
+        .count()
+    )
     members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
 
     with gui.div(className="d-flex align-items-center mt-3 text-secondary"):
@@ -247,9 +249,8 @@ def _render_member_photos(workspace: Workspace):
 
 
 def render_public_runs_list(request: Request, workspace: Workspace):
-    qs = PublishedRun.objects.filter(
-        workspace=workspace,
-        visibility=PublishedRunVisibility.PUBLIC,
+    qs = PublishedRun.objects.filter(workspace=workspace).exclude(
+        public_access=WorkflowAccessLevel.VIEW_ONLY
     )
 
     prs, cursor = paginate_queryset(
@@ -296,7 +297,7 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 def get_public_runs_summary(user: AppUser, *, top_n: int = 3) -> PublicRunsSummary:
     count_by_workflow = (
-        user.published_runs.filter(visibility=PublishedRunVisibility.PUBLIC)
+        user.published_runs.exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
         .values("workflow")
         .annotate(count=Count("id"))
         .order_by("-count")
@@ -373,17 +374,18 @@ def _edit_user_profile_header(workspace: Workspace):
                 )
 
         if handle:
-            copy_to_clipboard_button(
-                f"{icons.copy_solid} Copy",
-                value=handle.get_app_url(),
-                type="tertiary",
-                className="m-0",
-            )
-            with gui.link(
-                to=handle.get_app_url(),
-                className="btn btn-theme btn-tertiary m-0",
-            ):
-                gui.html(f"{icons.preview} Preview")
+            render_profile_link_buttons(handle)
+
+
+def render_profile_link_buttons(handle: Handle):
+    copy_to_clipboard_button(
+        f"{icons.copy_solid} Copy",
+        value=handle.get_app_url(),
+        type="tertiary",
+        className="m-0",
+    )
+    with gui.link(to=handle.get_app_url(), className="btn btn-theme btn-tertiary m-0"):
+        gui.html(f"{icons.preview} Preview")
 
 
 def _banner_image_div(url: str | None, **props):
@@ -623,15 +625,19 @@ def _get_meta_description_for_profile(handle: Handle) -> str:
 
 
 def render_handle_input(
-    label: str, *, handle: Handle | None = None, **kwargs
+    label: str,
+    *,
+    handle: Handle | None = None,
+    **kwargs,
 ) -> str | None:
     handle_style: dict[str, str] = {}
-    new_handle = gui.text_input(
-        label,
-        value=handle and handle.name or "",
-        style=handle_style,
-        **kwargs,
-    )
+    with gui.div(style=dict(maxWidth="300px", width="100%")):
+        new_handle = gui.text_input(
+            label,
+            value=handle and handle.name or "",
+            style=handle_style,
+            **kwargs,
+        )
     if not new_handle or (handle and handle.name == new_handle):
         # nothing to validate
         return new_handle
@@ -642,7 +648,11 @@ def render_handle_input(
         gui.error(e.messages[0], icon="")
         handle_style["border"] = "1px solid var(--bs-danger)"
     else:
-        gui.success("Handle is available", icon="")
+        with (
+            gui.div(style=dict(maxWidth="300px")),
+            gui.styled("& { padding: 0.8rem 1rem 0 !important } "),
+        ):
+            gui.success("Available", icon="")
         handle_style["border"] = "1px solid var(--bs-success)"
 
     return new_handle
@@ -681,7 +691,7 @@ def get_profile_title(workspace: Workspace) -> str:
     elif user.email:
         return user.email.split("@")[0]
     elif user.phone_number:
-        return user.phone_number.as_e164[:-4] + "XXXX"
+        return obscure_phone_number(user.phone_number)
     else:
         return ""
 

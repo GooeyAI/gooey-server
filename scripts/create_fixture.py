@@ -7,7 +7,7 @@ from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
     PublishedRun,
-    PublishedRunVisibility,
+    WorkflowAccessLevel,
 )
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
@@ -58,7 +58,7 @@ def get_objects(*args):
     bots_qs = BotIntegration.objects.filter(
         published_run__is_approved_example=True,
     ).exclude(
-        published_run__visibility=PublishedRunVisibility.UNLISTED,
+        published_run__public_access=WorkflowAccessLevel.VIEW_ONLY,
     )
     for bi in bots_qs:
         if bi.workspace_id:

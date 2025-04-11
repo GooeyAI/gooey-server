@@ -123,10 +123,10 @@ def _autorefresh_script():
     gui.js(
         # language=JavaScript
         """
-            setTimeout(() => {
-                gooeyRefresh();
-            }, 10000);
-            """
+        setTimeout(() => {
+            gui.rerun();
+        }, 10000);
+        """
     )
 
 

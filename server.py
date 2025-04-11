@@ -47,6 +47,7 @@ from routers import (
     twilio_api,
     static_pages,
     onedrive_api,
+    workspace,
 )
 from routers import twilio_ws_api
 
@@ -61,6 +62,7 @@ app.include_router(account.app, include_in_schema=False)
 app.include_router(facebook_api.app, include_in_schema=False)
 app.include_router(onedrive_api.app, include_in_schema=False)
 app.include_router(slack_api.router, include_in_schema=False)
+app.include_router(workspace.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)
 app.include_router(stripe.router, include_in_schema=False)

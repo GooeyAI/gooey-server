@@ -10,7 +10,7 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.exceptions import HTTPException
 
-from bots.models import PublishedRun, PublishedRunVisibility, Workflow
+from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
@@ -72,7 +72,7 @@ def payment_processing_route(
         # language=JavaScript
         """
         setTimeout(() => {
-            window.location.href = redirectUrl;
+            gui.navigate(redirectUrl);
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
@@ -264,7 +264,7 @@ class AccountTabs(TabData, Enum):
 def billing_tab(request: Request, workspace: Workspace):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
-    return billing_page(workspace=workspace, user=request.user)
+    return billing_page(workspace=workspace, user=request.user, session=request.session)
 
 
 def profile_tab(request: Request, workspace: Workspace):
@@ -277,12 +277,11 @@ def all_saved_runs_tab(request: Request):
     if workspace.is_personal:
         pr_filter |= Q(created_by=request.user, workspace__isnull=True)
     else:
-        pr_filter &= Q(
-            visibility__in=(
-                PublishedRunVisibility.PUBLIC,
-                PublishedRunVisibility.INTERNAL,
-            )
-        ) | Q(created_by=request.user)
+        pr_filter &= (
+            ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
+            | Q(created_by=request.user)
+            | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
+        )
 
     qs = PublishedRun.objects.select_related(
         "workspace", "created_by", "saved_run"

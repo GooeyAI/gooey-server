@@ -28,6 +28,7 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
+from workspaces.models import WorkspaceMembership
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -40,65 +41,171 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 
-class PublishedRunVisibility(models.IntegerChoices):
-    UNLISTED = 1
-    PUBLIC = 2
-    INTERNAL = 3
+class WorkflowAccessLevel(models.IntegerChoices):
+    VIEW_ONLY = 1
+    FIND_AND_VIEW = 2
+    EDIT = 4
+
+    # migration: set pr.public_access=VIEW_ONLY, pr.workspace_access=EDIT
+    INTERNAL = (3, "Internal (Deprecated)")
 
     @classmethod
-    def choices_for_pr(
-        cls, pr: PublishedRun
-    ) -> typing.Iterable[PublishedRunVisibility]:
-        if not pr.workspace or pr.workspace.is_personal:
-            return {cls.UNLISTED, cls.PUBLIC, PublishedRunVisibility(pr.visibility)}
+    def get_team_sharing_options(
+        cls, pr: "PublishedRun", current_user: "AppUser"
+    ) -> typing.List[WorkflowAccessLevel]:
+        if not cls.can_user_delete_published_run(
+            workspace=pr.workspace,
+            user=current_user,
+            pr=pr,
+        ):
+            options = [WorkflowAccessLevel(pr.workspace_access)]
+        elif pr.workspace.can_have_private_published_runs():
+            options = [cls.VIEW_ONLY, cls.FIND_AND_VIEW, cls.EDIT]
         else:
-            return [cls.UNLISTED, cls.INTERNAL, cls.PUBLIC]
+            options = [cls.FIND_AND_VIEW, cls.EDIT]
+
+        if (perm := WorkflowAccessLevel(pr.workspace_access)) not in options:
+            options.append(perm)
+        return options
 
     @classmethod
-    def get_default_for_workspace(cls, workspace: typing.Optional["Workspace"]):
-        if not workspace or workspace.is_personal:
-            return cls.UNLISTED
+    def get_public_sharing_options(
+        cls, pr: "PublishedRun"
+    ) -> typing.List[WorkflowAccessLevel]:
+        if pr.workspace.can_have_private_published_runs():
+            options = [cls.VIEW_ONLY, cls.FIND_AND_VIEW]
         else:
-            return cls.INTERNAL
+            options = [cls.FIND_AND_VIEW]
 
-    def help_text(self, workspace: typing.Optional["Workspace"] = None):
-        from routers.account import profile_route, saved_route
+        if (perm := WorkflowAccessLevel(pr.public_access)) not in options:
+            options.append(perm)
+        return options
 
+    def get_team_sharing_icon(self) -> str:
         match self:
-            case PublishedRunVisibility.UNLISTED:
-                return f"{self.get_icon()} Only me + people with a link"
-            case PublishedRunVisibility.PUBLIC:
-                if workspace and workspace.handle:
-                    profile_url = workspace.handle.get_app_url()
-                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
-                    return f'{self.get_icon()} Public on <a href="{profile_url}" target="_blank">{pretty_profile_url}</a> (view only)'
-                elif workspace and workspace.is_personal:
-                    return f'{self.get_icon()} Public on <a href="{get_route_path(profile_route)}" target="_blank">my profile page</a>'
-                else:
-                    return f"{self.get_icon()} Public"
-            case PublishedRunVisibility.INTERNAL if workspace:
-                saved_route_url = get_route_path(saved_route)
-                return f'{self.get_icon()} Members <a href="{saved_route_url}" target="_blank">can find</a> and edit'
-            case PublishedRunVisibility.INTERNAL:
-                return f"{self.get_icon()} Members can find and edit"
-
-    def get_icon(self):
-        match self:
-            case PublishedRunVisibility.UNLISTED:
-                return icons.lock
-            case PublishedRunVisibility.PUBLIC:
-                return icons.globe
-            case PublishedRunVisibility.INTERNAL:
+            case WorkflowAccessLevel.VIEW_ONLY:
+                return icons.eye_slash
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                return icons.eye
+            case WorkflowAccessLevel.EDIT:
                 return icons.company_solid
+            case _:
+                raise ValueError("Invalid permission for team sharing")
 
-    def get_badge_html(self) -> str:
+    def get_public_sharing_icon(self):
         match self:
-            case PublishedRunVisibility.UNLISTED:
-                return f"{self.get_icon()} Private"
-            case PublishedRunVisibility.PUBLIC:
-                return f"{self.get_icon()} Public"
-            case PublishedRunVisibility.INTERNAL:
-                return f"{self.get_icon()} Internal"
+            case WorkflowAccessLevel.VIEW_ONLY | WorkflowAccessLevel.INTERNAL:
+                return icons.eye_slash
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                return icons.globe
+            case _:
+                raise ValueError("Invalid permission for public sharing")
+
+    def get_team_sharing_label(self):
+        match self:
+            case WorkflowAccessLevel.VIEW_ONLY:
+                return "Unlisted"
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                return "Visible"
+            case WorkflowAccessLevel.EDIT:
+                return "Edit"
+            case _:
+                raise ValueError("Invalid permission for team sharing")
+
+    def get_public_sharing_label(self):
+        match self:
+            case WorkflowAccessLevel.VIEW_ONLY | WorkflowAccessLevel.INTERNAL:
+                return "Unlisted"
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                return "Public"
+            case _:
+                raise ValueError("Invalid permission for public sharing")
+
+    def get_team_sharing_text(self, pr: "PublishedRun", current_user: "AppUser"):
+        from routers.account import saved_route
+
+        match self:
+            case WorkflowAccessLevel.VIEW_ONLY:
+                text = ": Only members with a link can view"
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                if self.can_user_delete_published_run(
+                    workspace=pr.workspace,
+                    user=current_user,
+                    pr=pr,
+                ):
+                    text = f": Members [can find]({get_route_path(saved_route)}) but can't update"
+                else:
+                    text = (
+                        f": Members [can find]({get_route_path(saved_route)}) and view."
+                    )
+                    if pr.created_by_id:
+                        text += f"<br/>{pr.created_by.full_name()} + admins can update."
+                    else:
+                        text += "<br/>Admins can update."
+            case WorkflowAccessLevel.EDIT:
+                text = f": Members [can find]({get_route_path(saved_route)}) and edit"
+            case _:
+                raise ValueError("Invalid permission for team sharing")
+
+        icon, label = self.get_team_sharing_icon(), self.get_team_sharing_label()
+        return f"{icon} **{label}**" + text
+
+    def get_public_sharing_text(self, pr: "PublishedRun") -> str:
+        from routers.account import profile_route
+
+        match self:
+            case WorkflowAccessLevel.VIEW_ONLY | WorkflowAccessLevel.INTERNAL:
+                text = ": Only people with a link can view"
+            case WorkflowAccessLevel.FIND_AND_VIEW:
+                profile_url = (
+                    pr.workspace.handle_id and pr.workspace.handle.get_app_url()
+                )
+                if profile_url:
+                    pretty_url = urls.remove_scheme(profile_url).rstrip("/")
+                    text = f" on [{pretty_url}]({profile_url}) (view only)"
+                else:
+                    text = f" on [your profile page]({get_route_path(profile_route)})"
+            case WorkflowAccessLevel.EDIT:
+                raise ValueError("Invalid permission for public sharing")
+
+        icon, label = self.get_public_sharing_icon(), self.get_public_sharing_label()
+        return f"{icon} **{label}**" + text
+
+    @classmethod
+    def can_user_delete_published_run(
+        cls, *, workspace: Workspace, user: AppUser, pr: PublishedRun
+    ) -> bool:
+        if pr.is_root():
+            return False
+        if user.is_admin():
+            return True
+        return bool(
+            user
+            and workspace.id == pr.workspace_id
+            and (
+                pr.created_by_id == user.id
+                or pr.workspace.get_admins().filter(id=user.id).exists()
+            )
+        )
+
+    @classmethod
+    def can_user_edit_published_run(
+        cls, *, workspace: Workspace, user: AppUser, pr: PublishedRun
+    ) -> bool:
+        if user.is_admin():
+            return True
+        return bool(
+            user
+            and workspace.id == pr.workspace_id
+            and (
+                (
+                    pr.workspace_access == WorkflowAccessLevel.EDIT
+                    and pr.workspace.memberships.filter(user=user).exists()
+                )
+                or pr.created_by_id == user.id
+                or pr.workspace.get_admins().filter(id=user.id).exists()
+            )
+        )
 
 
 class Platform(models.IntegerChoices):
@@ -112,7 +219,7 @@ class Platform(models.IntegerChoices):
     def get_icon(self):
         match self:
             case Platform.WEB:
-                return '<i class="fa-regular fa-globe"></i>'
+                return icons.globe
             case Platform.TWILIO:
                 return '<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
             case _:
@@ -1777,7 +1884,7 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        public_access: WorkflowAccessLevel | None = None,
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1790,7 +1897,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 workspace=workspace,
                 title=title,
                 notes=notes,
-                visibility=visibility,
+                public_access=public_access,
             ),
         )
 
@@ -1804,15 +1911,18 @@ class PublishedRunQuerySet(models.QuerySet):
         workspace: typing.Optional["Workspace"],
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        public_access: WorkflowAccessLevel | None = None,
     ):
         workspace_id = (
             workspace
             and workspace.id
             or PublishedRun._meta.get_field("workspace").get_default()
         )
-        if not visibility:
-            visibility = PublishedRunVisibility.get_default_for_workspace(workspace)
+        if not public_access:
+            if workspace and workspace.can_have_private_published_runs():
+                public_access = WorkflowAccessLevel.VIEW_ONLY
+            else:
+                public_access = WorkflowAccessLevel.FIND_AND_VIEW
 
         with transaction.atomic():
             pr = self.create(
@@ -1827,7 +1937,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 user=user,
                 saved_run=saved_run,
                 title=title,
-                visibility=visibility,
+                public_access=public_access,
                 notes=notes,
             )
             return pr
@@ -1871,9 +1981,13 @@ class PublishedRun(models.Model):
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
-    visibility = models.IntegerField(
-        choices=PublishedRunVisibility.choices,
-        default=PublishedRunVisibility.UNLISTED,
+    public_access = models.IntegerField(
+        choices=WorkflowAccessLevel.choices,
+        default=WorkflowAccessLevel.FIND_AND_VIEW,
+    )
+    workspace_access = models.IntegerField(
+        choices=WorkflowAccessLevel.choices,
+        default=WorkflowAccessLevel.EDIT,
     )
     is_approved_example = models.BooleanField(default=False)
     example_priority = models.IntegerField(
@@ -1883,14 +1997,14 @@ class PublishedRun(models.Model):
 
     created_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         related_name="published_runs",
         blank=True,
     )
     last_edited_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -1921,7 +2035,8 @@ class PublishedRun(models.Model):
             models.Index(
                 fields=[
                     "is_approved_example",
-                    "visibility",
+                    "public_access",
+                    "workspace_access",
                     "published_run_id",
                     "updated_at",
                     "workflow",
@@ -1929,7 +2044,13 @@ class PublishedRun(models.Model):
                 ]
             ),
             models.Index(
-                fields=["-updated_at", "workspace", "created_by", "visibility"]
+                fields=[
+                    "-updated_at",
+                    "workspace",
+                    "created_by",
+                    "public_access",
+                    "workspace_access",
+                ]
             ),
         ]
 
@@ -1947,7 +2068,7 @@ class PublishedRun(models.Model):
         workspace: "Workspace",
         title: str,
         notes: str,
-        visibility: PublishedRunVisibility | None = None,
+        public_access: WorkflowAccessLevel | None = None,
     ) -> "PublishedRun":
         return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
@@ -1957,7 +2078,7 @@ class PublishedRun(models.Model):
             workspace=workspace,
             title=title,
             notes=notes,
-            visibility=visibility,
+            public_access=public_access,
         )
 
     def get_app_url(self, query_params: dict = None):
@@ -1970,14 +2091,18 @@ class PublishedRun(models.Model):
         *,
         user: AppUser | None,
         saved_run: SavedRun,
-        visibility: PublishedRunVisibility | None = None,
+        public_access: WorkflowAccessLevel | None = None,
+        workspace_access: WorkflowAccessLevel | None = None,
         title: str = "",
         notes: str = "",
         change_notes: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
-        visibility = visibility or self.visibility
+        if public_access is None:
+            public_access = self.public_access
+        if workspace_access is None:
+            workspace_access = self.workspace_access
         with transaction.atomic():
             version = PublishedRunVersion(
                 published_run=self,
@@ -1986,7 +2111,8 @@ class PublishedRun(models.Model):
                 changed_by=user,
                 title=title,
                 notes=notes,
-                visibility=visibility,
+                public_access=public_access,
+                workspace_access=workspace_access,
                 change_notes=change_notes,
             )
             version.save()
@@ -2001,9 +2127,24 @@ class PublishedRun(models.Model):
         self.last_edited_by = latest_version.changed_by
         self.title = latest_version.title
         self.notes = latest_version.notes
-        self.visibility = latest_version.visibility
+        self.public_access = latest_version.public_access
+        self.workspace_access = latest_version.workspace_access
 
         self.save()
+
+    def get_share_icon(self):
+        if self.workspace.is_personal:
+            return WorkflowAccessLevel(self.public_access).get_public_sharing_icon()
+        else:
+            return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
+
+    def get_share_badge_html(self):
+        if self.workspace.is_personal:
+            perm = WorkflowAccessLevel(self.public_access)
+            return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
+        else:
+            perm = WorkflowAccessLevel(self.workspace_access)
+            return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
 
     def get_run_count(self):
         annotated_versions = self.versions.annotate(
@@ -2038,7 +2179,7 @@ class PublishedRun(models.Model):
     def approved_example_q(cls):
         return (
             Q(is_approved_example=True)
-            & ~Q(visibility=PublishedRunVisibility.UNLISTED)
+            & ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY.value)
             & ~Q(published_run_id="")
         )
 
@@ -2058,16 +2199,20 @@ class PublishedRunVersion(models.Model):
     )
     changed_by = models.ForeignKey(
         "app_users.AppUser",
-        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
     change_notes = models.TextField(blank=True, default="")
-    visibility = models.IntegerField(
-        choices=PublishedRunVisibility.choices,
-        default=PublishedRunVisibility.UNLISTED,
+    public_access = models.IntegerField(
+        choices=WorkflowAccessLevel.choices,
+        default=WorkflowAccessLevel.VIEW_ONLY,
+    )
+    workspace_access = models.IntegerField(
+        choices=WorkflowAccessLevel.choices,
+        default=WorkflowAccessLevel.EDIT,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
