@@ -238,9 +238,9 @@ class AppUser(models.Model):
         from workspaces.models import Workspace
 
         return list(
-            Workspace.objects.filter(
-                memberships__user=self, memberships__deleted__isnull=True
-            ).order_by("-is_personal", "-created_at")
+            Workspace.objects.select_related("subscription")
+            .filter(memberships__user=self, memberships__deleted__isnull=True)
+            .order_by("-is_personal", "-created_at")
         ) or [self.get_or_create_personal_workspace()[0]]
 
     def get_handle(self) -> Handle | None:
