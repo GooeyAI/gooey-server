@@ -109,7 +109,7 @@ def render_create_workspace_form(
     gui.write("###### Your workspace's URL")
     with gui.div(className="d-flex align-items-start gap-2"):
         with gui.div(className="mt-2 pt-1"):
-            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/") + "/")
+            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/"))
         with gui.div(className="d-block d-lg-flex gap-3 w-100"):
             # separate div for input & error msg for handle field
             if "handle_name" not in gui.session_state:
@@ -250,6 +250,7 @@ def render_invite_team_form(
 
 def popup_close_or_navgiate_js(next_url: str) -> str:
     return (
+        # language=javascript
         """
         if (event) event.preventDefault();
         if (window.opener) { 
