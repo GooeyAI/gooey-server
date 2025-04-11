@@ -1767,6 +1767,7 @@ class FeedbackComment(models.Model):
 
 
 class PublishedRunQuerySet(models.QuerySet):
+
     def get_or_create_with_version(
         self,
         *,
@@ -1778,6 +1779,7 @@ class PublishedRunQuerySet(models.QuerySet):
         title: str,
         notes: str,
         visibility: PublishedRunVisibility | None = None,
+        photo_url: str = "",
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1791,6 +1793,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 notes=notes,
                 visibility=visibility,
+                photo_url=photo_url,
             ),
         )
 
@@ -1805,6 +1808,7 @@ class PublishedRunQuerySet(models.QuerySet):
         title: str,
         notes: str,
         visibility: PublishedRunVisibility | None = None,
+        photo_url: str = "",
     ):
         workspace_id = (
             workspace
@@ -1822,6 +1826,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 last_edited_by=user,
                 workspace_id=workspace_id,
                 title=title,
+                photo_url=photo_url,
             )
             pr.add_version(
                 user=user,
@@ -1829,6 +1834,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
+                photo_url=photo_url,
             )
             return pr
 
@@ -1974,6 +1980,7 @@ class PublishedRun(models.Model):
         title: str = "",
         notes: str = "",
         change_notes: str = "",
+        photo_url: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1988,6 +1995,7 @@ class PublishedRun(models.Model):
                 notes=notes,
                 visibility=visibility,
                 change_notes=change_notes,
+                photo_url=photo_url,
             )
             version.save()
             self.update_fields_to_latest_version()
@@ -2002,6 +2010,7 @@ class PublishedRun(models.Model):
         self.title = latest_version.title
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
+        self.photo_url = latest_version.photo_url
 
         self.save()
 
@@ -2070,6 +2079,7 @@ class PublishedRunVersion(models.Model):
         default=PublishedRunVisibility.UNLISTED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    photo_url = CustomURLField(default="", blank=True)
 
     class Meta:
         ordering = ["-created_at"]
