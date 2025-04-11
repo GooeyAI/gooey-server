@@ -606,6 +606,7 @@ class LargeLanguageModels(Enum):
         context_window=2048,
         price=1,
         is_chat_model=False,
+        is_deprecated=True,
     )
     llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
         label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
@@ -620,6 +621,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.self_hosted,
         context_window=2048,
         price=1,
+        is_deprecated=True,
     )
 
     llama_3_groq_70b_tool_use = LLMSpec(
