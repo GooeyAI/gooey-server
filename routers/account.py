@@ -76,7 +76,7 @@ def payment_processing_route(
         }, waitingTimeMs);
         """,
         waitingTimeMs=waiting_time_sec * 1000,
-        redirectUrl=get_app_route_url(account_route),
+        redirectUrl=get_route_path(account_route),
     )
 
     return dict(
