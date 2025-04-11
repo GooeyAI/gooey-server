@@ -238,6 +238,10 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
     "ki": "Kikuyu",
 }
 
+# https://docs.lelapa.ai/getting-started/language-support
+LELAPA_ASR_SUPPORTED = {"eng", "afr", "zul", "sot", "fra"}
+LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn", "tsn_Latn", "xho_Latn", "zul_Latn", "eng_Latn", "swh_Latn", "sna_Latn", "yor_Latn", "hau_Latn"}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -261,6 +265,7 @@ class AsrModels(Enum):
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
+    lelapa = "Vulavula (Lelapa AI)"
 
     def supports_auto_detect(self) -> bool:
         return self not in {
@@ -306,6 +311,7 @@ asr_model_ids = {
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
     AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
+    AsrModels.lelapa: "lelapa-vulavula",
 }
 
 forced_asr_languages = {
@@ -335,6 +341,7 @@ asr_supported_languages = {
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
     AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
+    AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
 }
 
 
@@ -370,6 +377,7 @@ class TranslationModels(TranslationModel, Enum):
         supports_auto_detect=True,
     )
     ghana_nlp = TranslationModel(label="Ghana NLP Translate")
+    lelapa = TranslationModel(label="Vulavula (Lelapa AI)")
     whisper_large_v2 = TranslationModel(
         label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
@@ -403,6 +411,8 @@ class TranslationModels(TranslationModel, Enum):
                 )
             case self.seamless_m4t_v2:
                 return SEAMLESS_v2_ASR_SUPPORTED
+            case self.lelapa:
+                return LELAPA_MT_SUPPORTED
             case _:
                 return ["en"]
 
@@ -716,6 +726,12 @@ def run_translate(
             target_language=target_language,
             source_language=source_language,
         )
+    elif model == TranslationModels.lelapa.name:
+        return run_lelapa_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -761,6 +777,35 @@ def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -
     )
     raise_for_status(r)
     return r.json()
+
+
+def run_lelapa_translate(
+    texts: list[str], target_language: str, source_language: str
+) -> list[str]:
+    assert (
+        source_language and target_language
+    ), "Both Source & Target language are required"
+    return map_parallel(
+        lambda text: _call_lelapa_translate_raw(text, source_language, target_language),
+        texts,
+        max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def _call_lelapa_translate_raw(
+    text: str, source_language: str, target_language: str
+) -> str:
+    r = requests.post(
+        "https://vulavula-services.lelapa.ai/api/v1/translate/process",
+        headers={"X-CLIENT-TOKEN": settings.LELAPA_API_KEY},
+        json={
+            "input_text": text,
+            "source_lang": source_language,
+            "target_lang": target_language,
+        },
+    )
+    raise_for_status(r)
+    return r.json()["translation"][0]["translated_text"]  # yes
 
 
 def run_google_translate(
@@ -1127,6 +1172,18 @@ def run_asr(
         )
         raise_for_status(r)
         data = r.json()
+    elif selected_model == AsrModels.lelapa:
+        audio_r = requests.get(audio_url)
+        params = language and {"lang_code": language} or None
+        r = requests.post(
+            "https://vulavula-services.lelapa.ai/api/v2alpha/transcribe/sync/file",
+            headers={"X-CLIENT-TOKEN": settings.LELAPA_API_KEY},
+            files={"file": audio_r.content},
+            params=params,
+        )
+        raise_for_status(r)
+
+        return r.json()["transcription_text"]
     elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
         from daras_ai_v2.language_model import get_openai_client
 
@@ -1268,16 +1325,7 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    try:
-        raise_for_status(r, is_user_url=True)
-    except requests.HTTPError:
-        # wait 3 seconds and try again (handles cases where the url has just been uploaded but cache is not updated yet, e.g. for Twilio)
-        from time import sleep
-
-        sleep(3)
-        r = requests.get(audio_url)
-        raise_for_status(r, is_user_url=True)
-
+    raise_for_status(r, is_user_url=True)
     audio_bytes = r.content
     wavdata, size = audio_bytes_to_wav(audio_bytes)
     if wavdata is audio_bytes:  # no change, don't re-upload

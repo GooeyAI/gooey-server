@@ -294,6 +294,24 @@ class LargeLanguageModels(Enum):
     )
 
     # https://console.groq.com/docs/models
+    llama4_maverick_17b_128e = LLMSpec(
+        label="Llama 4 Maverick Instruct",
+        model_id="accounts/fireworks/models/llama4-maverick-instruct-basic",
+        llm_api=LLMApis.fireworks,
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+        supports_json=True,
+        is_vision_model=True,
+    )
+    llama4_scout_17b_16e = LLMSpec(
+        label="Llama 4 Scout Instruct",
+        model_id="accounts/fireworks/models/llama4-scout-instruct-basic",
+        llm_api=LLMApis.fireworks,
+        context_window=128_000,
+        max_output_tokens=16_384,
+        supports_json=True,
+        is_vision_model=True,
+    )
     llama3_3_70b = LLMSpec(
         label="Llama 3.3 70B",
         model_id="llama-3.3-70b-versatile",
@@ -446,6 +464,26 @@ class LargeLanguageModels(Enum):
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+    gemini_2_5_pro_preview = LLMSpec(
+        label="Gemini 2.5 Pro Preview (Google)",
+        model_id="gemini-2.5-pro-preview-03-25",
+        llm_api=LLMApis.gemini,
+        context_window=1_048_576,
+        max_output_tokens=64_000,
+        price=20,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_2_flash_lite = LLMSpec(
+        label="Gemini 2 Flash Lite (Google)",
+        model_id="gemini-2.0-flash-lite",
+        llm_api=LLMApis.gemini,
+        context_window=1_048_576,
+        max_output_tokens=8192,
+        price=20,
+        is_vision_model=True,
+        supports_json=True,
+    )
     gemini_2_flash = LLMSpec(
         label="Gemini 2 Flash (Google)",
         model_id="gemini-2.0-flash-001",
@@ -1017,7 +1055,7 @@ def _run_chat_model(
             return _run_gemini_pro(
                 model_id=model.model_id,
                 messages=messages,
-                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
+                max_output_tokens=max_tokens,
                 temperature=temperature,
                 response_format_type=response_format_type,
             )

@@ -1,7 +1,9 @@
 import uuid
 from functools import cached_property
+from time import sleep
 
 import aifail
+import requests
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
@@ -46,18 +48,18 @@ class TwilioSMS(BotInterface):
         self,
         *,
         text: str | None = None,
-        audio: str | None = None,
-        video: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        assert buttons is None, "Interactive mode is not implemented yet"
-        assert update_msg_id is None, "Twilio does not support un-sms-ing things"
+        assert not buttons, "Interactive mode is not implemented yet"
+        media = audio or video or documents
         return send_sms_message(
             self.convo,
             text=text,
-            media_url=audio or video or (documents[0] if documents else None),
+            media_url=media and media[0] or None,
         ).sid
 
     def mark_read(self):
@@ -165,6 +167,8 @@ class TwilioVoice(BotInterface):
         elif audio_url:
             self.input_type = "audio"
             self._audio_url = audio_url
+            if requests.head(audio_url).status_code == 404:
+                sleep(1)  # wait for the recording to be available
         else:
             self.input_type = "interactive"
 
@@ -180,17 +184,16 @@ class TwilioVoice(BotInterface):
         self,
         *,
         text: str | None = None,
-        audio: str | None = None,
-        video: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
 
-        assert documents is None, "Twilio does not support sending documents via Voice"
-        assert video is None, "Twilio does not support sending videos via Voice"
-        assert buttons is None, "Interactive mode is not implemented yet"
-        assert update_msg_id is None, "Twilio does not support un-saying things"
+        assert not documents, "Twilio does not support sending documents via Voice"
+        assert not video, "Twilio does not support sending videos via Voice"
+        assert not buttons, "Interactive mode is not implemented yet"
 
         try:
             return send_msg_to_queue(
@@ -220,15 +223,17 @@ def is_queue_not_found(exc: Exception):
     return isinstance(exc, TwilioRestException) and exc.code == 20404
 
 
-@aifail.retry_if(is_queue_not_found, max_retry_delay=1, max_retries=5)
-def send_msg_to_queue(queue, *, convo_id: int, text: str | None, audio: str | None):
+@aifail.retry_if(is_queue_not_found, max_retry_delay=6, max_retries=10)
+def send_msg_to_queue(
+    queue, *, convo_id: int, text: str | None, audio: list[str] | None
+):
     from routers.twilio_api import twilio_voice_call_response
 
     return queue.members("Front").update(
         url=get_api_route_url(
             twilio_voice_call_response,
-            query_params=dict(convo_id=convo_id, text=text, audio_url=audio),
-        ),
+            query_params=dict(convo_id=convo_id, text=text, audio=audio),
+        )
     )
 
 

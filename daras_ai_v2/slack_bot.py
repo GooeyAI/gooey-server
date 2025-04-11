@@ -143,12 +143,12 @@ class SlackBot(BotInterface):
         self,
         *,
         text: str | None = None,
-        audio: str | None = None,
-        video: str | None = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
         update_msg_id: str | None = None,
-    ):
+    ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
 
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
@@ -182,8 +182,8 @@ class SlackBot(BotInterface):
         cls,
         *,
         text: str | None = None,
-        audio: str = None,
-        video: str = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         ## whatsapp specific
@@ -541,8 +541,8 @@ def chat_post_message(
     token: str,
     update_msg_ts: str = None,
     channel_is_personal: bool = False,
-    audio: str = None,
-    video: str = None,
+    audio: list[str] | None = None,
+    video: list[str] | None = None,
     username: str = "Video Bot",
     buttons: list[ReplyButton] = None,
 ) -> str | None:
@@ -565,10 +565,10 @@ def chat_post_message(
                         "type": "section",
                         "text": {"type": "mrkdwn", "text": text},
                     },
-                ]
-                + create_file_block("Audio", token, audio)
-                + create_file_block("Video", token, video)
-                + create_button_block(buttons),
+                    *create_file_block("Audio", token, audio),
+                    *create_file_block("Video", token, video),
+                    *create_button_block(buttons),
+                ],
             },
             headers={
                 "Authorization": f"Bearer {token}",
@@ -588,10 +588,10 @@ def chat_post_message(
                         "type": "section",
                         "text": {"type": "mrkdwn", "text": text},
                     },
-                ]
-                + create_file_block("Audio", token, audio)
-                + create_file_block("Video", token, video)
-                + create_button_block(buttons),
+                    *create_file_block("Audio", token, audio),
+                    *create_file_block("Video", token, video),
+                    *create_button_block(buttons),
+                ],
             },
             headers={
                 "Authorization": f"Bearer {token}",
@@ -604,29 +604,28 @@ def chat_post_message(
 def create_file_block(
     title: str,
     token: str,
-    url: str | None = None,
+    urls: list[str] | None = None,
 ) -> list[dict]:
-    if not url:
+    if not urls:
         return []
-    res = requests.get(
-        "https://slack.com/api/files.remote.add",
-        params={
-            "external_id": url,
-            "external_url": url,
-            "title": title,
-        },
-        headers={
-            "Authorization": f"Bearer {token}",
-        },
-    )
-    parse_slack_response(res)
-    return [
-        {
+    for url in urls:
+        res = requests.get(
+            "https://slack.com/api/files.remote.add",
+            params={
+                "external_id": url,
+                "external_url": url,
+                "title": title,
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        parse_slack_response(res)
+        yield {
             "type": "file",
             "external_id": url,
             "source": "remote",
-        },
-    ]
+        }
 
 
 def create_button_block(buttons: list[ReplyButton]) -> list[dict]:

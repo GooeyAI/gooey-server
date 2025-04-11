@@ -113,12 +113,12 @@ class WhatsappBot(BotInterface):
     def _send_msg(
         self,
         *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
-        update_msg_id: str = None,
+        text: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
+        update_msg_id: str | None = None,
     ) -> str | None:
         return self.send_msg_to(
             bot_number=self.bot_id,
@@ -140,11 +140,11 @@ class WhatsappBot(BotInterface):
     def send_msg_to(
         cls,
         *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        documents: list[str] = None,
-        buttons: list[ReplyButton] = None,
+        text: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
+        documents: list[str] | None = None,
+        buttons: list[ReplyButton] | None = None,
         ## whatsapp specific
         bot_number: str,
         user_number: str,
@@ -200,23 +200,23 @@ class WhatsappBot(BotInterface):
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
         if video:
             # video msg at the start
-            messages.insert(
-                0,
+            messages = [
                 {
                     "type": "video",
-                    "video": {"link": video},
-                },
-            )
+                    "video": {"link": url},
+                }
+                for url in video
+            ] + messages
         # video already has audio, so skip audio if video is present
         elif audio:
-            # audio msg at the start
-            messages.insert(
-                0,
+            # audio msg at the end
+            messages += [
                 {
                     "type": "audio",
-                    "audio": {"link": audio},
-                },
-            )
+                    "audio": {"link": url},
+                }
+                for url in audio
+            ]
         if documents:
             messages = [
                 # document msg at the start
@@ -429,12 +429,12 @@ class FacebookBot(BotInterface):
     def _send_msg(
         self,
         *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
-        update_msg_id: str = None,
+        text: str | None = None,
+        audio: list[str] | None = None,
+        video: list[str] | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
+        update_msg_id: str | None = None,
     ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
         return send_fb_msg(
@@ -494,9 +494,9 @@ def send_fb_msg(
     access_token: str,
     bot_id: str,
     user_id: str,
-    text: str = None,
-    audio: str = None,
-    video: str = None,
+    text: str | None = None,
+    audio: list[str] | None = None,
+    video: list[str] | None = None,
 ):
     messages = []
     if text:
@@ -508,23 +508,25 @@ def send_fb_msg(
         )
     # either audio or video should be sent, not both
     if video:
-        messages.append(
+        messages += [
             {
                 "messaging_type": "RESPONSE",
                 "message": {
-                    "attachment": {"type": "video", "payload": {"url": video}},
+                    "attachment": {"type": "video", "payload": {"url": url}},
                 },
-            },
-        )
+            }
+            for url in video
+        ]
     elif audio:
-        messages.append(
+        messages += [
             {
                 "messaging_type": "RESPONSE",
                 "message": {
-                    "attachment": {"type": "audio", "payload": {"url": audio}},
+                    "attachment": {"type": "audio", "payload": {"url": url}},
                 },
-            },
-        )
+            }
+            for url in audio
+        ]
     # send the response to the user
     send_fb_msgs_raw(
         page_id=bot_id,

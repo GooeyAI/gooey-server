@@ -284,6 +284,12 @@ FAL_API_KEY = config("FAL_API_KEY", default="")
 
 APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
 API_BASE_URL = config("API_BASE_URL", "/")
+WS_STREAM_API_BASE_URL = config(
+    "WS_STREAM_API_BASE_URL", API_BASE_URL.replace("http", "ws", 1)
+)
+WS_PROXY_API_BASE_URL = config(
+    "WS_PROXY_API_BASE_URL", API_BASE_URL.replace("http", "ws", 1)
+)
 ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
@@ -442,6 +448,7 @@ DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 
 GHANA_NLP_SUBKEY = config("GHANA_NLP_SUBKEY", "")
+LELAPA_API_KEY = config("LELAPA_API_KEY", "")
 
 VESPA_URL = config("VESPA_URL", "http://localhost:8085")
 VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")

@@ -534,6 +534,24 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="gemini-2.5-pro-preview-03-25",
+        model_name=LargeLanguageModels.gemini_2_5_pro_preview.name,
+        unit_cost_input=1.25,  # actually 2.5 when len(input) >= 200K
+        unit_cost_output=10,  # actually 15 when len(input) >= 200K
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro-preview",
+    )
+    llm_pricing_create(
+        model_id="gemini-2.0-flash-lite",
+        model_name=LargeLanguageModels.gemini_2_flash_lite.name,
+        unit_cost_input=0.075,
+        unit_cost_output=0.30,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.0-flash-lite",
+    )
+    llm_pricing_create(
         model_id="gemini-2.0-flash-001",
         model_name=LargeLanguageModels.gemini_2_flash.name,
         unit_cost_input=0.1,
@@ -921,6 +939,25 @@ def run():
         model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
         unit_cost_input=0.90,
         unit_cost_output=0.90,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/llama4-scout-instruct-basic",
+        model_name=LargeLanguageModels.llama4_scout_17b_16e.name,
+        unit_cost_input=0.15,
+        unit_cost_output=0.60,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/llama4-maverick-instruct-basic",
+        model_name=LargeLanguageModels.llama4_maverick_17b_128e.name,
+        unit_cost_input=0.22,
+        unit_cost_output=0.88,
         unit_quantity=10**6,
         provider=ModelProvider.fireworks,
         pricing_url="https://fireworks.ai/pricing",
