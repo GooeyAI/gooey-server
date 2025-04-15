@@ -5,7 +5,6 @@ from bots.models import (
     SavedRun,
     PublishedRun,
 )
-from daras_ai.image_input import truncate_text_words
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs

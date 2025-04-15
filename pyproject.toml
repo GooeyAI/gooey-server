@@ -105,3 +105,21 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 --force-exclude = "migrations|node_modules|\\.git|\\.venv|\\.env|\\.pytest_cache|\\.vscode|\\.github|\\.to"
+
+[tool.ruff]
+exclude = [
+  "migrations",
+  "node_modules",
+  ".git",
+  ".venv",
+  ".env",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".vscode",
+  ".github",
+  "__pycache__",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/{tests,views,admin}.py" = ["F401"]

@@ -230,7 +230,7 @@ class ObjectInpaintingPage(BasePage):
             diffusion_images = gui.session_state.get("output_images")
             if diffusion_images:
                 for url in diffusion_images:
-                    gui.image(url, caption=f"Generated Image")
+                    gui.image(url, caption="Generated Image")
             else:
                 gui.div()
 
@@ -268,7 +268,7 @@ class ObjectInpaintingPage(BasePage):
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
         state["obj_mask"] = upload_file_from_bytes("obj_mask.png", re_mask_bytes)
 
-        yield f"Generating Image..."
+        yield "Generating Image..."
 
         diffusion_images = stable_diffusion.inpainting(
             selected_model=request.selected_model,

@@ -13,7 +13,7 @@ from pyzbar import pyzbar
 
 import gooey_gui as gui
 from app_users.models import AppUser
-from bots.models import PublishedRun, Workflow
+from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,

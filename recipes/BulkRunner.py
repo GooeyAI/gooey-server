@@ -32,7 +32,6 @@ from daras_ai_v2.workflow_url_input import (
     get_published_run_options,
     edit_done_button,
 )
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
 

@@ -308,27 +308,27 @@ class ImageSegmentationPage(BasePage):
         with col2:
             output_image = gui.session_state.get("output_image")
             if output_image:
-                gui.image(output_image, caption=f"Segmentation Mask")
+                gui.image(output_image, caption="Segmentation Mask")
             else:
                 gui.div()
 
         with col3:
             resized_image = gui.session_state.get("resized_image")
             if resized_image:
-                gui.image(resized_image, caption=f"Resized Image")
+                gui.image(resized_image, caption="Resized Image")
             else:
                 gui.div()
 
             resized_mask = gui.session_state.get("resized_mask")
             if resized_mask:
-                gui.image(resized_mask, caption=f"Resized Mask")
+                gui.image(resized_mask, caption="Resized Mask")
             else:
                 gui.div()
 
         with col4:
             cutout_image = gui.session_state.get("cutout_image")
             if cutout_image:
-                gui.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption="Cutout Image")
             else:
                 gui.div()
 
@@ -345,7 +345,7 @@ class ImageSegmentationPage(BasePage):
         with col2:
             cutout_image = state.get("cutout_image")
             if cutout_image:
-                gui.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption="Cutout Image")
             else:
                 gui.div()
 

@@ -38,7 +38,6 @@ from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
     DocSearchRequest,
-    EmptySearchResults,
     get_top_k_references,
     references_as_prompt,
 )
