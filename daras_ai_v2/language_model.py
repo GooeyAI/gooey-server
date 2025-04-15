@@ -126,7 +126,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
-        label="o1-preview (openai) [Deprecated]",
+        label="o1-preview [Deprecated] (openai)",
         model_id="o1-preview-2024-09-12",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -219,7 +219,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision (openai) [Deprecated]",
+        label="GPT-4 Vision [Deprecated] (openai)",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -371,7 +371,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B (Meta AI) [Deprecated]",
+        label="Llama 3.1 70B [Deprecated] (Meta AI)",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -453,7 +453,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemma_7b_it = LLMSpec(
-        label="Gemma 7B (Google) [Deprecated]",
+        label="Gemma 7B [Deprecated] (Google)",
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
@@ -600,7 +600,7 @@ class LargeLanguageModels(Enum):
     )
 
     afrollama_v1 = LLMSpec(
-        label="AfroLlama3 v1 (Jacaranda)",
+        label="AfroLlama3 v1 [Deprecated] (Jacaranda)",
         model_id="Jacaranda/AfroLlama_V1",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
@@ -616,7 +616,7 @@ class LargeLanguageModels(Enum):
         price=1,
     )
     sarvam_2b = LLMSpec(
-        label="Sarvam 2B (sarvamai)",
+        label="Sarvam 2B [Deprecated] (sarvamai)",
         model_id="sarvamai/sarvam-2b-v0.5",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
