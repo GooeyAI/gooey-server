@@ -245,17 +245,9 @@ LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
-    whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
-    whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
-    whisper_chichewa_large_v3 = (
-        "Whisper Large v3 chichewa [Deprecated] (opportunity.org)"
-    )
     gpt_4_o_audio = "GPT-4o (openai)"
     gpt_4_o_mini_audio = "GPT-4o mini (openai)"
-    nemo_english = "Conformer English (ai4bharat.org)"
-    nemo_hindi = "Conformer Hindi (ai4bharat.org)"
-    vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     gcp_v1 = "Google Cloud V1"
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
@@ -263,9 +255,18 @@ class AsrModels(Enum):
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
-    seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
     lelapa = "Vulavula (Lelapa AI)"
+
+    seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
+    whisper_chichewa_large_v3 = (
+        "Whisper Large v3 chichewa [Deprecated] (opportunity.org)"
+    )
+    nemo_english = "Conformer English [Deprecated] (ai4bharat.org)"
+    nemo_hindi = "Conformer Hindi [Deprecated] (ai4bharat.org)"
+    whisper_hindi_large_v2 = "Whisper Hindi Large v2 [Deprecated] (Bhashini)"
+    whisper_telugu_large_v2 = "Whisper Telugu Large v2 [Deprecated] (Bhashini)"
+    vakyansh_bhojpuri = "Vakyansh Bhojpuri [Deprecated] (Open-Speech-EkStep)"
 
     def supports_auto_detect(self) -> bool:
         return self not in {
