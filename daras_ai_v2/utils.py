@@ -34,7 +34,7 @@ def get_relative_time(timestamp: datetime) -> str:
 
 def use_session_state(
     key: str, *, default: T = None
-) -> tuple[T, [typing.Callable[[T], None]]]:
+) -> tuple[T, typing.Callable[[T], None]]:
     def set_state(value: T) -> None:
         gui.session_state[key] = value
 
