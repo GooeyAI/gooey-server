@@ -39,10 +39,18 @@ check = '<i class="fa-solid fa-check"></i>'
 octopus = '<i class="fa-regular fa-octopus"></i>'
 eye = '<i class="fa-solid fa-eye"></i>'
 eye_slash = '<i class="fa-solid fa-eye-slash"></i>'
+photo = '<i class="fa-solid fa-image"></i>'
+sparkles = '<i class="fa-solid fa-sparkles"></i>'
+upload = '<i class="fa-solid fa-upload"></i>'
+phone = '<i class="fa-solid fa-phone"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
 github_alt = '<i class="fa-brands fa-github-alt"></i>'
+whatsapp = '<i class="fa-brands fa-whatsapp"></i>'
+fb_messenger = '<i class="fa-brands fa-facebook-messenger"></i>'
+slack = '<i class="fa-brands fa-slack"></i>'
+instagram = '<i class="fa-brands fa-instagram"></i>'
 
 # cards
 card_icons = {

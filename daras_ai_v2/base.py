@@ -12,6 +12,7 @@ from enum import Enum
 from functools import cached_property, partial
 from itertools import pairwise
 from random import Random
+from textwrap import dedent
 from time import sleep
 
 import gooey_gui as gui
@@ -27,12 +28,13 @@ from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
+    Platform,
     PublishedRun,
-    WorkflowAccessLevel,
     PublishedRunVersion,
     RetentionPolicy,
     SavedRun,
     Workflow,
+    WorkflowAccessLevel,
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
@@ -78,9 +80,12 @@ from widgets.workflow_share import (
 from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
-    set_current_workspace,
     render_create_workspace_alert,
+    set_current_workspace,
 )
+
+if typing.TYPE_CHECKING:
+    from bots.models import BotIntegration
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -353,7 +358,6 @@ class BasePage:
             return
 
         header_placeholder = gui.div()
-        gui.newline()
         with gui.div(className="position-relative"):
             with gui.nav_tabs():
                 for tab in self.get_tabs():
@@ -375,6 +379,7 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
+        demo_bi = self.tab == RecipeTabs.run and get_demo_bi_from_pr(pr)
 
         with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
             if tbreadcrumbs.has_breadcrumbs():
@@ -398,15 +403,82 @@ class BasePage:
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
 
+        if demo_bi:
+            heading_div, demo_div = gui.columns([10, 2])
+        else:
+            heading_div, demo_div = gui.div(), None
+
         if tbreadcrumbs.has_breadcrumbs():
-            self._render_title(tbreadcrumbs.h1_title)
+            with heading_div:
+                self._render_title(tbreadcrumbs.h1_title)
 
         if self.tab != RecipeTabs.run:
             return
-        if pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
-        elif is_root_example and self.tab != RecipeTabs.integrations:
-            gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+
+        with heading_div:
+            if pr and pr.notes:
+                gui.write(pr.notes, line_clamp=2)
+            elif is_root_example and self.tab != RecipeTabs.integrations:
+                gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+
+        if demo_bi:
+            platform = Platform(demo_bi.platform)
+            demo_dialog_ref = gui.use_alert_dialog(key="demo-modal")
+            with (
+                demo_div,
+                gui.center(className="h-100 container-margin-reset"),
+            ):
+                gui.write("Try the demo", className="text-muted")
+                if gui.button(
+                    f"{platform.get_icon()} {platform.get_title()}",
+                    className="m-0 py-2 px-3",
+                ):
+                    demo_dialog_ref.set_open(True)
+
+            if demo_dialog_ref.is_open:
+                title = dedent(
+                    f"""
+                ### {platform.get_title()} Demo
+                """
+                )
+                with gui.alert_dialog(demo_dialog_ref, modal_title=title):
+                    gui.write(
+                        f"#### {demo_bi.name or ''}",
+                        className="d-block mb-4",
+                        style={"margin-top": "-2.5rem"},
+                    )
+                    col1, col2 = gui.columns(2)
+                    with col1, gui.div():
+                        gui.write("Message")
+                        gui.write(
+                            f"#### [{demo_bi.get_display_name()}]({demo_bi.get_bot_test_link()})",
+                            className="d-block mt-3",
+                        )
+                        copy_to_clipboard_button(
+                            f"{icons.copy_solid} Copy",
+                            value=demo_bi.get_bot_test_link(),
+                            type="secondary",
+                        )
+                    with col2:
+                        with gui.div(
+                            className="d-flex justify-content-between align-items-center"
+                        ):
+                            gui.write("Or scan QR Code")
+                            gui.anchor(
+                                label=icons.download_solid,
+                                href=demo_bi.get_bot_test_link(),
+                                type="secondary",
+                                unsafe_allow_html=True,
+                                className="py-1",
+                            )
+                        gui.image(
+                            src=demo_bi.demo_button_qr_code_image,
+                            style={
+                                "width": "200px",
+                                "height": "200px",
+                                "contentFit": "fill",
+                            },
+                        )
 
     def _render_author_as_breadcrumb(self, *, is_example: bool, is_root_example: bool):
         if is_root_example:
@@ -2315,7 +2387,7 @@ def render_output_caption():
 
     run_time = gui.session_state.get(StateKeys.run_time, 0)
     if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
+        caption += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
 
     if seed := gui.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '
@@ -2381,6 +2453,10 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
+
+
+def get_demo_bi_from_pr(pr: PublishedRun) -> typing.Optional["BotIntegration"]:
+    return pr.botintegrations.filter(demo_button_qr_code_image__isnull=False).first()
 
 
 class TitleValidationError(Exception):

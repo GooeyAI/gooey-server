@@ -1,10 +1,10 @@
 import datetime
 
 import gooey_gui as gui
-from bots.models import BotIntegration, Platform, Message, PublishedRun
+
+from bots.models import BotIntegration, Message, Platform, PublishedRun
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
-from daras_ai_v2.bot_integration_widgets import get_bot_test_link
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
@@ -30,7 +30,7 @@ def _render_bi(bi: BotIntegration):
         <h4>
             {Platform(bi.platform).get_icon()} 
             &nbsp; 
-            <a href="{get_bot_test_link(bi)}">{bi.name}</a>
+            <a href="{bi.get_bot_test_link()}">{bi.name}</a>
         </h4>
         """,
     )

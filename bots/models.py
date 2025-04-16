@@ -14,16 +14,21 @@ from django.contrib.auth import get_user_model
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q, IntegerChoices, QuerySet, Subquery, OuterRef
+from django.db.models import IntegerChoices, OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
-from django.utils.text import Truncator
+from django.utils.text import Truncator, slugify
+from furl import furl
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
-from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from bots.custom_fields import CustomURLField, PostgresJSONEncoder
 from daras_ai_v2 import icons, urls
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_route_path, get_api_route_url
+from daras_ai_v2.fastapi_tricks import (
+    get_api_route_url,
+    get_app_route_url,
+    get_route_path,
+)
 from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -32,6 +37,7 @@ from workspaces.models import WorkspaceMembership
 
 if typing.TYPE_CHECKING:
     import celery.result
+
     from daras_ai_v2.base import BasePage
     from workspaces.models import Workspace
 
@@ -220,10 +226,27 @@ class Platform(models.IntegerChoices):
         match self:
             case Platform.WEB:
                 return icons.globe
+            case Platform.WHATSAPP:
+                return icons.whatsapp
+            case Platform.FACEBOOK:
+                return icons.fb_messenger
+            case Platform.INSTAGRAM:
+                return icons.instagram
+            case Platform.SLACK:
+                return icons.slack
             case Platform.TWILIO:
-                return '<img src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/73d11836-3988-11ef-9e06-02420a00011a/favicon-32x32.png" style="height: 1.2em; vertical-align: middle;">'
+                return icons.phone
             case _:
                 return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
+
+    def get_title(self):
+        match self:
+            case Platform.TWILIO:
+                return "Voice"
+            case Platform.FACEBOOK:
+                return "Messenger"
+            case _:
+                return self.label
 
 
 class Workflow(models.IntegerChoices):
@@ -920,6 +943,15 @@ class BotIntegration(models.Model):
         default=True,
         help_text="If set, the bot will stream messages to the frontend",
     )
+    demo_button_qr_code_image = models.TextField(
+        null=True,
+        help_text="QR code image for the demo button",
+    )
+    demo_button_qr_code_run = models.ForeignKey(
+        "SavedRun",
+        on_delete=models.SET_NULL,
+        null=True,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -971,6 +1003,34 @@ class BotIntegration(models.Model):
         )
 
     get_display_name.short_description = "Bot"
+
+    def get_bot_test_link(self) -> str | None:
+        from routers.root import chat_route
+
+        if self.wa_phone_number:
+            return (furl("https://wa.me/") / self.wa_phone_number.as_e164).tostr()
+        elif self.slack_team_id:
+            return (
+                furl("https://app.slack.com/client")
+                / self.slack_team_id
+                / self.slack_channel_id
+            ).tostr()
+        elif self.ig_username:
+            return (furl("http://instagram.com/") / self.ig_username).tostr()
+        elif self.fb_page_name:
+            return (furl("https://www.facebook.com/") / self.fb_page_id).tostr()
+        elif self.platform == Platform.WEB:
+            return get_app_route_url(
+                chat_route,
+                path_params=dict(
+                    integration_id=self.api_integration_id(),
+                    integration_name=slugify(self.name) or "untitled",
+                ),
+            )
+        elif self.twilio_phone_number:
+            return str(furl("tel:") / self.twilio_phone_number.as_e164)
+        else:
+            return None
 
     def api_integration_id(self) -> str:
         from routers.bots_api import api_hashids
