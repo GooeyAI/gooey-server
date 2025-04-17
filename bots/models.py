@@ -1874,7 +1874,6 @@ class FeedbackComment(models.Model):
 
 
 class PublishedRunQuerySet(models.QuerySet):
-
     def get_or_create_with_version(
         self,
         *,
