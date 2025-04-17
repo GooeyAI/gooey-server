@@ -70,7 +70,7 @@ class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
 
     input_location: dict = Field(
         None,
-        description="Location information including latitude, longitude, and accuracy.",
+        description="Location information including latitude, longitude.",
     )
 
     def __init__(self, **data: Any) -> None:
