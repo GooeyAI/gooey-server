@@ -944,13 +944,13 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will stream messages to the frontend",
     )
     demo_button_qr_code_image = models.TextField(
-        null=True,
-        help_text="QR code image for the demo button",
+        null=True, blank=True, help_text="QR code image for the demo button"
     )
     demo_button_qr_code_run = models.ForeignKey(
         "SavedRun",
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
