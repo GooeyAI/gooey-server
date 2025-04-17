@@ -4,6 +4,7 @@ import datetime
 import typing
 from collections import defaultdict
 from multiprocessing.pool import ThreadPool
+from loguru import logger
 
 import phonenumber_field.formfields
 import phonenumber_field.modelfields
@@ -29,6 +30,8 @@ from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
 from workspaces.models import WorkspaceMembership
+from managed_secrets.models import ManagedSecret
+
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -981,6 +984,7 @@ class BotIntegration(models.Model):
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
+            apiKeys=dict(),
             branding=(
                 self.web_config_extras.get("branding", {})
                 | dict(
@@ -993,6 +997,16 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+        try:
+            google_maps_secret = self.workspace.managed_secrets.get(
+                name__iexact="GOOGLE_MAPS_API"
+            )
+            google_maps_secret.load_value()
+            if google_maps_secret.value:
+                config["apiKeys"]["GoogleMapsAPI"] = google_maps_secret.value
+        except (ManagedSecret.DoesNotExist, ManagedSecret.NotLoadedErorr) as e:
+            logger.error(f"Error - GoogleMapsAPI key: {e}")
+
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
