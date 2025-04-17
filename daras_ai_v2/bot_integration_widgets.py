@@ -11,8 +11,7 @@ from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
-from daras_ai_v2 import icons
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -20,7 +19,7 @@ from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs, chat_route, chat_lib_route
+from routers.root import RecipeTabs, chat_lib_route, chat_route
 
 
 def integrations_welcome_screen(title: str):
@@ -325,33 +324,6 @@ def broadcast_input(bi: BotIntegration):
             f"Are you sure? This will send a message to all {convos.count()} users that have ever interacted with this bot.\n"
         )
         gui.button("✅ Yes, Send", key=confirmed_send_btn)
-
-
-def get_bot_test_link(bi: BotIntegration) -> str | None:
-    if bi.wa_phone_number:
-        return (furl("https://wa.me/") / bi.wa_phone_number.as_e164).tostr()
-    elif bi.slack_team_id:
-        return (
-            furl("https://app.slack.com/client")
-            / bi.slack_team_id
-            / bi.slack_channel_id
-        ).tostr()
-    elif bi.ig_username:
-        return (furl("http://instagram.com/") / bi.ig_username).tostr()
-    elif bi.fb_page_name:
-        return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
-    elif bi.platform == Platform.WEB:
-        return get_app_route_url(
-            chat_route,
-            path_params=dict(
-                integration_id=bi.api_integration_id(),
-                integration_name=slugify(bi.name) or "untitled",
-            ),
-        )
-    elif bi.twilio_phone_number:
-        return str(furl("tel:") / bi.twilio_phone_number.as_e164)
-    else:
-        return None
 
 
 def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str:

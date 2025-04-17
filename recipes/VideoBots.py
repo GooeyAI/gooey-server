@@ -13,9 +13,9 @@ from bots.models import (
     BotIntegration,
     Platform,
     PublishedRun,
-    WorkflowAccessLevel,
-    Workflow,
     SavedRun,
+    Workflow,
+    WorkflowAccessLevel,
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
@@ -43,21 +43,20 @@ from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     general_integration_settings,
-    get_bot_test_link,
     integrations_welcome_screen,
     slack_specific_settings,
     twilio_specific_settings,
     web_widget_config,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
+    SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
+    cache_knowledge_widget,
     citation_style_selector,
     doc_extract_selector,
     doc_search_advanced_settings,
     keyword_instructions_widget,
     query_instructions_widget,
-    cache_knowledge_widget,
-    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -65,6 +64,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
+from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.language_filters import asr_languages_without_dialects
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
@@ -102,11 +102,12 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
     text_to_speech_settings,
 )
+from daras_ai_v2.utils import use_session_state
 from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
-    doc_url_to_text_pages,
     doc_or_yt_url_to_file_metas,
+    doc_url_to_text_pages,
 )
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
@@ -122,6 +123,11 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
+
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -422,7 +428,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
                 if asr_model.supports_input_prompt():
                     gui.text_area(
-                        f'###### {field_title_desc(self.RequestModel, "asr_prompt")}',
+                        f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
                         key="asr_prompt",
                         value="Transcribe the recording as accurately as possible.",
                         height=300,
@@ -1457,7 +1463,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         gui.newline()
         with gui.div(style={"width": "100%", "textAlign": "left"}):
-            test_link = get_bot_test_link(bi)
+            test_link = bi.get_bot_test_link()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Connected To")
@@ -1584,6 +1590,28 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         new_tab=True,
                     )
 
+            if test_link:
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Show Demo Button")
+                    gui.caption('Add "Try Demo" with QR Code to connected Copilot page')
+                with col2:
+                    is_demo_button_enabled = gui.switch(
+                        "", value=bool(bi.demo_button_qr_code_image)
+                    )
+
+                if is_demo_button_enabled:
+                    self._render_demo_button_settings(bi=bi, link=test_link)
+                elif bi.demo_button_qr_code_image:
+                    bi.demo_button_qr_code_image = None
+                    bi.demo_button_qr_code_run = None
+                    bi.save(
+                        update_fields=[
+                            "demo_button_qr_code_image",
+                            "demo_button_qr_code_run",
+                        ]
+                    )
+
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Add Integration")
@@ -1622,6 +1650,126 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         bi.published_run = None
                         bi.save()
                         gui.rerun()
+
+    def _render_demo_button_settings(self, bi: BotIntegration, link: str):
+        is_generating_qr_code, set_is_generating_qr_code = use_session_state(
+            "--is-generating-qr-code"
+        )
+        qr_code_generation_error, set_qr_code_generation_error = use_session_state(
+            "--qr-code-generation-error"
+        )
+        is_uploading_qr_code, set_is_uploading_qr_code = use_session_state(
+            "--is-uploading-qr-code"
+        )
+
+        with gui.div(className="d-flex gap-5"):
+            preview_div = gui.div(
+                className="d-flex justify-content-center align-items-center bg-light p-0 fs-1 mb-3",
+                style={"width": "200px", "height": "200px"},
+            )
+            actions_div = gui.div()
+
+        with preview_div:
+            if bi.demo_button_qr_code_image:
+                gui.image(
+                    src=bi.demo_button_qr_code_image,
+                    style={"width": "100%", "height": "100%", "objectFit": "fill"},
+                    className="m-0",
+                )
+            else:
+                # empty state
+                gui.html(icons.photo)
+
+        with actions_div:
+            gui.caption(
+                "Generate or upload a scannable QR Code for users to access the integration"
+            )
+
+            if is_generating_qr_code:
+                qr_generation_result = gui.run_in_thread(
+                    generate_bot_qr_code,
+                    placeholder="",
+                    kwargs=dict(
+                        bi=bi,
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        link=link,
+                    ),
+                )
+                if qr_generation_result is None:
+                    html_spinner("Generating QR Code...")
+                    return
+
+                success, error_msg_or_sr_id = qr_generation_result
+                if not success:
+                    # error msg
+                    set_qr_code_generation_error(error_msg_or_sr_id)
+                else:
+                    # sr
+                    sr = SavedRun.objects.get(id=error_msg_or_sr_id)
+                    bi.demo_button_qr_code_image = sr.state["output_images"][0]
+                    bi.demo_button_qr_code_run = sr
+                    bi.save(
+                        update_fields=[
+                            "demo_button_qr_code_image",
+                            "demo_button_qr_code_run",
+                        ]
+                    )
+
+                set_is_generating_qr_code(False)
+                raise gui.RerunException()
+
+            elif is_uploading_qr_code:
+                qr_code_img = gui.file_uploader(
+                    "", accept=["image/*"], key="--demo_button_qr_code_image"
+                )
+                if qr_code_img:
+                    bi.demo_button_qr_code_image = qr_code_img
+                    bi.demo_button_qr_code_run = None
+                    bi.save(
+                        update_fields=[
+                            "demo_button_qr_code_image",
+                            "demo_button_qr_code_run",
+                        ]
+                    )
+                elif not gui.button(f"{icons.cancel} Cancel"):
+                    # user hasn't clicked button or uploaded. do nothing
+                    return
+
+                set_is_uploading_qr_code(False)
+                raise gui.RerunException()
+
+            with gui.div(className="d-flex gap-2"):
+                if gui.button(f"{icons.sparkles} Generate", type="tertiary"):
+                    set_is_generating_qr_code(True)
+                    raise gui.RerunException()
+
+                if gui.button(f"{icons.upload} Upload", type="tertiary"):
+                    set_is_uploading_qr_code(True)
+                    raise gui.RerunException()
+
+                if gui.button(f"{icons.clear} Clear", type="tertiary"):
+                    bi.demo_button_qr_code_image = None
+                    bi.demo_button_qr_code_run = None
+                    bi.save(
+                        update_fields=[
+                            "demo_button_qr_code_image",
+                            "demo_button_qr_code_run",
+                        ]
+                    )
+                    raise gui.RerunException()
+
+            with gui.div(className="d-flex align-items-center gap-3 mt-5"):
+                if qr_code_generation_error:
+                    gui.error(qr_code_generation_error)
+                elif bi.demo_button_qr_code_run_id:
+                    gui.download_button(
+                        f"{icons.download_solid} Download",
+                        url=bi.demo_button_qr_code_image,
+                    )
+                    gui.write(
+                        f"[Open QR Generation Run]({bi.demo_button_qr_code_run.get_app_url()})"
+                    )
 
     def render_chat_list_view(self):
         # render a reversed list view
@@ -1697,6 +1845,52 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     if input_audio:
                         gui.audio(input_audio)
                         input_audio = None
+
+
+def generate_bot_qr_code(
+    bi: BotIntegration, workspace: "Workspace", user: "AppUser", link: str
+) -> tuple[bool, str]:
+    """
+    Returns a tuple of:
+    1. `bool`: `True` for successful QR Code generation, `False` otherwise
+    2. `str`: The ID of a successful QR Code generation (when `bool=True`), or an error message
+    """
+    from recipes.CompareLLM import CompareLLMPage
+    from recipes.QRCodeGenerator import QRCodeGeneratorPage
+
+    llm_prompt_pr = CompareLLMPage.get_pr_from_example_id(
+        example_id=settings.INTEGRATION_QR_PROMPT_GENERATOR_EXAMPLE_ID
+    )
+    variables = llm_prompt_pr.saved_run.state.get("variables") or {}
+    variables |= {
+        "bot_name": bi.name or (bi.published_run_id and bi.published_run.title),
+        "bot_description": (
+            bi.descripton or (bi.published_run_id and bi.published_run.notes)
+        ),
+    }
+
+    result, prompt_gen_sr = llm_prompt_pr.submit_api_call(
+        workspace=workspace,
+        current_user=user,
+        request_body=dict(variables=variables),
+        deduct_credits=False,
+    )
+    prompt_gen_sr.wait_for_celery_result(result)
+    if prompt_gen_sr.error_msg:
+        return False, prompt_gen_sr.error_msg
+
+    prompt = "".join(prompt_gen_sr.state.get("output_text").popitem()[1])
+
+    result, qr_code_sr = QRCodeGeneratorPage.get_root_pr().submit_api_call(
+        workspace=workspace,
+        current_user=user,
+        request_body=dict(qr_code_data=link, text_prompt=prompt),
+    )
+    qr_code_sr.wait_for_celery_result(result)
+    if qr_code_sr.error_msg:
+        return False, qr_code_sr.error_msg
+
+    return True, qr_code_sr.id
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
