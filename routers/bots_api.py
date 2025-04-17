@@ -71,7 +71,6 @@ class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
     input_location: dict = Field(
         None,
         description="Location information including latitude, longitude, and accuracy.",
-        example={"latitude": 0.0, "longitude": 0.0, "accuracy": 0.0},
     )
 
     def __init__(self, **data: Any) -> None:
@@ -394,6 +393,8 @@ class ApiInterface(BotInterface):
     def get_input_documents(self) -> list[str] | None:
         return self.request.input_documents
 
-    def get_interactive_msg_info(self) -> tuple[ButtonPressed, dict | None]:
-        input_location = self.request.input_location or None
-        return self.request.button_pressed, input_location
+    def get_interactive_msg_info(self) -> ButtonPressed | None:
+        return self.request.button_pressed
+
+    def get_location_info(self) -> dict | None:
+        return self.request.input_location

@@ -76,9 +76,6 @@ class ButtonPressed(BaseModel):
     button_title: str | None = Field(
         description="The title of the button that was pressed by the user"
     )
-    location: typing.Optional[dict[str, float]] = Field(
-        description="The location information if the button was a location button"
-    )
 
 
 class BotInterface:
@@ -351,7 +348,7 @@ def _msg_handler(bot: BotInterface):
             if not input_location:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
-            input_text = _handle_location_msg(input_text, input_location)
+            input_text = _handle_location_msg(input_location)
         case "text":
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
@@ -641,7 +638,8 @@ def _save_msgs(
 
 
 def _handle_interactive_msg(bot: BotInterface):
-    button, location_coords = bot.get_interactive_msg_info()
+    button = bot.get_interactive_msg_info()
+    location_coords = bot.get_location_info()
     match button.button_id:
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
