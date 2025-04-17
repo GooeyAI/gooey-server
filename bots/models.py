@@ -1004,7 +1004,7 @@ class BotIntegration(models.Model):
             google_maps_secret.load_value()
             if google_maps_secret.value:
                 config["apiKeys"]["GoogleMapsAPI"] = google_maps_secret.value
-        except (ManagedSecret.DoesNotExist, ManagedSecret.NotLoadedErorr) as e:
+        except (ManagedSecret.DoesNotExist, ManagedSecret.NotLoadedError) as e:
             logger.error(f"Error - GoogleMapsAPI key: {e}")
 
         if settings.DEBUG:

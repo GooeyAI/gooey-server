@@ -41,13 +41,13 @@ class ManagedSecret(models.Model):
 
     _value: str | None = None
 
-    class NotLoadedErorr(Exception):
+    class NotLoadedError(Exception):
         pass
 
     @property
     def value(self) -> str:
         if self._value is None:
-            raise self.NotLoadedErorr()
+            raise self.NotLoadedError()
         return self._value
 
     @value.setter
