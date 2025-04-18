@@ -8,27 +8,27 @@ from time import time
 import gooey_gui as gui
 import requests
 import sentry_sdk
+from django.db.models import Sum, F
+from django.utils import timezone
+from fastapi import HTTPException
+from loguru import logger
+
 from app_users.models import AppUser, AppUserTransaction
 from bots.admin_links import change_obj_url
-from bots.models import Platform, SavedRun, Workflow
+from bots.models import Platform, SavedRun, Workflow, PublishedRun
+from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
-from django.db.models import Sum
-from django.utils import timezone
-from fastapi import HTTPException
 from gooeysite.bg_db_conn import db_middleware
-from loguru import logger
 from payments.auto_recharge import (
     run_auto_recharge_gracefully,
     should_attempt_auto_recharge,
 )
 from workspaces.widgets import set_current_workspace
-
-from celeryapp.celeryconfig import app
 
 if typing.TYPE_CHECKING:
     from workspaces.models import Workspace
@@ -109,6 +109,12 @@ def runner_task(
     set_current_workspace(page.request.session, int(sr.workspace_id))
     threadlocal.saved_run = sr
     gui.set_session_state(sr.to_dict() | (unsaved_state or {}))
+
+    if sr.parent_version:
+        # Increment run count for parent published run
+        PublishedRun.objects.filter(id=sr.parent_version.published_run_id).update(
+            run_count=F("run_count") + 1
+        )
 
     try:
         save_on_step()

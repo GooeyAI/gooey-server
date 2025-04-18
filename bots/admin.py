@@ -327,6 +327,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "open_in_gooey",
         "linked_saved_run",
         "view_runs",
+        "run_count",
         "created_at",
         "updated_at",
     ]
@@ -336,6 +337,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
     readonly_fields = [
         "open_in_gooey",
         "view_runs",
+        "run_count",
         "created_at",
         "updated_at",
     ]

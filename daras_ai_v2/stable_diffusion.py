@@ -60,18 +60,25 @@ class Text2ImgModels(Enum):
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
 
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    openjourney = "Open Journey (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-
+    openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
+    openjourney = "Open Journey [Deprecated] (PromptHero)"
+    analog_diffusion = "Analog Diffusion [Deprecated] (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 [Deprecated] (darkstorm2150)"
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
     deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
 
     @classmethod
     def _deprecated(cls):
-        return {cls.jack_qiao, cls.deepfloyd_if, cls.rodent_diffusion_1_5}
+        return {
+            cls.jack_qiao,
+            cls.deepfloyd_if,
+            cls.rodent_diffusion_1_5,
+            cls.analog_diffusion,
+            cls.openjourney_2,
+            cls.openjourney,
+            cls.protogen_5_3,
+        }
 
 
 text2img_model_ids = {
@@ -79,11 +86,7 @@ text2img_model_ids = {
     Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Text2ImgModels.openjourney: "prompthero/openjourney",
-    Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
-    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
 }
 dall_e_model_ids = {
     Text2ImgModels.dall_e: "dall-e-2",
@@ -100,27 +103,30 @@ class Img2ImgModels(Enum):
     dall_e = "Dall-E (OpenAI)"
 
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
-    openjourney = "Open Journey (PromptHero) 🐢"
-    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
 
+    openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
+    openjourney = "Open Journey [Deprecated] (PromptHero)"
+    analog_diffusion = "Analog Diffusion [Deprecated] (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 [Deprecated] (darkstorm2150)"
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
 
     @classmethod
     def _deprecated(cls):
-        return {cls.jack_qiao, cls.rodent_diffusion_1_5}
+        return {
+            cls.jack_qiao,
+            cls.rodent_diffusion_1_5,
+            cls.openjourney_2,
+            cls.openjourney,
+            cls.analog_diffusion,
+            cls.protogen_5_3,
+        }
 
 
 img2img_model_ids = {
     Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
-    Img2ImgModels.openjourney: "prompthero/openjourney",
-    Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Img2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
 }
 

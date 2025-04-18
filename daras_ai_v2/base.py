@@ -69,9 +69,16 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from routers.root import RecipeTabs
-from widgets.author import render_author_from_user, render_author_from_workspace
+from widgets.author import (
+    render_author_from_user,
+    render_author_as_breadcrumb,
+)
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.workflow_image import (
+    render_workflow_photo_uploader,
+    render_change_notes_input,
+)
 from widgets.workflow_share import (
     render_share_button,
 )
@@ -364,7 +371,7 @@ class BasePage:
                     self._render_saved_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
-
+        # rendered at the end to indicate unpublished changes
         with header_placeholder:
             self._render_header()
 
@@ -386,10 +393,12 @@ class BasePage:
                             tbreadcrumbs,
                             is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
                         )
-
-                    self._render_author_as_breadcrumb(
-                        is_example=is_example, is_root_example=is_root_example
-                    )
+                    if not is_root_example:
+                        render_author_as_breadcrumb(
+                            user=self.current_sr_user,
+                            pr=self.current_pr,
+                            sr=self.current_sr,
+                        )
             else:
                 self._render_title(tbreadcrumbs.h1_title)
 
@@ -399,51 +408,31 @@ class BasePage:
                 self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs():
-            self._render_title(tbreadcrumbs.h1_title)
+            if self.tab == RecipeTabs.run:
+                with gui.div(
+                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                ):
+                    gui.image(
+                        src=pr.photo_url,
+                        style=dict(
+                            width="150px",
+                            height="150px",
+                            margin=0,
+                            minHeight="150px",
+                            objectFit="cover",
+                        ),
+                    )
+                    with gui.div():
+                        self._render_title(tbreadcrumbs.h1_title)
+                        if pr and pr.notes and self.tab is RecipeTabs.run:
+                            gui.write(pr.notes, line_clamp=2)
+            else:
+                self._render_title(tbreadcrumbs.h1_title)
 
         if self.tab != RecipeTabs.run:
             return
-        if pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
-        elif is_root_example and self.tab != RecipeTabs.integrations:
+        if is_root_example and self.tab != RecipeTabs.integrations:
             gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
-
-    def _render_author_as_breadcrumb(self, *, is_example: bool, is_root_example: bool):
-        if is_root_example:
-            return
-        if is_example:
-            workspace = self.current_pr.workspace
-        else:
-            workspace = self.current_sr.workspace
-        if not workspace:
-            return
-
-        with gui.div(
-            className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
-        ):
-            with gui.tag("li"):
-                render_author_from_workspace(workspace)
-
-            # don't render the user's name for examples and personal workspaces
-            if is_example or workspace.is_personal:
-                return
-
-            gui.html(icons.chevron_right)
-
-            with gui.tag(
-                "li", className="d-flex align-items-center container-margin-reset"
-            ):
-                if user := self.current_sr_user:
-                    full_name = user.full_name()
-                    handle = user.get_handle()
-                    link = handle and handle.get_app_url()
-                else:
-                    full_name = "Deleted User"
-                    link = None
-
-                linkto = link and gui.link(to=link) or gui.dummy()
-                with linkto:
-                    gui.caption(full_name)
 
     def can_user_save_run(
         self,
@@ -661,29 +650,38 @@ class BasePage:
             else:
                 title = self._get_default_pr_title()
                 notes = ""
-            gui.write("Title", className="fs-5 container-margin-reset")
-            published_run_title = gui.text_input(
-                "",
-                key="published_run_title",
-                value=title,
-                className="mt-1",
-            )
-            gui.write("Description", className="fs-5 container-margin-reset")
-            published_run_description = gui.text_area(
-                "",
-                key="published_run_description",
-                value=notes,
-                placeholder="An excellent but one line description",
-                className="mt-1",
-            )
-            with gui.div(className="d-flex align-items-center gap-2"):
-                gui.html('<i class="fa-light fa-xl fa-money-check-pen mb-3"></i>')
-                with gui.div(className="flex-grow-1"):
-                    change_notes = gui.text_input(
-                        "",
-                        key="published_run_change_notes",
-                        placeholder="Add change notes",
+
+            col1, col2 = gui.columns([2, 1])
+            with col1:
+                gui.write("Title", className="fs-5 container-margin-reset")
+                published_run_title = gui.text_input(
+                    "",
+                    key="published_run_title",
+                    value=title,
+                    className="mt-1",
+                )
+                gui.write("Description", className="fs-5 container-margin-reset")
+                published_run_description = gui.text_area(
+                    "",
+                    key="published_run_description",
+                    value=notes,
+                    placeholder="An excellent but one line description",
+                    className="mt-1",
+                    rows=5,
+                )
+                # mobile only
+                with gui.div(className="d-flex mb-3 align-items-center gap-2"):
+                    change_notes = render_change_notes_input(
+                        key="published_run_change_notes"
                     )
+            with col2:
+                photo_url = render_workflow_photo_uploader(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=pr,
+                    title=published_run_title,
+                    description=published_run_description,
+                )
 
         self._render_admin_options(sr, pr)
 
@@ -738,6 +736,7 @@ class BasePage:
                 workspace=selected_workspace,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
+                photo_url=photo_url,
             )
         else:
             if not WorkflowAccessLevel.can_user_edit_published_run(
@@ -751,6 +750,7 @@ class BasePage:
                 saved_run=sr,
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
+                photo_url=photo_url,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -827,11 +827,13 @@ class BasePage:
         saved_run: SavedRun,
         title: str,
         notes: str,
+        photo_url: str,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
+            or published_run.photo_url != photo_url
         )
 
     def _has_request_changed(self) -> bool:
@@ -1397,6 +1399,7 @@ class BasePage:
         title: str,
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
+        photo_url: str = "",
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1407,6 +1410,7 @@ class BasePage:
             title=title,
             notes=notes,
             public_access=public_access,
+            photo_url=photo_url,
         )
 
     @classmethod

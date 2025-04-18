@@ -3,7 +3,48 @@ import html
 import gooey_gui as gui
 
 from app_users.models import AppUser
+from bots.models import PublishedRun, SavedRun
+from daras_ai_v2 import icons
 from workspaces.models import Workspace
+
+
+def render_author_as_breadcrumb(
+    user: AppUser | None,
+    pr: PublishedRun,
+    sr: SavedRun,
+):
+    is_example = pr.saved_run_id == sr.id
+    if is_example:
+        workspace = pr.workspace
+    else:
+        workspace = sr.workspace
+
+    with gui.div(
+        className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
+    ):
+        with gui.tag("li"):
+            render_author_from_workspace(workspace)
+
+        # don't render the user's name for examples and personal workspaces
+        if is_example or workspace.is_personal:
+            return
+
+        gui.html(icons.chevron_right)
+
+        with gui.tag(
+            "li", className="d-flex align-items-center container-margin-reset"
+        ):
+            if user:
+                full_name = user.full_name()
+                handle = user.get_handle()
+                link = handle and handle.get_app_url()
+            else:
+                full_name = "Deleted User"
+                link = None
+
+            linkto = link and gui.link(to=link) or gui.dummy()
+            with linkto:
+                gui.caption(full_name)
 
 
 def render_author_from_workspace(
