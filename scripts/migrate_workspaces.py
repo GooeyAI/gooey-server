@@ -160,4 +160,4 @@ def update_in_batches(qs, **kwargs):
             print("Done!")
             break
         total += rows
-        print(total, end=SEP)
+        print(total, end=SEP, flush=True)

@@ -2000,6 +2000,8 @@ class PublishedRun(models.Model):
         help_text="Priority of the example in the example list",
     )
 
+    run_count = models.IntegerField(default=0)
+
     created_by = models.ForeignKey(
         "app_users.AppUser",
         on_delete=models.SET_NULL,
@@ -2153,17 +2155,6 @@ class PublishedRun(models.Model):
         else:
             perm = WorkflowAccessLevel(self.workspace_access)
             return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
-
-    def get_run_count(self):
-        annotated_versions = self.versions.annotate(
-            children_runs_count=models.Count("children_runs")
-        )
-        return (
-            annotated_versions.aggregate(run_count=models.Sum("children_runs_count"))[
-                "run_count"
-            ]
-            or 0
-        )
 
     def submit_api_call(
         self,
