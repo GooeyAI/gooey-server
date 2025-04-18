@@ -31,7 +31,9 @@ from gooeysite.custom_create import get_or_create_lazy
 
 if typing.TYPE_CHECKING:
     import celery.result
+    import pandas as pd
     from daras_ai_v2.base import BasePage
+    from daras_ai_v2.language_model import ConversationEntry
     from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"

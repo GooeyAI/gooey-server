@@ -16,6 +16,7 @@ from managed_secrets.widgets import edit_secret_button_with_dialog
 from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
+    from google.cloud import texttospeech
     from daras_ai_v2.base import BasePage
 
 
@@ -243,14 +244,14 @@ def azure_tts_settings():
         return
     gui.markdown(
         f"""
-        ###### {voice.get('Name')}:
-        * Name: {voice.get('LocalName')} {'(' + str(voice.get('DisplayName')) + ')' if voice.get('LocalName') != voice.get('DisplayName') else ''}
-        * Gender: {voice.get('Gender')}
-        * Locale: {voice.get('LocaleName')}
-        * Locale Code: {voice.get('Locale')}
-        * Sample Rate: {voice.get('SampleRateHertz')} Hz
-        * Voice Type: {voice.get('VoiceType')}
-        * Words Per Minute: {voice.get('WordsPerMinute')}
+        ###### {voice.get("Name")}:
+        * Name: {voice.get("LocalName")} {"(" + str(voice.get("DisplayName")) + ")" if voice.get("LocalName") != voice.get("DisplayName") else ""}
+        * Gender: {voice.get("Gender")}
+        * Locale: {voice.get("LocaleName")}
+        * Locale Code: {voice.get("Locale")}
+        * Sample Rate: {voice.get("SampleRateHertz")} Hz
+        * Voice Type: {voice.get("VoiceType")}
+        * Words Per Minute: {voice.get("WordsPerMinute")}
 
         See all the supported languages and voices [here](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts).
         """
