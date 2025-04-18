@@ -34,6 +34,9 @@ from daras_ai_v2.workflow_url_input import (
 )
 from recipes.DocSearch import render_documents
 
+if typing.TYPE_CHECKING:
+    import pandas as pd
+
 
 class BulkRunnerPage(BasePage):
     title = "Bulk Runner"
@@ -110,7 +113,7 @@ List of URLs to the evaluation runs that you requested.
         for url in run_urls:
             try:
                 page_cls, sr, _ = url_to_runs(url)
-            except:
+            except Exception:
                 continue
 
             schema = page_cls.RequestModel.schema(ref_template="{model}")
