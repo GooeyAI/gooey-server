@@ -91,13 +91,13 @@ azure-identity = "^1.19.0"
 azure-keyvault-secrets = "^4.9.0"
 xlrd = "^2.0.1"
 websockets = "^15.0.1"
+ruff = "^0.11.6"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
 ipython = "^8.5.0"
 honcho = "^1.1.0"
 pre-commit = "^3.5.0"
-ruff = "^0.11.6"
 
 [build-system]
 requires = ["poetry-core"]
