@@ -1399,7 +1399,7 @@ class BasePage:
         title: str,
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
-        photo_url: str | None = None,
+        photo_url: str = "",
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,

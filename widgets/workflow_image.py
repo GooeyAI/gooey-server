@@ -15,7 +15,7 @@ def render_workflow_photo_uploader(
     title: str,
     description: str,
     key: str = "photo_url",
-) -> str | None:
+) -> str:
     is_generating, error_msg = pull_icon_bot_result(key)
 
     if error_msg:
@@ -25,7 +25,7 @@ def render_workflow_photo_uploader(
                 gui.write(error_msg, className="text-danger")
             gui.write("Please try again or upload a photo manually.")
 
-    photo_url = gui.session_state.setdefault(key, pr.photo_url)
+    photo_url = gui.session_state.setdefault(key, pr.photo_url) or ""
 
     upload_dialog_ref = gui.use_alert_dialog(key=key + ":upload-dialog")
     if photo_url:
@@ -73,7 +73,7 @@ def render_workflow_photo_uploader(
                 )
             elif photo_url:
                 if gui.button(f"{icons.clear} Clear", type="tertiary"):
-                    gui.session_state.pop(key, None)
+                    gui.session_state[key] = ""
                     raise gui.RerunException()
             else:
                 if gui.button(f"{icons.upload} Upload", type="tertiary"):
