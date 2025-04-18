@@ -195,12 +195,11 @@ def render_saved_workflow_author(
                 responsive=False,
             )
 
-        if published_run.run_count > 0:
+        if published_run.run_count > 1:
             gui.write(" • ")
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
             run_count = format_number_with_suffix(published_run.run_count)
             gui.caption(
-                f"{run_icon} {run_count} runs",
+                f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
                 style={"fontSize": "0.9rem"},
                 className="text-dark",
