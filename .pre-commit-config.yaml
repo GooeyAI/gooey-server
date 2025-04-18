@@ -8,9 +8,14 @@ repos:
     -   id: check-yaml
 -   repo: local
     hooks:
-    -   id: ruff
-        name: ruff
+    -   id: ruff-lint
+        name: ruff-lint
         entry: poetry run ruff check --fix
+        language: system
+        types: [python]
+    -   id: ruff-format
+        name: ruff-format
+        entry: poetry run ruff format
         language: system
         types: [python]
 -   repo: https://github.com/gitleaks/gitleaks
