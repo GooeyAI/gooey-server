@@ -8,9 +8,9 @@ repos:
     -   id: check-yaml
 -   repo: local
     hooks:
-    -   id: black
-        name: black
-        entry: poetry run black
+    -   id: ruff
+        name: ruff
+        entry: poetry run ruff check --fix
         language: system
         types: [python]
 -   repo: https://github.com/gitleaks/gitleaks

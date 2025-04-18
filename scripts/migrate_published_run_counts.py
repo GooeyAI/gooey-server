@@ -1,8 +1,7 @@
-from django.db.models import OuterRef, Subquery, Sum, F, Count
+from django.db.models import OuterRef, Subquery, Count
 from django.db.models.functions import Coalesce
 
 from bots.models import PublishedRun, SavedRun
-from .migrate_workspaces import update_in_batches
 
 
 def run():
