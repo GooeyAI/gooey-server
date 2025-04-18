@@ -221,9 +221,9 @@ class QRCodeGeneratorPage(BasePage):
 
     def validate_form_v2(self):
         assert gui.session_state.get("text_prompt"), "Please provide a prompt"
-        assert any(
-            gui.session_state.get(k) for k in QrSources._member_names_
-        ), "Please provide QR Code URL, text content, contact info, or upload an image"
+        assert any(gui.session_state.get(k) for k in QrSources._member_names_), (
+            "Please provide QR Code URL, text content, contact info, or upload an image"
+        )
 
     def render_description(self):
         gui.markdown(
@@ -477,7 +477,7 @@ Here is the final output:
             state["shortened_url"] = qr_code_data
         state["cleaned_qr_code"] = image
 
-        state["raw_images"] = raw_images = []
+        state["raw_images"] = []
 
         yield f"Running {Text2ImgModels[request.selected_model].value}..."
         if isinstance(request.selected_controlnet_model, str):
