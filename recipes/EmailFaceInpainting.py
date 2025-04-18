@@ -154,22 +154,22 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         assert text_prompt, "Please provide a Prompt and your Email Address"
 
         if gui.session_state.get("twitter_handle"):
-            assert re.fullmatch(
-                twitter_handle_regex, twitter_handle
-            ), "Please provide a valid Twitter Handle"
+            assert re.fullmatch(twitter_handle_regex, twitter_handle), (
+                "Please provide a valid Twitter Handle"
+            )
         elif gui.session_state.get("email_address"):
-            assert re.fullmatch(
-                email_regex, email_address
-            ), "Please provide a valid Email Address"
+            assert re.fullmatch(email_regex, email_address), (
+                "Please provide a valid Email Address"
+            )
         else:
             raise AssertionError("Please provide an Email Address or Twitter Handle")
 
         from_email = gui.session_state.get("email_from")
         email_subject = gui.session_state.get("email_subject")
         email_body = gui.session_state.get("email_body")
-        assert (
-            from_email and email_subject and email_body
-        ), "Please provide a From Email, Subject & Body"
+        assert from_email and email_subject and email_body, (
+            "Please provide a From Email, Subject & Body"
+        )
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage
@@ -337,11 +337,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
 class ImageNotFound(Exception):
     "Raised when the image not found in email profile"
+
     pass
 
 
 class TwitterError(Exception):
     "Raised when the twitter handle Lookup returns an error"
+
     pass
 
 

@@ -83,9 +83,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
-        assert gui.session_state.get(
-            "text_prompt", ""
-        ).strip(), "Text input cannot be empty"
+        assert gui.session_state.get("text_prompt", "").strip(), (
+            "Text input cannot be empty"
+        )
         assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
     def preview_description(self, state: dict) -> str:

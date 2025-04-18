@@ -217,7 +217,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"
-            img.transform(resize=form_data.get("resize", f"{1024 ** 2}@>"))
+            img.transform(resize=form_data.get("resize", f"{1024**2}@>"))
             data = img.make_blob()
 
     if len(data) > settings.MAX_UPLOAD_SIZE:
@@ -792,9 +792,12 @@ def anonymous_login_container(request: Request, context: dict):
             + '<i class="ps-2 fa-regular fa-chevron-down d-lg-none"></i>'
         )
 
-    with content, gui.div(
-        className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
-        style=dict(minWidth="200px"),
+    with (
+        content,
+        gui.div(
+            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
+            style=dict(minWidth="200px"),
+        ),
     ):
         row_height = "2.2rem"
 

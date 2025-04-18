@@ -43,9 +43,9 @@ class CompareUpscalerPage(BasePage):
         ] = Field({}, description="Output Videos")
 
     def validate_form_v2(self):
-        assert gui.session_state.get(
-            "selected_models"
-        ), "Please select at least one model"
+        assert gui.session_state.get("selected_models"), (
+            "Please select at least one model"
+        )
 
         assert gui.session_state.get("input_image") or gui.session_state.get(
             "input_video"

@@ -295,9 +295,9 @@ def generate_auth_header() -> str:
     Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
     @see https://developer.paypal.com/api/rest/authentication/
     """
-    assert (
-        settings.PAYPAL_CLIENT_ID and settings.PAYPAL_SECRET
-    ), "Missing API Credentials"
+    assert settings.PAYPAL_CLIENT_ID and settings.PAYPAL_SECRET, (
+        "Missing API Credentials"
+    )
     auth = base64.b64encode(
         f"{settings.PAYPAL_CLIENT_ID}:{settings.PAYPAL_SECRET}".encode()
     ).decode()

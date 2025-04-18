@@ -38,9 +38,7 @@ def get_objects(*args):
         + list(
             PublishedRun.objects.filter(
                 PublishedRun.approved_example_q(),
-            ).order_by(
-                "-updated_at"
-            )[:200],
+            ).order_by("-updated_at")[:200],
         )
         + list(
             PublishedRun.objects.filter(

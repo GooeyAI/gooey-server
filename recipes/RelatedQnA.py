@@ -65,7 +65,7 @@ class RelatedQnAPage(BasePage):
         output_queries = gui.session_state.get("output_queries", [])
         for i, result in enumerate(output_queries):
             gui.write("---")
-            gui.write(f"##### {i+1}. _{result.get('search_query')}_")
+            gui.write(f"##### {i + 1}. _{result.get('search_query')}_")
             serp_results = result.get("serp_results", result.get("scaleserp_results"))
             if serp_results:
                 gui.write("**Web Search Results**")

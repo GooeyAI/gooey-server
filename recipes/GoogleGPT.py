@@ -138,9 +138,9 @@ class GoogleGPTPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert gui.session_state.get(
-            "search_query", ""
-        ).strip(), "Please enter a search query"
+        assert gui.session_state.get("search_query", "").strip(), (
+            "Please enter a search query"
+        )
 
     def render_output(self):
         render_output_with_refs(gui.session_state)

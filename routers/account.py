@@ -248,7 +248,6 @@ class AccountTabs(TabData, Enum):
     def get_tabs_for_user(
         cls, user: typing.Optional["AppUser"], workspace: Workspace | None
     ) -> list["AccountTabs"]:
-
         ret = list(cls)
 
         if workspace.is_personal:

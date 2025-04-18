@@ -24,7 +24,6 @@ def redis_cache_decorator(fn: F | None = None, ex=None) -> F:
     def decorator(fn: F) -> F:
         @wraps(fn)
         def wrapper(*args, **kwargs):
-
             # hash the args and kwargs so they are not too long
             args_hash = hashlib.sha256(f"{args}{kwargs}".encode()).hexdigest()
             # create a readable cache key

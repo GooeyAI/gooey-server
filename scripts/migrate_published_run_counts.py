@@ -19,9 +19,9 @@ def run():
         run_count=Coalesce(
             Subquery(
                 SavedRun.objects.filter(parent_version__published_run=OuterRef("pk"))
-                .values('parent_version__published_run')
-                .annotate(run_count=Count('pk'))
-                .values('run_count')[:1],
+                .values("parent_version__published_run")
+                .annotate(run_count=Count("pk"))
+                .values("run_count")[:1],
             ),
             0,  # Default value if subquery returns null
         )

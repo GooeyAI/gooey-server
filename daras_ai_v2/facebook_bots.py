@@ -474,9 +474,9 @@ class FacebookBot(BotInterface):
         raise_for_status(r)
         # ensure file is audio/video
         mime_type = get_mimetype_from_response(r)
-        assert (
-            "audio/" in mime_type or "video/" in mime_type
-        ), f"Invalid mime type {mime_type} for {url}"
+        assert "audio/" in mime_type or "video/" in mime_type, (
+            f"Invalid mime type {mime_type} for {url}"
+        )
         # convert to wav
         data, _ = audio_bytes_to_wav(r.content)
         mime_type = "audio/wav"
