@@ -180,7 +180,6 @@ class FaceInpaintingPage(BasePage):
         repositioning_preview_img(img)
 
     def render_output(self):
-        text_prompt = gui.session_state.get("text_prompt", "")
         output_images = gui.session_state.get("output_images")
 
         if output_images:
