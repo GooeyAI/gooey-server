@@ -2,11 +2,11 @@ import io
 import os
 import typing
 import zipfile
+from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
 import requests
-from blib2to3.pgen2.parse import contextmanager
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
