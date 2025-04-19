@@ -308,27 +308,27 @@ class ImageSegmentationPage(BasePage):
         with col2:
             output_image = gui.session_state.get("output_image")
             if output_image:
-                gui.image(output_image, caption=f"Segmentation Mask")
+                gui.image(output_image, caption="Segmentation Mask")
             else:
                 gui.div()
 
         with col3:
             resized_image = gui.session_state.get("resized_image")
             if resized_image:
-                gui.image(resized_image, caption=f"Resized Image")
+                gui.image(resized_image, caption="Resized Image")
             else:
                 gui.div()
 
             resized_mask = gui.session_state.get("resized_mask")
             if resized_mask:
-                gui.image(resized_mask, caption=f"Resized Mask")
+                gui.image(resized_mask, caption="Resized Mask")
             else:
                 gui.div()
 
         with col4:
             cutout_image = gui.session_state.get("cutout_image")
             if cutout_image:
-                gui.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption="Cutout Image")
             else:
                 gui.div()
 
@@ -345,7 +345,7 @@ class ImageSegmentationPage(BasePage):
         with col2:
             cutout_image = state.get("cutout_image")
             if cutout_image:
-                gui.image(cutout_image, caption=f"Cutout Image")
+                gui.image(cutout_image, caption="Cutout Image")
             else:
                 gui.div()
 
@@ -354,12 +354,6 @@ class ImageSegmentationPage(BasePage):
 
     def render_usage_guide(self):
         youtube_video("hSsCMloAQ-8")
-
-
-def _add_shadow(img_pil):
-    draw = PIL.ImageDraw.Draw(img_pil)
-    # draw.ellipse([(xmin, ymin), (xmax, ymin)], fill="#000")
-    return img_pil
 
 
 def generate_gradient_pil(width, height, opacity) -> PIL.Image:
@@ -381,42 +375,3 @@ def generate_gradient_pil(width, height, opacity) -> PIL.Image:
     # grad = np.flip(grad, axis=0)
 
     return PIL.Image.fromarray(grad, mode="L")
-
-
-def _reflect(img_cv2, opacity):
-    top = opacity
-    btm = 0
-
-    # add opaque alpha channel to input
-    img_cv2 = cv2.cvtColor(img_cv2, cv2.COLOR_RGB2BGRA)
-
-    hh, ww = img_cv2.shape[:2]
-
-    # flip the input
-    flip = np.flip(img_cv2, axis=0)
-
-    hh //= 3
-    flip = flip[:hh, :, :]
-
-    # make vertical gradient that is bright at top and dark at bottom as alpha channel for the flipped image
-    gtop = 255 * top // 100
-    gbtm = 255 * btm // 100
-    grady = np.linspace(gbtm, gtop, hh, dtype=np.uint8)
-    gradx = np.linspace(1, 1, ww, dtype=np.uint8)
-    grad = np.outer(grady, gradx)
-    grad = np.flip(grad, axis=0)
-    # # alternate method
-    # grad = np.linspace(0, 255, hh, dtype=np.uint8)
-    # grad = np.linspace(gbtm, gtop, hh, dtype=np.uint8)
-    # grad = np.tile(grad, (ww, 1))
-    # grad = np.transpose(grad)
-    # grad = np.flip(grad, axis=0)
-
-    # put the gradient into the alpha channel of the flipped image
-    flip = cv2.cvtColor(flip, cv2.COLOR_BGR2BGRA)
-    flip[:, :, 3] = grad
-
-    # concatenate the original and the flipped versions
-    result = np.vstack((img_cv2, flip))
-
-    return result

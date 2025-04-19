@@ -224,8 +224,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
     def render_run_preview_output(self, state: dict):
         gui.write(
             f"""
-            **Google Search Query** `{state.get("search_query", '')}` \\
-            **Prompt** `{state.get("text_prompt", '')}`
+            **Google Search Query** `{state.get("search_query", "")}` \\
+            **Prompt** `{state.get("text_prompt", "")}`
             """
         )
 

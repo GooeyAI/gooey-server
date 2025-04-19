@@ -21,7 +21,7 @@ def workflow_url_input(
     del_key: str = None,
     current_user: AppUser | None = None,
     allow_none: bool = False,
-    include_root: bool = True
+    include_root: bool = True,
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 

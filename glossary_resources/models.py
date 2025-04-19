@@ -18,7 +18,6 @@ from daras_ai_v2.vector_search import (
     download_content_bytes,
     tabular_bytes_to_str_df,
 )
-from files.models import FileMetadata
 
 
 class GlossaryResourceQuerySet(models.QuerySet):

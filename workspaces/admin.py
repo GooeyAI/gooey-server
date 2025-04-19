@@ -1,3 +1,5 @@
+import typing
+
 from django.contrib import admin
 from django.db.models import Sum, Q
 from safedelete.admin import SafeDeleteAdmin, SafeDeleteAdminFilter
@@ -6,6 +8,9 @@ from bots.admin_links import change_obj_url, open_in_new_tab
 from payments.models import Subscription
 from usage_costs.models import UsageCost
 from . import models
+
+if typing.TYPE_CHECKING:
+    from django.http import HttpRequest
 
 
 class WorkspaceMembershipInline(admin.TabularInline):

@@ -38,7 +38,6 @@ from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
     DocSearchRequest,
-    EmptySearchResults,
     get_top_k_references,
     references_as_prompt,
 )
@@ -139,9 +138,9 @@ class GoogleGPTPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert gui.session_state.get(
-            "search_query", ""
-        ).strip(), "Please enter a search query"
+        assert gui.session_state.get("search_query", "").strip(), (
+            "Please enter a search query"
+        )
 
     def render_output(self):
         render_output_with_refs(gui.session_state)

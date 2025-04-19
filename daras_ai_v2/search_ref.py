@@ -115,7 +115,7 @@ def format_citations(
                 cites = " ".join(ref_to_slack_mrkdwn(ref) for ref in ref_map.values())
             case CitationStyles.plaintext:
                 cites = " ".join(
-                    f'[{ref["title"]} {ref["url"]}]' for ref_num, ref in ref_map.items()
+                    f"[{ref['title']} {ref['url']}]" for ref_num, ref in ref_map.items()
                 )
 
             case CitationStyles.number_markdown:
@@ -189,7 +189,7 @@ def format_footnotes(
         case CitationStyles.number_plaintext:
             formatted += "\n\n"
             formatted += "\n".join(
-                f'{ref_num}. {ref["title"]} {ref["url"]}'
+                f"{ref_num}. {ref['title']} {ref['url']}"
                 for ref_num, ref in sorted(all_refs.items())
             )
 
@@ -214,7 +214,7 @@ def format_footnotes(
         case CitationStyles.symbol_plaintext:
             formatted += "\n\n"
             formatted += "\n".join(
-                f'{generate_footnote_symbol(ref_num - 1)}. {ref["title"]} {ref["url"]}'
+                f"{generate_footnote_symbol(ref_num - 1)}. {ref['title']} {ref['url']}"
                 for ref_num, ref in sorted(all_refs.items())
             )
     return formatted
@@ -303,6 +303,8 @@ def render_output_with_refs(state, height=500):
 
 
 FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "♣", "✠", "☮", "☯", "✡"]  # fmt: skip
+
+
 def generate_footnote_symbol(idx: int) -> str:
     quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
     return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)

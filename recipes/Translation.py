@@ -46,8 +46,8 @@ class TranslationPage(BasePage):
         texts: list[str] = Field([])
 
         selected_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)]
-        ) | None = Field(TranslationModels.google.name)
+            (typing.Literal[tuple(e.name for e in TranslationModels)]) | None
+        ) = Field(TranslationModels.google.name)
 
     class RequestModel(TranslationOptions, RequestModelBase):
         pass

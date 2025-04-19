@@ -562,7 +562,9 @@ def get_conversations_and_messages(bi) -> tuple[ConversationQuerySet, MessageQue
     conversations: ConversationQuerySet = Conversation.objects.filter(
         bot_integration=bi
     ).order_by()  # type: ignore
-    messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
+    messages: MessageQuerySet = Message.objects.filter(
+        conversation__in=conversations
+    ).order_by()  # type: ignore
     return conversations, messages
 
 

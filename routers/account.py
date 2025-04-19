@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException
 from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
-from daras_ai_v2.fastapi_tricks import get_route_path, get_app_route_url
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -248,7 +248,6 @@ class AccountTabs(TabData, Enum):
     def get_tabs_for_user(
         cls, user: typing.Optional["AppUser"], workspace: Workspace | None
     ) -> list["AccountTabs"]:
-
         ret = list(cls)
 
         if workspace.is_personal:

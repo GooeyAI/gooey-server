@@ -1,5 +1,4 @@
 import numpy as np
-from fsspec.transaction import Transaction
 
 from gooeysite import wsgi
 

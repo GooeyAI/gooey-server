@@ -422,7 +422,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
                 if asr_model.supports_input_prompt():
                     gui.text_area(
-                        f'###### {field_title_desc(self.RequestModel, "asr_prompt")}',
+                        f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
                         key="asr_prompt",
                         value="Transcribe the recording as accurately as possible.",
                         height=300,
@@ -767,7 +767,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 prompt_funcs = list(
                     get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
                 )
-            except:
+            except Exception:
                 prompt_funcs = None
             if prompt_funcs:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")

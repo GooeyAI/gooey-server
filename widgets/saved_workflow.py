@@ -72,7 +72,7 @@ def render_saved_workflow_preview(
     with gui.div(className="position-relative py-2 pe-0"):
         with (
             gui.styled(WORKFLOW_PREVIEW_STYLE),
-            gui.div(className=f"position-relative overflow-hidden"),
+            gui.div(className="position-relative overflow-hidden"),
             gui.div(className="d-flex flex-column gap-2"),
         ):
             if output_url:

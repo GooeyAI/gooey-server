@@ -71,9 +71,9 @@ def send_sms_message(
 ):
     """Send an SMS message to the given conversation."""
 
-    assert (
-        convo.twilio_phone_number
-    ), "This is not a Twilio conversation, it has no phone number."
+    assert convo.twilio_phone_number, (
+        "This is not a Twilio conversation, it has no phone number."
+    )
 
     client = convo.bot_integration.get_twilio_client()
     message = client.messages.create(
@@ -150,7 +150,6 @@ class TwilioVoice(BotInterface):
         text: str = None,
         audio_url: str = None,
     ):
-
         self.convo = convo
 
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
@@ -190,7 +189,6 @@ class TwilioVoice(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-
         assert not documents, "Twilio does not support sending documents via Voice"
         assert not video, "Twilio does not support sending videos via Voice"
         assert not buttons, "Interactive mode is not implemented yet"
@@ -243,9 +241,9 @@ def send_single_voice_call(
     """Create a new voice call saying the given text and audio URL and then hanging up. Useful for notifications."""
     from routers.twilio_api import resp_say_or_tts_play
 
-    assert (
-        convo.twilio_phone_number
-    ), "This is not a Twilio conversation, it has no phone number."
+    assert convo.twilio_phone_number, (
+        "This is not a Twilio conversation, it has no phone number."
+    )
 
     bot = TwilioVoice(convo)
 

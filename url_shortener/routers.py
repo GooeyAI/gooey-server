@@ -29,7 +29,8 @@ def url_shortener(hashid: str, request: Request):
         )
     if surl.url:
         return RedirectResponse(
-            url=surl.url, status_code=303  # because youtu.be redirects are 303
+            url=surl.url,
+            status_code=303,  # because youtu.be redirects are 303
         )
     elif surl.content:
         return Response(

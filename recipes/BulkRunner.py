@@ -32,8 +32,10 @@ from daras_ai_v2.workflow_url_input import (
     get_published_run_options,
     edit_done_button,
 )
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
 
 
 class BulkRunnerPage(BasePage):
@@ -111,7 +113,7 @@ List of URLs to the evaluation runs that you requested.
         for url in run_urls:
             try:
                 page_cls, sr, _ = url_to_runs(url)
-            except:
+            except Exception:
                 continue
 
             schema = page_cls.RequestModel.schema(ref_template="{model}")

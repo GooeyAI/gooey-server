@@ -71,9 +71,9 @@ def _auto_recharge_workspace(workspace: Workspace):
     """
     from payments.webhooks import StripeWebhookHandler
 
-    assert (
-        workspace.subscription.payment_provider == PaymentProvider.STRIPE
-    ), "Auto recharge is only supported with Stripe"
+    assert workspace.subscription.payment_provider == PaymentProvider.STRIPE, (
+        "Auto recharge is only supported with Stripe"
+    )
 
     # check for monthly budget
     dollars_spent = workspace.get_dollars_spent_this_month()

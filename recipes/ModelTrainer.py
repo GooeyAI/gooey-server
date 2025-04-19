@@ -154,7 +154,7 @@ class ModelTrainerPage(BasePage):
     def render_form_v2(self):
         selected_model = enum_selector(
             enum_cls=FinetuneModels,
-            label=f'###### {ModelTrainerIcons.model} {field_title(self.RequestModel, "selected_model")}',
+            label=f"###### {ModelTrainerIcons.model} {field_title(self.RequestModel, 'selected_model')}",
             key="selected_model",
             use_selectbox=True,
         )
@@ -168,12 +168,12 @@ class ModelTrainerPage(BasePage):
 
     def render_settings(self):
         gui.number_input(
-            label=f'###### {ModelTrainerIcons.learning_rate} {field_title(self.RequestModel, "learning_rate")}',
+            label=f"###### {ModelTrainerIcons.learning_rate} {field_title(self.RequestModel, 'learning_rate')}",
             key="learning_rate",
             help=field_desc(self.RequestModel, "learning_rate"),
         )
         gui.slider(
-            label=f'###### {ModelTrainerIcons.steps} {field_title(self.RequestModel, "steps")}',
+            label=f"###### {ModelTrainerIcons.steps} {field_title(self.RequestModel, 'steps')}",
             key="steps",
             help=field_desc(self.RequestModel, "steps"),
             min_value=1,
@@ -290,7 +290,7 @@ def render_flux_lora_fast_form(selected_model: str):
     inputs = FluxLoraFastInputs.parse_obj(gui.session_state.get("inputs", {}))
     gui.session_state.setdefault("inputs.input_images", inputs.input_images)
     inputs.input_images = bulk_documents_uploader(
-        label=f'###### {ModelTrainerIcons.input_images} {field_title(FluxLoraFastInputs, "input_images")}',
+        label=f"###### {ModelTrainerIcons.input_images} {field_title(FluxLoraFastInputs, 'input_images')}",
         key="inputs.input_images",
         help=field_desc(FluxLoraFastInputs, "input_images"),
         accept=["image/*"],
@@ -298,13 +298,13 @@ def render_flux_lora_fast_form(selected_model: str):
     if selected_model == FinetuneModels.flux_lora_fast.name:
         inputs.model_type = enum_selector(
             enum_cls=FluxLoraModelTypes,
-            label=f'###### {ModelTrainerIcons.model_type} {field_title(FluxLoraFastInputs, "model_type")}',
+            label=f"###### {ModelTrainerIcons.model_type} {field_title(FluxLoraFastInputs, 'model_type')}",
             value=inputs.model_type and inputs.model_type,
             use_selectbox=True,
             help=field_desc(FluxLoraFastInputs, "model_type"),
         )
     inputs.trigger_word = gui.text_input(
-        label=f'{ModelTrainerIcons.trigger_word} {field_title(FluxLoraFastInputs, "trigger_word")}',
+        label=f"{ModelTrainerIcons.trigger_word} {field_title(FluxLoraFastInputs, 'trigger_word')}",
         value=inputs.trigger_word,
         help=field_desc(FluxLoraFastInputs, "trigger_word"),
     )

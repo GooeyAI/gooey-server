@@ -4,7 +4,7 @@ import gooey_gui as gui
 import requests
 from pydantic import BaseModel
 
-from bots.models import PublishedRun, Workflow
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video

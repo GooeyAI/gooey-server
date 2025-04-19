@@ -10,7 +10,7 @@ from daras_ai_v2.field_render import field_title_desc
 from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun, Workflow
+    from bots.models import SavedRun
     from daras_ai_v2.base import BasePage, JsonTypes
     from workspaces.models import Workspace
 

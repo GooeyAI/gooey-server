@@ -5,7 +5,6 @@ from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
 from furl import furl
 from starlette.requests import Request
-from starlette.responses import HTMLResponse
 
 from bots.models import SavedRun
 from daras_ai_v2 import settings

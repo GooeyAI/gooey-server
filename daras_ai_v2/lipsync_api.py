@@ -85,7 +85,7 @@ def run_sadtalker(
             | dict(source_image=face, driven_audio=audio, max_frames=max_frames)
         ),
         content_type="video/mp4",
-        filename=f"gooey.ai lipsync.mp4",
+        filename="gooey.ai lipsync.mp4",
     )
 
     return links[0], metadata["output"]["duration_sec"]
@@ -115,7 +115,7 @@ def run_wav2lip(
                 max_frames=max_frames,
             ),
             content_type="video/mp4",
-            filename=f"gooey.ai lipsync.mp4",
+            filename="gooey.ai lipsync.mp4",
         )
         return links[0], metadata["output"]["duration_sec"]
     except ValueError as e:

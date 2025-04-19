@@ -1,4 +1,10 @@
+import typing
+
 from daras_ai_v2.asr import google_translate_target_languages
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
+    from google.cloud import translate_v3 as translate
 
 
 def validate_glossary_document(document: str):

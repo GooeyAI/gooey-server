@@ -168,7 +168,7 @@ def render_list_item(
         className="d-flex align-items-center gap-4 container-margin-reset mb-2"
     ):
         gui.write(
-            f'{get_type_icon(value_type)}&nbsp; **`{name or "?"}`**',
+            f"{get_type_icon(value_type)}&nbsp; **`{name or '?'}`**",
             unsafe_allow_html=True,
         )
         gui.write(f"**{value_type}**", className="text-muted small")

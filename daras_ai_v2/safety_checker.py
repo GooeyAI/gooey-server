@@ -5,7 +5,6 @@ from daras_ai_v2 import settings
 from daras_ai_v2.azure_image_moderation import is_image_nsfw
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatten
-from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.CompareLLM import CompareLLMPage
 
 SAFETY_CHECKER_MSG = "Your request was rejected as a result of our safety system. Your input image may contain contents that are not allowed by our safety system."

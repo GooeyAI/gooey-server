@@ -138,9 +138,9 @@ class SocialLookupEmailPage(BasePage):
 
         assert email_address, "Please provide a Prompt and an Email Address"
 
-        assert re.fullmatch(
-            email_regex, email_address
-        ), "Please provide a valid Email Address"
+        assert re.fullmatch(email_regex, email_address), (
+            "Please provide a valid Email Address"
+        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: SocialLookupEmailPage.RequestModel = self.RequestModel.parse_obj(state)

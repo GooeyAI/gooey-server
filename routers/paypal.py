@@ -4,7 +4,6 @@ from typing import Literal
 
 import pydantic
 import requests
-from fastapi.encoders import jsonable_encoder
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from furl import furl

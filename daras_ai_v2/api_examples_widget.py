@@ -194,7 +194,7 @@ print(response.status_code, result)
 
         py_code = format_str(py_code, mode=Mode())
         gui.write(
-            rf"""
+            r"""
 1. Generate an api key [below👇](#api-keys)
 
 2. Install [requests](https://requests.readthedocs.io/en/latest/) & add the `GOOEY_API_KEY` to your environment variables.
@@ -427,7 +427,7 @@ document.startStreaming = async function() {
     )
 
     gui.html(
-        f"""
+        """
 <br>
 <button class="btn btn-theme btn-secondary" onclick="document.startStreaming()">🏃‍♀️ Preview Streaming</button>
 <pre style="text-align: left; background: #f5f2f0; display: none; flex-direction: column-reverse;" id="stream-output"></pre>

@@ -180,7 +180,6 @@ class FaceInpaintingPage(BasePage):
         repositioning_preview_img(img)
 
     def render_output(self):
-        text_prompt = gui.session_state.get("text_prompt", "")
         output_images = gui.session_state.get("output_images")
 
         if output_images:
@@ -260,7 +259,7 @@ class FaceInpaintingPage(BasePage):
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
         state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
-        yield f"Generating Image..."
+        yield "Generating Image..."
 
         prompt = state.get("text_prompt", "")
 

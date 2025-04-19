@@ -80,6 +80,10 @@ from embeddings.models import EmbeddedFile, EmbeddingsReference
 from files.models import FileMetadata
 
 
+if typing.TYPE_CHECKING:
+    import pandas as pd
+
+
 class DocSearchRequest(BaseModel):
     search_query: str
     keyword_query: str | list[str] | None
@@ -1119,7 +1123,7 @@ def render_sources_widget(refs: list[SearchReference]):
         for idx, ref in enumerate(refs):
             gui.html(
                 # language=HTML
-                f"""<p>{idx + 1}. <a href="{ref['url']}" target="_blank">{ref['title']}</a></p>""",
+                f"""<p>{idx + 1}. <a href="{ref["url"]}" target="_blank">{ref["title"]}</a></p>""",
             )
             gui.text(ref["snippet"], style={"maxHeight": "200px"})
         gui.write(

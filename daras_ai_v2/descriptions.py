@@ -30,7 +30,7 @@ def prompting101():
         f"""
         ###### Step 3: Construct your prompt:
         `An analogue film still of an astronaut in a space suit walking on the busy streets of Mumbai, golden light on the astronaut, 4k`
-        [example]({furl(settings.APP_BASE_URL).add(path='compare-ai-image-generators').add({"example_id": "s9nmzy34"}).url})
+        [example]({furl(settings.APP_BASE_URL).add(path="compare-ai-image-generators").add({"example_id": "s9nmzy34"}).url})
         """
     )
     gui.markdown(

@@ -108,12 +108,7 @@ def test_create_bot_integration_conversation_message(transactional_db):
 
 
 def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
-    from recipes.VideoBotsStats import VideoBotsStatsPage
-
-    page = VideoBotsStatsPage()
-
     # setup
-    run_url = "https://my_run_url"
     bi = BotIntegration.objects.create(
         name="My Bot Integration",
         saved_run=None,

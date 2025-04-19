@@ -817,9 +817,9 @@ def run_language_model(
     | tuple[list[str], list[list[dict]]]
     | typing.Generator[list[dict], None, None]
 ):
-    assert bool(prompt) != bool(
-        messages
-    ), "Pleave provide exactly one of { prompt, messages }"
+    assert bool(prompt) != bool(messages), (
+        "Pleave provide exactly one of { prompt, messages }"
+    )
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     if model.max_output_tokens:
@@ -1405,7 +1405,6 @@ def _stream_openai_chunked(
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
-
     ret = []
     chunk_size = start_chunk_size
 
