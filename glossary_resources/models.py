@@ -41,6 +41,7 @@ class GlossaryResourceQuerySet(models.QuerySet):
                     name=metadata.name,
                     etag=metadata.etag,
                     mime_type=metadata.mime_type,
+                    export_links=metadata.export_links,
                 )
                 with transaction.atomic():
                     try:
@@ -66,8 +67,11 @@ def create_glossary_cached(
     name: str,
     etag: str | None,
     mime_type: str | None,
+    export_links: dict[str, str] | None = None,
 ) -> "GlossaryResource":
-    f_bytes, mime_type = download_content_bytes(f_url=url, mime_type=mime_type)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=url, mime_type=mime_type, export_links=export_links
+    )
     df = tabular_bytes_to_str_df(f_name=name, f_bytes=f_bytes, mime_type=mime_type)
     if is_user_uploaded_url(url):
         glossary_url = url
