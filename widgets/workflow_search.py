@@ -1,5 +1,5 @@
 import gooey_gui as gui
-from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from django.db.models import Q, QuerySet
 
 from app_users.models import AppUser
@@ -73,10 +73,15 @@ def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
         )
     )
 
+    # build a raw tsquery like “foo:* & bar:*”
+    tokens = [t for t in search_query.strip().split() if t]
+    raw_query = " | ".join(f"{t}:*" for t in tokens)
+    search = SearchQuery(raw_query, search_type="raw")
+
     workflow_search = PublishedRun.objects.filter(
-        published_run_id="", title__search=search_query
+        published_run_id="", title__search=search
     ).values("workflow")
-    search_filter = Q(search=search_query) | Q(workflow__in=workflow_search)
+    search_filter = Q(search=search) | Q(workflow__in=workflow_search)
 
     permission_filter = ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
     if user and not user.is_anonymous:
