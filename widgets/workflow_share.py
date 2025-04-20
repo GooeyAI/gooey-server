@@ -8,7 +8,7 @@ from daras_ai_v2.fastapi_tricks import get_route_path
 from routers.account import account_route
 from widgets.author import render_author_from_workspace
 from widgets.publish_form import clear_publish_form
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.views import member_invite_button_with_dialog
 from workspaces.widgets import render_create_workspace_alert
 
@@ -213,7 +213,7 @@ def render_workspace_with_invite_button(workspace: Workspace, user_id: int) -> N
     with col2:
         try:
             membership = workspace.memberships.get(user_id=user_id)
-        except Workspace.DoesNotExist:
+        except WorkspaceMembership.DoesNotExist:
             return
         member_invite_button_with_dialog(
             membership,
