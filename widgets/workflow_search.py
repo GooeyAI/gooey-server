@@ -1,6 +1,6 @@
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
-from django.db.models import Q, QuerySet
+from django.db.models import Q, QuerySet, F
 
 from app_users.models import AppUser
 from bots.models import WorkflowAccessLevel, PublishedRun, Workflow
@@ -53,24 +53,15 @@ def _render_run(pr: PublishedRun):
 
 
 def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
-    qs = (
-        PublishedRun.objects.select_related("workspace", "created_by", "saved_run")
-        .annotate(
-            search=SearchVector(
-                "title", "notes", "created_by__display_name", "workspace__name"
-            ),
-            is_personal_workflow=Q(created_by=user),
-            is_team_workflow=Q(workspace__memberships__user=user),
-            is_root_workflow=Q(published_run_id=""),
-        )
-        .order_by(
-            "is_personal_workflow",
-            "is_team_workflow",
-            "is_approved_example",
-            "is_root_workflow",
-            "-updated_at",
-            "id",
-        )
+    qs = PublishedRun.objects.select_related(
+        "workspace", "created_by", "saved_run"
+    ).annotate(
+        search=SearchVector(
+            "title", "notes", "created_by__display_name", "workspace__name"
+        ),
+        is_personal_workflow=Q(created_by=user),
+        is_team_workflow=Q(workspace__memberships__user=user),
+        is_root_workflow=Q(published_run_id=""),
     )
 
     # build a raw tsquery like “foo:* & bar:*”
@@ -91,5 +82,17 @@ def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
             workspace__memberships__deleted__isnull=True,
         ) & ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
 
-    qs = qs.filter(search_filter & permission_filter).distinct()[:25]
+    qs = (
+        qs.filter(search_filter & permission_filter)
+        .order_by(
+            F("is_personal_workflow").desc(nulls_last=True),
+            F("is_team_workflow").desc(nulls_last=True),
+            "-is_approved_example",
+            "-is_root_workflow",
+            "-updated_at",
+            "id",
+        )
+        .distinct()[:25]
+    )
+
     return qs
