@@ -1,8 +1,7 @@
-from django.db.models import OuterRef, Subquery, Sum, F, Count
+from django.db.models import OuterRef, Count, Case, When
 from django.db.models.functions import Coalesce
 
 from bots.models import PublishedRun, SavedRun
-from .migrate_workspaces import update_in_batches
 
 
 def run():
@@ -17,14 +16,21 @@ def run():
     print(f"Found {total} published runs to process")
 
     qs.update(
-        run_count=Coalesce(
-            Subquery(
-                SavedRun.objects.filter(parent_version__published_run=OuterRef("pk"))
-                .values('parent_version__published_run')
-                .annotate(run_count=Count('pk'))
-                .values('run_count')[:1],
+        run_count=Case(
+            When(
+                published_run_id="",
+                then=SavedRun.objects.filter(workflow=OuterRef("workflow"))
+                .values("workflow")
+                .annotate(run_count=Count("pk"))
+                .values("run_count")[:1],
             ),
-            0,  # Default value if subquery returns null
+            default=Coalesce(
+                SavedRun.objects.filter(parent_version__published_run=OuterRef("pk"))
+                .values("parent_version__published_run")
+                .annotate(run_count=Count("pk"))
+                .values("run_count")[:1],
+                0,  # Default value if subquery returns null
+            ),
         )
     )
 
