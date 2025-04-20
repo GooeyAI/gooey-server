@@ -69,15 +69,13 @@ def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
             "is_approved_example",
             "is_root_workflow",
             "-updated_at",
+            "id",
         )
     )
 
-    workflow_search = (
-        PublishedRun.objects.filter(published_run_id="", title__search=search_query)
-        .values("workflow")
-        .order_by()
-        .distinct()
-    )
+    workflow_search = PublishedRun.objects.filter(
+        published_run_id="", title__search=search_query
+    ).values("workflow")
     search_filter = Q(search=search_query) | Q(workflow__in=workflow_search)
 
     permission_filter = ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
@@ -88,5 +86,5 @@ def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
             workspace__memberships__deleted__isnull=True,
         ) & ~Q(workspace_access=WorkflowAccessLevel.VIEW_ONLY)
 
-    qs = qs.filter(search_filter & permission_filter)[:25]
+    qs = qs.filter(search_filter & permission_filter).distinct()[:25]
     return qs
