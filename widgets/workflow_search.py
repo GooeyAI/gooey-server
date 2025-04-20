@@ -72,9 +72,12 @@ def get_filtered_published_runs(search_query: str, user: AppUser) -> QuerySet:
         )
     )
 
-    workflow_search = PublishedRun.objects.filter(
-        published_run_id="", title__search=search_query
-    ).values("workflow")
+    workflow_search = (
+        PublishedRun.objects.filter(published_run_id="", title__search=search_query)
+        .values("workflow")
+        .order_by()
+        .distinct()
+    )
     search_filter = Q(search=search_query) | Q(workflow__in=workflow_search)
 
     permission_filter = ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
