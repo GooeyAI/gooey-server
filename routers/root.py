@@ -247,10 +247,10 @@ def component_page(request: Request):
 
 @gui.route(app, "/explore/")
 def explore_page(request: Request):
-    import explore
+    from widgets import explore
 
     with page_wrapper(request):
-        explore.render()
+        explore.render(request.user)
 
     return {
         "meta": raw_build_meta_tags(
