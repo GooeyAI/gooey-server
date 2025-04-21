@@ -7,8 +7,6 @@ from datetime import timedelta
 import hashids
 import stripe
 from django.contrib import admin
-from django.contrib.postgres.indexes import GinIndex
-from django.contrib.postgres.search import SearchVector
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction, IntegrityError
