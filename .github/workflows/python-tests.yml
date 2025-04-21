@@ -64,6 +64,8 @@ jobs:
           postgresql-client
           libzbar0
           tar
+          build-essential
+          g++
 
       - uses: actions/checkout@v4
 
