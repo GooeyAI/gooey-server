@@ -1,6 +1,5 @@
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchVector, SearchQuery
-from django.db import connection
 from django.db.models import (
     Q,
     QuerySet,
@@ -14,7 +13,7 @@ from app_users.models import AppUser
 from bots.models import WorkflowAccessLevel, PublishedRun, Workflow
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
-from workspaces.models import WorkspaceRole, Workspace
+from workspaces.models import WorkspaceRole
 
 
 def render_search_bar(key: str = "search_query", value: str = "") -> str:
