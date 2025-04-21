@@ -11,6 +11,7 @@ jobs:
       matrix:
         python-version: [ "3.10.12" ]
         poetry-version: [ "1.8.3" ]
+        poetry-install-args: [ "--only main" ]
 
     # Service containers to run with `test`
     services:
@@ -62,15 +63,33 @@ jobs:
           python3-opencv
           postgresql-client
           libzbar0
+          tar
 
       - uses: actions/checkout@v4
 
-      - name: Setup Python, Poetry and Dependencies
-        uses: packetcoders/action-setup-cache-python-poetry@main
+      # https://github.com/packetcoders/action-setup-cache-python-poetry/blob/0d0be5577b30d85f3fa2d93a4beeda149520f120/action.yml
+      - name: Load cached Poetry Binary
+        id: cached-poetry-binary
+        uses: actions/cache@v4
         with:
-          python-version: ${{matrix.python-version}}
-          poetry-version: ${{matrix.poetry-version}}
-          install-args: --only main
+          path: ~/.local
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.poetry-version }}
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ matrix.poetry-version }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Load cached venv
+        id:: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}${{ matrix.poetry-install-args }}
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        shell: bash
+        run: poetry install --no-interaction --no-root ${{ matrix.poetry-install-args }}
 
       - name: Run tests
         env:
