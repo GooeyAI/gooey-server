@@ -3,6 +3,7 @@ import json
 import mimetypes
 import re
 import typing
+from copy import deepcopy
 from enum import Enum
 from functools import wraps
 
@@ -1306,13 +1307,15 @@ def run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
+    messages_for_completion = deepcopy(messages)
+
     if model in [
         LargeLanguageModels.o1_mini,
         LargeLanguageModels.o1,
         LargeLanguageModels.o3_mini,
     ]:
         # fuck you, openai
-        for entry in messages:
+        for entry in messages_for_completion:
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 if model == LargeLanguageModels.o1_mini:
                     entry["role"] = CHATML_ROLE_USER
@@ -1358,7 +1361,7 @@ def run_openai_chat(
         *[
             _get_chat_completions_create(
                 model=model_id,
-                messages=messages,
+                messages=messages_for_completion,
                 max_tokens=max_tokens,
                 max_completion_tokens=max_completion_tokens,
                 stop=stop or NOT_GIVEN,

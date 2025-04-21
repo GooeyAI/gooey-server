@@ -2,11 +2,13 @@ import typing
 
 import gooey_gui as gui
 
+from app_users.models import AppUser
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
+from widgets.workflow_search import render_search_bar, render_search_results
 
 META_TITLE = "Explore AI workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
@@ -15,8 +17,22 @@ TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
-def render():
-    heading(title=TITLE, description=DESCRIPTION)
+def render(user: AppUser | None, search: str | None):
+    heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
+
+    new_value = render_search_bar(value=search or "")
+    if search and not new_value:
+        # if the search bar is empty, redirect to the explore page
+        raise gui.QueryParamsRedirectException(dict())
+    if new_value and new_value != search:
+        # if the search bar value has changed, redirect to the new search page
+        raise gui.QueryParamsRedirectException(dict(search=new_value))
+
+    if search:
+        with gui.div(className="mb-4"):
+            render_search_results(user, search)
+            return
+
     for category, pages in all_home_pages_by_category.items():
         gui.write("---")
         if category != "Featured":

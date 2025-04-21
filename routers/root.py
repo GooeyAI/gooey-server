@@ -246,11 +246,11 @@ def component_page(request: Request):
 
 
 @gui.route(app, "/explore/")
-def explore_page(request: Request):
-    import explore
+def explore_page(request: Request, search: str | None = None):
+    from widgets import explore
 
     with page_wrapper(request):
-        explore.render()
+        explore.render(request.user, search)
 
     return {
         "meta": raw_build_meta_tags(

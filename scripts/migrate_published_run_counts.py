@@ -1,4 +1,4 @@
-from django.db.models import OuterRef, Subquery, Count
+from django.db.models import OuterRef, Count, Case, When
 from django.db.models.functions import Coalesce
 
 from bots.models import PublishedRun, SavedRun
@@ -16,14 +16,21 @@ def run():
     print(f"Found {total} published runs to process")
 
     qs.update(
-        run_count=Coalesce(
-            Subquery(
+        run_count=Case(
+            When(
+                published_run_id="",
+                then=SavedRun.objects.filter(workflow=OuterRef("workflow"))
+                .values("workflow")
+                .annotate(run_count=Count("pk"))
+                .values("run_count")[:1],
+            ),
+            default=Coalesce(
                 SavedRun.objects.filter(parent_version__published_run=OuterRef("pk"))
                 .values("parent_version__published_run")
                 .annotate(run_count=Count("pk"))
                 .values("run_count")[:1],
+                0,  # Default value if subquery returns null
             ),
-            0,  # Default value if subquery returns null
         )
     )
 
