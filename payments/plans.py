@@ -6,7 +6,6 @@ from textwrap import dedent
 from typing import Any
 
 import stripe
-from furl import furl
 
 from daras_ai_v2 import paypal, settings
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
@@ -142,7 +141,7 @@ class PricingPlan(PricingPlanData, Enum):
         credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
         monthly_charge=0,
         long_description=dedent(
-            f"""
+            """
             #### Features
             <ul class="text-muted">
               <li>Public Workflows</li>

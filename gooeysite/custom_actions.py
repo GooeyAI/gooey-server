@@ -15,7 +15,7 @@ def export_to_csv(modeladmin, request, queryset):
     response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
     try:
         df = queryset.to_df()
-    except AttributeError as e:
+    except AttributeError:
         df = qs_to_df(queryset)
     df.to_csv(response, index=False)
     return response
@@ -30,7 +30,7 @@ def export_to_excel(modeladmin, request, queryset):
     response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
     try:
         df = queryset.to_df()
-    except AttributeError as e:
+    except AttributeError:
         df = qs_to_df(queryset)
     df.to_excel(response, index=False)
     return response

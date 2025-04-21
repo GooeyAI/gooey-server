@@ -130,7 +130,7 @@ def keyword_instructions_widget():
 def cache_knowledge_widget(page: "BasePage"):
     gui.write("###### Cache")
     gui.caption(
-        f"""
+        """
         By default we embed your knowledge files & links and cache their contents for fast responses. 
         """
     )

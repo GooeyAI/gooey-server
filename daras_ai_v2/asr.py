@@ -40,6 +40,9 @@ from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
 
+if typing.TYPE_CHECKING:
+    import google.cloud.speech_v2
+
 TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
@@ -748,9 +751,9 @@ def run_translate(
 def run_ghana_nlp_translate(
     texts: list[str], target_language: str, source_language: str
 ) -> list[str]:
-    assert (
-        source_language and target_language
-    ), "Both Source & Target language is required for Ghana NLP"
+    assert source_language and target_language, (
+        "Both Source & Target language is required for Ghana NLP"
+    )
     source_language = normalised_lang_in_collection(
         source_language, ghana_nlp_translate_target_languages()
     )
@@ -791,9 +794,9 @@ def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -
 def run_lelapa_translate(
     texts: list[str], target_language: str, source_language: str
 ) -> list[str]:
-    assert (
-        source_language and target_language
-    ), "Both Source & Target language are required"
+    assert source_language and target_language, (
+        "Both Source & Target language are required"
+    )
     return map_parallel(
         lambda text: _call_lelapa_translate_raw(text, source_language, target_language),
         texts,

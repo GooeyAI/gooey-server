@@ -56,7 +56,7 @@ def test_integration_stats_route(db_fixtures, force_authentication, threadpool_s
     for bi in BotIntegration.objects.all():
         for i in range(5):
             convo = Conversation.objects.create(
-                bot_integration=bi, web_user_id=f"test-user-id-{i%2}"
+                bot_integration=bi, web_user_id=f"test-user-id-{i % 2}"
             )
             for j in range(10):
                 Message.objects.create(

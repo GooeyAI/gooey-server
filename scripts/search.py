@@ -1,5 +1,4 @@
 import json
-from pprint import pformat
 
 from loguru import logger
 from daras_ai_v2.vector_search import get_top_k_references, DocSearchRequest

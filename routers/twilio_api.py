@@ -1,9 +1,8 @@
 import random
 import traceback
-import typing
 from time import sleep
 
-from fastapi import Response, Query
+from fastapi import Response
 from loguru import logger
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks

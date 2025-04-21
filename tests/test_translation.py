@@ -59,7 +59,7 @@ def google_translate_check(
     *,
     glossary_url: str = None,
     target_language: str = "en",
-    source_language: str = None
+    source_language: str = None,
 ):
     actual = run_google_translate(
         texts=[text],
