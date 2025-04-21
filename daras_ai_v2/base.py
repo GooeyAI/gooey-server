@@ -1482,11 +1482,19 @@ class BasePage:
         if cost_note:
             ret += f" ({cost_note.strip()})"
 
-        additional_notes = self.additional_notes()
+        notes_result = self.additional_notes()
+        additional_notes = None
+        line_clamp = 1  # Default value
+
+        if isinstance(notes_result, str):
+            additional_notes = notes_result
+        elif isinstance(notes_result, tuple):
+            additional_notes, line_clamp = notes_result
+
         if additional_notes:
             ret += f" \n{additional_notes}"
 
-        gui.caption(ret, line_clamp=1, unsafe_allow_html=True)
+        gui.caption(ret, line_clamp=line_clamp, unsafe_allow_html=True)
 
     def _render_step_row(self):
         key = "details-expander"
@@ -1614,6 +1622,10 @@ class BasePage:
     functions_in_settings = True
     show_settings = True
 
+    def render_terms_caption(self):
+        terms_caption = "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
+        return terms_caption
+
     def _render_input_col(self):
         self.render_form_v2()
         placeholder = gui.div()
@@ -1629,10 +1641,9 @@ class BasePage:
 
         submitted = self.render_submit_button()
         with gui.div(style={"textAlign": "right"}):
-            gui.caption(
-                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
-                "[privacy policy](https://gooey.ai/privacy)._"
-            )
+            terms_caption = self.render_terms_caption()
+            gui.caption(f"_{terms_caption}_")
+
         return submitted
 
     def render_variables(self):
@@ -2278,7 +2289,7 @@ class BasePage:
                 output=output,
             )
 
-    def additional_notes(self) -> str | None:
+    def additional_notes(self) -> str | tuple[str, int] | None:
         pass
 
     def get_cost_note(self) -> str | None:
