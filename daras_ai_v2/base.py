@@ -28,11 +28,11 @@ from starlette.datastructures import URL
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
     PublishedRun,
-    WorkflowAccessLevel,
     PublishedRunVersion,
     RetentionPolicy,
     SavedRun,
     Workflow,
+    WorkflowAccessLevel,
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
@@ -70,14 +70,14 @@ from payments.auto_recharge import (
 )
 from routers.root import RecipeTabs
 from widgets.author import (
-    render_author_from_user,
     render_author_as_breadcrumb,
+    render_author_from_user,
 )
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
-    render_workflow_photo_uploader,
     render_change_notes_input,
+    render_workflow_photo_uploader,
 )
 from widgets.workflow_share import (
     render_share_button,
@@ -85,8 +85,8 @@ from widgets.workflow_share import (
 from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
-    set_current_workspace,
     render_create_workspace_alert,
+    set_current_workspace,
 )
 
 MAX_SEED = 4294967294
@@ -1470,6 +1470,9 @@ class BasePage:
             else:
                 return True
 
+    # Number of lines to clamp the run cost notes to
+    run_cost_line_clamp: int = 1
+
     def render_run_cost(self):
         url = self.get_credits_click_url()
         if self.current_sr.price and not self._has_request_changed():
@@ -1482,19 +1485,11 @@ class BasePage:
         if cost_note:
             ret += f" ({cost_note.strip()})"
 
-        notes_result = self.additional_notes()
-        additional_notes = None
-        line_clamp = 1  # Default value
-
-        if isinstance(notes_result, str):
-            additional_notes = notes_result
-        elif isinstance(notes_result, tuple):
-            additional_notes, line_clamp = notes_result
-
+        additional_notes = self.additional_notes()
         if additional_notes:
             ret += f" \n{additional_notes}"
 
-        gui.caption(ret, line_clamp=line_clamp, unsafe_allow_html=True)
+        gui.caption(ret, line_clamp=self.run_cost_line_clamp, unsafe_allow_html=True)
 
     def _render_step_row(self):
         key = "details-expander"
@@ -1622,10 +1617,6 @@ class BasePage:
     functions_in_settings = True
     show_settings = True
 
-    def render_terms_caption(self):
-        terms_caption = "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
-        return terms_caption
-
     def _render_input_col(self):
         self.render_form_v2()
         placeholder = gui.div()
@@ -1641,10 +1632,13 @@ class BasePage:
 
         submitted = self.render_submit_button()
         with gui.div(style={"textAlign": "right"}):
-            terms_caption = self.render_terms_caption()
+            terms_caption = self.get_terms_caption()
             gui.caption(f"_{terms_caption}_")
 
         return submitted
+
+    def get_terms_caption(self):
+        return "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
 
     def render_variables(self):
         if not self.functions_in_settings:
@@ -2289,7 +2283,8 @@ class BasePage:
                 output=output,
             )
 
-    def additional_notes(self) -> str | tuple[str, int] | None:
+    def additional_notes(self) -> str | None:
+        """Return additional notes to display. Override in subclasses."""
         pass
 
     def get_cost_note(self) -> str | None:
