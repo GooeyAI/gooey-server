@@ -193,10 +193,10 @@ class Workspace(SafeDeleteModel):
         ]
 
         indexes = [
-            GinIndex(
-                SearchVector("name", config="english"),
-                name="workspace_search_vector_idx",
-            ),
+            # GinIndex(
+            #     SearchVector("name", config="english"),
+            #     name="workspace_search_vector_idx",
+            # ),
         ]
 
     def __str__(self):

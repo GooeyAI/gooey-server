@@ -123,15 +123,21 @@ def build_search_filter(qs: QuerySet, search_query: str) -> QuerySet:
     raw_query = " | ".join(f"{t}:*" for t in tokens)
     search = SearchQuery(raw_query, search_type="raw")
 
-    # filter on the search vector
-    qs = qs.annotate(search=SearchVector("title", "notes", config="english"))
-    return qs.filter(
-        Q(search=search)
-        | Q(
-            workflow__in=(
-                qs.filter(published_run_id="", search=search).values("workflow")
-            )
-        )
-        | Q(created_by__in=AppUser.objects.filter(display_name__search=search))
-        | Q(workspace__in=Workspace.objects.filter(name__search=search))
+    # search by workflow title
+    workflow_search = PublishedRun.objects.filter(
+        published_run_id="", title__search=search
+    ).values("workflow")
+
+    # search by workflow metadata
+    qs = qs.annotate(
+        search=SearchVector(
+            "title",
+            "notes",
+            "created_by__display_name",
+            "workspace__handle__name",
+            "workspace__name",
+        ),
     )
+
+    # filter on the search vector
+    return qs.filter(Q(search=search) | Q(workflow__in=workflow_search))

@@ -2062,10 +2062,10 @@ class PublishedRun(models.Model):
                 ]
             ),
             models.Index(fields=["published_run_id"]),
-            GinIndex(
-                SearchVector("title", "notes", config="english"),
-                name="publishedrun_search_vector_idx",
-            ),
+            # GinIndex(
+            #     SearchVector("title", "notes", config="english"),
+            #     name="publishedrun_search_vector_idx",
+            # ),
         ]
 
     def __str__(self):
