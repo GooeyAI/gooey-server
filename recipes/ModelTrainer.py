@@ -10,7 +10,7 @@ import requests
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
-from bots.models import Workflow, SavedRun, PublishedRun
+from bots.models import PublishedRun, SavedRun, Workflow
 from daras_ai.image_input import (
     gcs_blob_for,
     upload_gcs_blob_from_bytes,
@@ -23,7 +23,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.field_render import field_desc, field_title
-from daras_ai_v2.stable_diffusion import Text2ImgModels, LoraWeight
+from daras_ai_v2.stable_diffusion import LoraWeight, Text2ImgModels
 from recipes.CompareText2Img import CompareText2ImgPage
 from workspaces.models import Workspace
 
@@ -185,8 +185,8 @@ class ModelTrainerPage(BasePage):
             max_value=10000,
         )
 
-    def render_terms_caption(self):
-        terms_caption = super().render_terms_caption()
+    def get_terms_caption(self):
+        terms_caption = super().get_terms_caption()
         terms_caption += " You also confirm that you have ownership IP rights to all uploaded images."
 
         return terms_caption
@@ -195,11 +195,17 @@ class ModelTrainerPage(BasePage):
         steps = gui.session_state.get("steps") or 1
         return f"*{steps} steps @ 0.36 Cr /step*"
 
-    def additional_notes(self) -> tuple[str, int | None] | None:
+    # Number of lines to clamp the run cost notes to
+    run_cost_line_clamp: int = 3
+
+    def additional_notes(self) -> str | None:
+        """Return additional notes to display."""
         steps = gui.session_state.get("steps") or 1
-        eco_cost_caption = f"🌳 [Eco Cost](https://gooey.ai/energy): 🚰 ~{int(steps*WATER_CUPS_PER_STEP)} cups of water & ⚡ electricity to power an EU household for ~{int(steps*ELECTRICITY_PER_STEP)} min."
-        line_clamp = 3
-        return eco_cost_caption, line_clamp
+        return (
+            f"🌳 [Eco Cost](https://gooey.ai/energy): "
+            f"🚰 ~{int(steps * WATER_CUPS_PER_STEP)} cups of water "
+            f"& ⚡ electricity to power an EU household for ~{int(steps * ELECTRICITY_PER_STEP)} min."
+        )
 
     def get_raw_price(self, state: dict) -> float:
         return 0.36 * (state.get("steps") or 1)
