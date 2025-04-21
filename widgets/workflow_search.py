@@ -1,16 +1,16 @@
 import gooey_gui as gui
-from django.contrib.postgres.search import SearchVector, SearchQuery
+from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
+    BooleanField,
+    F,
+    FilteredRelation,
     Q,
     QuerySet,
     Value,
-    BooleanField,
-    FilteredRelation,
-    F,
 )
 
 from app_users.models import AppUser
-from bots.models import WorkflowAccessLevel, PublishedRun, Workflow
+from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
@@ -122,7 +122,7 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
 def build_search_filter(qs: QuerySet, search_query: str) -> QuerySet:
     # build a raw tsquery like “foo:* & bar:*”
     tokens = [t for t in search_query.strip().split() if t]
-    raw_query = " | ".join(f"{t}:*" for t in tokens)
+    raw_query = " & ".join(f"{t}:*" for t in tokens)
     search = SearchQuery(raw_query, search_type="raw")
 
     # search by workflow title
