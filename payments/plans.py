@@ -246,7 +246,7 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
-        contact_us_link=str(settings.CONTACT_URL),
+        contact_us_link=settings.CONTACT_URL,
     )
 
     def __ge__(self, other: PricingPlan) -> bool:

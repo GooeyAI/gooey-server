@@ -27,6 +27,10 @@ from daras_ai_v2.stable_diffusion import Text2ImgModels, LoraWeight
 from recipes.CompareText2Img import CompareText2ImgPage
 from workspaces.models import Workspace
 
+# eco cost
+WATER_CUPS_PER_STEP = 0.01177967574
+ELECTRICITY_PER_STEP = 0.005782746854
+
 
 class FluxLoraModelTypes(Enum):
     concept = "🍎 Concept (Objects, Characters, Clothing, Anatomy, Poses, etc.)"
@@ -181,9 +185,21 @@ class ModelTrainerPage(BasePage):
             max_value=10000,
         )
 
+    def render_terms_caption(self):
+        terms_caption = super().render_terms_caption()
+        terms_caption += " You also confirm that you have ownership IP rights to all uploaded images."
+
+        return terms_caption
+
     def get_cost_note(self) -> str | None:
         steps = gui.session_state.get("steps") or 1
         return f"*{steps} steps @ 0.36 Cr /step*"
+
+    def additional_notes(self) -> tuple[str, int | None] | None:
+        steps = gui.session_state.get("steps") or 1
+        eco_cost_caption = f"🌳 [Eco Cost](https://gooey.ai/energy): 🚰 ~{int(steps*WATER_CUPS_PER_STEP)} cups of water & ⚡ electricity to power an EU household for ~{int(steps*ELECTRICITY_PER_STEP)} min."
+        line_clamp = 3
+        return eco_cost_caption, line_clamp
 
     def get_raw_price(self, state: dict) -> float:
         return 0.36 * (state.get("steps") or 1)
