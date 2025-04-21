@@ -7,6 +7,8 @@ from datetime import timedelta
 import hashids
 import stripe
 from django.contrib import admin
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction, IntegrityError
@@ -187,6 +189,13 @@ class Workspace(SafeDeleteModel):
                 "created_by",
                 condition=Q(deleted__isnull=True, is_personal=True),
                 name="unique_personal_workspace_per_user",
+            ),
+        ]
+
+        indexes = [
+            GinIndex(
+                SearchVector("name", config="english"),
+                name="workspace_search_vector_idx",
             ),
         ]
 

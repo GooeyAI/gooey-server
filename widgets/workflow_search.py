@@ -1,5 +1,6 @@
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchVector, SearchQuery
+from django.db import connection
 from django.db.models import (
     Q,
     QuerySet,
@@ -13,7 +14,7 @@ from app_users.models import AppUser
 from bots.models import WorkflowAccessLevel, PublishedRun, Workflow
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
-from workspaces.models import WorkspaceRole
+from workspaces.models import WorkspaceRole, Workspace
 
 
 def render_search_bar(key: str = "search_query", value: str = "") -> str:
@@ -65,25 +66,21 @@ def _render_run(pr: PublishedRun):
 
 def get_filtered_published_runs(user: AppUser | None, search_query: str) -> QuerySet:
     qs = PublishedRun.objects.all()
-    qs, search_filter = build_search_filter(qs, search_query)
-    qs, workflow_access_filter = build_workflow_access_filter(qs, user)
-    qs = (
-        qs.filter(search_filter, workflow_access_filter)
-        .annotate(is_root_workflow=Q(published_run_id=""))
-        .order_by(
-            F("is_created_by").desc(nulls_last=True),
-            "-is_member",
-            "-is_approved_example",
-            "-is_root_workflow",
-            "-updated_at",
-        )
+    qs = build_search_filter(qs, search_query)
+    qs = build_workflow_access_filter(qs, user)
+    qs = qs.annotate(
+        is_root_workflow=Q(published_run_id=""),
+    ).order_by(
+        F("is_created_by").desc(nulls_last=True),
+        "-is_member",
+        "-is_approved_example",
+        "-is_root_workflow",
+        "-updated_at",
     )
     return qs[:25]
 
 
-def build_workflow_access_filter(
-    qs: QuerySet, user: AppUser | None
-) -> tuple[QuerySet, Q]:
+def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
     # a) everyone can see published examples
     workflow_access_filter = Q(
         public_access__gt=WorkflowAccessLevel.VIEW_ONLY, is_approved_example=True
@@ -117,28 +114,24 @@ def build_workflow_access_filter(
             is_created_by=Value(False, output_field=BooleanField()),
             is_member=Value(False, output_field=BooleanField()),
         )
-    return qs, workflow_access_filter
+    return qs.filter(workflow_access_filter)
 
 
-def build_search_filter(qs: QuerySet, search_query: str) -> tuple[QuerySet, Q]:
+def build_search_filter(qs: QuerySet, search_query: str) -> QuerySet:
     # build a raw tsquery like “foo:* & bar:*”
     tokens = [t for t in search_query.strip().split() if t]
     raw_query = " | ".join(f"{t}:*" for t in tokens)
     search = SearchQuery(raw_query, search_type="raw")
 
-    # search by workflow title
-    workflow_search = PublishedRun.objects.filter(
-        published_run_id="", title__search=search
-    ).values("workflow")
-
-    # search by workflow metadata
-    qs = qs.annotate(
-        search=SearchVector(
-            "title", "notes", "created_by__display_name", "workspace__name"
-        ),
-    )
-
     # filter on the search vector
-    search_filter = Q(search=search) | Q(workflow__in=workflow_search)
-
-    return qs, search_filter
+    qs = qs.annotate(search=SearchVector("title", "notes", config="english"))
+    return qs.filter(
+        Q(search=search)
+        | Q(
+            workflow__in=(
+                qs.filter(published_run_id="", search=search).values("workflow")
+            )
+        )
+        | Q(created_by__in=AppUser.objects.filter(display_name__search=search))
+        | Q(workspace__in=Workspace.objects.filter(name__search=search))
+    )

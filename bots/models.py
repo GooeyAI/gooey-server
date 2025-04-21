@@ -11,6 +11,8 @@ import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -2058,6 +2060,11 @@ class PublishedRun(models.Model):
                     "public_access",
                     "workspace_access",
                 ]
+            ),
+            models.Index(fields=["published_run_id"]),
+            GinIndex(
+                SearchVector("title", "notes", config="english"),
+                name="publishedrun_search_vector_idx",
             ),
         ]
 

@@ -3,6 +3,8 @@ import typing
 from functools import cached_property
 
 import requests
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.db import models, IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import auth
@@ -137,6 +139,10 @@ class AppUser(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["email"]),
+            GinIndex(
+                SearchVector("display_name", config="english"),
+                name="appuser_search_vector_idx",
+            ),
         ]
 
     def __str__(self):
