@@ -5,6 +5,8 @@ on: [ push, workflow_dispatch ]
 jobs:
   test:
     runs-on: ubuntu-22.04
+    container:
+      image: python:3.10.12-slim-bookworm
     strategy:
       matrix:
         python-version: [ "3.10.12" ]
