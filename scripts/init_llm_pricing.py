@@ -5,6 +5,35 @@ category = ModelCategory.LLM
 
 
 def run():
+    # gpt-4.1
+    llm_pricing_create(
+        model_id="gpt-4.1-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1.name,
+        unit_cost_input=2.0,
+        unit_cost_output=8.0,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1",
+    )
+    llm_pricing_create(
+        model_id="gpt-4.1-mini-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1_mini.name,
+        unit_cost_input=0.4,
+        unit_cost_output=1.6,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1-mini",
+    )
+    llm_pricing_create(
+        model_id="gpt-4.1-nano-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1_nano.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1-nano",
+    )
+
     # gpt-4.5
 
     llm_pricing_create(
