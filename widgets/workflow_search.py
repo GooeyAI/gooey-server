@@ -1,6 +1,5 @@
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchVector, SearchQuery
-from django.db import connection
 from django.db.models import (
     Q,
     QuerySet,
@@ -17,7 +16,7 @@ from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
 
 
-def render_search_bar(key: str = "search_query") -> str:
+def render_search_bar(key: str = "search_query", value: str = "") -> str:
     with gui.styled(
         r"""
         & {
@@ -42,13 +41,14 @@ def render_search_bar(key: str = "search_query") -> str:
             className="bg-light border-0 rounded-pill",
             style=dict(maxWidth="500px", marginLeft="-0.3rem", paddingLeft="2.7rem"),
             key=key,
+            value=value,
         )
 
     return search_query
 
 
-def render_search_results(search_query: str, user: AppUser | None):
-    qs = get_filtered_published_runs(search_query, user)
+def render_search_results(user: AppUser | None, search_query: str):
+    qs = get_filtered_published_runs(user, search_query)
     qs = qs.select_related("workspace", "created_by", "saved_run")
     grid_layout(1, qs, _render_run)
 
@@ -59,10 +59,11 @@ def _render_run(pr: PublishedRun):
         workflow.page_cls,
         pr,
         workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+        hide_visibility_pill=True,
     )
 
 
-def get_filtered_published_runs(search_query: str, user: AppUser | None) -> QuerySet:
+def get_filtered_published_runs(user: AppUser | None, search_query: str) -> QuerySet:
     qs = PublishedRun.objects.all()
     qs, search_filter = build_search_filter(qs, search_query)
     qs, workflow_access_filter = build_workflow_access_filter(qs, user)
@@ -83,8 +84,10 @@ def get_filtered_published_runs(search_query: str, user: AppUser | None) -> Quer
 def build_workflow_access_filter(
     qs: QuerySet, user: AppUser | None
 ) -> tuple[QuerySet, Q]:
-    # a) everyone can see public workflows
-    workflow_access_filter = ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
+    # a) everyone can see published examples
+    workflow_access_filter = Q(
+        public_access__gt=WorkflowAccessLevel.VIEW_ONLY, is_approved_example=True
+    )
     if user and not user.is_anonymous:
         qs = qs.annotate(
             membership=FilteredRelation(

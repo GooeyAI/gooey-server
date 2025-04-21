@@ -17,12 +17,21 @@ TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
-def render(user: AppUser | None):
+def render(user: AppUser | None, search: str | None):
     heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
 
-    search_query = render_search_bar()
-    if search_query:
-        return render_search_results(search_query, user)
+    new_value = render_search_bar(value=search or "")
+    if search and not new_value:
+        # if the search bar is empty, redirect to the explore page
+        raise gui.QueryParamsRedirectException(dict())
+    if new_value and new_value != search:
+        # if the search bar value has changed, redirect to the new search page
+        raise gui.QueryParamsRedirectException(dict(search=new_value))
+
+    if search:
+        with gui.div(className="mb-4"):
+            render_search_results(user, search)
+            return
 
     for category, pages in all_home_pages_by_category.items():
         gui.write("---")
