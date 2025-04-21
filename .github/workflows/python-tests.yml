@@ -26,9 +26,11 @@ jobs:
         # Set health checks to wait until postgres has started
         options: >-
           --name postgres
+          --entrypoint "docker-entrypoint.sh postgres -c 'max_connections=10000'"
         ports:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
+        command: -c 'max_connections=10000'
       # https://docs.github.com/en/actions/using-containerized-services/creating-redis-service-containers
       redis:
         # Docker Hub image
@@ -44,11 +46,11 @@ jobs:
           - 6379:6379
     steps:
       # https://remarkablemark.org/blog/2022/05/12/github-actions-postgresql-increase-max-connections-and-shared-buffers/
-      - name: Increase max_connections
-        run: >-
-          docker exec -i postgres bash << EOF
-            sed -i -e 's/max_connections = 100/max_connections = 10000/' /var/lib/postgresql/data/postgresql.conf
-          EOF
+      # - name: Increase max_connections
+      #   run: >-
+      #     docker exec -i postgres bash << EOF
+      #       sed -i -e 's/max_connections = 100/max_connections = 10000/' /var/lib/postgresql/data/postgresql.conf
+      #     EOF
       - name: Restart postgres
         run: >-
           docker restart postgres
