@@ -383,9 +383,13 @@ STRIPE_ADDON_PRODUCT_NAME = config(
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE: str = config("PAYPAL_BASE", "")  # type: ignore
-PAYPAL_WEB_BASE_URL: furl = config("PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl)  # type: ignore
+PAYPAL_WEB_BASE_URL: furl = config(
+    "PAYPAL_WEB_BASE_URL", "https://www.paypal.com", cast=furl
+)  # type: ignore
 PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
-PAYPAL_DEFAULT_PRODUCT_NAME: str = config("PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits")  # type: ignore
+PAYPAL_DEFAULT_PRODUCT_NAME: str = config(
+    "PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits"
+)  # type: ignore
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
@@ -480,7 +484,9 @@ TWILIO_API_KEY_SECRET = config("TWILIO_API_KEY_SECRET", "")
 
 WORKSPACE_INVITE_EXPIRY_DAYS = config("WORKSPACE_INVITE_EXPIRY_DAYS", 180, cast=int)
 WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL = config(
-    "WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL", 60 * 60 * 24, cast=int  # 24 hours
+    "WORKSPACE_INVITE_EMAIL_COOLDOWN_INTERVAL",
+    60 * 60 * 24,
+    cast=int,  # 24 hours
 )
 
 SCRAPING_PROXY_HOST = config("SCRAPING_PROXY_HOST", "")

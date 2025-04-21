@@ -51,7 +51,6 @@ django-phonenumber-field = { extras = ["phonenumberslite"], version = "^7.0.2" }
 gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.6"
 whitenoise = "^6.4.0"
-black = "^24.2.0"
 django-extensions = "^3.2.1"
 pytest-django = "^4.9.0"
 celery = "^5.3.1"
@@ -92,6 +91,7 @@ azure-identity = "^1.19.0"
 azure-keyvault-secrets = "^4.9.0"
 xlrd = "^2.0.1"
 websockets = "^15.0.1"
+ruff = "^0.11.6"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
@@ -103,5 +103,23 @@ pre-commit = "^3.5.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
---force-exclude = "migrations|node_modules|\\.git|\\.venv|\\.env|\\.pytest_cache|\\.vscode|\\.github|\\.to"
+[tool.ruff]
+exclude = [
+  "migrations",
+  "node_modules",
+  ".git",
+  ".venv",
+  ".env",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".vscode",
+  ".github",
+  "__pycache__",
+]
+
+[tool.ruff.lint]
+ignore = ["E402", "E741"]  # position of imports, single letter variables
+
+[tool.ruff.lint.per-file-ignores]
+"*/{tests,views,admin}.py" = ["F401"]

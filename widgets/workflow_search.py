@@ -18,8 +18,9 @@ from workspaces.models import WorkspaceRole, Workspace
 
 
 def render_search_bar(key: str = "search_query", value: str = "") -> str:
-    with gui.styled(
-        r"""
+    with (
+        gui.styled(
+            r"""
         & {
             position: relative;
         }
@@ -35,7 +36,9 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             font-size: 0.9em;
         }
         """
-    ), gui.div():
+        ),
+        gui.div(),
+    ):
         search_query = gui.text_input(
             "",
             placeholder="Search Workflows",

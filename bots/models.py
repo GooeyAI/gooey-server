@@ -30,11 +30,12 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
-from workspaces.models import WorkspaceMembership
 
 if typing.TYPE_CHECKING:
     import celery.result
+    import pandas as pd
     from daras_ai_v2.base import BasePage
+    from daras_ai_v2.language_model import ConversationEntry
     from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"

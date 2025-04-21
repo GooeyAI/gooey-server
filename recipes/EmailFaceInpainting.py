@@ -12,7 +12,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
 
@@ -155,22 +154,22 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         assert text_prompt, "Please provide a Prompt and your Email Address"
 
         if gui.session_state.get("twitter_handle"):
-            assert re.fullmatch(
-                twitter_handle_regex, twitter_handle
-            ), "Please provide a valid Twitter Handle"
+            assert re.fullmatch(twitter_handle_regex, twitter_handle), (
+                "Please provide a valid Twitter Handle"
+            )
         elif gui.session_state.get("email_address"):
-            assert re.fullmatch(
-                email_regex, email_address
-            ), "Please provide a valid Email Address"
+            assert re.fullmatch(email_regex, email_address), (
+                "Please provide a valid Email Address"
+            )
         else:
             raise AssertionError("Please provide an Email Address or Twitter Handle")
 
         from_email = gui.session_state.get("email_from")
         email_subject = gui.session_state.get("email_subject")
         email_body = gui.session_state.get("email_body")
-        assert (
-            from_email and email_subject and email_body
-        ), "Please provide a From Email, Subject & Body"
+        assert from_email and email_subject and email_body, (
+            "Please provide a From Email, Subject & Body"
+        )
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage
@@ -338,11 +337,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
 class ImageNotFound(Exception):
     "Raised when the image not found in email profile"
+
     pass
 
 
 class TwitterError(Exception):
     "Raised when the twitter handle Lookup returns an error"
+
     pass
 
 

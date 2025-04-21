@@ -1446,9 +1446,9 @@ class BasePage:
         with gui.div(**self.get_submit_container_props()):
             gui.write("---")
             col1, col2 = gui.columns([2, 1], responsive=False)
-            col2.node.props[
-                "className"
-            ] += " d-flex justify-content-end align-items-center"
+            col2.node.props["className"] += (
+                " d-flex justify-content-end align-items-center"
+            )
             col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
                 self.render_run_cost()
@@ -2319,7 +2319,7 @@ def render_output_caption():
 
     run_time = gui.session_state.get(StateKeys.run_time, 0)
     if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
+        caption += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
 
     if seed := gui.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '

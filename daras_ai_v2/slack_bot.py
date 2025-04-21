@@ -110,9 +110,9 @@ class SlackBot(BotInterface):
         mime_type = self._file.get("mimetype") or mimetypes.guess_type(url)[0]
         if not (url and mime_type):
             return None
-        assert (
-            "audio/" in mime_type or "video/" in mime_type
-        ), f"Unsupported mime type {mime_type} for {url}"
+        assert "audio/" in mime_type or "video/" in mime_type, (
+            f"Unsupported mime type {mime_type} for {url}"
+        )
         # download file from slack
         r = requests.get(url, headers={"Authorization": f"Bearer {self._access_token}"})
         raise_for_status(r)
@@ -674,7 +674,7 @@ def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
 def parse_slack_response(res: Response):
     raise_for_status(res)
     data = res.json()
-    print(f'> {res.request.url.split("/")[-1]}: {data}')
+    print(f"> {res.request.url.split('/')[-1]}: {data}")
     if data.get("ok"):
         return data
     else:

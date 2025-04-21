@@ -49,7 +49,6 @@ class DeforumSDPage(BasePage):
     )
 
     class RequestModel(BasePage.RequestModel):
-        # input_prompt: str
         animation_prompts: AnimationPrompts
         max_frames: int | None
 
@@ -144,9 +143,9 @@ class DeforumSDPage(BasePage):
         assert prompt_list, "Please provide animation prompts"
 
         max_frames = gui.session_state["max_frames"]
-        assert (
-            get_last_frame(prompt_list) <= max_frames
-        ), "Please make sure that Frame Count matches the Animation Prompts"
+        assert get_last_frame(prompt_list) <= max_frames, (
+            "Please make sure that Frame Count matches the Animation Prompts"
+        )
 
     def render_usage_guide(self):
         youtube_video("sUvica6UuQU")
@@ -262,7 +261,6 @@ class DeforumSDPage(BasePage):
 
     @classmethod
     def preview_input(cls, state: dict) -> str:
-        input_prompt = state.get("input_prompt")
         animation_prompts = state.get("animation_prompts", [])
         display = "\n\n".join(
             [f"{fp['prompt']} [{fp['frame']}]" for fp in animation_prompts]

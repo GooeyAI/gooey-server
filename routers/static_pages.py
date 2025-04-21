@@ -47,7 +47,7 @@ def serve_static_file(request: Request) -> Response | None:
             if request.user and not request.user.is_anonymous:
                 html = html.replace(
                     ">Sign in<",
-                    f">Hi, {request.user.first_name()  or request.user.email or request.user.phone_number or 'Anon'}<",
+                    f">Hi, {request.user.first_name() or request.user.email or request.user.phone_number or 'Anon'}<",
                     1,
                 )
             return HTMLResponse(html, status_code=r.status_code)
@@ -69,8 +69,11 @@ def webflow_upload(request: Request):
     if not (request.user and BasePage.is_user_admin(request.user)):
         return PlainTextResponse("Not authorized", status_code=HTTP_401_UNAUTHORIZED)
 
-    with page_wrapper(request), gui.div(
-        className="d-flex align-items-center justify-content-center flex-column"
+    with (
+        page_wrapper(request),
+        gui.div(
+            className="d-flex align-items-center justify-content-center flex-column"
+        ),
     ):
         render_webflow_upload()
 

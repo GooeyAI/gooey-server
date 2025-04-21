@@ -159,7 +159,7 @@ class AsrPage(BasePage):
 
         if asr_model.supports_input_prompt():
             gui.text_area(
-                f'###### {field_title_desc(cls.RequestModel, "input_prompt")}',
+                f"###### {field_title_desc(cls.RequestModel, 'input_prompt')}",
                 key="input_prompt",
                 value="Transcribe the recording as accurately as possible.",
                 height=300,
@@ -220,9 +220,9 @@ class AsrPage(BasePage):
             )
 
     def validate_form_v2(self):
-        assert gui.session_state.get(
-            "documents"
-        ), "Please provide at least 1 Audio File"
+        assert gui.session_state.get("documents"), (
+            "Please provide at least 1 Audio File"
+        )
 
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)

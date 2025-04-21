@@ -1,3 +1,4 @@
+import typing
 import hashids
 import pytz
 from django.db import models, transaction, IntegrityError
@@ -9,6 +10,9 @@ from bots.models import Workflow
 from celeryapp.tasks import get_running_saved_run
 from daras_ai.image_input import truncate_filename
 from daras_ai_v2 import settings
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
 
 
 class ShortenedURLQuerySet(models.QuerySet):

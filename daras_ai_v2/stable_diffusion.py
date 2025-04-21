@@ -1,12 +1,10 @@
 import io
 import typing
 from enum import Enum
-from time import sleep
 
 import requests
 from PIL import Image
 from django.db import models
-from furl import furl
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
