@@ -88,6 +88,35 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models/gpt-4-1
+    gpt_4_1 = LLMSpec(
+        label="GPT-4.1 (openai)",
+        model_id="gpt-4.1-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gpt_4_1_mini = LLMSpec(
+        label="GPT-4.1 Mini (openai)",
+        model_id="gpt-4.1-mini-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gpt_4_1_nano = LLMSpec(
+        label="GPT-4.1 Nano (openai)",
+        model_id="gpt-4.1-nano-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://platform.openai.com/docs/models#gpt-4-5
     gpt_4_5 = LLMSpec(
         label="GPT-4.5 (openai)",
