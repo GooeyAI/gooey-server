@@ -30,7 +30,6 @@ jobs:
         ports:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
-        command: -c 'max_connections=10000'
       # https://docs.github.com/en/actions/using-containerized-services/creating-redis-service-containers
       redis:
         # Docker Hub image
