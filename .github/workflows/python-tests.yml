@@ -50,10 +50,10 @@ jobs:
       #     docker exec -i postgres bash << EOF
       #       sed -i -e 's/max_connections = 100/max_connections = 10000/' /var/lib/postgresql/data/postgresql.conf
       #     EOF
-      - name: Restart postgres
-        run: >-
-          docker restart postgres
-          && while ! docker exec postgres pg_isready; do sleep 5; done
+      # - name: Restart postgres
+      #   run: >-
+      #     docker restart postgres
+      #     && while ! docker exec postgres pg_isready; do sleep 5; done
 
       - name: Install system dependencies
         run: >-
