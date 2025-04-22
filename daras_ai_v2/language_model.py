@@ -128,6 +128,17 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    # https://platform.openai.com/docs/models/o4-mini
+    o4_mini = LLMSpec(
+        label="o4-mini (openai)",
+        model_id="o4-mini-2025-04-16",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=100_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://platform.openai.com/docs/models/o3
     o3 = LLMSpec(
         label="o3 (openai)",
