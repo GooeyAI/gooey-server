@@ -137,6 +137,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=100_000,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
 
     # https://platform.openai.com/docs/models/o3
@@ -1365,6 +1366,8 @@ def run_openai_chat(
         LargeLanguageModels.o1_mini,
         LargeLanguageModels.o1,
         LargeLanguageModels.o3_mini,
+        LargeLanguageModels.o3,
+        LargeLanguageModels.o4_mini,
     ]:
         # fuck you, openai
         for entry in messages_for_completion:
