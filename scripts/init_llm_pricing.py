@@ -46,6 +46,17 @@ def run():
         pricing_url="https://openai.com/api/pricing/",
     )
 
+    # o3
+    llm_pricing_create(
+        model_id="o3-2025-04-16",
+        model_name=LargeLanguageModels.o3.name,
+        unit_cost_input=10.00,
+        unit_cost_output=40.00,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/o3",
+    )
+
     # o3-mini
 
     llm_pricing_create(

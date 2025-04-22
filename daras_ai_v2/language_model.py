@@ -128,7 +128,19 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
-    # https://platform.openai.com/docs/models#o3-mini
+    # https://platform.openai.com/docs/models/o3
+    o3 = LLMSpec(
+        label="o3 (openai)",
+        model_id="o3-2025-04-16",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=100_000,
+        is_vision_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models/o3-mini
     o3_mini = LLMSpec(
         label="o3-mini (openai)",
         model_id=("openai-o3-mini-prod-eastus2-1", "o3-mini-2025-01-31"),
