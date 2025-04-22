@@ -113,6 +113,9 @@ class ModelTrainerPage(BasePage):
     class ResponseModel(BaseModel):
         model_url: str = Field(description="URL to the trained model.")
 
+    def preview_description(self, state: dict) -> str:
+        return "Upload your own image set + pick a base AI image generation model to train a fine-tuned FLUX model. Upload a collection of your photos to put yourself in any scene or a set of images from an under-represented visual culture to bring GenAI to all."
+
     def run_v2(
         self,
         request: "ModelTrainerPage.RequestModel",
