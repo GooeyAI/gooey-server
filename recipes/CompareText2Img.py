@@ -254,7 +254,7 @@ class CompareText2ImgPage(BasePage):
             self._render_outputs(state)
 
     def _render_outputs(self, state):
-        selected_models = state.get("selected_models", [])
+        selected_models = state.get("selected_models") or []
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
