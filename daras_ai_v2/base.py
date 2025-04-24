@@ -28,6 +28,7 @@ from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
+    BotIntegration,
     Platform,
     PublishedRun,
     PublishedRunVersion,
@@ -90,9 +91,6 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
-
-if typing.TYPE_CHECKING:
-    from bots.models import BotIntegration
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -386,9 +384,13 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
-        demo_bi = self.tab == RecipeTabs.run and get_demo_bi_from_pr(pr)
+        demo_bots = self.tab == RecipeTabs.run and BotIntegration.objects.filter(
+            workspace=pr.workspace,
+            published_run=pr,
+            demo_button_qr_code_image__isnull=False,
+        )
 
-        with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
+        with gui.div(className="d-flex justify-content-between align-items-start my-3"):
             if tbreadcrumbs.has_breadcrumbs():
                 with gui.div(
                     className="d-block d-lg-flex align-items-center pt-2 mb-2"
@@ -412,99 +414,60 @@ class BasePage:
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
 
-        if demo_bi:
-            heading_div, demo_div = gui.columns([10, 2])
+        if demo_bots:
+            heading_div, demo_div = gui.columns([10, 2], className="row mb-3")
         else:
             heading_div, demo_div = gui.div(), None
 
-        if tbreadcrumbs.has_breadcrumbs():
-            with heading_div:
-                if self.tab == RecipeTabs.run:
-                    with gui.div(
-                        className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
-                    ):
-                        gui.image(
-                            src=pr.photo_url,
-                            style=dict(
-                                width="150px",
-                                height="150px",
-                                margin=0,
-                                minHeight="150px",
-                                objectFit="cover",
-                            ),
-                        )
-                        with gui.div():
-                            self._render_title(tbreadcrumbs.h1_title)
-                            if pr and pr.notes and self.tab is RecipeTabs.run:
-                                gui.write(pr.notes, line_clamp=2)
-                else:
-                    self._render_title(tbreadcrumbs.h1_title)
-
         if self.tab != RecipeTabs.run:
+            if tbreadcrumbs.has_breadcrumbs():
+                with heading_div:
+                    self._render_title(tbreadcrumbs.h1_title)
             return
 
-        if is_root_example and self.tab != RecipeTabs.integrations:
-            with heading_div:
-                gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
-
-        if demo_bi:
-            platform = Platform(demo_bi.platform)
-            demo_dialog_ref = gui.use_alert_dialog(key="demo-modal")
+        if tbreadcrumbs.has_breadcrumbs():
             with (
-                demo_div,
-                gui.center(className="h-100 container-margin-reset"),
+                heading_div,
+                gui.div(
+                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                ),
             ):
-                gui.write("Try the demo", className="text-muted")
-                if gui.button(
-                    f"{platform.get_icon()} {platform.get_title()}",
-                    className="m-0 py-2 px-3",
-                ):
+                gui.image(
+                    src=pr.photo_url,
+                    style=dict(
+                        width="150px",
+                        height="150px",
+                        margin=0,
+                        minHeight="150px",
+                        objectFit="cover",
+                    ),
+                )
+                with gui.div():
+                    self._render_title(tbreadcrumbs.h1_title)
+                    if pr and pr.notes:
+                        gui.write(pr.notes, line_clamp=2)
+        elif is_root_example:
+            gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+
+        if not demo_bots:
+            return
+
+        with (
+            demo_div,
+            gui.center(),
+            gui.div(
+                className="d-flex flex-column gap-2 container-margin-reset",
+                style={"maxWidth": "150px"},
+            ),
+        ):
+            gui.caption("Try the demo")
+            for demo_bi in demo_bots:
+                demo_dialog_ref = gui.use_alert_dialog(key=f"demo-modal-{demo_bi.id}")
+                if render_demo_button(demo_bi, className="w-100"):
                     demo_dialog_ref.set_open(True)
 
-            if demo_dialog_ref.is_open:
-                title = dedent(
-                    f"""
-                ### {platform.get_title()} Demo
-                """
-                )
-                with gui.alert_dialog(demo_dialog_ref, modal_title=title):
-                    gui.write(
-                        f"#### {demo_bi.name or ''}",
-                        className="d-block mb-4",
-                        style={"margin-top": "-2.5rem"},
-                    )
-                    col1, col2 = gui.columns(2)
-                    with col1, gui.div():
-                        gui.write("Message")
-                        gui.write(
-                            f"#### [{demo_bi.get_display_name()}]({demo_bi.get_bot_test_link()})",
-                            className="d-block mt-3",
-                        )
-                        copy_to_clipboard_button(
-                            f"{icons.copy_solid} Copy",
-                            value=demo_bi.get_bot_test_link(),
-                            type="secondary",
-                        )
-                    with col2:
-                        with gui.div(
-                            className="d-flex justify-content-between align-items-center"
-                        ):
-                            gui.write("Or scan QR Code")
-                            gui.anchor(
-                                label=icons.download_solid,
-                                href=demo_bi.get_bot_test_link(),
-                                type="secondary",
-                                unsafe_allow_html=True,
-                                className="py-1",
-                            )
-                        gui.image(
-                            src=demo_bi.demo_button_qr_code_image,
-                            style={
-                                "width": "200px",
-                                "height": "200px",
-                                "contentFit": "fill",
-                            },
-                        )
+                if demo_dialog_ref.is_open:
+                    render_demo_dialog(bi=demo_bi, ref=demo_dialog_ref)
 
     def can_user_save_run(
         self,
@@ -531,7 +494,8 @@ class BasePage:
         )
 
     def _render_title(self, title: str):
-        gui.write(f"# {title}")
+        with gui.div(className="container-margin-reset"):
+            gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
@@ -2421,6 +2385,70 @@ def render_output_caption():
             )
 
 
+def render_demo_button(bi: BotIntegration, className: str = ""):
+    platform = Platform(bi.platform)
+    label = f"{platform.get_icon()} {platform.get_title()}"
+    className += " px-3 py-2 m-0"
+    key = f"demo-button-{bi.id}"
+
+    bg_color = platform.get_demo_button_color()
+    if not bg_color:
+        return gui.button(label, key=key, type="secondary", className=className)
+
+    return gui.button(
+        label,
+        key=key,
+        className=className,
+        style={"backgroundColor": bg_color, "borderColor": bg_color, "color": "white"},
+    )
+
+
+def render_demo_dialog(ref: gui.AlertDialogRef, bi: BotIntegration):
+    title = dedent(
+        f"""
+    ### {Platform(bi.platform).get_title()} Demo
+    """
+    )
+    with gui.alert_dialog(ref, modal_title=title):
+        gui.write(
+            f"#### {bi.name or ''}",
+            className="d-block mb-4",
+            style={"margin-top": "-2.5rem"},
+        )
+        col1, col2 = gui.columns(2)
+        with col1, gui.div():
+            gui.write("Message")
+            gui.write(
+                f"#### [{bi.get_display_name()}]({bi.get_bot_test_link()})",
+                className="d-block mt-3",
+            )
+            copy_to_clipboard_button(
+                f"{icons.copy_solid} Copy",
+                value=bi.get_bot_test_link(),
+                type="secondary",
+            )
+        with col2:
+            with gui.div(
+                className="d-flex justify-content-start gap-2 justify-content-lg-between align-items-center"
+            ):
+                gui.write("Or scan QR Code")
+                gui.anchor(
+                    label=icons.download_solid,
+                    href=bi.get_bot_test_link(),
+                    type="secondary",
+                    unsafe_allow_html=True,
+                    className="py-1",
+                )
+            gui.image(
+                src=bi.demo_button_qr_code_image,
+                style={
+                    "width": "200px",
+                    "height": "200px",
+                    "contentFit": "fill",
+                },
+            )
+
+
 def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
@@ -2463,10 +2491,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def get_demo_bi_from_pr(pr: PublishedRun) -> typing.Optional["BotIntegration"]:
-    return pr.botintegrations.filter(demo_button_qr_code_image__isnull=False).first()
 
 
 class TitleValidationError(Exception):

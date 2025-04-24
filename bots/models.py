@@ -37,6 +37,7 @@ from gooeysite.custom_create import get_or_create_lazy
 if typing.TYPE_CHECKING:
     import celery.result
     import pandas as pd
+
     from daras_ai_v2.base import BasePage
     from daras_ai_v2.language_model import ConversationEntry
     from workspaces.models import Workspace
@@ -247,6 +248,21 @@ class Platform(models.IntegerChoices):
                 return "Messenger"
             case _:
                 return self.label
+
+    def get_demo_button_color(self) -> str | None:
+        match self:
+            case Platform.WEB:
+                return None
+            case Platform.WHATSAPP:
+                return "#21d562"
+            case Platform.FACEBOOK:
+                return "#0466fb"
+            case Platform.SLACK:
+                return "#471549"
+            case Platform.INSTAGRAM:
+                return "#c20286"
+            case Platform.TWILIO:
+                return "#f22f46"
 
 
 class Workflow(models.IntegerChoices):
@@ -695,6 +711,7 @@ class BotIntegration(models.Model):
         max_length=1024,
         help_text="The name of the bot (for display purposes)",
     )
+
     by_line = models.TextField(blank=True, default="")
     descripton = models.TextField(blank=True, default="")
     conversation_starters = models.JSONField(default=list, blank=True)
