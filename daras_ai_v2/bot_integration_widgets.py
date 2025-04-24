@@ -19,7 +19,7 @@ from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs, chat_lib_route, chat_route
+from routers.root import RecipeTabs, chat_lib_route
 
 
 def integrations_welcome_screen(title: str):
@@ -556,7 +556,7 @@ def integration_details_generator(bi: BotIntegration, user: AppUser | None):
             return
 
     gui.button(
-        '<i class="fa-regular fa-sparkles" aria-hidden="true"></i> Improve',
+        f"{icons.sparkles} Improve",
         style=dict(float="right"),
         type="tertiary",
         key="generate_details_btn",

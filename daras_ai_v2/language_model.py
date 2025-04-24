@@ -3,6 +3,7 @@ import json
 import mimetypes
 import re
 import typing
+from copy import deepcopy
 from enum import Enum
 from functools import wraps
 
@@ -126,7 +127,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
-        label="o1-preview (openai) [Deprecated]",
+        label="o1-preview [Deprecated] (openai)",
         model_id="o1-preview-2024-09-12",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -219,7 +220,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision (openai) [Deprecated]",
+        label="GPT-4 Vision [Deprecated] (openai)",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -371,7 +372,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B (Meta AI) [Deprecated]",
+        label="Llama 3.1 70B [Deprecated] (Meta AI)",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -453,7 +454,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemma_7b_it = LLMSpec(
-        label="Gemma 7B (Google) [Deprecated]",
+        label="Gemma 7B [Deprecated] (Google)",
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
@@ -600,12 +601,13 @@ class LargeLanguageModels(Enum):
     )
 
     afrollama_v1 = LLMSpec(
-        label="AfroLlama3 v1 (Jacaranda)",
+        label="AfroLlama3 v1 [Deprecated] (Jacaranda)",
         model_id="Jacaranda/AfroLlama_V1",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
         price=1,
         is_chat_model=False,
+        is_deprecated=True,
     )
     llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
         label="Llama3 8B CPT SEA-LIONv2.1 Instruct (aisingapore)",
@@ -615,11 +617,12 @@ class LargeLanguageModels(Enum):
         price=1,
     )
     sarvam_2b = LLMSpec(
-        label="Sarvam 2B (sarvamai)",
+        label="Sarvam 2B [Deprecated] (sarvamai)",
         model_id="sarvamai/sarvam-2b-v0.5",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
         price=1,
+        is_deprecated=True,
     )
 
     llama_3_groq_70b_tool_use = LLMSpec(
@@ -814,9 +817,9 @@ def run_language_model(
     | tuple[list[str], list[list[dict]]]
     | typing.Generator[list[dict], None, None]
 ):
-    assert bool(prompt) != bool(
-        messages
-    ), "Pleave provide exactly one of { prompt, messages }"
+    assert bool(prompt) != bool(messages), (
+        "Pleave provide exactly one of { prompt, messages }"
+    )
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     if model.max_output_tokens:
@@ -1304,13 +1307,15 @@ def run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
+    messages_for_completion = deepcopy(messages)
+
     if model in [
         LargeLanguageModels.o1_mini,
         LargeLanguageModels.o1,
         LargeLanguageModels.o3_mini,
     ]:
         # fuck you, openai
-        for entry in messages:
+        for entry in messages_for_completion:
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 if model == LargeLanguageModels.o1_mini:
                     entry["role"] = CHATML_ROLE_USER
@@ -1356,7 +1361,7 @@ def run_openai_chat(
         *[
             _get_chat_completions_create(
                 model=model_id,
-                messages=messages,
+                messages=messages_for_completion,
                 max_tokens=max_tokens,
                 max_completion_tokens=max_completion_tokens,
                 stop=stop or NOT_GIVEN,
@@ -1400,7 +1405,6 @@ def _stream_openai_chunked(
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
-
     ret = []
     chunk_size = start_chunk_size
 

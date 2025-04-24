@@ -2,15 +2,15 @@ import io
 import os
 import typing
 import zipfile
+from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
 import requests
-from blib2to3.pgen2.parse import contextmanager
 from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
-from bots.models import Workflow, SavedRun, PublishedRun
+from bots.models import PublishedRun, SavedRun, Workflow
 from daras_ai.image_input import (
     gcs_blob_for,
     upload_gcs_blob_from_bytes,
@@ -23,9 +23,13 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.field_render import field_desc, field_title
-from daras_ai_v2.stable_diffusion import Text2ImgModels, LoraWeight
+from daras_ai_v2.stable_diffusion import LoraWeight, Text2ImgModels
 from recipes.CompareText2Img import CompareText2ImgPage
 from workspaces.models import Workspace
+
+# eco cost
+WATER_CUPS_PER_STEP = 0.01177967574
+ELECTRICITY_PER_STEP = 0.005782746854
 
 
 class FluxLoraModelTypes(Enum):
@@ -154,7 +158,7 @@ class ModelTrainerPage(BasePage):
     def render_form_v2(self):
         selected_model = enum_selector(
             enum_cls=FinetuneModels,
-            label=f'###### {ModelTrainerIcons.model} {field_title(self.RequestModel, "selected_model")}',
+            label=f"###### {ModelTrainerIcons.model} {field_title(self.RequestModel, 'selected_model')}",
             key="selected_model",
             use_selectbox=True,
         )
@@ -168,12 +172,12 @@ class ModelTrainerPage(BasePage):
 
     def render_settings(self):
         gui.number_input(
-            label=f'###### {ModelTrainerIcons.learning_rate} {field_title(self.RequestModel, "learning_rate")}',
+            label=f"###### {ModelTrainerIcons.learning_rate} {field_title(self.RequestModel, 'learning_rate')}",
             key="learning_rate",
             help=field_desc(self.RequestModel, "learning_rate"),
         )
         gui.slider(
-            label=f'###### {ModelTrainerIcons.steps} {field_title(self.RequestModel, "steps")}',
+            label=f"###### {ModelTrainerIcons.steps} {field_title(self.RequestModel, 'steps')}",
             key="steps",
             help=field_desc(self.RequestModel, "steps"),
             min_value=1,
@@ -181,9 +185,27 @@ class ModelTrainerPage(BasePage):
             max_value=10000,
         )
 
+    def get_terms_caption(self):
+        terms_caption = super().get_terms_caption()
+        terms_caption += " You also confirm that you have ownership IP rights to all uploaded images."
+
+        return terms_caption
+
     def get_cost_note(self) -> str | None:
         steps = gui.session_state.get("steps") or 1
         return f"*{steps} steps @ 0.36 Cr /step*"
+
+    # Number of lines to clamp the run cost notes to
+    run_cost_line_clamp: int = 3
+
+    def additional_notes(self) -> str | None:
+        """Return additional notes to display."""
+        steps = gui.session_state.get("steps") or 1
+        return (
+            f"🌳 [Eco Cost](https://gooey.ai/energy): "
+            f"🚰 ~{int(steps * WATER_CUPS_PER_STEP)} cups of water "
+            f"& ⚡ electricity to power an EU household for ~{int(steps * ELECTRICITY_PER_STEP)} min."
+        )
 
     def get_raw_price(self, state: dict) -> float:
         return 0.36 * (state.get("steps") or 1)
@@ -290,7 +312,7 @@ def render_flux_lora_fast_form(selected_model: str):
     inputs = FluxLoraFastInputs.parse_obj(gui.session_state.get("inputs", {}))
     gui.session_state.setdefault("inputs.input_images", inputs.input_images)
     inputs.input_images = bulk_documents_uploader(
-        label=f'###### {ModelTrainerIcons.input_images} {field_title(FluxLoraFastInputs, "input_images")}',
+        label=f"###### {ModelTrainerIcons.input_images} {field_title(FluxLoraFastInputs, 'input_images')}",
         key="inputs.input_images",
         help=field_desc(FluxLoraFastInputs, "input_images"),
         accept=["image/*"],
@@ -298,13 +320,13 @@ def render_flux_lora_fast_form(selected_model: str):
     if selected_model == FinetuneModels.flux_lora_fast.name:
         inputs.model_type = enum_selector(
             enum_cls=FluxLoraModelTypes,
-            label=f'###### {ModelTrainerIcons.model_type} {field_title(FluxLoraFastInputs, "model_type")}',
+            label=f"###### {ModelTrainerIcons.model_type} {field_title(FluxLoraFastInputs, 'model_type')}",
             value=inputs.model_type and inputs.model_type,
             use_selectbox=True,
             help=field_desc(FluxLoraFastInputs, "model_type"),
         )
     inputs.trigger_word = gui.text_input(
-        label=f'{ModelTrainerIcons.trigger_word} {field_title(FluxLoraFastInputs, "trigger_word")}',
+        label=f"{ModelTrainerIcons.trigger_word} {field_title(FluxLoraFastInputs, 'trigger_word')}",
         value=inputs.trigger_word,
         help=field_desc(FluxLoraFastInputs, "trigger_word"),
     )

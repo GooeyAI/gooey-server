@@ -26,9 +26,7 @@ function copyToClipboard(button) {
     }, 2000);
 }
 </script>
-""" % {
-    "copied_icon": icons.check
-}
+""" % {"copied_icon": icons.check}
 
 
 def copy_to_clipboard_button(

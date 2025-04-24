@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 import re
 import typing
 
@@ -214,7 +213,7 @@ def _generate_handle_options_for_personal_workspace(
             name_handle = _make_handle_from(user.display_name)
             yield name_handle
             for i in range(1, 10):
-                yield f"{name_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+                yield f"{name_handle[: HANDLE_MAX_LENGTH - 1]}{i}"
 
     elif email_domain in PRIVATE_EMAIL_DOMAINS:
         # prefix is not useful
@@ -222,7 +221,7 @@ def _generate_handle_options_for_personal_workspace(
             name_handle = _make_handle_from(user.display_name)
             yield name_handle
             for i in range(1, 10):
-                yield f"{name_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+                yield f"{name_handle[: HANDLE_MAX_LENGTH - 1]}{i}"
 
     else:
         # probably an org email
@@ -237,7 +236,7 @@ def _generate_handle_options_for_personal_workspace(
 
         yield email_handle
         for i in range(1, 10):
-            yield f"{email_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+            yield f"{email_handle[: HANDLE_MAX_LENGTH - 1]}{i}"
 
 
 def _generate_handle_options_for_team_workspace(
@@ -246,7 +245,7 @@ def _generate_handle_options_for_team_workspace(
     handle_name = _make_handle_from(display_name)
     yield handle_name[:HANDLE_MAX_LENGTH]
     for i in range(1, 10):
-        yield f"{handle_name[:HANDLE_MAX_LENGTH-1]}{i}"
+        yield f"{handle_name[: HANDLE_MAX_LENGTH - 1]}{i}"
 
 
 def _attempt_create_handle(handle_name: str):

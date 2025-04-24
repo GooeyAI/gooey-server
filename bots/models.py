@@ -33,12 +33,12 @@ from daras_ai_v2.language_model import format_chat_entry
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from gooeysite.custom_create import get_or_create_lazy
-from workspaces.models import WorkspaceMembership
 
 if typing.TYPE_CHECKING:
     import celery.result
-
+    import pandas as pd
     from daras_ai_v2.base import BasePage
+    from daras_ai_v2.language_model import ConversationEntry
     from workspaces.models import Workspace
 
 CHATML_ROLE_USER = "user"
@@ -695,7 +695,6 @@ class BotIntegration(models.Model):
         max_length=1024,
         help_text="The name of the bot (for display purposes)",
     )
-
     by_line = models.TextField(blank=True, default="")
     descripton = models.TextField(blank=True, default="")
     conversation_starters = models.JSONField(default=list, blank=True)
@@ -1945,6 +1944,7 @@ class PublishedRunQuerySet(models.QuerySet):
         title: str,
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
+        photo_url: str = "",
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -1958,6 +1958,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 notes=notes,
                 public_access=public_access,
+                photo_url=photo_url,
             ),
         )
 
@@ -1972,6 +1973,7 @@ class PublishedRunQuerySet(models.QuerySet):
         title: str,
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
+        photo_url: str = "",
     ):
         workspace_id = (
             workspace
@@ -1992,6 +1994,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 last_edited_by=user,
                 workspace_id=workspace_id,
                 title=title,
+                photo_url=photo_url,
             )
             pr.add_version(
                 user=user,
@@ -1999,6 +2002,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 public_access=public_access,
                 notes=notes,
+                photo_url=photo_url,
             )
             return pr
 
@@ -2054,6 +2058,8 @@ class PublishedRun(models.Model):
         default=1,
         help_text="Priority of the example in the example list",
     )
+
+    run_count = models.IntegerField(default=0)
 
     created_by = models.ForeignKey(
         "app_users.AppUser",
@@ -2112,6 +2118,11 @@ class PublishedRun(models.Model):
                     "workspace_access",
                 ]
             ),
+            models.Index(fields=["published_run_id"]),
+            # GinIndex(
+            #     SearchVector("title", "notes", config="english"),
+            #     name="publishedrun_search_vector_idx",
+            # ),
         ]
 
     def __str__(self):
@@ -2156,6 +2167,7 @@ class PublishedRun(models.Model):
         title: str = "",
         notes: str = "",
         change_notes: str = "",
+        photo_url: str = "",
     ):
         assert saved_run.workflow == self.workflow
 
@@ -2174,6 +2186,7 @@ class PublishedRun(models.Model):
                 public_access=public_access,
                 workspace_access=workspace_access,
                 change_notes=change_notes,
+                photo_url=photo_url,
             )
             version.save()
             self.update_fields_to_latest_version()
@@ -2189,6 +2202,7 @@ class PublishedRun(models.Model):
         self.notes = latest_version.notes
         self.public_access = latest_version.public_access
         self.workspace_access = latest_version.workspace_access
+        self.photo_url = latest_version.photo_url
 
         self.save()
 
@@ -2205,17 +2219,6 @@ class PublishedRun(models.Model):
         else:
             perm = WorkflowAccessLevel(self.workspace_access)
             return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
-
-    def get_run_count(self):
-        annotated_versions = self.versions.annotate(
-            children_runs_count=models.Count("children_runs")
-        )
-        return (
-            annotated_versions.aggregate(run_count=models.Sum("children_runs_count"))[
-                "run_count"
-            ]
-            or 0
-        )
 
     def submit_api_call(
         self,
@@ -2275,6 +2278,7 @@ class PublishedRunVersion(models.Model):
         default=WorkflowAccessLevel.EDIT,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    photo_url = CustomURLField(default="", blank=True)
 
     class Meta:
         ordering = ["-created_at"]

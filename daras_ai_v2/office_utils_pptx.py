@@ -115,7 +115,6 @@ def handle_tables(shape) -> list[str]:
     grid = [["" for _ in range(num_cols)] for _ in range(num_rows)]
 
     for row_idx, row in enumerate(table.rows):
-
         for col_idx, cell in enumerate(row.cells):
             cell_xml = table_xml.xpath(
                 f".//a:tbl/a:tr[{row_idx + 1}]/a:tc[{col_idx + 1}]"
@@ -186,7 +185,6 @@ def handle_charts(shape) -> list[str]:
 
 
 def handle_author_notes(slide) -> list[str]:
-
     notes = []
     if slide.notes_slide.notes_text_frame:
         notes_text = slide.notes_slide.notes_text_frame.text.strip()

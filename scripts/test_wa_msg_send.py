@@ -4,7 +4,6 @@ from daras_ai_v2.facebook_bots import WhatsappBot
 
 
 def run(bot_number: str, user_number: str, *args):
-
     class TestWhatsappBot(WhatsappBot):
         def __init__(self):
             self.bot_id = bot_number

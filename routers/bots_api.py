@@ -345,9 +345,7 @@ class ApiInterface(BotInterface):
                 detail=self.run_status,
                 references=(
                     #  avoid sending the entire snippet to save bandwidth
-                    [r | dict(snippet="") for r in references]
-                    if references
-                    else None
+                    [r | dict(snippet="") for r in references] if references else None
                 ),
             )
         )

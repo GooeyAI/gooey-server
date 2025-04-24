@@ -60,9 +60,9 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
     anal.save(update_fields=["last_run_at"])
 
     msg = Message.objects.get(id=msg_id)
-    assert (
-        msg.role == CHATML_ROLE_ASSISSTANT
-    ), f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
+    assert msg.role == CHATML_ROLE_ASSISSTANT, (
+        f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
+    )
 
     analysis_sr = anal.get_active_saved_run()
     variables = analysis_sr.state.get("variables", {})
@@ -182,7 +182,7 @@ def send_broadcast_msg(
     for convo in convos:
         match bi.platform:
             case Platform.WHATSAPP:
-                msg_id = WhatsappBot.send_msg_to(
+                _msg_id = WhatsappBot.send_msg_to(
                     text=text,
                     audio=audio and [audio],
                     video=video and [video],
@@ -193,7 +193,7 @@ def send_broadcast_msg(
                     access_token=bi.wa_business_access_token,
                 )
             case Platform.SLACK:
-                msg_id = SlackBot.send_msg_to(
+                _msg_id = SlackBot.send_msg_to(
                     text=text,
                     audio=audio and [audio],
                     video=video and [video],

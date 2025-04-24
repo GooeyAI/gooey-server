@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "django.contrib.postgres",
     "safedelete",
     "app_users",
     "files",
@@ -338,13 +339,13 @@ SAFETY_CHECKER_EXAMPLE_ID = config("SAFETY_CHECKER_EXAMPLE_ID", "3rcxqx0r")
 SAFETY_CHECKER_BILLING_EMAIL = config(
     "SAFETY_CHECKER_BILLING_EMAIL", "support+mods@gooey.ai"
 )
-
 INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID = config(
     "INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID", "59yem9i3iet5"
 )
 INTEGRATION_QR_PROMPT_GENERATOR_EXAMPLE_ID = config(
     "INTEGRATION_QR_PROMPT_GENERATOR_EXAMPLE_ID", ""
 )
+ICON_BOT_EXAMPLE_ID = config("ICON_BOT_EXAMPLE_ID", "14u2mhg4646r")
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 

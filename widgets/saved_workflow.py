@@ -6,7 +6,7 @@ import typing
 import gooey_gui as gui
 from furl import furl
 
-from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
+from bots.models import PublishedRun, Workflow
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
@@ -72,7 +72,7 @@ def render_saved_workflow_preview(
     with gui.div(className="position-relative py-2 pe-0"):
         with (
             gui.styled(WORKFLOW_PREVIEW_STYLE),
-            gui.div(className=f"position-relative overflow-hidden"),
+            gui.div(className="position-relative overflow-hidden"),
             gui.div(className="d-flex flex-column gap-2"),
         ):
             if output_url:
@@ -195,18 +195,15 @@ def render_saved_workflow_author(
                 responsive=False,
             )
 
-        if published_run.public_access == WorkflowAccessLevel.FIND_AND_VIEW:
-            run_icon = '<i class="fa-regular fa-person-running"></i>'
-            count = published_run.get_run_count()
-            if count > 0:
-                run_count = format_number_with_suffix(count)
-                gui.write(" • ")
-                gui.caption(
-                    f"{run_icon} {run_count} runs",
-                    unsafe_allow_html=True,
-                    style={"fontSize": "0.9rem"},
-                    className="text-dark",
-                )
+        if published_run.run_count > 1:
+            gui.write(" • ")
+            run_count = format_number_with_suffix(published_run.run_count)
+            gui.caption(
+                f"{icons.run} {run_count} runs",
+                unsafe_allow_html=True,
+                style={"fontSize": "0.9rem"},
+                className="text-dark",
+            )
 
         if published_run.last_edited_by:
             gui.write(" • ")

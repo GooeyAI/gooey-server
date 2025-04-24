@@ -137,6 +137,10 @@ class AppUser(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["email"]),
+            # GinIndex(
+            #     SearchVector("display_name", config="english"),
+            #     name="appuser_search_vector_idx",
+            # ),
         ]
 
     def __str__(self):

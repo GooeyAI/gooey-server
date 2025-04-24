@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -16,7 +16,6 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
-    ResponseFormatType,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -148,7 +147,7 @@ Prompt for merging several outputs together
         output_text: list = gui.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
             gui.text_area(
-                f"**Output Text**",
+                "**Output Text**",
                 help=f"output {idx}",
                 disabled=True,
                 value=text,

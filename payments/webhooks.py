@@ -25,9 +25,9 @@ class PaypalWebhookHandler:
             return
 
         pp_sub = paypal.Subscription.retrieve(sale.billing_agreement_id)
-        assert (
-            pp_sub.custom_id
-        ), f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
+        assert pp_sub.custom_id, (
+            f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
+        )
         assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
@@ -54,9 +54,9 @@ class PaypalWebhookHandler:
     def handle_subscription_updated(cls, pp_sub: paypal.Subscription):
         logger.info(f"Paypal subscription updated {pp_sub.id}")
 
-        assert (
-            pp_sub.custom_id
-        ), f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
+        assert pp_sub.custom_id, (
+            f"PayPal subscription {pp_sub.id} is missing workspace_id/uid"
+        )
         assert pp_sub.plan_id, f"PayPal subscription {pp_sub.id} is missing plan ID"
 
         plan = PricingPlan.get_by_paypal_plan_id(pp_sub.plan_id)
@@ -161,9 +161,9 @@ class StripeWebhookHandler:
         logger.info(f"Stripe subscription updated: {stripe_sub.id}")
 
         assert stripe_sub.plan, f"Stripe subscription {stripe_sub.id} is missing plan"
-        assert (
-            stripe_sub.plan.product
-        ), f"Stripe subscription {stripe_sub.id} is missing product"
+        assert stripe_sub.plan.product, (
+            f"Stripe subscription {stripe_sub.id} is missing product"
+        )
 
         product = stripe.Product.retrieve(stripe_sub.plan.product)
         plan = PricingPlan.get_by_stripe_product(product)

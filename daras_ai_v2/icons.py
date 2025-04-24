@@ -40,9 +40,10 @@ octopus = '<i class="fa-regular fa-octopus"></i>'
 eye = '<i class="fa-solid fa-eye"></i>'
 eye_slash = '<i class="fa-solid fa-eye-slash"></i>'
 photo = '<i class="fa-solid fa-image"></i>'
-sparkles = '<i class="fa-solid fa-sparkles"></i>'
 upload = '<i class="fa-solid fa-upload"></i>'
+sparkles = '<i class="fa-solid fa-sparkles"></i>'
 phone = '<i class="fa-solid fa-phone"></i>'
+stars = '<i class="fa-solid fa-stars"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

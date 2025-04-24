@@ -244,10 +244,10 @@ SearchSEO > Page Parsing > GPT3
     def render_run_preview_output(self, state: dict):
         gui.write(
             f"""
-            Search Query `{state.get('search_query', '')}` \\
-            Company Name `{state.get('title', '')}` \\
-            Company URL `{state.get('company_url', '')}` \\
-            Focus Keywords `{state.get('keywords', '')}`
+            Search Query `{state.get("search_query", "")}` \\
+            Company Name `{state.get("title", "")}` \\
+            Company URL `{state.get("company_url", "")}` \\
+            Focus Keywords `{state.get("keywords", "")}`
             """
         )
 
