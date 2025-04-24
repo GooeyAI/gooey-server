@@ -1,6 +1,7 @@
 import json
 import math
 import mimetypes
+from textwrap import dedent
 import typing
 from itertools import zip_longest
 
@@ -1147,7 +1148,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 pass
             try:
                 response.output_audio += [choices[0]["audio_url"]]
-                print(response.output_audio)
             except KeyError:
                 pass
 
@@ -1853,44 +1853,42 @@ def generate_bot_qr_code(
     """
     Returns a tuple of:
     1. `bool`: `True` for successful QR Code generation, `False` otherwise
-    2. `str`: The ID of a successful QR Code generation (when `bool=True`), or an error message
+    2. `str`: The id of the saved run that generated the QR Code Image
     """
-    from recipes.CompareLLM import CompareLLMPage
-    from recipes.QRCodeGenerator import QRCodeGeneratorPage
+    from recipes.VideoBots import VideoBotsPage
 
-    llm_prompt_pr = CompareLLMPage.get_pr_from_example_id(
-        example_id=settings.INTEGRATION_QR_PROMPT_GENERATOR_EXAMPLE_ID
-    )
-    variables = llm_prompt_pr.saved_run.state.get("variables") or {}
-    variables |= {
-        "bot_name": bi.name or (bi.published_run_id and bi.published_run.title),
-        "bot_description": (
-            bi.descripton or (bi.published_run_id and bi.published_run.notes)
-        ),
-    }
+    prompt = dedent(f'''
+    Title: """{bi.name or (bi.published_run_id and bi.published_run.title)}"""
+    Description: """
+    {bi.descripton or (bi.published_run_id and bi.published_run.notes)}
+    qr_code_data: """{bi.get_bot_test_link()}"""
 
-    result, prompt_gen_sr = llm_prompt_pr.submit_api_call(
+    Respond with the following JSON object: {{"qr_code_url": <generated image url>, "run_url": , "error": <in case there was an error, provide an error message here>"}}
+    """
+    ''')
+
+    pr = VideoBotsPage.get_pr_from_example_id(example_id=settings.QR_BOT_EXAMPLE_ID)
+    result, sr = pr.submit_api_call(
         workspace=workspace,
         current_user=user,
-        request_body=dict(variables=variables),
+        request_body=dict(
+            input_prompt=prompt, messages=[], response_format_type="json_object"
+        ),
         deduct_credits=False,
     )
-    prompt_gen_sr.wait_for_celery_result(result)
-    if prompt_gen_sr.error_msg:
-        return False, prompt_gen_sr.error_msg
 
-    prompt = "".join(prompt_gen_sr.state.get("output_text").popitem()[1])
+    sr.wait_for_celery_result(result)
+    if sr.error_msg:
+        return False, sr.error_msg
 
-    result, qr_code_sr = QRCodeGeneratorPage.get_root_pr().submit_api_call(
-        workspace=workspace,
-        current_user=user,
-        request_body=dict(qr_code_data=link, text_prompt=prompt),
-    )
-    qr_code_sr.wait_for_celery_result(result)
-    if qr_code_sr.error_msg:
-        return False, qr_code_sr.error_msg
+    output = json.loads(sr.state["output_text"][0])
+    if output.get("error"):
+        return False, output["error"]
 
-    return True, qr_code_sr.id
+    qr_code_sr = sr.called_functions.filter(
+        trigger=FunctionTrigger.prompt.db_value
+    ).first()
+    return True, qr_code_sr.function_run_id
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:

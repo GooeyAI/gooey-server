@@ -362,7 +362,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div()
+        header_placeholder = gui.div(className="mb-3")
         with gui.div(className="position-relative"):
             with gui.nav_tabs():
                 for tab in self.get_tabs():
