@@ -261,7 +261,7 @@ class Workflow(models.IntegerChoices):
     BULK_EVAL = (31, "Bulk Evaluator")
     FUNCTIONS = (32, "Functions")
     TRANSLATION = (33, "Translation")
-    MODEL_TRAINER = (34, "Translation")
+    MODEL_TRAINER = (34, "Model Trainer")
 
     @property
     def short_slug(self):
