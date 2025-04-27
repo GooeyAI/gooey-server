@@ -5,37 +5,38 @@ import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db.models import Max, Count, F, Sum
+from django.db.models import Count, F, Max, Sum
 from django.template import loader
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
 from app_users.models import AppUser
-from bots.admin_links import list_related_html_url, change_obj_url, open_in_new_tab
+from bots.admin_links import change_obj_url, list_related_html_url, open_in_new_tab
 from bots.models import (
+    BotIntegration,
+    BotIntegrationAnalysisChart,
+    BotIntegrationAnalysisRun,
     BotIntegrationScheduledRun,
+    Conversation,
+    Feedback,
     FeedbackComment,
-    CHATML_ROLE_ASSISSTANT,
-    SavedRun,
+    Message,
+    MessageAttachment,
+    Platform,
     PublishedRun,
     PublishedRunVersion,
-    Message,
-    Platform,
-    Feedback,
-    Conversation,
-    BotIntegration,
-    MessageAttachment,
-    WorkflowMetadata,
-    BotIntegrationAnalysisRun,
+    SavedRun,
     Workflow,
+    WorkflowMetadata,
 )
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from gooeysite.custom_actions import export_to_excel, export_to_csv
+from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
+from gooeysite.custom_actions import export_to_csv, export_to_excel
 from gooeysite.custom_filters import (
-    related_json_field_summary,
     JSONBExtractPath,
+    related_json_field_summary,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
 from recipes.VideoBots import VideoBotsPage
@@ -134,6 +135,11 @@ class BotIntegrationScheduledFunctionInline(admin.TabularInline):
     extra = 0
 
 
+class BotIntegrationAnalysisChartInline(admin.TabularInline):
+    model = BotIntegrationAnalysisChart
+    extra = 0
+
+
 @admin.register(BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
@@ -180,7 +186,11 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
-    inlines = [BotIntegrationAnalysisRunInline, BotIntegrationScheduledFunctionInline]
+    inlines = [
+        BotIntegrationAnalysisRunInline,
+        BotIntegrationScheduledFunctionInline,
+        BotIntegrationAnalysisChartInline,
+    ]
 
     readonly_fields = [
         "fb_page_access_token",
@@ -673,7 +683,7 @@ class MessageAdmin(admin.ModelAdmin):
                 },
             ),
         ]
-        if msg and msg.role == CHATML_ROLE_ASSISSTANT:
+        if msg and msg.role == CHATML_ROLE_ASSISTANT:
             fieldsets.append(
                 (
                     "User Message",
@@ -717,7 +727,7 @@ class MessageAdmin(admin.ModelAdmin):
     def msg_delivered(self, msg: Message):
         if (
             # user messages are delivered already
-            msg.role != CHATML_ROLE_ASSISSTANT
+            msg.role != CHATML_ROLE_ASSISTANT
             # we only have delivery status for whatsapp and slack
             or msg.conversation.bot_integration.platform
             not in [Platform.WHATSAPP, Platform.SLACK]
