@@ -11,8 +11,7 @@ from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
-from daras_ai_v2 import icons
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -20,7 +19,7 @@ from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs, chat_route, chat_lib_route
+from routers.root import RecipeTabs, chat_lib_route, chat_route
 
 
 def integrations_welcome_screen(title: str):
@@ -87,10 +86,11 @@ def general_integration_settings(bi: BotIntegration, request: Request):
 
     gui.write(
         """
-        ##### 🧠 Analysis Scripts
-        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. Must return a JSON object.
-        [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
-        """
+##### <i class="fa-solid fa-head-side-brain"></i> Analysis Scripts
+Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow.
+Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
+        """,
+        unsafe_allow_html=True,
     )
     if "analysis_urls" not in gui.session_state:
         gui.session_state["analysis_urls"] = [
@@ -102,7 +102,7 @@ def general_integration_settings(bi: BotIntegration, request: Request):
         from recipes.VideoBots import VideoBotsPage
 
         gui.anchor(
-            "📊 View Results",
+            "📊 View Analytics",
             str(
                 furl(
                     VideoBotsPage.app_url(
@@ -111,7 +111,7 @@ def general_integration_settings(bi: BotIntegration, request: Request):
                         query_params=dict(request.query_params),
                     )
                 )
-                / "analysis/"
+                / "stats/"
             ),
         )
 
