@@ -86,7 +86,7 @@ def related_json_field_summary(
                 .order_by("-count")
                 .values_list("val", "count")[:max_keys]
             )
-            if val is not None
+            if val is not None and val != ""
         ]
         for keypath in nested_keys
     }
