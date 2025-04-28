@@ -2173,7 +2173,7 @@ class PublishedRun(models.Model):
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
             return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
         else:
-            return f"{icons.company_solid} {perm.get_team_sharing_label()}"
+            return f"{self.workspace.html_icon(size='0.9rem')} {perm.get_team_sharing_label()}"
 
     def submit_api_call(
         self,

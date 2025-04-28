@@ -97,12 +97,6 @@ def render_saved_workflow_preview(
                                 className="d-md-flex d-none align-items-center ms-2 mt-1",
                                 style={"font-size": "0.9rem"},
                             ):
-                                if not hide_visibility_pill:
-                                    gui.pill(
-                                        published_run.get_share_badge_html(),
-                                        unsafe_allow_html=True,
-                                        className="border border-dark",
-                                    )
                                 if workflow_pill:
                                     gui.pill(
                                         workflow_pill,
@@ -161,6 +155,7 @@ def render_saved_workflow_preview(
             render_saved_workflow_author(
                 published_run=published_run,
                 show_workspace_author=show_workspace_author,
+                hide_visibility_pill=hide_visibility_pill,
             )
             if not hide_version_notes:
                 with gui.div(className="container-margin-reset mt-2 mt-md-0"):
@@ -174,7 +169,9 @@ def render_saved_workflow_preview(
 
 
 def render_saved_workflow_author(
-    published_run: PublishedRun, show_workspace_author: bool = True
+    published_run: PublishedRun,
+    show_workspace_author: bool = True,
+    hide_visibility_pill: bool = False,
 ):
     updated_at = published_run.saved_run.updated_at or ""
     with gui.div(
@@ -187,7 +184,7 @@ def render_saved_workflow_author(
                 text_size="0.9rem",
                 responsive=False,
             )
-        else:
+        elif published_run.last_edited_by:
             render_author_from_user(
                 published_run.last_edited_by,
                 image_size="24px",
@@ -214,6 +211,11 @@ def render_saved_workflow_author(
                 style={"fontSize": "0.9rem"},
                 className="container-margin-reset",
             )
+
+        if not hide_visibility_pill:
+            gui.write(" • ")
+            with gui.tag("span", style={"fontSize": "0.9rem"}, className="text-dark"):
+                gui.html(published_run.get_share_badge_html())
 
 
 def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
