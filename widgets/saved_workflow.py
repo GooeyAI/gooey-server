@@ -141,10 +141,7 @@ def render_saved_workflow_preview(
                                 className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
                             ):
                                 gui.write(" • ")
-                                with gui.div(
-                                    className="text-dark", style={"fontSize": "0.9rem"}
-                                ):
-                                    gui.html(published_run.get_share_badge_html())
+                                gui.html(published_run.get_share_badge_html())
                 with (
                     gui.div(
                         className=f"flex-grow-1 {'d-none d-md-flex' if output_url else 'd-flex'} justify-content-end ms-2"
@@ -174,8 +171,7 @@ def render_saved_workflow_preview(
             if not hide_visibility_pill:
                 with gui.div(className="mt-2"):
                     gui.write(" • ")
-                    with gui.div(className="text-dark", style={"fontSize": "0.9rem"}):
-                        gui.html(published_run.get_share_badge_html())
+                    gui.html(published_run.get_share_badge_html())
 
 
 def render_saved_workflow_author(
