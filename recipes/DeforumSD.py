@@ -25,7 +25,11 @@ MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
 
 class AnimationModels(TextChoices):
     protogen_2_2 = ("Protogen_V2.2.ckpt", "Protogen V2.2 (darkstorm2150)")
-    epicdream = ("epicdream.safetensors", "epiCDream (epinikion)")
+    epicdream = ("epicdream.safetensors", "epiCDream [Deprecated] (epinikion)")
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.epicdream}
 
 
 class _AnimationPrompt(TypedDict):
@@ -270,6 +274,11 @@ class DeforumSDPage(BasePage):
     def run(self, state: dict):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         model = AnimationModels[request.selected_model]
+
+        if model in AnimationModels._deprecated():
+            raise UserError(
+                f"The selected model `{model}` is deprecated. Please select a different model."
+            )
 
         yield f"Running {model.label}..."
 
