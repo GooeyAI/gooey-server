@@ -124,19 +124,27 @@ def render_saved_workflow_preview(
                             published_run=published_run,
                             show_workspace_author=show_workspace_author,
                         )
-                        if not hide_version_notes:
+                        if not hide_version_notes and version.change_notes:
                             with gui.div(
                                 className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
                             ):
-                                if version.change_notes:
-                                    gui.write(" • ")
-                                    gui.caption(
-                                        f"{icons.notes} {version.change_notes}",
-                                        unsafe_allow_html=True,
-                                        style={"fontSize": "0.9rem"},
-                                        line_clamp=1,
-                                        lineClampExpand=False,
-                                    )
+                                gui.write(" • ")
+                                gui.caption(
+                                    f"{icons.notes} {version.change_notes}",
+                                    unsafe_allow_html=True,
+                                    style={"fontSize": "0.9rem"},
+                                    line_clamp=1,
+                                    lineClampExpand=False,
+                                )
+                        if not hide_visibility_pill:
+                            with gui.div(
+                                className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
+                            ):
+                                gui.write(" • ")
+                                with gui.div(
+                                    className="text-dark", style={"fontSize": "0.9rem"}
+                                ):
+                                    gui.html(published_run.get_share_badge_html())
                 with (
                     gui.div(
                         className=f"flex-grow-1 {'d-none d-md-flex' if output_url else 'd-flex'} justify-content-end ms-2"
@@ -153,25 +161,25 @@ def render_saved_workflow_preview(
 
         with gui.div(className="d-md-none mt-2"):
             render_saved_workflow_author(
-                published_run=published_run,
-                show_workspace_author=show_workspace_author,
-                hide_visibility_pill=hide_visibility_pill,
+                published_run=published_run, show_workspace_author=show_workspace_author
             )
-            if not hide_version_notes:
+            if not hide_version_notes and version.change_notes:
                 with gui.div(className="container-margin-reset mt-2 mt-md-0"):
-                    if version.change_notes:
-                        gui.caption(
-                            f"{icons.notes} {version.change_notes}",
-                            unsafe_allow_html=True,
-                            style={"fontSize": "0.9rem"},
-                            line_clamp=1,
-                        )
+                    gui.caption(
+                        f"{icons.notes} {version.change_notes}",
+                        unsafe_allow_html=True,
+                        style={"fontSize": "0.9rem"},
+                        line_clamp=1,
+                    )
+            if not hide_visibility_pill:
+                with gui.div(className="mt-2"):
+                    gui.write(" • ")
+                    with gui.div(className="text-dark", style={"fontSize": "0.9rem"}):
+                        gui.html(published_run.get_share_badge_html())
 
 
 def render_saved_workflow_author(
-    published_run: PublishedRun,
-    show_workspace_author: bool = True,
-    hide_visibility_pill: bool = False,
+    published_run: PublishedRun, show_workspace_author: bool = True
 ):
     updated_at = published_run.saved_run.updated_at or ""
     with gui.div(
@@ -211,11 +219,6 @@ def render_saved_workflow_author(
                 style={"fontSize": "0.9rem"},
                 className="container-margin-reset",
             )
-
-        if not hide_visibility_pill:
-            gui.write(" • ")
-            with gui.tag("span", style={"fontSize": "0.9rem"}, className="text-dark"):
-                gui.html(published_run.get_share_badge_html())
 
 
 def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
