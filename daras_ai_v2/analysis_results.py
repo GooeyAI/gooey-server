@@ -136,7 +136,7 @@ def render_inputs(
     with ocol1:
         col1, col2, col3 = gui.columns(3)
     with ocol2:
-        ocol2.node.props["style"] = dict(paddingTop="2rem")
+        ocol2.node.props["style"] = dict(marginTop="1.5rem")
         del_button(del_key)
 
     with col1:
