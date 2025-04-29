@@ -126,7 +126,6 @@ def render_graphs(
             2,
             selected_graphs,
             partial(render_graph_data, bi=bi, results=results),
-            separator=False,
         )
 
 
@@ -186,7 +185,8 @@ def render_graph_data(
     results: dict[str, typing.Any],
 ):
     key = graph_data["result_field"]
-    gui.write(f"##### {key}")
+    with gui.center():
+        gui.write(f"##### {key}")
 
     if graph_data["data_selection"] == DataSelection.last.value:
         latest_msg = (

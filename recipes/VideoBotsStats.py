@@ -187,7 +187,7 @@ class VideoBotsStatsPage(BasePage):
             run_title = bi.saved_run.page_title  # this is mostly for backwards compat
         self.show_title_breadcrumb_share(bi, run_title, run_url)
 
-        col1, col2 = gui.columns([1, 2])
+        col1, col2 = gui.columns([1, 3])
 
         with col1:
             conversations, messages = get_conversations_and_messages(bi=bi)
@@ -229,9 +229,8 @@ class VideoBotsStatsPage(BasePage):
         with col2:
             plot_graphs(view, df)
 
-            gui.newline()
-
-            render_analysis_results_viewer(bi, start_date, end_date)
+        gui.newline()
+        render_analysis_results_viewer(bi, start_date, end_date)
 
         gui.write("---")
         gui.session_state.setdefault(
