@@ -133,7 +133,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models#o1
     o1_preview = LLMSpec(
-        label="o1-preview [Deprecated] (openai)",
+        label="o1-preview (openai)",
         model_id="o1-preview-2024-09-12",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -203,7 +203,7 @@ class LargeLanguageModels(Enum):
     )
 
     chatgpt_4_o = LLMSpec(
-        label="ChatGPT-4o [Redirects to GPT-4o] (openai) 🧪",
+        label="ChatGPT-4o (openai) 🧪",
         model_id="chatgpt-4o-latest",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -215,7 +215,7 @@ class LargeLanguageModels(Enum):
     )
     # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
     gpt_4_turbo_vision = LLMSpec(
-        label="GPT-4 Turbo with Vision [Redirects to GPT-4o] (openai)",
+        label="GPT-4 Turbo with Vision (openai)",
         model_id=(
             "openai-gpt-4-turbo-2024-04-09-prod-eastus2-1",
             "gpt-4-turbo-2024-04-09",
@@ -230,7 +230,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gpt_4_o",
     )
     gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision [Deprecated] (openai)",
+        label="GPT-4 Vision (openai)",
         model_id="gpt-4-vision-preview",
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -242,7 +242,7 @@ class LargeLanguageModels(Enum):
 
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
     gpt_4_turbo = LLMSpec(
-        label="GPT-4 Turbo [Redirects to GPT-4o] (openai)",
+        label="GPT-4 Turbo (openai)",
         model_id=("openai-gpt-4-turbo-prod-ca-1", "gpt-4-1106-preview"),
         llm_api=LLMApis.openai,
         context_window=128_000,
@@ -255,7 +255,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models/gpt-4
     gpt_4 = LLMSpec(
-        label="GPT-4 [Redirects to GPT-4o] (openai)",
+        label="GPT-4 (openai)",
         model_id=("openai-gpt-4-prod-ca-1", "gpt-4"),
         llm_api=LLMApis.openai,
         context_window=8192,
@@ -265,7 +265,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gpt_4_o",
     )
     gpt_4_32k = LLMSpec(
-        label="GPT-4 32K [Redirects to GPT-4o] (openai) 🔻",
+        label="GPT-4 32K (openai) 🔻",
         model_id="openai-gpt-4-32k-prod-ca-1",
         llm_api=LLMApis.openai,
         context_window=32_768,
@@ -277,7 +277,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models/gpt-3-5
     gpt_3_5_turbo = LLMSpec(
-        label="ChatGPT [Redirects to GPT-4o-mini] (openai)",
+        label="ChatGPT (openai)",
         model_id=("openai-gpt-35-turbo-prod-ca-1", "gpt-3.5-turbo-0613"),
         llm_api=LLMApis.openai,
         context_window=4096,
@@ -287,7 +287,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gpt_4_o_mini",
     )
     gpt_3_5_turbo_16k = LLMSpec(
-        label="ChatGPT 16k [Redirects to GPT-4o-mini] (openai)",
+        label="ChatGPT 16k (openai)",
         model_id=("openai-gpt-35-turbo-16k-prod-ca-1", "gpt-3.5-turbo-16k-0613"),
         llm_api=LLMApis.openai,
         context_window=16_384,
@@ -297,7 +297,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gpt_4_o_mini",
     )
     gpt_3_5_turbo_instruct = LLMSpec(
-        label="GPT-3.5 Instruct [Redirects to GPT-4o-mini] (openai)",
+        label="GPT-3.5 Instruct (openai)",
         model_id="gpt-3.5-turbo-instruct",
         llm_api=LLMApis.openai,
         context_window=4096,
@@ -345,7 +345,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     llama3_2_90b_vision = LLMSpec(
-        label="Llama 3.2 90B + Vision [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.2 90B + Vision (Meta AI)",
         model_id="llama-3.2-90b-vision-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -357,7 +357,7 @@ class LargeLanguageModels(Enum):
         redirect_to="llama4_maverick_17b_128e",
     )
     llama3_2_11b_vision = LLMSpec(
-        label="Llama 3.2 11B + Vision [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.2 11B + Vision (Meta AI)",
         model_id="llama-3.2-11b-vision-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -370,7 +370,7 @@ class LargeLanguageModels(Enum):
     )
 
     llama3_2_3b = LLMSpec(
-        label="Llama 3.2 3B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.2 3B (Meta AI)",
         model_id="llama-3.2-3b-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -381,7 +381,7 @@ class LargeLanguageModels(Enum):
         redirect_to="llama4_maverick_17b_128e",
     )
     llama3_2_1b = LLMSpec(
-        label="Llama 3.2 1B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.2 1B (Meta AI)",
         model_id="llama-3.2-1b-preview",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -393,7 +393,7 @@ class LargeLanguageModels(Enum):
     )
 
     llama3_1_405b = LLMSpec(
-        label="Llama 3.1 405B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.1 405B (Meta AI)",
         model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
         llm_api=LLMApis.fireworks,
         context_window=128_000,
@@ -404,7 +404,7 @@ class LargeLanguageModels(Enum):
         redirect_to="llama4_maverick_17b_128e",
     )
     llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B [Deprecated] (Meta AI)",
+        label="Llama 3.1 70B (Meta AI)",
         model_id="llama-3.1-70b-versatile",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -414,7 +414,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     llama3_1_8b = LLMSpec(
-        label="Llama 3.1 8B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3.1 8B (Meta AI)",
         model_id="llama-3.1-8b-instant",
         llm_api=LLMApis.groq,
         context_window=128_000,
@@ -426,7 +426,7 @@ class LargeLanguageModels(Enum):
     )
 
     llama3_70b = LLMSpec(
-        label="Llama 3 70B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3 70B (Meta AI)",
         model_id="llama3-70b-8192",
         llm_api=LLMApis.groq,
         context_window=8192,
@@ -436,7 +436,7 @@ class LargeLanguageModels(Enum):
         redirect_to="llama4_maverick_17b_128e",
     )
     llama3_8b = LLMSpec(
-        label="Llama 3 8B [Redirects to Llama 4 Maverick] (Meta AI)",
+        label="Llama 3 8B (Meta AI)",
         model_id="llama3-8b-8192",
         llm_api=LLMApis.groq,
         context_window=8192,
@@ -492,7 +492,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemma_7b_it = LLMSpec(
-        label="Gemma 7B [Deprecated] (Google)",
+        label="Gemma 7B (Google)",
         model_id="gemma-7b-it",
         llm_api=LLMApis.groq,
         context_window=8_192,
@@ -534,7 +534,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemini_1_5_flash = LLMSpec(
-        label="Gemini 1.5 Flash [Redirects to Gemini 2 Flash] (Google)",
+        label="Gemini 1.5 Flash (Google)",
         model_id="gemini-1.5-flash",
         llm_api=LLMApis.gemini,
         context_window=1_048_576,
@@ -546,7 +546,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gemini_2_flash",
     )
     gemini_1_5_pro = LLMSpec(
-        label="Gemini 1.5 Pro [Redirects to Gemini 2.5 Pro Preview] (Google)",
+        label="Gemini 1.5 Pro (Google)",
         model_id="gemini-1.5-pro",
         llm_api=LLMApis.gemini,
         context_window=2_097_152,
@@ -558,7 +558,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gemini_2_5_pro_preview",
     )
     gemini_1_pro_vision = LLMSpec(
-        label="Gemini 1.0 Pro Vision [Redirects to Gemini 2.5 Pro Preview] (Google)",
+        label="Gemini 1.0 Pro Vision (Google)",
         model_id="gemini-1.0-pro-vision",
         llm_api=LLMApis.gemini,
         context_window=2048,
@@ -569,7 +569,7 @@ class LargeLanguageModels(Enum):
         redirect_to="gemini_2_5_pro_preview",
     )
     gemini_1_pro = LLMSpec(
-        label="Gemini 1.0 Pro [Redirects to Gemini 2.5 Pro Preview] (Google)",
+        label="Gemini 1.0 Pro (Google)",
         model_id="gemini-1.0-pro",
         llm_api=LLMApis.gemini,
         context_window=8192,
@@ -606,7 +606,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     claude_3_5_sonnet = LLMSpec(
-        label="Claude 3.5 Sonnet [Redirects to Claude 3.7 Sonnet] (Anthropic)",
+        label="Claude 3.5 Sonnet (Anthropic)",
         model_id="claude-3-5-sonnet-20241022",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -618,7 +618,7 @@ class LargeLanguageModels(Enum):
         redirect_to="claude_3_7_sonnet",
     )
     claude_3_opus = LLMSpec(
-        label="Claude 3 Opus [Redirects to Claude 3.7 Sonnet] (Anthropic)",
+        label="Claude 3 Opus (Anthropic)",
         model_id="claude-3-opus-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -630,7 +630,7 @@ class LargeLanguageModels(Enum):
         redirect_to="claude_3_7_sonnet",
     )
     claude_3_sonnet = LLMSpec(
-        label="Claude 3 Sonnet [Redirects to Claude 3.7 Sonnet] (Anthropic)",
+        label="Claude 3 Sonnet (Anthropic)",
         model_id="claude-3-sonnet-20240229",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -642,7 +642,7 @@ class LargeLanguageModels(Enum):
         redirect_to="claude_3_7_sonnet",
     )
     claude_3_haiku = LLMSpec(
-        label="Claude 3 Haiku [Redirects to Claude 3.7 Sonnet] (Anthropic)",
+        label="Claude 3 Haiku (Anthropic)",
         model_id="claude-3-haiku-20240307",
         llm_api=LLMApis.anthropic,
         context_window=200_000,
@@ -655,7 +655,7 @@ class LargeLanguageModels(Enum):
     )
 
     afrollama_v1 = LLMSpec(
-        label="AfroLlama3 v1 [Deprecated] (Jacaranda)",
+        label="AfroLlama3 v1 (Jacaranda)",
         model_id="Jacaranda/AfroLlama_V1",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
@@ -671,7 +671,7 @@ class LargeLanguageModels(Enum):
         price=1,
     )
     sarvam_2b = LLMSpec(
-        label="Sarvam 2B [Deprecated] (sarvamai)",
+        label="Sarvam 2B (sarvamai)",
         model_id="sarvamai/sarvam-2b-v0.5",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
@@ -700,7 +700,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     llama2_70b_chat = LLMSpec(
-        label="Llama 2 70B Chat [Deprecated] (Meta AI)",
+        label="Llama 2 70B Chat (Meta AI)",
         model_id="llama2-70b-4096",
         llm_api=LLMApis.groq,
         context_window=4096,
@@ -709,7 +709,7 @@ class LargeLanguageModels(Enum):
     )
 
     sea_lion_7b_instruct = LLMSpec(
-        label="SEA-LION-7B-Instruct [Deprecated] (aisingapore)",
+        label="SEA-LION-7B-Instruct (aisingapore)",
         model_id="aisingapore/sea-lion-7b-instruct",
         llm_api=LLMApis.self_hosted,
         context_window=2048,
@@ -717,7 +717,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     llama3_8b_cpt_sea_lion_v2_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2 Instruct [Deprecated] (aisingapore)",
+        label="Llama3 8B CPT SEA-LIONv2 Instruct (aisingapore)",
         model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
         llm_api=LLMApis.self_hosted,
         context_window=8192,
@@ -727,7 +727,7 @@ class LargeLanguageModels(Enum):
 
     # https://platform.openai.com/docs/models/gpt-3
     text_davinci_003 = LLMSpec(
-        label="GPT-3.5 Davinci-3 [Deprecated] (openai)",
+        label="GPT-3.5 Davinci-3 (openai)",
         model_id="text-davinci-003",
         llm_api=LLMApis.openai,
         context_window=4097,
@@ -735,7 +735,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     text_davinci_002 = LLMSpec(
-        label="GPT-3.5 Davinci-2 [Deprecated] (openai)",
+        label="GPT-3.5 Davinci-2 (openai)",
         model_id="text-davinci-002",
         llm_api=LLMApis.openai,
         context_window=4097,
@@ -743,7 +743,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     code_davinci_002 = LLMSpec(
-        label="Codex [Deprecated] (openai)",
+        label="Codex (openai)",
         model_id="code-davinci-002",
         llm_api=LLMApis.openai,
         context_window=8001,
@@ -751,7 +751,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     text_curie_001 = LLMSpec(
-        label="Curie [Deprecated] (openai)",
+        label="Curie (openai)",
         model_id="text-curie-001",
         llm_api=LLMApis.openai,
         context_window=2049,
@@ -759,7 +759,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     text_babbage_001 = LLMSpec(
-        label="Babbage [Deprecated] (openai)",
+        label="Babbage (openai)",
         model_id="text-babbage-001",
         llm_api=LLMApis.openai,
         context_window=2049,
@@ -767,7 +767,7 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
     )
     text_ada_001 = LLMSpec(
-        label="Ada [Deprecated] (openai)",
+        label="Ada (openai)",
         model_id="text-ada-001",
         llm_api=LLMApis.openai,
         context_window=2049,
@@ -793,7 +793,14 @@ class LargeLanguageModels(Enum):
 
     @property
     def value(self):
-        return self.spec.label
+        label = self.spec.label
+        if self.is_deprecated:
+            if self.redirect_to:
+                label += f" [Redirects to {LargeLanguageModels[self.redirect_to].spec.label}]"
+            else:
+                label += " [Deprecated]"
+
+        return label
 
     @classmethod
     def _deprecated(cls):
