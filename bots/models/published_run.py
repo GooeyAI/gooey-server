@@ -312,8 +312,6 @@ class PublishedRun(models.Model):
         ):
             perm = WorkflowAccessLevel(self.public_access)
             return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
-        else:
-            perm = WorkflowAccessLevel(self.workspace_access)
 
         perm = WorkflowAccessLevel(self.workspace_access)
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
