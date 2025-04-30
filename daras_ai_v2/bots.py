@@ -705,7 +705,6 @@ def _handle_interactive_msg(bot: BotInterface):
 
 
 def _handle_location_msg(input_location: dict[str, float]) -> str:
-
     r = requests.post(
         url="https://maps.googleapis.com/maps/api/geocode/json",
         params={

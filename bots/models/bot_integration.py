@@ -13,10 +13,12 @@ from app_users.models import AppUser
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_api_route_url
+from managed_secrets.models import ManagedSecret
 from workspaces.models import Workspace
 
 from .published_run import PublishedRun
 from .saved_run import SavedRun
+from loguru import logger
 
 
 class Platform(models.IntegerChoices):
@@ -436,6 +438,7 @@ class BotIntegration(models.Model):
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
+            apiKeys=dict(),
             branding=(
                 self.web_config_extras.get("branding", {})
                 | dict(
@@ -448,6 +451,16 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+        try:
+            google_maps_secret = self.workspace.managed_secrets.get(
+                name__iexact="GOOGLE_MAPS_API"
+            )
+            google_maps_secret.load_value()
+            if google_maps_secret.value:
+                config["apiKeys"]["GoogleMapsAPI"] = google_maps_secret.value
+        except (ManagedSecret.DoesNotExist, ManagedSecret.NotLoadedError) as e:
+            logger.info(f"Error - GoogleMapsAPI key: {e}")
+
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
