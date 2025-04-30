@@ -9,8 +9,7 @@ from time import time
 
 import gooey_gui as gui
 import sentry_sdk
-from fastapi import Depends
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
@@ -18,30 +17,30 @@ from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
+    FileResponse,
     PlainTextResponse,
     Response,
-    FileResponse,
 )
 
 from app_users.models import AppUser
-from bots.models import Workflow, BotIntegration, PublishedRun
-from daras_ai.image_input import upload_file_from_bytes, safe_filename
-from daras_ai_v2 import settings, icons
+from bots.models import BotIntegration, PublishedRun, Workflow
+from daras_ai.image_input import safe_filename, upload_file_from_bytes
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
-from daras_ai_v2.exceptions import ffmpeg, UserError
+from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
-    fastapi_request_json,
     fastapi_request_form,
+    fastapi_request_json,
     get_route_path,
     resolve_url,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.profiles import profile_page, get_meta_tags_for_profile
+from daras_ai_v2.profiles import get_meta_tags_for_profile, profile_page
 from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
@@ -102,8 +101,7 @@ async def favicon():
 
 @app.get("/login/")
 def login(request: Request):
-    from routers.account import invitation_route
-    from routers.account import load_invite_from_hashid_or_404
+    from routers.account import invitation_route, load_invite_from_hashid_or_404
 
     if request.user and not request.user.is_anonymous:
         return RedirectResponse(
@@ -439,6 +437,10 @@ def add_integrations_route(
     "/{page_slug}/integrations/{integration_id}/stats/",
     "/{page_slug}/{run_slug}/integrations/{integration_id}/stats/",
     "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/",
+    ###
+    "/{page_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/",
 )
 def integrations_stats_route(
     request: Request,
@@ -446,6 +448,7 @@ def integrations_stats_route(
     integration_id: str,
     run_slug: str = None,
     example_id: str = None,
+    graphs: str = None,
 ):
     from routers.bots_api import api_hashids
 
@@ -453,43 +456,14 @@ def integrations_stats_route(
         gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
+
+    if graphs:
+        try:
+            gui.session_state["analysis_graphs"] = json.loads(graphs)
+        except json.JSONDecodeError:
+            pass
+
     return render_recipe_page(request, "stats", RecipeTabs.integrations, example_id)
-
-
-@gui.route(
-    app,
-    "/{page_slug}/integrations/{integration_id}/analysis/",
-    "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
-    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/",
-)
-def integrations_analysis_route(
-    request: Request,
-    page_slug: str,
-    integration_id: str,
-    run_slug: str = None,
-    example_id: str = None,
-    title: str = None,
-    graphs: str = None,
-):
-    from routers.bots_api import api_hashids
-    from daras_ai_v2.analysis_results import render_analysis_results_page
-
-    try:
-        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
-    except (IndexError, BotIntegration.DoesNotExist):
-        raise HTTPException(status_code=404)
-    url = get_og_url_path(request)
-
-    with page_wrapper(request):
-        render_analysis_results_page(bi, url, request.user, title, graphs)
-
-    return dict(
-        meta=raw_build_meta_tags(
-            url=url,
-            canonical_url=url,
-            title=f"Analysis for {bi.name}",
-        ),
-    )
 
 
 @gui.route(
@@ -543,8 +517,8 @@ def chat_explore_route(request: Request):
 def chat_route(
     request: Request, integration_id: str = None, integration_name: str = None
 ):
-    from routers.bots_api import api_hashids
     from daras_ai_v2.bot_integration_widgets import get_web_widget_embed_code
+    from routers.bots_api import api_hashids
 
     try:
         bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])

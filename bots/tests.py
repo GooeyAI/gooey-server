@@ -3,18 +3,17 @@ import uuid
 
 from app_users.models import AppUser
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from recipes.VideoBotsStats import get_tabular_data
 from workspaces.models import Workspace
-from .models import (
-    Message,
-    Conversation,
-    BotIntegration,
-    Platform,
-    ConvoState,
-)
 
-CHATML_ROLE_USER = "user"
-CHATML_ROLE_ASSISSTANT = "assistant"
+from .models import (
+    BotIntegration,
+    Conversation,
+    ConvoState,
+    Message,
+    Platform,
+)
 
 
 def test_add_balance(transactional_db):
@@ -88,7 +87,7 @@ def test_create_bot_integration_conversation_message(transactional_db):
     # Create a Bot Message within the Conversation
     message_b = Message.objects.create(
         conversation=conversation,
-        role=CHATML_ROLE_ASSISSTANT,
+        role=CHATML_ROLE_ASSISTANT,
         content="Red, green, and yellow grow the best.",
         display_content="Red, green, and yellow grow the best.",
     )
@@ -102,7 +101,7 @@ def test_create_bot_integration_conversation_message(transactional_db):
 
     # Assert that the Bot Message was created successfully
     assert message_b.conversation == conversation
-    assert message_b.role == CHATML_ROLE_ASSISSTANT
+    assert message_b.role == CHATML_ROLE_ASSISTANT
     assert message_b.content == "Red, green, and yellow grow the best."
     assert message_b.display_content == "Red, green, and yellow grow the best."
 
@@ -145,7 +144,7 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     )
     Message.objects.create(
         conversation=convo,
-        role=CHATML_ROLE_ASSISSTANT,
+        role=CHATML_ROLE_ASSISTANT,
         content="Red, green, and yellow grow the best.",
         display_content="Red, green, and yellow grow the best.",
         analysis_result={"Answered": True},
