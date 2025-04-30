@@ -878,24 +878,10 @@ def run_language_model(
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
 
-    if model.is_deprecated and model.redirect_to:
-        return run_language_model(
-            prompt=prompt,
-            messages=messages,
-            model=model.redirect_to,
-            max_tokens=max_tokens,
-            num_outputs=num_outputs,
-            temperature=temperature,
-            stop=stop,
-            avoid_repetition=avoid_repetition,
-            tools=tools,
-            response_format_type=response_format_type,
-            stream=stream,
-            audio_url=audio_url,
-            audio_session_extra=audio_session_extra,
-        )
-    elif model.is_deprecated:
-        raise UserError(f"Model {model} is deprecated.")
+    if model.is_deprecated:
+        if not model.redirect_to:
+            raise UserError(f"Model {model} is deprecated.")
+        return run_language_model(**(locals() | {"model": model.redirect_to}))
 
     if model.max_output_tokens:
         max_tokens = min(max_tokens, model.max_output_tokens)
