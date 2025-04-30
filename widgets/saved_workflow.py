@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import html
 import typing
 
 import gooey_gui as gui
@@ -64,7 +65,6 @@ def render_saved_workflow_preview(
     hide_version_notes: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
-    version = published_run.versions.latest()
     output_url = (
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
@@ -118,30 +118,14 @@ def render_saved_workflow_preview(
                                     style={"fontSize": "0.9rem"},
                                 )
                     with gui.div(
-                        className="d-none d-md-flex flex-1 align-items-center render_example_author_meta"
+                        className="d-none d-md-flex container-margin-reset align-items-center gap-2"
                     ):
                         render_saved_workflow_author(
                             published_run=published_run,
                             show_workspace_author=show_workspace_author,
                         )
-                        if not hide_version_notes and version.change_notes:
-                            with gui.div(
-                                className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
-                            ):
-                                gui.write(" • ")
-                                gui.caption(
-                                    f"{icons.notes} {version.change_notes}",
-                                    unsafe_allow_html=True,
-                                    style={"fontSize": "0.9rem"},
-                                    line_clamp=1,
-                                    lineClampExpand=False,
-                                )
-                        if not hide_visibility_pill:
-                            with gui.div(
-                                className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
-                            ):
-                                gui.write(" • ")
-                                gui.html(published_run.get_share_badge_html())
+                        gui.write(" • ", style={"fontSize": "0.9rem"})
+                        render_change_notes_and_share_badge(published_run=published_run)
                 with (
                     gui.div(
                         className=f"flex-grow-1 {'d-none d-md-flex' if output_url else 'd-flex'} justify-content-end ms-2"
@@ -149,10 +133,7 @@ def render_saved_workflow_preview(
                     gui.div(
                         className="gui_example_media d-flex align-items-center justify-content-center",
                     ),
-                    gui.link(
-                        to=published_run.get_app_url(),
-                        className="d-flex",
-                    ),
+                    gui.link(to=published_run.get_app_url(), className="d-flex"),
                 ):
                     render_saved_workflow_output(output_url, published_run)
 
@@ -160,61 +141,87 @@ def render_saved_workflow_preview(
             render_saved_workflow_author(
                 published_run=published_run, show_workspace_author=show_workspace_author
             )
-            if not hide_version_notes and version.change_notes:
-                with gui.div(className="container-margin-reset mt-2 mt-md-0"):
-                    gui.caption(
-                        f"{icons.notes} {version.change_notes}",
-                        unsafe_allow_html=True,
-                        style={"fontSize": "0.9rem"},
-                        line_clamp=1,
-                    )
-            if not hide_visibility_pill:
-                with gui.div(className="mt-2"):
-                    gui.write(" • ")
-                    gui.html(published_run.get_share_badge_html())
+            render_change_notes_and_share_badge(
+                published_run=published_run, className="mt-2"
+            )
 
 
 def render_saved_workflow_author(
     published_run: PublishedRun, show_workspace_author: bool = True
 ):
-    updated_at = published_run.saved_run.updated_at or ""
-    with gui.div(
-        className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta",
-    ):
-        if show_workspace_author:
-            render_author_from_workspace(
-                published_run.workspace,
-                image_size="24px",
-                text_size="0.9rem",
-                responsive=False,
+    items = []
+    if show_workspace_author:
+        items.append(
+            lambda: render_author_from_workspace(
+                published_run.workspace, image_size="24px", responsive=False
             )
-        elif published_run.last_edited_by:
-            render_author_from_user(
-                published_run.last_edited_by,
-                image_size="24px",
-                text_size="0.9rem",
-                responsive=False,
+        )
+    elif published_run.last_edited_by:
+        items.append(
+            lambda: render_author_from_user(
+                published_run.last_edited_by, image_size="24px", responsive=False
             )
+        )
 
-        if published_run.run_count > 1:
-            gui.write(" • ")
-            run_count = format_number_with_suffix(published_run.run_count)
-            gui.caption(
+    if published_run.run_count > 1:
+        run_count = format_number_with_suffix(published_run.run_count)
+        items.append(
+            lambda: gui.write(
                 f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
-                style={"fontSize": "0.9rem"},
                 className="text-dark",
             )
+        )
 
-        if published_run.last_edited_by:
-            gui.write(" • ")
+    updated_at = published_run.saved_run.updated_at or ""
+    if updated_at and isinstance(updated_at, datetime.datetime):
+        items.append(lambda: gui.write(f"{get_relative_time(updated_at)}"))
 
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            gui.caption(
-                f"{get_relative_time(updated_at)}",
-                style={"fontSize": "0.9rem"},
-                className="container-margin-reset",
+    render_items_with_separator(
+        items,
+        className="render_example_author_meta",
+        style={"fontSize": "0.9rem"},
+    )
+
+
+def render_change_notes_and_share_badge(
+    published_run: PublishedRun,
+    hide_version_notes: bool = False,
+    hide_visibility_pill: bool = False,
+    **props,
+):
+    version = published_run.versions.latest()
+    items = []
+    if not hide_version_notes and version.change_notes:
+        items.append(
+            lambda: gui.caption(
+                f"{icons.notes} {html.escape(version.change_notes)}",
+                unsafe_allow_html=True,
+                line_clamp=1,
+                lineClampExpand=False,
             )
+        )
+    if not hide_visibility_pill:
+        items.append(
+            lambda: gui.caption(
+                published_run.get_share_badge_html(), unsafe_allow_html=True
+            )
+        )
+    render_items_with_separator(items, **props, style={"fontSize": "0.9rem"})
+
+
+def render_items_with_separator(
+    items: typing.List[typing.Callable | None], *, separator: str = " • ", **props
+):
+    className = "d-flex align-items-center container-margin-reset gap-2 " + (
+        props.pop("className", "")
+    )
+    with gui.div(className=className, **props):
+        items = filter(None, items)
+        for i, item in enumerate(items):
+            if i != 0:
+                gui.write(separator)
+            item()
 
 
 def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
