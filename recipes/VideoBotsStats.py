@@ -8,13 +8,13 @@ from textwrap import dedent
 import gooey_gui as gui
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
-from django.db.models import Count, Avg, Q, CharField
+from django.db.models import Avg, CharField, Count, Q
 from django.db.models.functions import (
-    TruncMonth,
+    Concat,
     TruncDay,
+    TruncMonth,
     TruncWeek,
     TruncYear,
-    Concat,
 )
 from django.utils import timezone
 from django.utils.text import slugify
@@ -26,20 +26,23 @@ from pydantic import BaseModel, ValidationError
 
 from app_users.models import AppUser
 from bots.models import (
+    BotIntegration,
     BotIntegrationScheduledRun,
+    Conversation,
+    ConversationQuerySet,
+    Feedback,
+    Message,
+    MessageQuerySet,
+    Platform,
     PublishedRun,
     SavedRun,
     Workflow,
-    Platform,
-    BotIntegration,
-    Conversation,
-    Message,
-    Feedback,
-    ConversationQuerySet,
-    MessageQuerySet,
 )
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons, settings
+from daras_ai_v2.analysis_results import (
+    render_analysis_results_viewer,
+)
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from daras_ai_v2.workflow_url_input import workflow_url_input
@@ -184,7 +187,7 @@ class VideoBotsStatsPage(BasePage):
             run_title = bi.saved_run.page_title  # this is mostly for backwards compat
         self.show_title_breadcrumb_share(bi, run_title, run_url)
 
-        col1, col2 = gui.columns([1, 2])
+        col1, col2 = gui.columns([1, 3])
 
         with col1:
             conversations, messages = get_conversations_and_messages(bi=bi)
@@ -225,6 +228,9 @@ class VideoBotsStatsPage(BasePage):
 
         with col2:
             plot_graphs(view, df)
+
+        gui.newline()
+        render_analysis_results_viewer(bi, start_date, end_date)
 
         gui.write("---")
         gui.session_state.setdefault(

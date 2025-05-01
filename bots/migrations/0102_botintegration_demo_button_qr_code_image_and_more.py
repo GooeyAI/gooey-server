@@ -5,9 +5,8 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ("bots", "0100_remove_publishedrun_publishedrun_search_vector_idx"),
+        ("bots", "0101_botintegrationanalysischart"),
     ]
 
     operations = [

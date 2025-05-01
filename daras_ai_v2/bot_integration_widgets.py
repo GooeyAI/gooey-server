@@ -86,10 +86,11 @@ def general_integration_settings(bi: BotIntegration, request: Request):
 
     gui.write(
         """
-        ##### 🧠 Analysis Scripts
-        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. Must return a JSON object.
-        [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
-        """
+##### <i class="fa-solid fa-head-side-brain"></i> Analysis Scripts
+Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow.
+Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
+        """,
+        unsafe_allow_html=True,
     )
     if "analysis_urls" not in gui.session_state:
         gui.session_state["analysis_urls"] = [
@@ -101,7 +102,7 @@ def general_integration_settings(bi: BotIntegration, request: Request):
         from recipes.VideoBots import VideoBotsPage
 
         gui.anchor(
-            "📊 View Results",
+            "📊 View Analytics",
             str(
                 furl(
                     VideoBotsPage.app_url(
@@ -110,7 +111,7 @@ def general_integration_settings(bi: BotIntegration, request: Request):
                         query_params=dict(request.query_params),
                     )
                 )
-                / "analysis/"
+                / "stats/"
             ),
         )
 

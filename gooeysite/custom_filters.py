@@ -2,7 +2,7 @@ import json
 import typing
 
 from django.db import DataError
-from django.db.models import Func, QuerySet, Count, Value, JSONField, TextField
+from django.db.models import Count, Func, JSONField, QuerySet, TextField, Value
 from django.urls import reverse
 from furl import furl
 
@@ -43,7 +43,7 @@ def related_json_field_summary(
     instance_id: int = None,
     exclude_keys: typing.Iterable[str] = (),
     max_keys: int = None,
-):
+) -> dict[str, typing.Any]:
     if query_param is None:
         try:
             query_field_name = manager.field.name
@@ -86,7 +86,7 @@ def related_json_field_summary(
                 .order_by("-count")
                 .values_list("val", "count")[:max_keys]
             )
-            if val is not None
+            if val is not None and val != ""
         ]
         for keypath in nested_keys
     }

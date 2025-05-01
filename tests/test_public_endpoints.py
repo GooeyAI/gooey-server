@@ -4,18 +4,18 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from bots.models import (
-    Workflow,
-    PublishedRun,
-    BotIntegration,
-    Message,
-    Conversation,
+    CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
-    CHATML_ROLE_ASSISSTANT,
+    BotIntegration,
+    Conversation,
+    Message,
+    PublishedRun,
+    Workflow,
 )
 from daras_ai_v2.fastapi_tricks import get_route_path
 from routers import facebook_api
 from routers.root import RecipeTabs, integrations_stats_route
-from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
+from routers.slack_api import slack_connect_redirect, slack_connect_redirect_shortcuts
 from routers.static_pages import webflow_upload
 from server import app
 
@@ -66,7 +66,7 @@ def test_integration_stats_route(db_fixtures, force_authentication, threadpool_s
                 )
                 Message.objects.create(
                     conversation=convo,
-                    role=CHATML_ROLE_ASSISSTANT,
+                    role=CHATML_ROLE_ASSISTANT,
                     content="test-message-2",
                 )
         url_path = get_route_path(

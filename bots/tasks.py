@@ -9,20 +9,20 @@ from django.utils import timezone
 from loguru import logger
 
 from bots.models import (
-    BotIntegrationScheduledRun,
-    Message,
-    CHATML_ROLE_ASSISSTANT,
     BotIntegration,
-    Conversation,
-    Platform,
     BotIntegrationAnalysisRun,
+    BotIntegrationScheduledRun,
+    Conversation,
+    Message,
+    Platform,
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
+from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
 from daras_ai_v2.slack_bot import (
-    fetch_channel_members,
-    create_personal_channel,
     SlackBot,
+    create_personal_channel,
+    fetch_channel_members,
 )
 from daras_ai_v2.twilio_bot import send_single_voice_call, send_sms_message
 from daras_ai_v2.vector_search import references_as_prompt
@@ -60,8 +60,8 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
     anal.save(update_fields=["last_run_at"])
 
     msg = Message.objects.get(id=msg_id)
-    assert msg.role == CHATML_ROLE_ASSISSTANT, (
-        f"the message being analyzed must must be an {CHATML_ROLE_ASSISSTANT} msg"
+    assert msg.role == CHATML_ROLE_ASSISTANT, (
+        f"the message being analyzed must must be an {CHATML_ROLE_ASSISTANT} msg"
     )
 
     analysis_sr = anal.get_active_saved_run()
