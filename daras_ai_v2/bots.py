@@ -639,7 +639,6 @@ def _save_msgs(
 
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
-    location_coords = bot.get_location_info()
     match button.button_id:
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
@@ -679,28 +678,17 @@ def _handle_interactive_msg(bot: BotInterface):
             import glom
 
             # encoded by parse_html
-            target, title, actions = None, None, None
+            target, title = None, None
             parts = csv_decode_row(button.button_id)
             if len(parts) >= 3:
                 target = parts[1]
-                actions = parts[2]
                 title = parts[-1]
             bot.request_overrides = bot.request_overrides or {}
-            if len(parts) >= 3 and "send_location" in actions:
-                if location_coords is None:
-                    location_text = "error receiving location information"
-                else:
-                    location_text = _handle_location_msg(location_coords)
-
-                glom.assign(
-                    bot.request_overrides, target or "input_prompt", location_text
-                )
-            else:
-                glom.assign(
-                    bot.request_overrides,
-                    target or "input_prompt",
-                    title or button.button_title,
-                )
+            glom.assign(
+                bot.request_overrides,
+                target or "input_prompt",
+                title or button.button_title,
+            )
             return False
 
 

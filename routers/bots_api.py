@@ -62,20 +62,23 @@ class CreateStreamRequestBase(BaseModel):
         description="The button that was pressed by the user.",
     )
 
+    input_location: dict = Field(
+        None,
+        description="Location information including latitude, longitude.",
+    )
+
 
 class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
     input_text: str = Field(
         None, deprecated=True, description="Use `input_prompt` instead"
     )
 
-    input_location: dict = Field(
-        None,
-        description="Location information including latitude, longitude.",
-    )
-
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
-        self.input_prompt = self.input_prompt or self.input_text
+
+        # for backward compatibility
+        if self.input_text and not self.input_prompt:
+            self.input_prompt = self.input_text
 
 
 class CreateStreamResponse(BaseModel):
@@ -301,6 +304,8 @@ class ApiInterface(BotInterface):
         elif button := request.button_pressed:
             button.context_msg_id = MSG_ID_PREFIX + button.context_msg_id
             self.input_type = "interactive"
+        elif request.input_location:
+            self.input_type = "location"
         else:
             raise HTTPException(
                 status_code=400, detail="No input provided. Please provide input."
