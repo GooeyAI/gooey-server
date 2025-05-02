@@ -425,29 +425,27 @@ class BasePage:
                     self._render_title(tbreadcrumbs.h1_title)
             return
 
-        if tbreadcrumbs.has_breadcrumbs():
-            with (
-                heading_div,
-                gui.div(
+        with heading_div:
+            if tbreadcrumbs.has_breadcrumbs():
+                with gui.div(
                     className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
-                ),
-            ):
-                gui.image(
-                    src=pr.photo_url,
-                    style=dict(
-                        width="150px",
-                        height="150px",
-                        margin=0,
-                        minHeight="150px",
-                        objectFit="cover",
-                    ),
-                )
-                with gui.div():
-                    self._render_title(tbreadcrumbs.h1_title)
-                    if pr and pr.notes:
-                        gui.write(pr.notes, line_clamp=2)
-        elif is_root_example:
-            gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+                ):
+                    gui.image(
+                        src=pr.photo_url,
+                        style=dict(
+                            width="150px",
+                            height="150px",
+                            margin=0,
+                            minHeight="150px",
+                            objectFit="cover",
+                        ),
+                    )
+                    with gui.div():
+                        self._render_title(tbreadcrumbs.h1_title)
+                        if pr and pr.notes:
+                            gui.write(pr.notes, line_clamp=2)
+            elif is_root_example:
+                gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
 
         if not demo_bots:
             return
@@ -2404,9 +2402,10 @@ def render_demo_button(bi: BotIntegration, className: str = ""):
 
 
 def render_demo_dialog(ref: gui.AlertDialogRef, bi: BotIntegration):
+    platform = Platform(bi.platform)
     title = dedent(
         f"""
-    ### {Platform(bi.platform).get_title()} Demo
+    ### {platform.get_icon()} {platform.get_title()} Demo
     """
     )
     with gui.alert_dialog(ref, modal_title=title):
@@ -2416,26 +2415,27 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi: BotIntegration):
             style={"margin-top": "-2.5rem"},
         )
         col1, col2 = gui.columns(2)
-        with col1, gui.div():
+        with col1:
             gui.write("Message")
-            gui.write(
-                f"#### [{bi.get_display_name()}]({bi.get_bot_test_link()})",
-                className="d-block mt-3",
-            )
-            copy_to_clipboard_button(
-                f"{icons.copy_solid} Copy",
-                value=bi.get_bot_test_link(),
-                type="secondary",
-            )
+            with gui.div(className="d-flex align-items-center gap-2 mt-2"):
+                gui.write(
+                    f"[{bi.get_display_name()}]({bi.get_bot_test_link()})",
+                    className="fs-5",
+                )
+                copy_to_clipboard_button(
+                    icons.copy_solid,
+                    value=bi.get_bot_test_link(),
+                    type="tertiary",
+                )
+            if bi.demo_notes:
+                gui.write(bi.demo_notes, className="d-block mt-3")
         with col2:
-            with gui.div(
-                className="d-flex justify-content-start gap-2 justify-content-lg-between align-items-center"
-            ):
+            with gui.div(className="d-flex align-items-center gap-2"):
                 gui.write("Or scan QR Code")
                 gui.anchor(
                     label=icons.download_solid,
                     href=bi.get_bot_test_link(),
-                    type="secondary",
+                    type="tertiary",
                     unsafe_allow_html=True,
                     className="py-1",
                 )
