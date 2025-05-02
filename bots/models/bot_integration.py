@@ -438,7 +438,6 @@ class BotIntegration(models.Model):
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
-            apiKeys=dict(),
             branding=(
                 self.web_config_extras.get("branding", {})
                 | dict(
@@ -451,15 +450,19 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+
         try:
             google_maps_secret = self.workspace.managed_secrets.get(
-                name__iexact="GOOGLE_MAPS_API"
+                name__iexact="GOOGLE_MAPS_API_KEY"
             )
             google_maps_secret.load_value()
-            if google_maps_secret.value:
-                config["apiKeys"]["GoogleMapsAPI"] = google_maps_secret.value
+            google_maps_api_key = google_maps_secret.value
         except (ManagedSecret.DoesNotExist, ManagedSecret.NotLoadedError) as e:
             logger.info(f"Error - GoogleMapsAPI key: {e}")
+            google_maps_api_key = settings.GOOGLE_MAPS_API_KEY
+        if google_maps_api_key:
+            config["secrets"] = config.get("secrets") or {}
+            config["secrets"]["GOOGLE_MAPS_API_KEY"] = google_maps_api_key
 
         if settings.DEBUG:
             from routers.bots_api import stream_create
