@@ -19,9 +19,7 @@ from bots.models import (
     WorkflowAccessLevel,
 )
 from celeryapp.tasks import send_integration_attempt_email
-from daras_ai.image_input import (
-    truncate_text_words,
-)
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
@@ -116,10 +114,7 @@ from functions.recipe_functions import (
     get_tools_from_state,
     render_called_functions,
 )
-from recipes.DocSearch import (
-    get_top_k_references,
-    references_as_prompt,
-)
+from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
@@ -1739,6 +1734,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 set_is_uploading_qr_code(False)
                 raise gui.RerunException()
 
+            elif qr_code_generation_error:
+                gui.error(qr_code_generation_error)
+                set_qr_code_generation_error(None)
+
+            elif bi.demo_button_qr_code_run_id:
+                with gui.div(className="d-flex align-items-center gap-3"):
+                    gui.download_button(
+                        f"{icons.download_solid} Download",
+                        url=bi.demo_button_qr_code_image,
+                    )
+                    gui.write(
+                        f"[Open QR Generation Run]({bi.demo_button_qr_code_run.get_app_url()})"
+                    )
+
             with gui.div(className="d-flex gap-2"):
                 if gui.button(f"{icons.sparkles} Generate", type="tertiary"):
                     set_is_generating_qr_code(True)
@@ -1759,17 +1768,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                     raise gui.RerunException()
 
-            with gui.div(className="d-flex align-items-center gap-3 mt-5"):
-                if qr_code_generation_error:
-                    gui.error(qr_code_generation_error)
-                elif bi.demo_button_qr_code_run_id:
-                    gui.download_button(
-                        f"{icons.download_solid} Download",
-                        url=bi.demo_button_qr_code_image,
-                    )
-                    gui.write(
-                        f"[Open QR Generation Run]({bi.demo_button_qr_code_run.get_app_url()})"
-                    )
+            with gui.div(className="mt-3"):
+                bi.demo_notes = gui.text_area(
+                    "",
+                    placeholder='To get started, send over a "Hi". We\'d love your feedback.',
+                )
+                if gui.button("Save", type="primary"):
+                    bi.save(update_fields=["demo_notes"])
+                    raise gui.RerunException()
 
     def render_chat_list_view(self):
         # render a reversed list view
