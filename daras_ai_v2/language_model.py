@@ -1909,6 +1909,9 @@ def _run_gemini_pro(
     temperature: float,
     response_format_type: ResponseFormatType | None,
 ):
+    if model_id == LargeLanguageModels.gemini_2_5_pro_preview.model_id:
+        max_output_tokens = max(2048, max_output_tokens)
+
     contents = []
     for entry in messages:
         contents.append(
