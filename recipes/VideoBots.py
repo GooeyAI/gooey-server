@@ -1657,7 +1657,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             "--is-uploading-qr-code"
         )
 
-        with gui.div(className="d-flex gap-5"):
+        with gui.div(className="d-block d-lg-flex gap-5"):
             preview_div = gui.div(
                 className="d-flex justify-content-center align-items-center bg-light p-0 fs-1 mb-3",
                 style={"width": "200px", "height": "200px"},
@@ -1768,14 +1768,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     )
                     raise gui.RerunException()
 
-            with gui.div(className="mt-3"):
-                bi.demo_notes = gui.text_area(
-                    "",
-                    placeholder='To get started, send over a "Hi". We\'d love your feedback.',
-                )
-                if gui.button("Save", type="primary"):
-                    bi.save(update_fields=["demo_notes"])
-                    raise gui.RerunException()
+            if bi.demo_button_qr_code_image:
+                with gui.div(className="mt-3"):
+                    bi.demo_notes = gui.text_area(
+                        "",
+                        placeholder='To get started, send over a "Hi". We\'d love your feedback.',
+                    )
+                    if gui.button("Save", type="primary"):
+                        bi.save(update_fields=["demo_notes"])
+                        raise gui.RerunException()
 
     def render_chat_list_view(self):
         # render a reversed list view
