@@ -53,7 +53,7 @@ def manage_secrets_table(workspace: "Workspace", user: "AppUser"):
                                 secret.load_value()
                             try:
                                 gui.write(f"`{secret.value}`")
-                            except ManagedSecret.NotLoadedError:
+                            except ManagedSecret.NotFoundError:
                                 gui.write("`" + "*" * 10 + "`")
                                 gui.button(
                                     '<i class="fa-solid fa-eye"></i>',
