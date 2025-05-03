@@ -312,6 +312,11 @@ GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
 GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY", default="")
+GOOGLE_MAPS_API_KEY_HOSTNAMES = config(
+    "GOOGLE_MAPS_API_KEY_HOSTNAMES",
+    default=",".join(["gooey.ai", "127.0.0.1"]),
+    cast=Csv(),
+)
 
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
