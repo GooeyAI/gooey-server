@@ -123,9 +123,6 @@ class LipsyncPage(BasePage):
     def render_usage_guide(self):
         youtube_video("EJdtC0USujM")
 
-    def preview_description(self, state: dict) -> str:
-        return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
-
     def get_cost_note(self) -> str | None:
         selected_model = gui.session_state.get("selected_model")
         price = self.price_for_model(selected_model)

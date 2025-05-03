@@ -71,9 +71,6 @@ class FaceInpaintingPage(BasePage):
         diffusion_images: list[FieldHttpUrl]
         output_images: list[FieldHttpUrl]
 
-    def preview_description(self, state: dict) -> str:
-        return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."
-
     def render_description(self):
         gui.write(
             """    

@@ -395,15 +395,6 @@ To understand what each field represents, check out our [API docs](https://api.g
             sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())
 
-    def preview_description(self, state: dict) -> str:
-        return """
-Which AI model actually works best for your needs?
-Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other.
-Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing.
-To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit.
-More tips in the Details below.
-        """
-
     def render_description(self):
         gui.write(
             """

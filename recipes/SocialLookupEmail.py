@@ -65,9 +65,6 @@ class SocialLookupEmailPage(BasePage):
         final_prompt: str
         output_text: list[str]
 
-    def preview_description(self, state: dict) -> str:
-        return "Look up any email's public social profile (from LinkedIn, Facebook, the web, etc) and then use the profile's name, employment history, city, etc in your GPT3-powered AI mail merge to create personalized emails that get through spam filters."
-
     def related_workflows(self) -> list:
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
         from recipes.SEOSummary import SEOSummaryPage

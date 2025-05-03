@@ -82,9 +82,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def get_example_preferred_fields(self, state: dict) -> list[str]:
         return ["email_address"]
 
-    def preview_description(self, state: dict) -> str:
-        return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."
-
     def render_description(self):
         gui.write(
             """

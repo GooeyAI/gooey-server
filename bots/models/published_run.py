@@ -30,7 +30,7 @@ class PublishedRunQuerySet(models.QuerySet):
         user: AppUser | None,
         workspace: typing.Optional["Workspace"],
         title: str,
-        notes: str,
+        notes: str = "",
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
     ):

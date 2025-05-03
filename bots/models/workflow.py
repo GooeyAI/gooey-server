@@ -244,10 +244,7 @@ class Workflow(models.IntegerChoices):
                 short_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 default_image=self.page_cls.explore_image or "",
                 meta_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
-                meta_description=(
-                    self.page_cls().preview_description(state={})
-                    or self.page_cls.get_root_pr().notes
-                ),
+                meta_description=self.page_cls.get_root_pr().notes,
                 meta_image=self.page_cls.explore_image or "",
             ),
         )[0]

@@ -300,9 +300,6 @@ class ObjectInpaintingPage(BasePage):
             gui.write("**Prompt**")
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
-    def preview_description(self, state: dict) -> str:
-        return "Upload your product photo and describe the background. Then use Stable Diffusion's Inpainting AI to create professional background scenery without the photoshoot."
-
     def render_usage_guide(self):
         youtube_video("to6_17XJeck")
 

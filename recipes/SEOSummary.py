@@ -61,9 +61,6 @@ class SEOSummaryPage(BasePage):
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
 
-    def preview_description(self, state: dict) -> str:
-        return "Input a Google search query + your website & keywords to get AI search engine optimized content. This workflow parses the current top ranked sites and generates the best page summary for your site using OpenAI’s GPT3."
-
     sane_defaults = dict(
         search_query="rugs",
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
