@@ -378,7 +378,7 @@ def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str
     ).strip()
 
 
-def web_widget_config(bi: BotIntegration, user: AppUser | None):
+def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | None):
     with gui.div(style={"width": "100%", "textAlign": "left"}):
         col1, col2 = gui.columns(2)
     with col1:
@@ -536,7 +536,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None):
                 if (script) script.onload = loadGooeyEmbed;
                 loadGooeyEmbed();
                 """,
-                config=bi.get_web_widget_config() | dict(mode="inline"),
+                config=bi.get_web_widget_config(hostname) | dict(mode="inline"),
             )
         else:
             bot_api_example_generator(bi.api_integration_id())

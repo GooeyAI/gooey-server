@@ -1448,7 +1448,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         icon = Platform(bi.platform).get_icon()
 
         if bi.platform == Platform.WEB:
-            web_widget_config(bi, self.request.user)
+            web_widget_config(
+                bi=bi,
+                user=self.request.user,
+                hostname=self.request.url and self.request.url.hostname,
+            )
             gui.newline()
 
         gui.newline()
