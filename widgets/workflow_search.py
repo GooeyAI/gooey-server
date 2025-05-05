@@ -1,3 +1,4 @@
+from daras_ai_v2 import icons
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -22,12 +23,25 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             r"""
         & {
             position: relative;
+            max-width: 500px;
+        }
+        & .gui-input {
+            margin: 0;
+            width: 100%;
+        }
+        & .clear_button {
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            font-size: 0.9em;
+            margin: 0 !important;
         }
         &::before {
             content: "\f002";              /* FontAwesome glyph */
-            font-family: "Font Awesome 6 Pro";    
+            font-family: "Font Awesome 6 Pro";
             position: absolute;
-            left: 12px;                  
+            left: 12px;
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;          /* let clicks go through to the input */
@@ -41,11 +55,16 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         search_query = gui.text_input(
             "",
             placeholder="Search Workflows",
-            className="bg-light border-0 rounded-pill",
-            style=dict(maxWidth="500px", marginLeft="-0.3rem", paddingLeft="2.7rem"),
+            className="bg-light m-0 border-0 rounded-pill",
+            style=dict(marginLeft="-0.3rem", paddingLeft="2.7rem"),
             key=key,
             value=value,
         )
+        if search_query and gui.button(
+            icons.cancel, type="link", className="clear_button"
+        ):
+            gui.session_state[key] = ""
+            search_query = ""
 
     return search_query
 
