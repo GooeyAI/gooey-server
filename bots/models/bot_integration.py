@@ -18,7 +18,6 @@ from workspaces.models import Workspace
 
 from .published_run import PublishedRun
 from .saved_run import SavedRun
-from loguru import logger
 
 
 class Platform(models.IntegerChoices):
