@@ -31,9 +31,8 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         }
         & .clear_button {
             position: absolute;
-            top: 50%;
-            right: 12px;
-            transform: translateY(-50%);
+            top: 16px;
+            right: 18px;
             font-size: 0.9em;
             margin: 0 !important;
         }
@@ -41,9 +40,8 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             content: "\f002";              /* FontAwesome glyph */
             font-family: "Font Awesome 6 Pro";
             position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
+            top: 16px;
+            left: 18px;
             pointer-events: none;          /* let clicks go through to the input */
             color: #888;
             font-size: 0.9em;
@@ -52,13 +50,23 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         ),
         gui.div(),
     ):
-        search_query = gui.text_input(
+        search_query = gui.text_area(
             "",
             placeholder="Search Workflows",
-            className="bg-light m-0 border-0 rounded-pill",
-            style=dict(marginLeft="-0.3rem", paddingLeft="2.7rem"),
+            className="bg-light my-0  border-0",
+            style=dict(
+                resize="none",
+                borderRadius="24px",
+                paddingLeft="2.4rem",
+                paddingRight="2.4rem",
+            ),
             key=key,
             value=value,
+            rows=gui.nrows_for_text(
+                gui.session_state.get(key, value),
+                max_height_px=500,
+                row_width_px=50,
+            ),
         )
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
