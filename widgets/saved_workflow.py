@@ -190,7 +190,6 @@ def render_author_run_count_row(
             )
             # if not in a personal workspace, show the last edited user
             if not published_run.workspace.is_personal and published_run.last_edited_by:
-                gui.write(" • ")
                 render_author_from_user(
                     published_run.last_edited_by,
                     image_size="24px",
