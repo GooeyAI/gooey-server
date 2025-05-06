@@ -510,17 +510,17 @@ class BasePage:
             gui.styled("& .btn { padding: 6px }"),
             gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
         ):
-            meta = self.workflow.get_or_create_metadata()
-            if self.current_pr.is_root() and meta.help_url:
-                with gui.div(className="me-1"):
-                        if gui.button(
-                            f'<span style="color:initial">{icons.help_guide}</span> <span class="d-none d-lg-inline">Help Guide</span>',
-                            type="tertiary",
-                        ):
-                            gui.js(f'window.open("{meta.help_url}", "_blank")')
-
+           
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
             if self.tab == RecipeTabs.run:
+                meta = self.workflow.get_or_create_metadata()
+                if self.current_pr.is_root() and meta.help_url:
+                    with gui.div(className="me-1"):
+                            if gui.button(
+                                f'<span style="color:initial">{icons.help_guide}</span> <span class="d-none d-lg-inline">Help Guide</span>',
+                                type="tertiary",
+                            ):
+                                gui.js(f'window.open("{meta.help_url}", "_blank")')
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 render_share_button(
