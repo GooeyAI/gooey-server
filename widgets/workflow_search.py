@@ -63,6 +63,7 @@ def _render_run(pr: PublishedRun):
         pr,
         workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
         hide_visibility_pill=True,
+        show_workspace_author=True
     )
 
 
