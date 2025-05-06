@@ -177,11 +177,25 @@ def render_author_run_count_row(
     ):
         if show_workspace_author:
             render_author_from_workspace(
-                published_run.workspace, image_size="24px", responsive=False
+                published_run.workspace,
+                image_size="24px",
+                text_size="0.9rem",
+                responsive=False,
+                show_as_link=True,
             )
+            # if not in a personal workspace, show the last edited user
+            if not published_run.workspace.is_personal and published_run.last_edited_by:
+                gui.write(" • ")
+                render_author_from_user(
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    text_size="0.9rem",
+                    responsive=False,
+                    show_as_link=True
+                )
         elif published_run.last_edited_by:
             render_author_from_user(
-                published_run.last_edited_by, image_size="24px", responsive=False
+                published_run.last_edited_by, image_size="24px", responsive=False, show_as_link=True,
             )
 
         if published_run.run_count > 1:
