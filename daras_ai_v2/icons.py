@@ -59,3 +59,5 @@ card_icons = {
 }
 
 integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
+
+help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'
