@@ -49,16 +49,6 @@ WORKFLOW_PREVIEW_STYLE = """
         width: 130px;
     }
 }
-
-& .render_example_author_meta > a {
-    text-decoration: none;
-}
-& .render_example_author_meta > a:hover {
-    text-decoration: underline;
-    text-decoration-color: black;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.15em;
-}   
 """
 
 SEPARATOR_CSS = """
@@ -190,12 +180,13 @@ def render_author_run_count_row(
             )
             # if not in a personal workspace, show the last edited user
             if not published_run.workspace.is_personal and published_run.last_edited_by:
-                render_author_from_user(
-                    published_run.last_edited_by,
-                    image_size="24px",
-                    responsive=False,
-                    show_as_link=True,
-                )
+                with gui.div(style={"display": "contents"}):
+                    render_author_from_user(
+                        published_run.last_edited_by,
+                        image_size="24px",
+                        responsive=False,
+                        show_as_link=True,
+                    )
         elif published_run.last_edited_by:
             render_author_from_user(
                 published_run.last_edited_by,
