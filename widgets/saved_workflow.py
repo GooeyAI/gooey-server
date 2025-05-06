@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import html
 import typing
 
 import gooey_gui as gui
@@ -54,6 +55,16 @@ WORKFLOW_PREVIEW_STYLE = """
 }
 """
 
+SEPARATOR_CSS = """
+& > :not(:empty):not(:first-child)::before {
+  content: "•";
+  margin: 0 0.3em;
+  color: black;
+  display: inline-block;
+  vertical-align: middle;
+}
+"""
+
 
 def render_saved_workflow_preview(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
@@ -64,7 +75,6 @@ def render_saved_workflow_preview(
     hide_version_notes: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
-    version = published_run.versions.latest()
     output_url = (
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
@@ -97,12 +107,6 @@ def render_saved_workflow_preview(
                                 className="d-md-flex d-none align-items-center ms-2 mt-1",
                                 style={"font-size": "0.9rem"},
                             ):
-                                if not hide_visibility_pill:
-                                    gui.pill(
-                                        published_run.get_share_badge_html(),
-                                        unsafe_allow_html=True,
-                                        className="border border-dark",
-                                    )
                                 if workflow_pill:
                                     gui.pill(
                                         workflow_pill,
@@ -123,26 +127,21 @@ def render_saved_workflow_preview(
                                     lineClampExpand=False,
                                     style={"fontSize": "0.9rem"},
                                 )
-                    with gui.div(
-                        className="d-none d-md-flex flex-1 align-items-center render_example_author_meta"
+                    with (
+                        gui.styled(SEPARATOR_CSS),
+                        gui.div(
+                            className="d-none d-md-flex container-margin-reset align-items-center gap-2"
+                        ),
                     ):
-                        render_saved_workflow_author(
+                        render_author_run_count_row(
                             published_run=published_run,
                             show_workspace_author=show_workspace_author,
                         )
-                        if not hide_version_notes:
-                            with gui.div(
-                                className="container-margin-reset mt-2 mt-md-0 d-flex gap-2 ms-2 align-items-center"
-                            ):
-                                if version.change_notes:
-                                    gui.write(" • ")
-                                    gui.caption(
-                                        f"{icons.notes} {version.change_notes}",
-                                        unsafe_allow_html=True,
-                                        style={"fontSize": "0.9rem"},
-                                        line_clamp=1,
-                                        lineClampExpand=False,
-                                    )
+                        render_change_notes_visibility_row(
+                            published_run=published_run,
+                            hide_visibility_pill=hide_visibility_pill,
+                            hide_version_notes=hide_version_notes,
+                        )
                 with (
                     gui.div(
                         className=f"flex-grow-1 {'d-none d-md-flex' if output_url else 'd-flex'} justify-content-end ms-2"
@@ -150,69 +149,77 @@ def render_saved_workflow_preview(
                     gui.div(
                         className="gui_example_media d-flex align-items-center justify-content-center",
                     ),
-                    gui.link(
-                        to=published_run.get_app_url(),
-                        className="d-flex",
-                    ),
+                    gui.link(to=published_run.get_app_url(), className="d-flex"),
                 ):
                     render_saved_workflow_output(output_url, published_run)
 
         with gui.div(className="d-md-none mt-2"):
-            render_saved_workflow_author(
-                published_run=published_run,
-                show_workspace_author=show_workspace_author,
+            render_author_run_count_row(
+                published_run=published_run, show_workspace_author=show_workspace_author
             )
-            if not hide_version_notes:
-                with gui.div(className="container-margin-reset mt-2 mt-md-0"):
-                    if version.change_notes:
-                        gui.caption(
-                            f"{icons.notes} {version.change_notes}",
-                            unsafe_allow_html=True,
-                            style={"fontSize": "0.9rem"},
-                            line_clamp=1,
-                        )
+            with gui.div(className="mt-2 ms-1"):
+                render_change_notes_visibility_row(
+                    published_run=published_run,
+                    hide_visibility_pill=hide_visibility_pill,
+                    hide_version_notes=hide_version_notes,
+                )
 
 
-def render_saved_workflow_author(
+def render_author_run_count_row(
     published_run: PublishedRun, show_workspace_author: bool = True
 ):
-    updated_at = published_run.saved_run.updated_at or ""
-    with gui.div(
-        className="d-flex gap-2 align-items-center container-margin-reset render_example_author_meta",
+    with (
+        gui.styled(SEPARATOR_CSS),
+        gui.div(
+            className="d-flex align-items-center container-margin-reset gap-2",
+            style={"fontSize": "0.9rem"},
+        ),
     ):
         if show_workspace_author:
             render_author_from_workspace(
-                published_run.workspace,
-                image_size="24px",
-                text_size="0.9rem",
-                responsive=False,
+                published_run.workspace, image_size="24px", responsive=False
             )
-        else:
+        elif published_run.last_edited_by:
             render_author_from_user(
-                published_run.last_edited_by,
-                image_size="24px",
-                text_size="0.9rem",
-                responsive=False,
+                published_run.last_edited_by, image_size="24px", responsive=False
             )
 
         if published_run.run_count > 1:
-            gui.write(" • ")
             run_count = format_number_with_suffix(published_run.run_count)
-            gui.caption(
+            gui.write(
                 f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
-                style={"fontSize": "0.9rem"},
-                className="text-dark",
+                className="text-dark text-nowrap",
             )
 
-        if published_run.last_edited_by:
-            gui.write(" • ")
-
+        updated_at = published_run.saved_run.updated_at or ""
         if updated_at and isinstance(updated_at, datetime.datetime):
+            gui.write(f"{get_relative_time(updated_at)}", className="text-nowrap")
+
+
+def render_change_notes_visibility_row(
+    published_run: PublishedRun,
+    hide_version_notes: bool = False,
+    hide_visibility_pill: bool = False,
+):
+    version = published_run.versions.latest()
+    with (
+        gui.styled(SEPARATOR_CSS),
+        gui.div(className="d-flex align-items-center container-margin-reset gap-2"),
+    ):
+        if not hide_version_notes and version.change_notes:
             gui.caption(
-                f"{get_relative_time(updated_at)}",
-                style={"fontSize": "0.9rem"},
-                className="container-margin-reset",
+                f"{icons.notes} {html.escape(version.change_notes)}",
+                unsafe_allow_html=True,
+                line_clamp=1,
+                lineClampExpand=False,
+            )
+
+        if not hide_visibility_pill:
+            gui.caption(
+                published_run.get_share_badge_html(),
+                unsafe_allow_html=True,
+                style={"whiteSpace": "nowrap"},
             )
 
 

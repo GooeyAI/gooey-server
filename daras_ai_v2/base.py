@@ -79,9 +79,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
-from widgets.workflow_share import (
-    render_share_button,
-)
+from widgets.workflow_share import render_share_button
 from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
