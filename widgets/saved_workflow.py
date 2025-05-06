@@ -51,8 +51,14 @@ WORKFLOW_PREVIEW_STYLE = """
 }
 
 & .render_example_author_meta > a {
-    text-decoration: none !important;
+    text-decoration: none;
 }
+& .render_example_author_meta > a:hover {
+    text-decoration: underline;
+    text-decoration-color: black;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
+}   
 """
 
 SEPARATOR_CSS = """
@@ -179,7 +185,6 @@ def render_author_run_count_row(
             render_author_from_workspace(
                 published_run.workspace,
                 image_size="24px",
-                text_size="0.9rem",
                 responsive=False,
                 show_as_link=True,
             )
@@ -189,13 +194,15 @@ def render_author_run_count_row(
                 render_author_from_user(
                     published_run.last_edited_by,
                     image_size="24px",
-                    text_size="0.9rem",
                     responsive=False,
-                    show_as_link=True
+                    show_as_link=True,
                 )
         elif published_run.last_edited_by:
             render_author_from_user(
-                published_run.last_edited_by, image_size="24px", responsive=False, show_as_link=True,
+                published_run.last_edited_by,
+                image_size="24px",
+                responsive=False,
+                show_as_link=True,
             )
 
         if published_run.run_count > 1:
