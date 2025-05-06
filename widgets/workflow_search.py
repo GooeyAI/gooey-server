@@ -31,7 +31,7 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         }
         & .clear_button {
             position: absolute;
-            top: 16px;
+            top: 17px;
             right: 18px;
             font-size: 0.9em;
             margin: 0 !important;
@@ -53,20 +53,15 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         search_query = gui.text_area(
             "",
             placeholder="Search Workflows",
-            className="bg-light my-0  border-0",
+            className="bg-light border-0 rounded-pill",
             style=dict(
                 resize="none",
-                borderRadius="24px",
-                paddingLeft="2.4rem",
-                paddingRight="2.4rem",
+                paddingLeft="2.7rem",
+                paddingRight="2.7rem",
             ),
             key=key,
             value=value,
-            rows=gui.nrows_for_text(
-                gui.session_state.get(key, value),
-                max_height_px=500,
-                row_width_px=50,
-            ),
+            rows=1,
         )
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
