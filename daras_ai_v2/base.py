@@ -507,7 +507,9 @@ class BasePage:
 
     def render_social_buttons(self):
         with (
-            gui.styled("& .btn { padding: 6px } & a:hover { text-decoration: underline !important; }"),
+            gui.styled(
+                "& .btn { padding: 6px } & a:hover { text-decoration: underline !important; }"
+            ),
             gui.div(className="d-flex align-items-center gap-lg-2 gap-1"),
         ):
 
