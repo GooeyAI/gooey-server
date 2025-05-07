@@ -12,7 +12,6 @@ from enum import Enum
 from functools import cached_property, partial
 from itertools import pairwise
 from random import Random
-from textwrap import dedent
 from time import sleep
 
 import gooey_gui as gui
@@ -28,8 +27,6 @@ from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
-    BotIntegration,
-    Platform,
     PublishedRun,
     PublishedRunVersion,
     RetentionPolicy,
@@ -382,13 +379,8 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
-        demo_bots = self.tab == RecipeTabs.run and BotIntegration.objects.filter(
-            workspace=pr.workspace,
-            published_run=pr,
-            demo_button_qr_code_image__isnull=False,
-        )
 
-        with gui.div(className="d-flex justify-content-between align-items-start my-3"):
+        with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
             if tbreadcrumbs.has_breadcrumbs():
                 with gui.div(
                     className="d-block d-lg-flex align-items-center pt-2 mb-2"
@@ -413,19 +405,16 @@ class BasePage:
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
 
-        if demo_bots:
-            heading_div, demo_div = gui.columns([10, 2], className="row mb-3")
-        else:
-            heading_div, demo_div = gui.div(), None
-
-        # render title below the social buttons and breadcrumbs
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
-                with heading_div:
+                with gui.styled("& h1 { margin-top: 0 }"):
                     self._render_title(tbreadcrumbs.h1_title)
             else:
-                with heading_div, gui.div(
-                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                with (
+                    gui.styled("& h1 { margin-top: 0 }"),
+                    gui.div(
+                        className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                    ),
                 ):
                     gui.image(
                         src=pr.photo_url,
@@ -437,33 +426,22 @@ class BasePage:
                             objectFit="cover",
                         ),
                     )
-                    with gui.div():
-                        self._render_title(tbreadcrumbs.h1_title)
-                        if pr and pr.notes:
-                            gui.write(pr.notes, line_clamp=2)
+                    with gui.div(className="d-flex gap-2 w-100"):
+                        with gui.div(className="flex-grow-1"):
+                            self._render_title(tbreadcrumbs.h1_title)
+                            if pr and pr.notes:
+                                gui.write(pr.notes, line_clamp=2)
+                        self.render_header_extra()
         # render notes below the title and social buttons
-        elif pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
+        else:
+            with gui.div(className="d-flex gap-2 w-100"):
+                with gui.div(className="flex-grow-1"):
+                    if pr and pr.notes:
+                        gui.write(pr.notes, line_clamp=2)
+                self.render_header_extra()
 
-        if not demo_bots:
-            return
-
-        with (
-            demo_div,
-            gui.center(),
-            gui.div(
-                className="d-flex flex-column gap-2 container-margin-reset",
-                style={"maxWidth": "150px"},
-            ),
-        ):
-            gui.caption("Try the demo")
-            for demo_bi in demo_bots:
-                demo_dialog_ref = gui.use_alert_dialog(key=f"demo-modal-{demo_bi.id}")
-                if render_demo_button(demo_bi, className="w-100"):
-                    demo_dialog_ref.set_open(True)
-
-                if demo_dialog_ref.is_open:
-                    render_demo_dialog(bi=demo_bi, ref=demo_dialog_ref)
+    def render_header_extra(self):
+        pass
 
     def can_user_save_run(
         self,
@@ -2368,72 +2346,6 @@ def render_output_caption():
                     updated_at,
                     date_options={"month": "short", "day": "numeric"},
                 ),
-            )
-
-
-def render_demo_button(bi: BotIntegration, className: str = ""):
-    platform = Platform(bi.platform)
-    label = f"{platform.get_icon()} {platform.get_title()}"
-    className += " px-3 py-2 m-0"
-    key = f"demo-button-{bi.id}"
-
-    bg_color = platform.get_demo_button_color()
-    if not bg_color:
-        return gui.button(label, key=key, type="secondary", className=className)
-
-    return gui.button(
-        label,
-        key=key,
-        className=className,
-        style={"backgroundColor": bg_color, "borderColor": bg_color, "color": "white"},
-    )
-
-
-def render_demo_dialog(ref: gui.AlertDialogRef, bi: BotIntegration):
-    platform = Platform(bi.platform)
-    title = dedent(
-        f"""
-    ### {platform.get_icon()} {platform.get_title()} Demo
-    """
-    )
-    with gui.alert_dialog(ref, modal_title=title):
-        gui.write(
-            f"#### {bi.name or ''}",
-            className="d-block mb-4",
-            style={"margin-top": "-2.5rem"},
-        )
-        col1, col2 = gui.columns(2)
-        with col1:
-            gui.write("Message")
-            with gui.div(className="d-flex align-items-center gap-2 mt-2"):
-                gui.write(
-                    f"[{bi.get_display_name()}]({bi.get_bot_test_link()})",
-                    className="fs-5",
-                )
-                copy_to_clipboard_button(
-                    icons.copy_solid,
-                    value=bi.get_bot_test_link(),
-                    type="tertiary",
-                )
-            if bi.demo_notes:
-                gui.write(bi.demo_notes, className="d-block mt-3")
-        with col2:
-            with gui.div(className="d-flex align-items-center gap-2"):
-                gui.write("Or scan QR Code")
-                gui.anchor(
-                    label=icons.download_solid,
-                    href=bi.get_bot_test_link(),
-                    type="tertiary",
-                    unsafe_allow_html=True,
-                    className="py-1",
-                )
-            gui.image(
-                src=bi.demo_button_qr_code_image,
-                style={
-                    "width": "200px",
-                    "height": "200px",
-                    "contentFit": "fill",
-                },
             )
 
 

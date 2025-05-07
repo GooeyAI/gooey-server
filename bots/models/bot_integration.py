@@ -19,6 +19,7 @@ from managed_secrets.models import ManagedSecret
 from workspaces.models import Workspace
 from .published_run import PublishedRun
 from .saved_run import SavedRun
+from bots.models.workflow import WorkflowAccessLevel
 
 
 class Platform(models.IntegerChoices):
@@ -410,10 +411,16 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will stream messages to the frontend",
     )
 
-    demo_button_qr_code_image = models.TextField(
+    public_visibility = models.IntegerField(
+        choices=WorkflowAccessLevel.choices,
+        default=WorkflowAccessLevel.VIEW_ONLY,
+        help_text="Controls whether this bot integration is listed on gooey.ai/chat & whether the demo button is shown",
+    )
+
+    demo_qr_code_image = models.TextField(
         null=True, blank=True, help_text="QR code image for the demo button"
     )
-    demo_button_qr_code_run = models.ForeignKey(
+    demo_qr_code_run = models.ForeignKey(
         "SavedRun",
         on_delete=models.SET_NULL,
         null=True,
