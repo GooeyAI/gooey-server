@@ -507,20 +507,25 @@ class BasePage:
 
     def render_social_buttons(self):
         with (
-            gui.styled("& .btn { padding: 6px }"),
-            gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
+            gui.styled("& .btn { padding: 6px } & a:hover { text-decoration: underline !important; }"),
+            gui.div(className="d-flex align-items-center gap-lg-2 gap-1"),
         ):
-           
+
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
             if self.tab == RecipeTabs.run:
                 meta = self.workflow.get_or_create_metadata()
                 if self.current_pr.is_root() and meta.help_url:
-                    with gui.div(className="me-1"):
-                            if gui.button(
+                    with gui.div(className="me-1 container-margin-reset"):
+                        with gui.link(
+                            to=meta.help_url,
+                            target="_blank",
+                            style={"color": "gray"},
+                            className="mb-0 text-decoration-none",
+                        ):
+                            gui.write(
                                 f'<span style="color:initial">{icons.help_guide}</span> <span class="d-none d-lg-inline">Help Guide</span>',
-                                type="tertiary",
-                            ):
-                                gui.js(f'window.open("{meta.help_url}", "_blank")')
+                                unsafe_allow_html=True,
+                            )
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 render_share_button(
@@ -1446,9 +1451,9 @@ class BasePage:
         with gui.div(**self.get_submit_container_props()):
             gui.write("---")
             col1, col2 = gui.columns([2, 1], responsive=False)
-            col2.node.props["className"] += (
-                " d-flex justify-content-end align-items-center"
-            )
+            col2.node.props[
+                "className"
+            ] += " d-flex justify-content-end align-items-center"
             col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
                 self.render_run_cost()
