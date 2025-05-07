@@ -82,9 +82,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
-from widgets.workflow_share import (
-    render_share_button,
-)
+from widgets.workflow_share import render_share_button
 from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
@@ -407,6 +405,7 @@ class BasePage:
                             sr=self.current_sr,
                         )
             else:
+                # render title in line with the social buttons
                 self._render_title(tbreadcrumbs.h1_title)
 
             with gui.div(className="d-flex align-items-center my-auto"):
@@ -419,15 +418,13 @@ class BasePage:
         else:
             heading_div, demo_div = gui.div(), None
 
-        if self.tab != RecipeTabs.run:
-            if tbreadcrumbs.has_breadcrumbs():
+        # render title below the social buttons and breadcrumbs
+        if tbreadcrumbs.has_breadcrumbs():
+            if self.tab != RecipeTabs.run:
                 with heading_div:
                     self._render_title(tbreadcrumbs.h1_title)
-            return
-
-        with heading_div:
-            if tbreadcrumbs.has_breadcrumbs():
-                with gui.div(
+            else:
+                with heading_div, gui.div(
                     className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
                 ):
                     gui.image(
@@ -444,8 +441,9 @@ class BasePage:
                         self._render_title(tbreadcrumbs.h1_title)
                         if pr and pr.notes:
                             gui.write(pr.notes, line_clamp=2)
-            elif is_root_example:
-                gui.write(self.preview_description(sr.to_dict()), line_clamp=2)
+        # render notes below the title and social buttons
+        elif pr and pr.notes:
+            gui.write(pr.notes, line_clamp=2)
 
         if not demo_bots:
             return
@@ -1208,12 +1206,7 @@ class BasePage:
                     """
                 )
                 gui.markdown(f"###### {root_run.title or page.title}")
-                gui.caption(
-                    truncate_text_words(
-                        root_run.notes or page.preview_description(state),
-                        maxlen=210,
-                    )
-                )
+                gui.caption(truncate_text_words(root_run.notes, maxlen=210))
 
         grid_layout(4, page_clses, _render)
 
@@ -1418,7 +1411,6 @@ class BasePage:
             user=None,
             workspace=None,
             title=cls.title,
-            notes=cls().preview_description(state=cls.sane_defaults),
             public_access=WorkflowAccessLevel.FIND_AND_VIEW,
         )[0]
 
@@ -2137,10 +2129,6 @@ class BasePage:
             or state.get("search_query")
             or state.get("title")
         )
-
-    # this is mostly depreated in favour of PublishedRun.notes
-    def preview_description(self, state: dict) -> str:
-        return ""
 
     @classmethod
     def preview_image(cls, state: dict) -> str | None:

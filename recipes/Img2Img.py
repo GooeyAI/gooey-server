@@ -194,9 +194,6 @@ class Img2ImgPage(BasePage):
                 seed=request.seed,
             )
 
-    def preview_description(self, state: dict) -> str:
-        return "Add an image and a prompt and this workflow will alter the image using your text & the latest InstructPix2Pix or Stable Difussion Img2Img AI model."
-
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:

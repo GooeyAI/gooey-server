@@ -98,9 +98,6 @@ class RelatedQnAPage(BasePage):
             SocialLookupEmailPage,
         ]
 
-    def preview_description(self, state: dict) -> str:
-        return 'Input your Google Search query and discover related Q&As that your audience is asking, so you can create content that is more relevant and engaging. This workflow finds the related queries (aka "People also ask") for your Google search, browses through the URL you provide for all related results from your query and finally, generates cited answers from those results. A great way to quickly improve your website\'s SEO rank if you already rank well for a given query.'
-
     def run_v2(
         self,
         request: "RelatedQnAPage.RequestModel",

@@ -161,5 +161,5 @@ if __name__ == "__main__":
         "server:app",
         port=8080,
         reload=True,
-        reload_excludes=["models", "models.py", "admin.py", "api.py"],
+        reload_excludes=["models/*", "models.py", "admin.py", "api.py"],
     )

@@ -206,3 +206,5 @@ node_modules/
 #.idea/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,macOS
+bots/management/commands/export_messages.py
+bots/management/commands/import_messages.py

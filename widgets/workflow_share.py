@@ -67,14 +67,9 @@ def render_share_modal(
     with gui.alert_dialog(ref=dialog, modal_title=f"#### Share: {pr.title}"):
         with gui.styled("& .gui-input-radio { display: flex; align-items: center; }"):
             if not pr.workspace.is_personal:
-                updates = render_share_options_for_team_workspace(
-                    user=user,
-                    pr=pr,
-                )
+                updates = render_share_options_for_team_workspace(user=user, pr=pr)
             else:
-                updates = render_share_options_for_personal_workspace(
-                    pr=pr,
-                )
+                updates = render_share_options_for_personal_workspace(pr=pr)
 
         changed = any(getattr(pr, k) != v for k, v in updates.items())
         if changed:
@@ -134,8 +129,7 @@ def render_share_modal(
 
 
 def render_share_options_for_team_workspace(
-    user: AppUser,
-    pr: PublishedRun,
+    user: AppUser, pr: PublishedRun
 ) -> dict[str, WorkflowAccessLevel]:
     with gui.div(className="mb-4"):
         render_workspace_with_invite_button(pr.workspace, user.id)

@@ -104,9 +104,6 @@ class AsrPage(BasePage):
 
         return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
 
-    def preview_description(self, state: dict):
-        return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."
-
     def render_description(self):
         gui.markdown(
             """

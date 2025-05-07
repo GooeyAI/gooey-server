@@ -30,7 +30,7 @@ class PublishedRunQuerySet(models.QuerySet):
         user: AppUser | None,
         workspace: typing.Optional["Workspace"],
         title: str,
-        notes: str,
+        notes: str = "",
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
     ):
@@ -295,18 +295,29 @@ class PublishedRun(models.Model):
         self.save()
 
     def get_share_icon(self):
+        """
+        Shown internally to workspace members. For example: share button on workflow page.
+        """
         if self.workspace.is_personal:
             return WorkflowAccessLevel(self.public_access).get_public_sharing_icon()
         else:
             return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
 
     def get_share_badge_html(self):
-        if self.workspace.is_personal:
+        """
+        Shown externally AND on listings. For example: saved list, profile page.
+        """
+        if self.workspace.is_personal or (
+            self.public_access == WorkflowAccessLevel.FIND_AND_VIEW
+        ):
             perm = WorkflowAccessLevel(self.public_access)
             return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
-        else:
-            perm = WorkflowAccessLevel(self.workspace_access)
+
+        perm = WorkflowAccessLevel(self.workspace_access)
+        if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
             return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
+        else:
+            return f"{self.workspace.html_icon(size='20px')} {perm.get_team_sharing_label()}"
 
     def submit_api_call(
         self,

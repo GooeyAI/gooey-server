@@ -187,9 +187,6 @@ class GoogleGPTPage(BasePage):
             SocialLookupEmailPage,
         ]
 
-    def preview_description(self, state: dict) -> str:
-        return "Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.  Filter  results to your own website so users can ask anything and get answers based only on your site's pages."
-
     def render_usage_guide(self):
         youtube_video("mcscNaUIosA")
 

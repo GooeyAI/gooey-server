@@ -88,9 +88,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
         assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
-    def preview_description(self, state: dict) -> str:
-        return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."
-
     def render_description(self):
         gui.write(
             """

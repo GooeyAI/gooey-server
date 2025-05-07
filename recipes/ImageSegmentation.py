@@ -349,9 +349,6 @@ class ImageSegmentationPage(BasePage):
             else:
                 gui.div()
 
-    def preview_description(self, state: dict) -> str:
-        return "Use Dichotomous Image Segmentation to remove unwanted backgrounds from your images and correct perspective. Awesome when used with other Gooey.AI steps."
-
     def render_usage_guide(self):
         youtube_video("hSsCMloAQ-8")
 

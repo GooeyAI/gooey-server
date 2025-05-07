@@ -232,6 +232,3 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         out_imgs = state.get("output_images")
         if out_imgs:
             gui.image(out_imgs[0], caption="Generated Image")
-
-    def preview_description(self, state: dict) -> str:
-        return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."

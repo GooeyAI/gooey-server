@@ -105,9 +105,8 @@ def render_description(page: BasePage):
         gui.markdown(f"#### {page.get_recipe_title()}")
 
     root_pr = page.get_root_pr()
-    notes = root_pr.notes or page.preview_description(state=page.sane_defaults)
     with gui.div(className="mb-3"):
-        gui.write(notes, line_clamp=4)
+        gui.write(root_pr.notes, line_clamp=4)
     if root_pr.run_count > 1:
         run_count = format_number_with_suffix(root_pr.run_count)
         gui.caption(

@@ -15,6 +15,7 @@ from app_users.models import AppUser
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_api_route_url, get_app_route_url
+from managed_secrets.models import ManagedSecret
 from workspaces.models import Workspace
 from .published_run import PublishedRun
 from .saved_run import SavedRun
@@ -504,7 +505,9 @@ class BotIntegration(models.Model):
 
         return api_hashids.encode(self.id)
 
-    def get_web_widget_config(self, target="#gooey-embed") -> dict:
+    def get_web_widget_config(
+        self, hostname: str | None, target="#gooey-embed"
+    ) -> dict:
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
@@ -520,6 +523,21 @@ class BotIntegration(models.Model):
                 )
             ),
         )
+
+        google_maps_api_key = None
+        try:
+            google_maps_secret = self.workspace.managed_secrets.get(
+                name__iexact="GOOGLE_MAPS_API_KEY"
+            )
+            google_maps_secret.load_value()
+            google_maps_api_key = google_maps_secret.value
+        except (ManagedSecret.DoesNotExist, ManagedSecret.NotFoundError):
+            if hostname in settings.GOOGLE_MAPS_API_KEY_HOSTNAMES:
+                google_maps_api_key = settings.GOOGLE_MAPS_API_KEY
+        if google_maps_api_key:
+            config["secrets"] = config.get("secrets") or {}
+            config["secrets"]["GOOGLE_MAPS_API_KEY"] = google_maps_api_key
+
         if settings.DEBUG:
             from routers.bots_api import stream_create
 

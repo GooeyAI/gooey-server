@@ -140,9 +140,6 @@ class DocSearchPage(BasePage):
         gui.write("---")
         doc_search_advanced_settings()
 
-    def preview_description(self, state: dict) -> str:
-        return "Add your PDF, Word, HTML or Text docs, train our AI on them with OpenAI embeddings & vector search and then process results with a GPT3 script. This workflow is perfect for anything NOT in ChatGPT: 250-page compliance PDFs, training manuals, your diary, etc."
-
     def render_steps(self):
         render_doc_search_step(gui.session_state)
 

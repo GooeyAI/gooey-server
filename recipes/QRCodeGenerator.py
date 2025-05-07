@@ -533,12 +533,6 @@ Here is the final output:
         #     'Doh! That didn\'t work. Sometimes the AI produces bad QR codes. Please press "Regenerate" to try again.'
         # )
 
-    def preview_description(self, state: dict) -> str:
-        return """
-            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Codes has never been easier! 
-            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR code tailored to your style. 
-        """
-
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
         total = 5

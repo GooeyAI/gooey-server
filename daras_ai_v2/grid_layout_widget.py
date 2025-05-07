@@ -3,6 +3,16 @@ import typing
 import gooey_gui as gui
 
 SEPARATOR_STYLE = """
+@media (max-width: 767px) {
+    & > :not(:last-of-type)::after {
+        content: "";
+        width: 100%;
+        display: block;
+        margin: 1rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+}
+
 &:not(:last-of-type)::after {
     content: "";
     width: 100%;

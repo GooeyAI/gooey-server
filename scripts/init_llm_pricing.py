@@ -5,6 +5,35 @@ category = ModelCategory.LLM
 
 
 def run():
+    # gpt-4.1
+    llm_pricing_create(
+        model_id="gpt-4.1-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1.name,
+        unit_cost_input=2.0,
+        unit_cost_output=8.0,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1",
+    )
+    llm_pricing_create(
+        model_id="gpt-4.1-mini-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1_mini.name,
+        unit_cost_input=0.4,
+        unit_cost_output=1.6,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1-mini",
+    )
+    llm_pricing_create(
+        model_id="gpt-4.1-nano-2025-04-14",
+        model_name=LargeLanguageModels.gpt_4_1_nano.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-4.1-nano",
+    )
+
     # gpt-4.5
 
     llm_pricing_create(
@@ -15,6 +44,29 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.openai,
         pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o4-mini
+
+    llm_pricing_create(
+        model_id="o4-mini-2025-04-16",
+        model_name=LargeLanguageModels.o4_mini.name,
+        unit_cost_input=1.10,
+        unit_cost_output=4.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing/",
+    )
+
+    # o3
+    llm_pricing_create(
+        model_id="o3-2025-04-16",
+        model_name=LargeLanguageModels.o3.name,
+        unit_cost_input=10.00,
+        unit_cost_output=40.00,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/o3",
     )
 
     # o3-mini
@@ -541,6 +593,15 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.google,
         pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro-preview",
+    )
+    llm_pricing_create(
+        model_id="gemini-2.5-flash-preview-04-17",
+        model_name=LargeLanguageModels.gemini_2_5_flash_preview.name,
+        unit_cost_input=0.15,
+        unit_cost_output=3.5,  # thinking cost, non-thinking is 0.6
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash",
     )
     llm_pricing_create(
         model_id="gemini-2.0-flash-lite",

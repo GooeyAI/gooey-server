@@ -78,9 +78,6 @@ class RelatedQnADocPage(BasePage):
             CompareLLMPage,
         ]
 
-    def preview_description(self, state: dict) -> str:
-        return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
-
     def render_steps(self):
         serp_results = gui.session_state.get(
             "serp_results", gui.session_state.get("scaleserp_results")

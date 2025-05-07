@@ -80,11 +80,11 @@ class WorkflowAccessLevel(models.IntegerChoices):
     def get_team_sharing_label(self):
         match self:
             case WorkflowAccessLevel.VIEW_ONLY:
-                return "Unlisted"
+                return "Private"
             case WorkflowAccessLevel.FIND_AND_VIEW:
-                return "Visible"
+                return "View Only"
             case WorkflowAccessLevel.EDIT:
-                return "Edit"
+                return "Editable"
             case _:
                 raise ValueError("Invalid permission for team sharing")
 
@@ -102,14 +102,16 @@ class WorkflowAccessLevel(models.IntegerChoices):
 
         match self:
             case WorkflowAccessLevel.VIEW_ONLY:
-                text = ": Only members with a link can view"
+                if pr.created_by_id == current_user.id:
+                    members_text = "you and members"
+                else:
+                    members_text = "members"
+                text = f": Only {members_text} with a link can view."
             case WorkflowAccessLevel.FIND_AND_VIEW:
                 if self.can_user_delete_published_run(
-                    workspace=pr.workspace,
-                    user=current_user,
-                    pr=pr,
+                    workspace=pr.workspace, user=current_user, pr=pr
                 ):
-                    text = f": Members [can find]({get_route_path(saved_route)}) but can't update"
+                    text = f": Members [can find]({get_route_path(saved_route)}) but can't update."
                 else:
                     text = (
                         f": Members [can find]({get_route_path(saved_route)}) and view."
@@ -119,12 +121,12 @@ class WorkflowAccessLevel(models.IntegerChoices):
                     else:
                         text += "<br/>Admins can update."
             case WorkflowAccessLevel.EDIT:
-                text = f": Members [can find]({get_route_path(saved_route)}) and edit"
+                text = f": Members [can find]({get_route_path(saved_route)}) and edit."
             case _:
                 raise ValueError("Invalid permission for team sharing")
 
         icon, label = self.get_team_sharing_icon(), self.get_team_sharing_label()
-        return f"{icon} **{label}**" + text
+        return f"{icon} **{label}**{text}"
 
     def get_public_sharing_text(self, pr: PublishedRun) -> str:
         from routers.account import profile_route
@@ -244,10 +246,7 @@ class Workflow(models.IntegerChoices):
                 short_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 default_image=self.page_cls.explore_image or "",
                 meta_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
-                meta_description=(
-                    self.page_cls().preview_description(state={})
-                    or self.page_cls.get_root_pr().notes
-                ),
+                meta_description=self.page_cls.get_root_pr().notes,
                 meta_image=self.page_cls.explore_image or "",
             ),
         )[0]

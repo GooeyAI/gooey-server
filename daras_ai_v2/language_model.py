@@ -10,12 +10,7 @@ from functools import wraps
 import aifail
 import requests
 import typing_extensions
-from aifail import (
-    openai_should_retry,
-    retry_if,
-    vertex_ai_should_retry,
-    try_all,
-)
+from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
 from loguru import logger
 from openai.types.chat import (
@@ -30,16 +25,11 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
     cv2_img_to_bytes,
 )
-from daras_ai_v2.asr import (
-    get_google_auth_session,
-)
+from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.realtime_llm_openai import run_openai_audio
-from daras_ai_v2.text_splitter import (
-    default_length_function,
-    default_separators,
-)
+from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import LLMTool
 
 DEFAULT_JSON_PROMPT = (
@@ -88,6 +78,35 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models/gpt-4-1
+    gpt_4_1 = LLMSpec(
+        label="GPT-4.1 (openai)",
+        model_id="gpt-4.1-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gpt_4_1_mini = LLMSpec(
+        label="GPT-4.1 Mini (openai)",
+        model_id="gpt-4.1-mini-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gpt_4_1_nano = LLMSpec(
+        label="GPT-4.1 Nano (openai)",
+        model_id="gpt-4.1-nano-2025-04-14",
+        llm_api=LLMApis.openai,
+        context_window=1_047_576,
+        max_output_tokens=32_768,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://platform.openai.com/docs/models#gpt-4-5
     gpt_4_5 = LLMSpec(
         label="GPT-4.5 (openai)",
@@ -99,7 +118,31 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
-    # https://platform.openai.com/docs/models#o3-mini
+    # https://platform.openai.com/docs/models/o4-mini
+    o4_mini = LLMSpec(
+        label="o4-mini (openai)",
+        model_id="o4-mini-2025-04-16",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=100_000,
+        is_vision_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models/o3
+    o3 = LLMSpec(
+        label="o3 (openai)",
+        model_id="o3-2025-04-16",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=100_000,
+        is_vision_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
+    # https://platform.openai.com/docs/models/o3-mini
     o3_mini = LLMSpec(
         label="o3-mini (openai)",
         model_id=("openai-o3-mini-prod-eastus2-1", "o3-mini-2025-01-31"),
@@ -470,7 +513,17 @@ class LargeLanguageModels(Enum):
         model_id="gemini-2.5-pro-preview-03-25",
         llm_api=LLMApis.gemini,
         context_window=1_048_576,
-        max_output_tokens=64_000,
+        max_output_tokens=65_535,
+        price=20,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_2_5_flash_preview = LLMSpec(
+        label="Gemini 2.5 Flash Preview (Google)",
+        model_id="gemini-2.5-flash-preview-04-17",
+        llm_api=LLMApis.gemini,
+        context_window=1_048_576,
+        max_output_tokens=65_535,
         price=20,
         is_vision_model=True,
         supports_json=True,
@@ -1313,6 +1366,8 @@ def run_openai_chat(
         LargeLanguageModels.o1_mini,
         LargeLanguageModels.o1,
         LargeLanguageModels.o3_mini,
+        LargeLanguageModels.o3,
+        LargeLanguageModels.o4_mini,
     ]:
         # fuck you, openai
         for entry in messages_for_completion:
@@ -1854,6 +1909,12 @@ def _run_gemini_pro(
     temperature: float,
     response_format_type: ResponseFormatType | None,
 ):
+    if model_id in {
+        LargeLanguageModels.gemini_2_5_pro_preview.model_id,
+        LargeLanguageModels.gemini_2_5_flash_preview.model_id,
+    }:
+        max_output_tokens = max(2048, max_output_tokens)
+
     contents = []
     for entry in messages:
         contents.append(
