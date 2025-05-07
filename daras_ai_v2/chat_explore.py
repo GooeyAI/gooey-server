@@ -1,10 +1,11 @@
 import datetime
 
 import gooey_gui as gui
-from bots.models import BotIntegration, Platform, Message, PublishedRun
+
+from bots.models import BotIntegration, Message, Platform, PublishedRun
+from bots.models.workflow import WorkflowAccessLevel
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
-from daras_ai_v2.bot_integration_widgets import get_bot_test_link
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
@@ -19,7 +20,10 @@ def render():
     gui.newline()
 
     integrations = BotIntegration.objects.filter(
-        published_run__in=PublishedRun.objects.filter(PublishedRun.approved_example_q())
+        published_run__in=PublishedRun.objects.filter(
+            PublishedRun.approved_example_q()
+        ),
+        public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
     )
     grid_layout(3, integrations, _render_bi)
 
@@ -30,7 +34,7 @@ def _render_bi(bi: BotIntegration):
         <h4>
             {Platform(bi.platform).get_icon()} 
             &nbsp; 
-            <a href="{get_bot_test_link(bi)}">{bi.name}</a>
+            <a href="{bi.get_bot_test_link()}">{bi.name}</a>
         </h4>
         """,
     )
@@ -46,7 +50,8 @@ def _render_bi(bi: BotIntegration):
     tb = get_title_breadcrumbs(
         VideoBotsPage, bi.published_run.saved_run, bi.published_run
     )
-    gui.write(tb.h1_title)
+    with gui.link(to=bi.published_run.get_app_url()):
+        gui.write(tb.h1_title, className="container-margin-reset")
 
     with gui.div(className="d-flex align-items-center justify-content-between"):
         with gui.div():

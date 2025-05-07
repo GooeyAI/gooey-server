@@ -16,7 +16,7 @@ from pathlib import Path
 
 import sentry_sdk
 import stripe
-from decouple import config, UndefinedValueError, Csv
+from decouple import Csv, UndefinedValueError, config
 from django.contrib.humanize.templatetags import humanize
 from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
@@ -349,6 +349,7 @@ INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID = config(
     "INTEGRATION_DETAILS_GENERATOR_EXAMPLE_ID", "59yem9i3iet5"
 )
 ICON_BOT_EXAMPLE_ID = config("ICON_BOT_EXAMPLE_ID", "14u2mhg4646r")
+QR_BOT_EXAMPLE_ID = config("QR_BOT_EXAMPLE_ID", "ah6ozro2whyc")
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 

@@ -357,8 +357,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div()
-        gui.newline()
+        header_placeholder = gui.div(className="mb-3")
         with gui.div(className="position-relative"):
             with gui.nav_tabs():
                 for tab in self.get_tabs():
@@ -406,13 +405,16 @@ class BasePage:
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
 
-        # render title below the social buttons and breadcrumbs
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
-                self._render_title(tbreadcrumbs.h1_title)
+                with gui.styled("& h1 { margin-top: 0 }"):
+                    self._render_title(tbreadcrumbs.h1_title)
             else:
-                with gui.div(
-                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                with (
+                    gui.styled("& h1 { margin-top: 0 }"),
+                    gui.div(
+                        className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                    ),
                 ):
                     gui.image(
                         src=pr.photo_url,
@@ -424,13 +426,22 @@ class BasePage:
                             objectFit="cover",
                         ),
                     )
-                    with gui.div():
-                        self._render_title(tbreadcrumbs.h1_title)
-                        if pr and pr.notes:
-                            gui.write(pr.notes, line_clamp=2)
+                    with gui.div(className="d-flex gap-2 w-100"):
+                        with gui.div(className="flex-grow-1"):
+                            self._render_title(tbreadcrumbs.h1_title)
+                            if pr and pr.notes:
+                                gui.write(pr.notes, line_clamp=2)
+                        self.render_header_extra()
         # render notes below the title and social buttons
-        elif pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
+        else:
+            with gui.div(className="d-flex gap-2 w-100"):
+                with gui.div(className="flex-grow-1"):
+                    if pr and pr.notes:
+                        gui.write(pr.notes, line_clamp=2)
+                self.render_header_extra()
+
+    def render_header_extra(self):
+        pass
 
     def can_user_save_run(
         self,
@@ -457,7 +468,8 @@ class BasePage:
         )
 
     def _render_title(self, title: str):
-        gui.write(f"# {title}")
+        with gui.div(className="container-margin-reset"):
+            gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(

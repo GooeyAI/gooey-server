@@ -5,6 +5,9 @@ import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import PublishedRun
 from daras_ai_v2 import icons, settings
+from widgets.workflow_metadata_gen import (
+    render_ai_generated_image_widget,
+)
 from workspaces.models import Workspace
 
 
@@ -17,78 +20,25 @@ def render_workflow_photo_uploader(
     key: str = "photo_url",
 ) -> str:
     is_generating, error_msg = pull_icon_bot_result(key)
-
-    if error_msg:
-        error_dialog_ref = gui.use_alert_dialog(key=key + ":error-dialog")
-        with gui.alert_dialog(ref=error_dialog_ref, modal_title="### Error"):
-            with gui.tag("code"):
-                gui.write(error_msg, className="text-danger")
-            gui.write("Please try again or upload a photo manually.")
-
     photo_url = gui.session_state.setdefault(key, pr.photo_url) or ""
-
-    upload_dialog_ref = gui.use_alert_dialog(key=key + ":upload-dialog")
-    if photo_url:
-        upload_dialog_ref.set_open(False)
-    if upload_dialog_ref.is_open:
-        with gui.alert_dialog(
-            ref=upload_dialog_ref, modal_title="### Upload Workflow Image"
-        ):
-            gui.file_uploader("", accept=["image/*"], key=key)
-
     with gui.div(
         className="d-flex gap-2 flex-md-column flex-row align-items-center h-100 pt-md-4 mt-md-2 pb-3 pb-md-0"
     ):
-        with workflow_photo_div(photo_url):
-            if is_generating:
-                with gui.styled(
-                    """
-                    &.generating_workflow_photo_spinner i {
-                        animation: spin 0.7s ease-in-out infinite;
-                    }
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                    """
-                ):
-                    gui.write(
-                        f"## {icons.stars}",
-                        className="text-muted generating_workflow_photo_spinner",
-                        unsafe_allow_html=True,
-                    )
-            elif not photo_url:
-                gui.write(
-                    f"# {icons.photo}", className="text-muted", unsafe_allow_html=True
-                )
-
-        with gui.div(
-            className="d-flex align-items-center justify-content-center gap-1 flex-md-row flex-column"
-        ):
-            if is_generating:
-                gui.button(
-                    f"{icons.sparkles} Generating...",
-                    type="tertiary",
-                    disabled=True,
-                )
-            elif photo_url:
-                if gui.button(f"{icons.clear} Clear", type="tertiary"):
-                    gui.session_state[key] = ""
-                    raise gui.RerunException()
-            else:
-                if gui.button(f"{icons.upload} Upload", type="tertiary"):
-                    upload_dialog_ref.set_open(True)
-                    raise gui.RerunException()
-
-                if gui.button(f"{icons.sparkles} Generate", type="tertiary"):
-                    gui.session_state[key + ":icon-bot-channel"] = run_icon_bot(
-                        workspace=workspace,
-                        user=user,
-                        title=title,
-                        description=description,
-                    )
-                    raise gui.RerunException()
-
+        pressed_generate = render_ai_generated_image_widget(
+            image_url=photo_url,
+            key=key,
+            is_generating=is_generating,
+            error_msg=error_msg,
+            icon=icons.photo,
+        )
+    if pressed_generate:
+        gui.session_state[key + ":bot-channel"] = run_icon_bot(
+            workspace=workspace,
+            user=user,
+            title=title,
+            description=description,
+        )
+        raise gui.RerunException()
     return photo_url
 
 
@@ -147,7 +97,7 @@ def pull_icon_bot_result(key: str) -> tuple[bool, str | None]:
     from daras_ai_v2.base import RecipeRunState, StateKeys
     from recipes.VideoBots import VideoBotsPage
 
-    channel = gui.session_state.get(key + ":icon-bot-channel")
+    channel = gui.session_state.get(key + ":bot-channel")
     error_msg = None
     if not channel:
         return False, error_msg
@@ -162,5 +112,6 @@ def pull_icon_bot_result(key: str) -> tuple[bool, str | None]:
         error_msg = result.get("error")
     else:
         return True, error_msg
-    gui.session_state.pop(key + ":icon-bot-channel", None)
+
+    gui.session_state.pop(key + ":bot-channel", None)
     return False, error_msg

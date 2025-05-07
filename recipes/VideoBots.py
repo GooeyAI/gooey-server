@@ -13,14 +13,12 @@ from bots.models import (
     BotIntegration,
     Platform,
     PublishedRun,
-    WorkflowAccessLevel,
-    Workflow,
     SavedRun,
+    Workflow,
+    WorkflowAccessLevel,
 )
 from celeryapp.tasks import send_integration_attempt_email
-from daras_ai.image_input import (
-    truncate_text_words,
-)
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
@@ -43,21 +41,18 @@ from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     general_integration_settings,
-    get_bot_test_link,
     integrations_welcome_screen,
-    slack_specific_settings,
-    twilio_specific_settings,
     web_widget_config,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
+    SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
+    cache_knowledge_widget,
     citation_style_selector,
     doc_extract_selector,
     doc_search_advanced_settings,
     keyword_instructions_widget,
     query_instructions_widget,
-    cache_knowledge_widget,
-    SUPPORTED_SPREADSHEET_TYPES,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -105,8 +100,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 from daras_ai_v2.variables_widget import render_prompt_vars
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
-    doc_url_to_text_pages,
     doc_or_yt_url_to_file_metas,
+    doc_url_to_text_pages,
 )
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
@@ -114,14 +109,16 @@ from functions.recipe_functions import (
     get_tools_from_state,
     render_called_functions,
 )
-from recipes.DocSearch import (
-    get_top_k_references,
-    references_as_prompt,
-)
+from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from widgets.demo_button import render_demo_buttons_header
+
+if typing.TYPE_CHECKING:
+    pass
+
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -341,13 +338,13 @@ Translation Glossary for LLM Language (English) -> User Langauge
             """
 Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
 
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings.
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot's face and  voice settings.
 
 We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
 
 How It Works:
 1. Appends the user's question to the bottom of your dialog script.
-2. Sends the appended script to OpenAI’s GPT3 asking it to respond to the question in the style of your character
+2. Sends the appended script to OpenAI's GPT3 asking it to respond to the question in the style of your character
 3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
@@ -930,7 +927,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ),
                 input_prompt=request.asr_prompt,
             )
-            asr_msg = f"🎧 I heard: “{asr_output}”"
+            asr_msg = f'🎧 I heard: "{asr_output}"'
             response.output_text = [asr_msg] * request.num_outputs
             user_input = f"{asr_output}\n\n{user_input}".strip()
         else:
@@ -1137,7 +1134,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 pass
             try:
                 response.output_audio += [choices[0]["audio_url"]]
-                print(response.output_audio)
             except KeyError:
                 pass
 
@@ -1253,6 +1249,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ).dict()
                 yield from LipsyncPage(request=self.request).run(lip_state)
                 response.output_video.append(lip_state["output_video"])
+
+    def render_header_extra(self):
+        if self.tab == RecipeTabs.run:
+            render_demo_buttons_header(self.current_pr)
 
     def get_tabs(self):
         tabs = super().get_tabs()
@@ -1421,6 +1421,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
         gui.markdown("#### Configure your Copilot")
+        gui.newline()
 
         if len(integrations) > 1:
             with gui.div(
@@ -1445,7 +1446,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 gui.session_state["old_bi_id"] = bi_id
         else:
             bi = integrations[0]
-        icon = Platform(bi.platform).get_icon()
 
         if bi.platform == Platform.WEB:
             web_widget_config(
@@ -1453,11 +1453,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 user=self.request.user,
                 hostname=self.request.url and self.request.url.hostname,
             )
-            gui.newline()
+            with gui.div(className="w-100"):
+                gui.write("---")
 
-        gui.newline()
-        with gui.div(style={"width": "100%", "textAlign": "left"}):
-            test_link = get_bot_test_link(bi)
+        icon = Platform(bi.platform).get_icon()
+        with gui.div(className="w-100 text-start"):
+            test_link = bi.get_bot_test_link()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Connected To")
@@ -1595,33 +1596,36 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     unsafe_allow_html=True,
                 )
 
-            with gui.expander("Configure Settings 🛠️"):
-                if bi.platform == Platform.SLACK:
-                    slack_specific_settings(bi, run_title)
-                if bi.platform == Platform.TWILIO:
-                    twilio_specific_settings(bi)
-                general_integration_settings(bi, self.request)
+            gui.write("---")
+            gui.newline()
+            general_integration_settings(
+                user=self.request.user,
+                workspace=self.current_workspace,
+                bi=bi,
+                has_test_link=bool(test_link),
+            )
+            gui.write("---")
 
-                if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
-                    gui.newline()
-                    broadcast_input(bi)
-                    gui.write("---")
+            if bi.platform in [Platform.SLACK, Platform.WHATSAPP, Platform.TWILIO]:
+                gui.newline()
+                broadcast_input(bi)
+                gui.write("---")
 
-                col1, col2 = gui.columns(2, style={"alignItems": "center"})
-                with col1:
-                    gui.write("###### Disconnect")
-                    gui.caption(
-                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
-                    )
-                with col2:
-                    if gui.button(
-                        "💔️ Disconnect",
-                        key="btn_disconnect",
-                    ):
-                        bi.saved_run = None
-                        bi.published_run = None
-                        bi.save()
-                        gui.rerun()
+            col1, col2 = gui.columns(2, style={"alignItems": "center"})
+            with col1:
+                gui.write("###### Disconnect")
+                gui.caption(
+                    f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
+                )
+            with col2:
+                if gui.button(
+                    "💔️ Disconnect",
+                    key="btn_disconnect",
+                ):
+                    bi.saved_run = None
+                    bi.published_run = None
+                    bi.save()
+                    gui.rerun()
 
     def render_chat_list_view(self):
         # render a reversed list view
