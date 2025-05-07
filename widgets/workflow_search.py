@@ -1,4 +1,3 @@
-from daras_ai_v2 import icons
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -12,6 +11,7 @@ from django.db.models import (
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
+from daras_ai_v2 import icons
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
@@ -50,18 +50,13 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         ),
         gui.div(),
     ):
-        search_query = gui.text_area(
+        search_query = gui.text_input(
             "",
             placeholder="Search Workflows",
             className="bg-light border-0 rounded-pill",
-            style=dict(
-                resize="none",
-                paddingLeft="2.7rem",
-                paddingRight="2.7rem",
-            ),
+            style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
             key=key,
             value=value,
-            rows=1,
         )
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
