@@ -199,7 +199,7 @@ Description: """
 """
 qr_code_data: %s
 
-Respond with the following JSON object: {"qr_code_url": <generated image url>, "run_url": , "error": <in case there was an error, provide an error message here>"}\
+Respond with the following JSON object: {"qr_code_url": <generated image url>, "error": <in case there was an error, provide an error message here>"}\
 '''
 
 
