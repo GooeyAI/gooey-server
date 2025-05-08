@@ -73,6 +73,7 @@ from widgets.author import (
     render_author_as_breadcrumb,
     render_author_from_user,
 )
+from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
@@ -520,11 +521,13 @@ class BasePage:
     def render_social_buttons(self):
         with (
             gui.styled("& .btn { padding: 6px }"),
-            gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
+            gui.div(className="d-flex gap-lg-2 gap-1"),
         ):
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
 
             if self.tab == RecipeTabs.run:
+                if self.current_pr.is_root():
+                    render_help_button(self.workflow)
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 render_share_button(
