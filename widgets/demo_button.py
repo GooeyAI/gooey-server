@@ -113,13 +113,22 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
 def render_demo_button_settings(
     *, workspace: Workspace, user: AppUser, bi: BotIntegration
 ) -> None:
-    col1, col2 = gui.columns(2, responsive=False)
-    with col1:
-        gui.write("###### Show Demo Button")
-        gui.caption('Add "Try Demo" to connected Copilot page')
-    with col2:
+    with (
+        gui.styled("""
+        @media (min-width: 768px) {
+            & {
+                max-width: 55%;
+            }
+        }
+        """),
+        gui.div(),
+    ):
         enabled = bi.public_visibility > WorkflowAccessLevel.VIEW_ONLY
-        new_value = gui.switch("", value=enabled)
+        new_value = gui.switch(
+            "###### Show Demo Button",
+            value=enabled,
+        )
+        gui.caption("Add 'Try Demo' to connected Copilot page")
         if new_value != enabled:
             enabled = new_value
             if enabled:
