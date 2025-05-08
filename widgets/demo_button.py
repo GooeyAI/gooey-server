@@ -159,17 +159,16 @@ def qr_code_settings(
     key: str = "demo_qr_code_image",
 ):
     is_generating, error_msg = pull_qr_bot_result(key)
+
     bi.demo_qr_code_image = (
         gui.session_state.setdefault(key, bi.demo_qr_code_image) or ""
     )
-
     if not bi.demo_qr_code_image:
         bi.demo_qr_code_run = None
-    elif gui.session_state.get(key + ":qr_bot_run_id"):
-        bi.demo_qr_code_run = SavedRun.objects.filter(
-            called_by_runs__saved_run_id=gui.session_state.pop(key + ":qr_bot_run_id"),
-            workflow=Workflow.QR_CODE,
-        ).first()
+    else:
+        bi.demo_qr_code_run_id = gui.session_state.setdefault(
+            key + ":run_id", bi.demo_qr_code_run_id
+        )
 
     gui.write(
         "###### Demo QR Code",
@@ -233,11 +232,15 @@ def run_qr_bot(
         ),
         deduct_credits=False,
     )
-    gui.session_state[key + ":qr_bot_run_id"] = sr.id
+    gui.session_state[key + ":bot_run_id"] = sr.id
     return VideoBotsPage.realtime_channel_name(sr.run_id, sr.uid)
 
 
 def pull_qr_bot_result(key: str) -> tuple[bool, str | None]:
+    """
+    Pulls the result from the QR bot and updates the session state with the result.
+    Returns a tuple of (success, error_msg).
+    """
     from daras_ai_v2.base import RecipeRunState, StateKeys
     from recipes.VideoBots import VideoBotsPage
 
@@ -248,15 +251,26 @@ def pull_qr_bot_result(key: str) -> tuple[bool, str | None]:
 
     state = gui.realtime_pull([channel])[0]
     recipe_run_state = state and VideoBotsPage.get_run_state(state)
-    if recipe_run_state == RecipeRunState.failed:
-        error_msg = state.get(StateKeys.error_msg)
-    elif recipe_run_state == RecipeRunState.completed:
-        result = json.loads(state["output_text"][0])
-        image_url = result.get("qr_code_url")
-        gui.session_state[key] = image_url
-        error_msg = result.get("error")
-    else:
-        return True, error_msg
+    match recipe_run_state:
+        case RecipeRunState.failed:
+            error_msg = state.get(StateKeys.error_msg)
+        case RecipeRunState.completed:
+            result = json.loads(state.get("output_text", ["{}"])[0])
+            image_url = result.get("qr_code_url")
+            gui.session_state[key] = image_url
+            error_msg = result.get("error")
+            bot_run_id = gui.session_state.pop(key + ":bot_run_id", None)
+            if bot_run_id:
+                gui.session_state[key + ":run_id"] = (
+                    SavedRun.objects.filter(
+                        called_by_runs__saved_run_id=bot_run_id,
+                        workflow=Workflow.QR_CODE,
+                    )
+                    .values_list("id", flat=True)
+                    .first()
+                )
+        case _:
+            return True, error_msg
 
     gui.session_state.pop(key + ":bot-channel", None)
     return False, error_msg
