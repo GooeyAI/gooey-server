@@ -244,11 +244,21 @@ def component_page(request: Request):
 
 
 @gui.route(app, "/explore/")
-def explore_page(request: Request, search: str | None = None):
+def explore_page(
+    request: Request,
+    search: str | None = None,
+    workspace: str | None = None,
+    workflow: str | None = None,
+):
     from widgets import explore
+    from widgets.workflow_search import SearchFilters
+
+    search_filters = SearchFilters(
+        search=search, workspace=workspace, workflow=workflow
+    )
 
     with page_wrapper(request):
-        explore.render(request.user, search)
+        explore.render(request.user, search_filters)
 
     return {
         "meta": raw_build_meta_tags(

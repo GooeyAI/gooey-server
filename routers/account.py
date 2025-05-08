@@ -340,7 +340,7 @@ def all_saved_runs_tab(request: Request):
         render_saved_workflow_preview(
             workflow.page_cls,
             pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            workflow_pill=f"{workflow.emoji} {workflow.short_title}",
         )
 
     grid_layout(1, prs, _render_run)
