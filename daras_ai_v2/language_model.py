@@ -88,9 +88,7 @@ class LLMSpec(typing.NamedTuple):
     is_audio_model: bool = False
     is_deprecated: bool = False
     # redirect to a different LLM when deprecated
-    redirect_to: typing.Literal[tuple(m.name for m in LargeLanguageModels)] | None = (
-        None
-    )
+    redirect_to: str = "gpt_4_o_mini"
 
 
 class LargeLanguageModels(Enum):
@@ -143,6 +141,7 @@ class LargeLanguageModels(Enum):
         supports_json=False,
         supports_temperature=False,
         is_deprecated=True,
+        redirect_to="o1",
     )
 
     # https://platform.openai.com/docs/models#o1
@@ -238,6 +237,7 @@ class LargeLanguageModels(Enum):
         price=6,
         is_vision_model=True,
         is_deprecated=True,
+        redirect_to="gpt_4_o",
     )
 
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
@@ -284,7 +284,6 @@ class LargeLanguageModels(Enum):
         price=1,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="gpt_4_o_mini",
     )
     gpt_3_5_turbo_16k = LLMSpec(
         label="ChatGPT 16k (openai)",
@@ -294,7 +293,6 @@ class LargeLanguageModels(Enum):
         max_output_tokens=4096,
         price=2,
         is_deprecated=True,
-        redirect_to="gpt_4_o_mini",
     )
     gpt_3_5_turbo_instruct = LLMSpec(
         label="GPT-3.5 Instruct (openai)",
@@ -304,7 +302,6 @@ class LargeLanguageModels(Enum):
         price=1,
         is_chat_model=False,
         is_deprecated=True,
-        redirect_to="gpt_4_o_mini",
     )
 
     deepseek_r1 = LLMSpec(
@@ -412,6 +409,7 @@ class LargeLanguageModels(Enum):
         price=1,
         supports_json=True,
         is_deprecated=True,
+        redirect_to="llama4_maverick_17b_128e",
     )
     llama3_1_8b = LLMSpec(
         label="Llama 3.1 8B (Meta AI)",
@@ -481,6 +479,7 @@ class LargeLanguageModels(Enum):
         price=1,
         supports_json=True,
         is_deprecated=True,
+        redirect_to="mistral_small_24b_instruct",
     )
     gemma_2_9b_it = LLMSpec(
         label="Gemma 2 9B (Google)",
@@ -500,6 +499,7 @@ class LargeLanguageModels(Enum):
         price=1,
         supports_json=True,
         is_deprecated=True,
+        redirect_to="gemma_2_9b_it",
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -1328,7 +1328,7 @@ def _run_anthropic_chat(
     if response_format_type == "json_object":
         if response.stop_reason == "max_tokens":
             raise UserError(
-                "Claude’s response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
+                "Claude's response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
                 "Please retry the request with a higher max_tokens value to get the full tool use. "
             ) from anthropic.AnthropicError(
                 f"Hit {response.stop_reason=} when generating JSON: {response.content=}"
