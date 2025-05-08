@@ -43,6 +43,7 @@ photo = '<i class="fa-solid fa-image"></i>'
 upload = '<i class="fa-solid fa-upload"></i>'
 sparkles = '<i class="fa-regular fa-sparkles" aria-hidden="true"></i>'
 stars = '<i class="fa-solid fa-stars"></i>'
+filter = '<i class="fa-solid fa-bars-filter"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
