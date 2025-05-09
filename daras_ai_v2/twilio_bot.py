@@ -34,8 +34,23 @@ class TwilioSMS(BotInterface):
         self.bot_id = bi.twilio_phone_number.as_e164
         self.user_id = self.convo.twilio_phone_number.as_e164
 
-        self._text = data["Body"][0]
-        self.input_type = "text"
+        num_media = int(data.get("NumMedia", [0])[0])
+        if num_media > 0:
+            self._text = ""
+            self._media_urls = [data[f"MediaUrl{i}"][0] for i in range(num_media)]
+            content_type = data.get("MediaContentType0", [""])[0]
+            if content_type.startswith("image/"):
+                self.input_type = "image"
+            elif content_type.startswith("audio/"):
+                self.input_type = "audio"
+            elif content_type.startswith("video/"):
+                self.input_type = "video"
+            else:
+                self.input_type = "document"
+        else:
+            self._text = data["Body"][0]
+            self._media_urls = []
+            self.input_type = "text"
 
         self.user_msg_id = data["MessageSid"][0]
 
@@ -43,6 +58,15 @@ class TwilioSMS(BotInterface):
 
     def get_input_text(self) -> str | None:
         return self._text
+
+    def get_input_audio(self) -> str | None:
+        return self._media_urls and self._media_urls[0]
+
+    def get_input_images(self) -> list[str] | None:
+        return self._media_urls
+
+    def get_input_documents(self) -> list[str] | None:
+        return self._media_urls
 
     def _send_msg(
         self,

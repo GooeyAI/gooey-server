@@ -927,7 +927,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ),
                 input_prompt=request.asr_prompt,
             )
-            asr_msg = f'🎧 I heard: "{asr_output}"'
+            asr_msg = f'🎧: "{asr_output}"'
             response.output_text = [asr_msg] * request.num_outputs
             user_input = f"{asr_output}\n\n{user_input}".strip()
         else:
