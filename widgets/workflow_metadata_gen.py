@@ -12,6 +12,7 @@ def render_ai_generated_image_widget(
     is_generating: bool,
     error_msg: Optional[str],
     icon: str,
+    is_circle_image: bool = False,
 ) -> bool:
     """
     Renders a reusable AI-generated image widget with preview, error, upload, and action buttons.
@@ -39,9 +40,15 @@ def render_ai_generated_image_widget(
     else:
         img_style = dict()
 
+    img_classes = "d-flex align-items-center justify-content-center bg-light b-1 border"
+    if is_circle_image:
+        img_classes += " rounded-circle"
+    else:
+        img_classes += " rounded"
+
     with gui.div(
         style=dict(height="200px", width="200px") | img_style,
-        className="d-flex align-items-center justify-content-center bg-light b-1 border rounded",
+        className=img_classes,
     ):
         if is_generating:
             with gui.styled(
