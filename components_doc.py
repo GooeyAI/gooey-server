@@ -337,7 +337,7 @@ def code_block(content: str):
 def section_title(title: str):
     with (
         gui.tag("div", className="mb-4 mt-4 bg-light border-1 p-2"),
-        gui.tag("h3", style={"font-weight": "500", "margin": "0"}),
+        gui.tag("h3", style=dict(fontWeight="500", margin="0")),
     ):
         gui.html(title.upper())
 
@@ -353,17 +353,15 @@ def sub_section_title(title: str):
 def heading(
     title: str, description: str, margin_top: str = "2rem", margin_bottom: str = "2rem"
 ):
-    with gui.tag(
-        "div", style={"margin-top": margin_top, "margin-bottom": margin_bottom}
-    ):
+    with gui.tag("div", style=dict(marginTop=margin_top, marginBottom=margin_bottom)):
         with gui.tag(
             "p",
-            style={"margin-top": "0rem", "margin-bottom": "0rem"},
+            style=dict(marginTop="0rem", marginBottom="0rem"),
             className="text-muted",
         ):
             gui.html(description.upper())
         with gui.tag(
             "h1",
-            style={"margin-top": "0px", "margin-bottom": "0px", "font-weight": "500"},
+            style=dict(marginTop="0px", marginBottom="0px", fontWeight="500"),
         ):
             gui.html(title)
