@@ -9,6 +9,9 @@ from widgets.workflow_metadata_gen import (
     render_ai_generated_image_widget,
 )
 from workspaces.models import Workspace
+from bots.models import Workflow
+
+CIRCLE_IMAGE_WORKFLOWS = [Workflow.VIDEO_BOTS]
 
 
 def render_workflow_photo_uploader(
@@ -30,6 +33,7 @@ def render_workflow_photo_uploader(
             is_generating=is_generating,
             error_msg=error_msg,
             icon=icons.photo,
+            is_circle_image=pr.workflow in CIRCLE_IMAGE_WORKFLOWS,
         )
     if pressed_generate:
         gui.session_state[key + ":bot-channel"] = run_icon_bot(
@@ -50,19 +54,6 @@ def render_change_notes_input(key: str):
             key=key,
             placeholder="Add change notes",
         )
-
-
-def workflow_photo_div(url: str | None):
-    return gui.div(
-        style=dict(
-            aspectRatio="1",
-            width="80%",
-            backgroundImage=f"url({url})" if url else "none",
-            backgroundSize="cover",
-            backgroundPosition="center",
-        ),
-        className="d-flex align-items-center justify-content-center p-5 bg-light b-1 border rounded",
-    )
 
 
 PROMPT_FORMAT = '''\

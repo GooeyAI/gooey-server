@@ -374,6 +374,8 @@ class BasePage:
             self._render_header()
 
     def _render_header(self):
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
         is_root_example = is_example and pr.is_root()
@@ -417,15 +419,19 @@ class BasePage:
                         className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
                     ),
                 ):
+                    imageStyles = dict(
+                        maxWidth="150px",
+                        height="150px",
+                        margin=0,
+                        minHeight="150px",
+                        objectFit="cover",
+                    )
+                    if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
+                        imageStyles["borderRadius"] = "50%"
+
                     gui.image(
                         src=pr.photo_url,
-                        style=dict(
-                            width="150px",
-                            height="150px",
-                            margin=0,
-                            minHeight="150px",
-                            objectFit="cover",
-                        ),
+                        style=imageStyles,
                     )
                     with gui.div(className="d-flex gap-2 w-100"):
                         with gui.div(className="flex-grow-1"):
