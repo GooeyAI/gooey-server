@@ -4,6 +4,7 @@ import json
 import typing
 
 import gooey_gui as gui
+from furl import furl
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, Platform
@@ -80,19 +81,7 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
     ):
         col1, col2 = gui.columns(2)
         with col1:
-            gui.caption("Message")
-            with gui.div(className="d-flex align-items-center gap-2 mt-3"):
-                gui.write(
-                    f"[{bi.get_display_name()}]({bi.get_bot_test_link()})",
-                    className="fs-5 fw-bold",
-                )
-                copy_to_clipboard_button(
-                    icons.copy_solid,
-                    value=bi.get_bot_test_link(),
-                    type="tertiary",
-                )
-            if bi.demo_notes:
-                gui.write(bi.demo_notes, className="d-block mt-3")
+            render_demo_text(bi)
 
         if not bi.demo_qr_code_image:
             return
@@ -108,6 +97,28 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
                     className="py-1",
                 )
             gui.image(src=bi.demo_qr_code_image)
+
+
+def render_demo_text(bi: BotIntegration):
+    gui.caption("Message")
+    with gui.div(className="d-flex align-items-center gap-2 mt-3"):
+        test_link = bi.get_bot_test_link()
+        gui.write(
+            f"[{bi.get_display_name()}]({test_link})",
+            className="fs-5 fw-bold",
+        )
+        copy_to_clipboard_button(
+            icons.copy_solid,
+            value=test_link,
+            type="tertiary",
+        )
+
+    if bi.platform == Platform.TWILIO:
+        sms_link = str(furl("sms:") / bi.twilio_phone_number.as_e164)
+        gui.write(f"or [Send SMS]({sms_link})", className="fs-5 fw-bold")
+
+    if bi.demo_notes:
+        gui.write(bi.demo_notes, className="d-block mt-3")
 
 
 def render_demo_button_settings(
