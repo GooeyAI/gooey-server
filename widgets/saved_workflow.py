@@ -167,7 +167,7 @@ def render_author_run_count_row(
     with (
         gui.styled(SEPARATOR_CSS),
         gui.div(
-            className="d-flex align-items-center container-margin-reset gap-2",
+            className="d-flex align-items-center container-margin-reset gap-2 flex-wrap",
             style={"fontSize": "0.9rem"},
         ),
     ):
