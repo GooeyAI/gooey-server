@@ -71,7 +71,15 @@ slack_fields = [
     "slack_read_receipt_msg",
     "slack_create_personal_channels",
 ]
-web_fields = ["web_allowed_origins", "web_config_extras"]
+web_fields = [
+    "by_line",
+    "descripton",
+    "conversation_starters",
+    "photo_url",
+    "website_url",
+    "web_config_extras",
+    "web_allowed_origins",
+]
 twilio_fields = [
     "twilio_phone_number",
     "twilio_phone_number_sid",
@@ -95,13 +103,19 @@ class BotIntegrationAdminForm(forms.ModelForm):
             "platform": forms.Select(
                 attrs={
                     "--hideshow-fields": ",".join(
-                        fb_fields + ig_fields + wa_fields + slack_fields + web_fields
+                        fb_fields
+                        + ig_fields
+                        + wa_fields
+                        + slack_fields
+                        + web_fields
+                        + twilio_fields
                     ),
                     f"--show-on-{Platform.FACEBOOK}": ",".join(fb_fields),
                     f"--show-on-{Platform.INSTAGRAM}": ",".join(fb_fields + ig_fields),
                     f"--show-on-{Platform.WHATSAPP}": ",".join(wa_fields),
                     f"--show-on-{Platform.SLACK}": ",".join(slack_fields),
                     f"--show-on-{Platform.WEB}": ",".join(web_fields),
+                    f"--show-on-{Platform.TWILIO}": ",".join(twilio_fields),
                 },
             ),
         }
@@ -180,7 +194,13 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     form = BotIntegrationAdminForm
 
-    autocomplete_fields = ["saved_run", "published_run", "workspace", "created_by"]
+    autocomplete_fields = [
+        "saved_run",
+        "published_run",
+        "workspace",
+        "created_by",
+        "demo_qr_code_run",
+    ]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
@@ -231,6 +251,17 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *slack_fields,
                     *web_fields,
                     *twilio_fields,
+                ]
+            },
+        ),
+        (
+            "Visibility & Demo",
+            {
+                "fields": [
+                    "public_visibility",
+                    "demo_qr_code_image",
+                    "demo_qr_code_run",
+                    "demo_notes",
                 ]
             },
         ),

@@ -73,6 +73,7 @@ from widgets.author import (
     render_author_as_breadcrumb,
     render_author_from_user,
 )
+from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
@@ -357,8 +358,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div()
-        gui.newline()
+        header_placeholder = gui.div(className="mb-3")
         with gui.div(className="position-relative"):
             with gui.nav_tabs():
                 for tab in self.get_tabs():
@@ -374,6 +374,8 @@ class BasePage:
             self._render_header()
 
     def _render_header(self):
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
         is_root_example = is_example and pr.is_root()
@@ -406,31 +408,47 @@ class BasePage:
                     self._render_unpublished_changes_indicator()
                 self.render_social_buttons()
 
-        # render title below the social buttons and breadcrumbs
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
-                self._render_title(tbreadcrumbs.h1_title)
+                with gui.styled("& h1 { margin-top: 0 }"):
+                    self._render_title(tbreadcrumbs.h1_title)
             else:
-                with gui.div(
-                    className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                with (
+                    gui.styled("& h1 { margin-top: 0 }"),
+                    gui.div(
+                        className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                    ),
                 ):
+                    imageStyles = dict(
+                        maxWidth="150px",
+                        height="150px",
+                        margin=0,
+                        minHeight="150px",
+                        objectFit="cover",
+                    )
+                    if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
+                        imageStyles["borderRadius"] = "50%"
+
                     gui.image(
                         src=pr.photo_url,
-                        style=dict(
-                            width="150px",
-                            height="150px",
-                            margin=0,
-                            minHeight="150px",
-                            objectFit="cover",
-                        ),
+                        style=imageStyles,
                     )
-                    with gui.div():
-                        self._render_title(tbreadcrumbs.h1_title)
-                        if pr and pr.notes:
-                            gui.write(pr.notes, line_clamp=2)
+                    with gui.div(className="d-flex gap-2 w-100"):
+                        with gui.div(className="flex-grow-1"):
+                            self._render_title(tbreadcrumbs.h1_title)
+                            if pr and pr.notes:
+                                gui.write(pr.notes, line_clamp=2)
+                        self.render_header_extra()
         # render notes below the title and social buttons
-        elif pr and pr.notes:
-            gui.write(pr.notes, line_clamp=2)
+        else:
+            with gui.div(className="d-flex gap-2 w-100"):
+                with gui.div(className="flex-grow-1"):
+                    if pr and pr.notes:
+                        gui.write(pr.notes, line_clamp=2)
+                self.render_header_extra()
+
+    def render_header_extra(self):
+        pass
 
     def can_user_save_run(
         self,
@@ -457,7 +475,8 @@ class BasePage:
         )
 
     def _render_title(self, title: str):
-        gui.write(f"# {title}")
+        with gui.div(className="container-margin-reset"):
+            gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
@@ -508,11 +527,13 @@ class BasePage:
     def render_social_buttons(self):
         with (
             gui.styled("& .btn { padding: 6px }"),
-            gui.div(className="d-flex align-items-start gap-lg-2 gap-1"),
+            gui.div(className="d-flex gap-lg-2 gap-1"),
         ):
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
 
             if self.tab == RecipeTabs.run:
+                if self.current_pr.is_root():
+                    render_help_button(self.workflow)
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 render_share_button(

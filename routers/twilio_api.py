@@ -340,9 +340,7 @@ def twilio_sms(
 
     if bot.bi.twilio_waiting_text.strip():
         text = bot.bi.twilio_waiting_text
-    else:
-        text = "Please wait while we process your request."
-    resp.message(bot.translate_response(text))
+        resp.message(bot.translate_response(text))
 
     return twiml_response(resp)
 

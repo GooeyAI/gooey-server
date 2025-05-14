@@ -62,7 +62,7 @@ def render_author_from_workspace(
         name = workspace.created_by.display_name
     else:
         name = workspace.display_name()
-    if show_as_link and workspace.is_personal and workspace.handle_id:
+    if show_as_link and workspace.handle_id:
         link = workspace.handle.get_app_url()
     else:
         link = None

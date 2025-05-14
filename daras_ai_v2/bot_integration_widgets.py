@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
-from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
@@ -19,7 +18,9 @@ from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
-from routers.root import RecipeTabs, chat_lib_route, chat_route
+from routers.root import chat_lib_route
+from widgets.demo_button import render_demo_button_settings
+from workspaces.models import Workspace
 
 
 def integrations_welcome_screen(title: str):
@@ -57,63 +58,74 @@ def integrations_welcome_screen(title: str):
         gui.caption("Analyze your usage. Update your Saved Run to test changes.")
 
 
-def general_integration_settings(bi: BotIntegration, request: Request):
-    if gui.session_state.get(f"_bi_reset_{bi.id}"):
-        gui.session_state[f"_bi_streaming_enabled_{bi.id}"] = (
-            BotIntegration._meta.get_field("streaming_enabled").default
-        )
-        gui.session_state[f"_bi_show_feedback_buttons_{bi.id}"] = (
-            BotIntegration._meta.get_field("show_feedback_buttons").default
-        )
-        gui.session_state["analysis_urls"] = []
-        gui.session_state.pop("--list-view:analysis_urls", None)
+def general_integration_settings(
+    user: AppUser, workspace: Workspace, bi: BotIntegration, has_test_link: bool
+):
+    if has_test_link:
+        render_demo_button_settings(workspace=workspace, user=user, bi=bi)
 
-    if bi.platform != Platform.TWILIO:
-        bi.streaming_enabled = gui.checkbox(
-            "**📡 Streaming Enabled**",
-            value=bi.streaming_enabled,
-            key=f"_bi_streaming_enabled_{bi.id}",
-        )
-        gui.caption("Responses will be streamed to the user in real-time if enabled.")
-        bi.show_feedback_buttons = gui.checkbox(
-            "**👍🏾 👎🏽 Show Feedback Buttons**",
-            value=bi.show_feedback_buttons,
-            key=f"_bi_show_feedback_buttons_{bi.id}",
-        )
-        gui.caption(
-            "Users can rate and provide feedback on every copilot response if enabled."
-        )
+    if bi.platform == Platform.SLACK:
+        slack_specific_settings(bi)
 
-    gui.write(
-        """
-##### <i class="fa-solid fa-head-side-brain"></i> Analysis Scripts
-Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow.
-Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
-        """,
-        unsafe_allow_html=True,
-    )
-    if "analysis_urls" not in gui.session_state:
-        gui.session_state["analysis_urls"] = [
+    if bi.platform == Platform.TWILIO:
+        twilio_specific_settings(bi)
+    else:
+        col1, col2, _ = gui.columns([1, 1, 2])
+        with col1:
+            bi.streaming_enabled = gui.checkbox(
+                "**📡 Streaming Enabled**",
+                value=bi.streaming_enabled,
+                key=f"_bi_streaming_enabled_{bi.id}",
+                help="Responses will be streamed to the user in real-time if enabled.",
+            )
+        with col2:
+            bi.show_feedback_buttons = gui.checkbox(
+                "**👍🏾 👎🏽 Show Feedback Buttons**",
+                value=bi.show_feedback_buttons,
+                key=f"_bi_show_feedback_buttons_{bi.id}",
+                help="Users can rate and provide feedback on every copilot response if enabled.",
+            )
+
+    input_analysis_runs = analysis_scripts_section(user, bi)
+
+    if gui.button(
+        f"{icons.save} Save Settings",
+        type="primary",
+        style=dict(marginLeft="-2px", marginTop="8px"),
+    ):
+        with transaction.atomic():
+            try:
+                bi.full_clean()
+                bi.save()
+                save_analysis_runs_for_integration(bi, input_analysis_runs)
+            except ValidationError as e:
+                gui.error(str(e))
+
+
+def analysis_scripts_section(
+    user: AppUser,
+    bi: BotIntegration,
+    key: str = "analysis_urls",
+    default_analysis_url: str = "https://gooey.ai/compare-large-language-models/default-copilot-analysis-script-8qqg3xb84ddc/",
+) -> list[dict]:
+    with gui.div(className="d-flex align-items-center gap-3 mb-2"):
+        gui.write(
+            "##### <i class='fa-solid fa-head-side-brain'></i> Analysis Scripts",
+            unsafe_allow_html=True,
+            help=(
+                "Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. "
+                "Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis)."
+            ),
+        )
+        if gui.button(f"{icons.add} Add", type="tertiary", className="p-1 mb-2"):
+            list_items = gui.session_state.setdefault(f"--list-view:{key}", [])
+            list_items.append({"url": default_analysis_url})
+
+    if key not in gui.session_state:
+        gui.session_state[key] = [
             (anal.published_run or anal.saved_run).get_app_url()
             for anal in bi.analysis_runs.all()
         ]
-
-    if gui.session_state.get("analysis_urls"):
-        from recipes.VideoBots import VideoBotsPage
-
-        gui.anchor(
-            "📊 View Analytics",
-            str(
-                furl(
-                    VideoBotsPage.app_url(
-                        tab=RecipeTabs.integrations,
-                        path_params=dict(integration_id=bi.api_integration_id()),
-                        query_params=dict(request.query_params),
-                    )
-                )
-                / "stats/"
-            ),
-        )
 
     input_analysis_runs = []
 
@@ -124,7 +136,7 @@ Must return a JSON object with a consistent schema. [Learn more](https://gooey.a
                 key=key,
                 internal_state=d,
                 del_key=del_key,
-                current_user=request.user,
+                current_user=user,
             )
             if not ret:
                 return
@@ -135,44 +147,32 @@ Must return a JSON object with a consistent schema. [Learn more](https://gooey.a
                 input_analysis_runs.append(dict(saved_run=sr, published_run=None))
 
     list_view_editor(
-        add_btn_label="Add",
-        key="analysis_urls",
+        key=key,
         render_inputs=render_workflow_url_input,
         flatten_dict_key="url",
     )
 
-    with gui.center():
-        with gui.div():
-            pressed_update = gui.button("✅ Save")
-            pressed_reset = gui.button(
-                "Reset", key=f"_bi_reset_{bi.id}", type="tertiary"
-            )
-    if pressed_update or pressed_reset:
-        with transaction.atomic():
-            try:
-                bi.full_clean()
-                bi.save()
-                # save analysis runs
-                input_analysis_runs = [
-                    BotIntegrationAnalysisRun.objects.get_or_create(
-                        bot_integration=bi, **data
-                    )[0].id
-                    for data in input_analysis_runs
-                ]
-                # delete any analysis runs that were removed
-                bi.analysis_runs.all().exclude(id__in=input_analysis_runs).delete()
-            except ValidationError as e:
-                gui.error(str(e))
-    gui.write("---")
+    return input_analysis_runs
+
+
+def save_analysis_runs_for_integration(
+    bi: BotIntegration, input_analysis_runs: list[dict]
+):
+    """
+    Save analysis runs for the given BotIntegration and clean up removed runs.
+    """
+    input_analysis_run_ids = [
+        BotIntegrationAnalysisRun.objects.get_or_create(bot_integration=bi, **data)[
+            0
+        ].id
+        for data in input_analysis_runs
+    ]
+    # delete any analysis runs that were removed
+    bi.analysis_runs.all().exclude(id__in=input_analysis_run_ids).delete()
 
 
 def twilio_specific_settings(bi: BotIntegration):
     SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url", "twilio_fresh_conversation_per_call"]  # fmt:skip
-    if gui.session_state.get(f"_bi_reset_{bi.id}"):
-        for field in SETTINGS_FIELDS:
-            gui.session_state[f"_bi_{field}_{bi.id}"] = BotIntegration._meta.get_field(
-                field
-            ).default
 
     bi.twilio_initial_text = gui.text_area(
         "###### 📝 Initial Text (said at the beginning of each call)",
@@ -214,13 +214,7 @@ def twilio_specific_settings(bi: BotIntegration):
     )
 
 
-def slack_specific_settings(bi: BotIntegration, default_name: str):
-    if gui.session_state.get(f"_bi_reset_{bi.id}"):
-        gui.session_state[f"_bi_name_{bi.id}"] = default_name
-        gui.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
-            BotIntegration._meta.get_field("slack_read_receipt_msg").default
-        )
-
+def slack_specific_settings(bi: BotIntegration):
     bi.slack_read_receipt_msg = gui.text_input(
         """
             ##### ✅ Read Receipt
@@ -325,33 +319,6 @@ def broadcast_input(bi: BotIntegration):
             f"Are you sure? This will send a message to all {convos.count()} users that have ever interacted with this bot.\n"
         )
         gui.button("✅ Yes, Send", key=confirmed_send_btn)
-
-
-def get_bot_test_link(bi: BotIntegration) -> str | None:
-    if bi.wa_phone_number:
-        return (furl("https://wa.me/") / bi.wa_phone_number.as_e164).tostr()
-    elif bi.slack_team_id:
-        return (
-            furl("https://app.slack.com/client")
-            / bi.slack_team_id
-            / bi.slack_channel_id
-        ).tostr()
-    elif bi.ig_username:
-        return (furl("http://instagram.com/") / bi.ig_username).tostr()
-    elif bi.fb_page_name:
-        return (furl("https://www.facebook.com/") / bi.fb_page_id).tostr()
-    elif bi.platform == Platform.WEB:
-        return get_app_route_url(
-            chat_route,
-            path_params=dict(
-                integration_id=bi.api_integration_id(),
-                integration_name=slugify(bi.name) or "untitled",
-            ),
-        )
-    elif bi.twilio_phone_number:
-        return str(furl("tel:") / bi.twilio_phone_number.as_e164)
-    else:
-        return None
 
 
 def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str:
@@ -502,14 +469,13 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
         # remove defaults
         bi.web_config_extras = config
 
-        with gui.div(className="d-flex justify-content-end"):
-            if gui.button(
-                f"{icons.save} Update Web Preview",
-                type="primary",
-                className="align-right",
-            ):
-                bi.save()
-                gui.rerun()
+        if gui.button(
+            f"{icons.save} Update Web Preview",
+            type="primary",
+            style=dict(marginLeft="-2px", marginTop="8px"),
+        ):
+            bi.save()
+            gui.rerun()
     with col2:
         with gui.center(), gui.div():
             web_preview_tab = f"{icons.chat} Web Preview"
