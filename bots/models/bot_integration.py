@@ -50,7 +50,7 @@ class Platform(models.IntegerChoices):
     def get_title(self):
         match self:
             case Platform.TWILIO:
-                return "Voice"
+                return "Voice/SMS"
             case Platform.FACEBOOK:
                 return "Messenger"
             case _:

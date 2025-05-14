@@ -100,8 +100,14 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
 
 
 def render_demo_text(bi: BotIntegration):
-    gui.caption("Message")
-    with gui.div(className="d-flex align-items-center gap-2 mt-3"):
+    if bi.platform == Platform.TWILIO:
+        gui.caption("Call")
+    else:
+        gui.caption("Message")
+
+    with gui.div(
+        className="container-margin-reset d-flex align-items-center gap-2 mt-3"
+    ):
         test_link = bi.get_bot_test_link()
         gui.write(
             f"[{bi.get_display_name()}]({test_link})",
@@ -111,6 +117,7 @@ def render_demo_text(bi: BotIntegration):
             icons.copy_solid,
             value=test_link,
             type="tertiary",
+            className="m-0",
         )
 
     if bi.platform == Platform.TWILIO:
