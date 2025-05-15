@@ -1,6 +1,5 @@
 import json
 import math
-import mimetypes
 import typing
 from itertools import zip_longest
 import typing_extensions
@@ -37,7 +36,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
     azure_form_recognizer_models,
 )
-from daras_ai_v2.base import BasePage, RecipeTabs
+from daras_ai_v2.base import BasePage, RecipeRunState, RecipeTabs, StateKeys
 from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
@@ -45,6 +44,7 @@ from daras_ai_v2.bot_integration_widgets import (
     integrations_welcome_screen,
     web_widget_config,
 )
+from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
@@ -661,18 +661,51 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if output_text:
             gui.write(output_text[0], line_clamp=5)
 
+    scroll_into_view = False
+
+    def _render_running_output(self):
+        ## The embedded web widget includes a running output, so just scroll it into view
+
+        # language=JavaScript
+        gui.js(
+            """document.querySelector("#gooey-embed")?.scrollIntoView({ behavior: "smooth", block: "start" })"""
+        )
+
     def render_output(self):
-        # chat window
-        with gui.div(className="mb-3 border rounded"):
-            self.render_chat_list_view()
-            with gui.div(className="position-sticky bottom-0"):
-                pressed_send, new_inputs = chat_input_view()
+        from daras_ai_v2.bots import parse_bot_html
 
-        if pressed_send:
-            self.on_send(*new_inputs)
+        gui.tag(
+            "button",
+            type="submit",
+            name="onSendMessage",
+            hidden=True,
+            id="onSendMessage",
+        )
+        input_payload = gui.session_state.pop("onSendMessage", None)
+        if input_payload:
+            try:
+                input_data = json.loads(input_payload)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            else:
+                self.on_send(
+                    input_data.get("input_prompt"),
+                    input_data.get("input_images"),
+                    input_data.get("input_audio"),
+                    input_data.get("input_documents"),
+                    input_data.get("button_pressed"),
+                    input_data.get("input_location"),
+                )
 
-        # clear chat inputs
-        if gui.button("🗑️ Clear"):
+        gui.tag(
+            "button",
+            type="submit",
+            name="onNewConversation",
+            value="yes",
+            hidden=True,
+            id="onNewConversation",
+        )
+        if gui.session_state.pop("onNewConversation", None):
             gui.session_state["messages"] = []
             gui.session_state["input_prompt"] = ""
             gui.session_state["input_images"] = None
@@ -684,29 +717,175 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        # render sources
-        references = gui.session_state.get("references", [])
-        if not references:
-            return
-        key = "sources-expander"
-        with gui.expander("💁‍♀️ Sources", key=key):
-            if not gui.session_state.get(key):
-                return
-            for idx, ref in enumerate(references):
-                gui.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
-                text_output(
-                    "Source Document",
-                    value=ref["snippet"],
-                    label_visibility="collapsed",
+        entries = gui.session_state.get("messages", []).copy()
+        messages = []  # chat widget internal mishmash format
+        for entry in entries:
+            role = entry.get("role")
+            if role == CHATML_ROLE_USER:
+                messages.append(
+                    dict(
+                        role=role,
+                        input_prompt=get_entry_text(entry),
+                        input_images=get_entry_images(entry) or [],
+                    )
                 )
+            elif role == CHATML_ROLE_ASSISTANT:
+                messages.append(
+                    dict(
+                        role=role,
+                        type="final_response",
+                        status="completed",
+                        output_text=[parse_bot_html(get_entry_text(entry))[1]],
+                    )
+                )
+
+        # add last input to history if present
+        show_raw_msgs = False
+        if show_raw_msgs:
+            input_prompt = gui.session_state.get("raw_input_text") or ""
+        else:
+            input_prompt = gui.session_state.get("input_prompt") or ""
+        input_images = gui.session_state.get("input_images") or []
+        input_audio = gui.session_state.get("input_audio") or ""
+        input_documents = gui.session_state.get("input_documents") or []
+        if input_prompt or input_images or input_audio or input_documents:
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_USER,
+                    input_prompt=input_prompt,
+                    input_images=input_images,
+                    input_audio=input_audio,
+                    input_documents=input_documents,
+                ),
+            )
+
+            # add last output
+            run_status = self.get_run_state(gui.session_state)
+            if run_status == RecipeRunState.running:
+                event_type = "message_part"
+            elif run_status == RecipeRunState.failed:
+                event_type = "error"
+            else:
+                event_type = "final_response"
+            raw_output_text = gui.session_state.get("raw_output_text") or []
+            output_text = gui.session_state.get("output_text") or []
+            output_video = gui.session_state.get("output_video") or []
+            output_audio = gui.session_state.get("output_audio") or []
+            text = output_text and output_text[0] or ""
+            if text:
+                buttons, text, disable_feedback = parse_bot_html(text)
+            else:
+                buttons = []
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_ASSISTANT,
+                    type=event_type,
+                    status=run_status,
+                    detail=gui.session_state.get(StateKeys.run_status) or "",
+                    raw_output_text=raw_output_text,
+                    output_text=[text],
+                    text=text,
+                    output_video=output_video,
+                    output_audio=output_audio,
+                    references=gui.session_state.get("references") or [],
+                    buttons=buttons,
+                )
+            )
+
+        gui.html(
+            # language=html
+            f"""
+<div id="gooey-embed" className="border rounded py-1 mb-3" style="height: 80vh"></div>
+<script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
+            """
+        )
+        gui.js(
+            # language=javascript
+            """
+async function loadGooeyEmbed() {
+    await window.waitUntilHydrated;
+    if (typeof GooeyEmbed === "undefined" ||
+        document.getElementById("gooey-embed")?.children.length
+    )
+        return;
+    let controller = {
+        messages,
+        onSendMessage: (payload) => {
+            let btn = document.getElementById("onSendMessage");
+            if (!btn) return;
+            btn.value = JSON.stringify(payload);
+            btn.click();
+        },
+        onNewConversation() {
+          document.getElementById("onNewConversation").click();
+        },
+    };
+    GooeyEmbed.controller = controller;
+    GooeyEmbed.mount(config, controller);
+}
+
+const script = document.getElementById("gooey-embed-script");
+if (script) script.onload = loadGooeyEmbed;
+loadGooeyEmbed();
+window.addEventListener("hydrated", loadGooeyEmbed);
+
+if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
+    GooeyEmbed.controller.setMessages?.(messages);
+    console.log("setMessages:", messages);
+}
+            """,
+            config=dict(
+                integration_id="magic",
+                target="#gooey-embed",
+                mode="inline",
+                enableAudioMessage=True,
+                enablePhotoUpload=True,
+                enableConversations=False,
+                branding=dict(
+                    name=self.current_pr.title,
+                    photoUrl=self.current_pr.photo_url,
+                    title="Preview",
+                    showPoweredByGooey=False,
+                ),
+                fillParent=True,
+                secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
+            ),
+            messages=messages,
+        )
+
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
+        render_called_functions(
+            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+        )
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
 
     def on_send(
         self,
-        new_input_text: str,
-        new_input_images: list[str],
-        new_input_audio: str,
-        new_input_documents: list[str],
+        new_input_prompt: str | None,
+        new_input_images: list[str] | None,
+        new_input_audio: str | None,
+        new_input_documents: list[str] | None,
+        button_pressed: list[str] | None,
+        input_location: dict[str, float] | None,
     ):
+        if button_pressed:
+            # encoded by parse_html
+            target, title = None, None
+            parts = csv_decode_row(button_pressed.get("button_id", ""))
+            if len(parts) >= 3:
+                target = parts[1]
+                title = parts[-1]
+            value = title or button_pressed.get("button_title", "")
+            if target and target != "input_prompt":
+                gui.session_state[target] = value
+            else:
+                new_input_prompt = value
+
+        if input_location:
+            from daras_ai_v2.bots import handle_location_msg
+
+            new_input_prompt = handle_location_msg(input_location)
+
         prev_input = gui.session_state.get("raw_input_text") or ""
         prev_output = (gui.session_state.get("raw_output_text") or [""])[0]
         prev_input_images = gui.session_state.get("input_images")
@@ -732,7 +911,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ]
 
         # add new input to the state
-        gui.session_state["input_prompt"] = new_input_text
+        gui.session_state["input_prompt"] = new_input_prompt
         gui.session_state["input_audio"] = new_input_audio or None
         gui.session_state["input_images"] = new_input_images or None
         gui.session_state["input_documents"] = new_input_documents or None
@@ -764,7 +943,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         references = gui.session_state.get("references", [])
         if references:
             gui.write("###### `references`")
-            gui.json(references)
+            gui.json(references, collapseStringsAfterLength=False)
 
         if gui.session_state.get("functions"):
             try:
@@ -776,7 +955,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             if prompt_funcs:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
                 for tool in prompt_funcs:
-                    gui.json(tool.spec.get("function", tool.spec), depth=3)
+                    gui.json(
+                        tool.spec.get("function", tool.spec),
+                        depth=3,
+                        collapseStringsAfterLength=False,
+                    )
 
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
@@ -1638,75 +1821,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     bi.save()
                     gui.rerun()
 
-    def render_chat_list_view(self):
-        # render a reversed list view
-        with gui.div(
-            className="pb-1 d-flex flex-column-reverse overflow-auto",
-            style=dict(maxHeight="80vh"),
-        ):
-            with gui.div(className="px-3"):
-                show_raw_msgs = gui.checkbox("_Show Raw Output_")
-            # render the last output
-            with msg_container_widget(CHATML_ROLE_ASSISTANT):
-                if show_raw_msgs:
-                    output_text = gui.session_state.get("raw_output_text", [])
-                else:
-                    output_text = gui.session_state.get("output_text", [])
-                output_video = gui.session_state.get("output_video", [])
-                output_audio = gui.session_state.get("output_audio", [])
-                if output_text:
-                    gui.write("**Assistant**")
-                    render_called_functions(
-                        saved_run=self.current_sr, trigger=FunctionTrigger.pre
-                    )
-                    render_called_functions(
-                        saved_run=self.current_sr, trigger=FunctionTrigger.prompt
-                    )
-                    for text in output_text:
-                        gui.write(text)
-                    for video in output_video:
-                        gui.video(video)
-                    for audio in output_audio:
-                        gui.audio(audio)
-                    render_called_functions(
-                        saved_run=self.current_sr, trigger=FunctionTrigger.post
-                    )
-                output_documents = gui.session_state.get("output_documents", [])
-                if output_documents:
-                    for doc in output_documents:
-                        gui.write(doc)
-            messages = gui.session_state.get("messages", []).copy()
-            # add last input to history if present
-            if show_raw_msgs:
-                input_prompt = gui.session_state.get("raw_input_text")
-            else:
-                input_prompt = gui.session_state.get("input_prompt")
-            input_images = gui.session_state.get("input_images")
-            input_audio = gui.session_state.get("input_audio")
-            input_documents = gui.session_state.get("input_documents")
-            messages += [
-                format_chat_entry(
-                    role=CHATML_ROLE_USER,
-                    content_text=input_prompt,
-                    input_images=input_images,
-                    input_audio=input_audio,
-                    input_documents=input_documents,
-                ),
-            ]
-            # render history
-            for entry in reversed(messages):
-                with msg_container_widget(entry["role"]):
-                    images = get_entry_images(entry)
-                    text = get_entry_text(entry)
-                    if text or images or input_audio:
-                        gui.write(f"**{entry['role'].capitalize()}**  \n{text}")
-                    if images:
-                        for im in images:
-                            gui.image(im, style={"maxHeight": "200px"})
-                    if input_audio:
-                        gui.audio(input_audio)
-                        input_audio = None
-
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:
     return "\n".join(
@@ -1734,68 +1848,6 @@ def infer_asr_model_and_language(
     else:
         asr_model = default
     return asr_model.name, asr_lang
-
-
-def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
-    with (
-        gui.styled("& .gui-input, & button { margin-bottom: 0; height: 3.2rem }"),
-        gui.div(
-            className="p-1 d-flex gap-1",
-            style=dict(background="rgba(239, 239, 239)"),
-        ),
-    ):
-        show_uploader_key = "--show-file-uploader"
-        show_uploader = gui.session_state.setdefault(show_uploader_key, False)
-        if gui.button(
-            "📎",
-            style=dict(backgroundColor="white"),
-        ):
-            show_uploader = not show_uploader
-            gui.session_state[show_uploader_key] = show_uploader
-
-        with gui.div(className="flex-grow-1"):
-            new_input_text = gui.text_area("", placeholder="Send a message", height=50)
-
-        pressed_send = gui.button("✈ Send")
-
-    if show_uploader:
-        uploaded_files = gui.file_uploader("", accept_multiple_files=True)
-        new_input_images = []
-        new_input_audio = None
-        new_input_documents = []
-        for f in uploaded_files:
-            mime_type = mimetypes.guess_type(f)[0] or ""
-            if mime_type.startswith("image/"):
-                new_input_images.append(f)
-            elif mime_type.startswith("audio/") or mime_type.startswith("video/"):
-                new_input_audio = f
-            else:
-                new_input_documents.append(f)
-    else:
-        new_input_images = None
-        new_input_audio = None
-        new_input_documents = None
-
-    return (
-        pressed_send,
-        (
-            new_input_text,
-            new_input_images,
-            new_input_audio,
-            new_input_documents,
-        ),
-    )
-
-
-def msg_container_widget(role: str):
-    return gui.div(
-        className="px-3 py-1 pt-2",
-        style=dict(
-            background=(
-                "rgba(239, 239, 239, 0.6)" if role == CHATML_ROLE_USER else "#fff"
-            ),
-        ),
-    )
 
 
 def convo_window_clipper(
