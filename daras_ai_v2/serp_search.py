@@ -47,16 +47,27 @@ def get_links_from_serp_api(
         or data.get("news")
         or []
     )
-    links = [
-        SerpLink(
-            url=url,
-            title=item.get("title") or "",
-            snippet=item.get("snippet") or "",
-        )
-        for item in items
-        if item and (url := item.get("link") or item.get("website"))
-    ]
+    links = list(filter(None, map(item_to_serp_link, items)))
     return data, links
+
+
+def item_to_serp_link(item: dict | None) -> SerpLink | None:
+    if not item:
+        return None
+    url = item.get("link") or item.get("website")
+    if not url:
+        return None
+
+    snippet = item.get("snippet") or ""
+
+    image_url = item.get("imageUrl")
+    if image_url and image_url.startswith("http"):
+        snippet = f"Image URL: {image_url}\n\n{snippet}".strip()
+    thumbnail_url = item.get("thumbnailUrl")
+    if thumbnail_url and thumbnail_url.startswith("http"):
+        snippet = f"Thumbnail URL: {thumbnail_url}\n\n{snippet}".strip()
+
+    return SerpLink(url=url, title=item.get("title") or "", snippet=snippet)
 
 
 def call_serp_api(
