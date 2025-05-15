@@ -133,7 +133,10 @@ class WhatsappBot(BotInterface):
 
     def mark_read(self):
         wa_mark_read(
-            self.bot_id, self.input_message["id"], access_token=self.access_token
+            bot_number=self.bot_id,
+            message_id=self.input_message["id"],
+            user_msg_id=self.user_msg_id,
+            access_token=self.access_token,
         )
 
     @classmethod
@@ -376,7 +379,9 @@ def send_wa_msgs_raw(
     return msg_id
 
 
-def wa_mark_read(bot_number: str, message_id: str, access_token: str | None = None):
+def wa_mark_read(
+    bot_number: str, message_id: str, user_msg_id: str, access_token: str | None = None
+):
     # send read receipt
     r = requests.post(
         f"https://graph.facebook.com/v16.0/{bot_number}/messages",
@@ -388,6 +393,19 @@ def wa_mark_read(bot_number: str, message_id: str, access_token: str | None = No
         },
     )
     print("wa_mark_read:", r.status_code, r.json())
+
+    # send typing indicator
+    r = requests.post(
+        f"https://graph.facebook.com/v16.0/{bot_number}/messages",
+        headers=get_wa_auth_header(access_token),
+        json={
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": user_msg_id,
+            "typing_indicator": {"type": "text"},
+        },
+    )
+    print("wa_typing_indicator:", r.status_code, r.json())
 
 
 class FacebookBot(BotInterface):
