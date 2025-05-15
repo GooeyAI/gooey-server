@@ -41,88 +41,111 @@ def render_search_filters(
         search_filters = SearchFilters()
 
     with (
-        gui.styled(r"""
-            & .gui-input { margin-bottom: 0; }
-            & .gui-input-select { min-width: 80px; max-width: 50%; }
-        """),
+        gui.styled(r"& .gui-input { margin-bottom: 0; }"),
         gui.div(),
         gui.div(className="d-lg-flex container-margin-reset gap-3"),
     ):
         with gui.div(className="col-lg-5 flex-grow-1 flex-lg-grow-0 mb-2 mb-lg-0"):
             search_query = render_search_bar(value=search_filters.search)
 
-        with gui.div(className="col-lg-7 d-flex align-items-center gap-2"):
-            with gui.div():
-                gui.caption(
-                    f'{icons.filter}<span class="d-none d-lg-inline"> Filter</span>',
-                    unsafe_allow_html=True,
-                )
-            with gui.div(className="d-flex align-items-center gap-2 flex-grow-1"):
+        with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
+            gui.caption(
+                f'{icons.filter}<span class="d-none d-lg-inline"> Filter</span>',
+                unsafe_allow_html=True,
+            )
+            with gui.div(
+                className="d-flex gap-2 flex-grow-1",
+                style={"maxWidth": "calc(100% - 24px)"},
+            ):
                 if current_user and not current_user.is_anonymous:
-                    workspace_filter = render_workspace_filter(
-                        current_user=current_user,
-                        value=search_filters.workspace,
-                        className="flex-grow-1 flex-lg-grow-0",
-                    )
+                    with gui.div(className="flex-grow-1", style={"maxWidth": "50%"}):
+                        workspace_filter = render_workspace_filter(
+                            current_user=current_user, value=search_filters.workspace
+                        )
                 else:
                     workspace_filter = None
-                workflow_filter = render_workflow_filter(
-                    value=search_filters.workflow,
-                    className="flex-grow-1 flex-lg-grow-0",
-                )
+                with gui.div(className="flex-grow-1", style={"maxWidth": "50%"}):
+                    workflow_filter = render_workflow_filter(
+                        value=search_filters.workflow
+                    )
 
     return SearchFilters(
         search=search_query, workspace=workspace_filter, workflow=workflow_filter
     )
 
 
+def render_popover_selector(options: dict[str, str], label: str, key: str, value: str):
+    with (
+        gui.styled(r"& > button { max-width: 100%; width: 100%; }"),
+        gui.div(),
+    ):
+        popover, content = gui.popover(interactive=True, placement="bottom")
+
+    with popover, gui.div(className="d-flex align-items-center p-2 border rounded"):
+        popover_text = value and options.get(value) or label
+        gui.html(
+            popover_text,
+            className="flex-grow-1 d-inline-block pe-2 border-end border-light-2 overflow-hidden text-truncate",
+        )
+        gui.html(icons.chevron_down, className="d-block ps-2")
+
+    with (
+        content,
+        gui.div(
+            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-auto",
+            style={"maxWidth": "500px", "maxHeight": "500px"},
+        ),
+    ):
+        for option_value, option_html in options.items():
+            with gui.tag(
+                "button",
+                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
+                name=key,
+                type="submit",
+                value=option_value,
+                style=dict(minHeight="2.2rem"),
+            ):
+                with gui.div(className="row align-items-center"):
+                    with gui.div(className="col-10"):
+                        gui.html(option_html)
+                    with gui.div(className="col-2 text-end"):
+                        if option_value == value:
+                            gui.html(
+                                '<i class="fa-sharp fa-solid fa-circle-check"></i>'
+                            )
+
+    return gui.session_state.pop(key, value)
+
+
 def render_workspace_filter(
-    current_user: AppUser | None = None,
-    key: str = "workspace_filter",
-    value: str = "",
-    **props,
+    current_user: AppUser | None = None, key: str = "workspace_filter", value: str = ""
 ) -> str | None:
     if not current_user or current_user.is_anonymous:
         return None
 
-    if current_user and not current_user.is_anonymous:
-        workspace_options = {
-            w.handle_id and w.handle.name or str(w.id): w.display_html(
-                current_user=current_user
-            )
-            for w in current_user.cached_workspaces
-        }
-        return gui.selectbox(
-            "",
-            key=key,
-            value=value,
-            options=workspace_options,
-            format_func=lambda w_id: (
-                workspace_options.get(
-                    w_id,
-                    f"{icons.octopus} Workspace",
-                )
-            ),
-            allow_none=True,
-            **props,
+    workspace_options = {None: f"{icons.octopus}&nbsp;&nbsp;&nbsp;Any"}
+    workspace_options |= {
+        w.handle_id and w.handle.name or str(w.id): w.display_html(
+            current_user=current_user, icon_size="20px"
         )
+        for w in current_user.cached_workspaces
+    }
+
+    return render_popover_selector(
+        workspace_options, label=f"{icons.octopus} Workspace", key=key, value=value
+    )
 
 
 def render_workflow_filter(key: str = "workflow_filter", value: str = "", **props):
     from daras_ai_v2.all_pages import all_home_pages
 
-    workflow_options = {
+    workflow_options = {None: f"{icons.example}&nbsp;&nbsp;&nbsp;Any"}
+    workflow_options |= {
         p.workflow.short_slug: f"{p.workflow.emoji} {p.workflow.short_title}"
         for p in all_home_pages
     }
-    return gui.selectbox(
-        "",
-        key=key,
-        value=value,
-        options=workflow_options,
-        format_func=lambda w_id: workflow_options.get(w_id, f"{icons.example} Type"),
-        allow_none=True,
-        **props,
+    return render_popover_selector(
+        workflow_options, label=f"{icons.example} Type", key=key, value=value, **props
     )
 
 
