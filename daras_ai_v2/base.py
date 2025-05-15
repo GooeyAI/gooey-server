@@ -1743,6 +1743,7 @@ class BasePage:
                 self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
+                self.click_preview_tab()
                 self._render_running_output()
             else:
                 if not is_deleted:
@@ -1753,7 +1754,7 @@ class BasePage:
         err_msg = gui.session_state.get(StateKeys.error_msg)
         gui.error(err_msg, unsafe_allow_html=True)
 
-    def _render_running_output(self):
+    def click_preview_tab(self):
         # show the preview tab when running
         gui.html(
             """
@@ -1765,8 +1766,11 @@ class BasePage:
             """
         )
 
+    scroll_into_view = True
+
+    def _render_running_output(self):
         run_status = gui.session_state.get(StateKeys.run_status)
-        html_spinner(run_status)
+        html_spinner(run_status, scroll_into_view=self.scroll_into_view)
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):

@@ -348,7 +348,7 @@ def _msg_handler(bot: BotInterface):
             if not input_location:
                 bot.send_msg(text=DEFAULT_RESPONSE)
                 return
-            input_text = _handle_location_msg(input_location)
+            input_text = handle_location_msg(input_location)
         case "text":
             if not input_text:
                 bot.send_msg(text=DEFAULT_RESPONSE)
@@ -692,7 +692,7 @@ def _handle_interactive_msg(bot: BotInterface):
             return False
 
 
-def _handle_location_msg(input_location: dict[str, float]) -> str:
+def handle_location_msg(input_location: dict[str, float]) -> str:
     r = requests.post(
         url="https://maps.googleapis.com/maps/api/geocode/json",
         params={
