@@ -26,11 +26,14 @@ def render_demo_buttons_header(pr: PublishedRun):
     if not demo_bots:
         return
     with (
-        gui.styled("& button { padding: 4px !important }"),
+        gui.styled("& button { padding: 4px 12px !important }"),
         gui.div(className="d-flex flex-column justify-content-center gap-1 my-1"),
     ):
-        with gui.div(className="container-margin-reset text-center w-100 text-nowrap"):
-            gui.caption("Try the demo")
+        with gui.tag(
+            "small",
+            className="container-margin-reset text-center w-100 text-nowrap text-muted",
+        ):
+            gui.html("Try the demo")
         for bi_id, platform in demo_bots:
             dialog_ref = gui.use_alert_dialog(key=f"demo-modal-{bi_id}")
             if render_demo_button(bi_id, platform, className="w-100"):
@@ -52,7 +55,7 @@ def get_demo_bots(pr: PublishedRun):
 def render_demo_button(bi_id: int, platform_id: int, className: str = ""):
     platform = Platform(platform_id)
     label = f"{platform.get_icon()} {platform.get_title()}"
-    className += " px-3 py-2 m-0"
+    className += " m-0"
     key = f"demo-button-{bi_id}"
 
     bg_color = platform.get_demo_button_color()
