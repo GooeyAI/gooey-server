@@ -384,8 +384,10 @@ class Workspace(SafeDeleteModel):
     def get_pp_custom_id(self) -> str:
         return json.dumps(dict(workspace_id=self.id))
 
-    def display_html(self, current_user: AppUser | None = None) -> str:
-        return f"{self.html_icon()}&nbsp;&nbsp;{self.display_name(current_user)}"
+    def display_html(
+        self, current_user: AppUser | None = None, icon_size: str | None = None
+    ) -> str:
+        return f"{self.html_icon(size=icon_size)}&nbsp;&nbsp;{self.display_name(current_user)}"
 
     def display_name(self, current_user: AppUser | None = None) -> str:
         if self.name:
@@ -399,7 +401,8 @@ class Workspace(SafeDeleteModel):
         else:
             return f"{self.created_by.first_name_possesive()} Workspace"
 
-    def html_icon(self, size: str = "24px") -> str:
+    def html_icon(self, size: str | None = None) -> str:
+        size = size or "24px"
         if photo_url := self.get_photo():
             return f'<img class="workspace-icon" src="{photo_url}" style="height: {size}; width: {size}; object-fit: cover; border-radius: 50%;">'
         if self.is_personal:
