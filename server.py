@@ -48,6 +48,7 @@ from routers import (
     static_pages,
     onedrive_api,
     workspace,
+    pycon,
 )
 from routers import twilio_ws_api
 
@@ -69,6 +70,7 @@ app.include_router(stripe.router, include_in_schema=False)
 app.include_router(twilio_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
 app.include_router(twilio_ws_api.app, include_in_schema=False)
+app.include_router(pycon.app, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(
