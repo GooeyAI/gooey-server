@@ -232,6 +232,11 @@ class Workflow(models.IntegerChoices):
         return metadata.short_title
 
     @property
+    def emoji(self):
+        metadata = self.get_or_create_metadata()
+        return metadata.emoji
+
+    @property
     def page_cls(self) -> typing.Type[BasePage]:
         from daras_ai_v2.all_pages import workflow_map
 
