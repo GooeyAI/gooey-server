@@ -1,7 +1,6 @@
 import io
 import typing
 from furl import furl
-import requests
 
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
@@ -74,6 +73,7 @@ def gdrive_download(
 ) -> tuple[bytes, str]:
     from googleapiclient import discovery
     from googleapiclient.http import MediaIoBaseDownload
+    from daras_ai_v2.asr import get_google_auth_session
 
     if export_links is None:
         export_links = {}
@@ -87,7 +87,9 @@ def gdrive_download(
         # export google docs to appropriate type
         export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
         if f_url_export := export_links.get(export_mime_type, None):
-            r = requests.get(f_url_export)
+            drive_scopes = ["https://www.googleapis.com/auth/drive.readonly"]
+            session, _ = get_google_auth_session(drive_scopes)
+            r = session.get(f_url_export)
             file_bytes = r.content
             raise_for_status(r, is_user_url=True)
             return file_bytes, export_mime_type
