@@ -4,6 +4,7 @@ import json
 import typing
 
 import gooey_gui as gui
+from furl import furl
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, Platform
@@ -25,11 +26,14 @@ def render_demo_buttons_header(pr: PublishedRun):
     if not demo_bots:
         return
     with (
-        gui.styled("& button { padding: 4px !important }"),
+        gui.styled("& button { padding: 4px 12px !important }"),
         gui.div(className="d-flex flex-column justify-content-center gap-1 my-1"),
     ):
-        with gui.div(className="container-margin-reset text-center w-100 text-nowrap"):
-            gui.caption("Try the demo")
+        with gui.tag(
+            "small",
+            className="container-margin-reset text-center w-100 text-nowrap text-muted",
+        ):
+            gui.html("Try the demo")
         for bi_id, platform in demo_bots:
             dialog_ref = gui.use_alert_dialog(key=f"demo-modal-{bi_id}")
             if render_demo_button(bi_id, platform, className="w-100"):
@@ -51,7 +55,7 @@ def get_demo_bots(pr: PublishedRun):
 def render_demo_button(bi_id: int, platform_id: int, className: str = ""):
     platform = Platform(platform_id)
     label = f"{platform.get_icon()} {platform.get_title()}"
-    className += " px-3 py-2 m-0"
+    className += " m-0"
     key = f"demo-button-{bi_id}"
 
     bg_color = platform.get_demo_button_color()
@@ -80,19 +84,7 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
     ):
         col1, col2 = gui.columns(2)
         with col1:
-            gui.caption("Message")
-            with gui.div(className="d-flex align-items-center gap-2 mt-3"):
-                gui.write(
-                    f"[{bi.get_display_name()}]({bi.get_bot_test_link()})",
-                    className="fs-5 fw-bold",
-                )
-                copy_to_clipboard_button(
-                    icons.copy_solid,
-                    value=bi.get_bot_test_link(),
-                    type="tertiary",
-                )
-            if bi.demo_notes:
-                gui.write(bi.demo_notes, className="d-block mt-3")
+            render_demo_text(bi)
 
         if not bi.demo_qr_code_image:
             return
@@ -108,6 +100,35 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
                     className="py-1",
                 )
             gui.image(src=bi.demo_qr_code_image)
+
+
+def render_demo_text(bi: BotIntegration):
+    if bi.platform == Platform.TWILIO:
+        gui.caption("Call")
+    else:
+        gui.caption("Message")
+
+    with gui.div(
+        className="container-margin-reset d-flex align-items-center gap-2 mt-3"
+    ):
+        test_link = bi.get_bot_test_link()
+        gui.write(
+            f"[{bi.get_display_name()}]({test_link})",
+            className="fs-5 fw-bold",
+        )
+        copy_to_clipboard_button(
+            icons.copy_solid,
+            value=test_link,
+            type="tertiary",
+            className="m-0",
+        )
+
+    if bi.platform == Platform.TWILIO:
+        sms_link = str(furl("sms:") / bi.twilio_phone_number.as_e164)
+        gui.write(f"or [Send SMS]({sms_link})", className="fs-5 fw-bold")
+
+    if bi.demo_notes:
+        gui.write(bi.demo_notes, className="d-block mt-3")
 
 
 def render_demo_button_settings(
