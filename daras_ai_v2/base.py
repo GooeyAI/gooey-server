@@ -1437,6 +1437,9 @@ class BasePage:
     def render_settings(self):
         pass
 
+    def render_output_static(self):
+        pass
+
     def render_output(self):
         self.render_run_preview_output(gui.session_state)
 
@@ -1700,6 +1703,10 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
+        # render outputs
+        if not is_deleted:
+            self.render_output_static()
+
         run_state = self.get_run_state(gui.session_state)
         match run_state:
             case RecipeRunState.completed:
@@ -1727,9 +1734,11 @@ class BasePage:
         err_msg = gui.session_state.get(StateKeys.error_msg)
         gui.error(err_msg, unsafe_allow_html=True)
 
+    scroll_into_view = True
+
     def _render_running_output(self):
         run_status = gui.session_state.get(StateKeys.run_status)
-        html_spinner(run_status)
+        html_spinner(run_status, scroll_into_view=self.scroll_into_view)
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
