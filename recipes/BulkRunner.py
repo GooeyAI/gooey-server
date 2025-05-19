@@ -605,7 +605,13 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
     df = tabular_bytes_to_any_df(
         f_name=file_meta.name, f_bytes=f_bytes, mime_type=mime_type
     )
-    return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
+    # Drop completely empty rows/columns, fill NaNs, and reset the index so that it is contiguous
+    return (
+        df.dropna(how="all", axis=1)
+        .dropna(how="all", axis=0)
+        .fillna("")
+        .reset_index(drop=True)
+    )
 
 
 def list_view_editor(
