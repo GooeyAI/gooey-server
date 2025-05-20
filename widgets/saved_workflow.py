@@ -237,53 +237,6 @@ def render_preview_footer(
             )
 
 
-def render_author_run_count_row(
-    published_run: PublishedRun, show_workspace_author: bool = True
-):
-    with (
-        gui.styled(SEPARATOR_CSS),
-        gui.div(
-            className="d-flex align-items-center container-margin-reset gap-2 flex-wrap",
-            style={"fontSize": "0.9rem"},
-        ),
-    ):
-        if show_workspace_author:
-            render_author_from_workspace(
-                published_run.workspace, image_size="24px", responsive=False
-            )
-
-        if published_run.last_edited_by and not (
-            # don't repeat author for personal workspaces
-            show_workspace_author and published_run.workspace.is_personal
-        ):
-            with gui.div(style=dict(display="contents")):
-                render_author_from_user(
-                    published_run.last_edited_by, image_size="24px", responsive=False
-                )
-
-        render_run_count(published_run)
-
-
-def render_change_notes_visibility_row(
-    published_run: PublishedRun,
-    hide_version_notes: bool = False,
-    hide_visibility_pill: bool = False,
-):
-    with (
-        gui.styled(SEPARATOR_CSS),
-        gui.div(className="d-flex align-items-center container-margin-reset gap-2"),
-    ):
-        if not hide_version_notes:
-            render_change_notes(published_run)
-
-        if not hide_visibility_pill:
-            gui.caption(
-                published_run.get_share_badge_html(),
-                unsafe_allow_html=True,
-                style={"whiteSpace": "nowrap"},
-            )
-
-
 def render_change_notes(change_notes: str):
     gui.caption(
         f"{icons.notes} {html.escape(change_notes)}",
