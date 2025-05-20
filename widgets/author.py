@@ -54,7 +54,8 @@ def render_author_from_workspace(
     responsive: bool = True,
     show_as_link: bool = True,
     text_size: str | None = None,
-) -> object:
+    name_style: dict | None = None,
+):
     if not workspace:
         return
     photo = workspace.get_photo()
@@ -73,6 +74,7 @@ def render_author_from_workspace(
         image_size=image_size,
         responsive=responsive,
         text_size=text_size,
+        name_style=name_style,
     )
 
 
@@ -83,6 +85,7 @@ def render_author_from_user(
     responsive: bool = True,
     show_as_link: bool = True,
     text_size: str | None = None,
+    name_style: dict | None = None,
 ):
     if not user:
         return
@@ -99,6 +102,7 @@ def render_author_from_user(
         image_size=image_size,
         responsive=responsive,
         text_size=text_size,
+        name_style=name_style,
     )
 
 
@@ -110,6 +114,7 @@ def render_author(
     image_size: str,
     responsive: bool,
     text_size: str | None,
+    name_style: dict | None = None,
 ):
     if not photo and not name:
         return
@@ -146,6 +151,6 @@ def render_author(
                 )
 
         if name:
-            name_style = {"fontSize": text_size} if text_size else {}
+            name_style = ({"fontSize": text_size} if text_size else {}) | name_style
             with gui.tag("span", style=name_style):
                 gui.html(html.escape(name))
