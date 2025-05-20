@@ -50,16 +50,30 @@ WORKFLOW_PREVIEW_STYLE = """
     & .gui_example_media{
         width: 130px;
     }
+
+    & .w-md-auto {
+        width: auto !important;
+    }
 }
 """
 
 SEPARATOR_CSS = """
-& > :not(:empty):not(:first-child)::before {
+& > :not(.sep-hide):not(:empty):not(:last-child)::after {
   content: "•";
-  margin: 0 0.3em;
+  margin: 0 0.5rem;
   color: black;
   display: inline-block;
   vertical-align: middle;
+}
+
+@media (min-width: 768px) {
+    & > .sep-md-show:not(:empty):not(:last-child)::after {
+      content: "•";
+      margin: 0 0.5rem;
+      color: black;
+      display: inline-block;
+      vertical-align: middle;
+    }
 }
 """
 
@@ -136,20 +150,12 @@ def render_saved_workflow_preview(
                                     lineClampExpand=False,
                                     style={"fontSize": "0.9rem"},
                                 )
-                    with (
-                        gui.styled(SEPARATOR_CSS),
-                        gui.div(
-                            className="d-none d-md-flex container-margin-reset align-items-center gap-2"
-                        ),
-                    ):
-                        render_author_run_count_row(
+                    with gui.div(className="d-none d-md-block"):
+                        render_preview_footer(
                             published_run=published_run,
                             show_workspace_author=show_workspace_author,
-                        )
-                        render_change_notes_visibility_row(
-                            published_run=published_run,
-                            hide_visibility_pill=hide_visibility_pill,
                             hide_version_notes=hide_version_notes,
+                            hide_visibility_pill=hide_visibility_pill,
                         )
                 with (
                     gui.div(
@@ -162,16 +168,73 @@ def render_saved_workflow_preview(
                 ):
                     render_saved_workflow_output(output_url, published_run)
 
-        with gui.div(className="d-md-none mt-2"):
-            render_author_run_count_row(
-                published_run=published_run, show_workspace_author=show_workspace_author
-            )
-            with gui.div(className="mt-2 ms-1"):
-                render_change_notes_visibility_row(
-                    published_run=published_run,
-                    hide_visibility_pill=hide_visibility_pill,
+            with gui.div(className="d-md-none"):
+                render_preview_footer(
+                    published_run,
+                    show_workspace_author=show_workspace_author,
                     hide_version_notes=hide_version_notes,
+                    hide_visibility_pill=hide_visibility_pill,
                 )
+
+
+def render_preview_footer(
+    published_run: PublishedRun,
+    show_workspace_author: bool,
+    hide_visibility_pill: bool,
+    hide_version_notes: bool,
+):
+    latest_version = published_run.versions.latest()
+
+    with (
+        gui.styled(SEPARATOR_CSS),
+        gui.div(
+            className="d-flex align-items-center flex-wrap flex-lg-nowrap",
+            style={"fontSize": "0.9rem"},
+        ),
+    ):
+        if not hide_version_notes and latest_version and latest_version.change_notes:
+            with gui.div(
+                className="d-flex align-items-center w-100 w-md-auto sep-hide sep-md-show"
+            ):
+                render_change_notes(latest_version.change_notes)
+
+        if show_workspace_author and not published_run.workspace.is_personal:
+            # don't repeat author for personal workspaces
+            with gui.div(className="d-flex align-items-center"):
+                render_author_from_workspace(
+                    published_run.workspace,
+                    image_size="24px",
+                    responsive=False,
+                    name_style={
+                        "maxWidth": "100px",
+                        "overflow": "hidden",
+                        "textOverflow": "ellipsis",
+                    },
+                )
+
+        if published_run.last_edited_by:
+            with gui.div(className="d-flex align-items-center text-truncate"):
+                render_author_from_user(
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    responsive=False,
+                    name_style={
+                        "maxWidth": "100px",
+                        "overflow": "hidden",
+                        "textOverflow": "ellipsis",
+                    },
+                )
+
+        render_last_updated_at(published_run)
+
+        render_run_count(published_run)
+
+        if not hide_visibility_pill:
+            gui.caption(
+                published_run.get_share_badge_html(),
+                unsafe_allow_html=True,
+                style={"whiteSpace": "nowrap"},
+            )
 
 
 def render_author_run_count_row(
@@ -198,17 +261,7 @@ def render_author_run_count_row(
                     published_run.last_edited_by, image_size="24px", responsive=False
                 )
 
-        if published_run.run_count > 1:
-            run_count = format_number_with_suffix(published_run.run_count)
-            gui.write(
-                f"{icons.run} {run_count} runs",
-                unsafe_allow_html=True,
-                className="text-dark text-nowrap",
-            )
-
-        updated_at = published_run.saved_run.updated_at or ""
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            gui.write(f"{get_relative_time(updated_at)}", className="text-nowrap")
+        render_run_count(published_run)
 
 
 def render_change_notes_visibility_row(
@@ -216,18 +269,12 @@ def render_change_notes_visibility_row(
     hide_version_notes: bool = False,
     hide_visibility_pill: bool = False,
 ):
-    version = published_run.versions.latest()
     with (
         gui.styled(SEPARATOR_CSS),
         gui.div(className="d-flex align-items-center container-margin-reset gap-2"),
     ):
-        if not hide_version_notes and version.change_notes:
-            gui.caption(
-                f"{icons.notes} {html.escape(version.change_notes)}",
-                unsafe_allow_html=True,
-                line_clamp=1,
-                lineClampExpand=False,
-            )
+        if not hide_version_notes:
+            render_change_notes(published_run)
 
         if not hide_visibility_pill:
             gui.caption(
@@ -235,6 +282,35 @@ def render_change_notes_visibility_row(
                 unsafe_allow_html=True,
                 style={"whiteSpace": "nowrap"},
             )
+
+
+def render_change_notes(change_notes: str):
+    gui.caption(
+        f"{icons.notes} {html.escape(change_notes)}",
+        unsafe_allow_html=True,
+        line_clamp=1,
+        lineClampExpand=False,
+    )
+
+
+def render_last_updated_at(published_run: PublishedRun):
+    updated_at = published_run.saved_run.updated_at
+    if updated_at and isinstance(updated_at, datetime.datetime):
+        gui.write(
+            f"{icons.clock} {get_relative_time(updated_at)}",
+            className="text-nowrap",
+            unsafe_allow_html=True,
+        )
+
+
+def render_run_count(published_run: PublishedRun):
+    if published_run.run_count > 1:
+        run_count = format_number_with_suffix(published_run.run_count)
+        gui.write(
+            f"{icons.run} {run_count} runs",
+            unsafe_allow_html=True,
+            className="text-dark text-nowrap",
+        )
 
 
 def render_saved_workflow_output(output_url: str, published_run: PublishedRun):
