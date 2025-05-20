@@ -151,6 +151,7 @@ def render_author(
                 )
 
         if name:
-            name_style = ({"fontSize": text_size} if text_size else {}) | name_style
+            name_style = name_style or {}
+            name_style.setdefault("fontSize", text_size)
             with gui.tag("span", style=name_style):
                 gui.html(html.escape(name))
