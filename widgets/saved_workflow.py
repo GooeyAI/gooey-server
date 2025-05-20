@@ -250,7 +250,7 @@ def render_last_updated_at(published_run: PublishedRun):
     updated_at = published_run.saved_run.updated_at
     if updated_at and isinstance(updated_at, datetime.datetime):
         gui.write(
-            f"{icons.clock} {get_relative_time(updated_at)}",
+            f"{icons.time} {get_relative_time(updated_at)}",
             className="text-nowrap",
             unsafe_allow_html=True,
         )
