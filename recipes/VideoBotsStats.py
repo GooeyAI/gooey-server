@@ -41,7 +41,7 @@ from bots.models import (
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.analysis_results import (
-    render_analysis_results_viewer,
+    render_analysis_section,
 )
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
@@ -207,6 +207,9 @@ class VideoBotsStatsPage(BasePage):
                 trunc_fn,
             ) = self.render_date_view_inputs(bi)
 
+        gui.newline()
+        render_analysis_section(self.request.user, bi, start_date, end_date)
+
         df = calculate_stats_binned_by_time(
             bi=bi,
             start_date=start_date,
@@ -228,9 +231,6 @@ class VideoBotsStatsPage(BasePage):
 
         with col2:
             plot_graphs(view, df)
-
-        gui.newline()
-        render_analysis_results_viewer(bi, start_date, end_date)
 
         gui.write("---")
         gui.session_state.setdefault(

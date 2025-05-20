@@ -5,9 +5,17 @@ from functools import partial
 
 import gooey_gui as gui
 
+from app_users.models import AppUser
 from bots.models import BotIntegration, DataSelection, GraphType, Message
+from bots.models.bot_integration import (
+    BotIntegrationAnalysisChart,
+)
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons
+from daras_ai_v2.bot_integration_widgets import (
+    analysis_runs_list_view,
+    save_analysis_runs_for_integration,
+)
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.workflow_url_input import del_button
 from gooeysite.custom_filters import JSONBExtractPath, related_json_field_summary
@@ -25,7 +33,8 @@ COLOR_PALETTE = [
 ]  # fmt: skip
 
 
-def render_analysis_results_viewer(
+def render_analysis_section(
+    user: AppUser,
     bi: BotIntegration,
     start_date: datetime.datetime,
     end_date: datetime.datetime,
@@ -41,10 +50,25 @@ def render_analysis_results_viewer(
         gui.div(),
         gui.expander(label),
     ):
-        selected_graphs = render_editor(bi, results, key)
-    if not results:
-        return
-    render_graphs(bi, results, selected_graphs)
+        input_analysis_runs = analysis_runs_list_view(user, bi)
+
+        if results:
+            selected_graphs = analysis_graphs_list_view(bi, results, key)
+        else:
+            gui.caption(
+                "No analysis results found. Add an analysis workflow and wait for the results to appear here, or select a date range to view results from a specific time period."
+            )
+
+        with gui.div(className="d-flex justify-content-end gap-3"):
+            if gui.session_state.get(key + ":save"):
+                save_analysis_runs_for_integration(bi, input_analysis_runs)
+                save_analysis_charts_for_integration(bi, selected_graphs)
+                gui.success("Saved!")
+
+            gui.button(f"{icons.save} Save", type="primary", key=key + ":save")
+
+    if results:
+        render_graphs(bi, results, selected_graphs)
 
 
 @gui.cache_in_session_state
@@ -73,17 +97,25 @@ def fetch_analysis_results(
     return results
 
 
-def render_editor(
+def analysis_graphs_list_view(
     bi: BotIntegration,
     results: dict[str, typing.Any] | None,
     key: str,
 ) -> list[dict[str, typing.Any]]:
-    from bots.models import BotIntegrationAnalysisChart
-
-    gui.write(
-        "Your bot's analysis script results can be visualized here. "
-        "Make sure your analysis prompts return a consistent JSON Schema for best results!"
-    )
+    with gui.div(className="d-flex align-items-center gap-3 mb-2"):
+        gui.write(
+            '##### <i class="fa-solid fa-chart-line"></i> Analysis Graphs',
+            unsafe_allow_html=True,
+            help="Your bot's analysis script results can be visualized below. Make sure your analysis prompts return a consistent JSON Schema for best results!",
+        )
+        if gui.button(
+            f"{icons.add} Add",
+            type="tertiary",
+            className="p-1 mb-2",
+            key=key + ":add-graph",
+        ):
+            list_items = gui.session_state.setdefault(key, [])
+            list_items.append({})
 
     # Load existing charts from DB
     if key not in gui.session_state:
@@ -92,26 +124,9 @@ def render_editor(
         )
     # Allow editing in the UI
     selected_graphs = list_view_editor(
-        add_btn_label="Add a Graph",
-        add_btn_type="tertiary",
         key=key,
         render_inputs=partial(render_inputs, results),
     )
-
-    with gui.div(className="d-flex justify-content-end gap-3"):
-        if gui.session_state.get(key + ":save"):
-            BotIntegrationAnalysisChart.objects.filter(bot_integration=bi).delete()
-            for d in selected_graphs:
-                BotIntegrationAnalysisChart.objects.create(
-                    bot_integration=bi,
-                    result_field=d["result_field"],
-                    graph_type=d["graph_type"],
-                    data_selection=d["data_selection"],
-                )
-            # Optionally, reload the page or update the graphs
-            gui.success("Charts saved!")
-
-        gui.button(f"{icons.save} Save", type="primary", key=key + ":save")
 
     return selected_graphs
 
@@ -126,6 +141,22 @@ def render_graphs(
             2,
             selected_graphs,
             partial(render_graph_data, bi=bi, results=results),
+        )
+
+
+def save_analysis_charts_for_integration(
+    bi: BotIntegration, selected_graphs: list[dict]
+):
+    """
+    Save analysis charts for the given BotIntegration and clean up removed charts.
+    """
+    BotIntegrationAnalysisChart.objects.filter(bot_integration=bi).delete()
+    for d in selected_graphs:
+        BotIntegrationAnalysisChart.objects.create(
+            bot_integration=bi,
+            result_field=d["result_field"],
+            graph_type=d["graph_type"],
+            data_selection=d["data_selection"],
         )
 
 

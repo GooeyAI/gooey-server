@@ -86,7 +86,7 @@ def general_integration_settings(
                 help="Users can rate and provide feedback on every copilot response if enabled.",
             )
 
-    input_analysis_runs = analysis_scripts_section(user, bi)
+    input_analysis_runs = analysis_runs_list_view(user, bi)
 
     if gui.button(
         f"{icons.save} Save Settings",
@@ -102,7 +102,7 @@ def general_integration_settings(
                 gui.error(str(e))
 
 
-def analysis_scripts_section(
+def analysis_runs_list_view(
     user: AppUser,
     bi: BotIntegration,
     key: str = "analysis_urls",
@@ -110,14 +110,19 @@ def analysis_scripts_section(
 ) -> list[dict]:
     with gui.div(className="d-flex align-items-center gap-3 mb-2"):
         gui.write(
-            "##### <i class='fa-solid fa-head-side-brain'></i> Analysis Scripts",
+            "##### <i class='fa-solid fa-brain'></i> Analysis Workflows",
             unsafe_allow_html=True,
             help=(
                 "Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. "
                 "Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis)."
             ),
         )
-        if gui.button(f"{icons.add} Add", type="tertiary", className="p-1 mb-2"):
+        if gui.button(
+            f"{icons.add} Add",
+            type="tertiary",
+            className="p-1 mb-2",
+            key=key + ":add-workflow",
+        ):
             list_items = gui.session_state.setdefault(f"--list-view:{key}", [])
             list_items.append({"url": default_analysis_url})
 
