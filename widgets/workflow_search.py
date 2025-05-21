@@ -31,7 +31,7 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         }
         & .clear_button {
             position: absolute;
-            top: 17px;
+            top: 14px;
             right: 18px;
             font-size: 0.9em;
             margin: 0 !important;
@@ -40,7 +40,7 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             content: "\f002";              /* FontAwesome glyph */
             font-family: "Font Awesome 6 Pro";
             position: absolute;
-            top: 16px;
+            top: 14px;
             left: 18px;
             pointer-events: none;          /* let clicks go through to the input */
             color: #888;
