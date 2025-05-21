@@ -429,7 +429,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 "Show Sources", value=config["showSources"]
             )
             config["enablePhotoUpload"] = gui.checkbox(
-                "Allow Photo Upload", value=config["enablePhotoUpload"]
+                "Allow Photo/File Upload", value=config["enablePhotoUpload"]
             )
             config["enableConversations"] = gui.checkbox(
                 'Show "New Chat"', value=config["enableConversations"]
