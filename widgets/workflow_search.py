@@ -11,6 +11,7 @@ from django.db.models import (
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
+from daras_ai_v2 import icons
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
@@ -22,14 +23,25 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             r"""
         & {
             position: relative;
+            max-width: 500px;
+        }
+        & .gui-input {
+            margin: 0;
+            width: 100%;
+        }
+        & .clear_button {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            font-size: 0.9em;
+            margin: 0 !important;
         }
         &::before {
             content: "\f002";              /* FontAwesome glyph */
-            font-family: "Font Awesome 6 Pro";    
+            font-family: "Font Awesome 6 Pro";
             position: absolute;
-            left: 12px;                  
-            top: 50%;
-            transform: translateY(-50%);
+            top: 14px;
+            left: 18px;
             pointer-events: none;          /* let clicks go through to the input */
             color: #888;
             font-size: 0.9em;
@@ -42,10 +54,15 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             "",
             placeholder="Search Workflows",
             className="bg-light border-0 rounded-pill",
-            style=dict(maxWidth="500px", marginLeft="-0.3rem", paddingLeft="2.7rem"),
+            style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
             key=key,
             value=value,
         )
+        if search_query and gui.button(
+            icons.cancel, type="link", className="clear_button"
+        ):
+            gui.session_state[key] = ""
+            search_query = ""
 
     return search_query
 
