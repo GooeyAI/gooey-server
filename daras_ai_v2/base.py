@@ -359,14 +359,26 @@ class BasePage:
             return
 
         header_placeholder = gui.div(className="mb-3")
-        with gui.div(className="position-relative"):
-            with gui.nav_tabs():
-                for tab in self.get_tabs():
-                    url = self.current_app_url(tab)
-                    with gui.nav_item(url, active=tab == self.tab):
-                        gui.html(tab.title)
+        with (
+            gui.styled(
+                """
+                @media (max-width: 768px) { 
+                    & button {
+                        font-size: 0.9rem; 
+                        padding: 0.3rem !important 
+                    }   
+                }
+                """
+            ),
+            gui.div(className="position-relative"),
+            gui.nav_tabs(),
+        ):
+            for tab in self.get_tabs():
+                url = self.current_app_url(tab)
+                with gui.nav_item(url, active=tab == self.tab):
+                    gui.html(tab.title)
 
-                    self._render_saved_timestamp()
+                self._render_saved_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
         # rendered at the end to indicate unpublished changes
@@ -416,7 +428,7 @@ class BasePage:
                 with (
                     gui.styled("& h1 { margin-top: 0 }"),
                     gui.div(
-                        className="d-flex mt-4 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
+                        className="d-flex mt-3 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
                     ),
                 ):
                     imageStyles = dict(
@@ -1088,6 +1100,8 @@ class BasePage:
             tabs.extend([RecipeTabs.saved])
         return tabs
 
+    split_output_tab = False
+
     def render_selected_tab(self):
         match self.tab:
             case RecipeTabs.run:
@@ -1095,11 +1109,17 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                input_col, output_col = gui.columns([3, 2], gap="medium")
-                with input_col:
-                    submitted = self._render_input_col()
-                with output_col:
-                    self._render_output_col(submitted=submitted)
+                with gui.styled(
+                    "& [data-reach-tab-list] {  text-align: center; margin-top: 0 }"
+                    + ("" if self.split_output_tab else RESPONSIVE_OUTPUT_TAB_SPLIT_CSS)
+                ):
+                    output_col, input_col = gui.tabs(
+                        [f"{icons.preview} Preview", f"{icons.edit} Edit"]
+                    )
+                    with input_col:
+                        submitted = self._render_input_col()
+                    with output_col:
+                        self._render_output_col(submitted=submitted)
 
                 self._render_step_row()
 
@@ -1452,18 +1472,30 @@ class BasePage:
         else:
             return "/account/"
 
-    def get_submit_container_props(self):
-        return dict(className="position-sticky bottom-0 bg-white")
-
     def render_submit_button(self, key="--submit-1"):
-        with gui.div(**self.get_submit_container_props()):
-            gui.write("---")
+        gui.write("---")
+        with gui.div(
+            className="position-sticky bottom-0 container-margin-reset p-2",
+            style=dict(
+                background="rgba(255, 255, 255, 0.7)",
+                backdropFilter="blur(7px)",
+                WebkitBackdropFilter="blur(7px)",
+                marginLeft="-0.5rem",
+                marginRight="-0.5rem",
+            ),
+        ):
             col1, col2 = gui.columns([2, 1], responsive=False)
             col2.node.props["className"] += (
                 " d-flex justify-content-end align-items-center"
             )
             col1.node.props["className"] += " d-flex flex-column justify-content-center"
-            with col1:
+            with (
+                col1,
+                # make lineclamp button transparent
+                gui.styled(
+                    "& + span button { background-color: transparent !important; }"
+                ),
+            ):
                 self.render_run_cost()
             with col2:
                 submitted = gui.button(
@@ -1471,6 +1503,7 @@ class BasePage:
                     key=key,
                     type="primary",
                     unsafe_allow_html=True,
+                    className="my-0 py-2",
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
             if not submitted:
@@ -1700,34 +1733,38 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
-        run_state = self.get_run_state(gui.session_state)
-        match run_state:
-            case RecipeRunState.completed:
-                self._render_completed_output()
-            case RecipeRunState.failed:
+        with gui.div(style=dict(position="sticky", top="0.5rem")):
+            run_state = self.get_run_state(gui.session_state)
+            if run_state == RecipeRunState.failed:
                 self._render_failed_output()
-            case RecipeRunState.running | RecipeRunState.starting:
-                self._render_running_output()
-            case RecipeRunState.standby:
-                pass
 
-        # render outputs
-        if not is_deleted:
-            self.render_output()
-
-        if run_state != RecipeRunState.running:
+            # render outputs
             if not is_deleted:
-                self._render_after_output()
-            render_output_caption()
+                self.render_output()
 
-    def _render_completed_output(self):
-        pass
+            if run_state in (RecipeRunState.running, RecipeRunState.starting):
+                self._render_running_output()
+            else:
+                if not is_deleted:
+                    self._render_after_output()
+                render_output_caption()
 
     def _render_failed_output(self):
         err_msg = gui.session_state.get(StateKeys.error_msg)
         gui.error(err_msg, unsafe_allow_html=True)
 
     def _render_running_output(self):
+        # show the preview tab when running
+        gui.html(
+            """
+            <script>
+            window.addEventListener("hydrated", function() {
+                document.getElementById("tabs--tab--0")?.click();
+            });
+            </script>
+            """
+        )
+
         run_status = gui.session_state.get(StateKeys.run_status)
         html_spinner(run_status)
         self.render_extra_waiting_output()
@@ -2404,3 +2441,26 @@ def extract_nested_str(obj) -> str:
 
 class TitleValidationError(Exception):
     pass
+
+
+RESPONSIVE_OUTPUT_TAB_SPLIT_CSS = """
+@media (min-width: 768px) {
+    & [data-reach-tab-list] {
+        display: none;
+    }
+    & [data-reach-tab-panels] {
+        display: flex;
+        flex-direction: row-reverse;
+        gap: 1rem;
+    }
+    & [data-reach-tab-panels] > div:nth-child(1) {
+        flex: 5;
+    }
+    & [data-reach-tab-panels] > div:nth-child(2) {
+        flex: 7;
+    }
+    & [data-reach-tab-panel][hidden] {
+        display: block !important;
+    }
+}
+"""

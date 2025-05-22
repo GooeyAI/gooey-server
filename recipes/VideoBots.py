@@ -330,9 +330,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # don't show the input prompt in the run titles, instead show get_run_title()
         return None
 
-    def get_submit_container_props(self):
-        return {}
-
     def render_description(self):
         gui.write(
             """
@@ -653,9 +650,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def render_output(self):
         # chat window
-        with gui.div(className="pb-3"):
+        with gui.div(className="mb-3 border rounded"):
             self.render_chat_list_view()
-            pressed_send, new_inputs = chat_input_view()
+            with gui.div(className="position-sticky bottom-0"):
+                pressed_send, new_inputs = chat_input_view()
 
         if pressed_send:
             self.on_send(*new_inputs)
@@ -1630,14 +1628,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_chat_list_view(self):
         # render a reversed list view
         with gui.div(
-            className="pb-1",
-            style=dict(
-                maxHeight="80vh",
-                overflowY="scroll",
-                display="flex",
-                flexDirection="column-reverse",
-                border="1px solid #c9c9c9",
-            ),
+            className="pb-1 d-flex flex-column-reverse overflow-auto",
+            style=dict(maxHeight="80vh"),
         ):
             with gui.div(className="px-3"):
                 show_raw_msgs = gui.checkbox("_Show Raw Output_")
@@ -1732,15 +1724,18 @@ def infer_asr_model_and_language(
 
 
 def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
-    with gui.div(
-        className="px-3 pt-3 d-flex gap-1",
-        style=dict(background="rgba(239, 239, 239, 0.6)"),
+    with (
+        gui.styled("& .gui-input, & button { margin-bottom: 0; height: 3.2rem }"),
+        gui.div(
+            className="p-1 d-flex gap-1",
+            style=dict(background="rgba(239, 239, 239)"),
+        ),
     ):
         show_uploader_key = "--show-file-uploader"
         show_uploader = gui.session_state.setdefault(show_uploader_key, False)
         if gui.button(
             "📎",
-            style=dict(height="3.2rem", backgroundColor="white"),
+            style=dict(backgroundColor="white"),
         ):
             show_uploader = not show_uploader
             gui.session_state[show_uploader_key] = show_uploader
@@ -1748,7 +1743,7 @@ def chat_input_view() -> tuple[bool, tuple[str, list[str], str, list[str]]]:
         with gui.div(className="flex-grow-1"):
             new_input_text = gui.text_area("", placeholder="Send a message", height=50)
 
-        pressed_send = gui.button("✈ Send", style=dict(height="3.2rem"))
+        pressed_send = gui.button("✈ Send")
 
     if show_uploader:
         uploaded_files = gui.file_uploader("", accept_multiple_files=True)

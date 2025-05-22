@@ -142,6 +142,8 @@ class BulkEvalPage(BasePage):
 
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
 
+    split_output_tab = True
+
     def render_description(self):
         gui.write(
             """
