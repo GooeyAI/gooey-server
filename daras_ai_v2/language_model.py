@@ -1981,7 +1981,8 @@ def _run_gemini_pro(
         LargeLanguageModels.gemini_2_5_pro_preview.model_id,
         LargeLanguageModels.gemini_2_5_flash_preview.model_id,
     }:
-        max_output_tokens = max(2048, max_output_tokens)
+        # reserve tokens for reasoning
+        max_output_tokens = max(25_000, max_output_tokens)
 
     contents = []
     for entry in messages:
