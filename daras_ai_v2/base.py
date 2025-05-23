@@ -2451,13 +2451,20 @@ RESPONSIVE_OUTPUT_TAB_SPLIT_CSS = """
     & [data-reach-tab-panels] {
         display: flex;
         flex-direction: row-reverse;
-        gap: 1rem;
-    }
-    & [data-reach-tab-panels] > div:nth-child(1) {
-        flex: 5;
+        width: 100%;
+        padding-left: 1.5rem;
     }
     & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 7;
+        flex: 0 0 auto;
+        width: 60%;
+        max-width: 100%;
+        margin-right: 0.75rem;
+    }
+    & [data-reach-tab-panels] > div:nth-child(1) {
+        flex: 0 0 auto;
+        width: 40%;
+        max-width: 100%;
+        margin-left: 0.75rem;
     }
     & [data-reach-tab-panel][hidden] {
         display: block !important;
