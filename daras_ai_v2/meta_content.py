@@ -177,6 +177,8 @@ def meta_image_for_page(
 ) -> str | None:
     if pr and pr.saved_run == sr and pr.is_root():
         file_url = metadata.meta_image or page.preview_image(state)
+    elif pr and pr.saved_run == sr and pr.photo_url:
+        file_url = pr.photo_url
     else:
         file_url = page.preview_image(state) or metadata.meta_image
     return meta_preview_url(file_url)[0]
