@@ -209,14 +209,14 @@ def render_invite_team_form(
 
     error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2 mt-2"):
-        gui.button("Close", onClick=popup_close_or_navgiate_js(next_url))
+        close_btn = gui.button("Close")
 
         if selected_plan:
             label = "Add Payment Method"
         else:
             label = "Choose a Plan"
         submit_btn = gui.button(label, type="primary")
-        if not submit_btn:
+        if not (submit_btn or close_btn):
             return
 
     if emails_csv:
@@ -257,7 +257,7 @@ def popup_close_or_navgiate_js(next_url: str) -> str:
             window.close();
         } else {
             gui.navigate(%r);
-        }   
+        }
         """
         % next_url
     )
