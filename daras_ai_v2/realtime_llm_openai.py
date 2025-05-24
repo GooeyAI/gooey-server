@@ -12,11 +12,15 @@ from furl import furl
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect, ClientConnection
 
+from sentry_sdk import capture_exception
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_bytes_to_wav
 from daras_ai_v2.exceptions import raise_for_status, ffmpeg
+from django.core.exceptions import ValidationError
+from bots.models import BotIntegration
 from functions.recipe_functions import LLMTool
+from loguru import logger
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.language_model import LargeLanguageModels
@@ -103,9 +107,15 @@ def handle_twilio_ws(
     tools: list[LLMTool] | None = None,
 ):
     stream_sid = None
-    while not stream_sid:
+    call_sid = None
+    account_sid = None
+
+    while not (stream_sid and call_sid and account_sid):
         msg = recv_json(twilio_ws)
         stream_sid = msg.get("streamSid")
+        start_data = msg.get("start") or {}
+        call_sid = start_data.get("callSid")
+        account_sid = start_data.get("accountSid")
 
     last_assistant_item_id = None
     response_start_ts = None
@@ -165,7 +175,15 @@ def handle_twilio_ws(
                 if not tools:
                     continue
                 item = event.get("item")
-                if not item or item.get("type") != "function_call":
+
+                if not item:
+                    continue
+
+                if handle_transfer_call_button(openai_ws, item, call_sid, account_sid):
+                    continue
+
+                # Handle function calls
+                if item.get("type") != "function_call":
                     continue
                 result = yield_from(
                     exec_tool_call(
@@ -429,3 +447,126 @@ def recv_json(ws: ClientConnection, **kwargs) -> dict:
     }:
         raise openai.OpenAIError(event)
     return event
+
+
+def handle_transfer_call_button(
+    openai_ws: ClientConnection, item: dict, call_sid: str, account_sid: str
+) -> bool:
+    """Handle a transfer call button if present in the response item.
+    Returns True if a transfer was initiated, False otherwise."""
+    from daras_ai_v2.bots import parse_bot_html
+    from twilio.twiml.voice_response import VoiceResponse
+
+    content = item.get("content") or []
+    if not content:
+        return False
+
+    text_content = None
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+
+        if part.get("type") == "text":
+            text_content = part.get("text", "")
+            break
+        elif part.get("type") == "audio":
+            text_content = part.get("transcript", "")
+            break
+
+    if not text_content:
+        return False
+
+    buttons, _, _ = parse_bot_html(text_content)
+
+    for button in buttons:
+        from bots.models.bot_integration import validate_phonenumber
+
+        if "transfer_call" not in button.get("id", ""):
+            continue
+
+        transfer_number = button.get("title", "").strip()
+        if not transfer_number:
+            continue
+
+        # Validate the phone number before attempting transfer
+        try:
+            validate_phonenumber(transfer_number)
+            logger.info(f"Valid phone number format: {transfer_number}")
+        except ValidationError as e:
+            logger.info(f"invalid phone number format: {transfer_number}: {e=}")
+            send_json(
+                openai_ws,
+                {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Invalid phone number format: {str(e)}",
+                            }
+                        ],
+                    },
+                },
+            )
+            send_json(openai_ws, {"type": "response.create"})
+            return False
+
+        try:
+            # Use any available Twilio client to look up call details
+            temp_bi = BotIntegration.objects.filter(
+                twilio_phone_number__isnull=False
+            ).first()
+            if not temp_bi:
+                raise BotIntegration.DoesNotExist("No Twilio BotIntegration found")
+
+            temp_client = temp_bi.get_twilio_client()
+            call = temp_client.calls(call_sid).fetch()
+            bot_number = call.to
+            if account_sid == settings.TWILIO_ACCOUNT_SID:
+                account_sid = ""
+            bi = BotIntegration.objects.get(
+                twilio_account_sid=account_sid, twilio_phone_number=bot_number
+            )
+
+        except BotIntegration.DoesNotExist as e:
+            logger.debug(
+                f"could not find bot integration with Twilio phone number {account_sid=} {bot_number=} {e}"
+            )
+            capture_exception(e)
+            return False
+
+        client = bi.get_twilio_client()
+
+        # try to transfer the call
+        try:
+            resp = VoiceResponse()
+            resp.dial(transfer_number)
+            client.calls(call_sid).update(twiml=str(resp))
+            logger.info(f"Successfully initiated transfer to {transfer_number}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to transfer call: {e}")
+
+            send_json(
+                openai_ws,
+                {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Failed to transfer call: {str(e)}",
+                            }
+                        ],
+                    },
+                },
+            )
+            send_json(openai_ws, {"type": "response.create"})
+            capture_exception(e)
+            return False
+
+    return False
