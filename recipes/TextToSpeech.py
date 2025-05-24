@@ -259,8 +259,10 @@ class TextToSpeechPage(BasePage):
                 # Select the type of audio file you want returned
                 audio_config = texttospeech.AudioConfig()
                 audio_config.audio_encoding = texttospeech.AudioEncoding.MP3
-                audio_config.pitch = pitch  # optional
-                audio_config.speaking_rate = speaking_rate  # optional
+                # Chirp HD voices don't support SSML input, speaking rate and pitch-audio parameters, and the A-Law audio encoding
+                if "chirp" not in voice_name.lower():
+                    audio_config.pitch = pitch  # optional
+                    audio_config.speaking_rate = speaking_rate  # optional
 
                 # Perform the text-to-speech request on the text input with the selected
                 # voice parameters and audio file type
