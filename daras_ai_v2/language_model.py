@@ -62,6 +62,7 @@ class LLMApis(Enum):
     self_hosted = 7
     mistral = 8
     openai_audio = 9
+    sarvam = 10
 
 
 class LLMSpec(typing.NamedTuple):
@@ -730,6 +731,13 @@ class LargeLanguageModels(Enum):
         context_window=2048,
         price=1,
         is_deprecated=True,
+    )
+    sarvam_m = LLMSpec(
+        label="Sarvam M (sarvam.ai)",
+        model_id="sarvam-m",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=1,
     )
 
     llama_3_groq_70b_tool_use = LLMSpec(
@@ -1705,6 +1713,12 @@ def get_openai_client(model: str):
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_EASTUS2,
             api_version="2024-12-01-preview",
             max_retries=0,
+        )
+    elif model.startswith("sarvam-"):
+        client = openai.OpenAI(
+            api_key=settings.SARVAM_API_KEY,
+            max_retries=0,
+            base_url="https://api.sarvam.ai/v1",
         )
     else:
         client = openai.OpenAI(

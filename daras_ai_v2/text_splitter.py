@@ -41,10 +41,9 @@ threadlocal = threading.local()
 
 
 def default_length_function(text: str, model: str = "gpt-4") -> int:
-    if (
-        model.startswith("o3-")
-        or model.startswith("gpt-4.5-")
-        or model.startswith("gpt-4.1-")
+    if any(
+        model.startswith(prefix)
+        for prefix in ["o3-", "gpt-4.5-", "gpt-4.1-", "sarvam-"]
     ):
         model = "gpt-4o"
     try:

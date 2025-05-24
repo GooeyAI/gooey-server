@@ -982,6 +982,15 @@ def run():
         provider=ModelProvider.aks,
         notes="Same as GPT-4o. Note that the actual cost of this model is in GPU Milliseconds",
     )
+    llm_pricing_create(
+        model_id="sarvam-m",
+        model_name=LargeLanguageModels.sarvam_m.name,
+        unit_cost_input=5,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.sarvam,
+        pricing_url="https://dashboard.sarvam.ai/billing/pricing",
+    )
 
     # fireworks
 
