@@ -20,6 +20,7 @@ from daras_ai_v2.exceptions import raise_for_status, ffmpeg
 from django.core.exceptions import ValidationError
 from bots.models import BotIntegration
 from functions.recipe_functions import LLMTool
+from twilio.base.exceptions import TwilioRestException
 from loguru import logger
 
 if typing.TYPE_CHECKING:
@@ -71,7 +72,7 @@ def run_openai_audio(
             tools=tools,
         )
         if twilio_ws:
-            handle_twilio_ws(twilio_ws, openai_ws, tools)
+            handle_twilio_ws(twilio_ws, openai_ws, tools, audio_url)
         else:
             send_json(openai_ws, {"type": "response.create"})
             for entry in stream_ws_response(
@@ -105,17 +106,16 @@ def handle_twilio_ws(
     twilio_ws: ClientConnection,
     openai_ws: ClientConnection,
     tools: list[LLMTool] | None = None,
+    audio_url: str | None = None,
 ):
     stream_sid = None
     call_sid = None
-    account_sid = None
-
-    while not (stream_sid and call_sid and account_sid):
+    bi_id = furl(audio_url).args.get("bi_id") or None
+    while not (stream_sid and call_sid):
         msg = recv_json(twilio_ws)
         stream_sid = msg.get("streamSid")
         start_data = msg.get("start") or {}
         call_sid = start_data.get("callSid")
-        account_sid = start_data.get("accountSid")
 
     last_assistant_item_id = None
     response_start_ts = None
@@ -179,8 +179,8 @@ def handle_twilio_ws(
                 if not item:
                     continue
 
-                if handle_transfer_call_button(openai_ws, item, call_sid, account_sid):
-                    continue
+                if handle_transfer_call_button(openai_ws, item, call_sid, bi_id):
+                    break
 
                 # Handle function calls
                 if item.get("type") != "function_call":
@@ -339,7 +339,7 @@ def stream_ws_response(
     from usage_costs.models import ModelSku
     from usage_costs.cost_utils import record_cost_auto
 
-    ouput_pcm = b""
+    output_pcm = b""
     input_audio_transcript = None
     output = None
     entry = {"role": "assistant", "content": "", "chunk": ""}
@@ -357,7 +357,7 @@ def stream_ws_response(
                     yield entry
 
             case "response.audio.delta":
-                ouput_pcm += base64.b64decode(event["delta"])
+                output_pcm += base64.b64decode(event["delta"])
 
             case "conversation.item.input_audio_transcription.completed":
                 input_audio_transcript = event["transcript"]
@@ -393,12 +393,12 @@ def stream_ws_response(
     if input_audio_transcript is not None:
         entry["input_audio_transcript"] = input_audio_transcript
 
-    if ouput_pcm:
+    if output_pcm:
         with (
             tempfile.NamedTemporaryFile(suffix=".pcm") as infile,
             tempfile.NamedTemporaryFile(suffix=".mp3") as outfile,
         ):
-            infile.write(ouput_pcm)
+            infile.write(output_pcm)
             infile.flush()
             ffmpeg(
                 "-f", "s16le", "-ar", "24k", "-ac", "1", "-i", infile.name, outfile.name
@@ -450,15 +450,17 @@ def recv_json(ws: ClientConnection, **kwargs) -> dict:
 
 
 def handle_transfer_call_button(
-    openai_ws: ClientConnection, item: dict, call_sid: str, account_sid: str
+    openai_ws: ClientConnection, item: dict, call_sid: str, bi_id: str | None
 ) -> bool:
     """Handle a transfer call button if present in the response item.
     Returns True if a transfer was initiated, False otherwise."""
     from daras_ai_v2.bots import parse_bot_html
     from twilio.twiml.voice_response import VoiceResponse
+    from routers.bots_api import api_hashids
+    from bots.models.bot_integration import validate_phonenumber
 
     content = item.get("content") or []
-    if not content:
+    if not content or not bi_id:
         return False
 
     text_content = None
@@ -479,8 +481,6 @@ def handle_transfer_call_button(
     buttons, _, _ = parse_bot_html(text_content)
 
     for button in buttons:
-        from bots.models.bot_integration import validate_phonenumber
-
         if "transfer_call" not in button.get("id", ""):
             continue
 
@@ -491,9 +491,7 @@ def handle_transfer_call_button(
         # Validate the phone number before attempting transfer
         try:
             validate_phonenumber(transfer_number)
-            logger.info(f"Valid phone number format: {transfer_number}")
         except ValidationError as e:
-            logger.info(f"invalid phone number format: {transfer_number}: {e=}")
             send_json(
                 openai_ws,
                 {
@@ -514,25 +512,12 @@ def handle_transfer_call_button(
             return False
 
         try:
-            # Use any available Twilio client to look up call details
-            temp_bi = BotIntegration.objects.filter(
-                twilio_phone_number__isnull=False
-            ).first()
-            if not temp_bi:
-                raise BotIntegration.DoesNotExist("No Twilio BotIntegration found")
-
-            temp_client = temp_bi.get_twilio_client()
-            call = temp_client.calls(call_sid).fetch()
-            bot_number = call.to
-            if account_sid == settings.TWILIO_ACCOUNT_SID:
-                account_sid = ""
-            bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
-            )
+            bi_id_decoded = api_hashids.decode(bi_id)[0]
+            bi = BotIntegration.objects.get(id=bi_id_decoded)
 
         except BotIntegration.DoesNotExist as e:
             logger.debug(
-                f"could not find bot integration with Twilio phone number {account_sid=} {bot_number=} {e}"
+                f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
             )
             capture_exception(e)
             return False
@@ -545,8 +530,9 @@ def handle_transfer_call_button(
             resp.dial(transfer_number)
             client.calls(call_sid).update(twiml=str(resp))
             logger.info(f"Successfully initiated transfer to {transfer_number}")
+
             return True
-        except Exception as e:
+        except TwilioRestException as e:
             logger.error(f"Failed to transfer call: {e}")
 
             send_json(
