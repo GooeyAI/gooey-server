@@ -4,6 +4,7 @@ from collections import Counter
 from functools import partial
 
 import gooey_gui as gui
+from django.db import transaction
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, DataSelection, GraphType, Message
@@ -62,7 +63,8 @@ def render_analysis_section(
         with gui.div(className="d-flex justify-content-end gap-3"):
             if gui.session_state.get(key + ":save"):
                 save_analysis_runs_for_integration(bi, input_analysis_runs)
-                save_analysis_charts_for_integration(bi, selected_graphs)
+                if results:
+                    save_analysis_charts_for_integration(bi, selected_graphs)
                 gui.success("Saved!")
 
             gui.button(f"{icons.save} Save", type="primary", key=key + ":save")
@@ -144,6 +146,7 @@ def render_graphs(
         )
 
 
+@transaction.atomic
 def save_analysis_charts_for_integration(
     bi: BotIntegration, selected_graphs: list[dict]
 ):
