@@ -395,7 +395,9 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
+        with gui.div(
+            className="d-flex justify-content-between align-items-start mt-0 mt-md-3"
+        ):
             if tbreadcrumbs.has_breadcrumbs():
                 with gui.div(
                     className="d-block d-lg-flex align-items-center pt-2 mb-2"
@@ -425,39 +427,49 @@ class BasePage:
                 with gui.styled("& h1 { margin-top: 0 }"):
                     self._render_title(tbreadcrumbs.h1_title)
             else:
-                with (
-                    gui.styled("& h1 { margin-top: 0 }"),
-                    gui.div(
-                        className="d-flex mt-3 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
-                    ),
-                ):
-                    imageStyles = dict(
-                        maxWidth="150px",
-                        height="150px",
-                        margin=0,
-                        minHeight="150px",
-                        objectFit="cover",
-                    )
-                    if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
-                        imageStyles["borderRadius"] = "50%"
-
-                    gui.image(
-                        src=pr.photo_url,
-                        style=imageStyles,
-                    )
-                    with gui.div(className="d-flex gap-2 w-100"):
-                        with gui.div(className="flex-grow-1"):
+                img_style = dict(objectFit="cover", marginBottom=0)
+                if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
+                    img_style["borderRadius"] = "50%"
+                with gui.div(className="d-flex gap-4 align-items-center"):
+                    if pr.photo_url:
+                        with gui.div(className="d-none d-md-inline"):
+                            gui.image(
+                                src=pr.photo_url,
+                                style=img_style | dict(width="150px", height="150px"),
+                            )
+                    with (
+                        gui.styled(
+                            """
+                            & h1 { margin: 0 }
+                            @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
+                            """
+                        ),
+                        gui.div(),
+                    ):
+                        with (
+                            gui.div(
+                                className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
+                            ),
+                        ):
+                            if pr.photo_url:
+                                with gui.div(className="d-inline d-md-none"):
+                                    gui.image(
+                                        src=pr.photo_url,
+                                        style=img_style
+                                        | dict(width="80px", height="80px"),
+                                    )
                             self._render_title(tbreadcrumbs.h1_title)
-                            if pr and pr.notes:
-                                gui.write(pr.notes, line_clamp=2)
-                        self.render_header_extra()
+                        self.render_notes_and_extra()
         # render notes below the title and social buttons
         else:
-            with gui.div(className="d-flex gap-2 w-100"):
-                with gui.div(className="flex-grow-1"):
-                    if pr and pr.notes:
-                        gui.write(pr.notes, line_clamp=2)
-                self.render_header_extra()
+            self.render_notes_and_extra()
+
+    def render_notes_and_extra(self):
+        with gui.div(className="d-flex gap-2 w-100 align-items-center"):
+            with gui.div(className="flex-grow-1 container-margin-reset"):
+                if self.current_pr and self.current_pr.notes:
+                    gui.write(self.current_pr.notes, line_clamp=3)
+            self.render_header_extra()
 
     def render_header_extra(self):
         pass
@@ -1738,6 +1750,7 @@ class BasePage:
                 self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
+                self.click_preview_tab()
                 self._render_running_output()
             else:
                 if not is_deleted:
@@ -1748,7 +1761,7 @@ class BasePage:
         err_msg = gui.session_state.get(StateKeys.error_msg)
         gui.error(err_msg, unsafe_allow_html=True)
 
-    def _render_running_output(self):
+    def click_preview_tab(self):
         # show the preview tab when running
         gui.html(
             """
@@ -1760,8 +1773,11 @@ class BasePage:
             """
         )
 
+    scroll_into_view = True
+
+    def _render_running_output(self):
         run_status = gui.session_state.get(StateKeys.run_status)
-        html_spinner(run_status)
+        html_spinner(run_status, scroll_into_view=self.scroll_into_view)
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):

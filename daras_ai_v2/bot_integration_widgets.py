@@ -490,7 +490,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             gui.html(
                 # language=html
                 f"""
-                <div id="gooey-embed" style="border: 1px solid #eee; height: 80vh"></div>
+                <div id="gooey-embed" class="border rounded p-1" style="height:80vh"></div>
                 <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
                 """
             )
