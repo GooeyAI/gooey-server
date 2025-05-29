@@ -1100,8 +1100,6 @@ class BasePage:
             tabs.extend([RecipeTabs.saved])
         return tabs
 
-    split_output_tab = False
-
     def render_selected_tab(self):
         match self.tab:
             case RecipeTabs.run:
@@ -1109,10 +1107,7 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                with gui.styled(
-                    "& [data-reach-tab-list] {  text-align: center; margin-top: 0 }"
-                    + ("" if self.split_output_tab else RESPONSIVE_OUTPUT_TAB_SPLIT_CSS)
-                ):
+                with gui.styled(OUTPUT_TABS_CSS):
                     output_col, input_col = gui.tabs(
                         [f"{icons.preview} Preview", f"{icons.edit} Edit"]
                     )
@@ -2443,7 +2438,10 @@ class TitleValidationError(Exception):
     pass
 
 
-RESPONSIVE_OUTPUT_TAB_SPLIT_CSS = """
+OUTPUT_TABS_CSS = """
+& [data-reach-tab-list] {  
+    text-align: center; margin-top: 0 
+}
 @media (min-width: 768px) {
     & [data-reach-tab-list] {
         display: none;

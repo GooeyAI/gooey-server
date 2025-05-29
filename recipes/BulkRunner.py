@@ -45,8 +45,6 @@ class BulkRunnerPage(BasePage):
     slug_versions = ["bulk-runner", "bulk"]
     price = 1
 
-    split_output_tab = True
-
     class RequestModel(BasePage.RequestModel):
         documents: list[FieldHttpUrl] = Field(
             title="Input Data Spreadsheet",
