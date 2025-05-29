@@ -391,7 +391,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             bi.website_url = gui.text_input(
                 "###### Website Link",
                 key=f"_bi_website_url_{bi.id}",
-                value=bi.website_url or (user and user.website_url),
+                value=bi.website_url,
             )
 
         gui.write("###### Conversation Starters")
