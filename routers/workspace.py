@@ -13,7 +13,7 @@ from fastapi.responses import RedirectResponse
 from furl import furl
 
 from app_users.models import AppUser
-from daras_ai_v2 import settings, urls
+from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from handles.models import Handle, COMMON_EMAIL_DOMAINS
@@ -97,7 +97,7 @@ def render_create_workspace_form(
 ):
     from daras_ai_v2.profiles import render_handle_input, update_handle
 
-    gui.write("#### Create New Workspace")
+    gui.write("#### Create Gooey.AI Workspace")
     gui.caption(
         "Workspaces allow you to collaborate with team members with a shared payment method."
     )
@@ -109,7 +109,8 @@ def render_create_workspace_form(
     gui.write("###### Your workspace's URL")
     with gui.div(className="d-flex align-items-start gap-2"):
         with gui.div(className="mt-2 pt-1"):
-            gui.html(urls.remove_scheme(settings.APP_BASE_URL).rstrip("/"))
+            # rstrip("/") + "/" to preserve exactly one trailing slash
+            gui.html(settings.APP_BASE_URL.rstrip("/") + "/")
         with gui.div(className="d-block d-lg-flex gap-3 w-100"):
             # separate div for input & error msg for handle field
             if "handle_name" not in gui.session_state:
@@ -180,7 +181,7 @@ def get_default_workspace_name_for_user(user: AppUser) -> str:
 def render_invite_team_form(
     workspace: Workspace, user: AppUser, selected_plan: int | None, next_url: str
 ):
-    gui.write("### Invite Team Members")
+    gui.write(f"### Invite members to {workspace.display_name()} on Gooey.AI")
     gui.caption(
         "This workspace is private and only members can access its workflows and shared billing."
     )
