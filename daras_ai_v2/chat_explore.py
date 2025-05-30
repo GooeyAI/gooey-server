@@ -40,12 +40,11 @@ def _render_bi(bi: BotIntegration):
     )
 
     if bi.published_run.created_by:
-        with gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-            render_author_from_user(
-                bi.published_run.created_by,
-                image_size="20px",
-                text_size="0.9rem",
-            )
+        with (
+            gui.div(className="mb-1 text-truncate", style={"height": "1.5rem"}),
+            gui.styled("& .author-name { font-size: 0.9rem; }"),
+        ):
+            render_author_from_user(bi.published_run.created_by, image_size="20px")
 
     tb = get_title_breadcrumbs(
         VideoBotsPage, bi.published_run.saved_run, bi.published_run
