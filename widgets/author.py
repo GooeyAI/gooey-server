@@ -53,8 +53,6 @@ def render_author_from_workspace(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
-    text_size: str | None = None,
-    name_style: dict | None = None,
 ):
     if not workspace:
         return
@@ -73,8 +71,6 @@ def render_author_from_workspace(
         link=link,
         image_size=image_size,
         responsive=responsive,
-        text_size=text_size,
-        name_style=name_style,
     )
 
 
@@ -84,8 +80,6 @@ def render_author_from_user(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
-    text_size: str | None = None,
-    name_style: dict | None = None,
 ):
     if not user:
         return
@@ -101,8 +95,6 @@ def render_author_from_user(
         link=link,
         image_size=image_size,
         responsive=responsive,
-        text_size=text_size,
-        name_style=name_style,
     )
 
 
@@ -113,8 +105,6 @@ def render_author(
     *,
     image_size: str,
     responsive: bool,
-    text_size: str | None,
-    name_style: dict | None = None,
 ):
     if not photo and not name:
         return
@@ -129,13 +119,13 @@ def render_author(
         if photo:
             with gui.styled(
                 """
-                    @media (min-width: 1024px) {
-                        & {
-                            width: %(image_size)s;
-                            height: %(image_size)s;
-                        }
+                @media (min-width: 1024px) {
+                    & {
+                        width: %(image_size)s;
+                        height: %(image_size)s;
                     }
-                    """
+                }
+                """
                 % dict(image_size=image_size)
             ):
                 gui.image(
@@ -151,7 +141,5 @@ def render_author(
                 )
 
         if name:
-            name_style = name_style or {}
-            name_style.setdefault("fontSize", text_size)
-            with gui.tag("span", style=name_style):
+            with gui.tag("span", className="author-name"):
                 gui.html(html.escape(name))

@@ -186,11 +186,20 @@ def render_preview_footer(
     latest_version = published_run.versions.latest()
 
     with (
-        gui.styled(SEPARATOR_CSS),
-        gui.div(
-            className="d-flex align-items-center flex-wrap flex-lg-nowrap",
-            style={"fontSize": "0.9rem"},
+        gui.styled(
+            """
+            & .author-name {
+                max-width: 100px; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+            }
+            & {
+                font-size: 0.9rem;
+            }
+            """
+            + SEPARATOR_CSS
         ),
+        gui.div(className="d-flex align-items-center flex-wrap flex-lg-nowrap"),
     ):
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
@@ -205,11 +214,6 @@ def render_preview_footer(
                     published_run.workspace,
                     image_size="24px",
                     responsive=False,
-                    name_style={
-                        "maxWidth": "100px",
-                        "overflow": "hidden",
-                        "textOverflow": "ellipsis",
-                    },
                 )
 
         if published_run.last_edited_by:
@@ -218,11 +222,6 @@ def render_preview_footer(
                     published_run.last_edited_by,
                     image_size="24px",
                     responsive=False,
-                    name_style={
-                        "maxWidth": "100px",
-                        "overflow": "hidden",
-                        "textOverflow": "ellipsis",
-                    },
                 )
 
         render_last_updated_at(published_run)
