@@ -5,6 +5,7 @@ import json
 import tempfile
 import threading
 import typing
+from datetime import datetime
 
 import openai
 import requests
@@ -72,7 +73,24 @@ def run_openai_audio(
             tools=tools,
         )
         if twilio_ws:
-            handle_twilio_ws(twilio_ws, openai_ws, tools, audio_url)
+            transcript_entries = handle_twilio_ws(
+                twilio_ws, openai_ws, tools, audio_url
+            )
+            if transcript_entries:
+                formatted_entries = [
+                    (entry["timestamp"], entry["content"], entry["role"])
+                    for entry in transcript_entries
+                ]
+
+                if formatted_entries:
+                    # Use first entry's timestamp as conversation start
+                    first_timestamp, *_ = formatted_entries[0]
+                    consolidated_entry = format_transcription_entry(
+                        formatted_entries, first_timestamp
+                    )
+                    if consolidated_entry:
+                        yield [consolidated_entry]
+
         else:
             send_json(openai_ws, {"type": "response.create"})
             for entry in stream_ws_response(
@@ -117,6 +135,7 @@ def handle_twilio_ws(
         start_data = msg.get("start") or {}
         call_sid = start_data.get("callSid")
 
+    transcript_entries = []
     last_assistant_item_id = None
     response_start_ts = None
     latest_media_ts = {"val": 0}
@@ -126,83 +145,141 @@ def handle_twilio_ws(
         target=pipe_audio, args=(twilio_ws, openai_ws, latest_media_ts)
     ).start()
 
-    while True:
-        event = recv_json(openai_ws)
-        match event.get("type"):
-            case "input_audio_buffer.speech_started":
-                if not (last_assistant_item_id and response_start_ts):
-                    continue
-                # send_json(
-                #     openai_ws,
-                #     {
-                #         "type": "conversation.item.truncate",
-                #         "item_id": last_assistant_item_id,
-                #         "content_index": 0,
-                #         "audio_end_ms": max(
-                #             latest_media_ts["val"] - response_start_ts, 0
-                #         ),
-                #     },
-                # )
-                send_json(
-                    twilio_ws,
-                    {"event": "clear", "streamSid": stream_sid},
-                )
-                last_assistant_item_id = None
-                response_start_ts = None
-
-            case "response.audio.delta":
-                if response_start_ts is None:
-                    response_start_ts = latest_media_ts["val"]
-                item_id = event.get("item_id")
-                if item_id:
-                    last_assistant_item_id = item_id
-                send_json(
-                    twilio_ws,
-                    {
-                        "event": "media",
-                        "streamSid": stream_sid,
-                        "media": {"payload": event["delta"]},
-                    },
-                )
-                send_json(
-                    twilio_ws,
-                    {"event": "mark", "streamSid": stream_sid},
-                )
-
-            case "response.output_item.done":
-                from recipes.VideoBots import exec_tool_call
-
-                if not tools:
-                    continue
-                item = event.get("item")
-
-                if not item:
-                    continue
-
-                if handle_transfer_call_button(openai_ws, item, call_sid, bi_id):
-                    break
-
-                # Handle function calls
-                if item.get("type") != "function_call":
-                    continue
-                result = yield_from(
-                    exec_tool_call(
-                        {"function": item},
-                        {tool.name: tool for tool in tools},
+    try:
+        while True:
+            event = recv_json(openai_ws)
+            match event.get("type"):
+                case "input_audio_buffer.speech_started":
+                    if not (last_assistant_item_id and response_start_ts):
+                        continue
+                    # send_json(
+                    #     openai_ws,
+                    #     {
+                    #         "type": "conversation.item.truncate",
+                    #         "item_id": last_assistant_item_id,
+                    #         "content_index": 0,
+                    #         "audio_end_ms": max(
+                    #             latest_media_ts["val"] - response_start_ts, 0
+                    #         ),
+                    #     },
+                    # )
+                    send_json(
+                        twilio_ws,
+                        {"event": "clear", "streamSid": stream_sid},
                     )
-                )
-                send_json(
-                    openai_ws,
-                    {
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "function_call_output",
-                            "call_id": item["call_id"],
-                            "output": json.dumps(result),
+                    last_assistant_item_id = None
+                    response_start_ts = None
+
+                case "conversation.item.input_audio_transcription.completed":
+                    if event.get("transcript"):
+                        transcript_entries.append(
+                            {
+                                "timestamp": datetime.now(),
+                                "role": "user",
+                                "content": event["transcript"],
+                            }
+                        )
+
+                case "response.audio.delta":
+                    if response_start_ts is None:
+                        response_start_ts = latest_media_ts["val"]
+                    item_id = event.get("item_id")
+                    if item_id:
+                        last_assistant_item_id = item_id
+                    send_json(
+                        twilio_ws,
+                        {
+                            "event": "media",
+                            "streamSid": stream_sid,
+                            "media": {"payload": event["delta"]},
                         },
-                    },
-                )
-                send_json(openai_ws, {"type": "response.create"})
+                    )
+                    send_json(
+                        twilio_ws,
+                        {"event": "mark", "streamSid": stream_sid},
+                    )
+
+                case "response.output_item.done":
+                    from recipes.VideoBots import exec_tool_call
+
+                    if not tools:
+                        continue
+                    item = event.get("item")
+
+                    if not item:
+                        continue
+
+                    # Extract transcript from item content if available
+                    if item.get("content"):
+                        transcript = item["content"][0].get("transcript") or ""
+
+                        if transcript:
+                            transcript_entries.append(
+                                {
+                                    "timestamp": datetime.now(),
+                                    "role": "assistant",
+                                    "content": transcript,
+                                }
+                            )
+
+                    if handle_transfer_call_button(openai_ws, item, call_sid, bi_id):
+                        break
+
+                    # Handle function calls
+                    if item.get("type") != "function_call":
+                        continue
+                    result = yield_from(
+                        exec_tool_call(
+                            {"function": item},
+                            {tool.name: tool for tool in tools},
+                        )
+                    )
+                    send_json(
+                        openai_ws,
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": item["call_id"],
+                                "output": json.dumps(result),
+                            },
+                        },
+                    )
+                    send_json(openai_ws, {"type": "response.create"})
+    except ConnectionClosed:
+        pass
+
+    return transcript_entries
+
+
+def format_transcription_entry(transcription_entries, conversation_start):
+    """Format collected transcription data for display"""
+
+    formatted_lines = []
+
+    for _, (timestamp, content, role) in enumerate(transcription_entries):
+        time_str = format_timestamp(timestamp, conversation_start)
+        formatted_line = f"[{time_str}] {role.title()}: {content}"
+
+        formatted_lines.append(formatted_line)
+
+    if not formatted_lines:
+        return None
+
+    return {
+        "role": "assistant",
+        "content": "\n\n".join(formatted_lines),
+    }
+
+
+def format_timestamp(dt, conversation_start):
+    """Format datetime as elapsed time from conversation start (MM:SS)"""
+    if dt is None:
+        return "00:00"
+    elapsed = dt - conversation_start
+    minutes = int(elapsed.total_seconds() // 60)
+    seconds = int(elapsed.total_seconds() % 60)
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 T = typing.TypeVar("T")
