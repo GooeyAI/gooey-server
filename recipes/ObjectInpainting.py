@@ -237,7 +237,9 @@ class ObjectInpaintingPage(BasePage):
                 gui.div()
 
     def run(self, state: dict):
-        request: ObjectInpaintingPage.RequestModel = self.RequestModel.model_validate(state)
+        request: ObjectInpaintingPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield "Running Image Segmentation..."
 

@@ -881,7 +881,7 @@ class BasePage:
             return True
 
         curr_hash = hashlib.md5(
-            json.dumps(curr_req.model_dump(), sort_keys=True).encode()
+            json.dumps(curr_req.model_dump(mode="json"), sort_keys=True).encode()
         ).hexdigest()
         prev_hash = gui.session_state.setdefault("--prev-request-hash", curr_hash)
 
@@ -1636,7 +1636,7 @@ class BasePage:
             state.update(response.model_dict(exclude_unset=True))
 
         # validate the response if successful
-        self.ResponseModel.validate(response)
+        self.ResponseModel.model_validate(response)
 
     def run_v2(
         self, request: RequestModel, response: BaseModel
@@ -1981,7 +1981,7 @@ class BasePage:
         # clear error msg
         gui.session_state.pop(StateKeys.error_msg, None)
         # clear outputs
-        for field_name in self.ResponseModel.__fields__:
+        for field_name in self.ResponseModel.model_fields:
             gui.session_state.pop(field_name, None)
 
     def _render_after_output(self):
@@ -2017,7 +2017,7 @@ class BasePage:
         return [
             field_name
             for model in (self.RequestModel, self.ResponseModel)
-            for field_name in model.__fields__
+            for field_name in model.model_fields
         ] + [
             StateKeys.error_msg,
             StateKeys.run_status,
@@ -2414,10 +2414,10 @@ def extract_model_fields(
     """
     return {
         field_name: state.get(field_name)
-        for field_name, field in model.__fields__.items()
+        for field_name, field in model.model_fields.items()
         if (
             include_all
-            or field.required
+            or field.is_required()
             or (preferred_fields and field_name in preferred_fields)
             or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )

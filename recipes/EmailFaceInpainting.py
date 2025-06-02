@@ -238,8 +238,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     #         gui.div()
 
     def run(self, state: dict):
-        request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.model_validate(
-            state
+        request: EmailFaceInpaintingPage.RequestModel = (
+            self.RequestModel.model_validate(state)
         )
 
         yield "Fetching profile..."

@@ -189,7 +189,9 @@ class ImageSegmentationPage(BasePage):
         )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: ImageSegmentationPage.RequestModel = self.RequestModel.model_validate(state)
+        request: ImageSegmentationPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield f"Running {ImageSegmentationModels[request.selected_model].value}..."
 

@@ -98,7 +98,9 @@ class CreateStreamResponse(BaseModel):
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
     get_redis_cache().set(
-        f"gooey/stream-init/v1/{request_id}", request.model_dump_json(exclude_unset=True), ex=600
+        f"gooey/stream-init/v1/{request_id}",
+        request.model_dump_json(exclude_unset=True),
+        ex=600,
     )
     stream_url = str(
         furl(settings.API_BASE_URL)
@@ -214,7 +216,9 @@ def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
                 return
             if isinstance(event, StreamError):
                 yield b"event: error\n"
-            yield b"data: " + event.model_dump_json(exclude_none=True).encode() + b"\n\n"
+            yield (
+                b"data: " + event.model_dump_json(exclude_none=True).encode() + b"\n\n"
+            )
     finally:
         yield b"event: close\ndata:\n\n"
 

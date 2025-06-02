@@ -297,7 +297,8 @@ class GoogleGPTPage(BasePage):
         response.final_prompt += references_as_prompt(response.references) + "\n\n"
         # add task instructions
         task_instructions = render_prompt_vars(
-            prompt=request.task_instructions, state=request.model_dict() | response.model_dict()
+            prompt=request.task_instructions,
+            state=request.model_dict() | response.model_dict(),
         )
         response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question

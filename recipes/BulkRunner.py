@@ -120,7 +120,7 @@ List of URLs to the evaluation runs that you requested.
 
             schema = page_cls.RequestModel.schema(ref_template="{model}")
             for field, model_field in page_cls.RequestModel.model_fields.items():
-                if model_field.required:
+                if model_field.is_required():
                     input_fields = required_input_fields
                 else:
                     input_fields = optional_input_fields
