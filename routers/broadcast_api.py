@@ -16,6 +16,9 @@ app = CustomAPIRouter()
 
 
 class BotBroadcastFilters(BaseModel):
+    twilio_phone_number__in: list[str] | None = Field(
+        description="A list of Twilio phone numbers to broadcast to."
+    )
     wa_phone_number__in: list[str] | None = Field(
         description="A list of WhatsApp phone numbers to broadcast to."
     )
@@ -35,6 +38,9 @@ class BotBroadcastRequestModel(BaseModel):
     audio: str | None = Field(description="Audio URL to send to all users")
     video: str | None = Field(description="Video URL to send to all users")
     documents: list[str] | None = Field(description="Video URL to send to all users")
+    integration_id: str | None = Field(
+        description="The Bot's Integration ID as shown in the Copilot Integrations tab or as variables in a function call."
+    )
     buttons: list[ReplyButton] | None = Field(
         description="Buttons to send to all users"
     )
@@ -72,15 +78,26 @@ def broadcast_api_json(
         bi_qs = bi_qs.filter(
             saved_run__run_id=run_id, saved_run__workspace=api_key.workspace
         )
+    elif bot_request.integration_id:
+        from routers.bots_api import api_hashids
+
+        try:
+            bi_id_decoded = api_hashids.decode(bot_request.integration_id)[0]
+            bi_qs = bi_qs.filter(id=bi_id_decoded)
+        except IndexError:
+            return HTTPException(
+                status_code=404,
+                detail="Could not find a bot in your account with the given integration_id.",
+            )
     else:
         return HTTPException(
             status_code=400,
-            detail="Must provide either example_id or run_id as a query parameter.",
+            detail="Must provide one of the following: example_id or run_id as query parameters, or integration_id in the request body.",
         )
     if not bi_qs.exists():
         return HTTPException(
             status_code=404,
-            detail=f"Could not find a bot in your account with the given {example_id=} & {run_id=}. "
+            detail=f"Could not find a bot in your account with the given {example_id=} & {run_id=} & {bot_request.integration_id=}. "
             "Please use the same account that you used to create the bot.",
         )
 
