@@ -1559,7 +1559,7 @@ def _stream_openai_chunked(
                     try:
                         tc = entry["tool_calls"][tc_delta.index]
                     except (KeyError, IndexError):
-                        tc = tc_delta.dict()
+                        tc = tc_delta.model_dict()
                         entry.setdefault("tool_calls", []).append(tc)
                     else:
                         tc["function"]["arguments"] += tc_delta.function.arguments

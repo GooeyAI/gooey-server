@@ -571,7 +571,7 @@ def vcard_form(*, key: str) -> VCARD:
         else:
             vcard = imported_vcard
             # update inputs
-            for k, v in vcard.dict().items():
+            for k, v in vcard.model_dict().items():
                 gui.session_state[f"__vcard_data__{k}"] = v
 
     vcard.format_name = gui.text_input(
@@ -621,7 +621,7 @@ def vcard_form(*, key: str) -> VCARD:
             placeholder="123 Main gui, San Francisco, CA 94105",
         )
 
-    gui.session_state[key] = vcard.dict()
+    gui.session_state[key] = vcard.model_dict()
     return vcard
 
 

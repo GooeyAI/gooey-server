@@ -283,7 +283,7 @@ def call_text2img_for_model(
             text_prompt=text_prompt,
             selected_models=[Text2ImgModels.flux_1_dev.name],
             quality=50,
-        ).dict(exclude_unset=True),
+        ).model_dict(exclude_unset=True),
     )[1]
     return sr
 
@@ -335,7 +335,7 @@ def render_flux_lora_fast_form(selected_model: str):
     )
     if inputs.input_images and inputs.model_type != FluxLoraModelTypes.style.name:
         inputs.captions = render_captions(inputs)
-    gui.session_state["inputs"] = inputs.dict()
+    gui.session_state["inputs"] = inputs.model_dict()
 
 
 def render_captions(inputs: FluxLoraFastInputs, key: str = "captions"):
