@@ -35,18 +35,7 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
         # avoid empty space when breadcrumbs are not rendered
         return
 
-    with (
-        gui.styled(
-            """
-            @media (min-width: 1024px) {
-                & a {
-                    font-size: 1.25rem !important;
-                }
-            }
-            """
-        ),
-        gui.breadcrumbs(),
-    ):
+    with (gui.breadcrumbs()):
         if breadcrumbs.root_title:
             gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
