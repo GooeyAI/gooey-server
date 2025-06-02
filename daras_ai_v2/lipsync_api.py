@@ -33,39 +33,39 @@ class SadTalkerSettings(BaseModel):
         title="Expression Scale",
         description="Scale the amount of expression motion. 1.0 is normal, 0.5 is very reduced, and 2.0 is quite a lot.",
     )
-    ref_eyeblink: FieldHttpUrl = Field(
+    ref_eyeblink: FieldHttpUrl | None = Field(
         None,
         title="Reference Eyeblink",
         description="Optional reference video for eyeblinks to make the eyebrow movement more natural.",
     )
-    ref_pose: FieldHttpUrl = Field(
+    ref_pose: FieldHttpUrl | None = Field(
         None,
         title="Reference Pose",
         description="Optional reference video to pose the head.",
     )
     # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None
     # background_enhancer: typing.Literal["realesrgan"] =None
-    input_yaw: list[int] = Field(
+    input_yaw: list[int] | None = Field(
         None, title="Input Yaw (comma separated)", deprecated=True
     )
-    input_pitch: list[int] = Field(
+    input_pitch: list[int] | None = Field(
         None, title="Input Pitch (comma separated)", deprecated=True
     )
-    input_roll: list[int] = Field(
+    input_roll: list[int] | None = Field(
         None, title="Input Roll (comma separated)", deprecated=True
     )
 
 
 class LipsyncSettings(BaseModel):
-    input_face: FieldHttpUrl = None
+    input_face: FieldHttpUrl | None = None
 
     # wav2lip
-    face_padding_top: int = None
-    face_padding_bottom: int = None
-    face_padding_left: int = None
-    face_padding_right: int = None
+    face_padding_top: int | None = None
+    face_padding_bottom: int | None = None
+    face_padding_left: int | None = None
+    face_padding_right: int | None = None
 
-    sadtalker_settings: SadTalkerSettings = None
+    sadtalker_settings: SadTalkerSettings | None = None
 
 
 def run_sadtalker(
