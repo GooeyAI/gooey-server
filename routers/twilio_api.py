@@ -271,7 +271,7 @@ def resp_say_or_tts_play(
             # submit the TTS request
             tts_state = TextToSpeechPage.RequestModel.model_validate(
                 {**bot.saved_run.state, "text_prompt": text}
-            ).model_dict()
+            ).model_dump()
             result, sr = TextToSpeechPage.get_root_pr().submit_api_call(
                 current_user=bot.current_user,
                 workspace=bot.workspace,

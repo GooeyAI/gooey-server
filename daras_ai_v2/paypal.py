@@ -174,7 +174,7 @@ class Subscription(PaypalResource):
                 {
                     "op": "replace",
                     "path": "/billing_info/outstanding_balance",
-                    "value": amount.model_dict(),
+                    "value": amount.model_dump(),
                 }
             ],
         )
@@ -218,7 +218,7 @@ class Subscription(PaypalResource):
             headers=get_default_headers(),
             json={
                 "note": note,
-                "amount": amount.model_dict(),
+                "amount": amount.model_dump(),
                 "capture_type": capture_type,
             },
         )

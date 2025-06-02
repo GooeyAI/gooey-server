@@ -18,9 +18,9 @@ def generate_final_search_query(
     context: dict = None,
     response_format_type: typing.Literal["text", "json_object"] = None,
 ):
-    state = request.model_dict()
+    state = request.model_dump()
     if response:
-        state |= response.model_dict()
+        state |= response.model_dump()
     if context:
         state |= context
     instructions = render_prompt_vars(instructions, state).strip()
