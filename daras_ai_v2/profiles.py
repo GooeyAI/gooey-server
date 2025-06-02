@@ -245,7 +245,7 @@ def _render_member_photos(workspace: Workspace):
     )
     with gui.div(className="d-flex"), gui.styled(MEMBER_PHOTOS_STYLE):
         for member in members:
-            gui.image(src=member.user.get_photo())
+            gui.image(src=member.user.get_photo(), style={"pointerEvents": "none"})
 
 
 def render_public_runs_list(request: Request, workspace: Workspace):
