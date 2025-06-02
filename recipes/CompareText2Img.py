@@ -291,7 +291,7 @@ def loras_input(key: str = "loras"):
     )
     if lora_urls:
         gui.session_state[key] = [
-            LoraWeight(path=url, scale=1).dict() for url in lora_urls
+            LoraWeight(path=url, scale=1).model_dict() for url in lora_urls
         ]
     else:
         gui.session_state.pop("loras", None)

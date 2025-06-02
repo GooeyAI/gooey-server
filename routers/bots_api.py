@@ -227,7 +227,7 @@ class ApiInterface(BotInterface):
 
     def __init__(self, request: CreateStreamRequest):
         self.request = request
-        self.request_overrides = request.dict(exclude_unset=True)
+        self.request_overrides = request.model_dict(exclude_unset=True)
         try:
             self.bot_id = api_hashids.decode(request.integration_id)[0]
             assert BotIntegration.objects.filter(id=self.bot_id).exists()

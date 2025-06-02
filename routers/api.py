@@ -165,7 +165,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
             current_user=api_key.created_by,
             workspace=api_key.workspace,
-            request_body=page_request.dict(exclude_unset=True),
+            request_body=page_request.model_dict(exclude_unset=True),
             enable_rate_limits=True,
         )
         return build_sync_api_response(result, sr)
@@ -215,7 +215,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
             current_user=api_key.created_by,
             workspace=api_key.workspace,
-            request_body=page_request.dict(exclude_unset=True),
+            request_body=page_request.model_dict(exclude_unset=True),
             enable_rate_limits=True,
         )
         ret = build_async_api_response(sr)

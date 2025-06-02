@@ -1628,10 +1628,10 @@ class BasePage:
         # run the recipe
         try:
             for val in self.run_v2(request, response):
-                state.update(response.dict(exclude_unset=True))
+                state.update(response.model_dict(exclude_unset=True))
                 yield val
         finally:
-            state.update(response.dict(exclude_unset=True))
+            state.update(response.model_dict(exclude_unset=True))
 
         # validate the response if successful
         self.ResponseModel.validate(response)

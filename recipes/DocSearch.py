@@ -166,7 +166,7 @@ class DocSearchPage(BasePage):
         response.references = yield from get_top_k_references(
             DocSearchRequest.parse_obj(
                 {
-                    **request.dict(),
+                    **request.model_dict(),
                     "search_query": response.final_search_query,
                 },
             ),
@@ -186,7 +186,7 @@ class DocSearchPage(BasePage):
             response.output_text = []
             return
         task_instructions = render_prompt_vars(
-            prompt=task_instructions, state=request.dict() | response.dict()
+            prompt=task_instructions, state=request.model_dict() | response.model_dict()
         )
         response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question
