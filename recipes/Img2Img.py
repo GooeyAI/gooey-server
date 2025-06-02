@@ -148,7 +148,7 @@ class Img2ImgPage(BasePage):
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: Img2ImgPage.RequestModel = self.RequestModel.model_validate(state)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content

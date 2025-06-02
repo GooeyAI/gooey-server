@@ -156,7 +156,7 @@ class LLMTool:
         )
 
     def _get_system_vars(self) -> tuple[dict, dict]:
-        request = self.request_model.parse_obj(self.state)
+        request = self.request_model.model_validate(self.state)
         system_vars = dict(
             web_url=self.saved_run.get_app_url(),
             request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),

@@ -44,7 +44,7 @@ class PaypalResource(BaseModel):
             )
             raise_for_status(r)
             body = r.json()
-            result += [cls.parse_obj(item) for item in body[items_key]]
+            result += [cls.model_validate(item) for item in body[items_key]]
             if page * page_size >= body["total_items"]:
                 break
 
@@ -62,7 +62,7 @@ class PaypalResource(BaseModel):
         )
         raise_for_status(r)
         return [
-            cls.parse_obj(item)
+            cls.model_validate(item)
             for item in r.json().get(cls._get_api_list_items_key(), [])
         ]
 
@@ -76,7 +76,7 @@ class PaypalResource(BaseModel):
             headers=get_default_headers(),
         )
         raise_for_status(r)
-        return cls.parse_obj(r.json())
+        return cls.model_validate(r.json())
 
     @classmethod
     def create(cls: Type[T], **data) -> T:
@@ -89,7 +89,7 @@ class PaypalResource(BaseModel):
             json=data,
         )
         raise_for_status(r)
-        return cls.parse_obj(r.json())
+        return cls.model_validate(r.json())
 
     @classmethod
     def _get_api_list_items_key(cls) -> str:
@@ -267,7 +267,7 @@ def verify_webhook_event(event: dict, *, headers: Mapping) -> bool:
     @see https://developer.paypal.com/docs/api-basics/notifications/webhooks/rest/#verify-webhook-signature
     """
     try:
-        validated_headers = PaypalWebhookHeaders.parse_obj(headers)
+        validated_headers = PaypalWebhookHeaders.model_validate(headers)
     except ValidationError as e:
         logger.error(f"Invalid PayPal webhook headers: {e}")
         return False

@@ -325,7 +325,7 @@ def _parse_form_data(
             page_request_data.setdefault(key, []).extend(urls)
     # validate the request
     try:
-        page_request = request_model.parse_obj(page_request_data)
+        page_request = request_model.model_validate(page_request_data)
     except ValidationError as e:
         raise RequestValidationError(e.raw_errors, body=page_request_data) from e
     return page_request

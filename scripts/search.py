@@ -8,7 +8,7 @@ def run(arg, documents):
     logger.info(f"Started {arg=} {documents=}")
     logger.info("Running...")
     iterator = get_top_k_references(
-        DocSearchRequest.parse_obj(
+        DocSearchRequest.model_validate(
             {
                 "search_query": arg,
                 "documents": json.loads(documents),

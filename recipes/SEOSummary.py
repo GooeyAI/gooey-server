@@ -261,7 +261,7 @@ SearchSEO > Page Parsing > GPT3
                 )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: SEOSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: SEOSummaryPage.RequestModel = self.RequestModel.model_validate(state)
 
         yield "Googling..."
 

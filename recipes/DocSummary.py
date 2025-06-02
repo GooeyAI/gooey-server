@@ -161,7 +161,7 @@ Prompt for merging several outputs together
         return [GoogleGPTPage, DocSearchPage, VideoBotsPage, SEOSummaryPage]
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: DocSummaryPage.RequestModel = self.RequestModel.model_validate(state)
 
         yield "Downloading documents..."
 

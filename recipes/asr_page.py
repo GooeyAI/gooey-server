@@ -245,7 +245,7 @@ class AsrPage(BasePage):
 
     def run(self, state: dict):
         # Parse Request
-        request: AsrPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: AsrPage.RequestModel = self.RequestModel.model_validate(state)
 
         selected_model = AsrModels[request.selected_model]
         translation_model = TranslationModels.get(request.translation_model)

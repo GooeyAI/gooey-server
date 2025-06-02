@@ -1063,7 +1063,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             if response.final_search_query:  # perform doc search
                 response.references = yield from get_top_k_references(
-                    DocSearchRequest.parse_obj(
+                    DocSearchRequest.model_validate(
                         {
                             **request.model_dict(),
                             **response.model_dict(),
@@ -1242,7 +1242,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if request.tts_provider and not model.is_audio_model:
             response.output_audio = []
             for text in response.raw_tts_text or response.raw_output_text:
-                tts_state = TextToSpeechPage.RequestModel.parse_obj(
+                tts_state = TextToSpeechPage.RequestModel.model_validate(
                     {**gui.session_state, "text_prompt": text}
                 ).model_dict()
                 yield from TextToSpeechPage(request=self.request).run(tts_state)
@@ -1252,7 +1252,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if request.input_face and response.output_audio:
             response.output_video = []
             for audio_url in response.output_audio:
-                lip_state = LipsyncPage.RequestModel.parse_obj(
+                lip_state = LipsyncPage.RequestModel.model_validate(
                     {
                         **gui.session_state,
                         "input_audio": audio_url,

@@ -466,7 +466,7 @@ Here is the final output:
                 gui.caption(f"{shortened_url} → {qr_code_data}")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: QRCodeGeneratorPage.RequestModel = self.RequestModel.model_validate(state)
 
         yield "Running safety checker..."
         safety_checker(text=request.text_prompt, image=request.image_prompt)

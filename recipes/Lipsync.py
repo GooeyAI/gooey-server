@@ -71,7 +71,7 @@ class LipsyncPage(BasePage):
         lipsync_settings(gui.session_state.get("selected_model"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request = self.RequestModel.parse_obj(state)
+        request = self.RequestModel.model_validate(state)
 
         if self.is_current_user_paying() or self.is_current_user_admin():
             max_frames = None

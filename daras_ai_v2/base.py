@@ -875,7 +875,7 @@ class BasePage:
             return True
 
         try:
-            curr_req = self.RequestModel.parse_obj(gui.session_state)
+            curr_req = self.RequestModel.model_validate(gui.session_state)
         except ValidationError:
             # if the request model fails to parse, the request has likely changed
             return True
@@ -1624,7 +1624,7 @@ class BasePage:
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
-        request = self.RequestModel.parse_obj(state)
+        request = self.RequestModel.model_validate(state)
         response = self.ResponseModel.model_construct()
 
         # run the recipe

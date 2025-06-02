@@ -119,7 +119,7 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
         return JSONResponse({}, status_code=401)
     workspace = get_current_workspace(request.user, request.session)
 
-    lookup_key = SubscriptionPayload.parse_obj(payload).lookup_key
+    lookup_key = SubscriptionPayload.model_validate(payload).lookup_key
     plan = PricingPlan.get_by_key(lookup_key)
     if plan is None or not plan.supports_paypal():
         return JSONResponse(
@@ -193,7 +193,7 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
         return JSONResponse({"error": "Invalid signature"}, status_code=400)
 
     try:
-        event = WebhookEvent.parse_obj(payload)
+        event = WebhookEvent.model_validate(payload)
     except pydantic.ValidationError as e:
         logger.error(f"Invalid PayPal webhook payload: {json.dumps(e)}")
         return JSONResponse({"error": "Invalid event type"}, status_code=400)
@@ -202,13 +202,13 @@ def webhook(request: Request, payload: dict = fastapi_request_json):
 
     match event.event_type:
         case "PAYMENT.SALE.COMPLETED":
-            sale = SaleCompletedEvent.parse_obj(event).resource
+            sale = SaleCompletedEvent.model_validate(event).resource
             PaypalWebhookHandler.handle_sale_completed(sale)
         case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.UPDATED":
-            subscription = SubscriptionEvent.parse_obj(event).resource
+            subscription = SubscriptionEvent.model_validate(event).resource
             PaypalWebhookHandler.handle_subscription_updated(subscription)
         case "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
-            subscription = SubscriptionEvent.parse_obj(event).resource
+            subscription = SubscriptionEvent.model_validate(event).resource
             PaypalWebhookHandler.handle_subscription_cancelled(subscription)
 
     return JSONResponse({})

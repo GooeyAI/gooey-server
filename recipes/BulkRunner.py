@@ -523,7 +523,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
             else:
                 request_body[field] = df.at[df_ix, col]
         # for validation
-        request_body = page_cls.RequestModel.parse_obj(request_body).model_dict(
+        request_body = page_cls.RequestModel.model_validate(request_body).model_dict(
             exclude_unset=True
         )
 
