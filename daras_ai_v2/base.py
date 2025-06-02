@@ -1559,14 +1559,6 @@ class BasePage:
             run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
 
-        cost_note = self.get_cost_note()
-        if cost_note:
-            ret += f" ({cost_note.strip()})"
-
-        additional_notes = self.additional_notes()
-        if additional_notes:
-            ret += f" \n{additional_notes}"
-
         gui.caption(ret, line_clamp=self.run_cost_line_clamp, unsafe_allow_html=True)
 
     def _render_step_row(self):
