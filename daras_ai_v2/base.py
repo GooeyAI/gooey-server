@@ -381,7 +381,7 @@ class BasePage:
                 with gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
-                self._render_saved_timestamp()
+                self._render_saved_generated_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
         # rendered at the end to indicate unpublished changes
@@ -513,7 +513,7 @@ class BasePage:
         ):
             gui.html("Unpublished changes")
 
-    def _render_saved_timestamp(self):
+    def _render_saved_generated_timestamp(self):
         sr, pr = self.current_sr_pr
         if not (pr and self.tab == RecipeTabs.run):
             return
@@ -521,6 +521,19 @@ class BasePage:
             dt = pr.updated_at
         else:
             dt = sr.updated_at
+
+        tooltip_content = ""
+        run_time = gui.session_state.get(StateKeys.run_time, 0)
+        if run_time:
+            tooltip_content += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
+
+        if seed := gui.session_state.get("seed"):
+            tooltip_content += f' with seed <span style="color: black;">{seed}</span> '
+
+        updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+        if updated_at:
+            tooltip_content += " on " + updated_at.strftime('%b %d, %-I:%M %p')
+
         with (
             gui.div(
                 className="container-margin-reset d-none d-md-block",
@@ -531,9 +544,14 @@ class BasePage:
                     transform="translateY(-50%)",
                 ),
             ),
-            gui.tag("span", className="text-muted"),
+            gui.tag("span", className="text-muted d-none d-md-flex gap-2 align-items-center"),
         ):
             gui.write(get_relative_time(dt))
+            with gui.tooltip(
+                tooltip_content,
+            ):
+                with gui.tag("span", className="text-muted d-inline-block"):
+                    gui.html("<i class='fa-regular fa-circle-info'></i>")
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
@@ -1762,7 +1780,6 @@ class BasePage:
             else:
                 if not is_deleted:
                     self._render_after_output()
-                render_output_caption()
 
     def _render_failed_output(self):
         err_msg = gui.session_state.get(StateKeys.error_msg)
@@ -2389,36 +2406,6 @@ def started_at_text(dt: datetime.datetime):
             className="text-black",
             **render_local_dt_attrs(dt),
         )
-
-
-def render_output_caption():
-    caption = ""
-
-    run_time = gui.session_state.get(StateKeys.run_time, 0)
-    if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
-
-    if seed := gui.session_state.get("seed"):
-        caption += f' with seed <span style="color: black;">{seed}</span> '
-
-    updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
-    if updated_at:
-        if isinstance(updated_at, str):
-            updated_at = datetime.datetime.fromisoformat(updated_at)
-        caption += " on&nbsp;"
-
-    with gui.div(className="d-flex"):
-        gui.caption(caption, unsafe_allow_html=True)
-        if updated_at:
-            gui.caption(
-                "...",
-                className="text-black",
-                **render_local_dt_attrs(
-                    updated_at,
-                    date_options={"month": "short", "day": "numeric"},
-                ),
-            )
-
 
 def extract_model_fields(
     model: typing.Type[BaseModel],
