@@ -4,7 +4,7 @@ from functools import partial
 
 import gooey_gui as gui
 from django.db.models import TextChoices
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing_extensions import TypedDict
 
 from bots.models import Workflow
@@ -72,7 +72,7 @@ class DeforumSDPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        output_video: OptionalHttpUrl
+        output_video: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

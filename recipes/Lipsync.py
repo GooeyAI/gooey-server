@@ -2,7 +2,7 @@ import typing
 from math import ceil
 
 import gooey_gui as gui
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
@@ -28,7 +28,7 @@ class LipsyncPage(BasePage):
         input_audio: OptionalHttpUrl = None
 
     class ResponseModel(BaseModel):
-        output_video: OptionalHttpUrl
+        output_video: HttpUrl
         duration_sec: float | None = None
 
     def render_form_v2(self):

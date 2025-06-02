@@ -6,7 +6,7 @@ import numpy as np
 from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
 import gooey_gui as gui
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -61,10 +61,10 @@ class ImageSegmentationPage(BasePage):
         obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_image: OptionalHttpUrl
-        cutout_image: OptionalHttpUrl
-        resized_image: OptionalHttpUrl
-        resized_mask: OptionalHttpUrl
+        output_image: HttpUrl
+        cutout_image: HttpUrl
+        resized_image: HttpUrl
+        resized_mask: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage

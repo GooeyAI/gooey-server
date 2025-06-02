@@ -122,8 +122,8 @@ class QRCodeGeneratorPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: list[HttpUrl]
         raw_images: list[HttpUrl]
-        shortened_url: OptionalHttpUrl = None
-        cleaned_qr_code: OptionalHttpUrl = None
+        shortened_url: HttpUrl | None = None
+        cleaned_qr_code: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage

@@ -72,8 +72,8 @@ class ObjectInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: OptionalHttpUrl
-        obj_mask: OptionalHttpUrl
+        resized_image: HttpUrl
+        obj_mask: HttpUrl
         # diffusion_images: list[FieldHttpUrl]
         output_images: list[HttpUrl]
 

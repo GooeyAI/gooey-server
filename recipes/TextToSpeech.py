@@ -4,7 +4,7 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
@@ -95,7 +95,7 @@ class TextToSpeechPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        audio_url: OptionalHttpUrl
+        audio_url: HttpUrl
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

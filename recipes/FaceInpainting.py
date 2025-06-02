@@ -72,8 +72,8 @@ class FaceInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: OptionalHttpUrl
-        face_mask: OptionalHttpUrl
+        resized_image: HttpUrl
+        face_mask: HttpUrl
         diffusion_images: list[HttpUrl]
         output_images: list[HttpUrl]
 

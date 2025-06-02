@@ -73,9 +73,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        input_image: OptionalHttpUrl
-        resized_image: OptionalHttpUrl
-        face_mask: OptionalHttpUrl
+        input_image: HttpUrl
+        resized_image: HttpUrl
+        face_mask: HttpUrl
         diffusion_images: list[HttpUrl]
         output_images: list[HttpUrl]
         email_sent: bool = False
