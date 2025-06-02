@@ -12,7 +12,7 @@ class LanguageModelSettings(BaseModel):
     quality: float | None = None
     max_tokens: int | None = None
     sampling_temperature: float | None = None
-    response_format_type: ResponseFormatType = Field(
+    response_format_type: ResponseFormatType | None = Field(
         None,
         title="Response Format",
     )

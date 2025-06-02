@@ -26,7 +26,9 @@ def sadtalker_settings(settings: SadTalkerSettings):
 
     settings.preprocess = gui.selectbox(
         **field_label_val(settings, "preprocess"),
-        options=SadTalkerSettings.model_json_schema()["properties"]["preprocess"]["enum"],
+        options=SadTalkerSettings.model_json_schema()["properties"]["preprocess"][
+            "enum"
+        ],
     )
 
     settings.pose_style = gui.slider(
