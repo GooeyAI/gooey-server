@@ -2003,7 +2003,7 @@ class BasePage:
 
     @classmethod
     def load_state_defaults(cls, state: dict):
-        for k, v in cls.RequestModel.schema()["properties"].items():
+        for k, v in cls.RequestModel.model_json_schema()["properties"].items():
             try:
                 state.setdefault(k, copy(v["default"]))
             except KeyError:

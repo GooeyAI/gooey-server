@@ -500,7 +500,7 @@ To get started:
 def build_requests_for_df(df, request, df_ix, arr_len):
     for url_ix, url in enumerate(request.run_urls):
         page_cls, sr, pr = url_to_runs(url)
-        schema = page_cls.RequestModel.schema()
+        schema = page_cls.RequestModel.model_json_schema()
         properties = schema["properties"]
 
         request_body = {}
@@ -541,7 +541,7 @@ def slice_request_df(df, request):
         f = furl(url)
         slug = f.path.segments[0]
         page_cls = page_slug_map[normalize_slug(slug)]
-        schema = page_cls.RequestModel.schema()
+        schema = page_cls.RequestModel.model_json_schema()
         properties = schema["properties"]
 
         for field, col in request.input_columns.items():
