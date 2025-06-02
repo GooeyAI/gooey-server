@@ -45,12 +45,14 @@ class FluxLoraInputsBase(BaseModel):
         "Try to use at least 5-10 images, although more is better.",
     )
     trigger_word: str | None = Field(
+        None,
         title="Trigger Word",
         description="(optional) Trigger word to be used in the prompt.\n\n"
         "If not provided, a trigger word will not be used. "
         "If captions are provided, the trigger word will be used to replace the `[trigger]` keyword in the captions.",
     )
     captions: dict[str, str] | None = Field(
+        None,
         title="Captions",
         description="(optional) Captions for the images.\n\n"
         "The captions can include a special keyword `[trigger]`. If a Trigger Word is specified, it will replace [trigger] in the captions.",
@@ -60,6 +62,7 @@ class FluxLoraInputsBase(BaseModel):
 class FluxLoraFastInputs(FluxLoraInputsBase):
     model_type: typing.Literal[tuple(e.name for e in FluxLoraModelTypes)] | None = (
         Field(
+            None,
             title="Model Type",
             description="The type of model to train.\n\n"
             'Choose "style" if you want to train a model to generate images in a specific style.\n'
@@ -94,7 +97,7 @@ class ModelTrainerPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         selected_model: typing.Literal[tuple(e.name for e in FinetuneModels)] | None = (
-            Field(title="Model")
+            Field(None, title="Model")
         )
 
         inputs: FluxLoraFastInputs

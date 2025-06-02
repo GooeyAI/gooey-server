@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic import create_model
 from pydantic.error_wrappers import ErrorWrapper
-from pydantic.generics import GenericModel
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
@@ -57,7 +56,7 @@ O = typing.TypeVar("O")
 ## v2
 
 
-class ApiResponseModelV2(GenericModel, typing.Generic[O]):
+class ApiResponseModelV2(BaseModel, typing.Generic[O]):
     id: str = Field(description="Unique ID for this run")
     url: str = Field(description="Web URL for this run")
     created_at: str = Field(description="Time when the run was created as ISO format")
@@ -66,13 +65,13 @@ class ApiResponseModelV2(GenericModel, typing.Generic[O]):
 
 
 class FailedResponseDetail(BaseModel):
-    id: str | None = Field(description="Unique ID for this run")
-    url: str | None = Field(description="Web URL for this run")
+    id: str | None = Field(None, description="Unique ID for this run")
+    url: str | None = Field(None, description="Web URL for this run")
     created_at: str | None = Field(
-        description="Time when the run was created as ISO format"
+        None, description="Time when the run was created as ISO format"
     )
 
-    error: str | None = Field(description="Error message if the run failed")
+    error: str | None = Field(None, description="Error message if the run failed")
 
 
 class FailedReponseModelV2(BaseModel):
@@ -90,7 +89,7 @@ class GenericErrorResponse(BaseModel):
 ## v3
 
 
-class BaseResponseModelV3(GenericModel):
+class BaseResponseModelV3(BaseModel):
     run_id: str = Field(description="Unique ID for this run")
     web_url: str = Field(description="Web URL for this run")
     created_at: str = Field(description="Time when the run was created as ISO format")

@@ -14,31 +14,31 @@ MAXWIDTH = 75
 
 class VCARD(BaseModel):
     format_name: str
-    email: str | None
-    gender: str | None
-    birthday_year: int | None
-    birthday_month: int | None
-    birthday_day: int | None
-    family_name: str | None
-    given_name: str | None
-    middle_names: str | None
-    honorific_prefixes: str | None
-    honorific_suffixes: str | None
-    impp: str | None
-    address: str | None
-    calendar_url: str | None
-    comma_separated_categories: str | None
-    kind: str | None
-    language: str | None
-    organization: str | None
-    photo_url: str | None
-    logo_url: str | None
-    role: str | None
-    timezone: str | None
-    job_title: str | None
-    urls: list[str] | None
-    tel: str | None
-    note: str | None
+    email: str | None = None
+    gender: str | None = None
+    birthday_year: int | None = None
+    birthday_month: int | None = None
+    birthday_day: int | None = None
+    family_name: str | None = None
+    given_name: str | None = None
+    middle_names: str | None = None
+    honorific_prefixes: str | None = None
+    honorific_suffixes: str | None = None
+    impp: str | None = None
+    address: str | None = None
+    calendar_url: str | None = None
+    comma_separated_categories: str | None = None
+    kind: str | None = None
+    language: str | None = None
+    organization: str | None = None
+    photo_url: str | None = None
+    logo_url: str | None = None
+    role: str | None = None
+    timezone: str | None = None
+    job_title: str | None = None
+    urls: list[str] | None = None
+    tel: str | None = None
+    note: str | None = None
 
     def to_vcf_str(self, compress_and_base64: bool = True) -> str:
         if not self.format_name:

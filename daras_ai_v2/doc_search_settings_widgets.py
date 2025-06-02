@@ -179,7 +179,7 @@ def doc_search_advanced_settings():
 
     embeddings_model_selector(key="embedding_model")
 
-    dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
+    dense_weight_ = DocSearchRequest.model_fields["dense_weight"]
     gui.slider(
         label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
         key=dense_weight_.name,

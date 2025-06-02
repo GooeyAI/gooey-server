@@ -47,27 +47,29 @@ class ObjectInpaintingPage(BasePage):
         input_image: FieldHttpUrl
         text_prompt: str
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
-        mask_threshold: float | None
+        mask_threshold: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        ) = None
 
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
+        guidance_scale: float | None = None
 
-        sd_2_upscaling: bool | None
+        sd_2_upscaling: bool | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
         resized_image: FieldHttpUrl

@@ -21,7 +21,9 @@ class EmbeddingsPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         texts: list[str]
-        selected_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        ) = None
 
     class ResponseModel(BaseModel):
         embeddings: list[list[float]]

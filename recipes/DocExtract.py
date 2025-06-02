@@ -89,31 +89,34 @@ class DocExtractPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
-        sheet_url: FieldHttpUrl | None
+        sheet_url: FieldHttpUrl | None = None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        language: str | None
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
+            None
+        )
+        language: str | None = None
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        ) = None
 
         google_translate_target: str | None = Field(
+            None,
             deprecated=True,
             description="use `translation_model` & `translation_target` instead.",
         )
 
-        task_instructions: str | None
+        task_instructions: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
-        output_documents: list[FieldHttpUrl] | None
+        output_documents: list[FieldHttpUrl] | None = None
 
     def current_sr_to_session_state(self) -> dict:
         state = super().current_sr_to_session_state()

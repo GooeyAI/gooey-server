@@ -124,7 +124,7 @@ def run_doc_search(
     related_question: str,
     outputs: list[RelatedDocSearchResponse],
 ):
-    response = RelatedDocSearchResponse.construct()
+    response = RelatedDocSearchResponse.model_construct()
     request.search_query = related_question
     response.search_query = related_question
     try:

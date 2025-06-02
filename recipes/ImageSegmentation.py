@@ -50,15 +50,15 @@ class ImageSegmentationPage(BasePage):
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
-        )
-        mask_threshold: float | None
+        ) = None
+        mask_threshold: float | None = None
 
-        rect_persepective_transform: bool | None
-        reflection_opacity: float | None
+        rect_persepective_transform: bool | None = None
+        reflection_opacity: float | None = None
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
         output_image: FieldHttpUrl

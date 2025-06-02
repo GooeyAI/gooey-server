@@ -130,7 +130,7 @@ def run_google_gpt(
     related_question: str,
     outputs: list[RelatedGoogleGPTResponse],
 ):
-    response = RelatedGoogleGPTResponse.construct()
+    response = RelatedGoogleGPTResponse.model_construct()
     request.search_query = related_question
     response.search_query = related_question
     try:

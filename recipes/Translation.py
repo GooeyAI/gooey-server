@@ -23,6 +23,7 @@ from recipes.BulkRunner import list_view_editor
 
 class TranslationOptions(BaseModel):
     translation_source: str | None = Field(
+        None,
         title="Source Translation Language",
         description="This is usually inferred from the spoken language, but in case that is set to Auto detect, you can specify one explicitly.",
     )
@@ -31,6 +32,7 @@ class TranslationOptions(BaseModel):
         title="Target Translation Language",
     )
     glossary_document: FieldHttpUrl | None = Field(
+        None,
         title="Translation Glossary",
         description="""Provide a glossary to customize translation and improve accuracy of domain-specific terms.
 If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).""",

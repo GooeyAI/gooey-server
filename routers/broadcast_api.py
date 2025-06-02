@@ -17,29 +17,33 @@ app = CustomAPIRouter()
 
 class BotBroadcastFilters(BaseModel):
     wa_phone_number__in: list[str] | None = Field(
-        description="A list of WhatsApp phone numbers to broadcast to."
+        None, description="A list of WhatsApp phone numbers to broadcast to."
     )
     slack_user_id__in: list[str] | None = Field(
-        description="A list of Slack user IDs to broadcast to."
+        None, description="A list of Slack user IDs to broadcast to."
     )
     slack_user_name__icontains: str | None = Field(
-        description="Filter by the Slack user's name. Case insensitive."
+        None, description="Filter by the Slack user's name. Case insensitive."
     )
     slack_channel_is_personal: bool | None = Field(
-        description="Filter by whether the Slack channel is personal. By default, will broadcast to both public and personal slack channels."
+        None,
+        description="Filter by whether the Slack channel is personal. By default, will broadcast to both public and personal slack channels.",
     )
 
 
 class BotBroadcastRequestModel(BaseModel):
     text: str = Field(description="Message to broadcast to all users")
-    audio: str | None = Field(description="Audio URL to send to all users")
-    video: str | None = Field(description="Video URL to send to all users")
-    documents: list[str] | None = Field(description="Video URL to send to all users")
+    audio: str | None = Field(None, description="Audio URL to send to all users")
+    video: str | None = Field(None, description="Video URL to send to all users")
+    documents: list[str] | None = Field(
+        None, description="Video URL to send to all users"
+    )
     buttons: list[ReplyButton] | None = Field(
-        description="Buttons to send to all users"
+        None, description="Buttons to send to all users"
     )
     filters: BotBroadcastFilters | None = Field(
-        description="Filters to select users to broadcast to. If not provided, will broadcast to all users of this bot."
+        None,
+        description="Filters to select users to broadcast to. If not provided, will broadcast to all users of this bot.",
     )
 
 

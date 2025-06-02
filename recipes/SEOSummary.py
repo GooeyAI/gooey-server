@@ -88,21 +88,21 @@ class SEOSummaryPage(BasePage):
         title: str
         company_url: str
 
-        task_instructions: str | None
+        task_instructions: str | None = None
 
-        enable_html: bool | None
+        enable_html: bool | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
-        max_search_urls: int | None
+        max_search_urls: int | None = None
 
-        enable_crosslinks: bool | None
+        enable_crosslinks: bool | None = None
         # generate_lead_image: bool | None
         # enable_blog_mode: bool | None
 
-        seed: int | None
+        seed: int | None = None
 
     class RequestModel(GoogleSearchMixin, LanguageModelSettings, RequestModelBase):
         pass

@@ -34,10 +34,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
     class ResponseModel(BaseModel):
-        audio_url: str | None
+        audio_url: str | None = None
 
         output_video: FieldHttpUrl
-        duration_sec: float | None
+        duration_sec: float | None = None
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

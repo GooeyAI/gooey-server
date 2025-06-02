@@ -40,10 +40,10 @@ class CompareLLMPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None
+        input_prompt: str | None = None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

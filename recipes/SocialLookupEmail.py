@@ -44,7 +44,7 @@ class SocialLookupEmailPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         email_address: str
 
-        input_prompt: str | None
+        input_prompt: str | None = None
 
         # url1: str | None
         # url2: str | None
@@ -55,7 +55,7 @@ class SocialLookupEmailPage(BasePage):
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

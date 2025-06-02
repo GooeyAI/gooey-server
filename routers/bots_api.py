@@ -150,13 +150,13 @@ class MessagePart(BaseModel):
         description="Details about the status of the run as a human readable string"
     )
 
-    references: list[SearchReference] | None
+    references: list[SearchReference] | None = None
 
-    text: str | None
-    audio: str | None
-    video: str | None
-    buttons: list[ReplyButton] | None
-    documents: list[str] | None
+    text: str | None = None
+    audio: str | None = None
+    video: str | None = None
+    buttons: list[ReplyButton] | None = None
+    documents: list[str] | None = None
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):

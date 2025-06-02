@@ -45,23 +45,28 @@ class AsrPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            None,
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )
-        language: str | None
+        language: str | None = None
 
         input_prompt: str | None = Field(
+            None,
             title="👩‍💻 Prompt",
             description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
         )
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        ) = None
+
+        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None = (
+            None
         )
 
-        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
-
         google_translate_target: str | None = Field(
+            None,
             deprecated=True,
             description="use `translation_model` & `translation_target` instead.",
         )
@@ -70,7 +75,7 @@ class AsrPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        raw_output_text: list[str] | None
+        raw_output_text: list[str] | None = None
         output_text: list[str | AsrOutputJson]
 
     def current_sr_to_session_state(self) -> dict:
