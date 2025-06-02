@@ -26,7 +26,7 @@ def _test_api_sync(page_cls: typing.Type[BasePage], endpoint: str):
         endpoint,
         json=page_cls.get_example_request(state)[1],
         headers={"Authorization": "Token None"},
-        allow_redirects=False,
+        follow_redirects=False,
     )
     assert r.status_code == 200, r.text
 
@@ -46,7 +46,7 @@ def _test_api_async(page_cls: typing.Type[BasePage], endpoint: str):
         endpoint,
         json=page_cls.get_example_request(state)[1],
         headers={"Authorization": "Token None"},
-        allow_redirects=False,
+        follow_redirects=False,
     )
     assert r.status_code == 202, r.text
 
@@ -55,7 +55,7 @@ def _test_api_async(page_cls: typing.Type[BasePage], endpoint: str):
     r = client.get(
         status_url,
         headers={"Authorization": "Token None"},
-        allow_redirects=False,
+        follow_redirects=False,
     )
     assert r.status_code == 200, r.text
 
@@ -82,7 +82,7 @@ def _test_apis_examples(endpoint: str, body: dict):
         endpoint,
         json=body,
         headers={"Authorization": "Token None"},
-        allow_redirects=False,
+        follow_redirects=False,
     )
     assert r.status_code == 200, r.text
 
@@ -91,6 +91,6 @@ def test_get_balance(transactional_db, force_authentication):
     r = client.get(
         "/v1/balance/",
         headers={"Authorization": "Token None"},
-        allow_redirects=False,
+        follow_redirects=False,
     )
     assert r.status_code == 200, r.text
