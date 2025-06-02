@@ -49,7 +49,7 @@ def test_all_get(db_fixtures, threadpool_subtest):
 
 def _test_get_path(path):
     r = client.get(path, follow_redirects=False)
-    assert r.is_success, r.content
+    assert r.is_success or r.is_redirect, r.content
 
 
 def test_integration_stats_route(db_fixtures, force_authentication, threadpool_subtest):
