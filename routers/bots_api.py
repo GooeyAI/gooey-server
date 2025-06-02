@@ -36,33 +36,33 @@ class CreateStreamRequestBase(BaseModel):
         description="Your Integration ID as shown in the Copilot Integrations tab"
     )
 
-    conversation_id: str = Field(
-        default=None,
+    conversation_id: str | None = Field(
+        None,
         description="The gooey conversation ID.\n\n"
         "If not provided, a new conversation will be started and a new ID will be returned in the response. "
         "Use this to maintain the state of the conversation between requests.\n\n"
         "Note that you may not provide a custom ID here, and must only use the `conversation_id` returned in a previous response.",
     )
-    user_id: str = Field(
-        default=None,
+    user_id: str | None = Field(
+        None,
         description="Your app's custom user ID.\n\n"
         "If not provided, a random user will be created and a new ID will be returned in the response. "
         "If a `conversation_id` is provided, this field is automatically set to the user's id associated with that conversation.",
     )
 
-    user_message_id: str = Field(
-        default=None,
+    user_message_id: str | None = Field(
+        None,
         description="Your app's custom message ID for the user message.\n\n"
         "If not provided, a random ID will be generated and returned in the response. "
         "This is useful for tracking messages in the conversation.",
     )
 
-    button_pressed: ButtonPressed = Field(
-        default=None,
+    button_pressed: ButtonPressed | None = Field(
+        None,
         description="The button that was pressed by the user.",
     )
 
-    input_location: dict = Field(
+    input_location: dict | None = Field(
         None,
         description="Location information including latitude, longitude.",
     )
