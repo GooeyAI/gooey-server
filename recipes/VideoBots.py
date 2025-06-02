@@ -1044,7 +1044,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
                 yield "Finding keywords..."
-                k_request = request.copy()
+                k_request = request.model_copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_o.name
                 k_request.max_tokens = 4096
