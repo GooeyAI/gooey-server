@@ -40,7 +40,7 @@ class LLMTool:
         else:
             page_cls = Workflow(fn_sr.workflow).page_cls
             fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)[1]
-            fn_vars_schema = page_cls.RequestModel.schema()["properties"]
+            fn_vars_schema = page_cls.RequestModel.model_json_schema()["properties"]
 
         self.spec = {
             "type": "function",
