@@ -95,6 +95,11 @@ class AsrPage(BasePage):
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
+        title = super().get_run_title(sr, pr)
+        root_title = cls.get_recipe_title()
+        if title != root_title:
+            return title
+
         try:
             lang = langcodes.Language.get(sr.state["language"] or "").display_name()
         except (KeyError, langcodes.LanguageTagError):
@@ -102,7 +107,7 @@ class AsrPage(BasePage):
         model = AsrModels.get(sr.state.get("selected_model"))
         lang_or_model = lang or (model and model.value)
 
-        return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
+        return " ".join(filter(None, [lang_or_model, root_title]))
 
     def render_description(self):
         gui.markdown(

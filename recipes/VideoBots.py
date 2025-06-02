@@ -316,13 +316,18 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
+        title = super().get_run_title(sr, pr)
+        root_title = cls.get_recipe_title()
+        if title != root_title:
+            return title
+
         try:
             lang = langcodes.Language.get(
                 sr.state.get("user_language") or sr.state.get("asr_language") or ""
             ).display_name()
         except (KeyError, langcodes.LanguageTagError):
             lang = None
-        title = super().get_run_title(sr, pr)
+
         return " ".join(filter(None, [lang, title]))
 
     @classmethod
