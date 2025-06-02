@@ -538,6 +538,7 @@ def integration_details_generator(bi: BotIntegration, user: AppUser | None):
             gui.error(sr.error_msg)
             return
 
+        bi.website_url = bi.website_url or (user and user.website_url)
         for text in flatten(sr.state["output_text"].values()):
             output = json.loads(text)
             gui.session_state[f"_bi_descripton_{bi.id}"] = (
