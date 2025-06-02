@@ -110,7 +110,9 @@ class RelatedQnADocPage(BasePage):
 
         response.output_queries = []
         yield from apply_parallel(
-            lambda ques: run_doc_search(request.copy(), ques, response.output_queries),
+            lambda ques: run_doc_search(
+                request.model_copy(), ques, response.output_queries
+            ),
             all_questions,
             max_workers=4,
             message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
