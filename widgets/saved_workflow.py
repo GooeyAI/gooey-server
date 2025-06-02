@@ -111,8 +111,7 @@ def render_saved_workflow_preview(
                                         className="border border-dark ms-2",
                                     )
 
-                                for bot in demo_bots:
-                                    platform_id = bot[1]
+                                for _, platform_id in demo_bots:
                                     platform = Platform(platform_id)
                                     label = (
                                         f"{platform.get_icon()} {platform.get_title()}"
