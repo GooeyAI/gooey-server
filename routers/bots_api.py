@@ -69,7 +69,7 @@ class CreateStreamRequestBase(BaseModel):
 
 
 class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
-    input_text: str = Field(
+    input_text: str | None = Field(
         None, deprecated=True, description="Use `input_prompt` instead"
     )
 
