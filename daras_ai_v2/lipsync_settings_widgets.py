@@ -12,11 +12,11 @@ def lipsync_settings(selected_model: str):
         case LipsyncModel.SadTalker.name:
             settings = SadTalkerSettings.model_validate(
                 gui.session_state.setdefault(
-                    "sadtalker_settings", SadTalkerSettings().model_dict()
+                    "sadtalker_settings", SadTalkerSettings().model_dump()
                 )
             )
             sadtalker_settings(settings)
-            gui.session_state["sadtalker_settings"] = settings.model_dict()
+            gui.session_state["sadtalker_settings"] = settings.model_dump()
 
 
 def sadtalker_settings(settings: SadTalkerSettings):

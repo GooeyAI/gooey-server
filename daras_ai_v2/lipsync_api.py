@@ -81,7 +81,7 @@ def run_sadtalker(
             preprocess=settings.preprocess,
         ),
         inputs=(
-            settings.model_dict()
+            settings.model_dump()
             | dict(source_image=face, driven_audio=audio, max_frames=max_frames)
         ),
         content_type="video/mp4",

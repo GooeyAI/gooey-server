@@ -387,7 +387,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).h1_title}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
-            ).model_dict(exclude_unset=True)
+            ).model_dump(exclude_unset=True)
             result, sr = sr.submit_api_call(
                 workspace=self.current_workspace,
                 current_user=self.request.user,
@@ -523,7 +523,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
             else:
                 request_body[field] = df.at[df_ix, col]
         # for validation
-        request_body = page_cls.RequestModel.model_validate(request_body).model_dict(
+        request_body = page_cls.RequestModel.model_validate(request_body).model_dump(
             exclude_unset=True
         )
 

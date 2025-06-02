@@ -110,7 +110,7 @@ def broadcast_api_json(
         convo_qs = bi.conversations.all()
         if bot_request.filters:
             convo_qs = convo_qs.filter(
-                **bot_request.filters.model_dict(exclude_unset=True)
+                **bot_request.filters.model_dump(exclude_unset=True)
             )
         total += convo_qs.count()
         send_broadcast_msgs_chunked(
