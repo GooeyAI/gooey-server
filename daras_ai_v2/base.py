@@ -371,6 +371,10 @@ class BasePage:
                         padding: 0.3rem !important 
                     }   
                 }
+                & .nav-item {
+                    font-size: smaller;
+                    font-weight: bold;
+                }
                 """
             ),
             gui.div(className="position-relative"),
