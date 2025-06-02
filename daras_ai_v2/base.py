@@ -880,7 +880,9 @@ class BasePage:
             # if the request model fails to parse, the request has likely changed
             return True
 
-        curr_hash = hashlib.md5(curr_req.json(sort_keys=True).encode()).hexdigest()
+        curr_hash = hashlib.md5(
+            json.dumps(curr_req.model_dump(), sort_keys=True).encode()
+        ).hexdigest()
         prev_hash = gui.session_state.setdefault("--prev-request-hash", curr_hash)
 
         if curr_hash != prev_hash:
@@ -1933,7 +1935,9 @@ class BasePage:
     def _get_validated_state(self) -> dict:
         # ensure the request is validated
         return gui.session_state | json.loads(
-            self.RequestModel.parse_obj(gui.session_state).json(exclude_unset=True)
+            self.RequestModel.model_validate(gui.session_state).model_dump_json(
+                exclude_unset=True
+            )
         )
 
     def dump_state_to_sr(self, state: dict, sr: SavedRun):
