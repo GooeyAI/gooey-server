@@ -33,7 +33,7 @@ class AnimationModels(TextChoices):
 
 
 class _AnimationPrompt(TypedDict):
-    frame: str
+    frame: int | str
     prompt: str
 
 
