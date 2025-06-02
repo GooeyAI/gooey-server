@@ -14,7 +14,6 @@ from furl import furl
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic import create_model
-from pydantic.error_wrappers import ErrorWrapper
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
@@ -108,7 +107,7 @@ class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
         description="Details about the status of the run as a human readable string"
     )
     output: O | None = Field(
-        description='Output of the run. Only available if status is `"completed"`'
+        None, description='Output of the run. Only available if status is `"completed"`'
     )
 
 
@@ -313,7 +312,7 @@ def _parse_form_data(
             for uf in uf_list
         ]
         try:
-            is_str = request_model.schema()["properties"][key]["type"] == "string"
+            is_str = request_model.model_json_schema()["properties"][key]["type"] == "string"
         except KeyError:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
