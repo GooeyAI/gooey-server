@@ -185,7 +185,9 @@ class CompareText2ImgPage(BasePage):
         self._render_outputs(gui.session_state)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: CompareText2ImgPage.RequestModel = self.RequestModel.model_validate(state)
+        request: CompareText2ImgPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         request.text_prompt = render_prompt_vars(request.text_prompt, gui.session_state)
 

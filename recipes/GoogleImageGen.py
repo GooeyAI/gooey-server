@@ -103,7 +103,9 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         )
 
     def run(self, state: dict):
-        request: GoogleImageGenPage.RequestModel = self.RequestModel.model_validate(state)
+        request: GoogleImageGenPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield "Googling..."
 

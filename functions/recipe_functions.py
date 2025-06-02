@@ -1,4 +1,3 @@
-import json
 import typing
 
 import gooey_gui as gui
@@ -159,7 +158,9 @@ class LLMTool:
         request = self.request_model.model_validate(self.state)
         system_vars = dict(
             web_url=self.saved_run.get_app_url(),
-            request=request.model_dump(exclude_unset=True, exclude={"variables"}),
+            request=request.model_dump(
+                exclude_unset=True, exclude={"variables"}, mode="json"
+            ),
             response={
                 k: v
                 for k, v in self.state.items()
