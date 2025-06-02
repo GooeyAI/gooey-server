@@ -31,6 +31,7 @@ from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.realtime_llm_openai import run_openai_audio
+from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import LLMTool
 
@@ -549,8 +550,8 @@ class LargeLanguageModels(Enum):
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     gemini_2_5_pro_preview = LLMSpec(
         label="Gemini 2.5 Pro Preview (Google)",
-        model_id="gemini-2.5-pro-preview-03-25",
-        llm_api=LLMApis.gemini,
+        model_id="google/gemini-2.5-pro-preview-03-25",
+        llm_api=LLMApis.openai,
         context_window=1_048_576,
         max_output_tokens=65_535,
         price=20,
@@ -559,8 +560,8 @@ class LargeLanguageModels(Enum):
     )
     gemini_2_5_flash_preview = LLMSpec(
         label="Gemini 2.5 Flash Preview (Google)",
-        model_id="gemini-2.5-flash-preview-04-17",
-        llm_api=LLMApis.gemini,
+        model_id="google/gemini-2.5-flash-preview-04-17",
+        llm_api=LLMApis.openai,
         context_window=1_048_576,
         max_output_tokens=65_535,
         price=20,
@@ -569,8 +570,8 @@ class LargeLanguageModels(Enum):
     )
     gemini_2_flash_lite = LLMSpec(
         label="Gemini 2 Flash Lite (Google)",
-        model_id="gemini-2.0-flash-lite",
-        llm_api=LLMApis.gemini,
+        model_id="google/gemini-2.0-flash-lite",
+        llm_api=LLMApis.openai,
         context_window=1_048_576,
         max_output_tokens=8192,
         price=20,
@@ -579,8 +580,8 @@ class LargeLanguageModels(Enum):
     )
     gemini_2_flash = LLMSpec(
         label="Gemini 2 Flash (Google)",
-        model_id="gemini-2.0-flash-001",
-        llm_api=LLMApis.gemini,
+        model_id="google/gemini-2.0-flash-001",
+        llm_api=LLMApis.openai,
         context_window=1_048_576,
         max_output_tokens=8192,
         price=20,
@@ -1462,6 +1463,13 @@ def run_openai_chat(
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
         max_completion_tokens = max(25_000, max_completion_tokens)
+    elif model in [
+        LargeLanguageModels.gemini_2_5_pro_preview,
+        LargeLanguageModels.gemini_2_5_flash_preview,
+    ]:
+        # we want the lower bound for reasoning, but not the rest of openai's new changes
+        max_tokens = max(25_000, max_completion_tokens)
+        max_completion_tokens = NOT_GIVEN
     else:
         max_tokens = max_completion_tokens
         max_completion_tokens = NOT_GIVEN
@@ -1719,6 +1727,12 @@ def get_openai_client(model: str):
             api_key=settings.SARVAM_API_KEY,
             max_retries=0,
             base_url="https://api.sarvam.ai/v1",
+        )
+    elif model.startswith("google/"):
+        client = openai.OpenAI(
+            api_key=get_google_auth_token(),
+            max_retries=0,
+            base_url=f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
         )
     else:
         client = openai.OpenAI(
@@ -1991,13 +2005,6 @@ def _run_gemini_pro(
     temperature: float,
     response_format_type: ResponseFormatType | None,
 ):
-    if model_id in {
-        LargeLanguageModels.gemini_2_5_pro_preview.model_id,
-        LargeLanguageModels.gemini_2_5_flash_preview.model_id,
-    }:
-        # reserve tokens for reasoning
-        max_output_tokens = max(25_000, max_output_tokens)
-
     contents = []
     for entry in messages:
         contents.append(
@@ -2290,3 +2297,13 @@ def format_chat_entry(
             {"type": "text", "text": content},
         ]
     return {"role": role, "content": content}
+
+
+@redis_cache_decorator(ex=3600)  # Cache for 1 hour
+def get_google_auth_token():
+    from google.auth import default
+    import google.auth.transport.requests
+
+    credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    credentials.refresh(google.auth.transport.requests.Request())
+    return credentials.token
