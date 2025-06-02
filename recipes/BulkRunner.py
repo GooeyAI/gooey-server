@@ -118,14 +118,16 @@ List of URLs to the evaluation runs that you requested.
             except Exception:
                 continue
 
-            schema = page_cls.RequestModel.schema(ref_template="{model}")
-            for field, model_field in page_cls.RequestModel.model_fields.items():
-                if model_field.is_required():
+            schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
+            for field_name, field_info in page_cls.RequestModel.model_fields.items():
+                if field_info.is_required():
                     input_fields = required_input_fields
                 else:
                     input_fields = optional_input_fields
-                field_props = schema["properties"][field]
-                title = field_props.get("title", field.replace("_", " ").capitalize())
+                field_props = schema["properties"][field_name]
+                title = field_props.get(
+                    "title", field_name.replace("_", " ").capitalize()
+                )
                 keys = None
                 if is_arr(field_props):
                     try:
@@ -134,24 +136,24 @@ List of URLs to the evaluation runs that you requested.
                         keys = {k: prop["title"] for k, prop in props.items()}
                     except KeyError:
                         try:
-                            keys = {k: k for k in sr.state[field][0].keys()}
+                            keys = {k: k for k in sr.state[field_name][0].keys()}
                         except (KeyError, IndexError, AttributeError, TypeError):
                             pass
                 elif is_obj(field_props):
                     try:
-                        keys = {k: k for k in sr.state[field].keys()}
+                        keys = {k: k for k in sr.state[field_name].keys()}
                     except (KeyError, AttributeError, TypeError):
                         pass
                 if keys:
                     for k, ktitle in keys.items():
-                        input_fields[f"{field}.{k}"] = f"{title}.{ktitle}"
+                        input_fields[f"{field_name}.{k}"] = f"{title}.{ktitle}"
                 else:
-                    input_fields[field] = title
+                    input_fields[field_name] = title
 
-            schema = page_cls.ResponseModel.schema()
+            schema = page_cls.ResponseModel.model_json_schema()
             output_fields |= {
                 field: schema["properties"][field]["title"]
-                for field, model_field in page_cls.ResponseModel.model_fields.items()
+                for field in page_cls.ResponseModel.model_fields
             }
 
         gui.write(
@@ -192,16 +194,16 @@ To understand what each field represents, check out our [API docs](https://api.g
             (required_input_fields, visible_col1),
             (optional_input_fields, hidden_col1),
         ):
-            for field, title in fields.items():
+            for field_name, title in fields.items():
                 with div:
                     col = gui.selectbox(
                         label="`" + title + "`",
                         options=column_options,
-                        key="--input-mapping:" + field,
-                        value=input_columns_old.get(field),
+                        key="--input-mapping:" + field_name,
+                        value=input_columns_old.get(field_name),
                     )
                 if col:
-                    input_columns_new[field] = col
+                    input_columns_new[field_name] = col
 
         with visible_col2:
             gui.write("##### Outputs")
@@ -233,15 +235,15 @@ To understand what each field represents, check out our [API docs](https://api.g
             (visible_out_fields, visible_col2, True),
             (hidden_out_fields, hidden_col2, False),
         ):
-            for field, title in fields.items():
+            for field_name, title in fields.items():
                 with div:
                     col = gui.checkbox(
                         label="`" + title + "`",
-                        key="--output-mapping:" + field,
-                        value=bool(output_columns_old.get(field, checked)),
+                        key="--output-mapping:" + field_name,
+                        value=bool(output_columns_old.get(field_name, checked)),
                     )
                 if col:
-                    output_columns_new[field] = title
+                    output_columns_new[field_name] = title
 
         gui.write("---")
         gui.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")

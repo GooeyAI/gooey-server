@@ -112,7 +112,7 @@ def stream_create(request: CreateStreamRequest, response: Response):
 
 
 class ConversationStart(BaseModel):
-    type = Field(
+    type: str = Field(
         "conversation_start",
         description="The conversation was started. Save the IDs for future requests.",
     )
@@ -135,7 +135,7 @@ class ConversationStart(BaseModel):
 
 
 class RunStart(AsyncApiResponseModelV3):
-    type = Field(
+    type: str = Field(
         "run_start",
         description="The run was started. Save the IDs for future requests."
         "Use the `status_url` to check the status of the run and fetch the complete output.",
@@ -143,7 +143,7 @@ class RunStart(AsyncApiResponseModelV3):
 
 
 class MessagePart(BaseModel):
-    type = Field(
+    type: str = Field(
         "message_part",
         description="The partial outputs from the bot will be streamed in parts. Use this to update the user interface iteratively.",
     )
@@ -162,14 +162,14 @@ class MessagePart(BaseModel):
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):
-    type = Field(
+    type: str = Field(
         "final_response",
         description="The run has completed. Use the `status_url` to check the status of the run and fetch the complete output.",
     )
 
 
 class StreamError(BaseModel):
-    type = Field(
+    type: str = Field(
         "error",
         description="An error occurred. The stream has ended.",
     )
