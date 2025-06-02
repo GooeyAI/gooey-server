@@ -54,17 +54,17 @@ class FunctionsPage(BasePage):
         )
 
     class ResponseModel(BaseModel):
-        return_value: typing.Any = Field(
+        return_value: typing.Any | None = Field(
             None,
             title="Return value",
             description="Return value of the code. Can be any JSON object",
         )
-        error: str = Field(
+        error: str | None = Field(
             None,
             title="Error",
             description="JS Error from the code. If there are no errors, this will be null",
         )
-        logs: list[ConsoleLogs] = Field(
+        logs: list[ConsoleLogs] | None = Field(
             None,
             title="Logs",
             description="Console logs from the code execution",
