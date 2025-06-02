@@ -555,7 +555,7 @@ Here is the final output:
 def vcard_form(*, key: str) -> VCARD:
     vcard_data = gui.session_state.get(key, {})
     # populate inputs
-    for k in VCARD.model_fields.keys():
+    for k in VCARD.model_fields:
         gui.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
     vcard = VCARD.model_construct()
 

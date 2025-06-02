@@ -1,6 +1,7 @@
 __import__("gooeysite.wsgi")  # Note: this must always be at the top
 import logging
 import traceback
+from contextlib import asynccontextmanager
 from time import time
 
 import anyio
@@ -52,7 +53,15 @@ from routers import (
 )
 from routers import twilio_ws_api
 
-app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
+    yield
+
+
+app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -87,12 +96,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 for route in app.routes:
     if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
         route.endpoint = db_middleware(route.endpoint)
-
-
-@app.on_event("startup")
-async def startup():
-    limiter = anyio.to_thread.current_default_thread_limiter()
-    limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
 
 
 if config("ROBOTS_NOINDEX", default=False, cast=bool):

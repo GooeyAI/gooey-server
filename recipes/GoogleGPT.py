@@ -93,9 +93,7 @@ class GoogleGPTPage(BasePage):
         embedding_model: (
             typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         ) = None
-        dense_weight: float | None = DocSearchRequest.model_fields[
-            "dense_weight"
-        ].field_info
+        dense_weight: float | None = DocSearchRequest.model_fields["dense_weight"]
 
     class RequestModel(GoogleSearchMixin, LanguageModelSettings, RequestModelBase):
         pass

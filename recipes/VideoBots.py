@@ -3,6 +3,7 @@ import math
 import mimetypes
 import typing
 from itertools import zip_longest
+import typing_extensions
 
 import gooey_gui as gui
 from django.db.models import Q, QuerySet
@@ -126,7 +127,7 @@ DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 SAFETY_BUFFER = 100
 
 
-class ReplyButton(typing.TypedDict):
+class ReplyButton(typing_extensions.TypedDict):
     id: str
     title: str
 
@@ -219,9 +220,7 @@ class VideoBotsPage(BasePage):
         embedding_model: (
             typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         ) = None
-        dense_weight: float | None = DocSearchRequest.model_fields[
-            "dense_weight"
-        ].field_info
+        dense_weight: float | None = DocSearchRequest.model_fields["dense_weight"]
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
             None

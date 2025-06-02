@@ -49,7 +49,7 @@ AggFunctionsList = [
 ]
 
 
-class EvalPrompt(typing.TypedDict):
+class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
 
@@ -59,7 +59,7 @@ class AggFunction(typing_extensions.TypedDict):
     function: typing.Literal[tuple(AggFunctionsList)]
 
 
-class AggFunctionResult(typing.TypedDict):
+class AggFunctionResult(typing_extensions.TypedDict):
     column: str
     function: typing.Literal[tuple(AggFunctionsList)]
     count: int

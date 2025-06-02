@@ -9,6 +9,7 @@ from sentry_sdk import capture_exception
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.search_ref import CitationStyles
 
@@ -179,12 +180,11 @@ def doc_search_advanced_settings():
 
     embeddings_model_selector(key="embedding_model")
 
-    dense_weight_ = DocSearchRequest.model_fields["dense_weight"]
     gui.slider(
-        label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
-        key=dense_weight_.name,
-        min_value=dense_weight_.field_info.ge,
-        max_value=dense_weight_.field_info.le,
+        label=f"###### {field_title_desc(DocSearchRequest, 'dense_weight')}",
+        key="dense_weight",
+        min_value=0.0,
+        max_value=1.0,
     )
 
     gui.number_input(

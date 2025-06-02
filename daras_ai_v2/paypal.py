@@ -4,6 +4,7 @@ import base64
 from datetime import datetime
 from time import time
 from typing import Any, Literal, Mapping, Type, TypeVar
+import typing
 
 import requests
 from furl import furl
@@ -24,7 +25,7 @@ class PaypalResource(BaseModel):
     id: str
     create_time: datetime
     update_time: datetime | None = None
-    links: list
+    links: typing.List
 
     @classmethod
     def list(cls: Type[T], list_all: bool = False, **params) -> list[T]:

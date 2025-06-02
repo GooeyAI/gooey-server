@@ -2414,10 +2414,10 @@ def extract_model_fields(
     """
     return {
         field_name: state.get(field_name)
-        for field_name, field in model.model_fields.items()
+        for field_name, field_info in model.model_fields.items()
         if (
             include_all
-            or field.is_required()
+            or field_info.is_required()
             or (preferred_fields and field_name in preferred_fields)
             or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )
