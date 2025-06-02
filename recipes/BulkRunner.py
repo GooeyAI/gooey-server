@@ -4,7 +4,7 @@ import uuid
 
 import gooey_gui as gui
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
@@ -17,7 +17,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     doc_url_to_file_metadata,
@@ -46,7 +45,7 @@ class BulkRunnerPage(BasePage):
     price = 1
 
     class RequestModel(BasePage.RequestModel):
-        documents: list[FieldHttpUrl] = Field(
+        documents: list[HttpUrl] = Field(
             title="Input Data Spreadsheet",
             description="""
 Upload or link to a CSV or google sheet that contains your sample input data.
@@ -54,7 +53,7 @@ For example, for Copilot, this would sample questions or for Art QR Code, would 
 Remember to includes header names in your CSV too.
             """,
         )
-        run_urls: list[FieldHttpUrl] = Field(
+        run_urls: list[HttpUrl] = Field(
             title="Gooey Workflows",
             description="""
 Provide one or more Gooey.AI workflow runs.
@@ -75,7 +74,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
             """,
         )
 
-        eval_urls: list[FieldHttpUrl] | None = Field(
+        eval_urls: list[HttpUrl] | None = Field(
             None,
             title="Evaluation Workflows",
             description="""
@@ -84,9 +83,9 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
         )
 
     class ResponseModel(BaseModel):
-        output_documents: list[FieldHttpUrl]
+        output_documents: list[HttpUrl]
 
-        eval_runs: list[FieldHttpUrl] | None = Field(
+        eval_runs: list[HttpUrl] | None = Field(
             None,
             title="Evaluation Run URLs",
             description="""

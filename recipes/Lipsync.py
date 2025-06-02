@@ -10,7 +10,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from payments.plans import PricingPlan
 from workspaces.models import Workspace
 
@@ -25,10 +25,10 @@ class LipsyncPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )
-        input_audio: FieldHttpUrl | None = None
+        input_audio: OptionalHttpUrl = None
 
     class ResponseModel(BaseModel):
-        output_video: FieldHttpUrl
+        output_video: OptionalHttpUrl
         duration_sec: float | None = None
 
     def render_form_v2(self):

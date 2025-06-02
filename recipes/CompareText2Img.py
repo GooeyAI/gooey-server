@@ -1,7 +1,6 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -78,7 +77,7 @@ class CompareText2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[FieldHttpUrl],
+            list[HttpUrl],
         ]
 
     @classmethod

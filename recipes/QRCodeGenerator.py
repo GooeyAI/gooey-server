@@ -2,13 +2,13 @@ import typing
 from enum import Enum
 
 import numpy as np
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import qrcode
 import requests
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from pyzbar import pyzbar
 
 import gooey_gui as gui
@@ -79,9 +79,9 @@ class QRCodeGeneratorPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         qr_code_data: str | None = None
-        qr_code_input_image: FieldHttpUrl | None = None
+        qr_code_input_image: OptionalHttpUrl = None
         qr_code_vcard: VCARD | None = None
-        qr_code_file: FieldHttpUrl | None = None
+        qr_code_file: OptionalHttpUrl = None
 
         use_url_shortener: bool | None = None
 
@@ -120,10 +120,10 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_images: list[FieldHttpUrl]
-        raw_images: list[FieldHttpUrl]
-        shortened_url: FieldHttpUrl | None = None
-        cleaned_qr_code: FieldHttpUrl
+        output_images: list[HttpUrl]
+        raw_images: list[HttpUrl]
+        shortened_url: OptionalHttpUrl = None
+        cleaned_qr_code: OptionalHttpUrl = None
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage

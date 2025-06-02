@@ -8,7 +8,7 @@ import typing_extensions
 import gooey_gui as gui
 from django.db.models import Q, QuerySet
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import (
     BotIntegration,
@@ -83,7 +83,7 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     CitationStyles,
@@ -183,8 +183,8 @@ class VideoBotsPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None = None
         input_audio: str | None = None
-        input_images: list[FieldHttpUrl] | None = None
-        input_documents: list[FieldHttpUrl] | None = None
+        input_images: list[HttpUrl] | None = None
+        input_documents: list[HttpUrl] | None = None
 
         doc_extract_url: str | None = Field(
             None,
@@ -212,7 +212,7 @@ class VideoBotsPage(BasePage):
         task_instructions: str | None = None
         query_instructions: str | None = None
         keyword_instructions: str | None = None
-        documents: list[FieldHttpUrl] | None = None
+        documents: list[HttpUrl] | None = None
         max_references: int | None = None
         max_context_words: int | None = None
         scroll_jump: int | None = None
@@ -258,14 +258,14 @@ class VideoBotsPage(BasePage):
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        input_glossary_document: FieldHttpUrl | None = Field(
+        input_glossary_document: OptionalHttpUrl = Field(
             None,
             title="Input Glossary",
             description="""
 Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
-        output_glossary_document: FieldHttpUrl | None = Field(
+        output_glossary_document: OptionalHttpUrl = Field(
             None,
             title="Output Glossary",
             description="""
@@ -293,8 +293,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_prompt: str | list[ConversationEntry] = []
 
         output_text: list[str] = []
-        output_audio: list[FieldHttpUrl] = []
-        output_video: list[FieldHttpUrl] = []
+        output_audio: list[HttpUrl] = []
+        output_video: list[HttpUrl] = []
 
         # intermediate text
         raw_input_text: str | None = None
@@ -307,7 +307,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_keyword_query: str | list[str] | None = None
 
         # function calls
-        output_documents: list[FieldHttpUrl] | None = None
+        output_documents: list[HttpUrl] | None = None
         reply_buttons: list[ReplyButton] | None = None
 
         finish_reason: list[str] | None = None

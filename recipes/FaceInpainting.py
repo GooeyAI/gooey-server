@@ -1,9 +1,9 @@
 import typing
 from functools import partial
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -26,6 +26,10 @@ from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
+class HttpUrlHttpUrl:
+    pass
+
+
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/10c2ce06-88da-11ee-b428-02420a000168/ai%20image%20with%20a%20face.png.png"
@@ -43,7 +47,7 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: OptionalHttpUrl
         text_prompt: str
 
         face_scale: float | None = None
@@ -68,10 +72,10 @@ class FaceInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: FieldHttpUrl
-        face_mask: FieldHttpUrl
-        diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        resized_image: OptionalHttpUrl
+        face_mask: OptionalHttpUrl
+        diffusion_images: list[HttpUrl]
+        output_images: list[HttpUrl]
 
     def render_description(self):
         gui.write(
