@@ -41,7 +41,7 @@ class VariableSchema(TypedDict):
 class CalledFunctionResponse(BaseModel):
     url: str
     trigger: FunctionTrigger.api_choices
-    return_value: typing.Any = None
+    return_value: typing.Any | None = None
 
     @classmethod
     def from_db(cls, called_fn: "CalledFunction") -> "CalledFunctionResponse":

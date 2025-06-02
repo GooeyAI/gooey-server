@@ -25,7 +25,7 @@ class LipsyncPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
             LipsyncModel.Wav2Lip.name
         )
-        input_audio: FieldHttpUrl = None
+        input_audio: FieldHttpUrl | None = None
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
