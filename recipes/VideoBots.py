@@ -795,7 +795,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.html(
             # language=html
             f"""
-<div id="gooey-embed" className="border rounded py-1 mb-3" style="height: 80vh"></div>
+<div id="gooey-embed" className="border rounded py-1 mb-3" style="height: 98vh"></div>
 <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
             """
         )
