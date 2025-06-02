@@ -2,13 +2,13 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
@@ -40,7 +40,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: OptionalHttpUrl
         text_prompt: str | None = None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
@@ -70,7 +70,7 @@ class Img2ImgPage(BasePage):
         image_guidance_scale: float | None = None
 
     class ResponseModel(BaseModel):
-        output_images: list[FieldHttpUrl]
+        output_images: list[HttpUrl]
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:

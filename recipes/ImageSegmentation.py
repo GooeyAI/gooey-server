@@ -3,7 +3,7 @@ from pathlib import Path
 
 import PIL
 import numpy as np
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
 import gooey_gui as gui
 from pydantic import BaseModel
@@ -46,7 +46,7 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: OptionalHttpUrl
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
@@ -61,10 +61,10 @@ class ImageSegmentationPage(BasePage):
         obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_image: FieldHttpUrl
-        cutout_image: FieldHttpUrl
-        resized_image: FieldHttpUrl
-        resized_mask: FieldHttpUrl
+        output_image: OptionalHttpUrl
+        cutout_image: OptionalHttpUrl
+        resized_image: OptionalHttpUrl
+        resized_mask: OptionalHttpUrl
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage

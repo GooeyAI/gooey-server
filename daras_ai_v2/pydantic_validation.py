@@ -5,6 +5,7 @@ from pydantic import HttpUrl, WrapValidator, ValidatorFunctionWrapHandler
 if typing.TYPE_CHECKING:
     from pydantic_core import ErrorDetails
 
+
 def allow_empty_or_url(
     url: str, handler: ValidatorFunctionWrapHandler
 ) -> HttpUrl | None:
@@ -13,7 +14,7 @@ def allow_empty_or_url(
     return handler(url)
 
 
-FieldHttpUrl = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
+OptionalHttpUrl = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
 
 
 CUSTOM_MESSAGES = {

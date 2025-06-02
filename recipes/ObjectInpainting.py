@@ -1,8 +1,8 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -44,7 +44,7 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: OptionalHttpUrl
         text_prompt: str
 
         obj_scale: float | None = None
@@ -72,10 +72,10 @@ class ObjectInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: FieldHttpUrl
-        obj_mask: FieldHttpUrl
+        resized_image: OptionalHttpUrl
+        obj_mask: OptionalHttpUrl
         # diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        output_images: list[HttpUrl]
 
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage

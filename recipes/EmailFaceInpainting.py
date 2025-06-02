@@ -2,7 +2,7 @@ import re
 import typing
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -11,7 +11,7 @@ from daras_ai_v2 import db, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
 
@@ -73,11 +73,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        input_image: FieldHttpUrl
-        resized_image: FieldHttpUrl
-        face_mask: FieldHttpUrl
-        diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        input_image: OptionalHttpUrl
+        resized_image: OptionalHttpUrl
+        face_mask: OptionalHttpUrl
+        diffusion_images: list[HttpUrl]
+        output_images: list[HttpUrl]
         email_sent: bool = False
 
     @classmethod

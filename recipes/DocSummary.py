@@ -1,10 +1,9 @@
 import typing
 from enum import Enum
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
-
 import gooey_gui as gui
+from pydantic import BaseModel, HttpUrl
+
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -60,7 +59,7 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[FieldHttpUrl]
+        documents: list[HttpUrl]
 
         task_instructions: str | None = None
         merge_instructions: str | None = None

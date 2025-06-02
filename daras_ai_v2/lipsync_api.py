@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile_with_ret
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 
 
 class LipsyncModel(Enum):
@@ -33,12 +33,12 @@ class SadTalkerSettings(BaseModel):
         title="Expression Scale",
         description="Scale the amount of expression motion. 1.0 is normal, 0.5 is very reduced, and 2.0 is quite a lot.",
     )
-    ref_eyeblink: FieldHttpUrl | None = Field(
+    ref_eyeblink: OptionalHttpUrl = Field(
         None,
         title="Reference Eyeblink",
         description="Optional reference video for eyeblinks to make the eyebrow movement more natural.",
     )
-    ref_pose: FieldHttpUrl | None = Field(
+    ref_pose: OptionalHttpUrl = Field(
         None,
         title="Reference Pose",
         description="Optional reference video to pose the head.",
@@ -57,7 +57,7 @@ class SadTalkerSettings(BaseModel):
 
 
 class LipsyncSettings(BaseModel):
-    input_face: FieldHttpUrl | None = None
+    input_face: OptionalHttpUrl = None
 
     # wav2lip
     face_padding_top: int | None = None

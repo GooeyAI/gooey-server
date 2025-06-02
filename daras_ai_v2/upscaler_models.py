@@ -8,7 +8,7 @@ import requests
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.stable_diffusion import sd_upscale
 
 
@@ -52,7 +52,7 @@ def run_upscaler_model(
     selected_model: UpscalerModel,
     bg_model: UpscalerModel = None,
     filename: str = None,
-) -> FieldHttpUrl:
+) -> OptionalHttpUrl:
     match selected_model:
         case UpscalerModels.gfpgan_1_4:
             if video:
