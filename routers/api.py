@@ -300,7 +300,14 @@ def _parse_form_data(
         page_request_data = json.loads(page_request_json)
     except json.JSONDecodeError as e:
         raise RequestValidationError(
-            [ErrorWrapper(e, ("body", e.pos))], body=e.doc
+            [
+                {
+                    "loc": ("body", e.pos),
+                    "msg": str(e),
+                    "type": "value_error.jsondecode",
+                }
+            ],
+            body=e.doc,
         ) from e
     # fill in the file urls from the form data
     for key in form_data.keys():
@@ -312,7 +319,9 @@ def _parse_form_data(
             for uf in uf_list
         ]
         try:
-            is_str = request_model.model_json_schema()["properties"][key]["type"] == "string"
+            is_str = (
+                request_model.model_json_schema()["properties"][key]["type"] == "string"
+            )
         except KeyError:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
@@ -326,7 +335,7 @@ def _parse_form_data(
     try:
         page_request = request_model.model_validate(page_request_data)
     except ValidationError as e:
-        raise RequestValidationError(e.raw_errors, body=page_request_data) from e
+        raise RequestValidationError(e.errors(), body=page_request_data) from e
     return page_request
 
 
@@ -362,7 +371,7 @@ def submit_api_call(
             retention_policy=retention_policy or RetentionPolicy.keep,
         )
     except ValidationError as e:
-        raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
+        raise RequestValidationError(e.errors(), body=gui.session_state) from e
     # submit the task
     result = page.call_runner_task(sr, deduct_credits=deduct_credits)
     return result, sr
