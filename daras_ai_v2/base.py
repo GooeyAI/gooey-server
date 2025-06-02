@@ -552,6 +552,7 @@ class BasePage:
             ),
             gui.tag("span", className="text-muted d-none d-md-flex gap-2 align-items-center"),
         ):
+            self._render_report_button()
             gui.write(get_relative_time(dt))
             with gui.tooltip(
                 tooltip_content,
@@ -1680,9 +1681,10 @@ class BasePage:
         if not self.request.user or is_example:
             return
 
-        reported = gui.button(
-            '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
-        )
+        with gui.tooltip("Report"):
+            reported = gui.button(
+                '<i class="fa-regular fa-flag"></i>', type="tertiary", className="mb-0 p-1"
+            )
         if not reported:
             return
 
@@ -2027,7 +2029,6 @@ class BasePage:
                 gui.rerun()
 
     def _render_after_output(self):
-        self._render_report_button()
         self._render_regenerate_button()
 
     def current_sr_to_session_state(self) -> dict:
