@@ -513,7 +513,8 @@ class BasePage:
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
-            "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2"
+            "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2",
+            style=dict(fontSize="smaller", fontWeight="normal"),
         ):
             gui.html("Unpublished changes")
 
@@ -548,6 +549,8 @@ class BasePage:
                     top="50%",
                     right="0",
                     transform="translateY(-50%)",
+                    fontSize="smaller",
+                    fontWeight="normal",
                 ),
             ),
             gui.tag("span", className="text-muted d-none d-md-flex gap-2 align-items-center"),
