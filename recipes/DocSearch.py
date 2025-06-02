@@ -164,7 +164,7 @@ class DocSearchPage(BasePage):
             response.final_search_query = request.search_query
 
         response.references = yield from get_top_k_references(
-            DocSearchRequest.parse_obj(
+            DocSearchRequest.model_validate(
                 {
                     **request.model_dict(),
                     "search_query": response.final_search_query,

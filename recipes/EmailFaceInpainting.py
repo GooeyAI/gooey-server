@@ -238,7 +238,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     #         gui.div()
 
     def run(self, state: dict):
-        request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
+        request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.model_validate(
             state
         )
 

@@ -320,7 +320,7 @@ class ApiInterface(BotInterface):
             if self.run_id and self.uid:
                 sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
-                output = VideoBotsPage.ResponseModel.parse_obj(state)
+                output = VideoBotsPage.ResponseModel.model_validate(state)
                 output.output_text = [
                     parse_bot_html(text)[1] for text in output.output_text or []
                 ]

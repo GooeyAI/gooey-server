@@ -10,7 +10,7 @@ def lipsync_settings(selected_model: str):
             wav2lip_settings()
             gui.session_state.pop("sadtalker_settings", None)
         case LipsyncModel.SadTalker.name:
-            settings = SadTalkerSettings.parse_obj(
+            settings = SadTalkerSettings.model_validate(
                 gui.session_state.setdefault(
                     "sadtalker_settings", SadTalkerSettings().model_dict()
                 )

@@ -267,7 +267,7 @@ class GoogleGPTPage(BasePage):
         if request.embedding_model:
             # run vector search on links
             response.references = yield from get_top_k_references(
-                DocSearchRequest.parse_obj(
+                DocSearchRequest.model_validate(
                     {
                         **request.model_dict(),
                         "documents": list(link_titles.keys()),

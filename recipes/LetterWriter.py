@@ -224,7 +224,7 @@ class LetterWriterPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         yield "Calling API.."
 
-        request = self.RequestModel.parse_obj(state)
+        request = self.RequestModel.model_validate(state)
 
         url = request.api_url.replace("{{ action_id }}", request.action_id)
         method = request.api_http_method.replace("{{ action_id }}", request.action_id)

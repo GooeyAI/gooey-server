@@ -94,7 +94,7 @@ class SmartGPTPage(BasePage):
         ]
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: SmartGPTPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: SmartGPTPage.RequestModel = self.RequestModel.model_validate(state)
         jinja_env = jinja2.sandbox.SandboxedEnvironment()
         cot_prompt = jinja_env.from_string(request.cot_prompt).render(
             input_prompt=request.input_prompt.strip()

@@ -57,7 +57,7 @@ class EmbeddingsPage(BasePage):
             texts[i] = gui.text_area(f"`texts[{i}]`", value=text, disabled=True)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: EmbeddingsPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: EmbeddingsPage.RequestModel = self.RequestModel.model_validate(state)
         model = EmbeddingModels[request.selected_model]
         state["embeddings"] = create_embeddings(request.texts, model).tolist()
         yield

@@ -271,7 +271,7 @@ class DeforumSDPage(BasePage):
         return display
 
     def run(self, state: dict):
-        request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: DeforumSDPage.RequestModel = self.RequestModel.model_validate(state)
         model = AnimationModels[request.selected_model]
 
         if model in AnimationModels._deprecated():

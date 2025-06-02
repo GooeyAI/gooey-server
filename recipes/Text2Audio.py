@@ -93,7 +93,7 @@ class Text2AudioPage(BasePage):
         guidance_scale_setting()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: Text2AudioPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: Text2AudioPage.RequestModel = self.RequestModel.model_validate(state)
 
         state["output_audios"] = output_audios = {}
 

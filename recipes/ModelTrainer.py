@@ -312,7 +312,7 @@ def zip_images(input_images: list[str], captions: dict[str, str] | None) -> str:
 
 
 def render_flux_lora_fast_form(selected_model: str):
-    inputs = FluxLoraFastInputs.parse_obj(gui.session_state.get("inputs", {}))
+    inputs = FluxLoraFastInputs.model_validate(gui.session_state.get("inputs", {}))
     gui.session_state.setdefault("inputs.input_images", inputs.input_images)
     inputs.input_images = bulk_documents_uploader(
         label=f"###### {ModelTrainerIcons.input_images} {field_title(FluxLoraFastInputs, 'input_images')}",

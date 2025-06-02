@@ -269,7 +269,7 @@ def resp_say_or_tts_play(
     if not twilio_tts_voice:
         try:
             # submit the TTS request
-            tts_state = TextToSpeechPage.RequestModel.parse_obj(
+            tts_state = TextToSpeechPage.RequestModel.model_validate(
                 {**bot.saved_run.state, "text_prompt": text}
             ).model_dict()
             result, sr = TextToSpeechPage.get_root_pr().submit_api_call(
