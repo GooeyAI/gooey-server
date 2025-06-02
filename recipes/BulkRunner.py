@@ -573,7 +573,7 @@ def is_arr(field_props: dict | None) -> bool:
         return field_props["type"] == "array"
     except KeyError:
         for props in field_props.get("anyOf", []):
-            if props["type"] == "array":
+            if props.get("type") == "array":
                 return True
     return False
 
