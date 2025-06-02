@@ -859,6 +859,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         )
         render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
 
+    def _render_regenerate_button(self):
+        pass
+    
     def on_send(
         self,
         new_input_prompt: str | None,
