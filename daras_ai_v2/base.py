@@ -2011,9 +2011,7 @@ class BasePage:
         for field_name in self.ResponseModel.model_fields:
             gui.session_state.pop(field_name, None)
 
-    def _render_after_output(self):
-        self._render_report_button()
-
+    def _render_regenerate_button(self):
         if "seed" in self.RequestModel.schema_json():
             randomize = gui.button(
                 '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
@@ -2021,6 +2019,10 @@ class BasePage:
             if randomize:
                 gui.session_state[StateKeys.pressed_randomize] = True
                 gui.rerun()
+
+    def _render_after_output(self):
+        self._render_report_button()
+        self._render_regenerate_button()
 
     def current_sr_to_session_state(self) -> dict:
         state = self.current_sr.to_dict()
