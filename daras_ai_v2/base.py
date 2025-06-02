@@ -531,6 +531,8 @@ class BasePage:
             tooltip_content += f' with seed <span style="color: black;">{seed}</span> '
 
         updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+        if isinstance(updated_at, str):
+            updated_at = datetime.datetime.fromisoformat(updated_at)
         if updated_at:
             tooltip_content += " on " + updated_at.strftime('%b %d, %-I:%M %p')
 
