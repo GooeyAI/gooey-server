@@ -74,7 +74,7 @@ class ButtonPressed(BaseModel):
         description="The message ID of the context message on which the button was pressed"
     )
     button_title: str | None = Field(
-        description="The title of the button that was pressed by the user"
+        None, description="The title of the button that was pressed by the user"
     )
 
 

@@ -86,19 +86,22 @@ if typing.TYPE_CHECKING:
 
 class DocSearchRequest(BaseModel):
     search_query: str
-    keyword_query: str | list[str] | None
+    keyword_query: str | list[str] | None = None
 
-    documents: list[str] | None
+    documents: list[str] | None = None
 
-    max_references: int | None
-    max_context_words: int | None
-    scroll_jump: int | None
+    max_references: int | None = None
+    max_context_words: int | None = None
+    scroll_jump: int | None = None
 
-    doc_extract_url: str | None
+    doc_extract_url: str | None = None
     check_document_updates: typing.Optional[bool] = False
 
-    embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+    embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None = (
+        None
+    )
     dense_weight: float | None = Field(
+        None,
         ge=0.0,
         le=1.0,
         title="Dense Embeddings Weightage",

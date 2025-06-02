@@ -62,17 +62,21 @@ class DocSummaryPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         documents: list[FieldHttpUrl]
 
-        task_instructions: str | None
-        merge_instructions: str | None
+        task_instructions: str | None = None
+        merge_instructions: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        ) = None
+
+        chain_type: (
+            typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
+        ) = None
+
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
+            None
         )
-
-        chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
-
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        google_translate_target: str | None
+        google_translate_target: str | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -80,7 +84,7 @@ class DocSummaryPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
-        prompt_tree: PromptTree | None
+        prompt_tree: PromptTree | None = None
         final_prompt: str
 
     @classmethod

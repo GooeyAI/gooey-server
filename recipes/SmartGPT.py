@@ -32,13 +32,13 @@ class SmartGPTPage(BasePage):
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str
 
-        cot_prompt: str | None
-        reflexion_prompt: str | None
-        dera_prompt: str | None
+        cot_prompt: str | None = None
+        reflexion_prompt: str | None = None
+        dera_prompt: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -46,7 +46,7 @@ class SmartGPTPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
-        prompt_tree: PromptTree | None
+        prompt_tree: PromptTree | None = None
 
     def render_form_v2(self):
         gui.text_area(

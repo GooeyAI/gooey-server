@@ -77,21 +77,23 @@ class GoogleGPTPage(BasePage):
         search_query: str
         site_filter: str
 
-        task_instructions: str | None
-        query_instructions: str | None
+        task_instructions: str | None = None
+        query_instructions: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
-        check_document_updates: bool | None
-        max_search_urls: int | None
+        ) = None
+        check_document_updates: bool | None = None
+        max_search_urls: int | None = None
 
-        max_references: int | None
-        max_context_words: int | None
-        scroll_jump: int | None
+        max_references: int | None = None
+        max_context_words: int | None = None
+        scroll_jump: int | None = None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
-        dense_weight: float | None = DocSearchRequest.__fields__[
+        embedding_model: (
+            typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        ) = None
+        dense_weight: float | None = DocSearchRequest.model_fields[
             "dense_weight"
         ].field_info
 
@@ -106,7 +108,7 @@ class GoogleGPTPage(BasePage):
         references: list[SearchReference]
         final_prompt: str
 
-        final_search_query: str | None
+        final_search_query: str | None = None
 
     def render_form_v2(self):
         gui.text_area("#### Search Query", key="search_query")

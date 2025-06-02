@@ -180,81 +180,94 @@ class VideoBotsPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None
-        input_audio: str | None
-        input_images: list[FieldHttpUrl] | None
-        input_documents: list[FieldHttpUrl] | None
+        input_prompt: str | None = None
+        input_audio: str | None = None
+        input_images: list[FieldHttpUrl] | None = None
+        input_documents: list[FieldHttpUrl] | None = None
 
         doc_extract_url: str | None = Field(
+            None,
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
         )
 
         # conversation history/context
-        messages: list[dict] | None
+        messages: list[dict] | None = None
 
-        bot_script: str | None
+        bot_script: str | None = None
 
         # llm model
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
         document_model: str | None = Field(
+            None,
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
             "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
         )
 
         # doc search
-        task_instructions: str | None
-        query_instructions: str | None
-        keyword_instructions: str | None
-        documents: list[FieldHttpUrl] | None
-        max_references: int | None
-        max_context_words: int | None
-        scroll_jump: int | None
+        task_instructions: str | None = None
+        query_instructions: str | None = None
+        keyword_instructions: str | None = None
+        documents: list[FieldHttpUrl] | None = None
+        max_references: int | None = None
+        max_context_words: int | None = None
+        scroll_jump: int | None = None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
-        dense_weight: float | None = DocSearchRequest.__fields__[
+        embedding_model: (
+            typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        ) = None
+        dense_weight: float | None = DocSearchRequest.model_fields[
             "dense_weight"
         ].field_info
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
-        use_url_shortener: bool | None
-        check_document_updates: bool | None
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
+            None
+        )
+        use_url_shortener: bool | None = None
+        check_document_updates: bool | None = None
 
         asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            None,
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )
         asr_language: str | None = Field(
+            None,
             title="Spoken Language",
             description="Choose a language to transcribe incoming audio messages to text.",
         )
         asr_task: typing.Literal["translate", "transcribe"] | None = Field(
+            None,
             title="ASR Model Task",
             description="Use **{asr_model}** for speech translation from **{asr_language}** to **English**",
         )
         asr_prompt: str | None = Field(
+            None,
             title="👩‍💻 Prompt",
             description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
         )
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        ) = None
         user_language: str | None = Field(
+            None,
             title="Translation Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: FieldHttpUrl | None = Field(
+            None,
             title="Input Glossary",
             description="""
 Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
         output_glossary_document: FieldHttpUrl | None = Field(
+            None,
             title="Output Glossary",
             description="""
 Translation Glossary for LLM Language (English) -> User Langauge
@@ -266,6 +279,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
 
         tools: list[str] | None = Field(
+            None,
             title="🛠️ Tools",
             description="Use `functions` instead.",
             deprecated=True,
@@ -284,20 +298,20 @@ Translation Glossary for LLM Language (English) -> User Langauge
         output_video: list[FieldHttpUrl] = []
 
         # intermediate text
-        raw_input_text: str | None
-        raw_tts_text: list[str] | None
-        raw_output_text: list[str] | None
+        raw_input_text: str | None = None
+        raw_tts_text: list[str] | None = None
+        raw_output_text: list[str] | None = None
 
         # doc search
         references: list[SearchReference] | None = []
-        final_search_query: str | None
-        final_keyword_query: str | list[str] | None
+        final_search_query: str | None = None
+        final_keyword_query: str | list[str] | None = None
 
         # function calls
-        output_documents: list[FieldHttpUrl] | None
-        reply_buttons: list[ReplyButton] | None
+        output_documents: list[FieldHttpUrl] | None = None
+        reply_buttons: list[ReplyButton] | None = None
 
-        finish_reason: list[str] | None
+        finish_reason: list[str] | None = None
 
     def related_workflows(self):
         from recipes.CompareText2Img import CompareText2ImgPage

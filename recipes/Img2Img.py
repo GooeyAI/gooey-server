@@ -42,31 +42,33 @@ class Img2ImgPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         input_image: FieldHttpUrl
-        text_prompt: str | None
+        text_prompt: str | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
+            None
+        )
         selected_controlnet_model: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)]]
             | typing.Literal[tuple(e.name for e in ControlNetModels)]
             | None
-        )
-        negative_prompt: str | None
+        ) = None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
-        prompt_strength: float | None
-        controlnet_conditioning_scale: list[float] | None
+        guidance_scale: float | None = None
+        prompt_strength: float | None = None
+        controlnet_conditioning_scale: list[float] | None = None
 
         # sd_2_upscaling: bool | None
 
-        seed: int | None
+        seed: int | None = None
 
-        image_guidance_scale: float | None
+        image_guidance_scale: float | None = None
 
     class ResponseModel(BaseModel):
         output_images: list[FieldHttpUrl]

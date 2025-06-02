@@ -146,13 +146,16 @@ class BasePage:
 
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
+            None,
             title="🧩 Developer Tools and Functions",
         )
         variables: dict[str, typing.Any] | None = Field(
+            None,
             title="⌥ Variables",
             description="Variables to be used as Jinja prompt templates and in functions as arguments",
         )
         variables_schema: dict[str, VariableSchema] | None = Field(
+            None,
             title="Variables Schema",
             description="Schema for variables to be used in the variables input",
         )
@@ -1620,7 +1623,7 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
         request = self.RequestModel.parse_obj(state)
-        response = self.ResponseModel.construct()
+        response = self.ResponseModel.model_construct()
 
         # run the recipe
         try:

@@ -84,7 +84,7 @@ def runner_task(
             | {
                 k: v
                 for k, v in gui.session_state.items()
-                if k in page.ResponseModel.__fields__
+                if k in page.ResponseModel.model_fields
             }
             # add extra outputs from the run
             | extra_output

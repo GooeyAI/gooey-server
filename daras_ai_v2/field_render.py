@@ -15,10 +15,10 @@ def field_title_desc(model: typing.Type[BaseModel], name: str) -> str:
 
 
 def field_title(model: typing.Type[BaseModel], name: str) -> str:
-    field = model.__fields__[name]
+    field = model.model_fields[name]
     return field.field_info.title or ""
 
 
 def field_desc(model: typing.Type[BaseModel], name: str) -> str:
-    field = model.__fields__[name]
+    field = model.model_fields[name]
     return field.field_info.description or ""

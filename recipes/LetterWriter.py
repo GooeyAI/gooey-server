@@ -22,27 +22,27 @@ class LetterWriterPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         action_id: str
 
-        prompt_header: str | None
-        example_letters: list[TrainingDataModel] | None
+        prompt_header: str | None = None
+        example_letters: list[TrainingDataModel] | None = None
 
-        lm_selected_api: str | None
-        lm_selected_engine: str | None
-        num_outputs: int | None
-        quality: float | None
-        lm_sampling_temperature: float | None
+        lm_selected_api: str | None = None
+        lm_selected_engine: str | None = None
+        num_outputs: int | None = None
+        quality: float | None = None
+        lm_sampling_temperature: float | None = None
 
-        api_http_method: str | None
-        api_url: str | None
-        api_headers: str | None
-        api_json_body: str | None
+        api_http_method: str | None = None
+        api_url: str | None = None
+        api_headers: str | None = None
+        api_json_body: str | None = None
 
-        input_prompt: str | None
-        strip_html_2_text: bool | None
+        input_prompt: str | None = None
+        strip_html_2_text: bool | None = None
 
     class ResponseModel(BaseModel):
         output_letters: list[str]
 
-        response_json: typing.Any
+        response_json: typing.Any = None
         generated_input_prompt: str
         final_prompt: str
 

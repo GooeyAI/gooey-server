@@ -54,20 +54,22 @@ class DeforumSDPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         animation_prompts: AnimationPrompts
-        max_frames: int | None
+        max_frames: int | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in AnimationModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in AnimationModels)] | None
+        ) = None
 
-        animation_mode: str | None
-        zoom: str | None
-        translation_x: str | None
-        translation_y: str | None
-        rotation_3d_x: str | None
-        rotation_3d_y: str | None
-        rotation_3d_z: str | None
-        fps: int | None
+        animation_mode: str | None = None
+        zoom: str | None = None
+        translation_x: str | None = None
+        translation_y: str | None = None
+        rotation_3d_x: str | None = None
+        rotation_3d_y: str | None = None
+        rotation_3d_z: str | None = None
+        fps: int | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl

@@ -76,6 +76,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
         )
 
         eval_urls: list[FieldHttpUrl] | None = Field(
+            None,
             title="Evaluation Workflows",
             description="""
 _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the results of your runs.
@@ -86,6 +87,7 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
         output_documents: list[FieldHttpUrl]
 
         eval_runs: list[FieldHttpUrl] | None = Field(
+            None,
             title="Evaluation Run URLs",
             description="""
 List of URLs to the evaluation runs that you requested.
@@ -117,7 +119,7 @@ List of URLs to the evaluation runs that you requested.
                 continue
 
             schema = page_cls.RequestModel.schema(ref_template="{model}")
-            for field, model_field in page_cls.RequestModel.__fields__.items():
+            for field, model_field in page_cls.RequestModel.model_fields.items():
                 if model_field.required:
                     input_fields = required_input_fields
                 else:
@@ -149,7 +151,7 @@ List of URLs to the evaluation runs that you requested.
             schema = page_cls.ResponseModel.schema()
             output_fields |= {
                 field: schema["properties"][field]["title"]
-                for field, model_field in page_cls.ResponseModel.__fields__.items()
+                for field, model_field in page_cls.ResponseModel.model_fields.items()
             }
 
         gui.write(

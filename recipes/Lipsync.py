@@ -29,7 +29,7 @@ class LipsyncPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: FieldHttpUrl
-        duration_sec: float | None
+        duration_sec: float | None = None
 
     def render_form_v2(self):
         gui.file_uploader(

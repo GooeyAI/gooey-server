@@ -28,11 +28,11 @@ class CompareUpscalerPage(BasePage):
 
         selected_models: (
             list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
-        )
+        ) = None
         selected_bg_model: (
             typing.Literal[tuple(e.name for e in UpscalerModels if e.is_bg_model)]
             | None
-        )
+        ) = None
 
     class ResponseModel(BaseModel):
         output_images: dict[

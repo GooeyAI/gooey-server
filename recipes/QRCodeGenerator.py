@@ -78,49 +78,51 @@ class QRCodeGeneratorPage(BasePage):
         self.__dict__.update(self.sane_defaults)
 
     class RequestModel(BasePage.RequestModel):
-        qr_code_data: str | None
-        qr_code_input_image: FieldHttpUrl | None
-        qr_code_vcard: VCARD | None
-        qr_code_file: FieldHttpUrl | None
+        qr_code_data: str | None = None
+        qr_code_input_image: FieldHttpUrl | None = None
+        qr_code_vcard: VCARD | None = None
+        qr_code_file: FieldHttpUrl | None = None
 
-        use_url_shortener: bool | None
+        use_url_shortener: bool | None = None
 
         text_prompt: str
-        negative_prompt: str | None
-        image_prompt: str | None
+        negative_prompt: str | None = None
+        image_prompt: str | None = None
         image_prompt_controlnet_models: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
-        image_prompt_strength: float | None
-        image_prompt_scale: float | None
-        image_prompt_pos_x: float | None
-        image_prompt_pos_y: float | None
+        ) = None
+        image_prompt_strength: float | None = None
+        image_prompt_scale: float | None = None
+        image_prompt_pos_x: float | None = None
+        image_prompt_pos_y: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None = (
+            None
+        )
         selected_controlnet_model: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
+        ) = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
-        controlnet_conditioning_scale: typing.List[float] | None
+        guidance_scale: float | None = None
+        controlnet_conditioning_scale: typing.List[float] | None = None
 
-        num_outputs: int | None
-        quality: int | None
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        num_outputs: int | None = None
+        quality: int | None = None
+        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None = None
 
-        seed: int | None
+        seed: int | None = None
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
         output_images: list[FieldHttpUrl]
         raw_images: list[FieldHttpUrl]
-        shortened_url: FieldHttpUrl | None
+        shortened_url: FieldHttpUrl | None = None
         cleaned_qr_code: FieldHttpUrl
 
     def related_workflows(self) -> list:
@@ -553,7 +555,7 @@ def vcard_form(*, key: str) -> VCARD:
     # populate inputs
     for k in VCARD.__fields__.keys():
         gui.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
-    vcard = VCARD.construct()
+    vcard = VCARD.model_construct()
 
     vcard.email = gui.text_input(
         "Email", key="__vcard_data__email", placeholder="dev@gooey.ai"

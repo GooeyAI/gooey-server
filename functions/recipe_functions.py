@@ -138,8 +138,8 @@ class LLMTool:
             if isinstance(return_value, dict):
                 for k, v in return_value.items():
                     if (
-                        k in self.request_model.__fields__
-                        or k in self.response_model.__fields__
+                        k in self.request_model.model_fields
+                        or k in self.response_model.model_fields
                     ):
                         self.state[k] = v
                     else:
@@ -163,7 +163,7 @@ class LLMTool:
             response={
                 k: v
                 for k, v in self.state.items()
-                if k in self.response_model.__fields__
+                if k in self.response_model.model_fields
             },
         )
         system_vars_schema = {var: {"role": "system"} for var in system_vars}
