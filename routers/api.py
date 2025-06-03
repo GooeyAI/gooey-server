@@ -300,13 +300,7 @@ def _parse_form_data(
         page_request_data = json.loads(page_request_json)
     except json.JSONDecodeError as e:
         raise RequestValidationError(
-            [
-                {
-                    "loc": ("body", e.pos),
-                    "msg": str(e),
-                    "type": "value_error.jsondecode",
-                }
-            ],
+            [{"type": "json_invalid", "loc": ["body", e.pos], "msg": str(e)}],
             body=e.doc,
         ) from e
     # fill in the file urls from the form data
