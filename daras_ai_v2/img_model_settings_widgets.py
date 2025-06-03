@@ -73,10 +73,11 @@ def model_selector(
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
-        Img2ImgModels.instruct_pix2pix,
-        Img2ImgModels.dall_e,
-        Img2ImgModels.jack_qiao,
-        Img2ImgModels.sd_2,
+        Img2ImgModels.instruct_pix2pix.name,
+        Img2ImgModels.dall_e.name,
+        Img2ImgModels.gpt_image_1.name,
+        Img2ImgModels.jack_qiao.name,
+        Img2ImgModels.sd_2.name,
     ]
     col1, col2 = gui.columns(2)
     with col1:
@@ -208,7 +209,8 @@ def quality_setting(selected_models=None):
         selected_models = [selected_models]
     if any(
         [
-            selected_model in [InpaintingModels.dall_e.name]
+            selected_model
+            in [InpaintingModels.dall_e.name, Img2ImgModels.gpt_image_1.name]
             for selected_model in selected_models
         ]
     ):
@@ -280,6 +282,7 @@ RESOLUTIONS: dict[int, dict[str, str]] = {
         "1792, 512": "cinema",
         "2048, 512": "panorama",
         "1792, 1024": "wide",
+        "1536, 1024": "camera",
     },
 }
 LANDSCAPE = "Landscape"
@@ -329,6 +332,9 @@ def output_resolution_setting():
     elif selected_models and selected_models <= {Text2ImgModels.dall_e_3.name}:
         pixel_options = [1024]
         allowed_shapes = ["square", "wide"]
+    elif selected_models and selected_models <= {Text2ImgModels.gpt_image_1.name}:
+        pixel_options = [1024]
+        allowed_shapes = ["square", "camera"]
     else:
         pixel_options = [512, 768]
 
@@ -372,9 +378,10 @@ def sd_2_upscaling_setting():
     gui.caption("Note: Currently, only square images can be upscaled")
 
 
-def scheduler_setting(selected_model: str = None):
+def scheduler_setting(selected_model: str | None = None):
     if selected_model in [
         Text2ImgModels.dall_e.name,
+        Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.jack_qiao,
     ]:
         return
@@ -392,9 +399,10 @@ def scheduler_setting(selected_model: str = None):
     )
 
 
-def guidance_scale_setting(selected_model: str = None):
+def guidance_scale_setting(selected_model: str | None = None):
     if selected_model in [
         Text2ImgModels.dall_e.name,
+        Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.jack_qiao,
     ]:
         return
@@ -435,6 +443,7 @@ usually at the expense of lower image quality
 def prompt_strength_setting(selected_model: str = None):
     if selected_model in [
         Img2ImgModels.dall_e.name,
+        Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.instruct_pix2pix.name,
     ]:
         return
@@ -456,8 +465,8 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
-def negative_prompt_setting(selected_model: str = None):
-    if selected_model in [Text2ImgModels.dall_e.name]:
+def negative_prompt_setting(selected_model: str | None = None):
+    if selected_model in [Text2ImgModels.dall_e.name, Text2ImgModels.gpt_image_1.name]:
         return
 
     gui.text_area(
