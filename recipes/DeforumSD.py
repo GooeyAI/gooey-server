@@ -14,7 +14,6 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from recipes.BulkRunner import list_view_editor
 

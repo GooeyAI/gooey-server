@@ -3,7 +3,6 @@ from pathlib import Path
 
 import PIL
 import numpy as np
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
 import gooey_gui as gui
 from pydantic import BaseModel, HttpUrl
@@ -46,7 +45,7 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: OptionalHttpUrl
+        input_image: HttpUrl
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None

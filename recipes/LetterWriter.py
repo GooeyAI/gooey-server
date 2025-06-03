@@ -42,7 +42,7 @@ class LetterWriterPage(BasePage):
     class ResponseModel(BaseModel):
         output_letters: list[str]
 
-        response_json: typing.Any = None
+        response_json: typing.Any
         generated_input_prompt: str
         final_prompt: str
 

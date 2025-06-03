@@ -1,7 +1,6 @@
 import typing
 from functools import partial
 
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import requests
 from pydantic import BaseModel, HttpUrl
 
@@ -47,7 +46,7 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: OptionalHttpUrl
+        input_image: HttpUrl
         text_prompt: str
 
         face_scale: float | None = None

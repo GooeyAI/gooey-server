@@ -15,7 +15,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
     ELEVEN_LABS_MODELS,
     GHANA_NLP_TTS_LANGUAGES,

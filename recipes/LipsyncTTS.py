@@ -1,6 +1,5 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui

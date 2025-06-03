@@ -1,10 +1,9 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
+import gooey_gui as gui
 import requests
 from pydantic import BaseModel, HttpUrl
 
-import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -44,7 +43,7 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: OptionalHttpUrl
+        input_image: HttpUrl
         text_prompt: str
 
         obj_scale: float | None = None
