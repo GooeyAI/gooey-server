@@ -5,9 +5,7 @@ import requests
 from furl import furl
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import (
-    raise_for_status,
-)
+from daras_ai_v2.exceptions import raise_for_status
 
 
 def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None, dict]:

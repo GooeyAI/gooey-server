@@ -14,17 +14,10 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import (
-    raise_for_status,
-    UserError,
-)
+from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.fal_ai import generate_on_fal
-from daras_ai_v2.gpu_server import (
-    b64_img_decode,
-    call_sd_multi,
-)
+from daras_ai_v2.gpu_server import b64_img_decode, call_sd_multi
 from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
 SD_IMG_MAX_SIZE = (768, 768)
@@ -59,6 +52,7 @@ class Text2ImgModels(Enum):
 
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
+    gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
@@ -91,6 +85,7 @@ text2img_model_ids = {
 dall_e_model_ids = {
     Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.dall_e_3: "dall-e-3",
+    Text2ImgModels.gpt_image_1: "gpt-image-1",
 }
 
 
@@ -101,6 +96,7 @@ class Img2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
 
     dall_e = "Dall-E (OpenAI)"
+    gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
@@ -128,6 +124,8 @@ img2img_model_ids = {
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
+    Img2ImgModels.dall_e: "dall-e-2",
+    Img2ImgModels.gpt_image_1: "gpt-image-1",
 }
 
 
@@ -303,6 +301,7 @@ def text2img(
     if model not in {
         Text2ImgModels.dall_e_3,
         Text2ImgModels.flux_1_dev,
+        Text2ImgModels.gpt_image_1,
     }:
         _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -327,6 +326,18 @@ def text2img(
                 payload=payload,
             )
             return output_images
+        case Text2ImgModels.gpt_image_1:
+            from openai import OpenAI
+
+            client = OpenAI()
+            width, height = _get_gpt_image_1_img_size(width, height)
+            with capture_openai_content_policy_violation():
+                response = client.images.generate(
+                    model=dall_e_model_ids[model],
+                    prompt=prompt,
+                    size=f"{width}x{height}",
+                )
+            out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e_3:
             from openai import OpenAI
 
@@ -350,6 +361,7 @@ def text2img(
             client = OpenAI()
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
+                    model=dall_e_model_ids[model],
                     n=num_outputs,
                     prompt=prompt,
                     size=f"{edge}x{edge}",
@@ -390,19 +402,14 @@ def generate_fal_images(
     return [r["url"] for r in result["images"]]
 
 
-def _fal_auth_headers():
-    return {"Authorization": f"Key {settings.FAL_API_KEY}"}
-
-
-def _get_dall_e_img_size(width: int, height: int) -> int:
+def _get_dall_e_img_size(width: int, height: int) -> typing.Literal[256, 512, 1024]:
     edge = max(width, height)
     if edge < 512:
-        edge = 256
-    elif 512 < edge < 1024:
-        edge = 512
-    elif edge > 1024:
-        edge = 1024
-    return edge
+        return 256
+    elif 512 <= edge < 1024:
+        return 512
+    else:
+        return 1024
 
 
 def _get_dall_e_3_img_size(width: int, height: int) -> tuple[int, int]:
@@ -412,6 +419,31 @@ def _get_dall_e_3_img_size(width: int, height: int) -> tuple[int, int]:
         return 1024, 1792
     else:
         return 1792, 1024
+
+
+def _get_gpt_image_1_img_size(width: int, height: int) -> tuple[int, int]:
+    """
+    Returns the appropriate size for GPT Image 1 based on input dimensions.
+    Supported sizes: 1024x1024, 1536x1024, 1024x1536
+    """
+    if height == width:
+        return 1024, 1024
+    elif width > height:
+        return 1536, 1024
+    else:
+        return 1024, 1536
+
+
+def prepare_init_image(
+    init_image_bytes: bytes, width: int, height: int
+) -> tuple[bytes, bytes]:
+    image = resize_img_pad(init_image_bytes, (width, height))
+    image = rgb_img_to_rgba(image)
+    mask = io.BytesIO()
+    Image.new("RGBA", (width, height), (0, 0, 0, 0)).save(mask, format="PNG")
+    mask = mask.getvalue()
+
+    return image, mask
 
 
 def img2img(
@@ -430,30 +462,35 @@ def img2img(
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
-    height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
-    _resolution_check(width, height)
-
     match selected_model:
-        case Img2ImgModels.dall_e.name:
-            from openai import OpenAI
+        case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
+            from openai import NOT_GIVEN, OpenAI
 
-            edge = _get_dall_e_img_size(width, height)
-            image = resize_img_pad(init_image_bytes, (edge, edge))
-            image = rgb_img_to_rgba(image)
-            mask = io.BytesIO()
-            Image.new("RGBA", (edge, edge), (0, 0, 0, 0)).save(mask, format="PNG")
-            mask = mask.getvalue()
+            init_height, init_width, _ = bytes_to_cv2_img(init_image_bytes).shape
+            _resolution_check(init_width, init_height)
+
+            if selected_model == Img2ImgModels.dall_e.name:
+                edge = _get_dall_e_img_size(init_width, init_height)
+                width, height = edge, edge
+                response_format = "b64_json"
+            else:
+                width, height = _get_gpt_image_1_img_size(init_width, init_height)
+                response_format = NOT_GIVEN
+
+            image, mask = prepare_init_image(
+                init_image_bytes, width=width, height=height
+            )
 
             client = OpenAI()
             with capture_openai_content_policy_violation():
                 response = client.images.edit(
-                    model="dall-e-2",
+                    model=img2img_model_ids[Img2ImgModels[selected_model]],
                     prompt=prompt,
-                    image=image,
-                    mask=mask,
+                    image=("image.png", image),
+                    mask=("mask.png", mask),
                     n=num_outputs,
-                    size=f"{edge}x{edge}",
-                    response_format="b64_json",
+                    size=f"{width}x{height}",
+                    response_format=response_format,
                 )
 
             out_imgs = [
@@ -576,7 +613,7 @@ def inpainting(
             with capture_openai_content_policy_violation():
                 response = client.images.edit(
                     prompt=prompt,
-                    image=image,
+                    image=("image.png", image),
                     n=num_outputs,
                     size=f"{edge}x{edge}",
                     response_format="b64_json",

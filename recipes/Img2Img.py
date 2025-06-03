@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import FieldHttpUrl
@@ -155,6 +156,13 @@ class Img2ImgPage(BasePage):
             safety_checker(text=request.text_prompt, image=request.input_image)
 
         yield "Generating Image..."
+
+        if (
+            request.selected_model
+            in [Img2ImgModels.dall_e.name, Img2ImgModels.gpt_image_1.name]
+            and request.selected_controlnet_model
+        ):
+            raise UserError("ControlNet is not supported for OpenAI models")
 
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
