@@ -43,6 +43,7 @@ WORKFLOW_PREVIEW_STYLE = """
     height: 100%;
     margin: 0;
     object-fit: cover;
+    border-radius: 12px;
 }
 
 @media (min-width: 768px) {

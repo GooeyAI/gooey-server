@@ -440,6 +440,8 @@ class BasePage:
                     )
                     if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
                         imageStyles["borderRadius"] = "50%"
+                    else:
+                        imageStyles["borderRadius"] = "12px"
 
                     gui.image(
                         src=pr.photo_url,

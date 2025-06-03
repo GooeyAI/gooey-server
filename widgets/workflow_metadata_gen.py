@@ -44,7 +44,7 @@ def render_ai_generated_image_widget(
     if is_circle_image:
         img_classes += " rounded-circle"
     else:
-        img_classes += " rounded"
+        img_style["borderRadius"] = "8px"
 
     with gui.div(
         style=dict(height="200px", width="200px") | img_style,
