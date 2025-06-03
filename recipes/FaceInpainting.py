@@ -25,10 +25,6 @@ from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
-class HttpUrlHttpUrl:
-    pass
-
-
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/10c2ce06-88da-11ee-b428-02420a000168/ai%20image%20with%20a%20face.png.png"
