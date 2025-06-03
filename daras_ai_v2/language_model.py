@@ -651,6 +651,26 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_4_sonnet = LLMSpec(
+        label="Claude 4 Sonnet (Anthropic)",
+        model_id="claude-4-sonnet-20250514",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=64_000,
+        price=15,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    claude_4_opus = LLMSpec(
+        label="Claude 4 Opus (Anthropic)",
+        model_id="claude-4-opus-20250514",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=64_000,
+        price=15,
+        is_vision_model=True,
+        supports_json=True,
+    )
     claude_3_7_sonnet = LLMSpec(
         label="Claude 3.7 Sonnet (Anthropic)",
         model_id="claude-3-7-sonnet-20250219",
@@ -1464,6 +1484,8 @@ def run_openai_chat(
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
         max_completion_tokens = max(25_000, max_completion_tokens)
     elif model in [
+        LargeLanguageModels.claude_4_sonnet,
+        LargeLanguageModels.claude_4_opus,
         LargeLanguageModels.gemini_2_5_pro_preview,
         LargeLanguageModels.gemini_2_5_flash_preview,
     ]:
@@ -1549,6 +1571,11 @@ def _stream_openai_chunked(
 
     completion_chunk = None
     for completion_chunk in r:
+        if completion_chunk.choices is None:
+            # not a valid completion chunk...
+            # anthropic sends pings like this that must be ignored
+            continue
+
         changed = False
         for choice in completion_chunk.choices:
             delta = choice.delta
@@ -1727,6 +1754,12 @@ def get_openai_client(model: str):
             api_key=settings.SARVAM_API_KEY,
             max_retries=0,
             base_url="https://api.sarvam.ai/v1",
+        )
+    elif model.startswith("claude-4-"):
+        client = openai.OpenAI(
+            api_key=settings.ANTHROPIC_API_KEY,
+            max_retries=0,
+            base_url="https://api.anthropic.com/v1",
         )
     elif model.startswith("google/"):
         client = openai.OpenAI(
