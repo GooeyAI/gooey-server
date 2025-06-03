@@ -92,12 +92,12 @@ def render_demo_dialog(ref: gui.AlertDialogRef, bi_id: int):
         with col2:
             with gui.div(className="d-flex align-items-center gap-2"):
                 gui.caption("Or scan QR Code")
-                gui.anchor(
+                gui.download_button(
                     label=icons.download_solid,
-                    href=bi.get_bot_test_link(),
+                    url=bi.demo_qr_code_image,
                     type="tertiary",
-                    unsafe_allow_html=True,
                     className="py-1",
+                    unsafe_allow_html=True,
                 )
             gui.image(src=bi.demo_qr_code_image)
 
