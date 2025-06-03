@@ -273,6 +273,8 @@ class CompareText2ImgPage(BasePage):
                     total += 5
                 case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
                     total += 15
+                case Text2ImgModels.gpt_image_1.name:
+                    total += 20
                 case _:
                     total += 2
         num_outputs = state.get("num_outputs") or 0
