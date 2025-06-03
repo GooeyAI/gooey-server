@@ -639,6 +639,8 @@ class LargeLanguageModels(Enum):
         context_window=4096,
         max_output_tokens=1024,
         price=10,
+        is_deprecated=True,
+        redirect_to="gemini_2_flash",
     )
     palm2_text = LLMSpec(
         label="PaLM 2 Text (Google)",
@@ -648,6 +650,8 @@ class LargeLanguageModels(Enum):
         max_output_tokens=1024,
         price=15,
         is_chat_model=False,
+        is_deprecated=True,
+        redirect_to="gemini_2_flash",
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
