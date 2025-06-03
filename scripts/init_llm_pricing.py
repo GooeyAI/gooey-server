@@ -586,7 +586,7 @@ def run():
     # Gemini
 
     llm_pricing_create(
-        model_id="gemini-2.5-pro-preview-03-25",
+        model_id="google/gemini-2.5-pro-preview-03-25",
         model_name=LargeLanguageModels.gemini_2_5_pro_preview.name,
         unit_cost_input=1.25,  # actually 2.5 when len(input) >= 200K
         unit_cost_output=10,  # actually 15 when len(input) >= 200K
@@ -595,7 +595,7 @@ def run():
         pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro-preview",
     )
     llm_pricing_create(
-        model_id="gemini-2.5-flash-preview-04-17",
+        model_id="google/gemini-2.5-flash-preview-04-17",
         model_name=LargeLanguageModels.gemini_2_5_flash_preview.name,
         unit_cost_input=0.15,
         unit_cost_output=3.5,  # thinking cost, non-thinking is 0.6
@@ -604,7 +604,7 @@ def run():
         pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash",
     )
     llm_pricing_create(
-        model_id="gemini-2.0-flash-lite",
+        model_id="google/gemini-2.0-flash-lite",
         model_name=LargeLanguageModels.gemini_2_flash_lite.name,
         unit_cost_input=0.075,
         unit_cost_output=0.30,
@@ -613,7 +613,7 @@ def run():
         pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.0-flash-lite",
     )
     llm_pricing_create(
-        model_id="gemini-2.0-flash-001",
+        model_id="google/gemini-2.0-flash-001",
         model_name=LargeLanguageModels.gemini_2_flash.name,
         unit_cost_input=0.1,
         unit_cost_output=0.4,

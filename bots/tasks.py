@@ -149,7 +149,7 @@ def send_broadcast_msgs_chunked(
     buttons: list[ReplyButton] = None,
     convo_qs: QuerySet[Conversation],
     bi: BotIntegration,
-    medium: str = "Voice Call",
+    medium: str = "SMS/MMS",
 ):
     convo_ids = list(convo_qs.values_list("id", flat=True))
     for i in range(0, len(convo_ids), 100):
@@ -175,7 +175,7 @@ def send_broadcast_msg(
     documents: list[str] = None,
     bi_id: int,
     convo_ids: list[int],
-    medium: str = "Voice Call",
+    medium: str = "SMS/MMS",
 ):
     bi = BotIntegration.objects.get(id=bi_id)
     convos = Conversation.objects.filter(id__in=convo_ids)

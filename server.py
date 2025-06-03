@@ -95,6 +95,15 @@ async def startup():
     limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
 
 
+if config("ROBOTS_NOINDEX", default=False, cast=bool):
+
+    @app.middleware("http")
+    async def noindex_middleware(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return response
+
+
 @app.add_middleware
 def request_time_middleware(app):
     logger = logging.getLogger("uvicorn.time")
