@@ -7,7 +7,7 @@ import typing
 import gooey_gui as gui
 from furl import furl
 
-from bots.models import PublishedRun, Workflow
+from bots.models import PublishedRun, Workflow, Platform
 from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
@@ -15,6 +15,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.utils import get_relative_time
 from widgets.author import render_author_from_workspace, render_author_from_user
+from widgets.demo_button import get_demo_bots
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -74,7 +75,7 @@ def render_saved_workflow_preview(
     output_url = (
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
-
+    demo_bots = get_demo_bots(published_run)
     with gui.div(className="position-relative py-2 pe-0"):
         with (
             gui.styled(WORKFLOW_PREVIEW_STYLE),
@@ -106,6 +107,17 @@ def render_saved_workflow_preview(
                                 if workflow_pill:
                                     gui.pill(
                                         workflow_pill,
+                                        unsafe_allow_html=True,
+                                        className="border border-dark ms-2",
+                                    )
+
+                                for _, platform_id in demo_bots:
+                                    platform = Platform(platform_id)
+                                    label = (
+                                        f"{platform.get_icon()} {platform.get_title()}"
+                                    )
+                                    gui.pill(
+                                        label,
                                         unsafe_allow_html=True,
                                         className="border border-dark ms-2",
                                     )
