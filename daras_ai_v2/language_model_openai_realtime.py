@@ -54,8 +54,8 @@ class RealtimeSession:
 
         dispatch = {
             "input_audio_buffer.speech_started": self.on_speech_started,
-            "conversation.item.input_audio_transcription.completed": self.on_transcription_completed,
             "response.audio.delta": self.on_audio_delta,
+            "conversation.item.input_audio_transcription.completed": self.on_transcription_completed,
             "response.output_item.done": self.on_output_item_done,
         }
         try:
@@ -65,7 +65,7 @@ class RealtimeSession:
                 if not handler:
                     continue
                 handler(event)
-        except ConnectionClosed:
+        except (ConnectionClosed, CallTransferred):
             pass
 
         yield self.entry
@@ -92,15 +92,6 @@ class RealtimeSession:
         self.last_assistant_item_id = None
         self.response_start_ts = None
 
-    def on_transcription_completed(self, event: dict):
-        if not event.get("transcript"):
-            return
-        self.entry["content"] += format_transcription_entry(
-            "user",
-            event["transcript"],
-            self.response_start_ts,
-        )
-
     def on_audio_delta(self, event: dict):
         if self.response_start_ts is None:
             self.response_start_ts = self.latest_media_ts
@@ -120,6 +111,12 @@ class RealtimeSession:
             {"event": "mark", "streamSid": self.stream_sid},
         )
 
+    def on_transcription_completed(self, event: dict):
+        transcript = event.get("transcript")
+        if not transcript:
+            return
+        self.append_transcription_entry("user", transcript)
+
     def on_output_item_done(self, event: dict):
         from recipes.VideoBots import exec_tool_call
 
@@ -132,11 +129,7 @@ class RealtimeSession:
             # Extract transcript from item content if available
             transcript = content[0].get("transcript") or ""
             if transcript:
-                self.entry["content"] += format_transcription_entry(
-                    "assistant",
-                    transcript,
-                    self.response_start_ts,
-                )
+                self.append_transcription_entry("assistant", transcript)
             if self.bi_id:
                 handle_transfer_call_button(
                     content, self.openai_ws, self.call_sid, self.bi_id
@@ -187,12 +180,24 @@ class RealtimeSession:
         finally:
             self.openai_ws.close()
 
+    _first_transcript_ts: datetime | None = None
+    _last_transcript_role: str | None = None
 
-def format_transcription_entry(role: str, content: str, conversation_start: datetime):
-    elapsed = datetime.now() - conversation_start
-    return (
-        f"[{elapsed.minute:02d}:{elapsed.second:02d}] {role.title()}: {content.strip()}"
-    )
+    def append_transcription_entry(self, role: str, content: str):
+        content = content.strip()
+        if not content:
+            return
+        if self._first_transcript_ts is None:
+            self._first_transcript_ts = datetime.now()
+        if self._last_transcript_role == role:
+            line = "\n" + content
+        else:
+            self._last_transcript_role = role
+            elapsed = datetime.now() - self._first_transcript_ts
+            minutes, seconds = divmod(elapsed.total_seconds(), 60)
+            formatted_time = f"[{minutes:02.0f}:{seconds:02.0f}]"
+            line = f"\n\n{formatted_time} {role.title()}: {content}"
+        self.entry["content"] = (self.entry["content"] + line).strip()
 
 
 T = typing.TypeVar("T")
@@ -306,4 +311,8 @@ def handle_transfer_call_button(
             send_json(openai_ws, {"type": "response.create"})
         else:
             logger.info(f"Successfully initiated transfer to {transfer_number}")
-            raise ConnectionClosed
+            raise CallTransferred
+
+
+class CallTransferred(Exception):
+    pass
