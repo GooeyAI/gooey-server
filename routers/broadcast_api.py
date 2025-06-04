@@ -111,7 +111,7 @@ def broadcast_api_json(
         if bot_request.filters:
             convo_qs = convo_qs.filter(
                 **bot_request.filters.model_dump(exclude_unset=True)
-            )
+            ).distinct_by_user_id()
         total += convo_qs.count()
         send_broadcast_msgs_chunked(
             text=bot_request.text,
