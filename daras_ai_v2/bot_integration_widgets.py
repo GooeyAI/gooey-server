@@ -391,7 +391,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             bi.website_url = gui.text_input(
                 "###### Website Link",
                 key=f"_bi_website_url_{bi.id}",
-                value=bi.website_url or (user and user.website_url),
+                value=bi.website_url,
             )
 
         gui.write("###### Conversation Starters")
@@ -538,6 +538,7 @@ def integration_details_generator(bi: BotIntegration, user: AppUser | None):
             gui.error(sr.error_msg)
             return
 
+        bi.website_url = bi.website_url or (user and user.website_url)
         for text in flatten(sr.state["output_text"].values()):
             output = json.loads(text)
             gui.session_state[f"_bi_descripton_{bi.id}"] = (
