@@ -316,10 +316,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
-        title = super().get_run_title(sr, pr)
         root_title = cls.get_recipe_title()
-        if title != root_title:
-            return title
+        if pr and pr.title and not pr.is_root():
+            return pr.title
 
         try:
             lang = langcodes.Language.get(
@@ -328,7 +327,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         except (KeyError, langcodes.LanguageTagError):
             lang = None
 
-        return " ".join(filter(None, [lang, title]))
+        return " ".join(filter(None, [lang, root_title]))
 
     @classmethod
     def get_prompt_title(cls, state: dict) -> str | None:

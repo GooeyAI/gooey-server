@@ -95,10 +95,9 @@ class AsrPage(BasePage):
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
-        title = super().get_run_title(sr, pr)
         root_title = cls.get_recipe_title()
-        if title != root_title:
-            return title
+        if pr and pr.title and not pr.is_root():
+            return pr.title
 
         try:
             lang = langcodes.Language.get(sr.state["language"] or "").display_name()
