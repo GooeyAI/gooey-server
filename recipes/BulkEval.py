@@ -49,7 +49,7 @@ AggFunctionsList = [
 ]
 
 
-class EvalPrompt(typing.TypedDict):
+class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
 
@@ -59,7 +59,7 @@ class AggFunction(typing_extensions.TypedDict):
     function: typing.Literal[tuple(AggFunctionsList)]
 
 
-class AggFunctionResult(typing.TypedDict):
+class AggFunctionResult(typing_extensions.TypedDict):
     column: str
     function: typing.Literal[tuple(AggFunctionsList)]
     count: int
@@ -168,6 +168,7 @@ Remember to includes header names in your CSV too.
         )
 
         eval_prompts: list[EvalPrompt] | None = Field(
+            None,
             title="Evaluation Prompts",
             description="""
 Specify custom LLM prompts to calculate metrics that evaluate each row of the input data. The output should be a JSON object mapping the metric names to values.  
@@ -176,6 +177,7 @@ _The `columns` dictionary can be used to reference the spreadsheet columns._
         )
 
         agg_functions: list[AggFunction] | None = Field(
+            None,
             title="Aggregations",
             description="""
 Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats).
@@ -191,8 +193,8 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
 
     class ResponseModel(BaseModel):
         output_documents: list[str]
-        final_prompts: list[list[str]] | None
-        aggregations: list[list[AggFunctionResult]] | None
+        final_prompts: list[list[str]] | None = None
+        aggregations: list[list[AggFunctionResult]] | None = None
 
     def render_form_v2(self):
         files = bulk_documents_uploader(

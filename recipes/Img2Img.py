@@ -2,14 +2,13 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
@@ -41,35 +40,37 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
-        text_prompt: str | None
+        input_image: HttpUrl
+        text_prompt: str | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
+            None
+        )
         selected_controlnet_model: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)]]
             | typing.Literal[tuple(e.name for e in ControlNetModels)]
             | None
-        )
-        negative_prompt: str | None
+        ) = None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
-        prompt_strength: float | None
-        controlnet_conditioning_scale: list[float] | None
+        guidance_scale: float | None = None
+        prompt_strength: float | None = None
+        controlnet_conditioning_scale: list[float] | None = None
 
         # sd_2_upscaling: bool | None
 
-        seed: int | None
+        seed: int | None = None
 
-        image_guidance_scale: float | None
+        image_guidance_scale: float | None = None
 
     class ResponseModel(BaseModel):
-        output_images: list[FieldHttpUrl]
+        output_images: list[HttpUrl]
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:
@@ -146,7 +147,7 @@ class Img2ImgPage(BasePage):
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: Img2ImgPage.RequestModel = self.RequestModel.model_validate(state)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content

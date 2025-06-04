@@ -1,4 +1,3 @@
-import json
 import typing
 
 import gooey_gui as gui
@@ -41,7 +40,7 @@ class LLMTool:
         else:
             page_cls = Workflow(fn_sr.workflow).page_cls
             fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)[1]
-            fn_vars_schema = page_cls.RequestModel.schema()["properties"]
+            fn_vars_schema = page_cls.RequestModel.model_json_schema()["properties"]
 
         self.spec = {
             "type": "function",
@@ -138,8 +137,8 @@ class LLMTool:
             if isinstance(return_value, dict):
                 for k, v in return_value.items():
                     if (
-                        k in self.request_model.__fields__
-                        or k in self.response_model.__fields__
+                        k in self.request_model.model_fields
+                        or k in self.response_model.model_fields
                     ):
                         self.state[k] = v
                     else:
@@ -156,14 +155,16 @@ class LLMTool:
         )
 
     def _get_system_vars(self) -> tuple[dict, dict]:
-        request = self.request_model.parse_obj(self.state)
+        request = self.request_model.model_validate(self.state)
         system_vars = dict(
             web_url=self.saved_run.get_app_url(),
-            request=json.loads(request.json(exclude_unset=True, exclude={"variables"})),
+            request=request.model_dump(
+                exclude_unset=True, exclude={"variables"}, mode="json"
+            ),
             response={
                 k: v
                 for k, v in self.state.items()
-                if k in self.response_model.__fields__
+                if k in self.response_model.model_fields
             },
         )
         system_vars_schema = {var: {"role": "system"} for var in system_vars}

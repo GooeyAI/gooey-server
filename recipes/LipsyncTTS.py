@@ -1,7 +1,6 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -34,10 +33,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
     class ResponseModel(BaseModel):
-        audio_url: str | None
+        audio_url: str | None = None
 
-        output_video: FieldHttpUrl
-        duration_sec: float | None
+        output_video: HttpUrl
+        duration_sec: float | None = None
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

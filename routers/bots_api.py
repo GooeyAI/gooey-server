@@ -36,40 +36,40 @@ class CreateStreamRequestBase(BaseModel):
         description="Your Integration ID as shown in the Copilot Integrations tab"
     )
 
-    conversation_id: str = Field(
-        default=None,
+    conversation_id: str | None = Field(
+        None,
         description="The gooey conversation ID.\n\n"
         "If not provided, a new conversation will be started and a new ID will be returned in the response. "
         "Use this to maintain the state of the conversation between requests.\n\n"
         "Note that you may not provide a custom ID here, and must only use the `conversation_id` returned in a previous response.",
     )
-    user_id: str = Field(
-        default=None,
+    user_id: str | None = Field(
+        None,
         description="Your app's custom user ID.\n\n"
         "If not provided, a random user will be created and a new ID will be returned in the response. "
         "If a `conversation_id` is provided, this field is automatically set to the user's id associated with that conversation.",
     )
 
-    user_message_id: str = Field(
-        default=None,
+    user_message_id: str | None = Field(
+        None,
         description="Your app's custom message ID for the user message.\n\n"
         "If not provided, a random ID will be generated and returned in the response. "
         "This is useful for tracking messages in the conversation.",
     )
 
-    button_pressed: ButtonPressed = Field(
-        default=None,
+    button_pressed: ButtonPressed | None = Field(
+        None,
         description="The button that was pressed by the user.",
     )
 
-    input_location: dict = Field(
+    input_location: dict | None = Field(
         None,
         description="Location information including latitude, longitude.",
     )
 
 
 class CreateStreamRequest(VideoBotsPage.RequestModel, CreateStreamRequestBase):
-    input_text: str = Field(
+    input_text: str | None = Field(
         None, deprecated=True, description="Use `input_prompt` instead"
     )
 
@@ -98,7 +98,9 @@ class CreateStreamResponse(BaseModel):
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
     get_redis_cache().set(
-        f"gooey/stream-init/v1/{request_id}", request.json(exclude_unset=True), ex=600
+        f"gooey/stream-init/v1/{request_id}",
+        request.model_dump_json(exclude_unset=True),
+        ex=600,
     )
     stream_url = str(
         furl(settings.API_BASE_URL)
@@ -110,7 +112,7 @@ def stream_create(request: CreateStreamRequest, response: Response):
 
 
 class ConversationStart(BaseModel):
-    type = Field(
+    type: str = Field(
         "conversation_start",
         description="The conversation was started. Save the IDs for future requests.",
     )
@@ -133,7 +135,7 @@ class ConversationStart(BaseModel):
 
 
 class RunStart(AsyncApiResponseModelV3):
-    type = Field(
+    type: str = Field(
         "run_start",
         description="The run was started. Save the IDs for future requests."
         "Use the `status_url` to check the status of the run and fetch the complete output.",
@@ -141,7 +143,7 @@ class RunStart(AsyncApiResponseModelV3):
 
 
 class MessagePart(BaseModel):
-    type = Field(
+    type: str = Field(
         "message_part",
         description="The partial outputs from the bot will be streamed in parts. Use this to update the user interface iteratively.",
     )
@@ -150,24 +152,24 @@ class MessagePart(BaseModel):
         description="Details about the status of the run as a human readable string"
     )
 
-    references: list[SearchReference] | None
+    references: list[SearchReference] | None = None
 
-    text: str | None
-    audio: str | None
-    video: str | None
-    buttons: list[ReplyButton] | None
-    documents: list[str] | None
+    text: str | None = None
+    audio: str | None = None
+    video: str | None = None
+    buttons: list[ReplyButton] | None = None
+    documents: list[str] | None = None
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):
-    type = Field(
+    type: str = Field(
         "final_response",
         description="The run has completed. Use the `status_url` to check the status of the run and fetch the complete output.",
     )
 
 
 class StreamError(BaseModel):
-    type = Field(
+    type: str = Field(
         "error",
         description="An error occurred. The stream has ended.",
     )
@@ -214,7 +216,9 @@ def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
                 return
             if isinstance(event, StreamError):
                 yield b"event: error\n"
-            yield b"data: " + event.json(exclude_none=True).encode() + b"\n\n"
+            yield (
+                b"data: " + event.model_dump_json(exclude_none=True).encode() + b"\n\n"
+            )
     finally:
         yield b"event: close\ndata:\n\n"
 
@@ -227,7 +231,7 @@ class ApiInterface(BotInterface):
 
     def __init__(self, request: CreateStreamRequest):
         self.request = request
-        self.request_overrides = request.dict(exclude_unset=True)
+        self.request_overrides = request.model_dump(exclude_unset=True)
         try:
             self.bot_id = api_hashids.decode(request.integration_id)[0]
             assert BotIntegration.objects.filter(id=self.bot_id).exists()
@@ -320,7 +324,7 @@ class ApiInterface(BotInterface):
             if self.run_id and self.uid:
                 sr = self.page_cls.get_sr_from_ids(run_id=self.run_id, uid=self.uid)
                 state = sr.to_dict()
-                output = VideoBotsPage.ResponseModel.parse_obj(state)
+                output = VideoBotsPage.ResponseModel.model_validate(state)
                 output.output_text = [
                     parse_bot_html(text)[1] for text in output.output_text or []
                 ]

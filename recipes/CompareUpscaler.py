@@ -1,12 +1,12 @@
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
 from daras_ai_v2.upscaler_models import UpscalerModels, run_upscaler_model
@@ -19,8 +19,8 @@ class CompareUpscalerPage(BasePage):
     slug_versions = ["compare-ai-upscalers"]
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl | None = Field(None, description="Input Image")
-        input_video: FieldHttpUrl | None = Field(None, description="Input Video")
+        input_image: OptionalHttpUrl = Field(None, description="Input Image")
+        input_video: OptionalHttpUrl = Field(None, description="Input Video")
 
         scale: int = Field(
             description="The final upsampling scale of the image", ge=1, le=4
@@ -28,18 +28,18 @@ class CompareUpscalerPage(BasePage):
 
         selected_models: (
             list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
-        )
+        ) = None
         selected_bg_model: (
             typing.Literal[tuple(e.name for e in UpscalerModels if e.is_bg_model)]
             | None
-        )
+        ) = None
 
     class ResponseModel(BaseModel):
         output_images: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
+            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrl
         ] = Field({}, description="Output Images")
         output_videos: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], FieldHttpUrl
+            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrl
         ] = Field({}, description="Output Videos")
 
     def validate_form_v2(self):

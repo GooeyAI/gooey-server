@@ -40,10 +40,10 @@ class CompareLLMPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None
+        input_prompt: str | None = None
         selected_models: (
             list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -90,7 +90,7 @@ class CompareLLMPage(BasePage):
         )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: CompareLLMPage.RequestModel = self.RequestModel.model_validate(state)
 
         prompt = render_prompt_vars(request.input_prompt, state)
         state["output_text"] = output_text = {}

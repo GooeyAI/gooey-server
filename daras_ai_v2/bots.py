@@ -74,7 +74,7 @@ class ButtonPressed(BaseModel):
         description="The message ID of the context message on which the button was pressed"
     )
     button_title: str | None = Field(
-        description="The title of the button that was pressed by the user"
+        None, description="The title of the button that was pressed by the user"
     )
 
 
@@ -543,7 +543,7 @@ def _process_and_send_msg(
         input_documents=input_documents,
         input_text=input_text,
         platform_msg_id=sent_msg_id or update_msg_id,
-        response=VideoBotsPage.ResponseModel.parse_obj(state),
+        response=VideoBotsPage.ResponseModel.model_validate(state),
         saved_run=sr,
         received_time=recieved_time,
     )

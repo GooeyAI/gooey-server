@@ -2,7 +2,7 @@ import typing
 
 import gooey_gui as gui
 from jinja2.lexer import whitespace_re
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import Workflow, SavedRun, PublishedRun
 from daras_ai_v2.asr import (
@@ -28,7 +28,6 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc, field_title
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_filters import asr_languages_without_dialects
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
@@ -43,25 +42,30 @@ class AsrPage(BasePage):
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[FieldHttpUrl]
+        documents: list[HttpUrl]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            None,
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )
-        language: str | None
+        language: str | None = None
 
         input_prompt: str | None = Field(
+            None,
             title="👩‍💻 Prompt",
             description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
         )
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        ) = None
+
+        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None = (
+            None
         )
 
-        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
-
         google_translate_target: str | None = Field(
+            None,
             deprecated=True,
             description="use `translation_model` & `translation_target` instead.",
         )
@@ -70,7 +74,7 @@ class AsrPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        raw_output_text: list[str] | None
+        raw_output_text: list[str] | None = None
         output_text: list[str | AsrOutputJson]
 
     def current_sr_to_session_state(self) -> dict:
@@ -240,7 +244,7 @@ class AsrPage(BasePage):
 
     def run(self, state: dict):
         # Parse Request
-        request: AsrPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: AsrPage.RequestModel = self.RequestModel.model_validate(state)
 
         selected_model = AsrModels[request.selected_model]
         translation_model = TranslationModels.get(request.translation_model)

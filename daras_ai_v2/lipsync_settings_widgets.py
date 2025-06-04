@@ -10,13 +10,13 @@ def lipsync_settings(selected_model: str):
             wav2lip_settings()
             gui.session_state.pop("sadtalker_settings", None)
         case LipsyncModel.SadTalker.name:
-            settings = SadTalkerSettings.parse_obj(
+            settings = SadTalkerSettings.model_validate(
                 gui.session_state.setdefault(
-                    "sadtalker_settings", SadTalkerSettings().dict()
+                    "sadtalker_settings", SadTalkerSettings().model_dump()
                 )
             )
             sadtalker_settings(settings)
-            gui.session_state["sadtalker_settings"] = settings.dict()
+            gui.session_state["sadtalker_settings"] = settings.model_dump()
 
 
 def sadtalker_settings(settings: SadTalkerSettings):
@@ -26,7 +26,9 @@ def sadtalker_settings(settings: SadTalkerSettings):
 
     settings.preprocess = gui.selectbox(
         **field_label_val(settings, "preprocess"),
-        options=SadTalkerSettings.schema()["properties"]["preprocess"]["enum"],
+        options=SadTalkerSettings.model_json_schema()["properties"]["preprocess"][
+            "enum"
+        ],
     )
 
     settings.pose_style = gui.slider(

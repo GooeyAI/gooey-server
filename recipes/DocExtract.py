@@ -40,7 +40,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import (
@@ -56,7 +56,7 @@ from daras_ai_v2.vector_search import (
 from django.db.models import IntegerChoices
 from files.models import FileMetadata
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from recipes.asr_page import AsrPage
 from recipes.DocSearch import render_documents
@@ -87,33 +87,36 @@ class DocExtractPage(BasePage):
     price = 500
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[FieldHttpUrl]
+        documents: list[HttpUrl]
 
-        sheet_url: FieldHttpUrl | None
+        sheet_url: OptionalHttpUrl = None
 
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        language: str | None
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
+            None
+        )
+        language: str | None = None
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        ) = None
 
         google_translate_target: str | None = Field(
+            None,
             deprecated=True,
             description="use `translation_model` & `translation_target` instead.",
         )
 
-        task_instructions: str | None
+        task_instructions: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
     class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
-        output_documents: list[FieldHttpUrl] | None
+        output_documents: list[HttpUrl] | None = None
 
     def current_sr_to_session_state(self) -> dict:
         state = super().current_sr_to_session_state()

@@ -1,7 +1,6 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -51,34 +50,34 @@ class CompareText2ImgPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         text_prompt: str
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        num_outputs: int | None
-        quality: int | None
-        dall_e_3_quality: str | None
-        dall_e_3_style: str | None
+        num_outputs: int | None = None
+        quality: int | None = None
+        dall_e_3_quality: str | None = None
+        dall_e_3_style: str | None = None
 
-        guidance_scale: float | None
-        seed: int | None
-        sd_2_upscaling: bool | None
+        guidance_scale: float | None = None
+        seed: int | None = None
+        sd_2_upscaling: bool | None = None
 
         selected_models: (
             list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
-        )
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        ) = None
+        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None = None
 
-        edit_instruction: str | None
-        image_guidance_scale: float | None
+        edit_instruction: str | None = None
+        image_guidance_scale: float | None = None
 
-        loras: list[LoraWeight] | None
+        loras: list[LoraWeight] | None = None
 
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[FieldHttpUrl],
+            list[HttpUrl],
         ]
 
     @classmethod
@@ -185,7 +184,9 @@ class CompareText2ImgPage(BasePage):
         self._render_outputs(gui.session_state)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: CompareText2ImgPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         request.text_prompt = render_prompt_vars(request.text_prompt, gui.session_state)
 
@@ -291,7 +292,7 @@ def loras_input(key: str = "loras"):
     )
     if lora_urls:
         gui.session_state[key] = [
-            LoraWeight(path=url, scale=1).dict() for url in lora_urls
+            LoraWeight(path=url, scale=1).model_dump() for url in lora_urls
         ]
     else:
         gui.session_state.pop("loras", None)

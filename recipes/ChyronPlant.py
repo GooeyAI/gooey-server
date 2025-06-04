@@ -16,8 +16,8 @@ class ChyronPlantPage(BasePage):
     class RequestModel(BasePage.RequestModel):
         midi_notes: str
 
-        midi_notes_prompt: str | None
-        chyron_prompt: str | None
+        midi_notes_prompt: str | None = None
+        chyron_prompt: str | None = None
 
     class ResponseModel(BaseModel):
         midi_translation: str

@@ -1,10 +1,9 @@
 import typing
 from enum import Enum
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
-
 import gooey_gui as gui
+from pydantic import BaseModel, HttpUrl
+
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -60,19 +59,23 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[FieldHttpUrl]
+        documents: list[HttpUrl]
 
-        task_instructions: str | None
-        merge_instructions: str | None
+        task_instructions: str | None = None
+        merge_instructions: str | None = None
 
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        ) = None
+
+        chain_type: (
+            typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
+        ) = None
+
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
+            None
         )
-
-        chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
-
-        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        google_translate_target: str | None
+        google_translate_target: str | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -80,7 +83,7 @@ class DocSummaryPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
-        prompt_tree: PromptTree | None
+        prompt_tree: PromptTree | None = None
         final_prompt: str
 
     @classmethod
@@ -157,7 +160,7 @@ Prompt for merging several outputs together
         return [GoogleGPTPage, DocSearchPage, VideoBotsPage, SEOSummaryPage]
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: DocSummaryPage.RequestModel = self.RequestModel.model_validate(state)
 
         yield "Downloading documents..."
 

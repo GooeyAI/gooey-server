@@ -4,6 +4,7 @@ import base64
 from datetime import datetime
 from time import time
 from typing import Any, Literal, Mapping, Type, TypeVar
+import typing
 
 import requests
 from furl import furl
@@ -23,8 +24,8 @@ class PaypalResource(BaseModel):
 
     id: str
     create_time: datetime
-    update_time: datetime | None
-    links: list
+    update_time: datetime | None = None
+    links: typing.List
 
     @classmethod
     def list(cls: Type[T], list_all: bool = False, **params) -> list[T]:
@@ -44,7 +45,7 @@ class PaypalResource(BaseModel):
             )
             raise_for_status(r)
             body = r.json()
-            result += [cls.parse_obj(item) for item in body[items_key]]
+            result += [cls.model_validate(item) for item in body[items_key]]
             if page * page_size >= body["total_items"]:
                 break
 
@@ -62,7 +63,7 @@ class PaypalResource(BaseModel):
         )
         raise_for_status(r)
         return [
-            cls.parse_obj(item)
+            cls.model_validate(item)
             for item in r.json().get(cls._get_api_list_items_key(), [])
         ]
 
@@ -76,7 +77,7 @@ class PaypalResource(BaseModel):
             headers=get_default_headers(),
         )
         raise_for_status(r)
-        return cls.parse_obj(r.json())
+        return cls.model_validate(r.json())
 
     @classmethod
     def create(cls: Type[T], **data) -> T:
@@ -89,7 +90,7 @@ class PaypalResource(BaseModel):
             json=data,
         )
         raise_for_status(r)
-        return cls.parse_obj(r.json())
+        return cls.model_validate(r.json())
 
     @classmethod
     def _get_api_list_items_key(cls) -> str:
@@ -119,15 +120,15 @@ class Amount(BaseModel):
 
 
 class Subscriber(BaseModel):
-    email_address: str | None
-    payment_source: dict | None
+    email_address: str | None = None
+    payment_source: dict | None = None
 
 
 class InlinePaymentInfo(BaseModel):
     status: (
         Literal["COMPLETED", "DECLINED", "PARTIALLY_REFUNDED", "PENDING", "REFUNDED"]
         | None
-    )
+    ) = None
     amount: Amount
     time: datetime
 
@@ -135,23 +136,23 @@ class InlinePaymentInfo(BaseModel):
 class BillingInfo(BaseModel):
     outstanding_balance: Amount
     failed_payments_count: int
-    next_billing_time: datetime | None
-    last_payment: InlinePaymentInfo | None
+    next_billing_time: datetime | None = None
+    last_payment: InlinePaymentInfo | None = None
 
 
 class Subscription(PaypalResource):
     _api_endpoint = "v1/billing/subscriptions"
 
-    plan_id: str | None
+    plan_id: str | None = None
     status: Literal[
         "APPROVAL_PENDING", "APPROVED", "ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"
     ]
-    custom_id: str | None
-    start_date: str | None
-    quantity: str | None
+    custom_id: str | None = None
+    start_date: str | None = None
+    quantity: str | None = None
     plan_overridden: bool = False
-    subscriber: Subscriber | None
-    billing_info: BillingInfo | None
+    subscriber: Subscriber | None = None
+    billing_info: BillingInfo | None = None
 
     def cancel(self, *, reason: str = "cancellation_requested") -> None:
         if self.status in ["CANCELLED", "EXPIRED"]:
@@ -174,7 +175,7 @@ class Subscription(PaypalResource):
                 {
                     "op": "replace",
                     "path": "/billing_info/outstanding_balance",
-                    "value": amount.dict(),
+                    "value": amount.model_dump(),
                 }
             ],
         )
@@ -218,7 +219,7 @@ class Subscription(PaypalResource):
             headers=get_default_headers(),
             json={
                 "note": note,
-                "amount": amount.dict(),
+                "amount": amount.model_dump(),
                 "capture_type": capture_type,
             },
         )
@@ -230,27 +231,27 @@ class Plan(PaypalResource):
 
     name: str
     status: Literal["CREATED", "ACTIVE", "INACTIVE"]
-    product_id: str | None
-    billing_cycles: list[dict[str, Any]] | None
+    product_id: str | None = None
+    billing_cycles: list[dict[str, Any]] | None = None
 
 
 class Product(PaypalResource):
     _api_endpoint = "v1/catalogs/products"
 
     name: str
-    type: Literal["PHYSICAL", "DIGITAL", "SERVICE"] | None
-    description: str | None
+    type: Literal["PHYSICAL", "DIGITAL", "SERVICE"] | None = None
+    description: str | None = None
 
 
 class Sale(PaypalResource):
     _api_endpoint = "v1/payments/sale"
 
     amount: AmountV1
-    state: str | None
-    payment_mode: str | None
-    parent_payment: str | None
-    custom: str | None
-    billing_agreement_id: str | None
+    state: str | None = None
+    payment_mode: str | None = None
+    parent_payment: str | None = None
+    custom: str | None = None
+    billing_agreement_id: str | None = None
 
 
 class PaypalWebhookHeaders(BaseModel):
@@ -267,7 +268,7 @@ def verify_webhook_event(event: dict, *, headers: Mapping) -> bool:
     @see https://developer.paypal.com/docs/api-basics/notifications/webhooks/rest/#verify-webhook-signature
     """
     try:
-        validated_headers = PaypalWebhookHeaders.parse_obj(headers)
+        validated_headers = PaypalWebhookHeaders.model_validate(headers)
     except ValidationError as e:
         logger.error(f"Invalid PayPal webhook headers: {e}")
         return False

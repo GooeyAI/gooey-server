@@ -3,11 +3,12 @@ import math
 import mimetypes
 import typing
 from itertools import zip_longest
+import typing_extensions
 
 import gooey_gui as gui
 from django.db.models import Q, QuerySet
 from furl import furl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import (
     BotIntegration,
@@ -82,7 +83,7 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     CitationStyles,
@@ -126,7 +127,7 @@ DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 SAFETY_BUFFER = 100
 
 
-class ReplyButton(typing.TypedDict):
+class ReplyButton(typing_extensions.TypedDict):
     id: str
     title: str
 
@@ -180,81 +181,92 @@ class VideoBotsPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None
-        input_audio: str | None
-        input_images: list[FieldHttpUrl] | None
-        input_documents: list[FieldHttpUrl] | None
+        input_prompt: str | None = None
+        input_audio: str | None = None
+        input_images: list[HttpUrl] | None = None
+        input_documents: list[HttpUrl] | None = None
 
         doc_extract_url: str | None = Field(
+            None,
             title="📚 Document Extract Workflow",
             description="Select a workflow to extract text from documents and images.",
         )
 
         # conversation history/context
-        messages: list[dict] | None
+        messages: list[dict] | None = None
 
-        bot_script: str | None
+        bot_script: str | None = None
 
         # llm model
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
         document_model: str | None = Field(
+            None,
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
             "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
         )
 
         # doc search
-        task_instructions: str | None
-        query_instructions: str | None
-        keyword_instructions: str | None
-        documents: list[FieldHttpUrl] | None
-        max_references: int | None
-        max_context_words: int | None
-        scroll_jump: int | None
+        task_instructions: str | None = None
+        query_instructions: str | None = None
+        keyword_instructions: str | None = None
+        documents: list[HttpUrl] | None = None
+        max_references: int | None = None
+        max_context_words: int | None = None
+        scroll_jump: int | None = None
 
-        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
-        dense_weight: float | None = DocSearchRequest.__fields__[
-            "dense_weight"
-        ].field_info
+        embedding_model: (
+            typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
+        ) = None
+        dense_weight: float | None = DocSearchRequest.model_fields["dense_weight"]
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
-        use_url_shortener: bool | None
-        check_document_updates: bool | None
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
+            None
+        )
+        use_url_shortener: bool | None = None
+        check_document_updates: bool | None = None
 
         asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
+            None,
             title="Speech-to-Text Provider",
             description="Choose a model to transcribe incoming audio messages to text.",
         )
         asr_language: str | None = Field(
+            None,
             title="Spoken Language",
             description="Choose a language to transcribe incoming audio messages to text.",
         )
         asr_task: typing.Literal["translate", "transcribe"] | None = Field(
+            None,
             title="ASR Model Task",
             description="Use **{asr_model}** for speech translation from **{asr_language}** to **English**",
         )
         asr_prompt: str | None = Field(
+            None,
             title="👩‍💻 Prompt",
             description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
         )
 
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        )
+        ) = None
         user_language: str | None = Field(
+            None,
             title="Translation Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        input_glossary_document: FieldHttpUrl | None = Field(
+        input_glossary_document: OptionalHttpUrl = Field(
+            None,
             title="Input Glossary",
             description="""
 Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
-        output_glossary_document: FieldHttpUrl | None = Field(
+        output_glossary_document: OptionalHttpUrl = Field(
+            None,
             title="Output Glossary",
             description="""
 Translation Glossary for LLM Language (English) -> User Langauge
@@ -266,6 +278,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
 
         tools: list[str] | None = Field(
+            None,
             title="🛠️ Tools",
             description="Use `functions` instead.",
             deprecated=True,
@@ -280,24 +293,24 @@ Translation Glossary for LLM Language (English) -> User Langauge
         final_prompt: str | list[ConversationEntry] = []
 
         output_text: list[str] = []
-        output_audio: list[FieldHttpUrl] = []
-        output_video: list[FieldHttpUrl] = []
+        output_audio: list[HttpUrl] = []
+        output_video: list[HttpUrl] = []
 
         # intermediate text
-        raw_input_text: str | None
-        raw_tts_text: list[str] | None
-        raw_output_text: list[str] | None
+        raw_input_text: str | None = None
+        raw_tts_text: list[str] | None = None
+        raw_output_text: list[str] | None = None
 
         # doc search
         references: list[SearchReference] | None = []
-        final_search_query: str | None
-        final_keyword_query: str | list[str] | None
+        final_search_query: str | None = None
+        final_keyword_query: str | list[str] | None = None
 
         # function calls
-        output_documents: list[FieldHttpUrl] | None
-        reply_buttons: list[ReplyButton] | None
+        output_documents: list[HttpUrl] | None = None
+        reply_buttons: list[ReplyButton] | None = None
 
-        finish_reason: list[str] | None
+        finish_reason: list[str] | None = None
 
     def related_workflows(self):
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -1030,7 +1043,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
                 yield "Finding keywords..."
-                k_request = request.copy()
+                k_request = request.model_copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_o.name
                 k_request.max_tokens = 4096
@@ -1049,10 +1062,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             if response.final_search_query:  # perform doc search
                 response.references = yield from get_top_k_references(
-                    DocSearchRequest.parse_obj(
+                    DocSearchRequest.model_validate(
                         {
-                            **request.dict(),
-                            **response.dict(),
+                            **request.model_dump(),
+                            **response.model_dump(),
                             "search_query": response.final_search_query,
                             "keyword_query": response.final_keyword_query,
                         },
@@ -1228,9 +1241,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if request.tts_provider and not model.is_audio_model:
             response.output_audio = []
             for text in response.raw_tts_text or response.raw_output_text:
-                tts_state = TextToSpeechPage.RequestModel.parse_obj(
+                tts_state = TextToSpeechPage.RequestModel.model_validate(
                     {**gui.session_state, "text_prompt": text}
-                ).dict()
+                ).model_dump()
                 yield from TextToSpeechPage(request=self.request).run(tts_state)
                 response.output_audio.append(tts_state["audio_url"])
 
@@ -1238,13 +1251,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if request.input_face and response.output_audio:
             response.output_video = []
             for audio_url in response.output_audio:
-                lip_state = LipsyncPage.RequestModel.parse_obj(
+                lip_state = LipsyncPage.RequestModel.model_validate(
                     {
                         **gui.session_state,
                         "input_audio": audio_url,
                         "selected_model": request.lipsync_model,
                     }
-                ).dict()
+                ).model_dump()
                 yield from LipsyncPage(request=self.request).run(lip_state)
                 response.output_video.append(lip_state["output_video"])
 

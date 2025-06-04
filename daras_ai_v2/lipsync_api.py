@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile_with_ret
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 
 
 class LipsyncModel(Enum):
@@ -33,39 +33,39 @@ class SadTalkerSettings(BaseModel):
         title="Expression Scale",
         description="Scale the amount of expression motion. 1.0 is normal, 0.5 is very reduced, and 2.0 is quite a lot.",
     )
-    ref_eyeblink: FieldHttpUrl = Field(
+    ref_eyeblink: OptionalHttpUrl = Field(
         None,
         title="Reference Eyeblink",
         description="Optional reference video for eyeblinks to make the eyebrow movement more natural.",
     )
-    ref_pose: FieldHttpUrl = Field(
+    ref_pose: OptionalHttpUrl = Field(
         None,
         title="Reference Pose",
         description="Optional reference video to pose the head.",
     )
     # enhancer: typing.Literal["gfpgan", "RestoreFormer"] =None
     # background_enhancer: typing.Literal["realesrgan"] =None
-    input_yaw: list[int] = Field(
+    input_yaw: list[int] | None = Field(
         None, title="Input Yaw (comma separated)", deprecated=True
     )
-    input_pitch: list[int] = Field(
+    input_pitch: list[int] | None = Field(
         None, title="Input Pitch (comma separated)", deprecated=True
     )
-    input_roll: list[int] = Field(
+    input_roll: list[int] | None = Field(
         None, title="Input Roll (comma separated)", deprecated=True
     )
 
 
 class LipsyncSettings(BaseModel):
-    input_face: FieldHttpUrl = None
+    input_face: OptionalHttpUrl = None
 
     # wav2lip
-    face_padding_top: int = None
-    face_padding_bottom: int = None
-    face_padding_left: int = None
-    face_padding_right: int = None
+    face_padding_top: int | None = None
+    face_padding_bottom: int | None = None
+    face_padding_left: int | None = None
+    face_padding_right: int | None = None
 
-    sadtalker_settings: SadTalkerSettings = None
+    sadtalker_settings: SadTalkerSettings | None = None
 
 
 def run_sadtalker(
@@ -81,7 +81,7 @@ def run_sadtalker(
             preprocess=settings.preprocess,
         ),
         inputs=(
-            settings.dict()
+            settings.model_dump()
             | dict(source_image=face, driven_audio=audio, max_frames=max_frames)
         ),
         content_type="video/mp4",

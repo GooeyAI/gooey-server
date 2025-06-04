@@ -116,7 +116,9 @@ class RelatedQnAPage(BasePage):
 
         response.output_queries = []
         yield from apply_parallel(
-            lambda ques: run_google_gpt(request.copy(), ques, response.output_queries),
+            lambda ques: run_google_gpt(
+                request.model_copy(), ques, response.output_queries
+            ),
             all_questions,
             max_workers=4,
             message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
@@ -130,7 +132,7 @@ def run_google_gpt(
     related_question: str,
     outputs: list[RelatedGoogleGPTResponse],
 ):
-    response = RelatedGoogleGPTResponse.construct()
+    response = RelatedGoogleGPTResponse.model_construct()
     request.search_query = related_question
     response.search_query = related_question
     try:

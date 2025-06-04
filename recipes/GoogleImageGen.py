@@ -52,27 +52,29 @@ class GoogleImageGenPage(BasePage):
         search_query: str
         text_prompt: str
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
+            None
+        )
 
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        guidance_scale: float | None
-        prompt_strength: float | None
+        guidance_scale: float | None = None
+        prompt_strength: float | None = None
 
-        sd_2_upscaling: bool | None
+        sd_2_upscaling: bool | None = None
 
-        seed: int | None
+        seed: int | None = None
 
-        image_guidance_scale: float | None
+        image_guidance_scale: float | None = None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
 
         image_urls: list[str]
-        selected_image: str | None
+        selected_image: str | None = None
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -101,7 +103,9 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         )
 
     def run(self, state: dict):
-        request: GoogleImageGenPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: GoogleImageGenPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield "Googling..."
 

@@ -320,7 +320,7 @@ def text2img(
                 enable_safety_checker=False,
             )
             if loras:
-                payload["loras"] = [lora.dict() for lora in loras]
+                payload["loras"] = [lora.model_dump() for lora in loras]
             output_images = yield from generate_fal_images(
                 model_id=text2img_model_ids[model],
                 payload=payload,

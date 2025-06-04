@@ -43,7 +43,7 @@ def test_slack_get_response_for_msg_id(transactional_db):
                 output_audio=[],
                 output_video=[],
                 references=[],
-            ).dict(),
+            ).model_dump(),
         ),
     )
 

@@ -1,10 +1,9 @@
 import typing
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-import requests
-from pydantic import BaseModel
-
 import gooey_gui as gui
+import requests
+from pydantic import BaseModel, HttpUrl
+
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -44,36 +43,38 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: HttpUrl
         text_prompt: str
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
-        mask_threshold: float | None
+        mask_threshold: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        ) = None
 
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
+        guidance_scale: float | None = None
 
-        sd_2_upscaling: bool | None
+        sd_2_upscaling: bool | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: FieldHttpUrl
-        obj_mask: FieldHttpUrl
+        resized_image: HttpUrl
+        obj_mask: HttpUrl
         # diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        output_images: list[HttpUrl]
 
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage
@@ -235,7 +236,9 @@ class ObjectInpaintingPage(BasePage):
                 gui.div()
 
     def run(self, state: dict):
-        request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: ObjectInpaintingPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield "Running Image Segmentation..."
 

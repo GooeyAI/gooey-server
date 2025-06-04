@@ -15,7 +15,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import SUPPORTED_SPREADSHEET_TYPES
 from daras_ai_v2.field_render import field_title_desc, field_title
 from daras_ai_v2.language_filters import translation_languages_without_dialects
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 from daras_ai_v2.text_output_widget import text_outputs
 from daras_ai_v2.workflow_url_input import del_button
 from recipes.BulkRunner import list_view_editor
@@ -23,6 +23,7 @@ from recipes.BulkRunner import list_view_editor
 
 class TranslationOptions(BaseModel):
     translation_source: str | None = Field(
+        None,
         title="Source Translation Language",
         description="This is usually inferred from the spoken language, but in case that is set to Auto detect, you can specify one explicitly.",
     )
@@ -30,7 +31,8 @@ class TranslationOptions(BaseModel):
         "en",
         title="Target Translation Language",
     )
-    glossary_document: FieldHttpUrl | None = Field(
+    glossary_document: OptionalHttpUrl = Field(
+        None,
         title="Translation Glossary",
         description="""Provide a glossary to customize translation and improve accuracy of domain-specific terms.
 If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).""",

@@ -4,7 +4,7 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
@@ -15,7 +15,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.text_to_speech_settings_widgets import (
     ELEVEN_LABS_MODELS,
     GHANA_NLP_TTS_LANGUAGES,
@@ -34,33 +33,35 @@ from workspaces.models import Workspace
 
 
 class TextToSpeechSettings(BaseModel):
-    tts_provider: typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+    tts_provider: (
+        typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+    ) = None
 
-    uberduck_voice_name: str | None
-    uberduck_speaking_rate: float | None
+    uberduck_voice_name: str | None = None
+    uberduck_speaking_rate: float | None = None
 
-    google_voice_name: str | None
-    google_speaking_rate: float | None
-    google_pitch: float | None
+    google_voice_name: str | None = None
+    google_speaking_rate: float | None = None
+    google_pitch: float | None = None
 
-    bark_history_prompt: str | None
+    bark_history_prompt: str | None = None
 
     elevenlabs_voice_name: str | None = Field(
-        deprecated=True, description="Use `elevenlabs_voice_id` instead"
+        None, deprecated=True, description="Use `elevenlabs_voice_id` instead"
     )
-    elevenlabs_api_key: str | None
-    elevenlabs_voice_id: str | None
-    elevenlabs_model: str | None
-    elevenlabs_stability: float | None
-    elevenlabs_similarity_boost: float | None
+    elevenlabs_api_key: str | None = None
+    elevenlabs_voice_id: str | None = None
+    elevenlabs_model: str | None = None
+    elevenlabs_stability: float | None = None
+    elevenlabs_similarity_boost: float | None = None
     elevenlabs_style: float | None = Field(0)
-    elevenlabs_speaker_boost: bool | None
+    elevenlabs_speaker_boost: bool | None = None
 
-    azure_voice_name: str | None
+    azure_voice_name: str | None = None
 
-    openai_voice_name: OpenAI_TTS_Voices.api_choices | None
-    openai_tts_model: OpenAI_TTS_Models.api_choices | None
-    ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None
+    openai_voice_name: OpenAI_TTS_Voices.api_choices | None = None
+    openai_tts_model: OpenAI_TTS_Models.api_choices | None = None
+    ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None = None
 
 
 class TextToSpeechPage(BasePage):
@@ -93,7 +94,7 @@ class TextToSpeechPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        audio_url: FieldHttpUrl
+        audio_url: HttpUrl
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

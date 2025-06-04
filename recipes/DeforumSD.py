@@ -4,7 +4,7 @@ from functools import partial
 
 import gooey_gui as gui
 from django.db.models import TextChoices
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing_extensions import TypedDict
 
 from bots.models import Workflow
@@ -14,7 +14,6 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.safety_checker import safety_checker
 from recipes.BulkRunner import list_view_editor
 
@@ -33,7 +32,7 @@ class AnimationModels(TextChoices):
 
 
 class _AnimationPrompt(TypedDict):
-    frame: str
+    frame: int | str
     prompt: str
 
 
@@ -54,23 +53,25 @@ class DeforumSDPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         animation_prompts: AnimationPrompts
-        max_frames: int | None
+        max_frames: int | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in AnimationModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in AnimationModels)] | None
+        ) = None
 
-        animation_mode: str | None
-        zoom: str | None
-        translation_x: str | None
-        translation_y: str | None
-        rotation_3d_x: str | None
-        rotation_3d_y: str | None
-        rotation_3d_z: str | None
-        fps: int | None
+        animation_mode: str | None = None
+        zoom: str | None = None
+        translation_x: str | None = None
+        translation_y: str | None = None
+        rotation_3d_x: str | None = None
+        rotation_3d_y: str | None = None
+        rotation_3d_z: str | None = None
+        fps: int | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
-        output_video: FieldHttpUrl
+        output_video: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
@@ -269,7 +270,7 @@ class DeforumSDPage(BasePage):
         return display
 
     def run(self, state: dict):
-        request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: DeforumSDPage.RequestModel = self.RequestModel.model_validate(state)
         model = AnimationModels[request.selected_model]
 
         if model in AnimationModels._deprecated():

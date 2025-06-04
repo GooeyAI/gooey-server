@@ -1,8 +1,7 @@
 import typing
 from enum import Enum
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -37,25 +36,25 @@ class Text2AudioPage(BasePage):
 
     class RequestModel(BasePage.RequestModel):
         text_prompt: str
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        duration_sec: float | None
+        duration_sec: float | None = None
 
-        num_outputs: int | None
-        quality: int | None
+        num_outputs: int | None = None
+        quality: int | None = None
 
-        guidance_scale: float | None
-        seed: int | None
-        sd_2_upscaling: bool | None
+        guidance_scale: float | None = None
+        seed: int | None = None
+        sd_2_upscaling: bool | None = None
 
         selected_models: (
             list[typing.Literal[tuple(e.name for e in Text2AudioModels)]] | None
-        )
+        ) = None
 
     class ResponseModel(BaseModel):
         output_audios: dict[
             typing.Literal[tuple(e.name for e in Text2AudioModels)],
-            list[FieldHttpUrl],
+            list[HttpUrl],
         ]
 
     def render_form_v2(self):
@@ -93,7 +92,7 @@ class Text2AudioPage(BasePage):
         guidance_scale_setting()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: Text2AudioPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: Text2AudioPage.RequestModel = self.RequestModel.model_validate(state)
 
         state["output_audios"] = output_audios = {}
 

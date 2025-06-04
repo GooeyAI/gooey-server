@@ -14,8 +14,6 @@ from furl import furl
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic import create_model
-from pydantic.error_wrappers import ErrorWrapper
-from pydantic.generics import GenericModel
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
@@ -57,7 +55,7 @@ O = typing.TypeVar("O")
 ## v2
 
 
-class ApiResponseModelV2(GenericModel, typing.Generic[O]):
+class ApiResponseModelV2(BaseModel, typing.Generic[O]):
     id: str = Field(description="Unique ID for this run")
     url: str = Field(description="Web URL for this run")
     created_at: str = Field(description="Time when the run was created as ISO format")
@@ -66,13 +64,13 @@ class ApiResponseModelV2(GenericModel, typing.Generic[O]):
 
 
 class FailedResponseDetail(BaseModel):
-    id: str | None = Field(description="Unique ID for this run")
-    url: str | None = Field(description="Web URL for this run")
+    id: str | None = Field(None, description="Unique ID for this run")
+    url: str | None = Field(None, description="Web URL for this run")
     created_at: str | None = Field(
-        description="Time when the run was created as ISO format"
+        None, description="Time when the run was created as ISO format"
     )
 
-    error: str | None = Field(description="Error message if the run failed")
+    error: str | None = Field(None, description="Error message if the run failed")
 
 
 class FailedReponseModelV2(BaseModel):
@@ -90,7 +88,7 @@ class GenericErrorResponse(BaseModel):
 ## v3
 
 
-class BaseResponseModelV3(GenericModel):
+class BaseResponseModelV3(BaseModel):
     run_id: str = Field(description="Unique ID for this run")
     web_url: str = Field(description="Web URL for this run")
     created_at: str = Field(description="Time when the run was created as ISO format")
@@ -109,7 +107,7 @@ class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
         description="Details about the status of the run as a human readable string"
     )
     output: O | None = Field(
-        description='Output of the run. Only available if status is `"completed"`'
+        None, description='Output of the run. Only available if status is `"completed"`'
     )
 
 
@@ -166,7 +164,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
             current_user=api_key.created_by,
             workspace=api_key.workspace,
-            request_body=page_request.dict(exclude_unset=True),
+            request_body=page_request.model_dump(exclude_unset=True),
             enable_rate_limits=True,
         )
         return build_sync_api_response(result, sr)
@@ -216,7 +214,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             retention_policy=RetentionPolicy[page_request.settings.retention_policy],
             current_user=api_key.created_by,
             workspace=api_key.workspace,
-            request_body=page_request.dict(exclude_unset=True),
+            request_body=page_request.model_dump(exclude_unset=True),
             enable_rate_limits=True,
         )
         ret = build_async_api_response(sr)
@@ -302,7 +300,8 @@ def _parse_form_data(
         page_request_data = json.loads(page_request_json)
     except json.JSONDecodeError as e:
         raise RequestValidationError(
-            [ErrorWrapper(e, ("body", e.pos))], body=e.doc
+            [{"type": "json_invalid", "loc": ["body", e.pos], "msg": str(e)}],
+            body=e.doc,
         ) from e
     # fill in the file urls from the form data
     for key in form_data.keys():
@@ -314,7 +313,9 @@ def _parse_form_data(
             for uf in uf_list
         ]
         try:
-            is_str = request_model.schema()["properties"][key]["type"] == "string"
+            is_str = (
+                request_model.model_json_schema()["properties"][key]["type"] == "string"
+            )
         except KeyError:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
@@ -326,9 +327,9 @@ def _parse_form_data(
             page_request_data.setdefault(key, []).extend(urls)
     # validate the request
     try:
-        page_request = request_model.parse_obj(page_request_data)
+        page_request = request_model.model_validate(page_request_data)
     except ValidationError as e:
-        raise RequestValidationError(e.raw_errors, body=page_request_data) from e
+        raise RequestValidationError(e.errors(), body=page_request_data) from e
     return page_request
 
 
@@ -364,7 +365,7 @@ def submit_api_call(
             retention_policy=retention_policy or RetentionPolicy.keep,
         )
     except ValidationError as e:
-        raise RequestValidationError(e.raw_errors, body=gui.session_state) from e
+        raise RequestValidationError(e.errors(), body=gui.session_state) from e
     # submit the task
     result = page.call_runner_task(sr, deduct_credits=deduct_credits)
     return result, sr

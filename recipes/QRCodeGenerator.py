@@ -2,13 +2,13 @@ import typing
 from enum import Enum
 
 import numpy as np
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrl
 import qrcode
 import requests
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from pyzbar import pyzbar
 
 import gooey_gui as gui
@@ -78,50 +78,52 @@ class QRCodeGeneratorPage(BasePage):
         self.__dict__.update(self.sane_defaults)
 
     class RequestModel(BasePage.RequestModel):
-        qr_code_data: str | None
-        qr_code_input_image: FieldHttpUrl | None
-        qr_code_vcard: VCARD | None
-        qr_code_file: FieldHttpUrl | None
+        qr_code_data: str | None = None
+        qr_code_input_image: OptionalHttpUrl = None
+        qr_code_vcard: VCARD | None = None
+        qr_code_file: OptionalHttpUrl = None
 
-        use_url_shortener: bool | None
+        use_url_shortener: bool | None = None
 
         text_prompt: str
-        negative_prompt: str | None
-        image_prompt: str | None
+        negative_prompt: str | None = None
+        image_prompt: str | None = None
         image_prompt_controlnet_models: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
-        image_prompt_strength: float | None
-        image_prompt_scale: float | None
-        image_prompt_pos_x: float | None
-        image_prompt_pos_y: float | None
+        ) = None
+        image_prompt_strength: float | None = None
+        image_prompt_scale: float | None = None
+        image_prompt_pos_x: float | None = None
+        image_prompt_pos_y: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None = (
+            None
+        )
         selected_controlnet_model: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
-        )
+        ) = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
-        controlnet_conditioning_scale: typing.List[float] | None
+        guidance_scale: float | None = None
+        controlnet_conditioning_scale: typing.List[float] | None = None
 
-        num_outputs: int | None
-        quality: int | None
-        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
+        num_outputs: int | None = None
+        quality: int | None = None
+        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None = None
 
-        seed: int | None
+        seed: int | None = None
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_images: list[FieldHttpUrl]
-        raw_images: list[FieldHttpUrl]
-        shortened_url: FieldHttpUrl | None
-        cleaned_qr_code: FieldHttpUrl
+        output_images: list[HttpUrl]
+        raw_images: list[HttpUrl]
+        shortened_url: HttpUrl | None = None
+        cleaned_qr_code: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -464,7 +466,9 @@ Here is the final output:
                 gui.caption(f"{shortened_url} → {qr_code_data}")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: QRCodeGeneratorPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield "Running safety checker..."
         safety_checker(text=request.text_prompt, image=request.image_prompt)
@@ -551,9 +555,9 @@ Here is the final output:
 def vcard_form(*, key: str) -> VCARD:
     vcard_data = gui.session_state.get(key, {})
     # populate inputs
-    for k in VCARD.__fields__.keys():
+    for k in VCARD.model_fields:
         gui.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
-    vcard = VCARD.construct()
+    vcard = VCARD.model_construct()
 
     vcard.email = gui.text_input(
         "Email", key="__vcard_data__email", placeholder="dev@gooey.ai"
@@ -569,7 +573,7 @@ def vcard_form(*, key: str) -> VCARD:
         else:
             vcard = imported_vcard
             # update inputs
-            for k, v in vcard.dict().items():
+            for k, v in vcard.model_dump().items():
                 gui.session_state[f"__vcard_data__{k}"] = v
 
     vcard.format_name = gui.text_input(
@@ -619,7 +623,7 @@ def vcard_form(*, key: str) -> VCARD:
             placeholder="123 Main gui, San Francisco, CA 94105",
         )
 
-    gui.session_state[key] = vcard.dict()
+    gui.session_state[key] = vcard.model_dump()
     return vcard
 
 

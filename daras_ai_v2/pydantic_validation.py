@@ -1,28 +1,20 @@
 import typing
-from typing import Any
 
-from pydantic import HttpUrl
-
-from daras_ai_v2 import settings
+from pydantic import HttpUrl, WrapValidator, ValidatorFunctionWrapHandler
 
 if typing.TYPE_CHECKING:
-    from pydantic import BaseConfig, AnyUrl
-    from pydantic.fields import ModelField
-    from pydantic.error_wrappers import ErrorDict
+    from pydantic_core import ErrorDetails
 
 
-class FieldHttpUrl(HttpUrl):
-    if settings.DEBUG:
-        tld_required = False
-    min_length = 0  # allow empty string
+def allow_empty_or_url(
+    url: str, handler: ValidatorFunctionWrapHandler
+) -> HttpUrl | None:
+    if url == "":
+        url = None
+    return handler(url)
 
-    @classmethod
-    def validate(
-        cls, value: Any, field: "ModelField", config: "BaseConfig"
-    ) -> "AnyUrl":
-        if value == "":
-            return None
-        return super().validate(value, field, config)
+
+OptionalHttpUrl = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
 
 
 CUSTOM_MESSAGES = {
@@ -34,7 +26,7 @@ CUSTOM_MESSAGES = {
 }
 
 
-def convert_errors(errors: list["ErrorDict"]):
+def convert_errors(errors: typing.Iterable["ErrorDetails"]):
     for error in errors:
         for type_prefix, custom_message in CUSTOM_MESSAGES.items():
             if not error["type"].startswith(type_prefix):

@@ -7,12 +7,12 @@ from daras_ai_v2.language_model import LargeLanguageModels, ResponseFormatType, 
 
 
 class LanguageModelSettings(BaseModel):
-    avoid_repetition: bool | None
-    num_outputs: int | None
-    quality: float | None
-    max_tokens: int | None
-    sampling_temperature: float | None
-    response_format_type: ResponseFormatType = Field(
+    avoid_repetition: bool | None = None
+    num_outputs: int | None = None
+    quality: float | None = None
+    max_tokens: int | None = None
+    sampling_temperature: float | None = None
+    response_format_type: ResponseFormatType | None = Field(
         None,
         title="Response Format",
     )

@@ -305,17 +305,19 @@ class SerpSearchLocation(TextChoices):
 
 class GoogleSearchLocationMixin(BaseModel):
     serp_search_location: SerpSearchLocation | None = Field(
+        None,
         title="Location",
     )
     scaleserp_locations: list[str] | None = Field(
-        description="DEPRECATED: use `serp_search_location` instead"
+        None, description="DEPRECATED: use `serp_search_location` instead"
     )
 
 
 class GoogleSearchMixin(GoogleSearchLocationMixin, BaseModel):
     serp_search_type: SerpSearchType | None = Field(
+        None,
         title="Search Type",
     )
     scaleserp_search_field: str | None = Field(
-        description="DEPRECATED: use `serp_search_type` instead"
+        None, description="DEPRECATED: use `serp_search_type` instead"
     )

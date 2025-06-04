@@ -2,7 +2,7 @@ import re
 import typing
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -11,7 +11,6 @@ from daras_ai_v2 import db, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
 
@@ -37,45 +36,47 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        email_address: str | None
-        twitter_handle: str | None
+        email_address: str | None = None
+        twitter_handle: str | None = None
 
         text_prompt: str
 
-        face_scale: float | None
-        face_pos_x: float | None
-        face_pos_y: float | None
+        face_scale: float | None = None
+        face_pos_x: float | None = None
+        face_pos_y: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        ) = None
 
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
-        upscale_factor: float | None
+        num_outputs: int | None = None
+        quality: int | None = None
+        upscale_factor: float | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
+        guidance_scale: float | None = None
 
-        should_send_email: bool | None
-        email_from: str | None
-        email_cc: str | None
-        email_bcc: str | None
-        email_subject: str | None
-        email_body: str | None
-        email_body_enable_html: bool | None
-        fallback_email_body: str | None
+        should_send_email: bool | None = None
+        email_from: str | None = None
+        email_cc: str | None = None
+        email_bcc: str | None = None
+        email_subject: str | None = None
+        email_body: str | None = None
+        email_body_enable_html: bool | None = None
+        fallback_email_body: str | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
-        input_image: FieldHttpUrl
-        resized_image: FieldHttpUrl
-        face_mask: FieldHttpUrl
-        diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        input_image: HttpUrl
+        resized_image: HttpUrl
+        face_mask: HttpUrl
+        diffusion_images: list[HttpUrl]
+        output_images: list[HttpUrl]
         email_sent: bool = False
 
     @classmethod
@@ -236,8 +237,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     #         gui.div()
 
     def run(self, state: dict):
-        request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
-            state
+        request: EmailFaceInpaintingPage.RequestModel = (
+            self.RequestModel.model_validate(state)
         )
 
         yield "Fetching profile..."

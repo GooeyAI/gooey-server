@@ -66,14 +66,16 @@ class DocSearchPage(BasePage):
     }
 
     class RequestModelBase(DocSearchRequest, BasePage.RequestModel):
-        task_instructions: str | None
-        query_instructions: str | None
-        check_document_updates: bool | None
+        task_instructions: str | None = None
+        query_instructions: str | None = None
+        check_document_updates: bool | None = None
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        )
+        ) = None
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
+            None
+        )
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -83,7 +85,7 @@ class DocSearchPage(BasePage):
 
         references: list[SearchReference]
         final_prompt: str
-        final_search_query: str | None
+        final_search_query: str | None = None
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:
@@ -162,9 +164,9 @@ class DocSearchPage(BasePage):
             response.final_search_query = request.search_query
 
         response.references = yield from get_top_k_references(
-            DocSearchRequest.parse_obj(
+            DocSearchRequest.model_validate(
                 {
-                    **request.dict(),
+                    **request.model_dump(),
                     "search_query": response.final_search_query,
                 },
             ),
@@ -184,7 +186,7 @@ class DocSearchPage(BasePage):
             response.output_text = []
             return
         task_instructions = render_prompt_vars(
-            prompt=task_instructions, state=request.dict() | response.dict()
+            prompt=task_instructions, state=request.model_dump() | response.model_dump()
         )
         response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question

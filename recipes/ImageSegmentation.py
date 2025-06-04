@@ -3,10 +3,9 @@ from pathlib import Path
 
 import PIL
 import numpy as np
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
 import gooey_gui as gui
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -46,25 +45,25 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: HttpUrl
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
-        )
-        mask_threshold: float | None
+        ) = None
+        mask_threshold: float | None = None
 
-        rect_persepective_transform: bool | None
-        reflection_opacity: float | None
+        rect_persepective_transform: bool | None = None
+        reflection_opacity: float | None = None
 
-        obj_scale: float | None
-        obj_pos_x: float | None
-        obj_pos_y: float | None
+        obj_scale: float | None = None
+        obj_pos_x: float | None = None
+        obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_image: FieldHttpUrl
-        cutout_image: FieldHttpUrl
-        resized_image: FieldHttpUrl
-        resized_mask: FieldHttpUrl
+        output_image: HttpUrl
+        cutout_image: HttpUrl
+        resized_image: HttpUrl
+        resized_mask: HttpUrl
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -189,7 +188,9 @@ class ImageSegmentationPage(BasePage):
         )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: ImageSegmentationPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: ImageSegmentationPage.RequestModel = self.RequestModel.model_validate(
+            state
+        )
 
         yield f"Running {ImageSegmentationModels[request.selected_model].value}..."
 

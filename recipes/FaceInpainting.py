@@ -1,9 +1,8 @@
 import typing
 from functools import partial
 
-from daras_ai_v2.pydantic_validation import FieldHttpUrl
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -43,33 +42,35 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: FieldHttpUrl
+        input_image: HttpUrl
         text_prompt: str
 
-        face_scale: float | None
-        face_pos_x: float | None
-        face_pos_y: float | None
+        face_scale: float | None = None
+        face_pos_x: float | None = None
+        face_pos_y: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        ) = None
 
-        negative_prompt: str | None
+        negative_prompt: str | None = None
 
-        num_outputs: int | None
-        quality: int | None
-        upscale_factor: float | None
+        num_outputs: int | None = None
+        quality: int | None = None
+        upscale_factor: float | None = None
 
-        output_width: int | None
-        output_height: int | None
+        output_width: int | None = None
+        output_height: int | None = None
 
-        guidance_scale: float | None
+        guidance_scale: float | None = None
 
-        seed: int | None
+        seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: FieldHttpUrl
-        face_mask: FieldHttpUrl
-        diffusion_images: list[FieldHttpUrl]
-        output_images: list[FieldHttpUrl]
+        resized_image: HttpUrl
+        face_mask: HttpUrl
+        diffusion_images: list[HttpUrl]
+        output_images: list[HttpUrl]
 
     def render_description(self):
         gui.write(
