@@ -2003,13 +2003,16 @@ class BasePage:
 
     @classmethod
     def load_state_defaults(cls, state: dict):
-        for k, v in cls.RequestModel.model_json_schema()["properties"].items():
+        for field_name, properties in cls.RequestModel.model_json_schema()["properties"].items():
+            default_val = properties.get("default")
+            if default_val is None:
+                continue
             try:
-                state.setdefault(k, copy(v["default"]))
+                state.setdefault(field_name, copy(default_val))
             except KeyError:
                 pass
-        for k, v in cls.sane_defaults.items():
-            state.setdefault(k, v)
+        for field_name, default_val in cls.sane_defaults.items():
+            state.setdefault(field_name, default_val)
         return state
 
     def fields_to_save(self) -> list[str]:
