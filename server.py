@@ -9,9 +9,7 @@ from decouple import config
 from fastapi import FastAPI
 from fastapi.exception_handlers import (
     http_exception_handler,
-    request_validation_exception_handler,
 )
-from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +30,6 @@ from auth.auth_backend import (
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.github_tools import github_url_for_exc
-from daras_ai_v2.pydantic_validation import convert_errors
 from daras_ai_v2.settings import templates
 from gooeysite.bg_db_conn import db_middleware
 from routers import (
@@ -120,13 +117,6 @@ def request_time_middleware(app):
         )
 
     return middleware
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    ## https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions
-    convert_errors(exc.errors())
-    return await request_validation_exception_handler(request, exc)
 
 
 @app.exception_handler(HTTP_404_NOT_FOUND)

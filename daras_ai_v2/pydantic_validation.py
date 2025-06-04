@@ -1,38 +1,45 @@
 import typing
 
-from pydantic import HttpUrl, WrapValidator, ValidatorFunctionWrapHandler
+import django.core.exceptions
+import pydantic
+from django.core.validators import URLValidator
+from pydantic import GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import core_schema, PydanticCustomError
 
-if typing.TYPE_CHECKING:
-    from pydantic_core import ErrorDetails
+
+class HttpUrlTypeAnnotation:
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(core_schema.url_schema(allowed_schemes=["http", "https"]))
 
 
-def allow_empty_or_url(
-    url: str, handler: ValidatorFunctionWrapHandler
-) -> HttpUrl | None:
-    if url == "":
-        url = None
-    handler(url)
+def validate_url_or_none(url: str | None) -> str | None:
+    if not url:
+        return None
+    return validate_url(url)
+
+
+def validate_url(url: str) -> str:
+    try:
+        URLValidator(schemes=["http", "https"])(url)
+    except django.core.exceptions.ValidationError as e:
+        raise PydanticCustomError(
+            "url_parsing",
+            f"{e.message} If you are trying to use a local file, please use the [Upload Files via Form Data] option on https://gooey.ai/api/ to upload the file directly.",
+        )
     return url
 
 
-HttpUrlStr = typing.Annotated[HttpUrl, WrapValidator(allow_empty_or_url)]
-OptionalHttpUrlStr = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
-
-
-CUSTOM_MESSAGES = {
-    "value_error.url": (
-        "{original_msg}. "
-        "Please make sure the URL is correct and accessible. "
-        "If you are trying to use a local file, please use the [Upload Files via Form Data] option on https://gooey.ai/api/ to upload the file directly."
-    ),
-}
-
-
-def convert_errors(errors: typing.Iterable["ErrorDetails"]):
-    for error in errors:
-        for type_prefix, custom_message in CUSTOM_MESSAGES.items():
-            if not error["type"].startswith(type_prefix):
-                continue
-            ctx = error.get("ctx", {})
-            custom_message = custom_message.format(**ctx, original_msg=error["msg"])
-            error["msg"] = custom_message
+HttpUrlStr = typing.Annotated[
+    str,
+    pydantic.AfterValidator(validate_url),
+    HttpUrlTypeAnnotation,
+]
+OptionalHttpUrlStr = typing.Annotated[
+    str | None,
+    pydantic.AfterValidator(validate_url_or_none),
+    HttpUrlTypeAnnotation,
+]
