@@ -2,7 +2,7 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -18,6 +18,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.repositioning import (
     reposition_object_img_bytes,
     repositioning_preview_widget,
@@ -43,7 +44,7 @@ class ObjectInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: HttpUrl
+        input_image: HttpUrlStr
         text_prompt: str
 
         obj_scale: float | None = None
@@ -71,10 +72,10 @@ class ObjectInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: HttpUrl
-        obj_mask: HttpUrl
+        resized_image: HttpUrlStr
+        obj_mask: HttpUrlStr
         # diffusion_images: list[FieldHttpUrl]
-        output_images: list[HttpUrl]
+        output_images: list[HttpUrlStr]
 
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage

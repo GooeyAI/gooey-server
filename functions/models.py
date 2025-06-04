@@ -1,10 +1,11 @@
 import typing
 
 from django.db import models
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from typing_extensions import NotRequired, TypedDict
 
 from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 
 
 class _TriggerData(typing.NamedTuple):
@@ -19,7 +20,7 @@ class FunctionTrigger(_TriggerData, GooeyEnum):
 
 
 class RecipeFunction(BaseModel):
-    url: HttpUrl = Field(
+    url: HttpUrlStr = Field(
         title="URL",
         description="The URL of the [function](https://gooey.ai/functions) to call.",
     )

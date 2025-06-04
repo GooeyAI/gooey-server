@@ -1,12 +1,13 @@
 import typing
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
@@ -35,7 +36,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     class ResponseModel(BaseModel):
         audio_url: str | None = None
 
-        output_video: HttpUrl
+        output_video: HttpUrlStr
         duration_sec: float | None = None
 
     def related_workflows(self) -> list:

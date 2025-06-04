@@ -4,7 +4,7 @@ import typing
 
 import gooey_gui as gui
 import requests
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
@@ -15,6 +15,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.text_to_speech_settings_widgets import (
     ELEVEN_LABS_MODELS,
     GHANA_NLP_TTS_LANGUAGES,
@@ -94,7 +95,7 @@ class TextToSpeechPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        audio_url: HttpUrl
+        audio_url: HttpUrlStr
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

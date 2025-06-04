@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     scheduler_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
@@ -77,7 +78,7 @@ class CompareText2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)],
-            list[HttpUrl],
+            list[HttpUrlStr],
         ]
 
     @classmethod

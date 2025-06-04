@@ -11,10 +11,12 @@ def allow_empty_or_url(
 ) -> HttpUrl | None:
     if url == "":
         url = None
-    return handler(url)
+    handler(url)
+    return url
 
 
-OptionalHttpUrl = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
+HttpUrlStr = typing.Annotated[HttpUrl, WrapValidator(allow_empty_or_url)]
+OptionalHttpUrlStr = typing.Annotated[HttpUrl | None, WrapValidator(allow_empty_or_url)]
 
 
 CUSTOM_MESSAGES = {

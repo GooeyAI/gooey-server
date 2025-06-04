@@ -2,7 +2,7 @@ import typing
 from functools import partial
 
 import requests
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -14,6 +14,7 @@ from daras_ai.image_input import (
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.upscaler_models import gfpgan
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.img_model_settings_widgets import (
@@ -42,7 +43,7 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: HttpUrl
+        input_image: HttpUrlStr
         text_prompt: str
 
         face_scale: float | None = None
@@ -67,10 +68,10 @@ class FaceInpaintingPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        resized_image: HttpUrl
-        face_mask: HttpUrl
-        diffusion_images: list[HttpUrl]
-        output_images: list[HttpUrl]
+        resized_image: HttpUrlStr
+        face_mask: HttpUrlStr
+        diffusion_images: list[HttpUrlStr]
+        output_images: list[HttpUrlStr]
 
     def render_description(self):
         gui.write(

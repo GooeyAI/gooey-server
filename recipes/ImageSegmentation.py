@@ -5,7 +5,7 @@ import PIL
 import numpy as np
 import requests
 import gooey_gui as gui
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -22,6 +22,7 @@ from daras_ai_v2.polygon_fitter import (
     appx_best_fit_ngon,
     best_fit_rotated_rect,
 )
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.repositioning import (
     reposition_object,
     get_mask_bounds,
@@ -45,7 +46,7 @@ class ImageSegmentationPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: HttpUrl
+        input_image: HttpUrlStr
 
         selected_model: (
             typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
@@ -60,10 +61,10 @@ class ImageSegmentationPage(BasePage):
         obj_pos_y: float | None = None
 
     class ResponseModel(BaseModel):
-        output_image: HttpUrl
-        cutout_image: HttpUrl
-        resized_image: HttpUrl
-        resized_mask: HttpUrl
+        output_image: HttpUrlStr
+        cutout_image: HttpUrlStr
+        resized_image: HttpUrlStr
+        resized_mask: HttpUrlStr
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage

@@ -1,7 +1,7 @@
 import typing
 from enum import Enum
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -13,6 +13,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     num_outputs_setting,
 )
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 
 
 class Text2AudioModels(Enum):
@@ -54,7 +55,7 @@ class Text2AudioPage(BasePage):
     class ResponseModel(BaseModel):
         output_audios: dict[
             typing.Literal[tuple(e.name for e in Text2AudioModels)],
-            list[HttpUrl],
+            list[HttpUrlStr],
         ]
 
     def render_form_v2(self):

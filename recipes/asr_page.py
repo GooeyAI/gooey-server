@@ -2,7 +2,7 @@ import typing
 
 import gooey_gui as gui
 from jinja2.lexer import whitespace_re
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 from bots.models import Workflow, SavedRun, PublishedRun
 from daras_ai_v2.asr import (
@@ -28,6 +28,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc, field_title
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_filters import asr_languages_without_dialects
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
@@ -42,7 +43,7 @@ class AsrPage(BasePage):
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[HttpUrl]
+        documents: list[HttpUrlStr]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
             None,
             title="Speech-to-Text Provider",

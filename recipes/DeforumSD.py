@@ -4,7 +4,7 @@ from functools import partial
 
 import gooey_gui as gui
 from django.db.models import TextChoices
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing_extensions import TypedDict
 
 from bots.models import Workflow
@@ -14,6 +14,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from recipes.BulkRunner import list_view_editor
 
@@ -71,7 +72,7 @@ class DeforumSDPage(BasePage):
         seed: int | None = None
 
     class ResponseModel(BaseModel):
-        output_video: HttpUrl
+        output_video: HttpUrlStr
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

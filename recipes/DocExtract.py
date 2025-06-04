@@ -5,6 +5,10 @@ import typing
 import gooey_gui as gui
 import requests
 from aifail import retry_if
+from django.db.models import IntegerChoices
+from furl import furl
+from pydantic import BaseModel, Field
+
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -40,7 +44,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
 from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import (
@@ -53,14 +57,10 @@ from daras_ai_v2.vector_search import (
     yt_dlp_extract_info,
     yt_dlp_info_to_entries,
 )
-from django.db.models import IntegerChoices
 from files.models import FileMetadata
-from furl import furl
-from pydantic import BaseModel, Field, HttpUrl
-
-from recipes.asr_page import AsrPage
 from recipes.DocSearch import render_documents
 from recipes.Translation import TranslationOptions
+from recipes.asr_page import AsrPage
 
 
 class Columns(IntegerChoices):
@@ -87,9 +87,9 @@ class DocExtractPage(BasePage):
     price = 500
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[HttpUrl]
+        documents: list[HttpUrlStr]
 
-        sheet_url: OptionalHttpUrl = None
+        sheet_url: OptionalHttpUrlStr = None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
             None
@@ -116,7 +116,7 @@ class DocExtractPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        output_documents: list[HttpUrl] | None = None
+        output_documents: list[HttpUrlStr] | None = None
 
     def current_sr_to_session_state(self) -> dict:
         state = super().current_sr_to_session_state()

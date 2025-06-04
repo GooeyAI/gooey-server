@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 import gooey_gui as gui
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
@@ -22,6 +22,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
 )
 from daras_ai_v2.pt import PromptTree
+from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.vector_search import (
     doc_url_to_text_pages,
@@ -59,7 +60,7 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        documents: list[HttpUrl]
+        documents: list[HttpUrlStr]
 
         task_instructions: str | None = None
         merge_instructions: str | None = None

@@ -1,12 +1,12 @@
 import typing
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.pydantic_validation import OptionalHttpUrl
+from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
 from daras_ai_v2.upscaler_models import UpscalerModels, run_upscaler_model
@@ -19,8 +19,8 @@ class CompareUpscalerPage(BasePage):
     slug_versions = ["compare-ai-upscalers"]
 
     class RequestModel(BasePage.RequestModel):
-        input_image: OptionalHttpUrl = Field(None, description="Input Image")
-        input_video: OptionalHttpUrl = Field(None, description="Input Video")
+        input_image: OptionalHttpUrlStr = Field(None, description="Input Image")
+        input_video: OptionalHttpUrlStr = Field(None, description="Input Video")
 
         scale: int = Field(
             description="The final upsampling scale of the image", ge=1, le=4
@@ -36,10 +36,10 @@ class CompareUpscalerPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrl
+            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrlStr
         ] = Field({}, description="Output Images")
         output_videos: dict[
-            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrl
+            typing.Literal[tuple(e.name for e in UpscalerModels)], HttpUrlStr
         ] = Field({}, description="Output Videos")
 
     def validate_form_v2(self):
