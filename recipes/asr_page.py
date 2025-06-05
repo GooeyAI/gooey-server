@@ -100,6 +100,9 @@ class AsrPage(BasePage):
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
+        if pr and pr.title and not pr.is_root():
+            return pr.title
+
         try:
             lang = langcodes.Language.get(sr.state["language"] or "").display_name()
         except (KeyError, langcodes.LanguageTagError):
