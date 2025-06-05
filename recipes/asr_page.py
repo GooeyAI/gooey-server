@@ -95,7 +95,6 @@ class AsrPage(BasePage):
     def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
         import langcodes
 
-        root_title = cls.get_recipe_title()
         if pr and pr.title and not pr.is_root():
             return pr.title
 
@@ -106,7 +105,7 @@ class AsrPage(BasePage):
         model = AsrModels.get(sr.state.get("selected_model"))
         lang_or_model = lang or (model and model.value)
 
-        return " ".join(filter(None, [lang_or_model, root_title]))
+        return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
 
     def render_description(self):
         gui.markdown(
