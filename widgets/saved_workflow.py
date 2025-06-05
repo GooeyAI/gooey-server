@@ -34,11 +34,6 @@ def render_saved_workflow_preview(
     output_url = (
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
-    if output_url:
-        workflow_emoji = None
-    else:
-        workflow = Workflow(published_run.workflow)
-        workflow_emoji = workflow.get_or_create_metadata().emoji
 
     with gui.div(className="py-1 row"):
         with (
@@ -58,7 +53,6 @@ def render_saved_workflow_preview(
             gui.div(
                 className="order-last order-md-first d-flex flex-column gap-md-2"
                 + (" col-md-10" if output_url else "")
-                + (" col-10" if workflow_emoji else "")
             ),
         ):
             with gui.div(className="d-flex align-items-center"):
@@ -66,11 +60,20 @@ def render_saved_workflow_preview(
                     gui.write(f"#### {truncate_text_words(tb.h1_title, 80)}")
                 render_title_pills(published_run, workflow_pill)
 
-            if published_run.notes:
-                with gui.div(className="saved-workflow-notes mb-2 mb-md-0"):
-                    gui.caption(
-                        published_run.notes, line_clamp=2, lineClampExpand=False
-                    )
+            with gui.div(className="row"):
+                with gui.div(
+                    className="saved-workflow-notes mb-2 mb-md-0"
+                    + ("" if output_url else " col-10")
+                ):
+                    if published_run.notes:
+                        gui.caption(
+                            published_run.notes, line_clamp=2, lineClampExpand=False
+                        )
+                if not output_url:
+                    with gui.div(className="col-2 text-center m-auto"):
+                        workflow = Workflow(published_run.workflow)
+                        metadata = workflow.get_or_create_metadata()
+                        gui.write(f"# {metadata.emoji}")
 
             render_footer_breadcrumbs(
                 published_run=published_run,
@@ -79,8 +82,8 @@ def render_saved_workflow_preview(
                 hide_visibility_pill=hide_visibility_pill,
             )
 
-        if output_url or workflow_emoji:
-            render_workflow_media(output_url, workflow_emoji, published_run)
+        if output_url:
+            render_workflow_media(output_url, published_run)
 
 
 def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
@@ -205,17 +208,7 @@ def render_footer_breadcrumbs(
             )
 
 
-def render_workflow_media(
-    output_url: str | None, emoji: str | None, published_run: PublishedRun
-):
-    if emoji:
-        with (
-            gui.div(className="col-2 order-last text-center m-auto h-100"),
-            gui.link(to=published_run.get_app_url(), className="text-decoration-none"),
-        ):
-            gui.write(f"# {emoji}")
-        return
-
+def render_workflow_media(output_url: str, published_run: PublishedRun):
     with (
         gui.styled(
             """
@@ -231,7 +224,7 @@ def render_workflow_media(
             """
         ),
         gui.div(
-            className="col-md-2 order-first order-md-last justify-content-center mb-2 mb-md-0",
+            className="col-md-2 order-first order-md-last text-center mb-2 mb-md-0",
         ),
         gui.link(to=published_run.get_app_url()),
     ):
