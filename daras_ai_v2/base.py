@@ -1703,6 +1703,7 @@ class BasePage:
         placeholder = gui.div()
 
         if self.show_settings:
+          with gui.div(className="bg-white"):
             with gui.expander("⚙️ Settings"):
                 self.render_settings()
                 if self.functions_in_settings:
@@ -2471,10 +2472,12 @@ OUTPUT_TABS_CSS = """
         display: flex;
         flex-direction: row-reverse;
         width: 100%;
-        padding-left: 1.5rem;
+        background-color: #f9f9f9;
+        padding: 10px;
+        margin-top: -1rem;
     }
     & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 0 0 auto;
+        flex: 0 1 auto;
         width: 60%;
         max-width: 100%;
         margin-right: 0.75rem;
