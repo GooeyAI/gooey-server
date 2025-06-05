@@ -88,7 +88,7 @@ def render_saved_workflow_preview(
                 """
             ),
             gui.div(
-                className="col-md-2 order-first order-md-last justify-content-center mb-2 mb-md-0"
+                className="d-flex col-md-2 order-first order-md-last justify-content-center mb-2 mb-md-0"
             ),
         ):
             render_workflow_media(output_url, published_run)
