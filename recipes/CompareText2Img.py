@@ -1,3 +1,4 @@
+import math
 import typing
 
 from pydantic import BaseModel
@@ -60,6 +61,7 @@ class CompareText2ImgPage(BasePage):
         quality: int | None = None
         dall_e_3_quality: str | None = None
         dall_e_3_style: str | None = None
+        gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None
 
         guidance_scale: float | None = None
         seed: int | None = None
@@ -208,6 +210,7 @@ class CompareText2ImgPage(BasePage):
                 num_inference_steps=request.quality,
                 dall_e_3_quality=request.dall_e_3_quality,
                 dall_e_3_style=request.dall_e_3_style,
+                gpt_image_1_quality=request.gpt_image_1_quality,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,
@@ -266,6 +269,7 @@ class CompareText2ImgPage(BasePage):
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
+        grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
         total = 0
         for name in selected_models:
             match name:
@@ -274,7 +278,16 @@ class CompareText2ImgPage(BasePage):
                 case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
                     total += 15
                 case Text2ImgModels.gpt_image_1.name:
-                    total += 20
+                    if cost := grouped_costs.get(Text2ImgModels.gpt_image_1.name):
+                        total += math.ceil(float(cost) * 2.5)
+                        continue
+                    match state.get("gpt_image_1_quality"):
+                        case "low":
+                            total += 3
+                        case "medium":
+                            total += 10
+                        case _:
+                            total += 40
                 case _:
                     total += 2
         num_outputs = state.get("num_outputs") or 0

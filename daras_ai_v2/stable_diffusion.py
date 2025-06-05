@@ -2,6 +2,7 @@ import io
 import typing
 from enum import Enum
 
+import openai
 import requests
 from PIL import Image
 from django.db import models
@@ -82,7 +83,7 @@ text2img_model_ids = {
     Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
 }
-dall_e_model_ids = {
+openai_model_ids = {
     Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.dall_e_3: "dall-e-3",
     Text2ImgModels.gpt_image_1: "gpt-image-1",
@@ -296,6 +297,7 @@ def text2img(
     scheduler: str = None,
     dall_e_3_quality: str | None = None,
     dall_e_3_style: str | None = None,
+    gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
     loras: list[LoraWeight] | None = None,
 ):
     if model not in {
@@ -333,10 +335,18 @@ def text2img(
             width, height = _get_gpt_image_1_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[model],
+                    model=openai_model_ids[model],
                     prompt=prompt,
                     size=f"{width}x{height}",
+                    quality=gpt_image_1_quality,
                 )
+
+            # Record usage costs using the API response usage data
+            record_openai_image_generation_usage(
+                model=openai_model_ids[model],
+                usage=response.usage,
+            )
+
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e_3:
             from openai import OpenAI
@@ -345,7 +355,7 @@ def text2img(
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[model],
+                    model=openai_model_ids[model],
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -361,7 +371,7 @@ def text2img(
             client = OpenAI()
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=dall_e_model_ids[model],
+                    model=openai_model_ids[model],
                     n=num_outputs,
                     prompt=prompt,
                     size=f"{edge}x{edge}",
@@ -492,6 +502,12 @@ def img2img(
                     size=f"{width}x{height}",
                     response_format=response_format,
                 )
+
+            # Record usage costs if usage data is available
+            record_openai_image_generation_usage(
+                model=img2img_model_ids[Img2ImgModels[selected_model]],
+                usage=response.usage,
+            )
 
             out_imgs = [
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
@@ -703,4 +719,46 @@ def _resolution_check(width, height, max_size=SD_IMG_MAX_SIZE):
         raise ValueError(
             f"Maximum size is {max_size[0]}x{max_size[1]} pixels, because of memory limits. "
             f"Please select a lower width or height."
+        )
+
+
+def record_openai_image_generation_usage(
+    model: str,
+    usage: openai.types.images_response.Usage | None = None,
+):
+    """
+    Record usage costs for OpenAI image generation models.
+
+    Args:
+        model: The model identifier (e.g., "gpt-image-1")
+        usage: Usage object from OpenAI API response with token information
+    """
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    if not usage:
+        return
+
+    # Record text input usage (for text prompts)
+    if text_input_tokens := usage.input_tokens_details.text_tokens:
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.image_generation_text_input,
+            quantity=text_input_tokens,
+        )
+
+    # Record image input usage (for image inputs in img2img, editing)
+    if image_input_tokens := usage.input_tokens_details.image_tokens:
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.image_generation_image_input,
+            quantity=image_input_tokens,
+        )
+
+    # Record output usage (for generated images/content)
+    if usage.output_tokens:
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.image_generation_output,
+            quantity=usage.output_tokens,
         )

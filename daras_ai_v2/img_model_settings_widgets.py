@@ -6,8 +6,9 @@ from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
     ControlNetModels,
-    controlnet_model_explanations,
     Schedulers,
+    controlnet_model_explanations,
+    openai_model_ids,
 )
 
 
@@ -207,51 +208,60 @@ def num_outputs_setting(selected_models: str | list[str] = None):
 def quality_setting(selected_models=None):
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
+
     if any(
-        [
-            selected_model
-            in [InpaintingModels.dall_e.name, Img2ImgModels.gpt_image_1.name]
-            for selected_model in selected_models
-        ]
+        selected_model in [InpaintingModels.dall_e.name]
+        for selected_model in selected_models
     ):
         return
+
     if any(
-        [
-            selected_model in [Text2ImgModels.dall_e_3.name]
-            for selected_model in selected_models
-        ]
+        selected_model in [Text2ImgModels.dall_e_3.name]
+        for selected_model in selected_models
     ):
         gui.selectbox(
             """##### Dalle 3 Quality""",
-            options=[
-                "standard",
-                "hd",
-            ],
+            options=["standard", "hd"],
             key="dall_e_3_quality",
         )
         gui.selectbox(
             """##### Dalle 3 Style""",
-            options=[
-                "natural",
-                "vivid",
-            ],
+            options=["natural", "vivid"],
             key="dall_e_3_style",
         )
-    gui.slider(
-        label="""
-        ##### Quality
-        How precise, or focused do you want your output to be? 
-        """,
-        key="quality",
-        min_value=10,
-        max_value=200,
-        step=10,
-    )
-    gui.caption(
-        """
-        An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
-        """
-    )
+    if any(
+        selected_model in [Text2ImgModels.gpt_image_1.name]
+        for selected_model in selected_models
+    ):
+        gui.selectbox(
+            """##### GPT Image 1 Quality""",
+            options=["low", "medium", "high"],
+            key="gpt_image_1_quality",
+        )
+
+    if any(
+        (
+            selected_model
+            and selected_model not in map(lambda m: m.name, openai_model_ids)
+        )
+        for selected_model in selected_models
+    ):
+        # not applicable for openai models
+        gui.slider(
+            label="""
+            ##### Quality
+            How precise, or focused do you want your output to be? 
+            """,
+            key="quality",
+            min_value=10,
+            max_value=200,
+            step=10,
+        )
+        gui.caption(
+            """
+            An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
+            """
+        )
 
 
 RESOLUTIONS: dict[int, dict[str, str]] = {
