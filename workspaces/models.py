@@ -401,7 +401,7 @@ class Workspace(SafeDeleteModel):
 
     def html_icon(self, size: str = "24px") -> str:
         if photo_url := self.get_photo():
-            return f'<img src="{photo_url}" style="height: {size}; width: {size}; object-fit: cover; border-radius: 50%;">'
+            return f'<img class="workspace-icon" src="{photo_url}" style="height: {size}; width: {size}; object-fit: cover; border-radius: 50%;">'
         if self.is_personal:
             return icons.home
         else:
