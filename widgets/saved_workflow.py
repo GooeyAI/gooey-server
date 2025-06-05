@@ -30,9 +30,16 @@ def render_saved_workflow_preview(
     hide_version_notes: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
+
     output_url = (
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
+    if output_url:
+        workflow_emoji = None
+    else:
+        workflow = Workflow(published_run.workflow)
+        workflow_emoji = workflow.get_or_create_metadata().emoji
+
     with gui.div(className="py-1 row"):
         with (
             gui.styled(
@@ -49,7 +56,9 @@ def render_saved_workflow_preview(
                 """
             ),
             gui.div(
-                className="col-md-10 order-last order-md-first d-flex flex-column gap-md-2"
+                className="order-last order-md-first d-flex flex-column gap-md-2"
+                + (" col-md-10" if output_url else "")
+                + (" col-10" if workflow_emoji else "")
             ),
         ):
             with gui.div(className="d-flex align-items-center"):
@@ -70,28 +79,8 @@ def render_saved_workflow_preview(
                 hide_visibility_pill=hide_visibility_pill,
             )
 
-        with (
-            gui.styled(
-                """
-                & a {
-                    text-decoration: none !important;
-                }
-                & img, & video, & object {
-                    width: 100%; 
-                    height: auto;
-                    max-height: 30vh;
-                    margin: 0;
-                    object-fit: cover;
-                    border-radius: 12px;
-                    pointer-events: none !important;
-                }
-                """
-            ),
-            gui.div(
-                className="col-md-2 order-first order-md-last justify-content-center mb-2 mb-md-0"
-            ),
-        ):
-            render_workflow_media(output_url, published_run)
+        if output_url or workflow_emoji:
+            render_workflow_media(output_url, workflow_emoji, published_run)
 
 
 def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
@@ -216,20 +205,37 @@ def render_footer_breadcrumbs(
             )
 
 
-def render_workflow_media(output_url: str, published_run: PublishedRun):
-    state = published_run.saved_run.state
-    if not output_url:
-        workflow = Workflow(published_run.workflow)
-        metadata = workflow.get_or_create_metadata()
-        if not metadata.emoji:
-            return
-        with gui.link(to=published_run.get_app_url()):
-            gui.write(f"# {metadata.emoji}", className="m-0 container-margin-reset")
-        gui.div(className="newline-sm")
+def render_workflow_media(
+    output_url: str | None, emoji: str | None, published_run: PublishedRun
+):
+    if emoji:
+        with (
+            gui.div(className="col-2 order-last text-center m-auto h-100"),
+            gui.link(to=published_run.get_app_url(), className="text-decoration-none"),
+        ):
+            gui.write(f"# {emoji}")
         return
 
-    input_url = state.get("input_image")
-    with gui.link(to=published_run.get_app_url()):
+    with (
+        gui.styled(
+            """
+            & img, & video, & object {
+                width: 100%; 
+                height: auto;
+                max-height: 30vh;
+                margin: 0;
+                object-fit: cover;
+                border-radius: 12px;
+                pointer-events: none !important;
+            }
+            """
+        ),
+        gui.div(
+            className="col-md-2 order-first order-md-last justify-content-center mb-2 mb-md-0",
+        ),
+        gui.link(to=published_run.get_app_url()),
+    ):
+        input_url = published_run.saved_run.state.get("input_image")
         if input_url:
             col1, col2 = gui.columns(2, className="row g-2", responsive=False)
             with col1:
@@ -239,6 +245,8 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
         else:
             placeholder = gui.dummy()
 
+    if not output_url:
+        return
     with placeholder:
         preview_url, is_video = meta_preview_url(output_url)
         if is_video:
@@ -246,7 +254,7 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
             gui.html(
                 f"""
                 <object data={preview_url!r} class="gui-video">
-                  <video src={output_url!r} class="gui-video" autoplay playsInline loop muted>
+                <video src={output_url!r} class="gui-video" autoplay playsInline loop muted>
                 </object>
                 """
             )
@@ -254,7 +262,7 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
             gui.html(
                 f"""
                 <object data={preview_url!r} class="gui-image">
-                  <img src={output_url!r} class="gui-image" autoplay playsInline loop muted>
+                <img src={output_url!r} class="gui-image" autoplay playsInline loop muted>
                 </object>
                 """
             )
