@@ -197,7 +197,7 @@ def stream_ws_response(
     output_pcm = b""
     input_audio_transcript = None
     output = None
-    entry = {"role": "assistant", "content": "", "chunk": ""}
+    entry: dict = {"role": "assistant", "content": "", "chunk": ""}
     chunk_size = start_chunk_size
 
     while output is None or (wait_for_transcript and input_audio_transcript is None):
@@ -222,6 +222,7 @@ def stream_ws_response(
                 entry["tool_calls"] = [
                     {
                         "id": entry["call_id"],
+                        "type": "function",
                         "function": {
                             "name": entry["name"],
                             "arguments": entry["arguments"],
