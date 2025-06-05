@@ -30,7 +30,7 @@ from daras_ai.image_input import (
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
-from daras_ai_v2.realtime_llm_openai import run_openai_audio
+from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import LLMTool
