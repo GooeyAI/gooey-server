@@ -375,6 +375,9 @@ class BasePage:
                     font-size: smaller;
                     font-weight: bold;
                 }
+                & button {
+                    padding: 0.4rem !important;
+                }
                 """
             ),
             gui.div(className="position-relative"),
@@ -455,10 +458,8 @@ class BasePage:
                         ),
                         gui.div(),
                     ):
-                        with (
-                            gui.div(
-                                className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
-                            ),
+                        with gui.div(
+                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
                         ):
                             if pr.photo_url:
                                 with gui.div(className="d-inline d-md-none"):
@@ -513,7 +514,8 @@ class BasePage:
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
-            "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2",
+            "span",
+            className="d-none d-sm-inline-block text-muted text-nowrap mx-2",
             style=dict(fontSize="smaller", fontWeight="normal"),
         ):
             gui.html("Unpublished changes")
@@ -530,16 +532,20 @@ class BasePage:
         tooltip_content = ""
         run_time = gui.session_state.get(StateKeys.run_time, 0)
         if run_time:
-            tooltip_content += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
+            tooltip_content += (
+                f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
+            )
 
         if seed := gui.session_state.get("seed"):
             tooltip_content += f' with seed <span style="color: black;">{seed}</span> '
 
-        updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+        updated_at = gui.session_state.get(
+            StateKeys.updated_at, datetime.datetime.today()
+        )
         if isinstance(updated_at, str):
             updated_at = datetime.datetime.fromisoformat(updated_at)
         if updated_at:
-            tooltip_content += " on " + updated_at.strftime('%b %d, %-I:%M %p')
+            tooltip_content += " on " + updated_at.strftime("%b %d, %-I:%M %p")
 
         with (
             gui.div(
@@ -553,7 +559,9 @@ class BasePage:
                     fontWeight="normal",
                 ),
             ),
-            gui.tag("span", className="text-muted d-none d-md-flex gap-2 align-items-center"),
+            gui.tag(
+                "span", className="text-muted d-none d-md-flex gap-2 align-items-center"
+            ),
         ):
             self._render_report_button()
             gui.write(get_relative_time(dt))
@@ -1524,6 +1532,7 @@ class BasePage:
                 WebkitBackdropFilter="blur(7px)",
                 marginLeft="-0.5rem",
                 marginRight="-0.5rem",
+                zIndex=10,
             ),
         ):
             col1, col2 = gui.columns([2, 1], responsive=False)
@@ -1686,7 +1695,9 @@ class BasePage:
 
         with gui.tooltip("Report"):
             reported = gui.button(
-                '<i class="fa-regular fa-flag"></i>', type="tertiary", className="mb-0 p-1"
+                '<i class="fa-regular fa-flag"></i>',
+                type="tertiary",
+                className="mb-0 p-1",
             )
         if not reported:
             return
@@ -1703,11 +1714,11 @@ class BasePage:
         placeholder = gui.div()
 
         if self.show_settings:
-          with gui.div(className="bg-white"):
-            with gui.expander("⚙️ Settings"):
-                self.render_settings()
-                if self.functions_in_settings:
-                    functions_input(self.request.user)
+            with gui.div(className="bg-white"):
+                with gui.expander("⚙️ Settings"):
+                    self.render_settings()
+                    if self.functions_in_settings:
+                        functions_input(self.request.user)
 
         with placeholder:
             self.render_variables()
@@ -2023,6 +2034,9 @@ class BasePage:
         for field_name in self.ResponseModel.model_fields:
             gui.session_state.pop(field_name, None)
 
+    def _render_after_output(self):
+        self._render_regenerate_button()
+
     def _render_regenerate_button(self):
         if "seed" in self.RequestModel.schema_json():
             randomize = gui.button(
@@ -2031,9 +2045,6 @@ class BasePage:
             if randomize:
                 gui.session_state[StateKeys.pressed_randomize] = True
                 gui.rerun()
-
-    def _render_after_output(self):
-        self._render_regenerate_button()
 
     def current_sr_to_session_state(self) -> dict:
         state = self.current_sr.to_dict()
@@ -2411,6 +2422,7 @@ def started_at_text(dt: datetime.datetime):
             className="text-black",
             **render_local_dt_attrs(dt),
         )
+
 
 def extract_model_fields(
     model: typing.Type[BaseModel],

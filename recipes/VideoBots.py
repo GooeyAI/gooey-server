@@ -864,7 +864,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
     def _render_regenerate_button(self):
         pass
-    
+
     def on_send(
         self,
         new_input_prompt: str | None,
