@@ -381,8 +381,17 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         except HttpError as e:
             if e.status_code == 404:
                 raise UserError(
-                    f"Could not download the google doc at {f_url} "
-                    f"Please make sure to make the document public for viewing."
+                    # language=HTML
+                    f"""\
+<p>This knowledge base Google Doc is not accessible: <a href="{f_url}" target="_blank">{f_url}</a></p>
+<p>To address this:</p>
+<ul>
+    <li>Please make sure this Google Doc exists and is publicly viewable, or</li>
+    <li>
+    Share the Doc or its parent folder with <a href="mailto:support@gooey.ai" target="_blank">support@gooey.ai</a> as an authorized viewer and drop us an email.
+    </li>
+</ul>
+                    """
                 ) from e
             else:
                 raise
