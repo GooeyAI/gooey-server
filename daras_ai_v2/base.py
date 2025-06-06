@@ -371,6 +371,13 @@ class BasePage:
                         padding: 0.3rem !important 
                     }   
                 }
+                & .nav-item {
+                    font-size: smaller;
+                    font-weight: bold;
+                }
+                & button {
+                    padding: 0.4rem !important;
+                }
                 """
             ),
             gui.div(className="position-relative"),
@@ -381,7 +388,7 @@ class BasePage:
                 with gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
-                self._render_saved_timestamp()
+                self._render_saved_generated_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
         # rendered at the end to indicate unpublished changes
@@ -398,7 +405,9 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        with gui.div(className="d-flex justify-content-between align-items-start mt-3"):
+        with gui.div(
+            className="d-flex justify-content-between align-items-start mt-0 mt-md-3"
+        ):
             if tbreadcrumbs.has_breadcrumbs():
                 with gui.div(
                     className="d-block d-lg-flex align-items-center pt-2 mb-2"
@@ -428,41 +437,49 @@ class BasePage:
                 with gui.styled("& h1 { margin-top: 0 }"):
                     self._render_title(tbreadcrumbs.h1_title)
             else:
-                with (
-                    gui.styled("& h1 { margin-top: 0 }"),
-                    gui.div(
-                        className="d-flex mt-3 mt-md-2 flex-column flex-md-row align-items-center gap-4 container-margin-reset"
-                    ),
-                ):
-                    imageStyles = dict(
-                        maxWidth="150px",
-                        height="150px",
-                        margin=0,
-                        minHeight="150px",
-                        objectFit="cover",
-                    )
-                    if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
-                        imageStyles["borderRadius"] = "50%"
-                    else:
-                        imageStyles["borderRadius"] = "12px"
-
-                    gui.image(
-                        src=pr.photo_url,
-                        style=imageStyles,
-                    )
-                    with gui.div(className="d-flex gap-2 w-100"):
-                        with gui.div(className="flex-grow-1"):
+                img_style = dict(objectFit="cover", marginBottom=0)
+                if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
+                    img_style["borderRadius"] = "50%"
+                else:
+                    img_style["borderRadius"] = "12px"
+                with gui.div(className="d-flex gap-4 align-items-center"):
+                    if pr.photo_url:
+                        with gui.div(className="d-none d-md-inline"):
+                            gui.image(
+                                src=pr.photo_url,
+                                style=img_style | dict(width="150px", height="150px"),
+                            )
+                    with (
+                        gui.styled(
+                            """
+                            & h1 { margin: 0 }
+                            @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
+                            """
+                        ),
+                        gui.div(),
+                    ):
+                        with gui.div(
+                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
+                        ):
+                            if pr.photo_url:
+                                with gui.div(className="d-inline d-md-none"):
+                                    gui.image(
+                                        src=pr.photo_url,
+                                        style=img_style
+                                        | dict(width="80px", height="80px"),
+                                    )
                             self._render_title(tbreadcrumbs.h1_title)
-                            if pr and pr.notes:
-                                gui.write(pr.notes, line_clamp=2)
-                        self.render_header_extra()
+                        self.render_notes_and_extra()
         # render notes below the title and social buttons
         else:
-            with gui.div(className="d-flex gap-2 w-100"):
-                with gui.div(className="flex-grow-1"):
-                    if pr and pr.notes:
-                        gui.write(pr.notes, line_clamp=2)
-                self.render_header_extra()
+            self.render_notes_and_extra()
+
+    def render_notes_and_extra(self):
+        with gui.div(className="d-flex gap-2 w-100 align-items-center"):
+            with gui.div(className="flex-grow-1 container-margin-reset"):
+                if self.current_pr and self.current_pr.notes:
+                    gui.write(self.current_pr.notes, line_clamp=3)
+            self.render_header_extra()
 
     def render_header_extra(self):
         pass
@@ -497,11 +514,13 @@ class BasePage:
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
-            "span", className="d-none d-sm-inline-block text-muted text-nowrap mx-2"
+            "span",
+            className="d-none d-sm-inline-block text-muted text-nowrap mx-2",
+            style=dict(fontSize="smaller", fontWeight="normal"),
         ):
             gui.html("Unpublished changes")
 
-    def _render_saved_timestamp(self):
+    def _render_saved_generated_timestamp(self):
         sr, pr = self.current_sr_pr
         if not (pr and self.tab == RecipeTabs.run):
             return
@@ -509,6 +528,25 @@ class BasePage:
             dt = pr.updated_at
         else:
             dt = sr.updated_at
+
+        tooltip_content = ""
+        run_time = gui.session_state.get(StateKeys.run_time, 0)
+        if run_time:
+            tooltip_content += (
+                f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
+            )
+
+        if seed := gui.session_state.get("seed"):
+            tooltip_content += f' with seed <span style="color: black;">{seed}</span> '
+
+        updated_at = gui.session_state.get(
+            StateKeys.updated_at, datetime.datetime.today()
+        )
+        if isinstance(updated_at, str):
+            updated_at = datetime.datetime.fromisoformat(updated_at)
+        if updated_at:
+            tooltip_content += " on " + updated_at.strftime("%b %d, %-I:%M %p")
+
         with (
             gui.div(
                 className="container-margin-reset d-none d-md-block",
@@ -517,11 +555,21 @@ class BasePage:
                     top="50%",
                     right="0",
                     transform="translateY(-50%)",
+                    fontSize="smaller",
+                    fontWeight="normal",
                 ),
             ),
-            gui.tag("span", className="text-muted"),
+            gui.tag(
+                "span", className="text-muted d-none d-md-flex gap-2 align-items-center"
+            ),
         ):
+            self._render_report_button()
             gui.write(get_relative_time(dt))
+            with gui.tooltip(
+                tooltip_content,
+            ):
+                with gui.tag("span", className="text-muted d-inline-block"):
+                    gui.html("<i class='fa-regular fa-circle-info'></i>")
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
@@ -1484,6 +1532,7 @@ class BasePage:
                 WebkitBackdropFilter="blur(7px)",
                 marginLeft="-0.5rem",
                 marginRight="-0.5rem",
+                zIndex=10,
             ),
         ):
             col1, col2 = gui.columns([2, 1], responsive=False)
@@ -1528,14 +1577,6 @@ class BasePage:
         else:
             run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
-
-        cost_note = self.get_cost_note()
-        if cost_note:
-            ret += f" ({cost_note.strip()})"
-
-        additional_notes = self.additional_notes()
-        if additional_notes:
-            ret += f" \n{additional_notes}"
 
         gui.caption(ret, line_clamp=self.run_cost_line_clamp, unsafe_allow_html=True)
 
@@ -1652,9 +1693,12 @@ class BasePage:
         if not self.request.user or is_example:
             return
 
-        reported = gui.button(
-            '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
-        )
+        with gui.tooltip("Report"):
+            reported = gui.button(
+                '<i class="fa-regular fa-flag"></i>',
+                type="tertiary",
+                className="mb-0 p-1",
+            )
         if not reported:
             return
 
@@ -1670,10 +1714,11 @@ class BasePage:
         placeholder = gui.div()
 
         if self.show_settings:
-            with gui.expander("⚙️ Settings"):
-                self.render_settings()
-                if self.functions_in_settings:
-                    functions_input(self.request.user)
+            with gui.div(className="bg-white"):
+                with gui.expander("⚙️ Settings"):
+                    self.render_settings()
+                    if self.functions_in_settings:
+                        functions_input(self.request.user)
 
         with placeholder:
             self.render_variables()
@@ -1745,17 +1790,17 @@ class BasePage:
                 self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
+                self.click_preview_tab()
                 self._render_running_output()
             else:
                 if not is_deleted:
                     self._render_after_output()
-                render_output_caption()
 
     def _render_failed_output(self):
         err_msg = gui.session_state.get(StateKeys.error_msg)
         gui.error(err_msg, unsafe_allow_html=True)
 
-    def _render_running_output(self):
+    def click_preview_tab(self):
         # show the preview tab when running
         gui.html(
             """
@@ -1767,8 +1812,11 @@ class BasePage:
             """
         )
 
+    scroll_into_view = True
+
+    def _render_running_output(self):
         run_status = gui.session_state.get(StateKeys.run_status)
-        html_spinner(run_status)
+        html_spinner(run_status, scroll_into_view=self.scroll_into_view)
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
@@ -1987,8 +2035,9 @@ class BasePage:
             gui.session_state.pop(field_name, None)
 
     def _render_after_output(self):
-        self._render_report_button()
+        self._render_regenerate_button()
 
+    def _render_regenerate_button(self):
         if "seed" in self.RequestModel.schema_json():
             randomize = gui.button(
                 '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
@@ -2375,35 +2424,6 @@ def started_at_text(dt: datetime.datetime):
         )
 
 
-def render_output_caption():
-    caption = ""
-
-    run_time = gui.session_state.get(StateKeys.run_time, 0)
-    if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
-
-    if seed := gui.session_state.get("seed"):
-        caption += f' with seed <span style="color: black;">{seed}</span> '
-
-    updated_at = gui.session_state.get(StateKeys.updated_at, datetime.datetime.today())
-    if updated_at:
-        if isinstance(updated_at, str):
-            updated_at = datetime.datetime.fromisoformat(updated_at)
-        caption += " on&nbsp;"
-
-    with gui.div(className="d-flex"):
-        gui.caption(caption, unsafe_allow_html=True)
-        if updated_at:
-            gui.caption(
-                "...",
-                className="text-black",
-                **render_local_dt_attrs(
-                    updated_at,
-                    date_options={"month": "short", "day": "numeric"},
-                ),
-            )
-
-
 def extract_model_fields(
     model: typing.Type[BaseModel],
     state: dict,
@@ -2464,10 +2484,12 @@ OUTPUT_TABS_CSS = """
         display: flex;
         flex-direction: row-reverse;
         width: 100%;
-        padding-left: 1.5rem;
+        background-color: #f9f9f9;
+        padding: 10px;
+        margin-top: -1rem;
     }
     & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 0 0 auto;
+        flex: 0 1 auto;
         width: 60%;
         max-width: 100%;
         margin-right: 0.75rem;
