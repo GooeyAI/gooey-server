@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import multiprocessing
 import os.path
 import tempfile
 import threading
 import typing
 from enum import Enum
+from functools import lru_cache
 
 import gooey_gui as gui
 import requests
@@ -43,6 +46,7 @@ from daras_ai_v2.text_splitter import text_splitter
 
 if typing.TYPE_CHECKING:
     import google.cloud.speech_v2
+    from google.auth.transport.requests import AuthorizedSession
 
 TRANSLATE_BATCH_SIZE = 8
 
@@ -951,29 +955,20 @@ def _MinT_translate_one_text(
     return tanslation.get("translation", text)
 
 
-_session = None
 _session_lock = threading.Lock()
 
 
-def get_google_auth_session(scopes: typing.Optional[list[str]] = None):
-    global _session
+@lru_cache
+def get_google_auth_session(*scopes: str) -> tuple[AuthorizedSession, str]:
+    if not scopes:
+        scopes = ("https://www.googleapis.com/auth/cloud-platform",)
+    with _session_lock:
+        import google.auth
+        from google.auth.transport.requests import AuthorizedSession
 
-    if _session is None:
-        with _session_lock:
-            if _session is None:
-                import google.auth
-                from google.auth.transport.requests import AuthorizedSession
-
-                if not scopes:
-                    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-
-                creds, project = google.auth.default(
-                    scopes=scopes,
-                )
-                # takes care of refreshing the token and adding it to request headers
-                _session = AuthorizedSession(credentials=creds), project
-
-    return _session
+        creds, project = google.auth.default(scopes=scopes)
+        # AuthorizedSession takes care of refreshing the token and adding it to request headers
+        return AuthorizedSession(credentials=creds), project
 
 
 def run_asr(

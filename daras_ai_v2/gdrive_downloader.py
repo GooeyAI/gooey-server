@@ -87,11 +87,10 @@ def gdrive_download(
         # export google docs to appropriate type
         export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
         if f_url_export := export_links.get(export_mime_type, None):
-            drive_scopes = ["https://www.googleapis.com/auth/drive.readonly"]
-            session, _ = get_google_auth_session(drive_scopes)
+            session, _ = get_google_auth_session("https://www.googleapis.com/auth/drive.readonly")
             r = session.get(f_url_export)
-            file_bytes = r.content
             raise_for_status(r, is_user_url=True)
+            file_bytes = r.content
             return file_bytes, export_mime_type
 
     request = service.files().get_media(

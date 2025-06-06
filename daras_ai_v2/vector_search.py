@@ -380,23 +380,18 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             meta = gdrive_metadata(url_to_gdrive_file_id(f))
         except HttpError as e:
             if e.status_code == 404:
-                from google.oauth2.service_account import Credentials
-
-                service_account_client_email = Credentials.from_service_account_file(
-                    settings.service_account_key_path
-                ).service_account_email
-
                 raise UserError(
                     # language=HTML
-                    f"""<p>This knowledge base Google Doc is not accessible: <a href="{f_url}" target="_blank">{f_url}</a></p>
-                <p>To address this:</p>
-                <ul>
-                  <li>Please make the Google Doc publicly viewable, or</li>
-                  <li>Share the Doc or its parent folder with <br>
-                    <a href="mailto:{service_account_client_email}">{service_account_client_email}</a>
-                    as an authorized viewer.
-                  </li>
-                </ul>"""
+                    f"""\
+<p>This knowledge base Google Doc is not accessible: <a href="{f_url}" target="_blank">{f_url}</a></p>
+<p>To address this:</p>
+<ul>
+    <li>Please make sure this Google Doc exists and is publicly viewable, or</li>
+    <li>
+    Share the Doc or its parent folder with <a href="mailto:support@gooey.ai" target="_blank">support@gooey.ai</a> as an authorized viewer and drop us an email.
+    </li>
+</ul>
+                    """
                 ) from e
             else:
                 raise
