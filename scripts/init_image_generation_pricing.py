@@ -46,7 +46,7 @@ def image_generation_pricing_create(
     if unit_cost_text_input is not None:
         obj, created = ModelPricing.objects.get_or_create(
             model_id=model_id,
-            sku=ModelSku.image_generation_text_input,
+            sku=ModelSku.llm_prompt,
             defaults=dict(
                 model_name=model_name,
                 unit_cost=unit_cost_text_input,
@@ -64,7 +64,7 @@ def image_generation_pricing_create(
     if unit_cost_image_input is not None:
         obj, created = ModelPricing.objects.get_or_create(
             model_id=model_id,
-            sku=ModelSku.image_generation_image_input,
+            sku=ModelSku.input_image_tokens,
             defaults=dict(
                 model_name=model_name,
                 unit_cost=unit_cost_image_input,
@@ -81,7 +81,7 @@ def image_generation_pricing_create(
     # Output pricing (for generated images) - always required
     obj, created = ModelPricing.objects.get_or_create(
         model_id=model_id,
-        sku=ModelSku.image_generation_output,
+        sku=ModelSku.output_image_tokens,
         defaults=dict(
             model_name=model_name,
             unit_cost=unit_cost_output,
