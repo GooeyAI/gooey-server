@@ -301,7 +301,7 @@ CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 HEADER_LINKS = [
     (
         "/explore/",
-        '<i class="fa-solid fa-magnifying-glass" style="font-size: 0.9rem"></i> Explore',
+        '<i class="fa-solid fa-magnifying-glass small me-2"></i>Explore',
     ),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
