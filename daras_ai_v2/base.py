@@ -1724,7 +1724,7 @@ class BasePage:
             self.render_variables()
 
         submitted = self.render_submit_button()
-        with gui.div(style={"textAlign": "right"}):
+        with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
             terms_caption = self.get_terms_caption()
             gui.caption(f"_{terms_caption}_")
 
