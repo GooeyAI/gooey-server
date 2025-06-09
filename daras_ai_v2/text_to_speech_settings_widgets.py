@@ -303,7 +303,8 @@ def google_tts_selector():
         options=voices.keys(),
     )
     gui.caption(
-        "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
+        "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*",
+        style={"fontSize": "smaller"},
     )
 
 
