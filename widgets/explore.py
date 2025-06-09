@@ -32,7 +32,7 @@ def render(user: AppUser | None, search_filters: SearchFilters | None):
         raise gui.QueryParamsRedirectException(dict())
     if new_filters and new_filters != search_filters:
         # if the search bar value has changed, redirect to the new search page
-        raise gui.QueryParamsRedirectException(new_filters.dict())
+        raise gui.QueryParamsRedirectException(new_filters.model_dump())
 
     if search_filters:
         with gui.div(className="my-4"):

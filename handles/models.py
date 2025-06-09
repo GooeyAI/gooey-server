@@ -103,6 +103,7 @@ class Handle(models.Model):
             validate_handle_regex,
             validate_handles_blacklist,
         ],
+        db_index=True,
     )
 
     redirect_url = CustomURLField(default=None, null=True, blank=True)

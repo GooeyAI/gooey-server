@@ -8,7 +8,7 @@ from django.db.models import (
     QuerySet,
     Value,
 )
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
@@ -23,7 +23,8 @@ class SearchFilters(BaseModel):
     workspace: str | None = None
     workflow: str | None = None
 
-    @validator("*")
+    @field_validator("*", mode="after")
+    @classmethod
     def empty_str_to_none(cls, v: str | None) -> str | None:
         # to clear query params from URL when they are empty
         if v == "":
@@ -40,31 +41,26 @@ def render_search_filters(
     if not search_filters:
         search_filters = SearchFilters()
 
-    with (
-        gui.styled(r"& .gui-input { margin-bottom: 0; }"),
-        gui.div(),
-        gui.div(className="d-lg-flex container-margin-reset gap-3"),
-    ):
-        with gui.div(className="col-lg-5 flex-grow-1 flex-lg-grow-0 mb-2 mb-lg-0"):
+    with gui.div(className="d-lg-flex container-margin-reset gap-3"):
+        with gui.div(className="col-lg-5 mb-2 mb-lg-0"):
             search_query = render_search_bar(value=search_filters.search)
 
         with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
             gui.caption(
                 f'{icons.filter}<span class="d-none d-lg-inline"> Filter</span>',
                 unsafe_allow_html=True,
+                className="text-nowrap text-muted",
             )
-            with gui.div(
-                className="d-flex gap-2 flex-grow-1",
-                style={"maxWidth": "calc(100% - 24px)"},
-            ):
-                if current_user and not current_user.is_anonymous:
-                    with gui.div(className="flex-grow-1", style={"maxWidth": "50%"}):
+            with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
+                is_logged_in = current_user and not current_user.is_anonymous
+                if is_logged_in:
+                    with gui.div(className="col-6"):
                         workspace_filter = render_workspace_filter(
                             current_user=current_user, value=search_filters.workspace
                         )
                 else:
                     workspace_filter = None
-                with gui.div(className="flex-grow-1", style={"maxWidth": "50%"}):
+                with gui.div(className="col-6" if is_logged_in else "col-12 col-lg-6"):
                     workflow_filter = render_workflow_filter(
                         value=search_filters.workflow
                     )
@@ -74,111 +70,35 @@ def render_search_filters(
     )
 
 
-def render_popover_selector(options: dict[str, str], label: str, key: str, value: str):
-    with (
-        gui.styled(r"& > button { max-width: 100%; width: 100%; }"),
-        gui.div(),
-    ):
-        popover, content = gui.popover(interactive=True, placement="bottom")
-
-    with popover, gui.div(className="d-flex align-items-center p-2 border rounded"):
-        popover_text = value and options.get(value) or label
-        gui.html(
-            popover_text,
-            className="flex-grow-1 d-inline-block pe-2 border-end border-light-2 overflow-hidden text-truncate",
-        )
-        gui.html(icons.chevron_down, className="d-block ps-2")
-
-    with (
-        content,
-        gui.div(
-            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-auto",
-            style={"maxWidth": "500px", "maxHeight": "500px"},
-        ),
-    ):
-        for option_value, option_html in options.items():
-            with gui.tag(
-                "button",
-                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                name=key,
-                type="submit",
-                value=option_value,
-                style=dict(minHeight="2.2rem"),
-            ):
-                with gui.div(className="row align-items-center"):
-                    with gui.div(className="col-10"):
-                        gui.html(option_html)
-                    with gui.div(className="col-2 text-end"):
-                        if option_value == value:
-                            gui.html(
-                                '<i class="fa-sharp fa-solid fa-circle-check"></i>'
-                            )
-
-    return gui.session_state.pop(key, value)
-
-
-def render_workspace_filter(
-    current_user: AppUser | None = None, key: str = "workspace_filter", value: str = ""
-) -> str | None:
-    if not current_user or current_user.is_anonymous:
-        return None
-
-    workspace_options = {None: f"{icons.octopus}&nbsp;&nbsp;&nbsp;Any"}
-    workspace_options |= {
-        w.handle_id and w.handle.name or str(w.id): w.display_html(
-            current_user=current_user, icon_size="20px"
-        )
-        for w in current_user.cached_workspaces
-    }
-
-    return render_popover_selector(
-        workspace_options, label=f"{icons.octopus} Workspace", key=key, value=value
-    )
-
-
-def render_workflow_filter(key: str = "workflow_filter", value: str = "", **props):
-    from daras_ai_v2.all_pages import all_home_pages
-
-    workflow_options = {None: f"{icons.example}&nbsp;&nbsp;&nbsp;Any"}
-    workflow_options |= {
-        p.workflow.short_slug: f"{p.workflow.emoji} {p.workflow.short_title}"
-        for p in all_home_pages
-    }
-    return render_popover_selector(
-        workflow_options, label=f"{icons.example} Type", key=key, value=value, **props
-    )
-
-
 def render_search_bar(key: str = "search_query", value: str = "") -> str:
     with (
         gui.styled(
             r"""
-        & {
-            position: relative;
-            max-width: 500px;
-        }
-        & .gui-input {
-            margin: 0;
-            width: 100%;
-        }
-        & .clear_button {
-            position: absolute;
-            top: 14px;
-            right: 18px;
-            font-size: 0.9em;
-            margin: 0 !important;
-        }
-        &::before {
-            content: "\f002";              /* FontAwesome glyph */
-            font-family: "Font Awesome 6 Pro";
-            position: absolute;
-            top: 14px;
-            left: 18px;
-            pointer-events: none;          /* let clicks go through to the input */
-            color: #888;
-            font-size: 0.9em;
-        }
-        """
+            & {
+                position: relative;
+            }
+            & .gui-input {
+                margin: 0;
+                width: 100%;
+            }
+            & .clear_button {
+                position: absolute;
+                top: 14px;
+                right: 18px;
+                font-size: 0.9em;
+                margin: 0 !important;
+            }
+            &::before {
+                content: "\f002";              /* FontAwesome glyph */
+                font-family: "Font Awesome 6 Pro";
+                position: absolute;
+                top: 14px;
+                left: 18px;
+                pointer-events: none;          /* let clicks go through to the input */
+                color: #888;
+                font-size: 0.9em;
+            }
+            """
         ),
         gui.div(),
     ):
@@ -197,6 +117,65 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             search_query = ""
 
     return search_query
+
+
+def render_workspace_filter(
+    current_user: AppUser | None = None, key: str = "workspace_filter", value: str = ""
+) -> str | None:
+    if not current_user or current_user.is_anonymous:
+        return None
+
+    workspace_options = {
+        w.handle_id and w.handle.name or str(w.id): w.display_html(
+            current_user=current_user, icon_size="20px"
+        )
+        for w in current_user.cached_workspaces
+    }
+
+    return _render_selectbox(
+        workspace_options,
+        label=f"{icons.octopus} Workspace",
+        key=key,
+        value=value,
+        blank_label=f"{icons.octopus}&nbsp; Any",
+    )
+
+
+def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
+    from daras_ai_v2.all_pages import all_home_pages
+
+    workflow_options = {
+        p.workflow.short_slug: f"{p.workflow.emoji} {p.workflow.short_title}"
+        for p in all_home_pages
+    }
+    return _render_selectbox(
+        workflow_options,
+        label=f"{icons.example} Type",
+        key=key,
+        value=value,
+        blank_label=f"{icons.example}&nbsp; Any",
+    )
+
+
+def _render_selectbox(
+    options: dict[str, str],
+    label: str,
+    key: str,
+    value: str,
+    blank_label: str = "Any",
+):
+    return gui.selectbox(
+        label="",
+        label_visibility="collapsed",
+        placeholder=label,
+        options=options.keys(),
+        key=key,
+        value=value,
+        allow_none=True,
+        format_func=lambda x: options.get(x, blank_label),
+        className="mb-0 text-nowrap",
+        isClearable=True,
+    )
 
 
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
@@ -276,17 +255,30 @@ def build_search_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet
 
     if search_filters.workspace:
         try:
-            qs = qs.filter(workspace=int(search_filters.workspace))
+            workspace = int(search_filters.workspace)
         except ValueError:
             qs = qs.filter(workspace__handle__name=search_filters.workspace)
+        else:
+            qs = qs.filter(workspace=workspace)
+
     if search_filters.workflow:
-        workflow_page = page_slug_map[normalize_slug(search_filters.workflow)]
-        qs = qs.filter(workflow=workflow_page.workflow.value)
+        try:
+            workflow_page = page_slug_map[normalize_slug(search_filters.workflow)]
+        except KeyError:
+            pass
+        else:
+            qs = qs.filter(workflow=workflow_page.workflow.value)
 
     if search_filters.search:
-        # build a raw tsquery like “foo:* & bar:*”
-        tokens = [t for t in search_filters.search.strip().split() if t]
-        raw_query = " & ".join(f"{t}:*" for t in tokens)
+        # build a raw tsquery like "foo:* & bar:*
+        tokens = []
+        for token in search_filters.search.strip().split():
+            # Only allow tokens that are alphanumeric
+            token = "".join(c for c in token if c.isalnum())
+            if not token:
+                continue
+            tokens.append(token + ":*")
+        raw_query = " & ".join(tokens)
         search = SearchQuery(raw_query, search_type="raw")
 
         # search by workflow title
