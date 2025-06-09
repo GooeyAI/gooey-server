@@ -76,14 +76,13 @@ def get_model_choices():
 
 
 class ModelSku(models.IntegerChoices):
-    llm_prompt = 1, "LLM Prompt"
+    llm_prompt = 1, "LLM Prompt (Text)"
     llm_completion = 2, "LLM Completion"
 
     gpu_ms = 3, "GPU Milliseconds"
 
-    image_generation_text_input = 4, "Image Generation (Text Input)"
-    image_generation_image_input = 5, "Image Generation (Image Input)"
-    image_generation_output = 6, "Image Generation (Output)"
+    input_image_tokens = 5, "Image Prompt"
+    output_image_tokens = 6, "Image Generation (Output)"
 
 
 class ModelPricing(models.Model):

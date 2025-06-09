@@ -743,22 +743,22 @@ def record_openai_image_generation_usage(
     if text_input_tokens := usage.input_tokens_details.text_tokens:
         record_cost_auto(
             model=model,
-            sku=ModelSku.image_generation_text_input,
+            sku=ModelSku.llm_prompt,
             quantity=text_input_tokens,
         )
 
     # Record image input usage (for image inputs in img2img, editing)
-    if image_input_tokens := usage.input_tokens_details.image_tokens:
+    if input_image_tokens := usage.input_tokens_details.image_tokens:
         record_cost_auto(
             model=model,
-            sku=ModelSku.image_generation_image_input,
-            quantity=image_input_tokens,
+            sku=ModelSku.input_image_tokens,
+            quantity=input_image_tokens,
         )
 
     # Record output usage (for generated images/content)
-    if usage.output_tokens:
+    if output_image_tokens := usage.output_tokens:
         record_cost_auto(
             model=model,
-            sku=ModelSku.image_generation_output,
-            quantity=usage.output_tokens,
+            sku=ModelSku.output_image_tokens,
+            quantity=output_image_tokens,
         )
