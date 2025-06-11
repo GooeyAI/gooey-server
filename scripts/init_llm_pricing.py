@@ -205,7 +205,7 @@ def run():
         pricing_url="https://openai.com/api/pricing",
     )
     llm_pricing_create(
-        model_id="gpt-4o-realtime-preview-2024-12-17",
+        model_id="gpt-4o-realtime-preview-2025-06-03",
         model_name=LargeLanguageModels.gpt_4_o_audio.name,
         unit_cost_input=2.5,
         unit_cost_output=10,
