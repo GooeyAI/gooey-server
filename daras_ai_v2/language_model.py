@@ -228,7 +228,7 @@ class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
     gpt_4_o_audio = LLMSpec(
         label="GPT-4o Audio (openai)",
-        model_id="gpt-4o-realtime-preview-2024-12-17",
+        model_id="gpt-4o-realtime-preview-2025-06-03",
         llm_api=LLMApis.openai_audio,
         context_window=128_000,
         max_output_tokens=16_384,
