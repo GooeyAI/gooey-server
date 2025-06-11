@@ -752,6 +752,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         input_audio = gui.session_state.get("input_audio") or ""
         input_documents = gui.session_state.get("input_documents") or []
         if input_prompt or input_images or input_audio or input_documents:
+            if input_audio and input_audio.startswith(("ws://", "wss://")):
+                input_audio = ""
             messages.append(
                 dict(
                     role=CHATML_ROLE_USER,
