@@ -65,14 +65,12 @@ class Document:
         text: str,
         span: tuple[int, int],
         length_function: L = default_length_function,
-        **kwargs,
     ):
         self.text = text
         self.span = span
         self.start = self.span[0]
         self.end = self.span[1]
         self.length_function = length_function
-        self.kwargs = kwargs
 
     def __len__(self):
         if self._length is None:

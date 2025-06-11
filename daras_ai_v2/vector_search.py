@@ -780,7 +780,6 @@ def pages_to_split_refs(
                     "url": f_url,
                     **row,  # preserve extra csv rows
                     "snippet": doc.text,
-                    **doc.kwargs,
                     "score": -1,
                 }
                 for doc in splits
@@ -796,7 +795,6 @@ def pages_to_split_refs(
                     f_url, (doc.end + 1 if len(pages) > 1 else None)
                 ).url,
                 "snippet": doc.text,
-                **doc.kwargs,
                 "score": -1,
             }
             for doc in text_splitter(
