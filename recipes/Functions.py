@@ -251,14 +251,15 @@ def execute_python(
 ):
     import modal
 
-    code += f"""
+    code += """
 if "main" in globals(): 
-    import json
-    ret = main(**{json.dumps(variables)})
+    import json, sys
+    kwargs = json.loads(sys.argv[1])
+    ret = main(**kwargs)
     with open("/main/return_value.json", "w") as f:
         try:
             json.dump(ret, f)
-        except TypeError:
+        except TypeError as e:
             raise ValueError("Return value must be JSON serializable") from e
 """
 
@@ -272,6 +273,7 @@ if "main" in globals():
                 "python",
                 "-c",
                 code,
+                json.dumps(variables),
                 image=modal.Image.debian_slim().pip_install_from_requirements(f.name),
                 secrets=[modal.Secret.from_dict(env or {})],
                 app=app,
