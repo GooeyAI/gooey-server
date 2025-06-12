@@ -101,11 +101,29 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
         for _, platform_id in get_demo_bots(published_run):
             platform = Platform(platform_id)
             label = f"{platform.get_icon()} {platform.get_title()}"
-            gui.pill(
-                label,
-                unsafe_allow_html=True,
-                className="border border-dark ms-2",
-            )
+            bg_color = platform.get_demo_button_color()
+            if not bg_color:
+                gui.pill(
+                    label,
+                    unsafe_allow_html=True,
+                    className="border border-dark ms-2",
+                )
+            else:
+                with gui.styled(
+                    f"""
+                & span:first-child {{ 
+                    background-color: {bg_color} !important; 
+                    border-color: {bg_color} !important; 
+                    color: white;
+                }}
+                """
+                ):
+                    with gui.div(className=f"gui-pill-bg-color-{platform_id}"):
+                        gui.pill(
+                            label,
+                            unsafe_allow_html=True,
+                            className="border border-dark ms-2",
+                        )
 
 
 FOOTER_CSS = """
