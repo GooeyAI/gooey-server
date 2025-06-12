@@ -1,3 +1,4 @@
+import json
 import tempfile
 import typing
 from enum import Enum
@@ -250,24 +251,46 @@ def execute_python(
 ):
     import modal
 
-    app = modal.App.lookup("my-app", create_if_missing=True)
-    with tempfile.NamedTemporaryFile(suffix=".txt") as f:
-        if python_requirements:
-            f.write(python_requirements.encode())
-            f.flush()
-        sb = modal.Sandbox.create(
-            "python",
-            "-c",
-            code,
-            image=modal.Image.debian_slim().pip_install_from_requirements(f.name),
-            secrets=[modal.Secret.from_dict(env or {})],
-            app=app,
-        )
+    code += f"""
+if "main" in globals(): 
+    import json
+    ret = main(**{json.dumps(variables)})
+    with open("/main/return_value.json", "w") as f:
+        try:
+            json.dump(ret, f)
+        except TypeError:
+            raise ValueError("Return value must be JSON serializable") from e
+"""
 
-    response.logs = []
-    for line in sb.stdout:
-        response.logs.append(ConsoleLogs(level="log", message=line))
-    response.error = sb.stderr.read()
+    app = modal.App.lookup("gooey-functions", create_if_missing=True)
+    with modal.Volume.ephemeral() as vol:
+        with tempfile.NamedTemporaryFile(suffix=".txt") as f:
+            if python_requirements:
+                f.write(python_requirements.encode())
+                f.flush()
+            sb = modal.Sandbox.create(
+                "python",
+                "-c",
+                code,
+                image=modal.Image.debian_slim().pip_install_from_requirements(f.name),
+                secrets=[modal.Secret.from_dict(env or {})],
+                app=app,
+                volumes={"/main": vol},
+            )
+
+        response.logs = []
+        for line in sb.stdout:
+            response.logs.append(ConsoleLogs(level="log", message=line))
+        response.error = sb.stderr.read()
+
+        sb.wait()
+        sb.terminate()
+
+        try:
+            ret = b"".join(vol.read_file("/main/return_value.json"))
+            response.return_value = json.loads(ret.decode())
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
 
 
 def execute_js(
