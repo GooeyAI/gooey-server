@@ -98,7 +98,12 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
                 className="border border-dark ms-2",
             )
 
+        rendered_ids: set[str] = set()
         for _, platform_id in get_demo_bots(published_run):
+            if platform_id in rendered_ids:
+                continue
+
+            rendered_ids.add(platform_id)
             platform = Platform(platform_id)
             label = f"{platform.get_icon()} {platform.get_title()}"
             bg_color = platform.get_demo_button_color()
