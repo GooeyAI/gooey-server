@@ -287,7 +287,7 @@ if "main" in globals():
         sb.terminate()
 
         try:
-            ret = b"".join(vol.read_file("/main/return_value.json"))
+            ret = b"".join(vol.read_file("return_value.json"))
             response.return_value = json.loads(ret.decode())
         except (FileNotFoundError, json.JSONDecodeError):
             pass
