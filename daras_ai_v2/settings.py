@@ -509,3 +509,6 @@ SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")
 
 FIREWORKS_API_KEY = config("FIREWORKS_API_KEY", "")
 MISTRAL_API_KEY = config("MISTRAL_API_KEY", "")
+
+os.environ["MODAL_TOKEN_ID"] = config("MODAL_TOKEN_ID", "")
+os.environ["MODAL_TOKEN_SECRET"] = config("MODAL_TOKEN_SECRET", "")
