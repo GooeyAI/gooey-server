@@ -52,6 +52,19 @@ def get_demo_bots(pr: PublishedRun):
     )
 
 
+@gui.cache_in_session_state
+def get_unique_demo_platforms(pr: PublishedRun):
+    return list(
+        BotIntegration.objects.filter(
+            published_run=pr,
+            public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
+        )
+        .order_by("platform")
+        .values_list("platform", flat=True)
+        .distinct()
+    )
+
+
 def render_demo_button(bi_id: int, platform_id: int, className: str = ""):
     platform = Platform(platform_id)
     label = f"{platform.get_icon()} {platform.get_title()}"

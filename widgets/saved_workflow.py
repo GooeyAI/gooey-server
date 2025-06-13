@@ -15,7 +15,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.utils import get_relative_time
 from widgets.author import render_author_from_workspace, render_author_from_user
-from widgets.demo_button import get_demo_bots
+from widgets.demo_button import get_unique_demo_platforms
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -88,7 +88,7 @@ def render_saved_workflow_preview(
 
 def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
     with gui.div(
-        className="d-md-flex d-none align-items-center ms-2 mt-1",
+        className="d-md-flex d-none align-items-center ms-2 mb-2",
         style={"font-size": "0.9rem"},
     ):
         if workflow_pill:
@@ -98,37 +98,27 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
                 className="border border-dark ms-2",
             )
 
-        rendered_ids: set[str] = set()
-        for _, platform_id in get_demo_bots(published_run):
-            if platform_id in rendered_ids:
-                continue
-
-            rendered_ids.add(platform_id)
+        for platform_id in get_unique_demo_platforms(published_run):
             platform = Platform(platform_id)
             label = f"{platform.get_icon()} {platform.get_title()}"
             bg_color = platform.get_demo_button_color()
-            if not bg_color:
-                gui.pill(
-                    label,
-                    unsafe_allow_html=True,
-                    className="border border-dark ms-2",
+            if bg_color:
+                style = dict(
+                    backgroundColor=bg_color + " !important",
+                    borderColor=bg_color + " !important",
+                    color="white !important",
                 )
             else:
-                with gui.styled(
-                    f"""
-                & span:first-child {{ 
-                    background-color: {bg_color} !important; 
-                    border-color: {bg_color} !important; 
-                    color: white;
-                }}
-                """
-                ):
-                    with gui.div(className=f"gui-pill-bg-color-{platform_id}"):
-                        gui.pill(
-                            label,
-                            unsafe_allow_html=True,
-                            className="border border-dark ms-2",
-                        )
+                style = dict(
+                    backgroundColor="#f8f9fa !important",
+                    color="black !important",
+                )
+            with gui.tag(
+                "span",
+                className="badge rounded-pill border ms-2",
+                style=style,
+            ):
+                gui.html(label)
 
 
 FOOTER_CSS = """
