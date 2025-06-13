@@ -88,7 +88,7 @@ def render_saved_workflow_preview(
 
 def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
     with gui.div(
-        className="d-md-flex d-none align-items-center ms-2 mt-1",
+        className="d-md-flex d-none align-items-center ms-2",
         style={"font-size": "0.9rem"},
     ):
         if workflow_pill:
@@ -101,11 +101,24 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
         for _, platform_id in get_demo_bots(published_run):
             platform = Platform(platform_id)
             label = f"{platform.get_icon()} {platform.get_title()}"
-            gui.pill(
-                label,
-                unsafe_allow_html=True,
-                className="border border-dark ms-2",
-            )
+            bg_color = platform.get_demo_button_color()
+            if bg_color:
+                style = dict(
+                    backgroundColor=bg_color,
+                    borderColor=bg_color + " !important",
+                    color="white",
+                )
+            else:
+                style = dict(
+                    backgroundColor="#f8f9fa",
+                    color="black",
+                )
+            with gui.tag(
+                "span",
+                className="badge rounded-pill border ms-2",
+                style=style,
+            ):
+                gui.html(label)
 
 
 FOOTER_CSS = """

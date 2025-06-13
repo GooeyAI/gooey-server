@@ -48,7 +48,10 @@ def get_demo_bots(pr: PublishedRun):
         BotIntegration.objects.filter(
             published_run=pr,
             public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
-        ).values_list("id", "platform")
+        )
+        .order_by("platform")
+        .distinct("platform")
+        .values_list("id", "platform")
     )
 
 
