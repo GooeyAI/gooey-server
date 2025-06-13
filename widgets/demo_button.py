@@ -48,20 +48,10 @@ def get_demo_bots(pr: PublishedRun):
         BotIntegration.objects.filter(
             published_run=pr,
             public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
-        ).values_list("id", "platform")
-    )
-
-
-@gui.cache_in_session_state
-def get_unique_demo_platforms(pr: PublishedRun):
-    return list(
-        BotIntegration.objects.filter(
-            published_run=pr,
-            public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
         )
         .order_by("platform")
-        .values_list("platform", flat=True)
-        .distinct()
+        .distinct("platform")
+        .values_list("id", "platform")
     )
 
 
