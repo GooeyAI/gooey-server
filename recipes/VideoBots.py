@@ -807,8 +807,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             .first()
         )
         if bot_integration:
-            bot_config = bot_integration.get_web_widget_config(hostname=None)
-            bot_branding = bot_config["branding"]
+            bot_branding = bot_integration.get_web_widget_branding()
         else:
             bot_branding = dict(
                 name=self.current_pr.title,

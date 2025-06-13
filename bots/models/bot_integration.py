@@ -551,6 +551,11 @@ class BotIntegration(models.Model):
             config["apiUrl"] = get_api_route_url(stream_create)
         return config
 
+    def get_web_widget_branding(self, hostname: str | None = None) -> dict:
+        config = self.get_web_widget_config(hostname=hostname)
+        branding = config.get("branding", {})
+        return branding
+
     def translate(self, text: str) -> str:
         from daras_ai_v2.asr import run_google_translate, should_translate_lang
 
