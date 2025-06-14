@@ -456,7 +456,7 @@ class BasePage:
                             @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
                             """
                         ),
-                        gui.div(),
+                        gui.div(className="w-100"),
                     ):
                         with gui.div(
                             className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
@@ -2500,13 +2500,13 @@ OUTPUT_TABS_CSS = """
         flex: 0 1 auto;
         width: 60%;
         max-width: 100%;
-        margin-right: 0.75rem;
+        padding-right: 0.75rem;
     }
     & [data-reach-tab-panels] > div:nth-child(1) {
         flex: 0 0 auto;
         width: 40%;
         max-width: 100%;
-        margin-left: 0.75rem;
+        padding-left: 0.75rem;
     }
     & [data-reach-tab-panel][hidden] {
         display: block !important;
