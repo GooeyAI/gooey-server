@@ -456,7 +456,7 @@ class BasePage:
                             @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
                             """
                         ),
-                        gui.div(),
+                        gui.div(className="w-100"),
                     ):
                         with gui.div(
                             className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
