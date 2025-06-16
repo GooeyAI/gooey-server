@@ -854,7 +854,6 @@ window.addEventListener("hydrated", loadGooeyEmbed);
 
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
     GooeyEmbed.controller.setMessages?.(messages);
-    console.log("setMessages:", messages);
 }
             """,
             config=dict(

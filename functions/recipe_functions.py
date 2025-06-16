@@ -28,25 +28,27 @@ class LLMTool:
 
         self.function_url = function_url
 
-        _, fn_sr, fn_pr = url_to_runs(function_url)
-        self._fn_runs = (fn_sr, fn_pr)
+        self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
+        self._fn_runs = (self.fn_sr, self.fn_pr)
 
-        self.name = slugify(fn_pr.title).replace("-", "_")
-        self.label = fn_pr.title
+        self.name = slugify(self.fn_pr.title).replace("-", "_")
+        self.label = self.fn_pr.title
 
-        if fn_sr.workflow == Workflow.FUNCTIONS:
-            fn_vars = fn_sr.state.get("variables", {})
-            fn_vars_schema = fn_sr.state.get("variables_schema", {})
+        self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
+        if self.is_function_workflow:
+            fn_vars = self.fn_sr.state.get("variables", {})
+            fn_vars_schema = self.fn_sr.state.get("variables_schema", {})
         else:
-            page_cls = Workflow(fn_sr.workflow).page_cls
-            fn_vars = page_cls.get_example_request(fn_sr.state, fn_pr)[1]
-            fn_vars_schema = page_cls.RequestModel.model_json_schema()["properties"]
+            fn_vars = self.page_cls.get_example_request(self.fn_sr.state, self.fn_pr)[1]
+            fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
+                "properties", {}
+            )
 
         self.spec = {
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": fn_pr.notes,
+                "description": self.fn_pr.notes,
                 "parameters": {
                     "type": "object",
                     "properties": dict(generate_tool_params(fn_vars, fn_vars_schema)),
