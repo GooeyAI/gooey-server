@@ -1,25 +1,26 @@
 ### Q/A checklist
 
-- [ ] If you add new dependencies, did you update the lock file?
+- [ ] I have tested my UI changes on mobile and they look acceptable
+- [ ] I have tested changes to the workflows in both the API and the UI
+- [ ] I have done a code review of my changes and looked at each line of the diff + the references of each function I have changed
+- [ ] My changes have not increased the import time of the server
+
+<details>
+<summary>How to check import time?</summary>
+<p>
+
 ```bash
-poetry lock --no-update
+time python -c 'import server'
 ```
-- [ ] Run tests 
-```bash
-ulimit -n unlimited && ./scripts/run-tests.sh
-```
-- [ ] Do a self code review of the changes - Read the diff at least twice.  
-- [ ] Carefully think about the stuff that might break because of this change - this sounds obvious but it's easy to forget to do "Go to references" on each function you're changing and see if it's used in a way you didn't expect. 
-- [ ] The relevant pages still run when you press submit
-- [ ] The API for those pages still work (API tab)
-- [ ] The public API interface doesn't change if you didn't want it to (check API tab > docs page)
-- [ ] Do your UI changes (if applicable) look acceptable on mobile?
-- [ ] Ensure you have not regressed the import time unless you have a good reason to do so. 
+
 You can visualize this using tuna:
+
 ```bash
 python3 -X importtime -c 'import server' 2> out.log && tuna out.log
 ```
+
 To measure import time for a specific library:
+
 ```bash
 $ time python -c 'import pandas'
 
@@ -28,14 +29,18 @@ Executed in    1.15 secs    fish           external
    usr time    2.22 secs   86.00 micros    2.22 secs
    sys time    0.72 secs  613.00 micros    0.72 secs
 ```
+
 To reduce import times, import libraries that take a long time inside the functions that use them instead of at the top of the file:
+
 ```python
 def my_function():
     import pandas as pd
     ...
 ```
 
+</p>
+</details>
+
 ### Legal Boilerplate
 
 Look, I get it. The entity doing business as “Gooey.AI” and/or “Dara.network” was incorporated in the State of Delaware in 2020 as Dara Network Inc. and is gonna need some rights from me in order to utilize my contributions in this PR. So here's the deal: I retain all rights, title and interest in and to my contributions, and by keeping this boilerplate intact I confirm that Dara Network Inc can use, modify, copy, and redistribute my contributions, under its choice of terms.
-

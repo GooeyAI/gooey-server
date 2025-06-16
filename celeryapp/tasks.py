@@ -18,7 +18,7 @@ from bots.admin_links import change_obj_url
 from bots.models import Platform, SavedRun, Workflow, PublishedRun
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings
+from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
@@ -283,3 +283,13 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
         subject=f"{user.display_name} Attempted to Connect to {platform.label}",
         html_body=html_body,
     )
+
+
+@app.task
+def update_gcs_content_types(urls: dict[str, str]) -> None:
+    for url, content_type in urls.items():
+        try:
+            gcs_v2.update_content_type(url, content_type)
+        except Exception as e:
+            traceback.print_exc()
+            sentry_sdk.capture_exception(e)

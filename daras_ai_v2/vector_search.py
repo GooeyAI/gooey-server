@@ -29,7 +29,7 @@ from daras_ai.image_input import (
     safe_filename,
     upload_file_from_bytes,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.asr import (
     AsrModels,
     download_youtube_to_wav,
@@ -342,6 +342,8 @@ def doc_or_yt_url_to_file_metas(
         else:
             file_meta = yt_info_to_video_metadata(data)
             return file_meta, [(f_url, file_meta)]
+    elif ret := fn_url_to_file_metadata(f_url):
+        return ret
     else:
         file_meta = doc_url_to_file_metadata(f_url)
         return file_meta, [(f_url, file_meta)]
@@ -368,6 +370,70 @@ def yt_info_to_video_metadata(data: dict) -> FileMetadata:
         mime_type="audio/wav",
         total_bytes=data.get("filesize_approx", 0),
     )
+
+
+def fn_url_to_file_metadata(
+    leaf_url: str,
+) -> tuple[FileMetadata, list[tuple[str, FileMetadata]]] | None:
+    from functions.models import FunctionTrigger
+    from functions.recipe_functions import LLMTool
+    from recipes.VideoBots import VideoBotsPage
+
+    try:
+        tool = LLMTool(leaf_url)
+    except Exception:
+        return None
+    if not tool.is_function_workflow:
+        return None
+
+    file_meta = FileMetadata(
+        name=tool.fn_pr.title, etag=tool.fn_sr.created_at.isoformat()
+    )
+
+    sr = get_running_saved_run()
+    tool.bind(
+        saved_run=sr,
+        workspace=sr.workspace,
+        current_user=AppUser.objects.get(uid=sr.uid),
+        request_model=VideoBotsPage.RequestModel,
+        response_model=VideoBotsPage.ResponseModel,
+        state=sr.state,
+        trigger=FunctionTrigger.pre,
+    )
+    return_value = tool().get("return_value")
+    if not isinstance(return_value, dict):
+        return None
+    documents = return_value.get("documents")
+    if not isinstance(documents, list):
+        documents = [documents]
+
+    leaf_url_metas = []
+    for doc in documents:
+        leaf_meta = None
+        match doc:
+            case str():
+                leaf_url = doc
+            case dict():
+                doc = doc.copy()
+                try:
+                    leaf_url = doc.pop("content", None)
+                except KeyError:
+                    continue
+                leaf_meta = doc_url_to_file_metadata(leaf_url)
+                if name := doc.pop("name", None):
+                    leaf_meta.name = name
+                if etag := doc.pop("etag", None):
+                    leaf_meta.etag = etag
+                if mime_type := doc.pop("mime_type", None):
+                    leaf_meta.mime_type = mime_type
+                leaf_meta.ref_data = doc
+            case _:
+                continue
+        leaf_url_metas.append(
+            (leaf_url, leaf_meta or doc_url_to_file_metadata(leaf_url))
+        )
+
+    return file_meta, leaf_url_metas
 
 
 def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
@@ -410,6 +476,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         export_links = {mime_type: meta["@microsoft.graph.downloadUrl"]}
 
     else:
+        f_url = gcs_v2.private_to_signed_url(f_url)
         if is_user_uploaded_url(f_url):
             kwargs = {}
         else:
@@ -581,6 +648,7 @@ def create_embedded_file(
 
         # create fresh embeddings
         file_id = _sha256(lookup | dict(metadata=file_meta.astuple()))
+        refs = []
         for leaf_url, leaf_meta in leaf_url_metas:
             refs = create_embeddings_in_search_db(
                 f_url=leaf_url,
@@ -794,6 +862,7 @@ def pages_to_split_refs(
                 "url": add_page_number_to_pdf(
                     f_url, (doc.end + 1 if len(pages) > 1 else None)
                 ).url,
+                **(file_meta.ref_data or {}),
                 "snippet": doc.text,
                 "score": -1,
             }
@@ -878,6 +947,7 @@ def download_content_bytes(
     elif is_onedrive_url(f):
         return onedrive_download(mime_type, export_links)
     try:
+        f_url = gcs_v2.private_to_signed_url(f_url)
         # download from url
         if is_user_uploaded_url(f_url):
             r = requests.get(f_url)

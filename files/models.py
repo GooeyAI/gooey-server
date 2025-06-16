@@ -10,6 +10,7 @@ class FileMetadata(models.Model):
     total_bytes = models.PositiveIntegerField(default=0, blank=True)
 
     export_links: dict[str, str] | None = None
+    ref_data: dict | None = None
 
     def __str__(self):
         ret = f"{self.name or 'Unnamed'} - {self.mime_type}"
