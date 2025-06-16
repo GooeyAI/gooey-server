@@ -96,7 +96,7 @@ def profile_header(request: Request, handle: Handle):
         with gui.tag("p", className="lead text-secondary mb-0"):
             gui.html(escape_html(handle.name))
 
-        with gui.div(className="mt-2 text-secondary"):
+        with gui.div(className="text-start mt-2 text-secondary"):
             gui.write(workspace.get_description() or "")
 
         if workspace.is_personal:
