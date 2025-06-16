@@ -207,7 +207,7 @@ docker run \
 
 ### 📐 Code Formatting
 
-Use black - https://pypi.org/project/black
+Use [ruff](https://docs.astral.sh/ruff/)
 
 ### 💣 Secret Scanning
 
