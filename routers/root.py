@@ -737,6 +737,9 @@ def page_wrapper(request: Request, className=""):
             ):
                 for url, label in settings.HEADER_LINKS:
                     with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
+                        if icon := settings.HEADER_ICONS.get(url):
+                            with gui.div(className="d-inline-block me-2"):
+                                gui.html(icon)
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
@@ -802,6 +805,9 @@ def anonymous_login_container(request: Request, context: dict):
                 style=dict(height=row_height),
             ):
                 col1, col2 = gui.columns([2, 10], responsive=False)
+                if icon := settings.HEADER_ICONS.get(url):
+                    with col1, gui.div(className="d-flex justify-content-center"):
+                        gui.html(icon)
                 with col2:
                     gui.html(label)
 
