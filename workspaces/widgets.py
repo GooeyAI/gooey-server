@@ -158,9 +158,14 @@ def global_workspace_selector(user: AppUser, session: dict):
                     className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
                     style=dict(height=row_height),
                 ):
-                    col1, col2 = gui.columns([2, 10], responsive=False)
+                    col1, col2 = gui.columns(
+                        [2, 10], responsive=False, className="row align-items-center"
+                    )
                     if icon := settings.HEADER_ICONS.get(url):
-                        with col1, gui.div(className="d-flex justify-content-center"):
+                        with (
+                            col1,
+                            gui.div(className="d-flex justify-content-center"),
+                        ):
                             gui.html(icon)
                     with col2:
                         gui.html(label)

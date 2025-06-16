@@ -10,7 +10,7 @@
                 {% for url, label in settings.HEADER_LINKS %}
                 <a class="pe-2" href="{{ url }}">
                     {%- if url in settings.HEADER_ICONS -%}
-                    <span class="me-2">{{ settings.HEADER_ICONS.get(url, "") | safe }}</span>
+                    <span class="small me-2">{{ settings.HEADER_ICONS.get(url, "") | safe }}</span>
                     {%- endif -%}
                     {{- label -}}
                 </a>
