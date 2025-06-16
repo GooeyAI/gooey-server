@@ -8,7 +8,7 @@
             </a>
             <div class="mt-2 gap-2 d-flex justify-content-md-end flex-grow-1 justify-content-evenly flex-wrap align-items-center">
                 {% for url, label in settings.HEADER_LINKS %}
-                    <a class="pe-2" href="{{ url }}">{{ label }}</a>
+                    <a class="pe-2" href="{{ url }}">{{ label | safe }}</a>
                 {% endfor %}
                 {% if request.user and not request.user.is_anonymous %}
                     <a class="pe-2" href="/account">

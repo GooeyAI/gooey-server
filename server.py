@@ -7,9 +7,7 @@ from time import time
 import anyio
 from decouple import config
 from fastapi import FastAPI
-from fastapi.exception_handlers import (
-    http_exception_handler,
-)
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
