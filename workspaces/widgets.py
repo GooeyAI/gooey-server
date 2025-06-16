@@ -159,6 +159,9 @@ def global_workspace_selector(user: AppUser, session: dict):
                     style=dict(height=row_height),
                 ):
                     col1, col2 = gui.columns([2, 10], responsive=False)
+                    if icon := settings.HEADER_ICONS.get(url):
+                        with col1, gui.div(className="d-flex justify-content-center"):
+                            gui.html(icon)
                     with col2:
                         gui.html(label)
 
