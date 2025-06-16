@@ -306,7 +306,7 @@ HEADER_LINKS = [
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {"/explore/": '<i class="fa-regular fa-magnifying-glass"></i>'}
+HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 

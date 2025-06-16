@@ -738,7 +738,7 @@ def page_wrapper(request: Request, className=""):
                 for url, label in settings.HEADER_LINKS:
                     with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
                         if icon := settings.HEADER_ICONS.get(url):
-                            with gui.div(className="d-inline-block me-2"):
+                            with gui.div(className="d-inline-block me-2 small"):
                                 gui.html(icon)
                         gui.html(label)
 
@@ -804,7 +804,9 @@ def anonymous_login_container(request: Request, context: dict):
                 className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
-                col1, col2 = gui.columns([2, 10], responsive=False)
+                col1, col2 = gui.columns(
+                    [2, 10], responsive=False, className="row align-items-center"
+                )
                 if icon := settings.HEADER_ICONS.get(url):
                     with col1, gui.div(className="d-flex justify-content-center"):
                         gui.html(icon)
