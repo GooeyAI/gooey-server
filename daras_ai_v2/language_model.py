@@ -549,7 +549,7 @@ class LargeLanguageModels(Enum):
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     gemini_2_5_pro_preview = LLMSpec(
-        label="Gemini 2.5 Pro Preview (Google)",
+        label="Gemini 2.5 Pro (Google)",
         model_id="google/gemini-2.5-pro-preview-03-25",
         llm_api=LLMApis.openai,
         context_window=1_048_576,
@@ -559,7 +559,7 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemini_2_5_flash_preview = LLMSpec(
-        label="Gemini 2.5 Flash Preview (Google)",
+        label="Gemini 2.5 Flash (Google)",
         model_id="google/gemini-2.5-flash-preview-04-17",
         llm_api=LLMApis.openai,
         context_window=1_048_576,
