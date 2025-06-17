@@ -174,7 +174,24 @@ def init_ws_session(
     if tools:
         session_data["tools"] = [
             tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
+        ] + [
+            {
+                "type": "function",
+                "name": "get_phone_number",
+                "description": "Get Phone Number for call transferring in E.164 format ",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "phone_number": {
+                            "type": "string",
+                        }
+                    },
+                    "required": ["phone_number"],
+                    "additionalProperties": False,
+                },
+            }
         ]
+
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 
     if audio_data:
