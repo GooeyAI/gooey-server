@@ -518,17 +518,7 @@ class BotIntegration(models.Model):
         config = self.web_config_extras | dict(
             target=target,
             integration_id=self.api_integration_id(),
-            branding=(
-                self.web_config_extras.get("branding", {})
-                | dict(
-                    name=self.name,
-                    byLine=self.by_line,
-                    description=self.descripton,
-                    conversationStarters=self.conversation_starters,
-                    photoUrl=self.photo_url,
-                    websiteUrl=self.website_url,
-                )
-            ),
+            branding=self.get_web_widget_branding(),
         )
 
         google_maps_api_key = None
@@ -550,6 +540,16 @@ class BotIntegration(models.Model):
 
             config["apiUrl"] = get_api_route_url(stream_create)
         return config
+
+    def get_web_widget_branding(self) -> dict:
+        return self.web_config_extras.get("branding", {}) | dict(
+            name=self.name,
+            byLine=self.by_line,
+            description=self.descripton,
+            conversationStarters=self.conversation_starters,
+            photoUrl=self.photo_url,
+            websiteUrl=self.website_url,
+        )
 
     def translate(self, text: str) -> str:
         from daras_ai_v2.asr import run_google_translate, should_translate_lang

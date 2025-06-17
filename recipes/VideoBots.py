@@ -797,6 +797,24 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 )
             )
 
+        # fill branding with bot integration data if available
+        bot_integration = (
+            BotIntegration.objects.filter(
+                published_run=self.current_pr,
+                platform=Platform.WEB,
+            )
+            .order_by("-updated_at")
+            .first()
+        )
+        if bot_integration:
+            bot_branding = bot_integration.get_web_widget_branding()
+        else:
+            bot_branding = dict(
+                name=self.current_pr.title,
+                photoUrl=self.current_pr.photo_url,
+                title=self.current_pr.title,
+            )
+        bot_branding["showPoweredByGooey"] = False
         gui.html(
             # language=html
             f"""
@@ -846,12 +864,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 enableAudioMessage=True,
                 enablePhotoUpload=True,
                 enableConversations=False,
-                branding=dict(
-                    name=self.current_pr.title,
-                    photoUrl=self.current_pr.photo_url,
-                    title="Preview",
-                    showPoweredByGooey=False,
-                ),
+                branding=bot_branding,
                 fillParent=True,
                 secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
             ),
