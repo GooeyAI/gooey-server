@@ -155,7 +155,7 @@ class RealtimeSession:
             arguments = json.loads(item["arguments"])
             phone_number = arguments.get("phone_number") or ""
         except json.JSONDecodeError as e:
-            capture_exception(error=dict(error=repr(e)))
+            capture_exception(e)
             return None
 
         try:
@@ -268,7 +268,7 @@ def handle_transfer_call(transfer_number: str, call_sid: str, bi_id: str) -> str
     try:
         bi_id_decoded = api_hashids.decode(bi_id)[0]
         bi = BotIntegration.objects.get(id=bi_id_decoded)
-    except BotIntegration.DoesNotExist as e:
+    except (IndexError, BotIntegration.DoesNotExist) as e:
         logger.debug(
             f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
         )
