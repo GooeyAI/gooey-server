@@ -130,31 +130,59 @@ class RealtimeSession:
             transcript = content[0].get("transcript") or ""
             if transcript:
                 self.append_transcription_entry("assistant", transcript)
-            if self.bi_id:
-                handle_transfer_call_button(
-                    content, self.openai_ws, self.call_sid, self.bi_id
-                )
 
         # Handle function calls
         if self.tools and item.get("type") == "function_call":
-            result = yield_from(
-                exec_tool_call(
-                    {"function": item},
-                    {tool.name: tool for tool in self.tools},
+            # Check if this is a phone transfer request
+            if item["name"] == "get_phone_number" and self.bi_id:
+                result = self._handle_phone_transfer(
+                    item, call_sid=self.call_sid, bi_id=self.bi_id
                 )
+            else:
+                result = yield_from(
+                    exec_tool_call(
+                        {"function": item},
+                        {tool.name: tool for tool in self.tools},
+                    )
+                )
+
+            self._send_function_result(item["call_id"], result)
+
+    def _handle_phone_transfer(
+        self, item: dict, call_sid: str, bi_id: str
+    ) -> str | None:
+        try:
+            arguments = json.loads(item["arguments"])
+            phone_number = arguments.get("phone_number") or ""
+        except json.JSONDecodeError as e:
+            capture_exception(error=dict(error=repr(e)))
+            return None
+
+        try:
+            error_message = handle_transfer_call(
+                transfer_number=phone_number,
+                call_sid=call_sid,
+                bi_id=bi_id,
             )
-            send_json(
-                self.openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": item["call_id"],
-                        "output": json.dumps(result),
-                    },
+            return error_message
+        except CallTransferred:
+            raise
+
+    def _send_function_result(self, call_id: str, result: typing.Any):
+        if not result:
+            return
+        send_json(
+            self.openai_ws,
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": json.dumps(result),
                 },
-            )
-            send_json(self.openai_ws, {"type": "response.create"})
+            },
+        )
+        send_json(self.openai_ws, {"type": "response.create"})
 
     def pipe_twilio_audio_to_openai(self):
         try:
@@ -212,106 +240,56 @@ def yield_from(gen: typing.Generator[typing.Any, None, T]) -> T:
             return e.value
 
 
-def handle_transfer_call_button(
-    content: list[dict], openai_ws: ClientConnection, call_sid: str, bi_id: str
-):
+def handle_transfer_call(transfer_number: str, call_sid: str, bi_id: str) -> str | None:
     """
-    Handle a transfer call button if present in the response item.
-    Raises ConnectionClosed if a transfer was initiated.
-    """
+    Handle a transfer call for the get_phone_number function.
 
-    from daras_ai_v2.bots import parse_bot_html
+    Args:
+        transfer_number: Phone number to transfer to
+        call_sid: Twilio call SID
+        bi_id: Bot integration ID
+
+    Returns:
+        Error message string if transfer fails, None if successful
+
+    Raises:
+        CallTransferred: If transfer is successful
+    """
     from twilio.twiml.voice_response import VoiceResponse
     from routers.bots_api import api_hashids
     from bots.models.bot_integration import validate_phonenumber
 
-    text_content = None
-    for part in content:
-        if not isinstance(part, dict):
-            continue
+    # Validate the phone number before attempting transfer
+    try:
+        validate_phonenumber(transfer_number)
+    except ValidationError as e:
+        return f"Invalid phone number format: {str(e)} number should be in E.164 format"
 
-        if part.get("type") == "text":
-            text_content = part.get("text", "")
-            break
-        elif part.get("type") == "audio":
-            text_content = part.get("transcript", "")
-            break
-    if not text_content:
-        return
+    try:
+        bi_id_decoded = api_hashids.decode(bi_id)[0]
+        bi = BotIntegration.objects.get(id=bi_id_decoded)
+    except BotIntegration.DoesNotExist as e:
+        logger.debug(
+            f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
+        )
+        capture_exception(e)
+        return None
 
-    buttons, _, _ = parse_bot_html(text_content)
+    client = bi.get_twilio_client()
 
-    for button in buttons:
-        if "transfer_call" not in button.get("id", ""):
-            continue
-        transfer_number = button.get("title", "").strip()
-        if not transfer_number:
-            continue
+    # try to transfer the call
+    resp = VoiceResponse()
+    resp.dial(transfer_number)
 
-        # Validate the phone number before attempting transfer
-        try:
-            validate_phonenumber(transfer_number)
-        except ValidationError as e:
-            send_json(
-                openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Invalid phone number format: {str(e)}",
-                            }
-                        ],
-                    },
-                },
-            )
-            send_json(openai_ws, {"type": "response.create"})
-            return
-
-        try:
-            bi_id_decoded = api_hashids.decode(bi_id)[0]
-            bi = BotIntegration.objects.get(id=bi_id_decoded)
-        except BotIntegration.DoesNotExist as e:
-            logger.debug(
-                f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
-            )
-            capture_exception(e)
-            return
-
-        client = bi.get_twilio_client()
-
-        # try to transfer the call
-        resp = VoiceResponse()
-        resp.dial(transfer_number)
-        try:
-            client.calls(call_sid).update(twiml=str(resp))
-        except TwilioRestException as e:
-            logger.error(f"Failed to transfer call: {e}")
-            capture_exception(e)
-
-            send_json(
-                openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Failed to transfer call: {str(e)}",
-                            }
-                        ],
-                    },
-                },
-            )
-            send_json(openai_ws, {"type": "response.create"})
-        else:
-            logger.info(f"Successfully initiated transfer to {transfer_number}")
-            raise CallTransferred
+    try:
+        client.calls(call_sid).update(twiml=str(resp))
+    except TwilioRestException as e:
+        logger.error(f"Failed to transfer call: {e}")
+        capture_exception(e)
+        return f"Failed to transfer call: {str(e)}"
+    else:
+        logger.info(f"Successfully initiated transfer to {transfer_number}")
+        raise CallTransferred
 
 
 class CallTransferred(Exception):
