@@ -171,26 +171,31 @@ def init_ws_session(
     }
     if audio_session_extra:
         session_data |= audio_session_extra
-    if tools:
-        session_data["tools"] = [
-            tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
-        ] + [
-            {
-                "type": "function",
-                "name": "get_phone_number",
-                "description": "Get Phone Number for call transferring in E.164 format ",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "phone_number": {
-                            "type": "string",
-                        }
-                    },
-                    "required": ["phone_number"],
-                    "additionalProperties": False,
+
+    session_tools = [
+        {
+            "type": "function",
+            "name": "get_phone_number",
+            "description": "Get Phone Number for call transferring , The phone number number should be in E.164 format",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone_number": {
+                        "type": "string",
+                    }
                 },
-            }
+                "required": ["phone_number"],
+                "additionalProperties": False,
+            },
+        }
+    ]
+
+    if tools:
+        session_tools = session_tools + [
+            tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
         ]
+
+    session_data["tools"] = session_tools
 
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 
