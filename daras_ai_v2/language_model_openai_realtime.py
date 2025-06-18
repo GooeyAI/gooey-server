@@ -132,13 +132,15 @@ class RealtimeSession:
                 self.append_transcription_entry("assistant", transcript)
 
         # Handle function calls
-        if self.tools and item.get("type") == "function_call":
-            # Check if this is a phone transfer request
-            if item["name"] == "get_phone_number" and self.bi_id:
+        result = None
+        if item.get("type") == "function_call":
+            is_phone_transfer = item.get("name") == "get_phone_number"
+
+            if self.bi_id and is_phone_transfer:
                 result = self._handle_phone_transfer(
                     item, call_sid=self.call_sid, bi_id=self.bi_id
                 )
-            else:
+            elif self.tools and not is_phone_transfer:
                 result = yield_from(
                     exec_tool_call(
                         {"function": item},
@@ -263,7 +265,7 @@ def handle_transfer_call(transfer_number: str, call_sid: str, bi_id: str) -> str
     try:
         validate_phonenumber(transfer_number)
     except ValidationError as e:
-        return f"Invalid phone number format: {str(e)} number should be in E.164 format"
+        return f"Invalid phone number format: {str(e)} number should be in E.164 format ,try again"
 
     try:
         bi_id_decoded = api_hashids.decode(bi_id)[0]
