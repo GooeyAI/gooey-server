@@ -113,7 +113,7 @@ def render_description(page: BasePage):
     root_pr = page.get_root_pr()
     with gui.div(className="mb-3"):
         gui.write(root_pr.notes, line_clamp=4)
-    if root_pr.run_count > 1:
+    if root_pr.run_count >= 50:
         run_count = format_number_with_suffix(root_pr.run_count)
         gui.caption(
             f"{icons.run} {run_count} runs",
