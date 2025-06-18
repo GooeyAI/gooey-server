@@ -658,7 +658,7 @@ class LargeLanguageModels(Enum):
     claude_4_sonnet = LLMSpec(
         label="Claude 4 Sonnet (Anthropic)",
         model_id="claude-4-sonnet-20250514",
-        llm_api=LLMApis.anthropic,
+        llm_api=LLMApis.openai,
         context_window=200_000,
         max_output_tokens=64_000,
         price=15,
@@ -668,7 +668,7 @@ class LargeLanguageModels(Enum):
     claude_4_opus = LLMSpec(
         label="Claude 4 Opus (Anthropic)",
         model_id="claude-4-opus-20250514",
-        llm_api=LLMApis.anthropic,
+        llm_api=LLMApis.openai,
         context_window=200_000,
         max_output_tokens=64_000,
         price=15,
@@ -1758,6 +1758,12 @@ def get_openai_client(model: str):
             api_key=settings.SARVAM_API_KEY,
             max_retries=0,
             base_url="https://api.sarvam.ai/v1",
+        )
+    elif model.startswith("claude-4-"):
+        client = openai.OpenAI(
+            api_key=settings.ANTHROPIC_API_KEY,
+            max_retries=0,
+            base_url="https://api.anthropic.com/v1",
         )
     elif model.startswith("google/"):
         client = openai.OpenAI(
