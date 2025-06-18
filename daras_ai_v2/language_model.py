@@ -1542,7 +1542,7 @@ def run_openai_chat(
         ],
     )
     if stream:
-        return _stream_openai_chunked(completion, used_model, messages)
+        return _stream_openai_chunked(completion.__stream__(), used_model, messages)
     if not completion or not completion.choices:
         return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
     else:
