@@ -205,7 +205,7 @@ def render_footer_breadcrumbs(
                 unsafe_allow_html=True,
             )
 
-        if published_run.run_count > 1:
+        if published_run.run_count >= 50:
             run_count = format_number_with_suffix(published_run.run_count)
             gui.write(
                 f"{icons.run} {run_count} runs",
