@@ -589,6 +589,8 @@ def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict
             variables["bot_twilio_phone_number"] = (
                 bi.twilio_phone_number and bi.twilio_phone_number.as_international
             )
+            variables["platform_medium"] = convo.platform_medium
+
     variables_schema = {var: {"role": "system"} for var in variables}
     return variables, variables_schema
 

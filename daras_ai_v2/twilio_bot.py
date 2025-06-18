@@ -9,7 +9,7 @@ from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
 from twilio.twiml.voice_response import VoiceResponse
 
-from bots.models import BotIntegration, Platform, Conversation
+from bots.models import BotIntegration, Conversation, Platform, PlatformMedium
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
@@ -29,6 +29,7 @@ class TwilioSMS(BotInterface):
             bot_integration=bi,
             twilio_phone_number=data["From"][0],
             twilio_call_sid="",
+            platform_medium=PlatformMedium.SMS,
         )[0]
 
         self.bot_id = bi.twilio_phone_number.as_e164
@@ -175,6 +176,7 @@ class TwilioVoice(BotInterface):
         audio_url: str = None,
     ):
         self.convo = convo
+        self.convo.platform_medium = PlatformMedium.VOICE
 
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
         self.user_id = convo.twilio_phone_number.as_e164
