@@ -175,7 +175,7 @@ def render_footer_breadcrumbs(
     with (
         gui.styled(FOOTER_CSS),
         gui.div(
-            className="flex-grow-1 d-flex align-items-baseline flex-wrap flex-lg-nowrap"
+            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap"
         ),
     ):
         def add_sep():
