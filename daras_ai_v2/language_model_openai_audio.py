@@ -175,13 +175,14 @@ def init_ws_session(
     session_tools = [
         {
             "type": "function",
-            "name": "get_phone_number",
-            "description": "Get Phone Number for call transferring , The phone number number should be in E.164 format",
+            "name": "transfer_call",
+            "description": "Transfer the active phone call to another phone number. This will immediately end the current conversation and connect the caller to the specified number. Use this when the caller requests to speak with someone else, needs to be transferred to a different department, or when you cannot help them and they need human assistance.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "phone_number": {
                         "type": "string",
+                        "description": "The destination phone number to transfer the call to. Must be in E.164 international format.",
                     }
                 },
                 "required": ["phone_number"],
