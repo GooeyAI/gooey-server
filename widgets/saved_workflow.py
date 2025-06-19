@@ -29,6 +29,7 @@ def render_saved_workflow_preview(
     hide_visibility_pill: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
+    hide_updated_at: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -82,6 +83,7 @@ def render_saved_workflow_preview(
                 hide_version_notes=hide_version_notes,
                 hide_visibility_pill=hide_visibility_pill,
                 hide_last_editor=hide_last_editor,
+                hide_updated_at=hide_updated_at,
             )
 
         if output_url:
@@ -166,6 +168,7 @@ def render_footer_breadcrumbs(
     hide_visibility_pill: bool,
     hide_version_notes: bool,
     hide_last_editor: bool,
+    hide_updated_at: bool,
 ):
     latest_version = published_run.versions.latest()
 
@@ -202,7 +205,7 @@ def render_footer_breadcrumbs(
                 gui.div(className="newline-sm")
 
         updated_at = published_run.saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
+        if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
             gui.write(
                 f"{icons.time} {get_relative_time(updated_at)}",
                 unsafe_allow_html=True,

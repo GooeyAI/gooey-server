@@ -187,6 +187,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
 def _render_run(pr: PublishedRun):
     workflow = Workflow(pr.workflow)
     hide_last_editor = bool(pr.workspace_id and not getattr(pr, "is_member", False))
+    hide_updated_at = hide_last_editor  # same condition
     render_saved_workflow_preview(
         workflow.page_cls,
         pr,
@@ -194,6 +195,7 @@ def _render_run(pr: PublishedRun):
         hide_visibility_pill=True,
         show_workspace_author=True,
         hide_last_editor=hide_last_editor,
+        hide_updated_at=hide_updated_at,
     )
 
 
