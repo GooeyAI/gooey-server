@@ -28,6 +28,7 @@ def render_saved_workflow_preview(
     workflow_pill: str | None = None,
     hide_visibility_pill: bool = False,
     hide_version_notes: bool = False,
+    hide_last_editor: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -80,6 +81,7 @@ def render_saved_workflow_preview(
                 show_workspace_author=show_workspace_author,
                 hide_version_notes=hide_version_notes,
                 hide_visibility_pill=hide_visibility_pill,
+                hide_last_editor=hide_last_editor,
             )
 
         if output_url:
@@ -127,7 +129,7 @@ FOOTER_CSS = """
     white-space: nowrap;
 }
 & .author-name {
-    max-width: 100px; 
+    max-width: 150px; 
     overflow: hidden; 
     text-overflow: ellipsis; 
 }
@@ -163,6 +165,7 @@ def render_footer_breadcrumbs(
     show_workspace_author: bool,
     hide_visibility_pill: bool,
     hide_version_notes: bool,
+    hide_last_editor: bool,
 ):
     latest_version = published_run.versions.latest()
 
@@ -190,7 +193,7 @@ def render_footer_breadcrumbs(
                     published_run.workspace, image_size="24px", responsive=False
                 )
 
-        if published_run.last_edited_by:
+        if not hide_last_editor and published_run.last_edited_by:
             with gui.div(className="d-flex align-items-center text-truncate"):
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False
