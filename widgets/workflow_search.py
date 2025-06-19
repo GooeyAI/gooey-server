@@ -181,22 +181,28 @@ def _render_selectbox(
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     qs = get_filtered_published_runs(user, search_filters)
     qs = qs.select_related("workspace", "created_by", "saved_run")
+
+    def _render_run(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+
+        # decide if workspace pill should be shown
+        show_workspace_author = not bool(search_filters and search_filters.workspace)
+
+        is_member = bool(getattr(pr, "is_member", False))
+        hide_last_editor = bool(pr.workspace_id and not is_member)
+        hide_updated_at = hide_last_editor
+
+        render_saved_workflow_preview(
+            workflow.page_cls,
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            hide_visibility_pill=True,
+            show_workspace_author=show_workspace_author,
+            hide_last_editor=hide_last_editor,
+            hide_updated_at=hide_updated_at,
+        )
+
     grid_layout(1, qs, _render_run)
-
-
-def _render_run(pr: PublishedRun):
-    workflow = Workflow(pr.workflow)
-    hide_last_editor = bool(pr.workspace_id and not getattr(pr, "is_member", False))
-    hide_updated_at = hide_last_editor  # same condition
-    render_saved_workflow_preview(
-        workflow.page_cls,
-        pr,
-        workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-        hide_visibility_pill=True,
-        show_workspace_author=True,
-        hide_last_editor=hide_last_editor,
-        hide_updated_at=hide_updated_at,
-    )
 
 
 def get_filtered_published_runs(

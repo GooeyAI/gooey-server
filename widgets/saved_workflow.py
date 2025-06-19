@@ -178,47 +178,59 @@ def render_footer_breadcrumbs(
             className="flex-grow-1 d-flex align-items-end flex-wrap flex-lg-nowrap"
         ),
     ):
-        if not hide_version_notes and latest_version and latest_version.change_notes:
-            gui.caption(
-                f"{icons.notes} {html.escape(latest_version.change_notes)}",
-                unsafe_allow_html=True,
-                line_clamp=1,
-                lineClampExpand=False,
-            )
+        def add_sep():
             gui.div(className="newline-sm")
 
-        if published_run.workspace.is_personal:
-            show_workspace_author = False
-        if show_workspace_author:
-            # don't repeat author for personal workspaces
+        first = True
+
+        if show_workspace_author and not published_run.workspace.is_personal:
+            if not first:
+                add_sep()
+            first = False
             with gui.div(className="d-flex align-items-center"):
                 render_author_from_workspace(
                     published_run.workspace, image_size="24px", responsive=False
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
+            if not first:
+                add_sep()
+            first = False
             with gui.div(className="d-flex align-items-center text-truncate"):
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False
                 )
-            if show_workspace_author:
-                gui.div(className="newline-sm")
+
+        if not hide_version_notes and latest_version and latest_version.change_notes:
+            if not first:
+                add_sep()
+            first = False
+            gui.caption(
+                f"{icons.notes} {html.escape(latest_version.change_notes)}",
+                unsafe_allow_html=True,
+                line_clamp=1,
+                lineClampExpand=False,
+            )
 
         updated_at = published_run.saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
+            if not first:
+                add_sep()
+            first = False
             gui.write(
                 f"{icons.time} {get_relative_time(updated_at)}",
                 unsafe_allow_html=True,
             )
 
         if published_run.run_count >= 50:
+            if not first:
+                add_sep()
             run_count = format_number_with_suffix(published_run.run_count)
             gui.write(
                 f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
                 className="text-dark text-nowrap",
             )
-            gui.div(className="newline-sm")
 
         if not hide_visibility_pill:
             gui.caption(
