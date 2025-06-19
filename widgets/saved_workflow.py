@@ -179,52 +179,49 @@ def render_footer_breadcrumbs(
         ),
     ):
         def add_sep():
-            gui.div(className="newline-sm")
+            nonlocal printed
+            if printed:
+                gui.div(className="newline-sm")
 
-        first = True
+        printed = False
 
         if show_workspace_author and not published_run.workspace.is_personal:
-            if not first:
-                add_sep()
-            first = False
+            add_sep()
             with gui.div(className="d-flex align-items-center"):
                 render_author_from_workspace(
                     published_run.workspace, image_size="24px", responsive=False
                 )
+            printed = True
 
         if not hide_last_editor and published_run.last_edited_by:
-            if not first:
-                add_sep()
-            first = False
+            add_sep()
             with gui.div(className="d-flex align-items-center text-truncate"):
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False
                 )
+            printed = True
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
-            if not first:
-                add_sep()
-            first = False
+            add_sep()
             gui.caption(
                 f"{icons.notes} {html.escape(latest_version.change_notes)}",
                 unsafe_allow_html=True,
                 line_clamp=1,
                 lineClampExpand=False,
             )
+            printed = True
 
         updated_at = published_run.saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
-            if not first:
-                add_sep()
-            first = False
+            add_sep()
             gui.write(
                 f"{icons.time} {get_relative_time(updated_at)}",
                 unsafe_allow_html=True,
             )
+            printed = True
 
         if published_run.run_count >= 50:
-            if not first:
-                add_sep()
+            add_sep()
             run_count = format_number_with_suffix(published_run.run_count)
             gui.write(
                 f"{icons.run} {run_count} runs",
