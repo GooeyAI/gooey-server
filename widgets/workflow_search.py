@@ -186,12 +186,14 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
 
 def _render_run(pr: PublishedRun):
     workflow = Workflow(pr.workflow)
+    hide_last_editor = bool(pr.workspace_id and not getattr(pr, "is_member", False))
     render_saved_workflow_preview(
         workflow.page_cls,
         pr,
         workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
         hide_visibility_pill=True,
         show_workspace_author=True,
+        hide_last_editor=hide_last_editor,
     )
 
 
