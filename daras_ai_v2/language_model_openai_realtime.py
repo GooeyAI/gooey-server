@@ -134,7 +134,7 @@ class RealtimeSession:
         # Handle function calls
         result = None
         if item.get("type") == "function_call":
-            is_phone_transfer = item.get("name") == "get_phone_number"
+            is_phone_transfer = item.get("name") == "transfer_call"
 
             if self.bi_id and is_phone_transfer:
                 result = self._handle_phone_transfer(
@@ -244,7 +244,7 @@ def yield_from(gen: typing.Generator[typing.Any, None, T]) -> T:
 
 def handle_transfer_call(transfer_number: str, call_sid: str, bi_id: str) -> str | None:
     """
-    Handle a transfer call for the get_phone_number function.
+    Handle a transfer call for the transfer_call function.
 
     Args:
         transfer_number: Phone number to transfer to
@@ -275,7 +275,7 @@ def handle_transfer_call(transfer_number: str, call_sid: str, bi_id: str) -> str
             f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
         )
         capture_exception(e)
-        return None
+        return "Unable to transfer this call right now. Please try again later."
 
     client = bi.get_twilio_client()
 
