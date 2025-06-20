@@ -53,7 +53,7 @@ def render_saved_workflow_preview(
                 """
             ),
             gui.div(
-                className="order-last order-md-first d-flex flex-column gap-md-2"
+                className="order-last order-md-first d-flex flex-column"
                 + (" col-md-10" if output_url else "")
             ),
         ):
@@ -178,40 +178,60 @@ def render_footer_breadcrumbs(
             className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap"
         ),
     ):
+        components_rendered = 0
+        
+        def maybe_add_separator():
+            nonlocal components_rendered
+            if components_rendered > 0:
+                gui.div(className="newline-sm")
+        
         if show_workspace_author and not published_run.workspace.is_personal:
+            maybe_add_separator()
             with gui.div(className="d-flex align-items-center"):
                 render_author_from_workspace(
                     published_run.workspace, image_size="24px", responsive=False
                 )
+            components_rendered += 1
 
         if not hide_last_editor and published_run.last_edited_by:
+            maybe_add_separator()
             with gui.div(className="d-flex align-items-center text-truncate"):
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False
                 )
+            components_rendered += 1
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
-            gui.caption(
-                f"{icons.notes} {html.escape(latest_version.change_notes)}",
-                unsafe_allow_html=True,
-                line_clamp=1,
-                lineClampExpand=False,
-            )
+            change_notes = latest_version.change_notes.strip()
+            # Only render if there are actual change notes (not blank)
+            if change_notes:
+                maybe_add_separator()
+                gui.caption(
+                    f"{icons.notes} {html.escape(change_notes)}",
+                    unsafe_allow_html=True,
+                    line_clamp=1,
+                    lineClampExpand=True,
+                )
+                components_rendered += 1
 
         updated_at = published_run.saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
+            maybe_add_separator()
             gui.write(
                 f"{icons.time} {get_relative_time(updated_at)}",
                 unsafe_allow_html=True,
             )
+            components_rendered += 1
 
         if published_run.run_count >= 50:
+            maybe_add_separator()
             run_count = format_number_with_suffix(published_run.run_count)
             gui.write(
                 f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
                 className="text-dark text-nowrap",
             )
+            components_rendered += 1
 
         if not hide_visibility_pill:
             gui.caption(
