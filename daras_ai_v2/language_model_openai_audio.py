@@ -171,10 +171,33 @@ def init_ws_session(
     }
     if audio_session_extra:
         session_data |= audio_session_extra
+
+    session_tools = [
+        {
+            "type": "function",
+            "name": "transfer_call",
+            "description": "Transfer the active phone call to another phone number. This will immediately end the current conversation and connect the caller to the specified number. Use this when the caller requests to speak with someone else, needs to be transferred to a different department, or when you cannot help them and they need human assistance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone_number": {
+                        "type": "string",
+                        "description": "The destination phone number to transfer the call to. Must be in E.164 international format.",
+                    }
+                },
+                "required": ["phone_number"],
+                "additionalProperties": False,
+            },
+        }
+    ]
+
     if tools:
-        session_data["tools"] = [
+        session_tools = session_tools + [
             tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
         ]
+
+    session_data["tools"] = session_tools
+
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 
     if audio_data:
