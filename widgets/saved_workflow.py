@@ -175,7 +175,7 @@ def render_footer_breadcrumbs(
     with (
         gui.styled(FOOTER_CSS),
         gui.div(
-            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap mt-1 mb-0"
+            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap"
         ),
     ):
         components_rendered = 0
@@ -210,7 +210,7 @@ def render_footer_breadcrumbs(
                     gui.caption(
                         f"{icons.notes} {html.escape(change_notes)}",
                         unsafe_allow_html=True,
-                        className="text-truncate",
+                        className="text-truncate text-muted",
                         style={"max-width": "200px"},
                     )
                 components_rendered += 1
