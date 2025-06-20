@@ -37,7 +37,7 @@ def render_saved_workflow_preview(
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
 
-    with gui.div(className="py-1 row"):
+    with gui.div(className="row"):
         with (
             gui.styled(
                 """
@@ -53,7 +53,7 @@ def render_saved_workflow_preview(
                 """
             ),
             gui.div(
-                className="order-last order-md-first d-flex flex-column"
+                className="order-last order-md-first d-flex flex-column pb-0"
                 + (" col-md-10" if output_url else "")
             ),
         ):
@@ -62,9 +62,9 @@ def render_saved_workflow_preview(
                     gui.write(f"#### {truncate_text_words(tb.h1_title, 80)}")
                 render_title_pills(published_run, workflow_pill)
 
-            with gui.div(className="row"):
+            with gui.div(className="row mb-0"):
                 with gui.div(
-                    className="saved-workflow-notes mb-2 mb-md-0"
+                    className="saved-workflow-notes mb-0"
                     + ("" if output_url else " col-10")
                 ):
                     if published_run.notes:
@@ -175,7 +175,7 @@ def render_footer_breadcrumbs(
     with (
         gui.styled(FOOTER_CSS),
         gui.div(
-            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap"
+            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap mt-1 mb-0"
         ),
     ):
         components_rendered = 0
@@ -206,31 +206,34 @@ def render_footer_breadcrumbs(
             # Only render if there are actual change notes (not blank)
             if change_notes:
                 maybe_add_separator()
-                gui.caption(
-                    f"{icons.notes} {html.escape(change_notes)}",
-                    unsafe_allow_html=True,
-                    line_clamp=1,
-                    lineClampExpand=True,
-                )
+                with gui.div(className="d-flex align-items-center"):
+                    gui.caption(
+                        f"{icons.notes} {html.escape(change_notes)}",
+                        unsafe_allow_html=True,
+                        className="text-truncate",
+                        style={"max-width": "200px"},
+                    )
                 components_rendered += 1
 
         updated_at = published_run.saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
             maybe_add_separator()
-            gui.write(
-                f"{icons.time} {get_relative_time(updated_at)}",
-                unsafe_allow_html=True,
-            )
+            with gui.div(className="d-flex align-items-center"):
+                gui.write(
+                    f"{icons.time} {get_relative_time(updated_at)}",
+                    unsafe_allow_html=True,
+                )
             components_rendered += 1
 
         if published_run.run_count >= 50:
             maybe_add_separator()
             run_count = format_number_with_suffix(published_run.run_count)
-            gui.write(
-                f"{icons.run} {run_count} runs",
-                unsafe_allow_html=True,
-                className="text-dark text-nowrap",
-            )
+            with gui.div(className="d-flex align-items-center"):
+                gui.write(
+                    f"{icons.run} {run_count} runs",
+                    unsafe_allow_html=True,
+                    className="text-dark text-nowrap",
+                )
             components_rendered += 1
 
         if not hide_visibility_pill:
