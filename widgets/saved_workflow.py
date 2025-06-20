@@ -129,6 +129,8 @@ FOOTER_CSS = """
 & {
     font-size: 0.9rem;
     white-space: nowrap;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
 }
 & .author-name {
     max-width: 150px; 
