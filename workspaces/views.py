@@ -286,10 +286,12 @@ def member_invite_button_with_dialog(
     close_on_confirm: bool = True,
     **props,
 ):
+    from routers.workspace import validate_and_invite_from_emails_csv
+
     if not membership.can_invite():
         return
 
-    ref = gui.use_confirm_dialog(key="invite-member", close_on_confirm=False)
+    ref = gui.use_confirm_dialog(key="invite-members", close_on_confirm=False)
 
     if gui.button(label=f"{icons.add_user} Invite", **props):
         clear_invite_creation_form()
@@ -299,28 +301,31 @@ def member_invite_button_with_dialog(
 
     with gui.confirm_dialog(
         ref=ref,
-        modal_title="#### Invite Member",
-        confirm_label=f"{icons.send} Send Invite",
+        modal_title="#### Invite Members",
+        confirm_label=f"{icons.send} Send",
     ):
-        role, email = render_invite_creation_form(membership.workspace)
+        role, emails_csv = render_invite_creation_form(membership.workspace)
         if not ref.pressed_confirm:
             return
 
-        try:
-            WorkspaceInvite.objects.create_and_send_invite(
-                workspace=membership.workspace,
-                email=email,
-                current_user=membership.user,
-                defaults=dict(role=role),
-            )
-        except ValidationError as e:
-            gui.write("\n".join(e.messages), className="text-danger")
+        error_msg_container = gui.div()
+        success = validate_and_invite_from_emails_csv(
+            emails_csv,
+            role=WorkspaceRole(role),
+            workspace=membership.workspace,
+            current_user=membership.user,
+            error_msg_container=error_msg_container,
+            max_emails=5,
+        )
+        if not success:
+            # don't close
+            return
+
+        if close_on_confirm:
+            ref.set_open(False)
+            gui.rerun()
         else:
-            if close_on_confirm:
-                ref.set_open(False)
-                gui.rerun()
-            else:
-                gui.success("Invite sent successfully!")
+            gui.success("Invites sent!")
 
 
 def edit_workspace_button_with_dialog(membership: WorkspaceMembership):
@@ -380,17 +385,11 @@ def clear_invite_creation_form():
 
 
 def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
+    from routers.workspace import render_emails_csv_input
+
     gui.write(f"Invite to **{workspace.display_name()}**.")
 
-    email = (
-        gui.text_input(
-            "###### Email",
-            style=dict(minWidth="300px", textTransform="lowercase"),
-            key="invite-form-email",
-        )
-        .strip()
-        .lower()
-    )
+    emails_csv = render_emails_csv_input(key="invite-form-emails", max_emails=5)
 
     role = gui.selectbox(
         "###### Role",
@@ -405,7 +404,7 @@ def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
             f"Users with `@{workspace.domain_name}` email will be added automatically."
         )
 
-    return role, email
+    return role, emails_csv
 
 
 def render_danger_zone_by_membership(

@@ -18,8 +18,7 @@ from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from handles.models import Handle, COMMON_EMAIL_DOMAINS
 from routers.custom_api_router import CustomAPIRouter
-from workspaces.models import Workspace
-from workspaces.models import WorkspaceInvite
+from workspaces.models import Workspace, WorkspaceInvite, WorkspaceRole
 from workspaces.widgets import (
     get_current_workspace,
     set_current_workspace,
@@ -186,15 +185,7 @@ def render_invite_team_form(
         "This workspace is private and only members can access its workflows and shared billing."
     )
     max_emails = 5
-    emails_csv = gui.text_area(
-        label=(
-            "###### Emails\n"
-            f"Add email addresses for members, separated by commas (up to {max_emails})."
-        ),
-        placeholder="foo@gooey.ai, bar@gooey.ai, baz@gooey.ai, ...",
-        height=5,
-        key="workspace:create:emails",
-    )
+    emails_csv = render_emails_csv_input(max_emails=5, key="workspace:create:emails")
 
     options = get_workspace_domain_name_options(workspace, user)
     if options:
@@ -220,24 +211,13 @@ def render_invite_team_form(
         if not (submit_btn or close_btn):
             return
 
-    if emails_csv:
-        try:
-            emails = validate_emails_csv(emails_csv, max_emails=max_emails)
-        except ValidationError as e:
-            with error_msg_container:
-                gui.error("\n".join(e.messages))
-            return
-
-        for email in emails:
-            try:
-                WorkspaceInvite.objects.create_and_send_invite(
-                    workspace=workspace,
-                    email=email,
-                    current_user=user,
-                )
-            except (ValidationError, IntegrityError) as e:
-                # log and continue
-                sentry_sdk.capture_exception(e)
+    validate_and_invite_from_emails_csv(
+        emails_csv,
+        workspace=workspace,
+        current_user=user,
+        error_msg_container=error_msg_container,
+        max_emails=max_emails,
+    )
 
     try:
         workspace.full_clean()
@@ -247,6 +227,50 @@ def render_invite_team_form(
             gui.error("\n".join(e.messages))
     else:
         gui.js(popup_close_or_navgiate_js(next_url))
+
+
+def render_emails_csv_input(max_emails: int, key: str) -> str:
+    return gui.text_area(
+        label=(
+            "###### Emails\n"
+            f"Add email addresses for members, separated by commas (up to {max_emails})."
+        ),
+        placeholder="foo@gooey.ai, bar@gooey.ai, baz@gooey.ai, ...",
+        height=5,
+        key=key,
+    )
+
+
+def validate_and_invite_from_emails_csv(
+    emails_csv: str,
+    workspace: Workspace,
+    current_user: AppUser,
+    error_msg_container: gui.NestingCtx,
+    role: WorkspaceRole = WorkspaceRole.MEMBER,
+    max_emails: int = 5,
+):
+    if not emails_csv:
+        return
+
+    try:
+        emails = validate_emails_csv(emails_csv, max_emails=max_emails)
+    except ValidationError as e:
+        with error_msg_container:
+            gui.error("\n".join(e.messages))
+        return
+
+    for email in emails:
+        try:
+            WorkspaceInvite.objects.create_and_send_invite(
+                workspace=workspace,
+                email=email,
+                current_user=current_user,
+                defaults=dict(role=role),
+            )
+        except (ValidationError, IntegrityError) as e:
+            # log and continue
+            sentry_sdk.capture_exception(e)
+    return True
 
 
 def popup_close_or_navgiate_js(next_url: str) -> str:
