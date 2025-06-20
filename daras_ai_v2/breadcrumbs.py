@@ -1,10 +1,7 @@
 import typing
 
 import gooey_gui as gui
-from bots.models import (
-    SavedRun,
-    PublishedRun,
-)
+from bots.models import SavedRun, PublishedRun
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
@@ -57,7 +54,7 @@ def get_title_breadcrumbs(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     sr: SavedRun,
     pr: PublishedRun | None,
-    tab: "RecipeTabs" = None,
+    tab: typing.Optional["RecipeTabs"] = None,
 ) -> TitleBreadCrumbs:
     from routers.root import RecipeTabs
 

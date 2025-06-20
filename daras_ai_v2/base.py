@@ -422,6 +422,9 @@ class BasePage:
                             user=self.current_sr_user,
                             pr=self.current_pr,
                             sr=self.current_sr,
+                            current_workspace=(
+                                self.is_logged_in() and self.current_workspace or None
+                            ),
                         )
             else:
                 # render title in line with the social buttons
@@ -1252,7 +1255,6 @@ class BasePage:
         def _render(page_cls: typing.Type[BasePage]):
             page = page_cls()
             root_run = page.get_root_pr()
-            state = root_run.saved_run.to_dict()
             preview_image = page.get_explore_image()
 
             with gui.link(to=page.app_url(), className="text-decoration-none"):
