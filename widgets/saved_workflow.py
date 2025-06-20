@@ -53,7 +53,7 @@ def render_saved_workflow_preview(
                 """
             ),
             gui.div(
-                className="order-last order-md-first d-flex flex-column pb-0"
+                className="order-last order-md-first d-flex flex-column"
                 + (" col-md-10" if output_url else "")
             ),
         ):
@@ -62,9 +62,9 @@ def render_saved_workflow_preview(
                     gui.write(f"#### {truncate_text_words(tb.h1_title, 80)}")
                 render_title_pills(published_run, workflow_pill)
 
-            with gui.div(className="row mb-0"):
+            with gui.div(className="row"):
                 with gui.div(
-                    className="saved-workflow-notes mb-0"
+                    className="saved-workflow-notes mb-2 mb-md-0"
                     + ("" if output_url else " col-10")
                 ):
                     if published_run.notes:
@@ -129,8 +129,6 @@ FOOTER_CSS = """
 & {
     font-size: 0.9rem;
     white-space: nowrap;
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
 }
 & .author-name {
     max-width: 150px; 
