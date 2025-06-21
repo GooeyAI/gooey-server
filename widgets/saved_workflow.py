@@ -179,12 +179,12 @@ def render_footer_breadcrumbs(
         ),
     ):
         components_rendered = 0
-        
+
         def maybe_add_separator():
             nonlocal components_rendered
             if components_rendered > 0:
                 gui.div(className="newline-sm")
-        
+
         if show_workspace_author and not published_run.workspace.is_personal:
             maybe_add_separator()
             with gui.div(className="d-flex align-items-center"):
@@ -216,7 +216,11 @@ def render_footer_breadcrumbs(
                 components_rendered += 1
 
         updated_at = published_run.saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
+        if (
+            updated_at
+            and isinstance(updated_at, datetime.datetime)
+            and not hide_updated_at
+        ):
             maybe_add_separator()
             with gui.div(className="d-flex align-items-center"):
                 gui.write(
