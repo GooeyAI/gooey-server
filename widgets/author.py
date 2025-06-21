@@ -42,7 +42,11 @@ def render_author_as_breadcrumb(
                 full_name = "Deleted User"
                 link = None
 
-            linkto = link and gui.link(to=link, className="text-decoration-none") or gui.dummy()
+            linkto = (
+                link
+                and gui.link(to=link, className="text-decoration-none")
+                or gui.dummy()
+            )
             with linkto:
                 gui.caption(full_name)
 
