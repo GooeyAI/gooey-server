@@ -129,6 +129,9 @@ FOOTER_CSS = """
 & {
     font-size: 0.9rem;
     white-space: nowrap;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
 }
 & .author-name {
     max-width: 150px; 
@@ -175,7 +178,8 @@ def render_footer_breadcrumbs(
     with (
         gui.styled(FOOTER_CSS),
         gui.div(
-            className="flex-grow-1 d-flex align-items-center flex-wrap flex-lg-nowrap"
+            className="d-flex align-items-center flex-wrap flex-lg-nowrap",
+            style={"min-height": "24px"}
         ),
     ):
         components_rendered = 0
