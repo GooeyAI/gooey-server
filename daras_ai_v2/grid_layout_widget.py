@@ -8,7 +8,7 @@ SEPARATOR_STYLE = """
         content: "";
         width: 100%;
         display: block;
-        margin: 1rem 0;
+        margin: 1.5rem 0;
         border-bottom: 1px solid #dee2e6;
     }
 }
@@ -16,7 +16,7 @@ SEPARATOR_STYLE = """
 &:not(:last-of-type)::after {
     content: "";
     width: 100%;
-    margin: 1rem 0.75rem;
+    margin: 1.5rem 0.75rem;
     border-bottom: 1px solid #dee2e6;
 }
 """

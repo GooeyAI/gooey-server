@@ -37,25 +37,30 @@ def render_saved_workflow_preview(
         page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
     )
 
-    with gui.div(className="row"):
-        with (
-            gui.styled(
-                """
-                & h4, & h1, & p {
-                    margin: 0 !important;
+    with (
+        gui.styled(
+            """
+            & {
+                min-height: 120px;
+                display: flex;
+                flex-direction: column;
+            }
+            & h4, & h1, & p {
+                margin: 0 !important;
+            }
+            @media (max-width: 768px) {
+                & .saved-workflow-notes span {
+                    font-size: 0.9rem;
+                    -webkit-line-clamp: 3 !important;
                 }
-                @media (max-width: 768px) {
-                    & .saved-workflow-notes span {
-                        font-size: 0.9rem;
-                        -webkit-line-clamp: 3 !important;
-                    }
-                }
-                """
-            ),
-            gui.div(
-                className="order-last order-md-first d-flex flex-column"
-                + (" col-md-10" if output_url else "")
-            ),
+            }
+            """
+        ),
+        gui.div(className="row"),
+    ):
+        with gui.div(
+            className="order-last order-md-first d-flex flex-column"
+            + (" col-md-10" if output_url else "")
         ):
             with gui.div(className="d-flex align-items-center"):
                 with gui.link(to=published_run.get_app_url()):
@@ -77,14 +82,15 @@ def render_saved_workflow_preview(
                         metadata = workflow.get_or_create_metadata()
                         gui.write(f"# {metadata.emoji}")
 
-            render_footer_breadcrumbs(
-                published_run=published_run,
-                show_workspace_author=show_workspace_author,
-                hide_version_notes=hide_version_notes,
-                hide_visibility_pill=hide_visibility_pill,
-                hide_last_editor=hide_last_editor,
-                hide_updated_at=hide_updated_at,
-            )
+            with gui.div(className="mt-auto"):
+                render_footer_breadcrumbs(
+                    published_run=published_run,
+                    show_workspace_author=show_workspace_author,
+                    hide_version_notes=hide_version_notes,
+                    hide_visibility_pill=hide_visibility_pill,
+                    hide_last_editor=hide_last_editor,
+                    hide_updated_at=hide_updated_at,
+                )
 
         if output_url:
             render_workflow_media(output_url, published_run)
@@ -179,7 +185,7 @@ def render_footer_breadcrumbs(
         gui.styled(FOOTER_CSS),
         gui.div(
             className="d-flex align-items-center flex-wrap flex-lg-nowrap",
-            style={"min-height": "24px"}
+            style={"min-height": "24px"},
         ),
     ):
         components_rendered = 0
