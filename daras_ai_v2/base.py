@@ -57,7 +57,7 @@ from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
 from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
-    LLMTool,
+    BaseLLMTool,
     call_recipe_functions,
     functions_input,
     get_tools_from_state,
@@ -1368,7 +1368,7 @@ class BasePage:
         sr.save(update_fields=["is_flagged"])
         gui.session_state["is_flagged"] = is_flagged
 
-    def get_current_llm_tools(self) -> dict[str, LLMTool]:
+    def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
         return {
             tool.name: tool.bind(
                 saved_run=self.current_sr,

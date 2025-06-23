@@ -15,7 +15,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_bytes_to_wav
 from daras_ai_v2.exceptions import raise_for_status, ffmpeg
 from daras_ai_v2.language_model_openai_realtime import RealtimeSession
-from functions.recipe_functions import LLMTool
+from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json, send_recv_json
 
 if typing.TYPE_CHECKING:
@@ -31,7 +31,7 @@ def run_openai_audio(
     audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
@@ -55,6 +55,9 @@ def run_openai_audio(
         wav_bytes = audio_bytes_to_wav(response.content)[0] or response.content
         audio_data = base64.b64encode(wav_bytes).decode()
 
+    # Prepare tools with any required additions for the session type
+    prepared_tools = prepare_tools_for_session(tools, audio_url)
+
     has_tool_calls = False
     try:
         init_ws_session(
@@ -64,11 +67,11 @@ def run_openai_audio(
             audio_session_extra=audio_session_extra,
             messages=messages,
             temperature=temperature,
-            tools=tools,
+            tools=prepared_tools,
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, tools, audio_url
+                twilio_ws, openai_ws, prepared_tools, audio_url
             ).stream():
                 yield [entry]
         else:
@@ -118,6 +121,25 @@ def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
     return ws, created
 
 
+def prepare_tools_for_session(
+    tools: list[BaseLLMTool] | None, audio_url: str | None
+) -> list[BaseLLMTool] | None:
+    from functions.recipe_functions import CallTransferTool, TRANSFER_CALL_FN_NAME
+
+    if not (audio_url and audio_url.startswith("ws")):
+        return tools
+
+    call_transfer_tool = CallTransferTool()
+    if tools is None:
+        return [call_transfer_tool]
+
+    # Add call transfer tool if not already present
+    if not any(tool.name == TRANSFER_CALL_FN_NAME for tool in tools):
+        return list(tools) + [call_transfer_tool]
+
+    return tools
+
+
 def init_ws_session(
     ws: ClientConnection,
     created: bool,
@@ -125,7 +147,7 @@ def init_ws_session(
     audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
 ):
     from daras_ai_v2.language_model import get_entry_text, msgs_to_prompt_str
 
@@ -172,31 +194,10 @@ def init_ws_session(
     if audio_session_extra:
         session_data |= audio_session_extra
 
-    session_tools = [
-        {
-            "type": "function",
-            "name": "transfer_call",
-            "description": "Transfer the active phone call to another phone number. This will immediately end the current conversation and connect the caller to the specified number. Use this when the caller requests to speak with someone else, needs to be transferred to a different department, or when you cannot help them and they need human assistance.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "phone_number": {
-                        "type": "string",
-                        "description": "The destination phone number to transfer the call to. Must be in E.164 international format.",
-                    }
-                },
-                "required": ["phone_number"],
-                "additionalProperties": False,
-            },
-        }
-    ]
-
     if tools:
-        session_tools = session_tools + [
+        session_data["tools"] = [
             tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
         ]
-
-    session_data["tools"] = session_tools
 
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 

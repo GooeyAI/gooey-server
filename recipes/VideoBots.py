@@ -106,7 +106,7 @@ from daras_ai_v2.vector_search import (
 )
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
-    LLMTool,
+    BaseLLMTool,
     get_tools_from_state,
     render_called_functions,
 )
@@ -1882,7 +1882,7 @@ def convo_window_clipper(
     return 0
 
 
-def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
+def exec_tool_call(call: dict, tools: dict[str, "BaseLLMTool"]):
     tool_name = call["function"]["name"]
     tool_args = call["function"]["arguments"]
     tool = tools[tool_name]

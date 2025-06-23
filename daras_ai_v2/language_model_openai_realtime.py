@@ -14,7 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection
 
 from bots.models import BotIntegration
-from functions.recipe_functions import LLMTool
+from functions.recipe_functions import BaseLLMTool, TRANSFER_CALL_FN_NAME
 from .language_model_openai_ws_tools import send_json, recv_json
 
 
@@ -24,7 +24,7 @@ class RealtimeSession:
         self,
         twilio_ws: ClientConnection,
         openai_ws: ClientConnection,
-        tools: list[LLMTool] | None = None,
+        tools: list[BaseLLMTool] | None = None,
         audio_url: str | None = None,
     ):
         self.twilio_ws = twilio_ws
@@ -49,6 +49,13 @@ class RealtimeSession:
             self.stream_sid = msg.get("streamSid")
             start_data = msg.get("start") or {}
             self.call_sid = start_data.get("callSid")
+
+        # Bind context to existing CallTransferTool
+        if self.bi_id and self.call_sid and self.tools:
+            for tool in self.tools:
+                if tool.name == TRANSFER_CALL_FN_NAME:
+                    tool.bind(call_sid=self.call_sid, bi_id=self.bi_id)
+                    break
 
         threading.Thread(target=self.pipe_twilio_audio_to_openai).start()
 
@@ -134,57 +141,26 @@ class RealtimeSession:
         # Handle function calls
         result = None
         if item.get("type") == "function_call":
-            is_phone_transfer = item.get("name") == "transfer_call"
-
-            if self.bi_id and is_phone_transfer:
-                result = self._handle_phone_transfer(
-                    item, call_sid=self.call_sid, bi_id=self.bi_id
-                )
-            elif self.tools and not is_phone_transfer:
+            if self.tools:
                 result = yield_from(
                     exec_tool_call(
                         {"function": item},
                         {tool.name: tool for tool in self.tools},
                     )
                 )
-
-            self._send_function_result(item["call_id"], result)
-
-    def _handle_phone_transfer(
-        self, item: dict, call_sid: str, bi_id: str
-    ) -> str | None:
-        try:
-            arguments = json.loads(item["arguments"])
-            phone_number = arguments.get("phone_number") or ""
-        except json.JSONDecodeError as e:
-            capture_exception(e)
-            return None
-
-        try:
-            error_message = handle_transfer_call(
-                transfer_number=phone_number,
-                call_sid=call_sid,
-                bi_id=bi_id,
-            )
-            return error_message
-        except CallTransferred:
-            raise
-
-    def _send_function_result(self, call_id: str, result: typing.Any):
-        if not result:
-            return
-        send_json(
-            self.openai_ws,
-            {
-                "type": "conversation.item.create",
-                "item": {
-                    "type": "function_call_output",
-                    "call_id": call_id,
-                    "output": json.dumps(result),
-                },
-            },
-        )
-        send_json(self.openai_ws, {"type": "response.create"})
+            if result:
+                send_json(
+                    self.openai_ws,
+                    {
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "function_call_output",
+                            "call_id": item["call_id"],
+                            "output": json.dumps(result),
+                        },
+                    },
+                )
+                send_json(self.openai_ws, {"type": "response.create"})
 
     def pipe_twilio_audio_to_openai(self):
         try:

@@ -1,4 +1,5 @@
 import typing
+from abc import ABC, abstractmethod
 
 import gooey_gui as gui
 from django.utils.text import slugify
@@ -20,8 +21,108 @@ allowing it execute logic, use common JS libraries or make external API calls \
 before or after the workflow runs.
 <a href='/functions-help' target='_blank'>Learn more.</a>"""
 
+TRANSFER_CALL_FN_NAME = "transfer_call"
+TRANSFER_CALL_FN_PARAM_NAME = "phone_number"
 
-class LLMTool:
+
+class BaseLLMTool(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def label(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def spec(self) -> dict:
+        pass
+
+    @abstractmethod
+    def bind(self, **kwargs) -> "BaseLLMTool":
+        pass
+
+    @abstractmethod
+    def __call__(self, **kwargs) -> typing.Any:
+        pass
+
+
+class CallTransferTool(BaseLLMTool):
+    """Internal tool for transferring phone calls."""
+
+    def __init__(self):
+        self._name = TRANSFER_CALL_FN_NAME
+        self._label = "Transfer Call"
+        self._description = "Transfer the call to another phone number"
+        self._spec = {
+            "type": "function",
+            "function": {
+                "name": TRANSFER_CALL_FN_NAME,
+                "description": "Transfer the active phone call to another phone number. This will immediately end the current conversation and connect the caller to the specified number. Use this when the caller requests to speak with someone else, needs to be transferred to a different department, or when you cannot help them and they need human assistance.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        TRANSFER_CALL_FN_PARAM_NAME: {
+                            "type": "string",
+                            "description": "The destination phone number to transfer the call to. Must be in E.164 international format.",
+                        }
+                    },
+                    "required": [TRANSFER_CALL_FN_PARAM_NAME],
+                },
+            },
+        }
+
+    def bind(self, call_sid: str, bi_id: str):
+        self.call_sid = call_sid
+        self.bi_id = bi_id
+        return self
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def label(self) -> str:
+        return self._label
+
+    @property
+    def spec(self) -> dict:
+        return self._spec
+
+    def __call__(self, **kwargs) -> dict:
+        from daras_ai_v2.language_model_openai_realtime import handle_transfer_call
+
+        from loguru import logger
+
+        logger.info(f"CallTransferTool __call__: {kwargs}")
+        try:
+            self.call_sid
+            self.bi_id
+        except AttributeError:
+            raise RuntimeError("This CallTransferTool instance is not yet bound")
+
+        phone_number = kwargs.get(TRANSFER_CALL_FN_PARAM_NAME) or ""
+        # phone_number = phone_number.replace("+", "")
+        phone_number = f"{phone_number}"
+        error_message = handle_transfer_call(
+            transfer_number=phone_number,
+            call_sid=self.call_sid,
+            bi_id=self.bi_id,
+        )
+
+        if error_message:
+            return {"success": False, "error": error_message}
+        else:
+            # This should not be reached as handle_transfer_call raises CallTransferred on success
+            return {"success": True, "message": "Transfer initiated"}
+
+
+class LLMTool(BaseLLMTool):
+    """External function tool that calls workflow URLs."""
+
     def __init__(self, function_url: str):
         from daras_ai_v2.workflow_url_input import url_to_runs
         from bots.models import Workflow
@@ -31,8 +132,8 @@ class LLMTool:
         self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
         self._fn_runs = (self.fn_sr, self.fn_pr)
 
-        self.name = slugify(self.fn_pr.title).replace("-", "_")
-        self.label = self.fn_pr.title
+        self._name = slugify(self.fn_pr.title).replace("-", "_")
+        self._label = self.fn_pr.title
 
         self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
         if self.is_function_workflow:
@@ -44,10 +145,10 @@ class LLMTool:
                 "properties", {}
             )
 
-        self.spec = {
+        self._spec = {
             "type": "function",
             "function": {
-                "name": self.name,
+                "name": self._name,
                 "description": self.fn_pr.notes,
                 "parameters": {
                     "type": "object",
@@ -55,6 +156,18 @@ class LLMTool:
                 },
             },
         }
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def label(self) -> str:
+        return self._label
+
+    @property
+    def spec(self) -> dict:
+        return self._spec
 
     def bind(
         self,
@@ -203,7 +316,7 @@ def call_recipe_functions(
 
 def get_tools_from_state(
     state: dict, trigger: FunctionTrigger
-) -> typing.Iterable[LLMTool]:
+) -> typing.Iterable[BaseLLMTool]:
     functions = state.get("functions")
     if not functions:
         return
