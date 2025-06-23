@@ -33,7 +33,7 @@ from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
-from functions.recipe_functions import LLMTool
+from functions.recipe_functions import BaseLLMTool
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
@@ -955,7 +955,7 @@ def run_language_model(
     temperature: float = 0.7,
     stop: list[str] = None,
     avoid_repetition: bool = False,
-    tools: list[LLMTool] = None,
+    tools: list[BaseLLMTool] = None,
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
     audio_url: str | None = None,
@@ -1150,7 +1150,7 @@ def _run_chat_model(
     temperature: float | None,
     stop: list[str] | None,
     avoid_repetition: bool,
-    tools: list[LLMTool] | None,
+    tools: list[BaseLLMTool] | None,
     response_format_type: ResponseFormatType | None,
     stream: bool = False,
     audio_url: str | None = None,
@@ -1455,7 +1455,7 @@ def run_openai_chat(
     temperature: float | None = None,
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
@@ -1785,7 +1785,7 @@ def _run_groq_chat(
     model: str,
     messages: list[ConversationEntry],
     max_tokens: int,
-    tools: list[LLMTool] | None,
+    tools: list[BaseLLMTool] | None,
     temperature: float,
     avoid_repetition: bool,
     stop: list[str] | None,
@@ -1838,7 +1838,7 @@ def _run_fireworks_chat(
     temperature: float | None = None,
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
 ):
     from usage_costs.cost_utils import record_cost_auto
@@ -1891,7 +1891,7 @@ def _run_mistral_chat(
     temperature: float | None = None,
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
 ):
     from usage_costs.cost_utils import record_cost_auto
