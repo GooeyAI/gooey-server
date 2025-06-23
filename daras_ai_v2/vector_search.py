@@ -3,6 +3,7 @@ import csv
 import datetime
 import hashlib
 import io
+import json
 import mimetypes
 import multiprocessing
 import re
@@ -1004,11 +1005,18 @@ def any_bytes_to_text_pages_or_df(
     except UnsupportedDocumentError:
         pass
 
-    if mime_type == "text/plain":
-        text = f_bytes.decode()
-    else:
-        ext = mimetypes.guess_extension(mime_type) or ""
-        text = pandoc_to_text(f_name + ext, f_bytes)
+    match mime_type:
+        case "text/plain" | "text/markdown":
+            text = f_bytes.decode()
+        case "application/json":
+            try:
+                text = json.dumps(json.loads(f_bytes.decode()), indent=2)
+            except json.JSONDecodeError as e:
+                raise UserError(f"Invalid JSON file: {e}") from e
+        case _:
+            ext = mimetypes.guess_extension(mime_type) or ""
+            text = pandoc_to_text(f_name + ext, f_bytes)
+
     return [text]
 
 
