@@ -192,6 +192,21 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         hide_last_editor = bool(pr.workspace_id and not is_member)
         hide_updated_at = hide_last_editor
 
+        # Only show all run counts if user is a member AND they're filtering by their workspace
+        show_all_run_counts = False
+        if is_member and search_filters and search_filters.workspace:
+            if user and not user.is_anonymous:
+                user_workspace_ids = {w.id for w in user.cached_workspaces}
+                user_workspace_handles = {w.handle.name for w in user.cached_workspaces if w.handle}
+                
+                try:
+                    # Check if workspace filter is numeric (workspace ID)
+                    workspace_id = int(search_filters.workspace)
+                    show_all_run_counts = workspace_id in user_workspace_ids
+                except ValueError:
+                    # Workspace filter is a handle name
+                    show_all_run_counts = search_filters.workspace in user_workspace_handles
+
         render_saved_workflow_preview(
             workflow.page_cls,
             pr,
@@ -200,7 +215,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
             show_workspace_author=show_workspace_author,
             hide_last_editor=hide_last_editor,
             hide_updated_at=hide_updated_at,
-            show_all_run_counts=is_member,
+            show_all_run_counts=show_all_run_counts,
         )
 
     grid_layout(1, qs, _render_run)
