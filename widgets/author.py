@@ -42,7 +42,7 @@ def render_author_as_breadcrumb(
                 full_name = "Deleted User"
                 link = None
 
-            linkto = link and gui.link(to=link) or gui.dummy()
+            linkto = link and gui.link(to=link, className="text-decoration-none") or gui.dummy()
             with linkto:
                 gui.caption(full_name)
 
@@ -114,7 +114,7 @@ def render_author(
     else:
         responsive_image_size = image_size
 
-    linkto = link and gui.link(to=link) or gui.dummy()
+    linkto = link and gui.link(to=link, className="text-decoration-none") or gui.dummy()
     with linkto, gui.div(className="d-flex align-items-center"):
         if photo:
             with gui.styled(

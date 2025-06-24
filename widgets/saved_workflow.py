@@ -178,15 +178,6 @@ def render_footer_breadcrumbs(
             className="flex-grow-1 d-flex align-items-end flex-wrap flex-lg-nowrap"
         ),
     ):
-        if not hide_version_notes and latest_version and latest_version.change_notes:
-            gui.caption(
-                f"{icons.notes} {html.escape(latest_version.change_notes)}",
-                unsafe_allow_html=True,
-                line_clamp=1,
-                lineClampExpand=False,
-            )
-            gui.div(className="newline-sm")
-
         if published_run.workspace.is_personal:
             show_workspace_author = False
         if show_workspace_author:
@@ -201,8 +192,15 @@ def render_footer_breadcrumbs(
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False
                 )
-            if show_workspace_author:
-                gui.div(className="newline-sm")
+            # if show_workspace_author:
+            gui.div(className="newline-sm")
+
+        if not hide_version_notes and latest_version and latest_version.change_notes:
+            with gui.div(className="text-truncate text-muted", style=dict(maxWidth="200px")):
+                gui.html(
+                    f"{icons.notes} {html.escape(latest_version.change_notes)}"
+                )
+            gui.div(className="newline-sm")
 
         updated_at = published_run.saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime) and not hide_updated_at:
