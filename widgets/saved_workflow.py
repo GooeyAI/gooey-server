@@ -30,6 +30,7 @@ def render_saved_workflow_preview(
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
     hide_updated_at: bool = False,
+    show_all_run_counts: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -84,6 +85,7 @@ def render_saved_workflow_preview(
                 hide_visibility_pill=hide_visibility_pill,
                 hide_last_editor=hide_last_editor,
                 hide_updated_at=hide_updated_at,
+                show_all_run_counts=show_all_run_counts,
             )
 
         if output_url:
@@ -169,6 +171,7 @@ def render_footer_breadcrumbs(
     hide_version_notes: bool,
     hide_last_editor: bool,
     hide_updated_at: bool,
+    show_all_run_counts: bool = False,
 ):
     latest_version = published_run.versions.latest()
 
@@ -209,7 +212,7 @@ def render_footer_breadcrumbs(
                 unsafe_allow_html=True,
             )
 
-        if published_run.run_count >= 50:
+        if published_run.run_count >= 50 or show_all_run_counts:
             run_count = format_number_with_suffix(published_run.run_count)
             gui.write(
                 f"{icons.run} {run_count} runs",

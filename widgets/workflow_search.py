@@ -200,6 +200,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
             show_workspace_author=show_workspace_author,
             hide_last_editor=hide_last_editor,
             hide_updated_at=hide_updated_at,
+            show_all_run_counts=is_member,
         )
 
     grid_layout(1, qs, _render_run)
