@@ -415,6 +415,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 autoPlayResponses=True,
                 enableAudioMessage=True,
                 enableConversations=True,
+                enableSourcePreview=True,
                 branding=(
                     dict(showPoweredByGooey=True)
                     | bi.web_config_extras.get("branding", {})
@@ -441,9 +442,9 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             config["autoPlayResponses"] = gui.checkbox(
                 "Auto-play responses", value=config["autoPlayResponses"]
             )
-            # config["branding"]["showPoweredByGooey"] = gui.checkbox(
-            #     "Show Powered By Gooey", value=config["branding"]["showPoweredByGooey"]
-            # )
+            config["enableSourcePreview"] = gui.checkbox(
+                "Preview Links & Sources", value=config["enableSourcePreview"]
+            )
 
         with gui.expander("Embed Settings"):
             gui.caption(
