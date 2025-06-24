@@ -11,7 +11,7 @@ import requests
 from PIL import Image, ImageOps
 from furl import furl
 
-from daras_ai_v2 import settings
+from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.exceptions import UserError
 
 if typing.TYPE_CHECKING:
@@ -162,8 +162,11 @@ def guess_ext_from_response(response: requests.Response) -> str:
 
 
 def get_mimetype_from_response(response: requests.Response) -> str:
-    content_type = response.headers.get("Content-Type", "application/octet-stream")
-    return content_type.split(";")[0]
+    content_type = response.headers.get("Content-Type", "")
+    content_type = content_type.split(";")[0]
+    if content_type in gcs_v2.dumb_content_types:
+        content_type = ""
+    return content_type
 
 
 def gs_url_to_uri(url: str) -> str:
