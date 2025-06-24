@@ -15,10 +15,10 @@ from widgets.workflow_search import (
 )
 
 META_TITLE = "Explore AI workflows"
-META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
+META_DESCRIPTION = "Find, fork and run your field's favorite AI recipes on Gooey.AI"
 
 TITLE = "Explore"
-DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
+DESCRIPTION = "DISCOVER YOUR FIELD'S FAVORITE AI WORKFLOWS"
 
 
 def render(user: AppUser | None, search_filters: SearchFilters | None):
@@ -44,9 +44,19 @@ def render(user: AppUser | None, search_filters: SearchFilters | None):
         if category != "Featured":
             section_heading(category)
         if category == "Images" or category == "Featured":
-            grid_layout(3, pages, lambda page_cls: _render_as_featured(page_cls, user, search_filters), separator=False)
+            grid_layout(
+                3,
+                pages,
+                lambda page_cls: _render_as_featured(page_cls, user, search_filters),
+                separator=False,
+            )
         else:
-            grid_layout(2, pages, lambda page_cls: _render_non_featured(page_cls, user, search_filters), separator=False)
+            grid_layout(
+                2,
+                pages,
+                lambda page_cls: _render_non_featured(page_cls, user, search_filters),
+                separator=False,
+            )
 
 
 def heading(
@@ -87,7 +97,11 @@ def render_image(page: BasePage):
     )
 
 
-def _render_as_featured(page_cls: typing.Type[BasePage], user: AppUser | None = None, search_filters: SearchFilters | None = None):
+def _render_as_featured(
+    page_cls: typing.Type[BasePage],
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     page = page_cls()
     render_image(page)
     # total_runs = page.get_total_runs()
@@ -95,7 +109,11 @@ def _render_as_featured(page_cls: typing.Type[BasePage], user: AppUser | None = 
     render_description(page, user, search_filters)
 
 
-def _render_non_featured(page_cls: typing.Type[BasePage], user: AppUser | None = None, search_filters: SearchFilters | None = None):
+def _render_non_featured(
+    page_cls: typing.Type[BasePage],
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     page = page_cls()
     col1, col2 = gui.columns([1, 2])
     with col1:
@@ -106,21 +124,26 @@ def _render_non_featured(page_cls: typing.Type[BasePage], user: AppUser | None =
         render_description(page, user, search_filters)
 
 
-def render_description(page: BasePage, user: AppUser | None = None, search_filters: SearchFilters | None = None):
+def render_description(
+    page: BasePage,
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     with gui.link(to=page.app_url()):
         gui.markdown(f"#### {page.get_recipe_title()}")
 
     root_pr = page.get_root_pr()
     with gui.div(className="mb-3"):
         gui.write(root_pr.notes, line_clamp=4)
-    
+
     # Check if user is viewing their own workspace
     show_all_counts = False
     if user and search_filters and search_filters.workspace:
-        # User has filtered by workspace, check if they're a member of that workspace
         user_workspace_ids = {w.id for w in user.cached_workspaces}
-        user_workspace_handles = {w.handle.name for w in user.cached_workspaces if w.handle}
-        
+        user_workspace_handles = {
+            w.handle.name for w in user.cached_workspaces if w.handle
+        }
+
         try:
             # Check if workspace filter is numeric (workspace ID)
             workspace_id = int(search_filters.workspace)
@@ -128,7 +151,7 @@ def render_description(page: BasePage, user: AppUser | None = None, search_filte
         except ValueError:
             # Workspace filter is a handle name
             show_all_counts = search_filters.workspace in user_workspace_handles
-    
+
     if root_pr.run_count >= 50 or show_all_counts:
         run_count = format_number_with_suffix(root_pr.run_count)
         gui.caption(

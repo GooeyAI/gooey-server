@@ -23,7 +23,7 @@ def render_author_as_breadcrumb(
         className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
     ):
         with gui.tag("li"):
-            render_author_from_workspace(workspace)
+            render_author_from_workspace(workspace, remove_underline=False)
 
         # don't render the user's name for examples and personal workspaces
         if is_example or workspace.is_personal:
@@ -42,7 +42,11 @@ def render_author_as_breadcrumb(
                 full_name = "Deleted User"
                 link = None
 
-            linkto = link and gui.link(to=link, className="text-decoration-none") or gui.dummy()
+            linkto = (
+                link
+                and gui.link(to=link, className="text-decoration-none")
+                or gui.dummy()
+            )
             with linkto:
                 gui.caption(full_name)
 
@@ -53,6 +57,7 @@ def render_author_from_workspace(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
+    remove_underline: bool = True,
 ):
     if not workspace:
         return
@@ -71,6 +76,7 @@ def render_author_from_workspace(
         link=link,
         image_size=image_size,
         responsive=responsive,
+        remove_underline=remove_underline,
     )
 
 
@@ -80,6 +86,7 @@ def render_author_from_user(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
+    remove_underline: bool = True,
 ):
     if not user:
         return
@@ -95,6 +102,7 @@ def render_author_from_user(
         link=link,
         image_size=image_size,
         responsive=responsive,
+        remove_underline=remove_underline,
     )
 
 
@@ -105,6 +113,7 @@ def render_author(
     *,
     image_size: str,
     responsive: bool,
+    remove_underline: bool = True,
 ):
     if not photo and not name:
         return
@@ -114,7 +123,11 @@ def render_author(
     else:
         responsive_image_size = image_size
 
-    linkto = link and gui.link(to=link, className="text-decoration-none") or gui.dummy()
+    if link:
+        class_name = "text-decoration-none" if remove_underline else ""
+        linkto = gui.link(to=link, className=class_name)
+    else:
+        linkto = gui.dummy()
     with linkto, gui.div(className="d-flex align-items-center"):
         if photo:
             with gui.styled(

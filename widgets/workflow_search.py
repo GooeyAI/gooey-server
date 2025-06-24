@@ -197,15 +197,19 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         if is_member and search_filters and search_filters.workspace:
             if user and not user.is_anonymous:
                 user_workspace_ids = {w.id for w in user.cached_workspaces}
-                user_workspace_handles = {w.handle.name for w in user.cached_workspaces if w.handle}
-                
+                user_workspace_handles = {
+                    w.handle.name for w in user.cached_workspaces if w.handle
+                }
+
                 try:
                     # Check if workspace filter is numeric (workspace ID)
                     workspace_id = int(search_filters.workspace)
                     show_all_run_counts = workspace_id in user_workspace_ids
                 except ValueError:
                     # Workspace filter is a handle name
-                    show_all_run_counts = search_filters.workspace in user_workspace_handles
+                    show_all_run_counts = (
+                        search_filters.workspace in user_workspace_handles
+                    )
 
         render_saved_workflow_preview(
             workflow.page_cls,
