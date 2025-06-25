@@ -151,7 +151,7 @@ FOOTER_CSS = """
   color: black;
   display: inline-block;
   vertical-align: middle;
-}
+} 
 @media (max-width: 768px) {
      & .newline-sm {
         width: 100%;
@@ -201,7 +201,7 @@ def render_footer_breadcrumbs(
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
                 className="text-truncate text-muted",
-                style=dict(maxWidth="200px"),
+                style={"maxWidth": "200px"},
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
             gui.div(className="newline-sm")

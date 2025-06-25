@@ -8,6 +8,7 @@ from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
+from utils.workspace import is_user_workspace_owner
 from widgets.workflow_search import (
     SearchFilters,
     render_search_filters,
@@ -138,19 +139,8 @@ def render_description(
 
     # Check if user is viewing their own workspace
     show_all_counts = False
-    if user and search_filters and search_filters.workspace:
-        user_workspace_ids = {w.id for w in user.cached_workspaces}
-        user_workspace_handles = {
-            w.handle.name for w in user.cached_workspaces if w.handle
-        }
-
-        try:
-            # Check if workspace filter is numeric (workspace ID)
-            workspace_id = int(search_filters.workspace)
-            show_all_counts = workspace_id in user_workspace_ids
-        except ValueError:
-            # Workspace filter is a handle name
-            show_all_counts = search_filters.workspace in user_workspace_handles
+    if search_filters and search_filters.workspace:
+        show_all_counts = is_user_workspace_owner(user, search_filters.workspace)
 
     if root_pr.run_count >= 50 or show_all_counts:
         run_count = format_number_with_suffix(root_pr.run_count)
