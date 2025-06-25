@@ -145,13 +145,9 @@ FOOTER_CSS = """
     margin: 0 2px;
     text-align: center;
 }
-& > :not(:empty):not(:first-child):not(.newline-sm):before {
-  content: "•";
-  margin: 0 0.5rem;
-  color: black;
-  display: inline-block;
-  vertical-align: middle;
-} 
+& > div {
+    margin-right: 1rem;
+}
 @media (max-width: 768px) {
      & .newline-sm {
         width: 100%;
@@ -187,13 +183,13 @@ def render_footer_breadcrumbs(
             # don't repeat author for personal workspaces
             with gui.div(className="d-flex align-items-center"):
                 render_author_from_workspace(
-                    published_run.workspace, image_size="24px", responsive=False
+                    published_run.workspace, image_size="24px", responsive=False, remove_underline=False
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
             with gui.div(className="d-flex align-items-center text-truncate"):
                 render_author_from_user(
-                    published_run.last_edited_by, image_size="24px", responsive=False
+                    published_run.last_edited_by, image_size="24px", responsive=False, remove_underline=False
                 )
             # if show_workspace_author:
             gui.div(className="newline-sm")
@@ -201,7 +197,7 @@ def render_footer_breadcrumbs(
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
                 className="text-truncate text-muted",
-                style={"maxWidth": "200px"},
+                style={"maxWidth": "250px"},
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
             gui.div(className="newline-sm")
@@ -223,7 +219,7 @@ def render_footer_breadcrumbs(
             gui.write(
                 f"{icons.run} {run_count} runs",
                 unsafe_allow_html=True,
-                className="text-dark text-nowrap",
+                className="text-muted text-nowrap",
             )
             gui.div(className="newline-sm")
 
