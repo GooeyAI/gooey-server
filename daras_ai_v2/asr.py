@@ -7,7 +7,6 @@ import threading
 import typing
 from enum import Enum
 from functools import lru_cache
-import json
 
 import gooey_gui as gui
 import requests
@@ -992,17 +991,17 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     """
     import requests
     from daras_ai_v2 import settings
-    
+
     audio_r = requests.get(audio_url)
     raise_for_status(audio_r, is_user_url=True)
-    
+
     files = {"file": audio_r.content}
     headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
-    
+
     params = {}
     if language:
         params["language"] = language
-    
+
     response = requests.post(
         "https://api.elevenlabs.io/v1/speech-to-text",
         files=files,
@@ -1010,7 +1009,7 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
         params=params,
     )
     raise_for_status(response)
-    
+
     return response.json()
 
 
@@ -1071,13 +1070,12 @@ def run_asr(
                     chunk = {
                         "timestamp": (word_data["start"], word_data["end"]),
                         "text": word_data["text"],
-                        "speaker": word_data.get("speaker_id", 0) if word_data["type"] == "word" else None,
+                        "speaker": word_data.get("speaker_id", 0)
+                        if word_data["type"] == "word"
+                        else None,
                     }
                     chunks.append(chunk)
-            return {
-                "text": data["text"],
-                "chunks": chunks
-            }
+            return {"text": data["text"], "chunks": chunks}
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
