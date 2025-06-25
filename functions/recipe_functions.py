@@ -252,7 +252,7 @@ def call_recipe_functions(
             state=state,
             trigger=trigger,
         )
-        tool()
+        tool._call()
 
 
 def get_workflow_tools_from_state(
