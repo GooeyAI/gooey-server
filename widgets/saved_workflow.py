@@ -146,7 +146,9 @@ FOOTER_CSS = """
     text-align: center;
 }
 & > div {
-    margin-right: 1rem;
+    margin-right: 0.75rem;
+    display: flex;
+    align-items: center;
 }
 @media (max-width: 768px) {
      & .newline-sm {
@@ -196,7 +198,7 @@ def render_footer_breadcrumbs(
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
-                className="text-truncate text-muted",
+                className="text-truncate text-muted d-flex align-items-center",
                 style={"maxWidth": "250px"},
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
@@ -208,19 +210,21 @@ def render_footer_breadcrumbs(
             and isinstance(updated_at, datetime.datetime)
             and not hide_updated_at
         ):
-            gui.write(
-                f"{icons.time} {get_relative_time(updated_at)}",
-                unsafe_allow_html=True,
-                className="text-muted",
-            )
+            with gui.div(className="d-flex align-items-center"):
+                gui.write(
+                    f"{icons.time} {get_relative_time(updated_at)}",
+                    unsafe_allow_html=True,
+                    className="text-muted",
+                )
 
         if published_run.run_count >= 50 or show_all_run_counts:
             run_count = format_number_with_suffix(published_run.run_count)
-            gui.write(
-                f"{icons.run} {run_count} runs",
-                unsafe_allow_html=True,
-                className="text-muted text-nowrap",
-            )
+            with gui.div(className="d-flex align-items-center"):
+                gui.write(
+                    f"{icons.run} {run_count} runs",
+                    unsafe_allow_html=True,
+                    className="text-muted text-nowrap",
+                )
             gui.div(className="newline-sm")
 
         if not hide_visibility_pill:
