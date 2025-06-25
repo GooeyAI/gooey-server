@@ -125,7 +125,7 @@ def init_workflow_selector(
 
 def url_to_runs(
     url: str,
-) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
+) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     assert url, "URL is required"
