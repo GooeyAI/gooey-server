@@ -1,5 +1,5 @@
+import json
 import typing
-from abc import ABC, abstractmethod
 
 import gooey_gui as gui
 from django.utils.text import slugify
@@ -21,106 +21,56 @@ allowing it execute logic, use common JS libraries or make external API calls \
 before or after the workflow runs.
 <a href='/functions-help' target='_blank'>Learn more.</a>"""
 
-TRANSFER_CALL_FN_NAME = "transfer_call"
-TRANSFER_CALL_FN_PARAM_NAME = "phone_number"
 
+class BaseLLMTool:
+    def __init__(
+        self,
+        name: str,
+        label: str,
+        description: str,
+        properties: dict,
+        required: list[str] | None = None,
+        await_audio_completed: bool = False,
+    ):
+        self.name = name
+        self.label = label
 
-class BaseLLMTool(ABC):
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
+        self.spec_parameters = {
+            "type": "object",
+            "properties": properties,
+        }
+        if required:
+            self.spec_parameters["required"] = required
 
-    @property
-    @abstractmethod
-    def label(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def spec(self) -> dict:
-        pass
-
-    @abstractmethod
-    def bind(self, **kwargs) -> "BaseLLMTool":
-        pass
-
-    @abstractmethod
-    def __call__(self, **kwargs) -> typing.Any:
-        pass
-
-
-class CallTransferTool(BaseLLMTool):
-    """Internal tool for transferring phone calls."""
-
-    def __init__(self):
-        self._name = TRANSFER_CALL_FN_NAME
-        self._label = "Transfer Call"
-        self._description = "Transfer the call to another phone number"
-        self._spec = {
-            "type": "function",
-            "function": {
-                "name": TRANSFER_CALL_FN_NAME,
-                "description": "Transfer the active phone call to another phone number. This will immediately end the current conversation and connect the caller to the specified number. Use this when the caller requests to speak with someone else, needs to be transferred to a different department, or when you cannot help them and they need human assistance.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        TRANSFER_CALL_FN_PARAM_NAME: {
-                            "type": "string",
-                            "description": "The destination phone number to transfer the call to. Must be in E.164 international format.",
-                        }
-                    },
-                    "required": [TRANSFER_CALL_FN_PARAM_NAME],
-                },
-            },
+        self.spec_function = {
+            "name": name,
+            "description": description,
+            "parameters": self.spec_parameters,
         }
 
-    def bind(self, call_sid: str, bi_id: str):
-        self.call_sid = call_sid
-        self.bi_id = bi_id
-        return self
+        ## Yes openai really does have 2 ways to specify tools in their own APIs
+        # https://platform.openai.com/docs/api-reference/chat/create
+        self.spec_openai = {"type": "function", "function": self.spec_function}
+        # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+        self.spec_openai_audio = {"type": "function"} | self.spec_function
 
-    @property
-    def name(self) -> str:
-        return self._name
+        self.await_audio_completed = await_audio_completed
 
-    @property
-    def label(self) -> str:
-        return self._label
-
-    @property
-    def spec(self) -> dict:
-        return self._spec
-
-    def __call__(self, **kwargs) -> dict:
-        from daras_ai_v2.language_model_openai_realtime import handle_transfer_call
-
-        from loguru import logger
-
-        logger.info(f"CallTransferTool __call__: {kwargs}")
+    def call(self, arguments: str) -> typing.Any:
         try:
-            self.call_sid
-            self.bi_id
-        except AttributeError:
-            raise RuntimeError("This CallTransferTool instance is not yet bound")
+            kwargs = json.loads(arguments)
+        except json.JSONDecodeError as e:
+            return dict(error=repr(e))
+        try:
+            return self._call(**kwargs)
+        except TypeError as e:
+            return dict(error=repr(e))
 
-        phone_number = kwargs.get(TRANSFER_CALL_FN_PARAM_NAME) or ""
-        # phone_number = phone_number.replace("+", "")
-        phone_number = f"{phone_number}"
-        error_message = handle_transfer_call(
-            transfer_number=phone_number,
-            call_sid=self.call_sid,
-            bi_id=self.bi_id,
-        )
-
-        if error_message:
-            return {"success": False, "error": error_message}
-        else:
-            # This should not be reached as handle_transfer_call raises CallTransferred on success
-            return {"success": True, "message": "Transfer initiated"}
+    def _call(self, **kwargs) -> typing.Any:
+        raise NotImplementedError
 
 
-class LLMTool(BaseLLMTool):
+class WorkflowLLMTool(BaseLLMTool):
     """External function tool that calls workflow URLs."""
 
     def __init__(self, function_url: str):
@@ -132,9 +82,6 @@ class LLMTool(BaseLLMTool):
         self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
         self._fn_runs = (self.fn_sr, self.fn_pr)
 
-        self._name = slugify(self.fn_pr.title).replace("-", "_")
-        self._label = self.fn_pr.title
-
         self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
         if self.is_function_workflow:
             fn_vars = self.fn_sr.state.get("variables", {})
@@ -144,30 +91,15 @@ class LLMTool(BaseLLMTool):
             fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
                 "properties", {}
             )
+        properties = dict(generate_tool_properties(fn_vars, fn_vars_schema))
 
-        self._spec = {
-            "type": "function",
-            "function": {
-                "name": self._name,
-                "description": self.fn_pr.notes,
-                "parameters": {
-                    "type": "object",
-                    "properties": dict(generate_tool_params(fn_vars, fn_vars_schema)),
-                },
-            },
-        }
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def label(self) -> str:
-        return self._label
-
-    @property
-    def spec(self) -> dict:
-        return self._spec
+        name = slugify(self.fn_pr.title).replace("-", "_")
+        super().__init__(
+            name=name,
+            label=self.fn_pr.title or name,
+            description=self.fn_pr.notes,
+            properties=properties,
+        )
 
     def bind(
         self,
@@ -178,7 +110,7 @@ class LLMTool(BaseLLMTool):
         response_model: typing.Type["BasePage.ResponseModel"],
         state: dict,
         trigger: FunctionTrigger,
-    ) -> "LLMTool":
+    ) -> "WorkflowLLMTool":
         self.saved_run = saved_run
         self.workspace = workspace
         self.current_user = current_user
@@ -188,14 +120,14 @@ class LLMTool(BaseLLMTool):
         self.trigger = trigger
         return self
 
-    def __call__(self, **kwargs):
+    def _call(self, **kwargs):
         from bots.models import Workflow
         from daras_ai_v2.base import extract_model_fields
 
         try:
             self.saved_run
         except AttributeError:
-            raise RuntimeError("This LLMTool instance is not yet bound")
+            raise RuntimeError(f"This {self.__class__} instance is not yet bound")
 
         fn_sr, fn_pr = self._fn_runs
 
@@ -287,6 +219,15 @@ class LLMTool(BaseLLMTool):
         return system_vars, system_vars_schema
 
 
+def get_tool_from_call(
+    function_call: dict, tools_by_name: dict[str, "BaseLLMTool"]
+) -> tuple[BaseLLMTool, str]:
+    name = function_call["name"]
+    arguments = function_call["arguments"]
+    tool = tools_by_name[name]
+    return tool, arguments
+
+
 def call_recipe_functions(
     *,
     saved_run: "SavedRun",
@@ -297,7 +238,7 @@ def call_recipe_functions(
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Iterable[str]:
-    tools = list(get_tools_from_state(state, trigger))
+    tools = list(get_workflow_tools_from_state(state, trigger))
     if not tools:
         return
     yield f"Running {trigger.name} hooks..."
@@ -314,19 +255,19 @@ def call_recipe_functions(
         tool()
 
 
-def get_tools_from_state(
+def get_workflow_tools_from_state(
     state: dict, trigger: FunctionTrigger
-) -> typing.Iterable[BaseLLMTool]:
+) -> typing.Iterable[WorkflowLLMTool]:
     functions = state.get("functions")
     if not functions:
         return
     for function in functions:
         if function.get("trigger") != trigger.name:
             continue
-        yield LLMTool(function.get("url"))
+        yield WorkflowLLMTool(function.get("url"))
 
 
-def generate_tool_params(
+def generate_tool_properties(
     fn_vars: dict, fn_vars_schema: dict
 ) -> typing.Iterable[tuple[str, dict]]:
     for name, value in fn_vars.items():

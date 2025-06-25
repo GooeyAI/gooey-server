@@ -536,6 +536,26 @@ class LastActiveDeltaFilter(admin.SimpleListFilter):
         return queryset
 
 
+class NullifyEmptyStringsModelForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        for field in self._meta.model._meta.get_fields():
+            if (
+                hasattr(field, "null")
+                and field.null
+                and field.get_internal_type() in ["CharField", "TextField"]
+            ):
+                if cleaned_data.get(field.name) == "":
+                    cleaned_data[field.name] = None
+        return cleaned_data
+
+
+class ConversationAdminForm(NullifyEmptyStringsModelForm):
+    class Meta:
+        model = Conversation
+        fields = "__all__"
+
+
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
     list_display = [
@@ -572,6 +592,8 @@ class ConversationAdmin(admin.ModelAdmin):
         "twilio_phone_number",
     ] + [f"bot_integration__{field}" for field in BotIntegrationAdmin.search_fields]
     actions = [export_to_csv, export_to_excel]
+
+    form = ConversationAdminForm
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
