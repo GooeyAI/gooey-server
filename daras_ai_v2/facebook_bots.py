@@ -408,6 +408,34 @@ def wa_mark_read(
     print("wa_typing_indicator:", r.status_code, r.json())
 
 
+def block_wa_number(
+    bot_number_id: str, user_number: str, access_token: str | None = None
+):
+    r = requests.post(
+        f"https://graph.facebook.com/v16.0/{bot_number_id}/block_users",
+        headers=get_wa_auth_header(access_token),
+        json={
+            "messaging_product": "whatsapp",
+            "block_users": [{"user": user_number}],
+        },
+    )
+    print("block_wa_number:", r.status_code, r.json())
+
+
+def unblock_wa_number(
+    bot_number_id: str, user_number: str, access_token: str | None = None
+):
+    r = requests.delete(
+        f"https://graph.facebook.com/v16.0/{bot_number_id}/block_users",
+        headers=get_wa_auth_header(access_token),
+        json={
+            "messaging_product": "whatsapp",
+            "block_users": [{"user": user_number}],
+        },
+    )
+    print("unblock_wa_number:", r.status_code, r.json())
+
+
 class FacebookBot(BotInterface):
     def __init__(self, object_name: str, messaging: dict):
         if object_name == "instagram":
