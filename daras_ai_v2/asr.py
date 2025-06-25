@@ -7,6 +7,7 @@ import threading
 import typing
 from enum import Enum
 from functools import lru_cache
+import json
 
 import gooey_gui as gui
 import requests
@@ -119,6 +120,17 @@ SEAMLESS_v2_ASR_SUPPORTED = {
     "kor", "lao", "lit", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld", "nno", "nob",
     "npi", "nya", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna", "snd", "som", "spa",
     "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "yor", "yue", "zul",
+}  # fmt: skip
+
+# Eleven Labs Scribe v1 - supports 99 languages with 3-letter ISO codes
+ELEVENLABS_SUPPORTED = {
+    "afr", "amh", "ara", "hye", "asm", "ast", "aze", "bel", "ben", "bos", "bul", "mya", "yue", "cat", "ceb", "nya",
+    "hrv", "ces", "dan", "nld", "eng", "est", "fil", "fin", "fra", "ful", "glg", "lug", "kat", "deu", "ell", "guj",
+    "hau", "heb", "hin", "hun", "isl", "ibo", "ind", "gle", "ita", "jpn", "jav", "kea", "kan", "kaz", "khm", "kor",
+    "kur", "kir", "lao", "lav", "lin", "lit", "luo", "ltz", "mkd", "msa", "mal", "mlt", "cmn", "mri", "mar", "mon",
+    "nep", "nso", "nor", "oci", "ori", "pus", "fas", "pol", "por", "pan", "ron", "rus", "srp", "sna", "snd", "slk",
+    "slv", "som", "spa", "swa", "swe", "tam", "tgk", "tel", "tha", "tur", "ukr", "umb", "urd", "uzb", "vie", "cym",
+    "wol", "xho", "zul"
 }  # fmt: skip
 
 AZURE_SUPPORTED = {
@@ -260,6 +272,7 @@ class AsrModels(Enum):
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
+    elevenlabs = "ElevenLabs Scribe v1"
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
@@ -329,6 +342,7 @@ asr_model_ids = {
     AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.lelapa: "lelapa-vulavula",
+    AsrModels.elevenlabs: "elevenlabs-scribe-v1",
 }
 
 forced_asr_languages = {
@@ -354,6 +368,7 @@ asr_supported_languages = {
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
+    AsrModels.elevenlabs: ELEVENLABS_SUPPORTED,
     AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
@@ -971,6 +986,34 @@ def get_google_auth_session(*scopes: str) -> tuple[AuthorizedSession, str]:
         return AuthorizedSession(credentials=creds), project
 
 
+def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
+    """
+    Call ElevenLabs Speech-to-Text API
+    """
+    import requests
+    from daras_ai_v2 import settings
+    
+    audio_r = requests.get(audio_url)
+    raise_for_status(audio_r, is_user_url=True)
+    
+    files = {"file": audio_r.content}
+    headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
+    
+    params = {}
+    if language:
+        params["language"] = language
+    
+    response = requests.post(
+        "https://api.elevenlabs.io/v1/speech-to-text",
+        files=files,
+        headers=headers,
+        params=params,
+    )
+    raise_for_status(response)
+    
+    return response.json()
+
+
 def run_asr(
     audio_url: str,
     selected_model: str,
@@ -1017,6 +1060,24 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.elevenlabs:
+        data = elevenlabs_asr(audio_url, language)
+        if output_format == AsrOutputFormat.text:
+            return data["text"]
+        else:
+            chunks = []
+            if "words" in data:
+                for word_data in data["words"]:
+                    chunk = {
+                        "timestamp": (word_data["start"], word_data["end"]),
+                        "text": word_data["text"],
+                        "speaker": word_data.get("speaker_id", 0) if word_data["type"] == "word" else None,
+                    }
+                    chunks.append(chunk)
+            return {
+                "text": data["text"],
+                "chunks": chunks
+            }
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
