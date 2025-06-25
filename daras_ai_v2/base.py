@@ -55,12 +55,13 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
+from functions.inbuilt_tools import get_inbuilt_tools_from_state
 from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
     BaseLLMTool,
     call_recipe_functions,
     functions_input,
-    get_tools_from_state,
+    get_workflow_tools_from_state,
     is_functions_enabled,
     render_called_functions,
 )
@@ -1379,7 +1380,11 @@ class BasePage:
                 state=gui.session_state,
                 trigger=FunctionTrigger.prompt,
             )
-            for tool in get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+            for tool in get_workflow_tools_from_state(
+                gui.session_state, FunctionTrigger.prompt
+            )
+        } | {
+            tool.name: tool for tool in get_inbuilt_tools_from_state(gui.session_state)
         }
 
     @cached_property

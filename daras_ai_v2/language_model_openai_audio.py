@@ -40,7 +40,7 @@ def run_openai_audio(
 
     twilio_ws = None
     audio_data = None
-    if audio_url and audio_url.startswith("ws"):
+    if is_realtime_audio_url(audio_url):
         # if the audio_url is a websocket url, connect to it
         twilio_ws = connect(audio_url)
         audio_session_extra = (audio_session_extra or {}) | {
@@ -55,9 +55,6 @@ def run_openai_audio(
         wav_bytes = audio_bytes_to_wav(response.content)[0] or response.content
         audio_data = base64.b64encode(wav_bytes).decode()
 
-    # Prepare tools with any required additions for the session type
-    prepared_tools = prepare_tools_for_session(tools, audio_url)
-
     has_tool_calls = False
     try:
         init_ws_session(
@@ -67,11 +64,11 @@ def run_openai_audio(
             audio_session_extra=audio_session_extra,
             messages=messages,
             temperature=temperature,
-            tools=prepared_tools,
+            tools=tools,
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, prepared_tools, audio_url
+                twilio_ws, openai_ws, tools, messages, audio_url
             ).stream():
                 yield [entry]
         else:
@@ -102,6 +99,14 @@ def run_openai_audio(
             twilio_ws.close()
 
 
+def is_realtime_audio_url(url: str | None) -> bool:
+    """
+    Check if the given URL is a Realtime audio URL.
+    This function checks if the URL starts with 'ws://' or 'wss://'
+    """
+    return bool(url and url.startswith(("ws://", "wss://")))
+
+
 def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
     try:
         ws = threadlocal._realtime_ws
@@ -119,25 +124,6 @@ def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
         )
         created = True
     return ws, created
-
-
-def prepare_tools_for_session(
-    tools: list[BaseLLMTool] | None, audio_url: str | None
-) -> list[BaseLLMTool] | None:
-    from functions.recipe_functions import CallTransferTool, TRANSFER_CALL_FN_NAME
-
-    if not (audio_url and audio_url.startswith("ws")):
-        return tools
-
-    call_transfer_tool = CallTransferTool()
-    if tools is None:
-        return [call_transfer_tool]
-
-    # Add call transfer tool if not already present
-    if not any(tool.name == TRANSFER_CALL_FN_NAME for tool in tools):
-        return list(tools) + [call_transfer_tool]
-
-    return tools
 
 
 def init_ws_session(
@@ -184,6 +170,7 @@ def init_ws_session(
             + msgs_to_prompt_str(conversation)
         )
 
+    # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
     session_data = {
         "instructions": system_message,
         "input_audio_transcription": {"model": "whisper-1"},
@@ -193,12 +180,8 @@ def init_ws_session(
     }
     if audio_session_extra:
         session_data |= audio_session_extra
-
     if tools:
-        session_data["tools"] = [
-            tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
-        ]
-
+        session_data["tools"] = [tool.spec_openai_audio for tool in tools]
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 
     if audio_data:

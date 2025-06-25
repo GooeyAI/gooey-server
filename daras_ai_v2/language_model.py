@@ -1511,7 +1511,7 @@ def run_openai_chat(
     else:
         temperature = NOT_GIVEN
     if tools:
-        tools = [tool.spec for tool in tools]
+        tools = [tool.spec_openai for tool in tools]
     else:
         tools = NOT_GIVEN
     if response_format_type:
@@ -1801,7 +1801,7 @@ def _run_groq_chat(
         temperature=temperature,
     )
     if tools:
-        data["tools"] = [tool.spec for tool in tools]
+        data["tools"] = [tool.spec_openai for tool in tools]
     if avoid_repetition:
         data["frequency_penalty"] = 0.1
         data["presence_penalty"] = 0.25
@@ -1852,7 +1852,7 @@ def _run_fireworks_chat(
         temperature=temperature,
     )
     if tools:
-        data["tools"] = [tool.spec for tool in tools]
+        data["tools"] = [tool.spec_openai for tool in tools]
     if avoid_repetition:
         data["frequency_penalty"] = 0.1
         data["presence_penalty"] = 0.25
@@ -1905,7 +1905,7 @@ def _run_mistral_chat(
         temperature=temperature,
     )
     if tools:
-        data["tools"] = [tool.spec for tool in tools]
+        data["tools"] = [tool.spec_openai for tool in tools]
     if avoid_repetition:
         data["frequency_penalty"] = 0.1
         data["presence_penalty"] = 0.25
