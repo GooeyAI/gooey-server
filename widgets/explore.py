@@ -1,4 +1,5 @@
 import typing
+from copy import copy
 
 import gooey_gui as gui
 
@@ -24,15 +25,15 @@ DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 def render(user: AppUser | None, search_filters: SearchFilters | None):
     heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
 
+    search_filters = search_filters or SearchFilters()
     new_filters = render_search_filters(
-        current_user=user, search_filters=search_filters
+        current_user=user, search_filters=copy(search_filters)
     )
-    if search_filters and not new_filters:
-        # if the search bar is empty, redirect to the explore page
-        raise gui.QueryParamsRedirectException(dict())
-    if new_filters and new_filters != search_filters:
+    if new_filters != search_filters:
         # if the search bar value has changed, redirect to the new search page
-        raise gui.QueryParamsRedirectException(new_filters.model_dump())
+        raise gui.QueryParamsRedirectException(
+            new_filters.model_dump(exclude_defaults=True)
+        )
 
     if search_filters:
         with gui.div(className="my-4"):
