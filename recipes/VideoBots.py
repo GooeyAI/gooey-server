@@ -369,13 +369,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def render_form_v2(self):
-        gui.text_area(
-            """
-            #### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions
-            """,
+        gui.code_editor(
+            label='#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions',
             key="bot_script",
-            height=300,
-            help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
+            language="jinja",
+            style=dict(maxHeight="50vh"),
+            help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
         language_model_selector(
