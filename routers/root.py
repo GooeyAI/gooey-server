@@ -34,6 +34,7 @@ from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
+    get_app_route_url,
     get_route_path,
     resolve_url,
 )
@@ -46,6 +47,9 @@ from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import global_workspace_selector
+
+if typing.TYPE_CHECKING:
+    from widgets.workflow_search import SearchFilters
 
 app = CustomAPIRouter()
 
@@ -256,8 +260,7 @@ def explore_page(
     search_filters = SearchFilters(
         search=search, workspace=workspace, workflow=workflow
     )
-
-    with page_wrapper(request):
+    with page_wrapper(request, search_filters=search_filters):
         explore.render(request.user, search_filters)
 
     return {
@@ -702,12 +705,30 @@ def get_og_url_path(request) -> str:
     )
 
 
+def _render_search_bar_with_redirect(
+    search_filters: typing.Optional["SearchFilters"], **props
+):
+    from widgets.workflow_search import SearchFilters, render_search_bar
+
+    search_filters = search_filters or SearchFilters()
+    search_query = render_search_bar(value=search_filters.search, **props)
+    if search_query != search_filters.search:
+        search_filters.search = search_query
+        raise gui.RedirectException(
+            get_app_route_url(
+                explore_page,
+                query_params=search_filters.model_dump(exclude_defaults=True),
+            )
+        )
+
+
 @contextmanager
-def page_wrapper(request: Request, className=""):
-    context = {
-        "request": request,
-        "block_incognito": True,
-    }
+def page_wrapper(
+    request: Request,
+    className="",
+    search_filters: typing.Optional["SearchFilters"] = None,
+):
+    context = {"request": request, "block_incognito": True}
 
     with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
@@ -732,6 +753,16 @@ def page_wrapper(request: Request, className=""):
                     height="40",
                     className="img-fluid logo d-sm-none",
                 )
+
+            with gui.div(
+                className="flex-grow-1 d-flex justify-content-center align-items-center"
+            ):
+                with gui.div(
+                    className="d-none d-md-flex flex-grow-1 justify-content-center align-items-center"
+                ):
+                    # desktop search - always hidden on mobile
+                    _render_search_bar_with_redirect(search_filters)
+
             with gui.div(
                 className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
             ):
