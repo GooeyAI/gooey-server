@@ -299,14 +299,13 @@ BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 
 HEADER_LINKS = [
-    ("/explore/", "Explore"),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
     (BLOG_URL, "Blog"),
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
+HEADER_ICONS = {}
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
