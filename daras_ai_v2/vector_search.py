@@ -401,7 +401,7 @@ def fn_url_to_file_metadata(
         state=sr.state,
         trigger=FunctionTrigger.pre,
     )
-    return_value = tool().get("return_value")
+    return_value = tool.call().get("return_value")
     if not isinstance(return_value, dict):
         return None
     documents = return_value.get("documents")

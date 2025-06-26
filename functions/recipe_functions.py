@@ -56,17 +56,15 @@ class BaseLLMTool:
 
         self.await_audio_completed = await_audio_completed
 
-    def call(self, arguments: str) -> typing.Any:
+    def call_json(self, arguments: str) -> str:
         try:
             kwargs = json.loads(arguments)
-        except json.JSONDecodeError as e:
-            return dict(error=repr(e))
-        try:
-            return self._call(**kwargs)
-        except TypeError as e:
-            return dict(error=repr(e))
+            ret = self.call(**kwargs)
+        except (json.JSONDecodeError, TypeError) as e:
+            ret = dict(error=repr(e))
+        return json.dumps(ret)
 
-    def _call(self, **kwargs) -> typing.Any:
+    def call(self, **kwargs) -> typing.Any:
         raise NotImplementedError
 
 
@@ -120,7 +118,7 @@ class WorkflowLLMTool(BaseLLMTool):
         self.trigger = trigger
         return self
 
-    def _call(self, **kwargs):
+    def call(self, **kwargs):
         from bots.models import Workflow
         from daras_ai_v2.base import extract_model_fields
 
@@ -252,7 +250,7 @@ def call_recipe_functions(
             state=state,
             trigger=trigger,
         )
-        tool._call()
+        tool.call()
 
 
 def get_workflow_tools_from_state(

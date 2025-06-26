@@ -1405,11 +1405,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         for call in tool_calls:
             tool, arguments = get_tool_from_call(call["function"], tools_by_name)
             yield f"🛠 {tool.label}..."
-            result = tool.call(arguments)
+            output = tool.call_json(arguments)
             response.final_prompt.append(
                 dict(
                     role="tool",
-                    content=json.dumps(result),
+                    content=output,
                     tool_call_id=call["id"],
                 ),
             )

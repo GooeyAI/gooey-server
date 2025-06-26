@@ -179,8 +179,7 @@ class RealtimeSession:
             thread.start()
 
     def call_tool(self, call_id: str, tool: BaseLLMTool, arguments: str):
-        result = tool.call(arguments)
-        output = json.dumps(result)
+        output = tool.call_json(arguments)
 
         self.messages.append(dict(role="tool", content=output, tool_call_id=call_id))
 
