@@ -1,4 +1,5 @@
 import typing
+import html
 
 import gooey_gui as gui
 from furl import furl
@@ -51,15 +52,10 @@ def global_workspace_selector(user: AppUser, session: dict):
                 display_name = "Personal"
         else:
             display_name = current.display_name(user)
-        gui.html(
-            " ".join(
-                [
-                    current.html_icon(),
-                    display_name,
-                    '<i class="ps-1 fa-regular fa-chevron-down"></i>',
-                ],
-            ),
-        )
+        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
+            gui.html(f"{current.html_icon()}")
+            gui.html(html.escape(display_name), className="d-none d-md-inline")
+            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
 
     with (
         content,
@@ -150,7 +146,7 @@ def global_workspace_selector(user: AppUser, session: dict):
                         style=dict(marginBottom="0.1rem"),
                     )
 
-        with gui.div(className="d-lg-none d-inline-block"):
+        with gui.div(className="d-xl-none d-inline-block"):
             for url, label in settings.HEADER_LINKS:
                 with gui.tag(
                     "a",

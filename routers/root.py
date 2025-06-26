@@ -5,6 +5,7 @@ import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
+from textwrap import dedent
 from time import time
 
 import gooey_gui as gui
@@ -250,9 +251,9 @@ def component_page(request: Request):
 @gui.route(app, "/explore/")
 def explore_page(
     request: Request,
-    search: str | None = None,
-    workspace: str | None = None,
-    workflow: str | None = None,
+    search: str = "",
+    workspace: str = "",
+    workflow: str = "",
 ):
     from widgets import explore
     from widgets.workflow_search import SearchFilters
@@ -722,6 +723,27 @@ def _render_search_bar_with_redirect(
         )
 
 
+def get_js_hide_mobile_search():
+    return dedent("""
+    event.preventDefault();
+    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
+    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
+    """)
+
+
+def get_js_show_mobile_search():
+    return dedent("""
+    event.preventDefault();
+    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
+    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
+    document.querySelector('#mobile_search').focus();
+    """)
+
+
 @contextmanager
 def page_wrapper(
     request: Request,
@@ -737,8 +759,12 @@ def page_wrapper(
             gui.div(className="header"),
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
+            gui.div(className="w-100 d-flex gap-2"),
         ):
-            with gui.tag("a", href="/"):
+            with (
+                gui.div(className="hide_on_mobile_search d-md-block"),
+                gui.tag("a", href="/"),
+            ):
                 gui.tag(
                     "img",
                     src=settings.GOOEY_LOGO_IMG,
@@ -758,16 +784,39 @@ def page_wrapper(
                 className="flex-grow-1 d-flex justify-content-center align-items-center"
             ):
                 with gui.div(
+                    className="show_on_mobile_search flex-grow-1 justify-content-center align-items-center d-md-none",
+                    style={"display": "none"},
+                ):
+                    # mobile search - hidden by default & when focused out, shown on clicking Search icon
+                    _render_search_bar_with_redirect(
+                        search_filters,
+                        id="mobile_search",
+                        key="mobile_search_query",
+                        onBlur=get_js_hide_mobile_search(),
+                    )
+                with gui.div(
                     className="d-none d-md-flex flex-grow-1 justify-content-center align-items-center"
                 ):
                     # desktop search - always hidden on mobile
                     _render_search_bar_with_redirect(search_filters)
+                with gui.div(
+                    className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
+                    style={"display": "flex"},
+                ):
+                    gui.button(
+                        icons.search,
+                        type="tertiary",
+                        unsafe_allow_html=True,
+                        className="m-0",
+                        onClick=get_js_show_mobile_search(),
+                    )
 
             with gui.div(
-                className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
+                className="hide_on_mobile_search gap-2 d-md-flex justify-content-end flex-wrap align-items-center",
+                style={"display": "flex", "maxWidth": "50%"},
             ):
                 for url, label in settings.HEADER_LINKS:
-                    with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
+                    with gui.tag("a", href=url, className="pe-2 d-none d-xl-block"):
                         if icon := settings.HEADER_ICONS.get(url):
                             with gui.div(className="d-inline-block me-2 small"):
                                 gui.html(icon)
