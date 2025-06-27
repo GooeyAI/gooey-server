@@ -126,6 +126,7 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
             ):
                 gui.html(label)
 
+
 FOOTER_CSS = """
 & {
     font-size: 0.9rem;
@@ -181,6 +182,7 @@ FOOTER_CSS = """
 }
 """
 
+
 def render_footer_breadcrumbs(
     published_run: PublishedRun,
     show_workspace_author: bool,
@@ -204,13 +206,21 @@ def render_footer_breadcrumbs(
             # don't repeat author for personal workspaces
             with gui.div(className="d-flex align-items-center workspace-container"):
                 render_author_from_workspace(
-                    published_run.workspace, image_size="24px", responsive=False, remove_underline=False
+                    published_run.workspace,
+                    image_size="24px",
+                    responsive=False,
+                    remove_underline=False,
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
-            with gui.div(className="d-flex align-items-center text-truncate author-container"):
+            with gui.div(
+                className="d-flex align-items-center text-truncate author-container"
+            ):
                 render_author_from_user(
-                    published_run.last_edited_by, image_size="24px", responsive=False, remove_underline=False
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    responsive=False,
+                    remove_underline=False,
                 )
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
