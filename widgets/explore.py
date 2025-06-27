@@ -8,6 +8,7 @@ from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
+from utils.workspace import is_user_workspace_owner
 from widgets.workflow_search import (
     SearchFilters,
     render_search_filters,
@@ -15,10 +16,10 @@ from widgets.workflow_search import (
 )
 
 META_TITLE = "Explore AI workflows"
-META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
+META_DESCRIPTION = "Find, fork and run your field's favorite AI recipes on Gooey.AI"
 
 TITLE = "Explore"
-DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
+DESCRIPTION = "DISCOVER YOUR FIELD'S FAVORITE AI WORKFLOWS"
 
 
 def render(user: AppUser | None, search_filters: SearchFilters | None):
@@ -44,9 +45,19 @@ def render(user: AppUser | None, search_filters: SearchFilters | None):
         if category != "Featured":
             section_heading(category)
         if category == "Images" or category == "Featured":
-            grid_layout(3, pages, _render_as_featured, separator=False)
+            grid_layout(
+                3,
+                pages,
+                lambda page_cls: _render_as_featured(page_cls, user, search_filters),
+                separator=False,
+            )
         else:
-            grid_layout(2, pages, _render_non_featured, separator=False)
+            grid_layout(
+                2,
+                pages,
+                lambda page_cls: _render_non_featured(page_cls, user, search_filters),
+                separator=False,
+            )
 
 
 def heading(
@@ -87,15 +98,23 @@ def render_image(page: BasePage):
     )
 
 
-def _render_as_featured(page_cls: typing.Type[BasePage]):
+def _render_as_featured(
+    page_cls: typing.Type[BasePage],
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     page = page_cls()
     render_image(page)
     # total_runs = page.get_total_runs()
     # render_description(page, state, total_runs)
-    render_description(page)
+    render_description(page, user, search_filters)
 
 
-def _render_non_featured(page_cls):
+def _render_non_featured(
+    page_cls: typing.Type[BasePage],
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     page = page_cls()
     col1, col2 = gui.columns([1, 2])
     with col1:
@@ -103,17 +122,27 @@ def _render_non_featured(page_cls):
     with col2:
         # total_runs = page.get_total_runs()
         # render_description(page, state, total_runs)
-        render_description(page)
+        render_description(page, user, search_filters)
 
 
-def render_description(page: BasePage):
+def render_description(
+    page: BasePage,
+    user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+):
     with gui.link(to=page.app_url()):
         gui.markdown(f"#### {page.get_recipe_title()}")
 
     root_pr = page.get_root_pr()
     with gui.div(className="mb-3"):
         gui.write(root_pr.notes, line_clamp=4)
-    if root_pr.run_count >= 50:
+
+    # Check if user is viewing their own workspace
+    show_all_counts = False
+    if search_filters and search_filters.workspace:
+        show_all_counts = is_user_workspace_owner(user, search_filters.workspace)
+
+    if root_pr.run_count >= 50 or show_all_counts:
         run_count = format_number_with_suffix(root_pr.run_count)
         gui.caption(
             f"{icons.run} {run_count} runs",
