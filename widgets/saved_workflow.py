@@ -209,7 +209,6 @@ def render_footer_breadcrumbs(
                     published_run.workspace,
                     image_size="24px",
                     responsive=False,
-                    remove_underline=False,
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
@@ -220,7 +219,6 @@ def render_footer_breadcrumbs(
                     published_run.last_edited_by,
                     image_size="24px",
                     responsive=False,
-                    remove_underline=False,
                 )
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
