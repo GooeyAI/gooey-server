@@ -126,14 +126,13 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
             ):
                 gui.html(label)
 
-
 FOOTER_CSS = """
 & {
     font-size: 0.9rem;
     white-space: nowrap;
 }
 & .author-name {
-    max-width: 150px; 
+    max-width: 200px; 
     overflow: hidden; 
     text-overflow: ellipsis; 
 }
@@ -151,16 +150,36 @@ FOOTER_CSS = """
     align-items: center;
 }
 @media (max-width: 768px) {
-     & .newline-sm {
-        width: 100%;
-        height: 0.12rem;
+    & {
+        display: grid !important;
+        grid-template-areas: 
+            "workspace author"
+            "notes notes"
+            "time runs";
+        gap: 0.25rem 0.75rem;
+        align-items: start;
+        white-space: normal;
     }
-    & .newline-sm:before, & .newline-sm + :before {
-        content: unset !important;
+    & .workspace-container {
+        grid-area: workspace;
+    }
+    & .author-container {
+        grid-area: author;
+    }
+    & .notes-container {
+        grid-area: notes;
+    }
+    & .time-container {
+        grid-area: time;
+    }
+    & .runs-container {
+        grid-area: runs;
+    }
+    & > div {
+        margin: 0;
     }
 }
 """
-
 
 def render_footer_breadcrumbs(
     published_run: PublishedRun,
@@ -183,26 +202,23 @@ def render_footer_breadcrumbs(
             show_workspace_author = False
         if show_workspace_author:
             # don't repeat author for personal workspaces
-            with gui.div(className="d-flex align-items-center"):
+            with gui.div(className="d-flex align-items-center workspace-container"):
                 render_author_from_workspace(
                     published_run.workspace, image_size="24px", responsive=False, remove_underline=False
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
-            with gui.div(className="d-flex align-items-center text-truncate"):
+            with gui.div(className="d-flex align-items-center text-truncate author-container"):
                 render_author_from_user(
                     published_run.last_edited_by, image_size="24px", responsive=False, remove_underline=False
                 )
-            # if show_workspace_author:
-            gui.div(className="newline-sm")
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
-                className="text-truncate text-muted d-flex align-items-center",
+                className="text-truncate text-muted d-flex align-items-center notes-container",
                 style={"maxWidth": "250px"},
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
-            gui.div(className="newline-sm")
 
         updated_at = published_run.saved_run.updated_at
         if (
@@ -210,7 +226,7 @@ def render_footer_breadcrumbs(
             and isinstance(updated_at, datetime.datetime)
             and not hide_updated_at
         ):
-            with gui.div(className="d-flex align-items-center"):
+            with gui.div(className="d-flex align-items-center time-container"):
                 gui.write(
                     f"{icons.time} {get_relative_time(updated_at)}",
                     unsafe_allow_html=True,
@@ -219,13 +235,12 @@ def render_footer_breadcrumbs(
 
         if published_run.run_count >= 50 or show_all_run_counts:
             run_count = format_number_with_suffix(published_run.run_count)
-            with gui.div(className="d-flex align-items-center"):
+            with gui.div(className="d-flex align-items-center runs-container"):
                 gui.write(
                     f"{icons.run} {run_count} runs",
                     unsafe_allow_html=True,
                     className="text-muted text-nowrap",
                 )
-            gui.div(className="newline-sm")
 
         if not hide_visibility_pill:
             gui.caption(
