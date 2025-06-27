@@ -32,14 +32,19 @@ def drain(ws: ClientConnection):
 
 def recv_json(ws: ClientConnection, **kwargs) -> dict:
     event = json.loads(ws.recv(**kwargs))
-    # print(f"< {event=}")
+    # if event.get("event") == "media":
+    #     pass
+    # elif event.get("type") == "response.audio.delta":
+    #     print(f"< event={event | {'delta': len(event['delta'])}}")
+    # else:
+    #     print(f"< {event=}")
     if event.get("type") in {
         "error",
         "response.failed",
         "response.incomplete",
     } or event.get("response", {}).get("status") in {
         "failed",
-        "incomplete",
+        # "incomplete",
     }:
         raise openai.OpenAIError(event)
     return event

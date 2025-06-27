@@ -1,3 +1,4 @@
+import json
 import typing
 
 import gooey_gui as gui
@@ -21,7 +22,55 @@ before or after the workflow runs.
 <a href='/functions-help' target='_blank'>Learn more.</a>"""
 
 
-class LLMTool:
+class BaseLLMTool:
+    def __init__(
+        self,
+        name: str,
+        label: str,
+        description: str,
+        properties: dict,
+        required: list[str] | None = None,
+        await_audio_completed: bool = False,
+    ):
+        self.name = name
+        self.label = label
+
+        self.spec_parameters = {
+            "type": "object",
+            "properties": properties,
+        }
+        if required:
+            self.spec_parameters["required"] = required
+
+        self.spec_function = {
+            "name": name,
+            "description": description,
+            "parameters": self.spec_parameters,
+        }
+
+        ## Yes openai really does have 2 ways to specify tools in their own APIs
+        # https://platform.openai.com/docs/api-reference/chat/create
+        self.spec_openai = {"type": "function", "function": self.spec_function}
+        # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+        self.spec_openai_audio = {"type": "function"} | self.spec_function
+
+        self.await_audio_completed = await_audio_completed
+
+    def call_json(self, arguments: str) -> str:
+        try:
+            kwargs = json.loads(arguments)
+            ret = self.call(**kwargs)
+        except (json.JSONDecodeError, TypeError) as e:
+            ret = dict(error=repr(e))
+        return json.dumps(ret)
+
+    def call(self, **kwargs) -> typing.Any:
+        raise NotImplementedError
+
+
+class WorkflowLLMTool(BaseLLMTool):
+    """External function tool that calls workflow URLs."""
+
     def __init__(self, function_url: str):
         from daras_ai_v2.workflow_url_input import url_to_runs
         from bots.models import Workflow
@@ -30,9 +79,6 @@ class LLMTool:
 
         self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
         self._fn_runs = (self.fn_sr, self.fn_pr)
-
-        self.name = slugify(self.fn_pr.title).replace("-", "_")
-        self.label = self.fn_pr.title
 
         self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
         if self.is_function_workflow:
@@ -43,18 +89,15 @@ class LLMTool:
             fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
                 "properties", {}
             )
+        properties = dict(generate_tool_properties(fn_vars, fn_vars_schema))
 
-        self.spec = {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.fn_pr.notes,
-                "parameters": {
-                    "type": "object",
-                    "properties": dict(generate_tool_params(fn_vars, fn_vars_schema)),
-                },
-            },
-        }
+        name = slugify(self.fn_pr.title).replace("-", "_")
+        super().__init__(
+            name=name,
+            label=self.fn_pr.title or name,
+            description=self.fn_pr.notes,
+            properties=properties,
+        )
 
     def bind(
         self,
@@ -65,7 +108,7 @@ class LLMTool:
         response_model: typing.Type["BasePage.ResponseModel"],
         state: dict,
         trigger: FunctionTrigger,
-    ) -> "LLMTool":
+    ) -> "WorkflowLLMTool":
         self.saved_run = saved_run
         self.workspace = workspace
         self.current_user = current_user
@@ -75,14 +118,14 @@ class LLMTool:
         self.trigger = trigger
         return self
 
-    def __call__(self, **kwargs):
+    def call(self, **kwargs):
         from bots.models import Workflow
         from daras_ai_v2.base import extract_model_fields
 
         try:
             self.saved_run
         except AttributeError:
-            raise RuntimeError("This LLMTool instance is not yet bound")
+            raise RuntimeError(f"This {self.__class__} instance is not yet bound")
 
         fn_sr, fn_pr = self._fn_runs
 
@@ -174,6 +217,15 @@ class LLMTool:
         return system_vars, system_vars_schema
 
 
+def get_tool_from_call(
+    function_call: dict, tools_by_name: dict[str, "BaseLLMTool"]
+) -> tuple[BaseLLMTool, str]:
+    name = function_call["name"]
+    arguments = function_call["arguments"]
+    tool = tools_by_name[name]
+    return tool, arguments
+
+
 def call_recipe_functions(
     *,
     saved_run: "SavedRun",
@@ -184,7 +236,7 @@ def call_recipe_functions(
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Iterable[str]:
-    tools = list(get_tools_from_state(state, trigger))
+    tools = list(get_workflow_tools_from_state(state, trigger))
     if not tools:
         return
     yield f"Running {trigger.name} hooks..."
@@ -198,22 +250,22 @@ def call_recipe_functions(
             state=state,
             trigger=trigger,
         )
-        tool()
+        tool.call()
 
 
-def get_tools_from_state(
+def get_workflow_tools_from_state(
     state: dict, trigger: FunctionTrigger
-) -> typing.Iterable[LLMTool]:
+) -> typing.Iterable[WorkflowLLMTool]:
     functions = state.get("functions")
     if not functions:
         return
     for function in functions:
         if function.get("trigger") != trigger.name:
             continue
-        yield LLMTool(function.get("url"))
+        yield WorkflowLLMTool(function.get("url"))
 
 
-def generate_tool_params(
+def generate_tool_properties(
     fn_vars: dict, fn_vars_schema: dict
 ) -> typing.Iterable[tuple[str, dict]]:
     for name, value in fn_vars.items():

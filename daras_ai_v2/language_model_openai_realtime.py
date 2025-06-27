@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import json
 import threading
 import typing
 from datetime import datetime
 
-from django.core.exceptions import ValidationError
+import openai
 from furl import furl
-from loguru import logger
-from sentry_sdk import capture_exception
-from twilio.base.exceptions import TwilioRestException
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection
 
-from bots.models import BotIntegration
-from functions.recipe_functions import LLMTool
+from functions.inbuilt_tools import CallTransferLLMTool
+from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json
 
 
@@ -24,12 +20,14 @@ class RealtimeSession:
         self,
         twilio_ws: ClientConnection,
         openai_ws: ClientConnection,
-        tools: list[LLMTool] | None = None,
+        tools: list[BaseLLMTool] | None = None,
+        messages: list[dict] | None = None,
         audio_url: str | None = None,
     ):
         self.twilio_ws = twilio_ws
         self.openai_ws = openai_ws
-        self.tools = tools
+        self.tools_by_name = {tool.name: tool for tool in tools}
+        self.messages = messages or []
 
         self.audio_url = audio_url
         self.bi_id = furl(audio_url).args.get("bi_id")
@@ -39,6 +37,8 @@ class RealtimeSession:
         self.last_assistant_item_id: str | None = None
         self.response_start_ts: int | None = None
         self.latest_media_ts: int = 0
+        self.last_mark: str | None = None
+        self.awaiting_threads: list[threading.Thread] = []
 
         # transcript
         self.entry = {"role": "assistant", "content": "", "chunk": ""}
@@ -50,6 +50,13 @@ class RealtimeSession:
             start_data = msg.get("start") or {}
             self.call_sid = start_data.get("callSid")
 
+        # Bind context to existing CallTransferLLMTool
+        if self.bi_id and self.call_sid and self.tools_by_name:
+            for tool in self.tools_by_name.values():
+                if isinstance(tool, CallTransferLLMTool):
+                    tool.bind(call_sid=self.call_sid, bi_id=self.bi_id)
+                    break
+
         threading.Thread(target=self.pipe_twilio_audio_to_openai).start()
 
         dispatch = {
@@ -60,12 +67,15 @@ class RealtimeSession:
         }
         try:
             while True:
-                event = recv_json(self.openai_ws)
+                try:
+                    event = recv_json(self.openai_ws)
+                except openai.OpenAIError:
+                    continue
                 handler = dispatch.get(event.get("type"))
                 if not handler:
                     continue
                 handler(event)
-        except (ConnectionClosed, CallTransferred):
+        except ConnectionClosed:
             pass
 
         yield self.entry
@@ -95,9 +105,8 @@ class RealtimeSession:
     def on_audio_delta(self, event: dict):
         if self.response_start_ts is None:
             self.response_start_ts = self.latest_media_ts
-        item_id = event.get("item_id")
-        if item_id:
-            self.last_assistant_item_id = item_id
+        self.last_assistant_item_id = event["item_id"]
+        event_id = event["event_id"]
         send_json(
             self.twilio_ws,
             {
@@ -108,8 +117,13 @@ class RealtimeSession:
         )
         send_json(
             self.twilio_ws,
-            {"event": "mark", "streamSid": self.stream_sid},
+            {
+                "event": "mark",
+                "streamSid": self.stream_sid,
+                "mark": {"name": event_id},
+            },
         )
+        self.last_mark = event_id
 
     def on_transcription_completed(self, event: dict):
         transcript = event.get("transcript")
@@ -118,8 +132,6 @@ class RealtimeSession:
         self.append_transcription_entry("user", transcript)
 
     def on_output_item_done(self, event: dict):
-        from recipes.VideoBots import exec_tool_call
-
         item = event.get("item")
         if not item:
             return
@@ -130,31 +142,58 @@ class RealtimeSession:
             transcript = content[0].get("transcript") or ""
             if transcript:
                 self.append_transcription_entry("assistant", transcript)
-            if self.bi_id:
-                handle_transfer_call_button(
-                    content, self.openai_ws, self.call_sid, self.bi_id
-                )
 
         # Handle function calls
-        if self.tools and item.get("type") == "function_call":
-            result = yield_from(
-                exec_tool_call(
-                    {"function": item},
-                    {tool.name: tool for tool in self.tools},
-                )
+        if self.tools_by_name and item.get("type") == "function_call":
+            self.handle_function_call(item)
+
+    def handle_function_call(self, function_call: dict):
+        from recipes.VideoBots import get_tool_from_call
+
+        call_id = function_call["call_id"]
+        self.messages.append(
+            dict(
+                role="assistant",
+                content="",
+                tool_calls=[
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": function_call["name"],
+                            "arguments": function_call["arguments"],
+                        },
+                    }
+                ],
             )
-            send_json(
-                self.openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": item["call_id"],
-                        "output": json.dumps(result),
-                    },
+        )
+
+        tool, arguments = get_tool_from_call(function_call, self.tools_by_name)
+        thread = threading.Thread(
+            target=self.call_tool, args=(call_id, tool, arguments)
+        )
+        if self.last_mark and tool.await_audio_completed:
+            self.awaiting_threads.append(thread)
+        else:
+            thread.start()
+
+    def call_tool(self, call_id: str, tool: BaseLLMTool, arguments: str):
+        output = tool.call_json(arguments)
+
+        self.messages.append(dict(role="tool", content=output, tool_call_id=call_id))
+
+        send_json(
+            self.openai_ws,
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": output,
                 },
-            )
-            send_json(self.openai_ws, {"type": "response.create"})
+            },
+        )
+        send_json(self.openai_ws, {"type": "response.create"})
 
     def pipe_twilio_audio_to_openai(self):
         try:
@@ -175,6 +214,12 @@ class RealtimeSession:
                                 "audio": media["payload"],
                             },
                         )
+                    case "mark":
+                        if msg.get("mark", {}).get("name") == self.last_mark:
+                            self.last_mark = None
+                            for thread in self.awaiting_threads:
+                                thread.start()
+                            self.awaiting_threads = []
         except ConnectionClosed:
             pass
         finally:
@@ -198,6 +243,7 @@ class RealtimeSession:
             formatted_time = f"[{minutes:02.0f}:{seconds:02.0f}]"
             line = f"\n\n{formatted_time} {role.title()}: {content}"
         self.entry["content"] = (self.entry["content"] + line).strip()
+        self.messages.append(dict(role=role, content=content))
 
 
 T = typing.TypeVar("T")
@@ -210,109 +256,3 @@ def yield_from(gen: typing.Generator[typing.Any, None, T]) -> T:
             next(gen)
         except StopIteration as e:
             return e.value
-
-
-def handle_transfer_call_button(
-    content: list[dict], openai_ws: ClientConnection, call_sid: str, bi_id: str
-):
-    """
-    Handle a transfer call button if present in the response item.
-    Raises ConnectionClosed if a transfer was initiated.
-    """
-
-    from daras_ai_v2.bots import parse_bot_html
-    from twilio.twiml.voice_response import VoiceResponse
-    from routers.bots_api import api_hashids
-    from bots.models.bot_integration import validate_phonenumber
-
-    text_content = None
-    for part in content:
-        if not isinstance(part, dict):
-            continue
-
-        if part.get("type") == "text":
-            text_content = part.get("text", "")
-            break
-        elif part.get("type") == "audio":
-            text_content = part.get("transcript", "")
-            break
-    if not text_content:
-        return
-
-    buttons, _, _ = parse_bot_html(text_content)
-
-    for button in buttons:
-        if "transfer_call" not in button.get("id", ""):
-            continue
-        transfer_number = button.get("title", "").strip()
-        if not transfer_number:
-            continue
-
-        # Validate the phone number before attempting transfer
-        try:
-            validate_phonenumber(transfer_number)
-        except ValidationError as e:
-            send_json(
-                openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Invalid phone number format: {str(e)}",
-                            }
-                        ],
-                    },
-                },
-            )
-            send_json(openai_ws, {"type": "response.create"})
-            return
-
-        try:
-            bi_id_decoded = api_hashids.decode(bi_id)[0]
-            bi = BotIntegration.objects.get(id=bi_id_decoded)
-        except BotIntegration.DoesNotExist as e:
-            logger.debug(
-                f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
-            )
-            capture_exception(e)
-            return
-
-        client = bi.get_twilio_client()
-
-        # try to transfer the call
-        resp = VoiceResponse()
-        resp.dial(transfer_number)
-        try:
-            client.calls(call_sid).update(twiml=str(resp))
-        except TwilioRestException as e:
-            logger.error(f"Failed to transfer call: {e}")
-            capture_exception(e)
-
-            send_json(
-                openai_ws,
-                {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Failed to transfer call: {str(e)}",
-                            }
-                        ],
-                    },
-                },
-            )
-            send_json(openai_ws, {"type": "response.create"})
-        else:
-            logger.info(f"Successfully initiated transfer to {transfer_number}")
-            raise CallTransferred
-
-
-class CallTransferred(Exception):
-    pass

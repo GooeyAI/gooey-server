@@ -61,6 +61,7 @@ def variables_input(
 
     list_key = key + ":list"
     list_items = gui.session_state.setdefault(list_key, [])
+
     var_names -= {item["name"] for item in list_items}
     var_names = sorted(
         var_names, key=lambda x: variables_schema.get(x, {}).get("role") or ""
@@ -73,8 +74,18 @@ def variables_input(
                 "schema": variables_schema.get(var, {}),
             }
         )
+
     if pressed_add:
         list_items.insert(0, {"name": "", "value": None, "schema": {}, "_edit": True})
+
+    # if the user clicks the button to clear system variables, remove all system variables
+    if gui.session_state.pop(list_key + ":clear-system", None):
+        gui.session_state[list_key] = [
+            item
+            for item in list_items
+            if item.get("schema", {}).get("role") != "system"
+        ]
+
     list_items = list_view_editor(
         key=list_key,
         render_inputs=partial(render_list_item, template_var_names=template_var_names),
@@ -85,6 +96,15 @@ def variables_input(
 
     if not list_items and gui.session_state.get(key) is None:
         return
+
+    # button to clear system variables
+    if any(item.get("schema", {}).get("role") == "system" for item in list_items):
+        gui.button(
+            f"{icons.clear}<i class='ps-1'>Clear System Variables</i>",
+            type="link",
+            className="text-muted",
+            key=list_key + ":clear-system",
+        )
 
     gui.session_state[key] = {item["name"]: item["value"] for item in list_items}
     gui.session_state[schema_key] = {

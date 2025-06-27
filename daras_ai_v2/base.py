@@ -55,12 +55,13 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
+from functions.inbuilt_tools import get_inbuilt_tools_from_state
 from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
-    LLMTool,
+    BaseLLMTool,
     call_recipe_functions,
     functions_input,
-    get_tools_from_state,
+    get_workflow_tools_from_state,
     is_functions_enabled,
     render_called_functions,
 )
@@ -422,6 +423,9 @@ class BasePage:
                             user=self.current_sr_user,
                             pr=self.current_pr,
                             sr=self.current_sr,
+                            current_workspace=(
+                                self.is_logged_in() and self.current_workspace or None
+                            ),
                         )
             else:
                 # render title in line with the social buttons
@@ -1252,7 +1256,6 @@ class BasePage:
         def _render(page_cls: typing.Type[BasePage]):
             page = page_cls()
             root_run = page.get_root_pr()
-            state = root_run.saved_run.to_dict()
             preview_image = page.get_explore_image()
 
             with gui.link(to=page.app_url(), className="text-decoration-none"):
@@ -1368,7 +1371,7 @@ class BasePage:
         sr.save(update_fields=["is_flagged"])
         gui.session_state["is_flagged"] = is_flagged
 
-    def get_current_llm_tools(self) -> dict[str, LLMTool]:
+    def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
         return {
             tool.name: tool.bind(
                 saved_run=self.current_sr,
@@ -1379,7 +1382,11 @@ class BasePage:
                 state=gui.session_state,
                 trigger=FunctionTrigger.prompt,
             )
-            for tool in get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+            for tool in get_workflow_tools_from_state(
+                gui.session_state, FunctionTrigger.prompt
+            )
+        } | {
+            tool.name: tool for tool in get_inbuilt_tools_from_state(gui.session_state)
         }
 
     @cached_property

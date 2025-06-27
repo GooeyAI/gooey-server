@@ -15,7 +15,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_bytes_to_wav
 from daras_ai_v2.exceptions import raise_for_status, ffmpeg
 from daras_ai_v2.language_model_openai_realtime import RealtimeSession
-from functions.recipe_functions import LLMTool
+from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json, send_recv_json
 
 if typing.TYPE_CHECKING:
@@ -31,7 +31,7 @@ def run_openai_audio(
     audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
@@ -40,7 +40,7 @@ def run_openai_audio(
 
     twilio_ws = None
     audio_data = None
-    if audio_url and audio_url.startswith("ws"):
+    if is_realtime_audio_url(audio_url):
         # if the audio_url is a websocket url, connect to it
         twilio_ws = connect(audio_url)
         audio_session_extra = (audio_session_extra or {}) | {
@@ -68,7 +68,7 @@ def run_openai_audio(
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, tools, audio_url
+                twilio_ws, openai_ws, tools, messages, audio_url
             ).stream():
                 yield [entry]
         else:
@@ -99,6 +99,14 @@ def run_openai_audio(
             twilio_ws.close()
 
 
+def is_realtime_audio_url(url: str | None) -> bool:
+    """
+    Check if the given URL is a Realtime audio URL.
+    This function checks if the URL starts with 'ws://' or 'wss://'
+    """
+    return bool(url and url.startswith(("ws://", "wss://")))
+
+
 def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
     try:
         ws = threadlocal._realtime_ws
@@ -125,7 +133,7 @@ def init_ws_session(
     audio_session_extra: dict | None,
     messages: list,
     temperature: float | None = None,
-    tools: list[LLMTool] | None = None,
+    tools: list[BaseLLMTool] | None = None,
 ):
     from daras_ai_v2.language_model import get_entry_text, msgs_to_prompt_str
 
@@ -162,6 +170,7 @@ def init_ws_session(
             + msgs_to_prompt_str(conversation)
         )
 
+    # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
     session_data = {
         "instructions": system_message,
         "input_audio_transcription": {"model": "whisper-1"},
@@ -172,9 +181,7 @@ def init_ws_session(
     if audio_session_extra:
         session_data |= audio_session_extra
     if tools:
-        session_data["tools"] = [
-            tool.spec["function"] | {"type": tool.spec["type"]} for tool in tools
-        ]
+        session_data["tools"] = [tool.spec_openai_audio for tool in tools]
     send_recv_json(ws, {"type": "session.update", "session": session_data})
 
     if audio_data:

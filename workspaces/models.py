@@ -560,9 +560,13 @@ class WorkspaceInviteQuerySet(models.QuerySet):
             )
             invite.full_clean()
 
-            if not created and invite.status != WorkspaceInvite.Status.PENDING:
-                invite.status = WorkspaceInvite.Status.PENDING
-                invite.save(update_fields=["status"])
+            if not created:
+                # update older invite
+                if invite.status != WorkspaceInvite.Status.PENDING:
+                    invite.status = WorkspaceInvite.Status.PENDING
+                if "role" in defaults and invite.role != defaults["role"]:
+                    invite.role = defaults["role"]
+                invite.save(update_fields=["status", "role"])
 
         try:
             invitee = AppUser.objects.get(email=invite.email)

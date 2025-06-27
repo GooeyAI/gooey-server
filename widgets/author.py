@@ -5,6 +5,7 @@ import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun
 from daras_ai_v2 import icons
+from daras_ai_v2.fastapi_tricks import get_route_path
 from workspaces.models import Workspace
 
 
@@ -12,6 +13,7 @@ def render_author_as_breadcrumb(
     user: AppUser | None,
     pr: PublishedRun,
     sr: SavedRun,
+    current_workspace: Workspace | None = None,
 ):
     is_example = pr.saved_run_id == sr.id
     if is_example:
@@ -23,7 +25,7 @@ def render_author_as_breadcrumb(
         className="d-flex gap-2 align-items-center", style=dict(listStyle="none")
     ):
         with gui.tag("li"):
-            render_author_from_workspace(workspace, remove_underline=False)
+            render_author_from_workspace(workspace, current_workspace=current_workspace)
 
         # don't render the user's name for examples and personal workspaces
         if is_example or workspace.is_personal:
@@ -42,11 +44,7 @@ def render_author_as_breadcrumb(
                 full_name = "Deleted User"
                 link = None
 
-            linkto = (
-                link
-                and gui.link(to=link, className="text-decoration-none")
-                or gui.dummy()
-            )
+            linkto = link and gui.link(to=link) or gui.dummy()
             with linkto:
                 gui.caption(full_name)
 
@@ -57,8 +55,10 @@ def render_author_from_workspace(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
-    remove_underline: bool = True,
+    current_workspace: Workspace | None = None,
 ):
+    from routers.account import saved_route
+
     if not workspace:
         return
     photo = workspace.get_photo()
@@ -66,7 +66,10 @@ def render_author_from_workspace(
         name = workspace.created_by.display_name
     else:
         name = workspace.display_name()
-    if show_as_link and workspace.handle_id:
+
+    if show_as_link and workspace == current_workspace:
+        link = get_route_path(saved_route)
+    elif show_as_link and workspace.handle_id:
         link = workspace.handle.get_app_url()
     else:
         link = None
@@ -76,7 +79,6 @@ def render_author_from_workspace(
         link=link,
         image_size=image_size,
         responsive=responsive,
-        remove_underline=remove_underline,
     )
 
 
@@ -86,7 +88,6 @@ def render_author_from_user(
     image_size: str = "30px",
     responsive: bool = True,
     show_as_link: bool = True,
-    remove_underline: bool = True,
 ):
     if not user:
         return
@@ -102,7 +103,6 @@ def render_author_from_user(
         link=link,
         image_size=image_size,
         responsive=responsive,
-        remove_underline=remove_underline,
     )
 
 
@@ -113,7 +113,6 @@ def render_author(
     *,
     image_size: str,
     responsive: bool,
-    remove_underline: bool = True,
 ):
     if not photo and not name:
         return
@@ -123,11 +122,7 @@ def render_author(
     else:
         responsive_image_size = image_size
 
-    if link:
-        class_name = "text-decoration-none" if remove_underline else ""
-        linkto = gui.link(to=link, className=class_name)
-    else:
-        linkto = gui.dummy()
+    linkto = link and gui.link(to=link) or gui.dummy()
     with linkto, gui.div(className="d-flex align-items-center"):
         if photo:
             with gui.styled(

@@ -75,6 +75,7 @@ from daras_ai_v2.language_model import (
     get_entry_text,
     run_language_model,
 )
+from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 from daras_ai_v2.language_model_settings_widgets import (
     LanguageModelSettings,
     language_model_selector,
@@ -104,10 +105,11 @@ from daras_ai_v2.vector_search import (
     doc_or_yt_url_to_file_metas,
     doc_url_to_text_pages,
 )
+from functions.inbuilt_tools import get_inbuilt_tools_from_state
 from functions.models import FunctionTrigger
 from functions.recipe_functions import (
-    LLMTool,
-    get_tools_from_state,
+    get_tool_from_call,
+    get_workflow_tools_from_state,
     render_called_functions,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -367,13 +369,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def render_form_v2(self):
-        gui.text_area(
-            """
-            #### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions
-            """,
+        gui.code_editor(
+            label='#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions',
             key="bot_script",
-            height=300,
-            help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
+            language="jinja",
+            style=dict(maxHeight="50vh"),
+            help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
         language_model_selector(
@@ -752,7 +753,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         input_audio = gui.session_state.get("input_audio") or ""
         input_documents = gui.session_state.get("input_documents") or []
         if input_prompt or input_images or input_audio or input_documents:
-            if input_audio and input_audio.startswith(("ws://", "wss://")):
+            if is_realtime_audio_url(input_audio):
                 input_audio = ""
             messages.append(
                 dict(
@@ -808,6 +809,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
         if bot_integration:
             bot_branding = bot_integration.get_web_widget_branding()
+            if self.current_pr.photo_url:
+                bot_branding["photoUrl"] = self.current_pr.photo_url
         else:
             bot_branding = dict(
                 name=self.current_pr.title,
@@ -967,19 +970,22 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
         if gui.session_state.get("functions"):
             try:
-                prompt_funcs = list(
-                    get_tools_from_state(gui.session_state, FunctionTrigger.prompt)
+                tools = list(
+                    get_workflow_tools_from_state(
+                        gui.session_state, FunctionTrigger.prompt
+                    ),
+                ) + list(
+                    get_inbuilt_tools_from_state(gui.session_state),
                 )
             except Exception:
-                prompt_funcs = None
-            if prompt_funcs:
+                tools = None
+            if tools:
                 gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                for tool in prompt_funcs:
-                    gui.json(
-                        tool.spec.get("function", tool.spec),
-                        depth=3,
-                        collapseStringsAfterLength=False,
-                    )
+                gui.json(
+                    [tool.spec_function for tool in tools],
+                    depth=3,
+                    collapseStringsAfterLength=False,
+                )
 
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
@@ -1312,7 +1318,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
 
-        tools = self.get_current_llm_tools()
+        tools_by_name = self.get_current_llm_tools()
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
             messages=response.final_prompt,
@@ -1321,7 +1327,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
-            tools=list(tools.values()),
+            tools=list(tools_by_name.values()),
             stream=True,
             audio_url=request.input_audio,
             audio_session_extra=audio_session_extra,
@@ -1397,11 +1403,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
         )
         for call in tool_calls:
-            result = yield from exec_tool_call(call, tools)
+            tool, arguments = get_tool_from_call(call["function"], tools_by_name)
+            yield f"🛠 {tool.label}..."
+            output = tool.call_json(arguments)
             response.final_prompt.append(
                 dict(
                     role="tool",
-                    content=json.dumps(result),
+                    content=output,
                     tool_call_id=call["id"],
                 ),
             )
@@ -1880,18 +1888,6 @@ def convo_window_clipper(
         if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
-
-
-def exec_tool_call(call: dict, tools: dict[str, "LLMTool"]):
-    tool_name = call["function"]["name"]
-    tool_args = call["function"]["arguments"]
-    tool = tools[tool_name]
-    yield f"🛠 {tool.label}..."
-    try:
-        kwargs = json.loads(tool_args)
-    except json.JSONDecodeError as e:
-        return dict(error=repr(e))
-    return tool(**kwargs)
 
 
 class ConnectChoice(typing.NamedTuple):
