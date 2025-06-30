@@ -48,9 +48,7 @@ from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import global_workspace_selector
-
-if typing.TYPE_CHECKING:
-    from widgets.workflow_search import SearchFilters
+from widgets.workflow_search import SearchFilters, render_search_bar
 
 app = CustomAPIRouter()
 
@@ -256,7 +254,6 @@ def explore_page(
     workflow: str = "",
 ):
     from widgets import explore
-    from widgets.workflow_search import SearchFilters
 
     search_filters = SearchFilters(
         search=search, workspace=workspace, workflow=workflow
@@ -707,10 +704,8 @@ def get_og_url_path(request) -> str:
 
 
 def _render_search_bar_with_redirect(
-    request: Request, search_filters: typing.Optional["SearchFilters"], **props
+    request: Request, search_filters: typing.Optional[SearchFilters], **props
 ):
-    from widgets.workflow_search import SearchFilters, render_search_bar
-
     search_filters = search_filters or SearchFilters()
     search_query = render_search_bar(value=search_filters.search, **props)
     if search_query != search_filters.search:
@@ -748,7 +743,7 @@ def get_js_show_mobile_search():
 def page_wrapper(
     request: Request,
     className="",
-    search_filters: typing.Optional["SearchFilters"] = None,
+    search_filters: typing.Optional[SearchFilters] = None,
 ):
     context = {"request": request, "block_incognito": True}
 
