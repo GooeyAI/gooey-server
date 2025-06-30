@@ -22,6 +22,8 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
+from daras_ai_v2 import icons
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -299,14 +301,14 @@ BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 
 HEADER_LINKS = [
-    ("/explore/", "Explore"),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
     (BLOG_URL, "Blog"),
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
+    ("/saved/", "Saved"),
 ]
-HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
+HEADER_ICONS = {"/saved/": icons.save}
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 

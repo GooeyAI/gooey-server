@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException
 from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -143,16 +143,20 @@ def old_saved_route(request: Request):
 
 @gui.route(app, "/account/saved")
 def saved_route(request: Request):
-    with account_page_wrapper(request, AccountTabs.saved):
-        all_saved_runs_tab(request)
-    url = get_og_url_path(request)
-    return dict(
-        meta=raw_build_meta_tags(
-            url=url,
-            canonical_url=url,
-            title="Saved • Gooey.AI",
-            description="Your saved runs.",
-            robots="noindex,nofollow",
+    from widgets.workflow_search import SearchFilters, get_filter_value_from_workspace
+
+    if not request.user or request.user.is_anonymous:
+        next_url = request.query_params.get("next", "/account/")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        raise gui.RedirectException(str(redirect_url))
+
+    current_workspace = get_current_workspace(request.user, request.session)
+    search_filters = SearchFilters(
+        workspace=get_filter_value_from_workspace(current_workspace)
+    )
+    raise gui.RedirectException(
+        get_app_route_url(
+            explore_page, query_params=search_filters.model_dump(exclude_defaults=True)
         )
     )
 

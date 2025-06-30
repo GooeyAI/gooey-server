@@ -1,3 +1,5 @@
+import typing
+
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -8,7 +10,7 @@ from django.db.models import (
     QuerySet,
     Value,
 )
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
@@ -17,19 +19,14 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
 
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
+
 
 class SearchFilters(BaseModel):
-    search: str | None = None
-    workspace: str | None = None
-    workflow: str | None = None
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def empty_str_to_none(cls, v: str | None) -> str | None:
-        # to clear query params from URL when they are empty
-        if v == "":
-            return None
-        return v
+    search: str = ""
+    workspace: str = ""
+    workflow: str = ""
 
     def __bool__(self):
         return bool(self.search or self.workspace or self.workflow)
@@ -42,40 +39,41 @@ def render_search_filters(
         search_filters = SearchFilters()
 
     with gui.div(className="d-lg-flex container-margin-reset gap-3"):
-        with gui.div(className="col-lg-5 mb-2 mb-lg-0"):
-            search_query = render_search_bar(value=search_filters.search)
-
         with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
             gui.caption(
-                f'{icons.filter}<span class="d-none d-lg-inline"> Filter</span>',
+                icons.filter,
                 unsafe_allow_html=True,
-                className="text-nowrap text-muted",
+                className="text-muted d-flex align-items-center",
             )
             with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
                 is_logged_in = current_user and not current_user.is_anonymous
                 if is_logged_in:
                     with gui.div(className="col-6"):
-                        workspace_filter = render_workspace_filter(
-                            current_user=current_user, value=search_filters.workspace
+                        search_filters.workspace = (
+                            render_workspace_filter(
+                                current_user=current_user,
+                                value=search_filters.workspace,
+                            )
+                            or ""
                         )
                 else:
-                    workspace_filter = None
+                    search_filters.workspace = ""
                 with gui.div(className="col-6" if is_logged_in else "col-12 col-lg-6"):
-                    workflow_filter = render_workflow_filter(
-                        value=search_filters.workflow
+                    search_filters.workflow = (
+                        render_workflow_filter(value=search_filters.workflow) or ""
                     )
 
-    return SearchFilters(
-        search=search_query, workspace=workspace_filter, workflow=workflow_filter
-    )
+    return search_filters
 
 
-def render_search_bar(key: str = "search_query", value: str = "") -> str:
+def render_search_bar(key: str = "search_query", value: str = "", **props) -> str:
     with (
         gui.styled(
             r"""
             & {
                 position: relative;
+                max-width: 500px;
+                flex-grow: 1;
             }
             & .gui-input {
                 margin: 0;
@@ -102,13 +100,15 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
         ),
         gui.div(),
     ):
+        extra_classes = props.pop("className", "")
         search_query = gui.text_input(
             "",
             placeholder="Search Workflows",
-            className="bg-light border-0 rounded-pill",
+            className="bg-light border-0 rounded-pill " + extra_classes,
             style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
             key=key,
             value=value,
+            **props,
         )
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
@@ -126,7 +126,7 @@ def render_workspace_filter(
         return None
 
     workspace_options = {
-        w.handle_id and w.handle.name or str(w.id): w.display_html(
+        get_filter_value_from_workspace(w): w.display_html(
             current_user=current_user, icon_size="20px"
         )
         for w in current_user.cached_workspaces
@@ -139,6 +139,21 @@ def render_workspace_filter(
         value=value,
         blank_label=f"{icons.octopus}&nbsp; Any",
     )
+
+
+def get_filter_value_from_workspace(workspace: "Workspace") -> str:
+    return (workspace.handle_id and workspace.handle.name) or str(workspace.id)
+
+
+def get_workspace_from_filter_value(user: AppUser, value: str) -> "Workspace | None":
+    if not value:
+        return None
+
+    for w in user.cached_workspaces:
+        if str(w.id) == value or (w.handle_id and w.handle.name == value):
+            return w
+
+    return None
 
 
 def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
@@ -201,7 +216,7 @@ def get_filtered_published_runs(
     user: AppUser | None, search_filters: SearchFilters
 ) -> QuerySet:
     qs = PublishedRun.objects.all()
-    qs = build_search_filter(qs, search_filters)
+    qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
     qs = qs.annotate(
         is_root_workflow=Q(published_run_id=""),
@@ -252,16 +267,14 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
     return qs.filter(workflow_access_filter)
 
 
-def build_search_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
+def build_search_filter(
+    qs: QuerySet, search_filters: SearchFilters, user: AppUser
+) -> QuerySet:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     if search_filters.workspace:
-        try:
-            workspace = int(search_filters.workspace)
-        except ValueError:
-            qs = qs.filter(workspace__handle__name=search_filters.workspace)
-        else:
-            qs = qs.filter(workspace=workspace)
+        workspace = get_workspace_from_filter_value(user, search_filters.workspace)
+        qs = qs.filter(workspace=workspace)
 
     if search_filters.workflow:
         try:
