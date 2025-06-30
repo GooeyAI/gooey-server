@@ -740,7 +740,7 @@ def get_js_show_mobile_search():
     const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
     hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
     show_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
-    document.querySelector('#mobile_search').focus();
+    document.querySelector('#search_bar').focus();
     """)
 
 
@@ -784,22 +784,13 @@ def page_wrapper(
                 className="flex-grow-1 d-flex justify-content-center align-items-center"
             ):
                 with gui.div(
-                    className="show_on_mobile_search flex-grow-1 justify-content-center align-items-center d-md-none",
+                    className="show_on_mobile_search d-md-flex flex-grow-1 justify-content-center align-items-center",
                     style={"display": "none"},
+                    onBlur=get_js_hide_mobile_search(),
                 ):
-                    # mobile search - hidden by default & when focused out, shown on clicking Search icon
                     _render_search_bar_with_redirect(
-                        request,
-                        search_filters,
-                        id="mobile_search",
-                        key="mobile_search_query",
-                        onBlur=get_js_hide_mobile_search(),
+                        request, search_filters, id="search_bar"
                     )
-                with gui.div(
-                    className="d-none d-md-flex flex-grow-1 justify-content-center align-items-center"
-                ):
-                    # desktop search - always hidden on mobile
-                    _render_search_bar_with_redirect(request, search_filters)
                 with gui.div(
                     className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
                     style={"display": "flex"},
