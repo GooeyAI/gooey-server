@@ -707,7 +707,7 @@ def get_og_url_path(request) -> str:
 
 
 def _render_search_bar_with_redirect(
-    search_filters: typing.Optional["SearchFilters"], **props
+    request: Request, search_filters: typing.Optional["SearchFilters"], **props
 ):
     from widgets.workflow_search import SearchFilters, render_search_bar
 
@@ -789,6 +789,7 @@ def page_wrapper(
                 ):
                     # mobile search - hidden by default & when focused out, shown on clicking Search icon
                     _render_search_bar_with_redirect(
+                        request,
                         search_filters,
                         id="mobile_search",
                         key="mobile_search_query",
@@ -798,7 +799,7 @@ def page_wrapper(
                     className="d-none d-md-flex flex-grow-1 justify-content-center align-items-center"
                 ):
                     # desktop search - always hidden on mobile
-                    _render_search_bar_with_redirect(search_filters)
+                    _render_search_bar_with_redirect(request, search_filters)
                 with gui.div(
                     className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
                     style={"display": "flex"},
