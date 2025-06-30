@@ -54,7 +54,11 @@ def global_workspace_selector(user: AppUser, session: dict):
             display_name = current.display_name(user)
         with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
             gui.html(f"{current.html_icon()}")
-            gui.html(html.escape(display_name), className="d-none d-md-inline")
+            gui.html(
+                html.escape(display_name),
+                className="d-none d-md-inline text-truncate",
+                style={"maxWidth": "150px"},
+            )
             gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
 
     with (
