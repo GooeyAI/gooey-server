@@ -96,7 +96,6 @@ class WorkspaceAdmin(SafeDeleteAdmin):
             "view_saved_runs",
             "view_published_runs",
             "view_api_keys",
-            "view_embedded_files",
         ),
         ("created_at", "updated_at"),
         "open_in_stripe",
@@ -120,7 +119,6 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "view_saved_runs",
         "view_published_runs",
         "view_api_keys",
-        "view_embedded_files",
         "total_payments",
         "total_charged",
         "total_usage_cost",
@@ -168,15 +166,6 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     def view_api_keys(self, workspace: models.Workspace):
         return list_related_html_url(
             ApiKey.objects.filter(workspace=workspace),
-            query_param="workspace__id__exact",
-            instance_id=workspace.id,
-            show_add=False,
-        )
-
-    @admin.display(description="Embedded Files")
-    def view_embedded_files(self, workspace: models.Workspace):
-        return list_related_html_url(
-            EmbeddedFile.objects.filter(workspace=workspace),
             query_param="workspace__id__exact",
             instance_id=workspace.id,
             show_add=False,
