@@ -1,3 +1,5 @@
+import typing
+
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -16,6 +18,9 @@ from daras_ai_v2 import icons
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
+
+if typing.TYPE_CHECKING:
+    from workspaces.models import Workspace
 
 
 class SearchFilters(BaseModel):
@@ -138,7 +143,7 @@ def render_workspace_filter(
         return None
 
     workspace_options = {
-        w.handle_id and w.handle.name or str(w.id): w.display_html(
+        get_filter_value_from_workspace(w): w.display_html(
             current_user=current_user, icon_size="20px"
         )
         for w in current_user.cached_workspaces
@@ -151,6 +156,21 @@ def render_workspace_filter(
         value=value,
         blank_label=f"{icons.octopus}&nbsp; Any",
     )
+
+
+def get_filter_value_from_workspace(workspace: "Workspace") -> str:
+    return (workspace.handle_id and workspace.handle.name) or str(workspace.id)
+
+
+def get_workspace_from_filter_value(user: AppUser, value: str) -> "Workspace | None":
+    if not value:
+        return None
+
+    for w in user.cached_workspaces:
+        if str(w.id) == value or (w.handle_id and w.handle.name == value):
+            return w
+
+    return None
 
 
 def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
@@ -218,7 +238,7 @@ def get_filtered_published_runs(
     user: AppUser | None, search_filters: SearchFilters
 ) -> QuerySet:
     qs = PublishedRun.objects.all()
-    qs = build_search_filter(qs, search_filters)
+    qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
     qs = qs.annotate(
         is_root_workflow=Q(published_run_id=""),
@@ -269,16 +289,14 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
     return qs.filter(workflow_access_filter)
 
 
-def build_search_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
+def build_search_filter(
+    qs: QuerySet, search_filters: SearchFilters, user: AppUser
+) -> QuerySet:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     if search_filters.workspace:
-        try:
-            workspace = int(search_filters.workspace)
-        except ValueError:
-            qs = qs.filter(workspace__handle__name=search_filters.workspace)
-        else:
-            qs = qs.filter(workspace=workspace)
+        workspace = get_workspace_from_filter_value(user, search_filters.workspace)
+        qs = qs.filter(workspace=workspace)
 
     if search_filters.workflow:
         try:
