@@ -707,7 +707,9 @@ def _render_search_bar_with_redirect(
     request: Request, search_filters: typing.Optional[SearchFilters], **props
 ):
     search_filters = search_filters or SearchFilters()
-    search_query = render_search_bar(value=search_filters.search, **props)
+    search_query = render_search_bar(
+        current_user=request.user, search_filters=search_filters, **props
+    )
     if search_query != search_filters.search:
         search_filters.search = search_query
         raise gui.RedirectException(
