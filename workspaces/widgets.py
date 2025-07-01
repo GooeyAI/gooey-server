@@ -19,7 +19,7 @@ SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
-    from routers.account import profile_route, saved_route
+    from routers.account import members_route, profile_route
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -30,7 +30,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     if switch_workspace_id := gui.session_state.pop(SWITCH_WORKSPACE_KEY, None):
         try:
             if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
-                raise gui.RedirectException(get_route_path(saved_route))
+                raise gui.RedirectException(get_route_path(members_route))
         except KeyError:
             pass
         set_current_workspace(session, int(switch_workspace_id))
@@ -110,7 +110,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_route_path(saved_route),
+                to=get_route_path(members_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
