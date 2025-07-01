@@ -834,8 +834,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 async function loadGooeyEmbed() {
     await window.waitUntilHydrated;
     if (typeof GooeyEmbed === "undefined" ||
-        document.getElementById("gooey-embed")?.children.length
-    )
+        document.getElementById("gooey-embed")?.children.length)
         return;
     let controller = {
         messages,

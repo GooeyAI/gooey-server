@@ -34,10 +34,11 @@ class BaseLLMTool:
     ):
         self.name = name
         self.label = label
+        self.properties = properties
 
         self.spec_parameters = {
             "type": "object",
-            "properties": properties,
+            "properties": self.properties,
         }
         if required:
             self.spec_parameters["required"] = required

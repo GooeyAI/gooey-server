@@ -1,12 +1,16 @@
 import typing
-from functions.recipe_functions import BaseLLMTool
-from twilio.twiml.voice_response import VoiceResponse
-from bots.models.bot_integration import validate_phonenumber
+import uuid
+
+import gooey_gui as gui
 from django.core.exceptions import ValidationError
-from bots.models import BotIntegration
-from sentry_sdk import capture_exception
 from loguru import logger
+from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
+from twilio.twiml.voice_response import VoiceResponse
+
+from bots.models import BotIntegration
+from bots.models.bot_integration import validate_phonenumber
+from functions.recipe_functions import BaseLLMTool, generate_tool_properties
 
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
@@ -15,6 +19,48 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     audio_url = state.get("input_audio")
     if is_realtime_audio_url(audio_url):
         yield CallTransferLLMTool()
+
+    update_gui_state_params = (state.get("variables") or {}).get(
+        "update_gui_state_params"
+    )
+    if update_gui_state_params:
+        yield UpdateGuiStateLLMTool(
+            update_gui_state_params.get("channel"),
+            update_gui_state_params.get("state"),
+            update_gui_state_params.get("page_slug"),
+        )
+
+
+class UpdateGuiStateLLMTool(BaseLLMTool):
+    def __init__(self, channel, state, page_slug):
+        from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+
+        self.channel = channel
+        self.state = state or {}
+        try:
+            page_cls = page_slug_map[normalize_slug(page_slug)]
+        except KeyError:
+            properties = dict(generate_tool_properties(self.state, {}))
+        else:
+            schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
+            properties = schema["properties"]
+
+        super().__init__(
+            name="update_gui_state",
+            label="Update GUI State",
+            description="Update the current GUI state.",
+            properties=properties,
+        )
+
+    def call(self, **kwargs) -> dict:
+        if not self.channel:
+            return {"success": False, "error": "update channel not found"}
+        # sometimes the state is nested in the kwargs, so we need to get the state from the kwargs
+        kwargs = kwargs.get("state", kwargs)
+        # generate a nonce so UI can detect if the state has changed or not
+        nonce_info = {"-gooey-builder-nonce": str(uuid.uuid4())}
+        # push the state back to the UI, expire in 1 minute
+        gui.realtime_push(self.channel, kwargs | nonce_info, ex=60)
 
 
 class CallTransferLLMTool(BaseLLMTool):

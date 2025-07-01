@@ -37,6 +37,7 @@ class WhatsappBot(BotInterface):
         self.input_type = message["type"]
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
+
         self.access_token = bi.wa_business_access_token
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
