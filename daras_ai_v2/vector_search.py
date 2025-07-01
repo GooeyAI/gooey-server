@@ -653,7 +653,7 @@ def create_embedded_file(
         file_id = _sha256(lookup | dict(metadata=file_meta.astuple()))
         refs = []
         for leaf_url, leaf_meta in leaf_url_metas:
-            refs = create_embeddings_in_search_db(
+            refs += create_embeddings_in_search_db(
                 f_url=leaf_url,
                 file_meta=leaf_meta,
                 file_id=file_id,
