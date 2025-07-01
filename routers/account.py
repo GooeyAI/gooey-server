@@ -137,12 +137,7 @@ def profile_route(request: Request):
 
 
 @gui.route(app, "/saved")
-def old_saved_route(request: Request):
-    raise gui.RedirectException(get_route_path(saved_route))
-
-
-@gui.route(app, "/account/saved")
-def saved_route(request: Request):
+def explore_in_current_workspace(request: Request):
     from widgets.workflow_search import SearchFilters, get_filter_value_from_workspace
 
     if not request.user or request.user.is_anonymous:
@@ -157,6 +152,22 @@ def saved_route(request: Request):
     raise gui.RedirectException(
         get_app_route_url(
             explore_page, query_params=search_filters.model_dump(exclude_defaults=True)
+        )
+    )
+
+
+@gui.route(app, "/account/saved")
+def saved_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.saved):
+        all_saved_runs_tab(request)
+    url = get_og_url_path(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title="Saved • Gooey.AI",
+            description="Your saved runs.",
+            robots="noindex,nofollow",
         )
     )
 
