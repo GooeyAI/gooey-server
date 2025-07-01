@@ -66,7 +66,12 @@ def render_search_filters(
     return search_filters
 
 
-def render_search_bar(key: str = "search_query", value: str = "", **props) -> str:
+def render_search_bar(
+    search_filters: SearchFilters,
+    key: str = "search_query",
+    current_user: AppUser | None = None,
+    **props,
+) -> str:
     with (
         gui.styled(
             r"""
@@ -100,14 +105,19 @@ def render_search_bar(key: str = "search_query", value: str = "", **props) -> st
         ),
         gui.div(),
     ):
-        extra_classes = props.pop("className", "")
+        placeholder = get_placeholder_by_search_filters(
+            search_filters=search_filters, current_user=current_user
+        )
         search_query = gui.text_input(
             "",
-            placeholder="Search Workflows",
-            className="bg-light border-0 rounded-pill " + extra_classes,
-            style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
+            placeholder=placeholder,
+            className="bg-light border-0 rounded-pill " + props.pop("className", ""),
+            style=(
+                dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem")
+                | props.pop("style", {})
+            ),
             key=key,
-            value=value,
+            value=search_filters.search,
             **props,
         )
 
@@ -121,6 +131,38 @@ def render_search_bar(key: str = "search_query", value: str = "", **props) -> st
             search_query = ""
 
     return search_query
+
+
+def get_placeholder_by_search_filters(
+    search_filters: SearchFilters,
+    current_user: AppUser | None,
+    fallback_workspace_text: str = "Gooey.AI",
+) -> str:
+    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+
+    text = "Search"
+    workspace = current_user and get_workspace_from_filter_value(
+        current_user, search_filters.workspace
+    )
+    if workspace:
+        workspace_text = (
+            "Personal Workspace"
+            if workspace.is_personal and workspace.created_by == current_user
+            else workspace.display_name(current_user=current_user)
+        )
+        text += f": {workspace_text}"
+    else:
+        text += f" {fallback_workspace_text}"
+
+    if search_filters.workflow:
+        try:
+            workflow_page = page_slug_map[normalize_slug(search_filters.workflow)]
+        except KeyError:
+            workflow_page = None
+        else:
+            text += f" › {workflow_page.workflow.short_title}"
+
+    return text
 
 
 def render_workspace_filter(
@@ -149,7 +191,9 @@ def get_filter_value_from_workspace(workspace: "Workspace") -> str:
     return (workspace.handle_id and workspace.handle.name) or str(workspace.id)
 
 
-def get_workspace_from_filter_value(user: AppUser, value: str) -> "Workspace | None":
+def get_workspace_from_filter_value(
+    user: AppUser, value: str
+) -> typing.Optional["Workspace"]:
     if not value:
         return None
 
