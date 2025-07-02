@@ -130,54 +130,35 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
 FOOTER_CSS = """
 & {
     font-size: 0.9rem;
-    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+& .metadata-item {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 12px;
+}
+& .metadata-item:last-child {
+    margin-right: 0;
 }
 & .author-name {
-    max-width: 200px; 
+    max-width: 150px; 
     overflow: hidden; 
-    text-overflow: ellipsis; 
-}
-& .workspace-icon {
-    margin: 0 0.17rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 & i[class^="fa"] {
     width: 20px;
-    margin: 0 2px;
+    margin-right: 2px;
     text-align: center;
 }
-& > div {
-    margin-right: 0.75rem;
-    display: flex;
-    align-items: center;
+& a {
+    text-decoration: none;
 }
 @media (max-width: 768px) {
     & {
-        display: grid !important;
-        grid-template-areas: 
-            "workspace author"
-            "notes notes"
-            "time runs";
-        gap: 0.25rem 0.75rem;
-        align-items: start;
-        white-space: normal;
-    }
-    & .workspace-container {
-        grid-area: workspace;
-    }
-    & .author-container {
-        grid-area: author;
-    }
-    & .notes-container {
-        grid-area: notes;
-    }
-    & .time-container {
-        grid-area: time;
-    }
-    & .runs-container {
-        grid-area: runs;
-    }
-    & > div {
-        margin: 0;
+        row-gap: 8px;
     }
 }
 """
@@ -194,17 +175,12 @@ def render_footer_breadcrumbs(
 ):
     latest_version = published_run.versions.latest()
 
-    with (
-        gui.styled(FOOTER_CSS),
-        gui.div(
-            className="flex-grow-1 d-flex align-items-end flex-wrap flex-lg-nowrap"
-        ),
-    ):
+    with gui.styled(FOOTER_CSS), gui.div():
         if published_run.workspace.is_personal:
             show_workspace_author = False
+
         if show_workspace_author:
-            # don't repeat author for personal workspaces
-            with gui.div(className="d-flex align-items-center workspace-container"):
+            with gui.div(className="metadata-item"):
                 render_author_from_workspace(
                     published_run.workspace,
                     image_size="24px",
@@ -212,9 +188,7 @@ def render_footer_breadcrumbs(
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
-            with gui.div(
-                className="d-flex align-items-center text-truncate author-container"
-            ):
+            with gui.div(className="metadata-item"):
                 render_author_from_user(
                     published_run.last_edited_by,
                     image_size="24px",
@@ -223,8 +197,7 @@ def render_footer_breadcrumbs(
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
-                className="text-truncate text-muted d-flex align-items-center notes-container",
-                style={"maxWidth": "250px"},
+                className="metadata-item text-muted", style={"maxWidth": "250px"}
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
 
@@ -234,27 +207,26 @@ def render_footer_breadcrumbs(
             and isinstance(updated_at, datetime.datetime)
             and not hide_updated_at
         ):
-            with gui.div(className="d-flex align-items-center time-container"):
+            with gui.div(className="metadata-item text-muted"):
                 gui.write(
                     f"{icons.time} {get_relative_time(updated_at)}",
                     unsafe_allow_html=True,
-                    className="text-muted",
                 )
 
         if published_run.run_count >= 50 or show_all_run_counts:
             run_count = format_number_with_suffix(published_run.run_count)
-            with gui.div(className="d-flex align-items-center runs-container"):
+            with gui.div(className="metadata-item text-muted text-nowrap"):
                 gui.write(
                     f"{icons.run} {run_count} runs",
                     unsafe_allow_html=True,
-                    className="text-muted text-nowrap",
                 )
 
         if not hide_visibility_pill:
-            gui.caption(
-                published_run.get_share_badge_html(),
-                unsafe_allow_html=True,
-            )
+            with gui.div(className="metadata-item"):
+                gui.caption(
+                    published_run.get_share_badge_html(),
+                    unsafe_allow_html=True,
+                )
 
 
 def render_workflow_media(output_url: str, published_run: PublishedRun):

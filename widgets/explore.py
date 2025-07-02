@@ -144,8 +144,10 @@ def render_description(
 
     if root_pr.run_count >= 50 or show_all_counts:
         run_count = format_number_with_suffix(root_pr.run_count)
-        gui.caption(
-            f"{icons.run} {run_count} runs",
-            unsafe_allow_html=True,
-            style={"fontSize": "0.9rem"},
-        )
+        with gui.div(className="d-flex align-items-center"):
+            gui.caption(
+                f"{icons.run} {run_count} runs",
+                unsafe_allow_html=True,
+                className="text-muted",
+                style={"fontSize": "0.9rem"},
+            )
