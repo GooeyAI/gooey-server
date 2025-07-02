@@ -995,18 +995,20 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     audio_r = requests.get(audio_url)
     raise_for_status(audio_r, is_user_url=True)
 
+    # Set up the files and form data for the multipart request
     files = {"file": audio_r.content}
+    data = {"model_id": "scribe_v1"}
     headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
-
-    params = {}
+    
+    # Language parameter is sent in the form data
     if language:
-        params["language"] = language
+        data["language_code"] = language
 
     response = requests.post(
         "https://api.elevenlabs.io/v1/speech-to-text",
         files=files,
         headers=headers,
-        params=params,
+        data=data,
     )
     raise_for_status(response)
 
