@@ -379,6 +379,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "open_in_gooey",
         "view_runs",
         "run_count",
+        "view_bot_integrations",
         "created_at",
         "updated_at",
     ]
@@ -403,6 +404,14 @@ class PublishedRunAdmin(admin.ModelAdmin):
             query_param="parent_version__published_run__id__exact",
             instance_id=published_run.id,
             show_add=False,
+        )
+
+    @admin.display(description="Bot Integrations")
+    def view_bot_integrations(self, published_run: PublishedRun):
+        return list_related_html_url(
+            published_run.botintegrations.all(),
+            query_param="published_run__id__exact",
+            instance_id=published_run.id,
         )
 
 
