@@ -1,5 +1,6 @@
-<span class="pe-2" style="height: 44px; width: 200px" data-replace-login-spinner>
-    <span id="g_id_signin"></span>
+<span class="pe-2" style="height: 44px; max-width: 200px" data-replace-login-spinner>
+    <span id="g_id_signin_desktop" class="d-none d-md-inline"></span>
+    <span id="g_id_signin_mobile" class="d-md-none"></span>
 </span>
 
 <script>
@@ -14,10 +15,14 @@
     });
     async function oneTapSignin() {
         google.accounts.id.prompt();
-        google.accounts.id.renderButton(document.getElementById("g_id_signin"), {
+        google.accounts.id.renderButton(document.getElementById("g_id_signin_desktop"), {
             shape: "rectangular",
             width: 200,
             text: "continue_with",
+        });
+        google.accounts.id.renderButton(document.getElementById("g_id_signin_mobile"), {
+            shape: "rectangular",
+            type: "icon"
         });
     }
 </script>
