@@ -4,6 +4,7 @@ import html
 import inspect
 import json
 import math
+from textwrap import dedent
 import traceback
 import typing
 import uuid
@@ -339,7 +340,66 @@ class BasePage:
         if output:
             gui.session_state.update(output)
 
+    def is_current_user_authorized(self) -> bool:
+        if self.is_current_user_admin():
+            return True
+
+        sr, pr = self.current_sr_pr
+        if sr == pr.saved_run:
+            # published run
+            return (
+                pr.is_approved_example
+                or (
+                    WorkflowAccessLevel(pr.public_access)
+                    in [
+                        WorkflowAccessLevel.FIND_AND_VIEW,
+                        WorkflowAccessLevel.EDIT,
+                    ]
+                )
+                or (
+                    WorkflowAccessLevel(pr.workspace_access)
+                    in [
+                        WorkflowAccessLevel.FIND_AND_VIEW,
+                        WorkflowAccessLevel.EDIT,
+                    ]
+                    and bool(
+                        self.request.user
+                        and pr.workspace in self.request.user.cached_workspaces
+                    )
+                )
+            )
+
+        return (
+            bool(self.request.user)
+            and sr.workspace in self.request.user.cached_workspaces
+        )
+
+    def render_unauthorized(self):
+        with gui.div(className="d-flex flex-column align-items-center"):
+            gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
+            gui.caption("Welcome to Gooey.AI")
+            gui.write("# You need access")
+            if not self.request.user or self.request.user.is_anonymous:
+                gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
+            else:
+                owner_workspace = (
+                    self.current_pr.workspace
+                    if self.current_pr.saved_run == self.current_sr
+                    else self.current_sr.workspace
+                )
+                gui.write(
+                    dedent(f"""
+                You currently don't have access to this resource. Please request access from the
+                {owner_workspace.display_name(current_user=self.request.user)} admin or sign in with another account. 
+                You are logged in as {self.request.user.email or self.request.user.phone_number}.
+                """)
+                )
+
     def render(self):
+        if not self.is_current_user_authorized():
+            self.render_unauthorized()
+            return
+
         self.setup_sentry()
 
         if self.get_run_state(gui.session_state) in (
