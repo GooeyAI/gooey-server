@@ -401,7 +401,7 @@ def fn_url_to_file_metadata(
         state=sr.state,
         trigger=FunctionTrigger.pre,
     )
-    return_value = tool().get("return_value")
+    return_value = tool.call().get("return_value")
     if not isinstance(return_value, dict):
         return None
     documents = return_value.get("documents")
@@ -477,8 +477,10 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         export_links = {mime_type: meta["@microsoft.graph.downloadUrl"]}
 
     else:
-        f_url = gcs_v2.private_to_signed_url(f_url)
         if is_user_uploaded_url(f_url):
+            kwargs = {}
+        elif f_url.startswith(gcs_v2.GCS_BUCKET_URL):
+            f_url = gcs_v2.private_to_signed_url(f_url)
             kwargs = {}
         else:
             kwargs = requests_scraping_kwargs() | dict(
@@ -651,7 +653,7 @@ def create_embedded_file(
         file_id = _sha256(lookup | dict(metadata=file_meta.astuple()))
         refs = []
         for leaf_url, leaf_meta in leaf_url_metas:
-            refs = create_embeddings_in_search_db(
+            refs += create_embeddings_in_search_db(
                 f_url=leaf_url,
                 file_meta=leaf_meta,
                 file_id=file_id,
@@ -948,12 +950,15 @@ def download_content_bytes(
     elif is_onedrive_url(f):
         return onedrive_download(mime_type, export_links)
     try:
-        f_url = gcs_v2.private_to_signed_url(f_url)
         # download from url
         if is_user_uploaded_url(f_url):
-            r = requests.get(f_url)
+            kwargs = {}
+        elif f_url.startswith(gcs_v2.GCS_BUCKET_URL):
+            f_url = gcs_v2.private_to_signed_url(f_url)
+            kwargs = {}
         else:
-            r = requests.get(f_url, **requests_scraping_kwargs())
+            kwargs = requests_scraping_kwargs()
+        r = requests.get(f_url, **kwargs)
         raise_for_status(r, is_user_url=is_user_url)
     except requests.RequestException as e:
         logger.warning(f"ignore error while downloading {f_url}: {e}")

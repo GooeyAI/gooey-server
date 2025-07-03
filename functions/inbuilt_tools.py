@@ -52,7 +52,7 @@ class CallTransferLLMTool(BaseLLMTool):
         self.bi_id = bi_id
         return self
 
-    def _call(self, phone_number: str) -> dict:
+    def call(self, phone_number: str) -> dict:
         from routers.bots_api import api_hashids
 
         try:

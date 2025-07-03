@@ -58,13 +58,12 @@ class CompareLLMPage(BasePage):
         return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
-        gui.text_area(
-            """
-            #### 👩‍💻 Prompt
-            """,
+        gui.code_editor(
+            label="#### 👩‍💻 Prompt",
             key="input_prompt",
-            help="What a fine day..",
-            height=300,
+            language="jinja",
+            style=dict(maxHeight="50vh"),
+            help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
         enum_multiselect(

@@ -121,7 +121,7 @@ def render_demo_text(bi: BotIntegration):
         )
         copy_to_clipboard_button(
             icons.copy_solid,
-            value=test_link,
+            value=test_link.lstrip("tel:"),
             type="tertiary",
             className="m-0",
         )

@@ -369,26 +369,26 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def render_form_v2(self):
-        gui.text_area(
-            """
-            #### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions
-            """,
+        gui.code_editor(
+            label='#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions',
             key="bot_script",
-            height=300,
-            help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/craft-your-ai-copilots-personality) about how to prompt your copilot's personality!",
+            language="jinja",
+            style=dict(maxHeight="50vh"),
+            help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        language_model_selector(
+        language_model = language_model_selector(
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
         )
 
-        bulk_documents_uploader(
-            """ 
-            #### <i class="fa-light fa-books" style="fontSize:20px"></i> Knowledge
-            """,
-            accept=["audio/*", "application/*", "video/*", "text/*"],
-            help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
-        )
+        if not LargeLanguageModels[language_model].is_audio_model:
+            bulk_documents_uploader(
+                """ 
+                #### <i class="fa-light fa-books" style="fontSize:20px"></i> Knowledge
+                """,
+                accept=["audio/*", "application/*", "video/*", "text/*"],
+                help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
+            )
 
         gui.markdown("#### 💪 Capabilities")
 
@@ -722,8 +722,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        entries = gui.session_state.get("messages", []).copy()
         messages = []  # chat widget internal mishmash format
+        input_audio = gui.session_state.get("input_audio", "")
+        input_images = gui.session_state.get("input_images", [])
+        input_documents = gui.session_state.get("input_documents", [])
+
+        if is_realtime_audio_url(input_audio):
+            entries = gui.session_state.get("final_prompt", []).copy()
+            input_audio = ""  # dont render ws audio url in chat widget
+        else:
+            entries = gui.session_state.get("messages", []).copy()
+
         for entry in entries:
             role = entry.get("role")
             if role == CHATML_ROLE_USER:
@@ -750,12 +759,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             input_prompt = gui.session_state.get("raw_input_text") or ""
         else:
             input_prompt = gui.session_state.get("input_prompt") or ""
-        input_images = gui.session_state.get("input_images") or []
-        input_audio = gui.session_state.get("input_audio") or ""
-        input_documents = gui.session_state.get("input_documents") or []
+
         if input_prompt or input_images or input_audio or input_documents:
-            if is_realtime_audio_url(input_audio):
-                input_audio = ""
             messages.append(
                 dict(
                     role=CHATML_ROLE_USER,
@@ -1406,11 +1411,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         for call in tool_calls:
             tool, arguments = get_tool_from_call(call["function"], tools_by_name)
             yield f"🛠 {tool.label}..."
-            result = tool.call(arguments)
+            output = tool.call_json(arguments)
             response.final_prompt.append(
                 dict(
                     role="tool",
-                    content=json.dumps(result),
+                    content=output,
                     tool_call_id=call["id"],
                 ),
             )

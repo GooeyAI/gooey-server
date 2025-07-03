@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import threading
 import typing
 from datetime import datetime
@@ -106,9 +105,8 @@ class RealtimeSession:
     def on_audio_delta(self, event: dict):
         if self.response_start_ts is None:
             self.response_start_ts = self.latest_media_ts
-        item_id = event.get("item_id")
-        if item_id:
-            self.last_assistant_item_id = item_id
+        self.last_assistant_item_id = event["item_id"]
+        event_id = event["event_id"]
         send_json(
             self.twilio_ws,
             {
@@ -117,9 +115,6 @@ class RealtimeSession:
                 "media": {"payload": event["delta"]},
             },
         )
-        event_id = event.get("event_id")
-        if not event_id:
-            return
         send_json(
             self.twilio_ws,
             {
@@ -177,14 +172,13 @@ class RealtimeSession:
         thread = threading.Thread(
             target=self.call_tool, args=(call_id, tool, arguments)
         )
-        if tool.await_audio_completed:
+        if self.last_mark and tool.await_audio_completed:
             self.awaiting_threads.append(thread)
         else:
             thread.start()
 
     def call_tool(self, call_id: str, tool: BaseLLMTool, arguments: str):
-        result = tool.call(arguments)
-        output = json.dumps(result)
+        output = tool.call_json(arguments)
 
         self.messages.append(dict(role="tool", content=output, tool_call_id=call_id))
 
@@ -222,6 +216,7 @@ class RealtimeSession:
                         )
                     case "mark":
                         if msg.get("mark", {}).get("name") == self.last_mark:
+                            self.last_mark = None
                             for thread in self.awaiting_threads:
                                 thread.start()
                             self.awaiting_threads = []

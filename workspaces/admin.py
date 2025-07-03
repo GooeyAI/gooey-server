@@ -4,7 +4,11 @@ from django.contrib import admin
 from django.db.models import Sum, Q
 from safedelete.admin import SafeDeleteAdmin, SafeDeleteAdminFilter
 
-from bots.admin_links import change_obj_url, open_in_new_tab
+from api_keys.models import ApiKey
+from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
+from bots.models import SavedRun, BotIntegration
+from bots.models.published_run import PublishedRun
+from embeddings.models import EmbeddedFile
 from payments.models import Subscription
 from usage_costs.models import UsageCost
 from . import models
@@ -86,8 +90,14 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "created_by",
         "is_personal",
         ("is_paying", "stripe_customer_id"),
-        ("balance", "subscription"),
         ("total_payments", "total_charged", "total_usage_cost"),
+        ("balance", "subscription"),
+        (
+            "view_saved_runs",
+            "view_published_runs",
+            "view_api_keys",
+            "view_bot_integrations",
+        ),
         ("created_at", "updated_at"),
         "open_in_stripe",
         "onedrive_user_name",
@@ -107,6 +117,10 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "is_personal",
         "created_at",
         "updated_at",
+        "view_saved_runs",
+        "view_published_runs",
+        "view_api_keys",
+        "view_bot_integrations",
         "total_payments",
         "total_charged",
         "total_usage_cost",
@@ -131,6 +145,41 @@ class WorkspaceAdmin(SafeDeleteAdmin):
     @admin.display(description="Name")
     def display_name(self, workspace: models.Workspace):
         return workspace.display_name()
+
+    @admin.display(description="User Runs")
+    def view_saved_runs(self, workspace: models.Workspace):
+        return list_related_html_url(
+            SavedRun.objects.filter(workspace=workspace),
+            query_param="workspace__id__exact",
+            instance_id=workspace.id,
+            show_add=False,
+        )
+
+    @admin.display(description="Published Runs")
+    def view_published_runs(self, workspace: models.Workspace):
+        return list_related_html_url(
+            PublishedRun.objects.filter(workspace=workspace),
+            query_param="workspace__id__exact",
+            instance_id=workspace.id,
+            show_add=False,
+        )
+
+    @admin.display(description="API Keys")
+    def view_api_keys(self, workspace: models.Workspace):
+        return list_related_html_url(
+            ApiKey.objects.filter(workspace=workspace),
+            query_param="workspace__id__exact",
+            instance_id=workspace.id,
+            show_add=False,
+        )
+
+    @admin.display(description="Bot Integrations")
+    def view_bot_integrations(self, workspace: models.Workspace):
+        return list_related_html_url(
+            BotIntegration.objects.filter(workspace=workspace),
+            query_param="workspace__id__exact",
+            instance_id=workspace.id,
+        )
 
     @admin.display(description="Total Payments")
     def total_payments(self, workspace: models.Workspace):
