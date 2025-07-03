@@ -188,7 +188,6 @@ def twilio_specific_settings(bi: BotIntegration):
         gui.file_uploader(
             "###### 🔊 Initial Audio (played at the beginning of each call)",
             accept=["audio/*"],
-            value=bi.twilio_initial_audio_url,
             key=f"_bi_twilio_initial_audio_url_{bi.id}",
         )
         or ""
@@ -197,14 +196,12 @@ def twilio_specific_settings(bi: BotIntegration):
         gui.file_uploader(
             "###### 🎵 Waiting Audio (played while waiting for a response -- Voice)",
             accept=["audio/*"],
-            value=bi.twilio_waiting_audio_url,
             key=f"_bi_twilio_waiting_audio_url_{bi.id}",
         )
         or ""
     )
     bi.twilio_waiting_text = gui.text_area(
         "###### 📝 Waiting Text (texted while waiting for a response -- SMS)",
-        value=bi.twilio_waiting_text,
         key=f"_bi_twilio_waiting_text_{bi.id}",
     )
     bi.twilio_use_missed_call = gui.checkbox(
