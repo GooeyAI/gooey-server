@@ -117,6 +117,7 @@ class Img2ImgModels(Enum):
             cls.openjourney,
             cls.analog_diffusion,
             cls.protogen_5_3,
+            cls.dall_e,
         }
 
 
@@ -444,18 +445,6 @@ def _get_gpt_image_1_img_size(width: int, height: int) -> tuple[int, int]:
         return 1024, 1536
 
 
-def prepare_init_image(
-    init_image_bytes: bytes, width: int, height: int
-) -> tuple[bytes, bytes]:
-    image = resize_img_pad(init_image_bytes, (width, height))
-    image = rgb_img_to_rgba(image)
-    mask = io.BytesIO()
-    Image.new("RGBA", (width, height), (0, 0, 0, 0)).save(mask, format="PNG")
-    mask = mask.getvalue()
-
-    return image, mask
-
-
 def img2img(
     *,
     selected_model: str,
@@ -468,12 +457,13 @@ def img2img(
     negative_prompt: str = None,
     guidance_scale: float,
     seed: int = 42,
+    gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
 ):
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
     match selected_model:
-        case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
+        case Img2ImgModels.gpt_image_1.name:
             from openai import NOT_GIVEN, OpenAI
 
             init_height, init_width, _ = bytes_to_cv2_img(init_image_bytes).shape
@@ -487,9 +477,8 @@ def img2img(
                 width, height = _get_gpt_image_1_img_size(init_width, init_height)
                 response_format = NOT_GIVEN
 
-            image, mask = prepare_init_image(
-                init_image_bytes, width=width, height=height
-            )
+            image = resize_img_pad(init_image_bytes, (width, height))
+            image = rgb_img_to_rgba(image)
 
             client = OpenAI()
             with capture_openai_content_policy_violation():
@@ -497,10 +486,10 @@ def img2img(
                     model=img2img_model_ids[Img2ImgModels[selected_model]],
                     prompt=prompt,
                     image=("image.png", image),
-                    mask=("mask.png", mask),
                     n=num_outputs,
                     size=f"{width}x{height}",
                     response_format=response_format,
+                    quality=gpt_image_1_quality,
                 )
 
             # Record usage costs if usage data is available
