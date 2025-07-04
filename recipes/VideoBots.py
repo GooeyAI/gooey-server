@@ -1507,11 +1507,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 response.output_video.append(lip_state["output_video"])
 
     def render_header_extra(self):
-        if self.tab == RecipeTabs.run:
+        if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
 
     def get_tabs(self):
         tabs = super().get_tabs()
+        tabs.insert(1, RecipeTabs.preview)
         tabs.extend([RecipeTabs.integrations])
         return tabs
 

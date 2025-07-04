@@ -594,6 +594,18 @@ let script = document.createElement("script");
 
 @gui.route(
     app,
+    "/{page_slug}/preview/",
+    "/{page_slug}/{run_slug}/preview/",
+    "/{page_slug}/{run_slug}-{example_id}/preview/",
+)
+def preview_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    return render_recipe_page(request, page_slug, RecipeTabs.preview, example_id)
+
+
+@gui.route(
+    app,
     "/{path:path}",
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
@@ -821,8 +833,13 @@ class TabData(typing.NamedTuple):
 
 
 class RecipeTabs(TabData, Enum):
+    preview = TabData(
+        title=f"<span class='mobile-only-recipe-tab'>{icons.preview} Preview</span>",
+        label="",
+        route=preview_route,
+    )
     run = TabData(
-        title=f"{icons.run} <span class='d-none d-lg-inline'>Run</span>",
+        title=f"{icons.run} Run",
         label="",
         route=recipe_or_handle_or_static,
     )
@@ -842,7 +859,7 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> <span class="d-none d-lg-inline">Integrations</span>',
+        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
         label="Integrations",
         route=integrations_route,
     )

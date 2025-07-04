@@ -407,6 +407,37 @@ class BasePage:
                 & button {
                     padding: 0.4rem !important;
                 }
+
+                & a:has(span.mobile-only-recipe-tab) {
+                    display: block !important;
+                }
+
+                & ul.nav-tabs {
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    white-space: nowrap;
+                    flex-wrap: nowrap !important;
+                    display: flex;
+                    -webkit-overflow-scrolling: touch;
+                    scrollbar-width: none;
+                    gap: 0.5rem;
+                }
+
+                @media (min-width: 768px) {
+                    & a:has(span.mobile-only-recipe-tab) {
+                        display: none !important;
+                    }
+
+                    /* RUN as active tab in lg view for preview route */
+                    & span.active-lg button {
+                        color: #000;
+                        border-bottom: 2px solid black;
+                    }
+
+                    & ul.nav-tabs {
+                        gap: 0;
+                    }
+                }
                 """
             ),
             gui.div(className="position-relative"),
@@ -414,8 +445,17 @@ class BasePage:
         ):
             for tab in self.get_tabs():
                 url = self.current_app_url(tab)
-                with gui.nav_item(url, active=tab == self.tab):
-                    gui.html(tab.title)
+                with gui.tag(
+                    "span",
+                    className="active-lg"
+                    if (tab == RecipeTabs.run and self.tab == RecipeTabs.preview)
+                    else "",
+                ):
+                    with gui.nav_item(
+                        url,
+                        active=tab == self.tab,
+                    ):
+                        gui.html(tab.title)
 
                 self._render_saved_generated_timestamp()
         with gui.nav_tab_content():
@@ -465,7 +505,7 @@ class BasePage:
                 self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs():
-            if self.tab != RecipeTabs.run:
+            if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
                 with gui.styled("& h1 { margin-top: 0 }"):
                     self._render_title(tbreadcrumbs.h1_title)
             else:
@@ -1189,7 +1229,7 @@ class BasePage:
 
     def render_selected_tab(self):
         match self.tab:
-            case RecipeTabs.run:
+            case RecipeTabs.run | RecipeTabs.preview:
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                     return
@@ -1202,9 +1242,7 @@ class BasePage:
                     )
 
                 with gui.styled(OUTPUT_TABS_CSS):
-                    output_col, input_col = gui.tabs(
-                        [f"{icons.preview} Preview", f"{icons.edit} Edit"]
-                    )
+                    input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
                         submitted = self._render_input_col()
                     with output_col:
@@ -1759,25 +1797,28 @@ class BasePage:
     show_settings = True
 
     def _render_input_col(self):
-        self.render_form_v2()
-        placeholder = gui.div()
+        with gui.div(
+            className="d-none d-lg-block" if self.tab == RecipeTabs.preview else ""
+        ):
+            self.render_form_v2()
+            placeholder = gui.div()
 
-        if self.show_settings:
-            with gui.div(className="bg-white"):
-                with gui.expander("⚙️ Settings"):
-                    self.render_settings()
-                    if self.functions_in_settings:
-                        functions_input(self.request.user)
+            if self.show_settings:
+                with gui.div(className="bg-white"):
+                    with gui.expander("⚙️ Settings"):
+                        self.render_settings()
+                        if self.functions_in_settings:
+                            functions_input(self.request.user)
 
-        with placeholder:
-            self.render_variables()
+            with placeholder:
+                self.render_variables()
 
-        submitted = self.render_submit_button()
-        with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
-            terms_caption = self.get_terms_caption()
-            gui.caption(f"_{terms_caption}_")
+            submitted = self.render_submit_button()
+            with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
+                terms_caption = self.get_terms_caption()
+                gui.caption(f"_{terms_caption}_")
 
-        return submitted
+            return submitted
 
     def get_terms_caption(self):
         return "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
@@ -1829,7 +1870,12 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
-        with gui.div(style=dict(position="sticky", top="0.5rem")):
+        with gui.div(
+            style=dict(position="sticky", top="0.5rem"),
+            className="d-none d-lg-block pb-2"
+            if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS
+            else "",
+        ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
                 self._render_failed_output()
@@ -2553,36 +2599,16 @@ class TitleValidationError(Exception):
     pass
 
 
+PREVIEW_ROUTE_WORKFLOWS = [Workflow.VIDEO_BOTS]
 OUTPUT_TABS_CSS = """
-& [data-reach-tab-list] {  
-    text-align: center; margin-top: 0 
-}
-@media (min-width: 768px) {
-    & [data-reach-tab-list] {
-        display: none;
+    & {
+        margin: -1rem 0 1rem 0;
+        padding-top: 1rem;
     }
-    & [data-reach-tab-panels] {
-        display: flex;
-        flex-direction: row-reverse;
-        width: 100%;
-        background-color: #f9f9f9;
-        padding: 10px;
-        margin-top: -1rem;
+    @media (min-width: 768px) {
+        & {
+            background-color: #f9f9f9;
+        }
     }
-    & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 0 1 auto;
-        width: 60%;
-        max-width: 100%;
-        padding-right: 0.75rem;
-    }
-    & [data-reach-tab-panels] > div:nth-child(1) {
-        flex: 0 0 auto;
-        width: 40%;
-        max-width: 100%;
-        padding-left: 0.75rem;
-    }
-    & [data-reach-tab-panel][hidden] {
-        display: block !important;
-    }
-}
+
 """
