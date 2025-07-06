@@ -32,6 +32,11 @@ class ConvoState(models.IntegerChoices):
     ASK_FOR_FEEDBACK_THUMBS_DOWN = 2, "Ask for feedback (👎)"
 
 
+class PlatformMedium(models.TextChoices):
+    SMS = "SMS", "SMS"
+    VOICE = "VOICE", "Voice"
+
+
 class ConversationQuerySet(models.QuerySet):
     def distinct_by_user_id(self) -> QuerySet["Conversation"]:
         """Get unique conversations"""
@@ -236,6 +241,14 @@ class Conversation(models.Model):
         blank=True,
         default="",
         help_text="Twilio call sid (only used if each call is a new conversation)",
+    )
+
+    platform_medium = models.CharField(
+        max_length=32,
+        choices=PlatformMedium.choices,
+        blank=True,
+        default="",
+        help_text="Platform medium (Voice / SMS etc.)",
     )
 
     web_user_id = models.CharField(
