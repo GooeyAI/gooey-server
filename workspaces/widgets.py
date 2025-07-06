@@ -1,4 +1,5 @@
 import typing
+import html
 
 import gooey_gui as gui
 from furl import furl
@@ -18,7 +19,7 @@ SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
-    from routers.account import profile_route, saved_route
+    from routers.account import members_route, profile_route
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -29,7 +30,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     if switch_workspace_id := gui.session_state.pop(SWITCH_WORKSPACE_KEY, None):
         try:
             if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
-                raise gui.RedirectException(get_route_path(saved_route))
+                raise gui.RedirectException(get_route_path(members_route))
         except KeyError:
             pass
         set_current_workspace(session, int(switch_workspace_id))
@@ -51,15 +52,14 @@ def global_workspace_selector(user: AppUser, session: dict):
                 display_name = "Personal"
         else:
             display_name = current.display_name(user)
-        gui.html(
-            " ".join(
-                [
-                    current.html_icon(),
-                    display_name,
-                    '<i class="ps-1 fa-regular fa-chevron-down"></i>',
-                ],
-            ),
-        )
+        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
+            gui.html(f"{current.html_icon()}")
+            gui.html(
+                html.escape(display_name),
+                className="d-none d-md-inline text-truncate",
+                style={"maxWidth": "150px"},
+            )
+            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
 
     with (
         content,
@@ -110,7 +110,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_route_path(saved_route),
+                to=get_route_path(members_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
@@ -150,7 +150,7 @@ def global_workspace_selector(user: AppUser, session: dict):
                         style=dict(marginBottom="0.1rem"),
                     )
 
-        with gui.div(className="d-lg-none d-inline-block"):
+        with gui.div(className="d-xl-none d-inline-block"):
             for url, label in settings.HEADER_LINKS:
                 with gui.tag(
                     "a",

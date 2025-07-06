@@ -5,6 +5,7 @@ import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
+from textwrap import dedent
 from time import time
 
 import gooey_gui as gui
@@ -34,6 +35,7 @@ from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
+    get_app_route_url,
     get_route_path,
     resolve_url,
 )
@@ -46,6 +48,7 @@ from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import global_workspace_selector
+from widgets.workflow_search import SearchFilters, render_search_bar
 
 app = CustomAPIRouter()
 
@@ -246,18 +249,16 @@ def component_page(request: Request):
 @gui.route(app, "/explore/")
 def explore_page(
     request: Request,
-    search: str | None = None,
-    workspace: str | None = None,
-    workflow: str | None = None,
+    search: str = "",
+    workspace: str = "",
+    workflow: str = "",
 ):
     from widgets import explore
-    from widgets.workflow_search import SearchFilters
 
     search_filters = SearchFilters(
         search=search, workspace=workspace, workflow=workflow
     )
-
-    with page_wrapper(request):
+    with page_wrapper(request, search_filters=search_filters):
         explore.render(request.user, search_filters)
 
     return {
@@ -702,12 +703,51 @@ def get_og_url_path(request) -> str:
     )
 
 
+def _render_search_bar_with_redirect(
+    request: Request, search_filters: typing.Optional[SearchFilters], **props
+):
+    search_filters = search_filters or SearchFilters()
+    search_query = render_search_bar(
+        current_user=request.user, search_filters=search_filters, **props
+    )
+    if search_query != search_filters.search:
+        search_filters.search = search_query
+        raise gui.RedirectException(
+            get_app_route_url(
+                explore_page,
+                query_params=search_filters.model_dump(exclude_defaults=True),
+            )
+        )
+
+
+def get_js_hide_mobile_search():
+    return dedent("""
+    event.preventDefault();
+    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
+    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
+    """)
+
+
+def get_js_show_mobile_search():
+    return dedent("""
+    event.preventDefault();
+    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
+    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
+    document.querySelector('#search_bar').focus();
+    """)
+
+
 @contextmanager
-def page_wrapper(request: Request, className=""):
-    context = {
-        "request": request,
-        "block_incognito": True,
-    }
+def page_wrapper(
+    request: Request,
+    className="",
+    search_filters: typing.Optional[SearchFilters] = None,
+):
+    context = {"request": request, "block_incognito": True}
 
     with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
@@ -716,8 +756,12 @@ def page_wrapper(request: Request, className=""):
             gui.div(className="header"),
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
+            gui.div(className="w-100 d-flex gap-2"),
         ):
-            with gui.tag("a", href="/"):
+            with (
+                gui.div(className="hide_on_mobile_search d-md-block"),
+                gui.tag("a", href="/"),
+            ):
                 gui.tag(
                     "img",
                     src=settings.GOOEY_LOGO_IMG,
@@ -732,11 +776,36 @@ def page_wrapper(request: Request, className=""):
                     height="40",
                     className="img-fluid logo d-sm-none",
                 )
+
             with gui.div(
-                className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
+                className="flex-grow-1 d-flex justify-content-center align-items-center"
+            ):
+                with gui.div(
+                    className="show_on_mobile_search d-md-flex flex-grow-1 justify-content-center align-items-center",
+                    style={"display": "none"},
+                    onBlur=get_js_hide_mobile_search(),
+                ):
+                    _render_search_bar_with_redirect(
+                        request, search_filters, id="search_bar"
+                    )
+                with gui.div(
+                    className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
+                    style={"display": "flex"},
+                ):
+                    gui.button(
+                        icons.search,
+                        type="tertiary",
+                        unsafe_allow_html=True,
+                        className="m-0",
+                        onClick=get_js_show_mobile_search(),
+                    )
+
+            with gui.div(
+                className="hide_on_mobile_search gap-2 d-md-flex justify-content-end flex-wrap align-items-center",
+                style={"display": "flex", "maxWidth": "50%"},
             ):
                 for url, label in settings.HEADER_LINKS:
-                    with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
+                    with gui.tag("a", href=url, className="pe-2 d-none d-xl-block"):
                         if icon := settings.HEADER_ICONS.get(url):
                             with gui.div(className="d-inline-block me-2 small"):
                                 gui.html(icon)
