@@ -1948,7 +1948,12 @@ class BasePage:
         sr = self.on_submit(unsaved_state=unsaved_state)
         if not sr:
             return
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            raise gui.RedirectException(
+                self.app_url(run_id=sr.run_id, uid=sr.uid, tab=RecipeTabs.preview)
+            )
+        else:
+            raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -1973,7 +1978,10 @@ class BasePage:
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
         )
-        raise gui.RedirectException(pr.get_app_url())
+        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            raise gui.RedirectException(pr.get_app_url())
+        else:
+            raise gui.RedirectException(pr.get_app_url())
 
     def on_submit(self, unsaved_state: dict[str, typing.Any] = None):
         sr = self.create_and_validate_new_run(enable_rate_limits=True)
