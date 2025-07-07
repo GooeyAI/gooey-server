@@ -999,7 +999,7 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     files = {"file": audio_r.content}
     data = {"model_id": "scribe_v1"}
     headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
-    
+
     # Language parameter is sent in the form data
     if language:
         data["language_code"] = language
