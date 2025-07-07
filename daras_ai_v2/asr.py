@@ -989,9 +989,6 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     """
     Call ElevenLabs Speech-to-Text API
     """
-    import requests
-    from daras_ai_v2 import settings
-
     audio_r = requests.get(audio_url)
     raise_for_status(audio_r, is_user_url=True)
 
