@@ -723,9 +723,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.rerun()
 
         messages = []  # chat widget internal mishmash format
-        input_audio = gui.session_state.get("input_audio", "")
-        input_images = gui.session_state.get("input_images", [])
-        input_documents = gui.session_state.get("input_documents", [])
+        input_audio = gui.session_state.get("input_audio") or ""
+        input_images = gui.session_state.get("input_images") or []
+        input_documents = gui.session_state.get("input_documents") or []
 
         if is_realtime_audio_url(input_audio):
             entries = gui.session_state.get("final_prompt", []).copy()
