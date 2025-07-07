@@ -783,10 +783,16 @@ def page_wrapper(
                 with gui.div(
                     className="show_on_mobile_search d-md-flex flex-grow-1 justify-content-center align-items-center",
                     style={"display": "none"},
-                    onBlur=get_js_hide_mobile_search(),
                 ):
                     _render_search_bar_with_redirect(
                         request, search_filters, id="search_bar"
+                    )
+                    gui.button(
+                        "Cancel",
+                        type="tertiary",
+                        className="show_on_mobile_search d-md-none fs-6 m-0 ms-1 p-1",
+                        style={"display": "none"},
+                        onClick=get_js_hide_mobile_search(),
                     )
                 with gui.div(
                     className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
