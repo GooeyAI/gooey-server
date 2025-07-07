@@ -398,7 +398,7 @@ class BasePage:
                     & button {
                         font-size: 0.9rem; 
                         padding: 0.3rem !important 
-                    }   
+                    }
                 }
                 & .nav-item {
                     font-size: smaller;
