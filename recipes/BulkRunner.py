@@ -49,9 +49,11 @@ class BulkRunnerPage(BasePage):
         documents: list[HttpUrlStr] = Field(
             title="Input Data Spreadsheet",
             description="""
-Upload or link to a CSV or google sheet that contains your sample input data.
-For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs.
-Remember to includes header names in your CSV too.
+Add a CSV, Excel or Google Sheet url with the columns:
+1. **Input prompt** for your questions
+2. **Golden Answer** for your ideal output (optional)
+
+TIP: Only the left most Sheet of Excel/Google Sheet is used so add ~3 rows of common QnAs while testing and then add more later to save time and credits.
             """,
         )
         run_urls: list[HttpUrlStr] = Field(
