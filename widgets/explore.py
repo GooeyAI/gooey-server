@@ -23,7 +23,11 @@ DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
 def render(user: AppUser | None, search_filters: SearchFilters | None):
-    heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
+    heading_class = (
+        "d-none d-md-block" if search_filters and search_filters.search else ""
+    )
+    with gui.div(className=heading_class):
+        heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
 
     search_filters = search_filters or SearchFilters()
     new_filters = render_search_filters(
@@ -53,7 +57,7 @@ def render(user: AppUser | None, search_filters: SearchFilters | None):
 def heading(
     title: str, description: str, margin_top: str = "2rem", margin_bottom: str = "2rem"
 ):
-    with gui.tag("div", style={"marginTop": margin_top, "marginBottom": margin_bottom}):
+    with gui.div(style={"marginTop": margin_top, "marginBottom": margin_bottom}):
         with gui.tag(
             "p",
             style={"marginTop": "0rem", "marginBottom": "0rem"},
