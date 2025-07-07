@@ -668,7 +668,7 @@ class BasePage:
         ):
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
 
-            if self.tab == RecipeTabs.run:
+            if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
                 if self.current_pr.is_root():
                     render_help_button(self.workflow)
                 if self.is_logged_in():
