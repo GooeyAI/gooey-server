@@ -16,7 +16,7 @@ from handles.models import Handle
 from payments.plans import PricingPlan
 
 if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+    from workspaces.models import Workspace, WorkspaceMembership
     from phonenumber_field.phonenumber import PhoneNumber
 
 
@@ -240,13 +240,23 @@ class AppUser(models.Model):
 
     @cached_property
     def cached_workspaces(self) -> list["Workspace"]:
-        from workspaces.models import Workspace
+        return list(m.workspace for m in self.cached_memberships.values())
 
-        return list(
-            Workspace.objects.filter(
-                memberships__user=self, memberships__deleted__isnull=True
-            ).order_by("-is_personal", "-created_at")
-        ) or [self.get_or_create_personal_workspace()[0]]
+    @cached_property
+    def cached_memberships(self) -> dict[int, "WorkspaceMembership"]:
+        from workspaces.models import WorkspaceMembership
+
+        memberships = (
+            WorkspaceMembership.objects.select_related("workspace")
+            .filter(user=self, workspace__deleted__isnull=True)
+            .order_by("-workspace__is_personal", "-workspace__created_at")
+        )
+        if not memberships:
+            self.get_or_create_personal_workspace()
+            memberships = memberships.all()  # refresh
+            assert memberships
+
+        return {m.workspace.id: m for m in memberships}
 
     def get_handle(self) -> Handle | None:
         workspace, _ = self.get_or_create_personal_workspace()
