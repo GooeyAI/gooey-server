@@ -53,7 +53,7 @@ class AsrPage(BasePage):
 
         input_prompt: str | None = Field(
             None,
-            title="👩‍💻 Prompt",
+            title="👩‍💻 ASR Prompt",
             description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
         )
 
