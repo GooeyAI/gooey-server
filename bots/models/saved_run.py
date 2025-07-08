@@ -56,6 +56,7 @@ class SavedRun(models.Model):
         null=True,
         blank=True,
         related_name="children",
+        verbose_name="Parent Run",
     )
     parent_version = models.ForeignKey(
         "bots.PublishedRunVersion",

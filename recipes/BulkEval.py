@@ -102,13 +102,7 @@ def _render_results(results: list[AggFunctionResult]):
             + [
                 [
                     columns[i],
-                    dict(
-                        kind="number",
-                        readonly=True,
-                        displayData=str(values[i]),
-                        data=values[i],
-                        themeOverride=dict(bgCell=colors[i]),
-                    ),
+                    dict(value=values[i], style=dict(backgroundColor=colors[i])),
                     g[i].get("count", 1),
                 ]
                 for i in range(len(g))

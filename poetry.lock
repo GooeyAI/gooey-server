@@ -1581,26 +1581,30 @@ yaml = ["PyYAML"]
 
 [[package]]
 name = "gooey-gui"
-version = "0.5.5"
+version = "0.5.6"
 description = ""
 optional = false
-python-versions = "<4.0,>=3.10"
-files = [
-    {file = "gooey_gui-0.5.5-py3-none-any.whl", hash = "sha256:b038b72f43059d537f54a33e9d7d63e7a90951d2fd0e313bd732e342ecd5a0ee"},
-    {file = "gooey_gui-0.5.5.tar.gz", hash = "sha256:bc0200d3b8e5cdaf16d77ddfcb83cc3375418b3d6db96cf15435ab8bc17f38b9"},
-]
+python-versions = "^3.10"
+files = []
+develop = false
 
 [package.dependencies]
 fastapi = "*"
-furl = ">=2.1.3,<3.0.0"
-loguru = ">=0.7.2,<0.8.0"
-python-decouple = ">=3.6,<4.0"
-python-multipart = ">=0.0.6,<0.0.7"
-redis = ">=4.5.1,<5.0.0"
+furl = "^2.1.3"
+loguru = "^0.7.2"
+python-decouple = "^3.6"
+redis = "^4.5.1"
 uvicorn = {version = "*", extras = ["standard"]}
 
 [package.extras]
 image = ["numpy (>=1.25.0,<2.0.0)", "opencv-contrib-python (>=4.7.0.72,<5.0.0.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/GooeyAI/gooey-gui.git"
+reference = "test"
+resolved_reference = "81840d9c0fdd08284ab0383b8f2ee5f83185c87c"
+subdirectory = "py"
 
 [[package]]
 name = "google-api-core"
@@ -7123,4 +7127,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "adc858887bc0cda289b2034acd83fceeec1ce3e0de79f868458484a15a3e3571"
+content-hash = "bf75fe29e1d0a992a14c9d2acafd83ea9a94bf4d7ee2a28995cb61c244c91881"

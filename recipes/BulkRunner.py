@@ -15,7 +15,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.vector_search import (
@@ -95,7 +95,10 @@ List of URLs to the evaluation runs that you requested.
         )
 
     def render_form_v2(self):
-        gui.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
+        gui.write(
+            f"##### {field_title(self.RequestModel, 'run_urls')}",
+            help=field_desc(self.RequestModel, "run_urls"),
+        )
         run_urls = list_view_editor(
             add_btn_label="Add a Workflow",
             key="run_urls",
@@ -104,12 +107,13 @@ List of URLs to the evaluation runs that you requested.
         )
 
         files = bulk_documents_uploader(
-            f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
+            f"##### {field_title(self.RequestModel, 'documents')}",
+            help=field_desc(self.RequestModel, "documents"),
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
 
-        required_input_fields = {}
-        optional_input_fields = {}
+        preferred_input_fields = {}
+        other_input_fields = {}
         output_fields = {}
 
         for url in run_urls:
@@ -120,10 +124,13 @@ List of URLs to the evaluation runs that you requested.
 
             schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
             for field_name, field_info in page_cls.RequestModel.model_fields.items():
-                if field_info.is_required():
-                    input_fields = required_input_fields
+                if (
+                    field_info.is_required()
+                    or field_name in page_cls.get_example_preferred_fields(sr.state)
+                ):
+                    input_fields = preferred_input_fields
                 else:
-                    input_fields = optional_input_fields
+                    input_fields = other_input_fields
                 field_props = schema["properties"][field_name]
                 title = field_props.get(
                     "title", field_name.replace("_", " ").capitalize()
@@ -144,6 +151,7 @@ List of URLs to the evaluation runs that you requested.
                         keys = {k: k for k in sr.state[field_name].keys()}
                     except (KeyError, AttributeError, TypeError):
                         pass
+
                 if keys:
                     for k, ktitle in keys.items():
                         input_fields[f"{field_name}.{k}"] = f"{title}.{ktitle}"
@@ -157,96 +165,70 @@ List of URLs to the evaluation runs that you requested.
             }
 
         gui.write(
-            """
-###### **Preview**: Here's what you uploaded
-            """
+            "###### Input Columns",
+            help="""Please select which CSV column corresponds to your workflow's input fields.
+To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).""",
         )
-        for file in files:
-            gui.data_table(file)
 
-        if not (required_input_fields or optional_input_fields):
+        name_prefix = "input_column:"
+        for field, col in gui.session_state.get("input_columns", {}).items():
+            gui.session_state.setdefault(name_prefix + col, field)
+        for file in files:
+            gui.data_table(
+                file,
+                headerSelect=dict(
+                    name=name_prefix + "{col}",
+                    options=[
+                        dict(value=None, label=gui.BLANK_OPTION),
+                    ]
+                    + [
+                        dict(value=col, label=col)
+                        for col in sorted(preferred_input_fields.keys())
+                    ]
+                    + [
+                        dict(value=col, label=col)
+                        for col in sorted(other_input_fields.keys())
+                    ],
+                ),
+            )
+        gui.newline()
+        gui.session_state["input_columns"] = {
+            field: col.removeprefix(name_prefix)
+            for col, field in gui.session_state.items()
+            if col.startswith(name_prefix) and field != gui.BLANK_OPTION
+        }
+
+        if not (preferred_input_fields or other_input_fields):
             return
 
-        with gui.div(className="pt-3"):
-            gui.write(
-                """
-###### **Columns**
-Please select which CSV column corresponds to your workflow's input fields.
-For the outputs, select the fields that should be included in the output CSV.
-To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).
-                """,
-            )
-
-        visible_col1, visible_col2 = gui.columns(2)
-        with gui.expander("🤲 Show All Columns"):
-            hidden_col1, hidden_col2 = gui.columns(2)
-
-        with visible_col1:
-            gui.write("##### Inputs")
-        with hidden_col1:
-            gui.write("##### Inputs")
-
-        input_columns_old = gui.session_state.pop("input_columns", {})
-        input_columns_new = gui.session_state.setdefault("input_columns", {})
-
-        column_options = [None, *get_columns(files)]
-        for fields, div in (
-            (required_input_fields, visible_col1),
-            (optional_input_fields, hidden_col1),
-        ):
-            for field_name, title in fields.items():
-                with div:
-                    col = gui.selectbox(
-                        label="`" + title + "`",
-                        options=column_options,
-                        key="--input-mapping:" + field_name,
-                        value=input_columns_old.get(field_name),
-                    )
-                if col:
-                    input_columns_new[field_name] = col
-
-        with visible_col2:
-            gui.write("##### Outputs")
-        with hidden_col2:
-            gui.write("##### Outputs")
-
-        visible_out_fields = {}
-        # only show the first output & run url field by default, and hide others
-        if output_fields:
-            try:
-                first_out_field = next(
-                    field for field in output_fields if "output" in field
-                )
-            except StopIteration:
-                first_out_field = next(iter(output_fields))
-            visible_out_fields[first_out_field] = output_fields[first_out_field]
-        visible_out_fields["run_url"] = "Run URL"
-
-        hidden_out_fields = {
-            "price": "Price",
+        output_fields = {
+            "run_url": "Run URL",
             "run_time": "Run Time",
             "error_msg": "Error Msg",
-        } | {k: v for k, v in output_fields.items() if k not in visible_out_fields}
-
-        output_columns_old = gui.session_state.pop("output_columns", {})
-        output_columns_new = gui.session_state.setdefault("output_columns", {})
-
-        for fields, div, checked in (
-            (visible_out_fields, visible_col2, True),
-            (hidden_out_fields, hidden_col2, False),
-        ):
-            for field_name, title in fields.items():
-                with div:
-                    col = gui.checkbox(
-                        label="`" + title + "`",
-                        key="--output-mapping:" + field_name,
-                        value=bool(output_columns_old.get(field_name, checked)),
-                    )
-                if col:
-                    output_columns_new[field_name] = title
+            "price": "Price",
+        } | output_fields
+        gui.session_state.setdefault(
+            "selected_output_fields",
+            list(gui.session_state.get("output_columns", {})),
+        )
+        selected_output_fields = gui.multiselect(
+            "###### Output Columns",
+            help="""Please select which fields you'd like to include in the output CSV.
+To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).""",
+            options=list(output_fields),
+            key="selected_output_fields",
+            format_func=output_fields.__getitem__,
+            allow_none=True,
+        )
+        gui.session_state["output_columns"] = {
+            field: output_fields.get(field, field) for field in selected_output_fields
+        }
 
         gui.write("---")
-        gui.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")
+        gui.write(
+            f"##### {field_title(self.RequestModel, 'eval_urls')}",
+            help=field_desc(self.RequestModel, "eval_urls"),
+        )
         list_view_editor(
             add_btn_label="Add an Eval",
             key="eval_urls",
@@ -582,7 +564,18 @@ def is_arr(field_props: dict | None) -> bool:
 def is_obj(field_props: dict | None) -> bool:
     if not field_props:
         return False
-    return bool(field_props.get("type") == "object" or field_props.get("$ref"))
+    try:
+        return field_props["type"] == "object"
+    except KeyError:
+        pass
+    try:
+        return field_props["$ref"]
+    except KeyError:
+        pass
+    for props in field_props.get("anyOf", []):
+        if props.get("type") == "object":
+            return True
+    return False
 
 
 @gui.cache_in_session_state

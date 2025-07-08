@@ -445,11 +445,12 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     readonly_fields = [
         "open_in_gooey",
-        "parent",
+        "view_parent_published_run",
         "view_bots",
         "price",
         "view_usage_cost",
         "transaction",
+        "parent",
         "created_at",
         "updated_at",
         "run_time",
@@ -485,7 +486,10 @@ class SavedRunAdmin(admin.ModelAdmin):
     view_user.short_description = "View User"
 
     def view_bots(self, saved_run: SavedRun):
-        return list_related_html_url(saved_run.botintegrations)
+        pr = saved_run.parent_published_run()
+        if not pr:
+            raise SavedRun.DoesNotExist
+        return list_related_html_url(pr.botintegrations)
 
     view_bots.short_description = "View Bots"
 
