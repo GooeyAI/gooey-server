@@ -65,6 +65,7 @@ class Img2ImgPage(BasePage):
         controlnet_conditioning_scale: list[float] | None = None
 
         # sd_2_upscaling: bool | None
+        gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None
 
         seed: int | None = None
 
