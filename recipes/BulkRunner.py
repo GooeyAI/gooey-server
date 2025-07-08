@@ -60,7 +60,7 @@ TIP: Only the left most Sheet of Excel/Google Sheet is used so add ~3 rows of co
             title="Gooey Workflows",
             description="""
 Provide one or more Gooey.AI workflow runs.
-You can add multiple runs from the same recipe (e.g. two versions of your copilot) and we'll run the inputs over both of them.
+Add multiple runs from the same workflow (e.g. two versions of your copilot) and we'll run the inputs through each of them.
             """,
         )
 
