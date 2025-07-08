@@ -126,10 +126,10 @@ ELEVENLABS_SUPPORTED = {
     "afr", "amh", "ara", "hye", "asm", "ast", "aze", "bel", "ben", "bos", "bul", "mya", "yue", "cat", "ceb", "nya",
     "hrv", "ces", "dan", "nld", "eng", "est", "fil", "fin", "fra", "ful", "glg", "lug", "kat", "deu", "ell", "guj",
     "hau", "heb", "hin", "hun", "isl", "ibo", "ind", "gle", "ita", "jpn", "jav", "kea", "kan", "kaz", "khm", "kor",
-    "kur", "kir", "lao", "lav", "lin", "lit", "luo", "ltz", "mkd", "msa", "mal", "mlt", "cmn", "mri", "mar", "mon",
+    "kur", "kir", "lao", "lav", "lin", "lit", "luo", "ltz", "mkd", "msa", "mal", "mlt", "zho", "mri", "mar", "mon",
     "nep", "nso", "nor", "oci", "ori", "pus", "fas", "pol", "por", "pan", "ron", "rus", "srp", "sna", "snd", "slk",
     "slv", "som", "spa", "swa", "swe", "tam", "tgk", "tel", "tha", "tur", "ukr", "umb", "urd", "uzb", "vie", "cym",
-    "wol", "xho", "zul"
+    "wol", "xho", "zul",
 }  # fmt: skip
 
 AZURE_SUPPORTED = {
@@ -989,9 +989,6 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     """
     Call ElevenLabs Speech-to-Text API
     """
-    import requests
-    from daras_ai_v2 import settings
-
     audio_r = requests.get(audio_url)
     raise_for_status(audio_r, is_user_url=True)
 
@@ -999,7 +996,7 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     files = {"file": audio_r.content}
     data = {"model_id": "scribe_v1"}
     headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
-    
+
     # Language parameter is sent in the form data
     if language:
         data["language_code"] = language
@@ -1062,22 +1059,20 @@ def run_asr(
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
     elif selected_model == AsrModels.elevenlabs:
-        data = elevenlabs_asr(audio_url, language)
-        if output_format == AsrOutputFormat.text:
-            return data["text"]
-        else:
-            chunks = []
-            if "words" in data:
-                for word_data in data["words"]:
-                    chunk = {
-                        "timestamp": (word_data["start"], word_data["end"]),
-                        "text": word_data["text"],
-                        "speaker": word_data.get("speaker_id", 0)
-                        if word_data["type"] == "word"
-                        else None,
-                    }
-                    chunks.append(chunk)
-            return {"text": data["text"], "chunks": chunks}
+        result = elevenlabs_asr(audio_url, language)
+        chunks = []
+        for word_data in result.get("words", []):
+            if word_data.get("type") == "word":
+                speaker = word_data.get("speaker_id", 0)
+            else:
+                speaker = None
+            chunk = {
+                "timestamp": (word_data["start"], word_data["end"]),
+                "text": word_data["text"],
+                "speaker": speaker,
+            }
+            chunks.append(chunk)
+        data = {"text": result["text"], "chunks": chunks}
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
