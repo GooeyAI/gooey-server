@@ -16,7 +16,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.field_render import field_title, field_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -155,9 +155,11 @@ Summarize and score every row of any CSV, google sheet or excel with GPT4 (or an
         documents: list[str] = Field(
             title="Input Data Spreadsheet",
             description="""
-Upload or link to a CSV or google sheet that contains your sample input data. 
-For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs. 
-Remember to includes header names in your CSV too.
+Add a CSV, Excel or Google Sheet url with the columns:
+1. **Input prompt** for your questions
+2. **Golden Answer** for your ideal output (optional)
+
+TIP: Only the left most Sheet of Excel/Google Sheet is used so add ~3 rows of common QnAs while testing and then add more later to save time and credits.
             """,
         )
 
@@ -192,8 +194,9 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
 
     def render_form_v2(self):
         files = bulk_documents_uploader(
-            f"##### {field_title_desc(self.RequestModel, 'documents')}",
+            f"##### {field_title(self.RequestModel, 'documents')}",
             accept=SUPPORTED_SPREADSHEET_TYPES,
+            help=field_desc(self.RequestModel, "documents"),
         )
         gui.session_state[NROWS_CACHE_KEY] = get_nrows(files)
         if not files:
@@ -237,7 +240,10 @@ Here's what you uploaded:
             format_func=lambda e: LargeLanguageModels[e].value,
         )
 
-        gui.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
+        gui.write(
+            "##### " + field_title(self.RequestModel, "eval_prompts"),
+            help=field_desc(self.RequestModel, "eval_prompts"),
+        )
         list_view_editor(
             add_btn_label="Add a Prompt",
             key="eval_prompts",
@@ -259,7 +265,10 @@ Here's what you uploaded:
                 del_button(del_key)
 
         gui.html("<br>")
-        gui.write("##### " + field_title_desc(self.RequestModel, "agg_functions"))
+        gui.write(
+            "##### " + field_title(self.RequestModel, "agg_functions"),
+            help=field_desc(self.RequestModel, "agg_functions"),
+        )
         list_view_editor(
             add_btn_label="Add an Aggregation",
             key="agg_functions",
