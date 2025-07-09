@@ -425,10 +425,7 @@ class BasePage:
                 with gui.tag(
                     "span",
                     className="active-lg"
-                    if (
-                        tab == RecipeTabs.run
-                        and self.workflow in PREVIEW_ROUTE_WORKFLOWS
-                    )
+                    if (tab == RecipeTabs.run and self.tab == RecipeTabs.preview)
                     else "",
                 ):
                     with gui.nav_item(
