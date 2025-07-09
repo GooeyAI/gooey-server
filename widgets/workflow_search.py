@@ -110,6 +110,10 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             key=key,
             value=value,
         )
+
+        # add a hidden submit button to allow form submission on pressing Enter
+        gui.html('<input type="submit" hidden />')
+
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
         ):
