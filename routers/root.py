@@ -831,7 +831,10 @@ class TabData(typing.NamedTuple):
     label: str
     route: typing.Callable
 
+
 PREVIEW_ROUTE_WORKFLOWS = [Workflow.VIDEO_BOTS]
+
+
 class RecipeTabs(TabData, Enum):
     preview = TabData(
         title=f"<span class='mobile-only-recipe-tab'>{icons.preview} Preview</span>",
@@ -839,7 +842,7 @@ class RecipeTabs(TabData, Enum):
         route=preview_route,
     )
     run = TabData(
-        title=f"{icons.run} Run",
+        title=f"{icons.run} Run</span>",
         label="",
         route=recipe_or_handle_or_static,
     )

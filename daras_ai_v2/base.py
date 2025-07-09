@@ -413,6 +413,10 @@ class BasePage:
                     display: block !important;
                 }
 
+                & li.nav-item:first-of-type button {
+                    margin-left: 0 !important;
+                }
+
                 & ul.nav-tabs {
                     overflow-x: auto;
                     overflow-y: hidden;
@@ -1246,7 +1250,10 @@ class BasePage:
                     )
 
                 with gui.styled(OUTPUT_TABS_CSS):
-                    input_col, output_col = gui.columns([3, 2], gap="medium")
+                    input_col, output_col = gui.columns(
+                        [3, 2],
+                        gap="medium",
+                    )
                     with input_col:
                         submitted = self._render_input_col()
                     with output_col:
@@ -2616,9 +2623,20 @@ OUTPUT_TABS_CSS = """
         margin: -1rem 0 1rem 0;
         padding-top: 1rem;
     }
+    
+    /* reset col padding in mobile */
+    & > div {
+        padding: 0; 
+    }
+
     @media (min-width: 768px) {
         & {
             background-color: #f9f9f9;
+        }
+        /* set col padding in mobile */
+        & > div {
+            padding-left: calc(var(--bs-gutter-x) * .5);
+            padding-right: calc(var(--bs-gutter-x) * .5);
         }
     }
 
