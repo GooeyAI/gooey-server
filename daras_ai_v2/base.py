@@ -88,6 +88,7 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
+from routers.root import PREVIEW_ROUTE_WORKFLOWS
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -412,7 +413,7 @@ class BasePage:
                 }
                 """
             ),
-            gui.div(className="position-relative"),
+            gui.div(className="position-relative", id="recipe-nav-tabs"),
             gui.nav_tabs(),
         ):
             for tab in self.get_tabs():
@@ -420,7 +421,10 @@ class BasePage:
                 with gui.tag(
                     "span",
                     className="active-lg"
-                    if (tab == RecipeTabs.run and self.tab == RecipeTabs.preview)
+                    if (
+                        tab == RecipeTabs.run
+                        and self.workflow in PREVIEW_ROUTE_WORKFLOWS
+                    )
                     else "",
                 ):
                     with gui.nav_item(
@@ -2541,7 +2545,6 @@ class TitleValidationError(Exception):
     pass
 
 
-PREVIEW_ROUTE_WORKFLOWS = [Workflow.VIDEO_BOTS]
 OUTPUT_TABS_CSS = """
     & {
         margin: -1rem 0 1rem 0;
