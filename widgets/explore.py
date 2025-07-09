@@ -9,17 +9,45 @@ from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
+from daras_ai_v2.meta_content import raw_build_meta_tags
 from widgets.workflow_search import (
     SearchFilters,
     render_search_filters,
     render_search_results,
 )
 
-META_TITLE = "Explore AI workflows"
+META_TITLE = "Explore AI Workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
 
 TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
+
+
+def build_meta_tags(url: str, search_filters: SearchFilters | None):
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+
+    if not search_filters:
+        search_filters = SearchFilters()
+
+    match search_filters.search, search_filters.workflow:
+        case "", "":
+            title = META_TITLE
+        case query, "":
+            title = f"{query} AI Workflows"
+        case query, workflow:
+            page = page_slug_map.get(normalize_slug(workflow))
+            if page:
+                title = f"{query} {page.workflow.short_title} Workflows".lstrip()
+            else:
+                title = META_TITLE
+
+    title += " | Gooey.AI"
+
+    return raw_build_meta_tags(
+        url=url,
+        title=title,
+        description=META_DESCRIPTION,
+    )
 
 
 def render(user: AppUser | None, search_filters: SearchFilters | None):

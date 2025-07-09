@@ -262,10 +262,8 @@ def explore_page(
         explore.render(request.user, search_filters)
 
     return {
-        "meta": raw_build_meta_tags(
-            url=get_og_url_path(request),
-            title=explore.META_TITLE,
-            description=explore.META_DESCRIPTION,
+        "meta": explore.build_meta_tags(
+            url=get_og_url_path(request), search_filters=search_filters
         ),
     }
 
