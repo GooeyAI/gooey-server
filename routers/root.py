@@ -745,6 +745,8 @@ def page_wrapper(
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
 ):
+    from routers.account import explore_in_current_workspace
+
     context = {"request": request, "block_incognito": True}
 
     with gui.div(className="d-flex flex-column min-vh-100"):
@@ -816,6 +818,15 @@ def page_wrapper(
                         gui.html(label)
 
                 if request.user and not request.user.is_anonymous:
+                    with gui.tag(
+                        "a",
+                        href=get_route_path(explore_in_current_workspace),
+                        className="pe-2 d-none d-xl-block",
+                    ):
+                        with gui.div(className="d-inline-block me-2 small"):
+                            gui.html(icons.save)
+                        gui.html("Saved")
+
                     current_workspace = global_workspace_selector(
                         request.user, request.session
                     )
