@@ -35,7 +35,6 @@ def render_help_button(workflow: Workflow):
 def render_breadcrumbs_with_author(
     tbreadcrumbs,
     *,
-    is_api_call: bool = False,
     is_root_example: bool = False,
     user: AppUser | None = None,
     pr: PublishedRun | None = None,
@@ -46,10 +45,7 @@ def render_breadcrumbs_with_author(
         className="d-flex flex-wrap align-items-center container-margin-reset"
     ):
         with gui.div(className="me-2"):
-            render_breadcrumbs(
-                tbreadcrumbs,
-                is_api_call=is_api_call,
-            )
+            render_breadcrumbs(tbreadcrumbs)
         if not is_root_example:
             with gui.div(className="d-flex align-items-center"):
                 gui.write("by", className="me-2 d-none d-md-block text-muted")
