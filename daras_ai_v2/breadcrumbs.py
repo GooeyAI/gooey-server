@@ -23,6 +23,7 @@ class TitleBreadCrumbs(typing.NamedTuple):
     h1_title: str
     root_title: TitleUrl | None
     published_title: TitleUrl | None
+    title_prefix: str | None
 
     def has_breadcrumbs(self):
         return bool(self.root_title or self.published_title)
@@ -63,19 +64,21 @@ def get_title_breadcrumbs(
     match tab:
         case RecipeTabs.examples | RecipeTabs.history | RecipeTabs.saved:
             return TitleBreadCrumbs(
-                f"{tab.label}: {metadata.short_title}",
+                metadata.short_title,
                 root_title=root_breadcrumb,
                 published_title=None,
+                title_prefix=tab.label,
             )
         case RecipeTabs.run_as_api | RecipeTabs.integrations:
             tbreadcrumbs_on_run = get_title_breadcrumbs(page_cls=page_cls, sr=sr, pr=pr)
             return TitleBreadCrumbs(
-                f"{tab.label}: {tbreadcrumbs_on_run.h1_title}",
+                tbreadcrumbs_on_run.h1_title,
                 root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
                 published_title=tbreadcrumbs_on_run.published_title,
+                title_prefix=f"{tab.label}",
             )
         case _ if is_root:
-            return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
+            return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None, None)
         case _ if is_example:
             assert pr is not None
             return TitleBreadCrumbs(
@@ -84,6 +87,7 @@ def get_title_breadcrumbs(
                 or page_cls.get_run_title(sr, pr),
                 root_title=root_breadcrumb,
                 published_title=None,
+                title_prefix=None,
             )
         case _ if is_run:
             if pr and not pr.is_root():
@@ -95,9 +99,10 @@ def get_title_breadcrumbs(
                 published_title = None
             return TitleBreadCrumbs(
                 page_cls.get_prompt_title(sr)
-                or f"{'API Run:' if is_api_call else 'Run:'} {published_title.title if published_title else page_cls.get_run_title(sr, pr)}",
+                or f"{published_title.title if published_title else page_cls.get_run_title(sr, pr)}",
                 root_title=root_breadcrumb,
                 published_title=published_title,
+                title_prefix="API Run" if is_api_call else "Run",
             )
         case _:
             raise ValueError(f"Unknown tab: {tab}")
