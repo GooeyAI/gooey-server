@@ -855,7 +855,7 @@ def anonymous_login_container(request: Request, context: dict):
     with popover, gui.div(className="d-flex align-items-center"):
         gui.html(
             templates.get_template("google_one_tap_button.html").render(**context)
-            + '<i class="ps-2 fa-regular fa-chevron-down d-lg-none"></i>'
+            + '<i class="ps-2 fa-regular fa-chevron-down d-xl-none"></i>'
         )
 
     with (
