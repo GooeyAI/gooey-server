@@ -38,7 +38,8 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, TitleBreadCrumbs
+from widgets.base_header import render_breadcrumbs_with_author
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -390,7 +391,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div(className="mb-3")
+        header_placeholder = gui.div(className="mb-2")
         with (
             gui.styled(
                 """
@@ -437,32 +438,9 @@ class BasePage:
         with gui.div(
             className="d-flex justify-content-between align-items-start mt-0 mt-md-3"
         ):
-            if tbreadcrumbs.has_breadcrumbs():
-                with gui.div(
-                    className="d-block d-lg-flex align-items-center pt-2 mb-2"
-                ):
-                    with gui.div(className="me-3 mb-1 mb-lg-0"):
-                        render_breadcrumbs(
-                            tbreadcrumbs,
-                            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
-                        )
-                    if not is_root_example:
-                        render_author_as_breadcrumb(
-                            user=self.current_sr_user,
-                            pr=self.current_pr,
-                            sr=self.current_sr,
-                            current_workspace=(
-                                self.is_logged_in() and self.current_workspace or None
-                            ),
-                        )
-            else:
+            if not tbreadcrumbs.has_breadcrumbs():
                 # render title in line with the social buttons
                 self._render_title(tbreadcrumbs.h1_title)
-
-            with gui.div(className="d-flex align-items-center my-auto"):
-                if request_changed or (can_save and not is_example):
-                    self._render_unpublished_changes_indicator()
-                self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
@@ -479,7 +457,7 @@ class BasePage:
                         with gui.div(className="d-none d-md-inline"):
                             gui.image(
                                 src=pr.photo_url,
-                                style=img_style | dict(width="150px", height="150px"),
+                                style=img_style | dict(width="120px", height="120px"),
                             )
                     with (
                         gui.styled(
@@ -491,27 +469,63 @@ class BasePage:
                         gui.div(className="w-100"),
                     ):
                         with gui.div(
-                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
+                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-2 gap-md-4 container-margin-reset mb-2 mb-md-0"
                         ):
                             if pr.photo_url:
                                 with gui.div(className="d-inline d-md-none"):
                                     gui.image(
                                         src=pr.photo_url,
                                         style=img_style
-                                        | dict(width="80px", height="80px"),
+                                        | dict(width="40px", height="40px"),
                                     )
-                            self._render_title(tbreadcrumbs.h1_title)
-                        self.render_notes_and_extra()
+                            with gui.div(className="w-100 mb-md-2"):
+                                with gui.div(
+                                    className="d-flex justify-content-between align-items-center w-100 mb-md-2"
+                                ):
+                                    self._render_title(tbreadcrumbs.h1_title)
+                                    with gui.div(
+                                        className="d-flex align-items-center my-auto"
+                                    ):
+                                        if request_changed or (
+                                            can_save and not is_example
+                                        ):
+                                            self._render_unpublished_changes_indicator()
+                                        self.render_social_buttons()
+                                with gui.div(className="w-100 gap-2 d-none d-md-flex"):
+                                    self.render_extra_and_breadcrumbs(
+                                        tbreadcrumbs, sr, is_root_example
+                                    )
+                        with gui.div(className="w-100 gap-2 d-flex d-md-none mb-2"):
+                            self.render_extra_and_breadcrumbs(
+                                tbreadcrumbs, sr, is_root_example
+                            )
+                        self.render_notes(is_example)
         # render notes below the title and social buttons
         else:
-            self.render_notes_and_extra()
+            self.render_notes()
 
-    def render_notes_and_extra(self):
+    def render_extra_and_breadcrumbs(
+        self,
+        tbreadcrumbs: TitleBreadCrumbs,
+        sr: SavedRun,
+        is_root_example: bool,
+    ):
+        self.render_header_extra()
+        render_breadcrumbs_with_author(
+            tbreadcrumbs,
+            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
+            is_root_example=is_root_example,
+            user=self.current_sr_user,
+            pr=self.current_pr,
+            sr=self.current_sr,
+            current_workspace=(self.is_logged_in() and self.current_workspace or None),
+        )
+
+    def render_notes(self, is_example: bool):
         with gui.div(className="d-flex gap-2 w-100 align-items-center"):
             with gui.div(className="flex-grow-1 container-margin-reset"):
-                if self.current_pr and self.current_pr.notes:
+                if is_example and (self.current_pr and self.current_pr.notes):
                     gui.write(self.current_pr.notes, line_clamp=3)
-            self.render_header_extra()
 
     def render_header_extra(self):
         pass
