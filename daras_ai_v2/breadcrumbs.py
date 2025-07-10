@@ -40,20 +40,6 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
                 link_to=breadcrumbs.root_title.url,
                 className="text-muted",
             )
-        if breadcrumbs.published_title:
-            gui.breadcrumb_item(
-                breadcrumbs.published_title.title,
-                link_to=breadcrumbs.published_title.url,
-                className="fs-lg-5 d-none d-md-block",
-            )
-            gui.breadcrumb_item(
-                truncate_text_words(breadcrumbs.published_title.title, 20),
-                link_to=breadcrumbs.published_title.url,
-                className="fs-lg-5 d-block d-md-none",
-            )
-
-        if is_api_call:
-            gui.caption("(API)", className="m-0")
 
 
 def get_title_breadcrumbs(
@@ -67,6 +53,7 @@ def get_title_breadcrumbs(
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = not is_root and pr and pr.saved_run == sr
     is_run = not is_root and not is_example
+    is_api_call = sr.is_api_call and tab == RecipeTabs.run
 
     metadata = page_cls.workflow.get_or_create_metadata()
     root_breadcrumb = TitleUrl(
@@ -108,7 +95,7 @@ def get_title_breadcrumbs(
                 published_title = None
             return TitleBreadCrumbs(
                 page_cls.get_prompt_title(sr)
-                or f"Run: {page_cls.get_run_title(sr, pr)}",
+                or f"{'API Run:' if is_api_call else 'Run:'} {published_title.title if published_title else page_cls.get_run_title(sr, pr)}",
                 root_title=root_breadcrumb,
                 published_title=published_title,
             )
