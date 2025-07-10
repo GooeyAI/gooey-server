@@ -464,7 +464,11 @@ class BasePage:
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
                 with gui.styled("& h1 { margin-top: 0 }"):
-                    self._render_title(tbreadcrumbs.h1_title)
+                    self._render_title(
+                        tbreadcrumbs.h1_title,
+                        published_title=tbreadcrumbs.published_title,
+                        title_prefix=tbreadcrumbs.title_prefix,
+                    )
             else:
                 img_style = dict(objectFit="cover", marginBottom=0)
                 if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
@@ -504,9 +508,10 @@ class BasePage:
                                     self._render_title(
                                         tbreadcrumbs.h1_title,
                                         published_title=tbreadcrumbs.published_title,
+                                        title_prefix=tbreadcrumbs.title_prefix,
                                     )
                                     with gui.div(
-                                        className="d-flex align-items-center my-auto"
+                                        className="d-flex align-items-xl-center flex-sm-column-reverse flex-xl-row gap-sm-2 gap-xl-0"
                                     ):
                                         if request_changed or (
                                             can_save and not is_example
@@ -575,16 +580,21 @@ class BasePage:
             )
         )
 
-    def _render_title(self, title: str, published_title: TitleUrl | None = None):
+    def _render_title(
+        self,
+        title: str,
+        published_title: TitleUrl | None = None,
+        title_prefix: str | None = None,
+    ):
         with gui.div(className="container-margin-reset"):
+            prefix = f"{title_prefix}: " if title_prefix else ""
             if published_title:
-                with gui.link(
-                    to=published_title.url,
-                    className="fs-lg-5",
-                ):
-                    gui.write(f"# {title}")
+                gui.write(
+                    f"# {prefix} <a href='{published_title.url}'>{title}</a>",
+                    unsafe_allow_html=True,
+                )
             else:
-                gui.write(f"# {title}")
+                gui.write(f"# {prefix} {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
@@ -2280,8 +2290,8 @@ class BasePage:
                         unsafe_allow_html=True,
                         className="border border-dark",
                     )
-
-            gui.write(f"#### {tb.h1_title}")
+            prefix = f"{tb.title_prefix}: " if tb.title_prefix else ""
+            gui.write(f"#### {prefix} {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if (
