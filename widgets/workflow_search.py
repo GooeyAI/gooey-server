@@ -70,7 +70,11 @@ def render_search_filters(
     )
 
 
-def render_search_bar(key: str = "search_query", value: str = "") -> str:
+def render_search_bar(
+    key: str = "search_query", value: str = "", id: str | None = None
+) -> str:
+    id = id or f"--search_bar:{key}"
+
     with (
         gui.styled(
             r"""
@@ -109,10 +113,19 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
             key=key,
             value=value,
+            id=id,
         )
 
         # add a hidden submit button to allow form submission on pressing Enter
-        gui.html('<input type="submit" hidden />')
+        gui.button(
+            "",
+            className="m-0 p-0",
+            hidden=True,
+            onClick=f"""
+            event.preventDefault();
+            document.getElementById("{id}").blur();
+            """,
+        )
 
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
