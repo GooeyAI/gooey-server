@@ -502,7 +502,7 @@ class BasePage:
                         self.render_notes(is_example)
         # render notes below the title and social buttons
         else:
-            self.render_notes()
+            self.render_notes(is_example)
 
     def render_extra_and_breadcrumbs(
         self,
