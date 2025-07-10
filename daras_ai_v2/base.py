@@ -2281,8 +2281,8 @@ class BasePage:
                         unsafe_allow_html=True,
                         className="border border-dark",
                     )
-
-            gui.write(f"#### {tb.h1_title}")
+            prefix = f"{tb.title_prefix}: " if tb.title_prefix else ""
+            gui.write(f"#### {prefix} {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if (
