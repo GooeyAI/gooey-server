@@ -1,4 +1,4 @@
-<span class="pe-2" style="height: 44px; max-width: 200px" data-replace-login-spinner>
+<span class="pe-2" style="height: 44px; min-width: 40px; max-width: 200px;" data-replace-login-spinner>
     <span id="g_id_signin_desktop" class="d-none d-md-inline"></span>
     <span id="g_id_signin_mobile" class="d-md-none"></span>
 </span>
@@ -19,10 +19,13 @@
             shape: "rectangular",
             width: 200,
             text: "continue_with",
+            size: "large",
         });
         google.accounts.id.renderButton(document.getElementById("g_id_signin_mobile"), {
             shape: "rectangular",
-            type: "icon"
+            width: 60,
+            type: "icon",
+            size: "large",
         });
     }
 </script>
