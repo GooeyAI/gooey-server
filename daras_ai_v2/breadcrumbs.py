@@ -2,6 +2,7 @@ import typing
 
 import gooey_gui as gui
 from bots.models import SavedRun, PublishedRun
+from daras_ai.image_input import truncate_text_words
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
@@ -32,7 +33,7 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
         # avoid empty space when breadcrumbs are not rendered
         return
 
-    with gui.breadcrumbs():
+    with gui.breadcrumbs(className="container-margin-reset"):
         if breadcrumbs.root_title:
             gui.breadcrumb_item(
                 breadcrumbs.root_title.title,
@@ -43,11 +44,16 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = Fal
             gui.breadcrumb_item(
                 breadcrumbs.published_title.title,
                 link_to=breadcrumbs.published_title.url,
-                className="fs-lg-5",
+                className="fs-lg-5 d-none d-md-block",
+            )
+            gui.breadcrumb_item(
+                truncate_text_words(breadcrumbs.published_title.title, 20),
+                link_to=breadcrumbs.published_title.url,
+                className="fs-lg-5 d-block d-md-none",
             )
 
         if is_api_call:
-            gui.caption("(API)")
+            gui.caption("(API)", className="m-0")
 
 
 def get_title_breadcrumbs(
