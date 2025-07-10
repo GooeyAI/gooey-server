@@ -47,7 +47,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from workspaces.widgets import global_workspace_selector
+from workspaces.widgets import global_workspace_selector, render_link_in_dropdown
 from widgets.workflow_search import SearchFilters, render_search_bar
 
 app = CustomAPIRouter()
@@ -854,37 +854,14 @@ def anonymous_login_container(request: Request, context: dict):
             style=dict(minWidth="200px"),
         ),
     ):
-        row_height = "2.2rem"
-
-        with gui.tag(
-            "a",
-            href=login_url,
-            className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-            style=dict(height=row_height),
-        ):
-            with gui.div(className="row align-items-center"):
-                with gui.div(className="col-2 d-flex justify-content-center"):
-                    gui.html('<i class="fa-regular fa-circle-user"></i>')
-                with gui.div(className="col-10"):
-                    gui.html("Sign In")
+        render_link_in_dropdown(url=login_url, label="Sign In", icon=icons.sign_in)
 
         gui.html('<hr class="my-1"/>')
 
         for url, label in settings.HEADER_LINKS:
-            with gui.tag(
-                "a",
-                href=url,
-                className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-                style=dict(height=row_height),
-            ):
-                col1, col2 = gui.columns(
-                    [2, 10], responsive=False, className="row align-items-center"
-                )
-                if icon := settings.HEADER_ICONS.get(url):
-                    with col1, gui.div(className="d-flex justify-content-center"):
-                        gui.html(icon)
-                with col2:
-                    gui.html(label)
+            render_link_in_dropdown(
+                url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+            )
 
 
 class TabData(typing.NamedTuple):
