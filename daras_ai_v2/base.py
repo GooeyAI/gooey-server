@@ -38,7 +38,7 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, TitleBreadCrumbs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, TitleBreadCrumbs, TitleUrl
 from widgets.base_header import render_breadcrumbs_with_author
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
@@ -440,7 +440,9 @@ class BasePage:
         ):
             if not tbreadcrumbs.has_breadcrumbs():
                 # render title in line with the social buttons
-                self._render_title(tbreadcrumbs.h1_title)
+                self._render_title(
+                    tbreadcrumbs.h1_title, published_title=tbreadcrumbs.published_title
+                )
 
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
@@ -482,7 +484,10 @@ class BasePage:
                                 with gui.div(
                                     className="d-flex justify-content-between align-items-center w-100 mb-md-2"
                                 ):
-                                    self._render_title(tbreadcrumbs.h1_title)
+                                    self._render_title(
+                                        tbreadcrumbs.h1_title,
+                                        published_title=tbreadcrumbs.published_title,
+                                    )
                                     with gui.div(
                                         className="d-flex align-items-center my-auto"
                                     ):
@@ -491,13 +496,13 @@ class BasePage:
                                         ):
                                             self._render_unpublished_changes_indicator()
                                         self.render_social_buttons()
-                                with gui.div(className="w-100 gap-2 d-none d-md-flex"):
+                                with gui.div(className="d-none d-md-block"):
                                     self.render_extra_and_breadcrumbs(
-                                        tbreadcrumbs, sr, is_root_example
+                                        tbreadcrumbs, is_root_example
                                     )
-                        with gui.div(className="w-100 gap-2 d-flex d-md-none mb-2"):
+                        with gui.div(className="d-block d-md-none mb-2"):
                             self.render_extra_and_breadcrumbs(
-                                tbreadcrumbs, sr, is_root_example
+                                tbreadcrumbs, is_root_example
                             )
                         self.render_notes(is_example)
         # render notes below the title and social buttons
@@ -507,25 +512,24 @@ class BasePage:
     def render_extra_and_breadcrumbs(
         self,
         tbreadcrumbs: TitleBreadCrumbs,
-        sr: SavedRun,
         is_root_example: bool,
     ):
-        self.render_header_extra()
-        render_breadcrumbs_with_author(
-            tbreadcrumbs,
-            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
-            is_root_example=is_root_example,
-            user=self.current_sr_user,
-            pr=self.current_pr,
-            sr=self.current_sr,
-            current_workspace=(self.is_logged_in() and self.current_workspace or None),
-        )
+        with gui.div(className="d-flex align-items-center gap-2 w-100"):
+            self.render_header_extra()
+            render_breadcrumbs_with_author(
+                tbreadcrumbs,
+                is_root_example=is_root_example,
+                user=self.current_sr_user,
+                pr=self.current_pr,
+                sr=self.current_sr,
+                current_workspace=(
+                    self.is_logged_in() and self.current_workspace or None
+                ),
+            )
 
     def render_notes(self, is_example: bool):
-        with gui.div(className="d-flex gap-2 w-100 align-items-center"):
-            with gui.div(className="flex-grow-1 container-margin-reset"):
-                if is_example and (self.current_pr and self.current_pr.notes):
-                    gui.write(self.current_pr.notes, line_clamp=3)
+        if is_example and (self.current_pr and self.current_pr.notes):
+            gui.write(self.current_pr.notes, line_clamp=3)
 
     def render_header_extra(self):
         pass
@@ -554,9 +558,16 @@ class BasePage:
             )
         )
 
-    def _render_title(self, title: str):
+    def _render_title(self, title: str, published_title: TitleUrl | None = None):
         with gui.div(className="container-margin-reset"):
-            gui.write(f"# {title}")
+            if published_title:
+                with gui.link(
+                    to=published_title.url,
+                    className="fs-lg-5",
+                ):
+                    gui.write(f"# {title}")
+            else:
+                gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
