@@ -52,7 +52,7 @@ def render_breadcrumbs_with_author(
             )
         if not is_root_example:
             with gui.div(className="d-flex align-items-center"):
-                gui.write("by", className="me-2 d-block text-muted")
+                gui.write("by", className="me-2 d-none d-md-block text-muted")
                 render_author_as_breadcrumb(
                     user=user,
                     pr=pr,
