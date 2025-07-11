@@ -27,13 +27,8 @@ def render_demo_buttons_header(pr: PublishedRun):
         return
     with (
         gui.styled("& button { padding: 4px 12px !important }"),
-        gui.div(className="d-flex flex-column justify-content-center gap-1 my-1"),
+        gui.div(className="d-flex gap-1 my-1"),
     ):
-        with gui.tag(
-            "small",
-            className="container-margin-reset text-center w-100 text-nowrap text-muted",
-        ):
-            gui.html("Try the demo")
         for bi_id, platform in demo_bots:
             dialog_ref = gui.use_alert_dialog(key=f"demo-modal-{bi_id}")
             if render_demo_button(bi_id, platform, className="w-100"):
