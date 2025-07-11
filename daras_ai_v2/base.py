@@ -458,7 +458,7 @@ class BasePage:
                     img_style["borderRadius"] = "50%"
                 else:
                     img_style["borderRadius"] = "12px"
-                with gui.div(className="d-flex gap-4 align-items-center"):
+                with gui.div(className="d-flex gap-4 align-items-md-center"):
                     if pr.photo_url:
                         with gui.div(className="d-none d-md-inline"):
                             gui.image(
@@ -475,10 +475,10 @@ class BasePage:
                         gui.div(className="w-100"),
                     ):
                         with gui.div(
-                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-2 gap-md-4 container-margin-reset mb-2 mb-md-0"
+                            className="d-flex mt-3 mt-md-2 flex-row align-items-start align-items-md-center gap-2 gap-md-4 container-margin-reset mb-2 mb-md-0"
                         ):
                             if pr.photo_url:
-                                with gui.div(className="d-inline d-md-none"):
+                                with gui.div(className="d-inline d-md-none mt-1"):
                                     gui.image(
                                         src=pr.photo_url,
                                         style=img_style
@@ -519,7 +519,7 @@ class BasePage:
         tbreadcrumbs: TitleBreadCrumbs,
         is_root_example: bool,
     ):
-        with gui.div(className="d-flex align-items-center gap-2 w-100"):
+        with gui.div(className="d-flex align-items-center gap-2 w-100 flex-wrap"):
             self.render_header_extra()
             render_breadcrumbs_with_author(
                 tbreadcrumbs,
