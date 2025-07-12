@@ -4,6 +4,7 @@ import html
 import inspect
 import json
 import math
+from textwrap import dedent
 import traceback
 import typing
 import uuid
@@ -82,7 +83,7 @@ from widgets.workflow_image import (
     render_workflow_photo_uploader,
 )
 from widgets.workflow_share import render_share_button
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceRole
 from workspaces.widgets import (
     get_current_workspace,
     render_create_workspace_alert,
@@ -339,7 +340,32 @@ class BasePage:
         if output:
             gui.session_state.update(output)
 
+    def render_unauthorized(self):
+        with gui.div(className="d-flex flex-column align-items-center"):
+            gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
+            gui.caption("Welcome to Gooey.AI")
+            gui.write("# You need access")
+            if not self.request.user or self.request.user.is_anonymous:
+                gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
+            else:
+                owner_workspace = (
+                    self.current_pr.workspace
+                    if self.current_pr.saved_run == self.current_sr
+                    else self.current_sr.workspace
+                )
+                gui.write(
+                    dedent(f"""
+                You currently don't have access to this resource. Please request access from the
+                {owner_workspace.display_name(current_user=self.request.user)} admin or sign in with another account. 
+                You are logged in as {self.request.user.email or self.request.user.phone_number}.
+                """)
+                )
+
     def render(self):
+        if not self.is_current_user_authorized():
+            self.render_unauthorized()
+            return
+
         self.setup_sentry()
 
         if self.get_run_state(gui.session_state) in (
@@ -1447,7 +1473,7 @@ class BasePage:
         uid: str,
         *,
         create: bool = False,
-        defaults: dict = None,
+        defaults: dict[str, typing.Any] | None = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
@@ -1457,9 +1483,8 @@ class BasePage:
 
     @classmethod
     def get_pr_from_example_id(cls, *, example_id: str):
-        return PublishedRun.objects.get(
-            workflow=cls.workflow,
-            published_run_id=example_id,
+        return PublishedRun.objects.select_related("saved_run", "workspace").get(
+            workflow=cls.workflow, published_run_id=example_id
         )
 
     @classmethod
@@ -2424,6 +2449,42 @@ class BasePage:
 
     def is_current_user_owner(self) -> bool:
         return bool(self.request.user and self.current_sr_user == self.request.user)
+
+    def is_user_authorized(self, user: AppUser | None = None) -> bool:
+        if self.is_user_admin(user):
+            return True
+
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id != sr.id:
+            # not published run: simply check if user is a member of workspace
+            return bool(user) and sr.workspace_id in user.cached_memberships
+
+        # published run
+        if pr.is_approved_example:
+            return True
+
+        if WorkflowAccessLevel(pr.public_access) in (
+            WorkflowAccessLevel.FIND_AND_VIEW,
+            WorkflowAccessLevel.EDIT,
+        ):
+            # public access allowed
+            return True
+
+        membership = user and user.cached_memberships.get(pr.workspace_id, None)
+        role = membership and WorkspaceRole(membership.role)
+        match pr.workspace_access, role:
+            case _, WorkspaceRole.ADMIN | WorkspaceRole.OWNER:
+                return True
+            case (
+                WorkflowAccessLevel.FIND_AND_VIEW | WorkflowAccessLevel.EDIT,
+                WorkspaceRole.MEMBER,
+            ):
+                return True
+            case _:
+                return False
+
+    def is_current_user_authorized(self) -> bool:
+        return self.is_user_authorized(self.request.user)
 
 
 def started_at_text(dt: datetime.datetime):

@@ -217,23 +217,25 @@ def robots_tag_for_page(
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = pr and pr.saved_run == sr and not pr.is_root()
 
-    match page.tab:
-        case RecipeTabs.run if is_root or is_example:
-            no_follow, no_index = False, False
-        case RecipeTabs.run:  # ordinary run (not example)
-            no_follow, no_index = False, True
-        case RecipeTabs.examples:
-            no_follow, no_index = False, False
-        case RecipeTabs.run_as_api:
-            no_follow, no_index = False, True
-        case RecipeTabs.integrations:
-            no_follow, no_index = True, True
-        case RecipeTabs.history:
-            no_follow, no_index = True, True
-        case RecipeTabs.saved:
-            no_follow, no_index = True, True
-        case _:
-            raise ValueError(f"Unknown tab: {page.tab}")
+    if not page.is_user_authorized(None):
+        # nofollow & noindex if page is not open for anonymous users
+        no_follow, no_index = True, True
+    else:
+        match page.tab:
+            case RecipeTabs.run if is_root or is_example:
+                no_follow, no_index = False, False
+            case RecipeTabs.run:  # ordinary run (not example)
+                no_follow, no_index = False, True
+            case RecipeTabs.examples:
+                no_follow, no_index = False, False
+            case RecipeTabs.run_as_api:
+                no_follow, no_index = False, True
+            case RecipeTabs.integrations:
+                no_follow, no_index = True, True
+            case RecipeTabs.history:
+                no_follow, no_index = True, True
+            case RecipeTabs.saved:
+                no_follow, no_index = True, True
 
     parts = []
     if no_follow:
