@@ -220,7 +220,11 @@ def robots_tag_for_page(
     match page.tab:
         case RecipeTabs.run if is_root or is_example:
             no_follow, no_index = False, False
+        case RecipeTabs.preview if is_root or is_example:
+            no_follow, no_index = False, False
         case RecipeTabs.run:  # ordinary run (not example)
+            no_follow, no_index = False, True
+        case RecipeTabs.preview:
             no_follow, no_index = False, True
         case RecipeTabs.examples:
             no_follow, no_index = False, False
