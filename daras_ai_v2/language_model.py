@@ -122,6 +122,8 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         supports_json=True,
+        is_deprecated=True,
+        redirect_to="gpt_4_o",
     )
 
     # https://platform.openai.com/docs/models/o4-mini
