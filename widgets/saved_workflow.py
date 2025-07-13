@@ -24,13 +24,13 @@ if typing.TYPE_CHECKING:
 def render_saved_workflow_preview(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     published_run: PublishedRun,
+    *,
     show_workspace_author: bool = False,
     workflow_pill: str | None = None,
     hide_visibility_pill: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
-    hide_updated_at: bool = False,
-    show_all_run_counts: bool = False,
+    is_member: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -84,8 +84,7 @@ def render_saved_workflow_preview(
                 hide_version_notes=hide_version_notes,
                 hide_visibility_pill=hide_visibility_pill,
                 hide_last_editor=hide_last_editor,
-                hide_updated_at=hide_updated_at,
-                show_all_run_counts=show_all_run_counts,
+                is_member=is_member,
             )
 
         if output_url:
@@ -152,28 +151,9 @@ FOOTER_CSS = """
 }
 @media (max-width: 768px) {
     & {
-        grid-template-areas: 
-            "workspace author"
-            "notes notes"
-            "time runs";
         gap: 0.25rem 0.75rem;
         align-items: start;
         white-space: normal;
-    }
-    & .workspace-container {
-        grid-area: workspace;
-    }
-    & .author-container {
-        grid-area: author;
-    }
-    & .notes-container {
-        grid-area: notes;
-    }
-    & .time-container {
-        grid-area: time;
-    }
-    & .runs-container {
-        grid-area: runs;
     }
     & > div {
         margin: 0;
@@ -183,13 +163,13 @@ FOOTER_CSS = """
 
 
 def render_footer_breadcrumbs(
+    *,
     published_run: PublishedRun,
     show_workspace_author: bool,
     hide_visibility_pill: bool,
     hide_version_notes: bool,
     hide_last_editor: bool,
-    hide_updated_at: bool,
-    show_all_run_counts: bool = False,
+    is_member: bool,
 ):
     latest_version = published_run.versions.latest()
 
@@ -203,7 +183,7 @@ def render_footer_breadcrumbs(
             show_workspace_author = False
         if show_workspace_author:
             # don't repeat author for personal workspaces
-            with gui.div(className="d-flex align-items-center workspace-container"):
+            with gui.div():
                 render_author_from_workspace(
                     published_run.workspace,
                     image_size="24px",
@@ -211,9 +191,7 @@ def render_footer_breadcrumbs(
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
-            with gui.div(
-                className="d-flex align-items-center text-truncate author-container"
-            ):
+            with gui.div(className="text-truncate"):
                 render_author_from_user(
                     published_run.last_edited_by,
                     image_size="24px",
@@ -222,28 +200,27 @@ def render_footer_breadcrumbs(
 
         if not hide_version_notes and latest_version and latest_version.change_notes:
             with gui.div(
-                className="text-truncate text-muted d-flex align-items-center notes-container",
+                className="text-truncate text-muted",
                 style={"maxWidth": "250px"},
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
-        # gui.div(className="mobile-line-break")
 
         updated_at = published_run.saved_run.updated_at
         if (
             updated_at
             and isinstance(updated_at, datetime.datetime)
-            and not hide_updated_at
+            and not hide_last_editor
         ):
-            with gui.div(className="d-flex align-items-center time-container"):
+            with gui.div():
                 gui.write(
                     f"{icons.time} {get_relative_time(updated_at)}",
                     unsafe_allow_html=True,
                     className="text-muted",
                 )
 
-        if published_run.run_count >= 50 or show_all_run_counts:
+        if published_run.run_count and (published_run.run_count >= 50 or is_member):
             run_count = format_number_with_suffix(published_run.run_count)
-            with gui.div(className="d-flex align-items-center runs-container"):
+            with gui.div():
                 gui.write(
                     f"{icons.run} {run_count} runs",
                     unsafe_allow_html=True,

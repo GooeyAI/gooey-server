@@ -16,7 +16,6 @@ from daras_ai_v2 import icons
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import WorkspaceRole
-from utils.workspace import is_user_workspace_owner
 
 
 class SearchFilters(BaseModel):
@@ -186,40 +185,19 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
 
-        # Extract UI display flags
-        display_flags = _determine_display_flags(pr, user, search_filters)
+        show_workspace_author = not bool(search_filters and search_filters.workspace)
+        is_member = bool(getattr(pr, "is_member", False))
+        hide_last_editor = bool(pr.workspace_id and not is_member)
 
         render_saved_workflow_preview(
             workflow.page_cls,
             pr,
             workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
             hide_visibility_pill=True,
-            **display_flags,
+            show_workspace_author=show_workspace_author,
+            hide_last_editor=hide_last_editor,
+            is_member=is_member,
         )
-
-    def _determine_display_flags(
-        pr: PublishedRun, user: AppUser | None, search_filters: SearchFilters
-    ) -> dict:
-        """Determine UI display flags for the published run preview."""
-        show_workspace_author = not bool(search_filters and search_filters.workspace)
-
-        is_member = bool(getattr(pr, "is_member", False))
-        hide_last_editor = bool(pr.workspace_id and not is_member)
-        hide_updated_at = hide_last_editor
-
-        # Only show all run counts if user is a member AND they're filtering by their workspace
-        show_all_run_counts = False
-        if is_member and search_filters and search_filters.workspace:
-            show_all_run_counts = is_user_workspace_owner(
-                user, search_filters.workspace
-            )
-
-        return {
-            "show_workspace_author": show_workspace_author,
-            "hide_last_editor": hide_last_editor,
-            "hide_updated_at": hide_updated_at,
-            "show_all_run_counts": show_all_run_counts,
-        }
 
     grid_layout(1, qs, _render_run)
 
