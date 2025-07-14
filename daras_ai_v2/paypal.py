@@ -3,8 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import datetime
 from time import time
-from typing import Any, Literal, Mapping, Type, TypeVar
-import typing
+from typing import Any, ClassVar, List, Literal, Mapping, Type, TypeVar
 
 import requests
 from furl import furl
@@ -19,13 +18,13 @@ T = TypeVar("T", bound="PaypalResource")
 
 
 class PaypalResource(BaseModel):
-    _api_endpoint: str | None = None
-    _api_list_items_key: str | None = None
+    _api_endpoint: ClassVar[str | None] = None
+    _api_list_items_key: ClassVar[str | None] = None
 
     id: str
     create_time: datetime
     update_time: datetime | None = None
-    links: typing.List
+    links: List
 
     @classmethod
     def list(cls: Type[T], list_all: bool = False, **params) -> list[T]:
