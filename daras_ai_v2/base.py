@@ -70,6 +70,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
     should_attempt_auto_recharge,
 )
+from payments.plans import PricingPlan
 from routers.root import RecipeTabs
 from widgets.author import (
     render_author_as_breadcrumb,
@@ -83,7 +84,7 @@ from widgets.workflow_image import (
     render_workflow_photo_uploader,
 )
 from widgets.workflow_share import render_share_button
-from workspaces.models import Workspace, WorkspaceRole
+from workspaces.models import Workspace
 from workspaces.widgets import (
     get_current_workspace,
     render_create_workspace_alert,
@@ -2456,32 +2457,28 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         if pr.saved_run_id != sr.id:
-            # not published run: simply check if user is a member of workspace
-            return bool(user) and sr.workspace_id in user.cached_memberships
+            # not published run
+            return (
+                # free workspace: allow anyone
+                not sr.workspace.subscription_id
+                or (
+                    PricingPlan.from_sub(sr.workspace.subscription)
+                    == PricingPlan.STARTER
+                )
+                # paid workspace: allow members
+                or bool(user and sr.workspace in user.cached_workspaces)
+            )
 
         # published run
-        if pr.is_approved_example:
-            return True
-
-        if WorkflowAccessLevel(pr.public_access) in (
-            WorkflowAccessLevel.FIND_AND_VIEW,
-            WorkflowAccessLevel.EDIT,
-        ):
-            # public access allowed
-            return True
-
-        membership = user and user.cached_memberships.get(pr.workspace_id, None)
-        role = membership and WorkspaceRole(membership.role)
-        match pr.workspace_access, role:
-            case _, WorkspaceRole.ADMIN | WorkspaceRole.OWNER:
-                return True
-            case (
-                WorkflowAccessLevel.FIND_AND_VIEW | WorkflowAccessLevel.EDIT,
-                WorkspaceRole.MEMBER,
-            ):
-                return True
-            case _:
-                return False
+        return (
+            pr.is_approved_example
+            or (
+                WorkflowAccessLevel(pr.public_access)
+                in (WorkflowAccessLevel.FIND_AND_VIEW, WorkflowAccessLevel.EDIT)
+            )
+            # current user is in the same workspace
+            or bool(user and pr.workspace in user.cached_workspaces)
+        )
 
     def is_current_user_authorized(self) -> bool:
         return self.is_user_authorized(self.request.user)
