@@ -236,7 +236,7 @@ class FunctionsPage(BasePage):
     def render_output(self):
         if error := gui.session_state.get("error"):
             with gui.tag("pre", className="bg-danger bg-opacity-25"):
-                gui.html(error)
+                gui.html(html.escape(error))
 
         if return_value := gui.session_state.get("return_value"):
             gui.write("**Return value**")
