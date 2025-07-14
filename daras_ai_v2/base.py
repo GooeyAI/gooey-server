@@ -441,7 +441,10 @@ class BasePage:
                         tbreadcrumbs.h1_title,
                         published_title=tbreadcrumbs.published_title,
                     )
-                with gui.div(className="d-flex align-items-center"):
+                with gui.div(
+                    className="d-flex align-items-center",
+                    style={"whiteSpace": "nowrap"},
+                ):
                     if request_changed or (can_save and not is_example):
                         self._render_unpublished_changes_indicator()
                     self.render_social_buttons()
@@ -474,7 +477,7 @@ class BasePage:
 
                         # desktop image and title, social buttons, extra and breadcrumbs
                         with gui.div(
-                            className="d-flex mt-3 mt-md-2 align-items-start align-items-md-center gap-2 gap-md-4 container-margin-reset mb-2 mb-md-0 w-100"
+                            className="d-flex mt-3 mt-md-2 align-items-md-center gap-2 gap-md-4 container-margin-reset mb-2 mb-md-0 w-100"
                         ):
                             if pr.photo_url:
                                 with gui.div(className="d-inline d-md-none"):
@@ -493,7 +496,8 @@ class BasePage:
                                         title_prefix=tbreadcrumbs.title_prefix,
                                     )
                                     with gui.div(
-                                        className="d-flex align-items-xl-center flex-sm-column-reverse flex-xl-row gap-sm-2 gap-xl-0"
+                                        className="d-flex align-items-xl-center flex-sm-column-reverse flex-xl-row gap-sm-2 gap-xl-0",
+                                        style={"whiteSpace": "nowrap"},
                                     ):
                                         if request_changed or (
                                             can_save and not is_example
