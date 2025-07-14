@@ -24,11 +24,13 @@ if typing.TYPE_CHECKING:
 def render_saved_workflow_preview(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     published_run: PublishedRun,
+    *,
     show_workspace_author: bool = False,
     workflow_pill: str | None = None,
     hide_visibility_pill: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
+    is_member: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -82,6 +84,7 @@ def render_saved_workflow_preview(
                 hide_version_notes=hide_version_notes,
                 hide_visibility_pill=hide_visibility_pill,
                 hide_last_editor=hide_last_editor,
+                is_member=is_member,
             )
 
         if output_url:
@@ -129,7 +132,7 @@ FOOTER_CSS = """
     white-space: nowrap;
 }
 & .author-name {
-    max-width: 150px; 
+    max-width: 200px; 
     overflow: hidden; 
     text-overflow: ellipsis; 
 }
@@ -141,31 +144,32 @@ FOOTER_CSS = """
     margin: 0 2px;
     text-align: center;
 }
-& > :not(:empty):not(:first-child):not(.newline-sm):before {
-  content: "•";
-  margin: 0 0.5rem;
-  color: black;
-  display: inline-block;
-  vertical-align: middle;
+& > div {
+    margin-right: 0.75rem;
+    display: flex;
+    align-items: center;
 }
 @media (max-width: 768px) {
-     & .newline-sm {
-        width: 100%;
-        height: 0.12rem;
+    & {
+        gap: 0.25rem 0.75rem;
+        align-items: start;
+        white-space: normal;
     }
-    & .newline-sm:before, & .newline-sm + :before {
-        content: unset !important;
+    & > div {
+        margin: 0;
     }
 }
 """
 
 
 def render_footer_breadcrumbs(
+    *,
     published_run: PublishedRun,
     show_workspace_author: bool,
     hide_visibility_pill: bool,
     hide_version_notes: bool,
     hide_last_editor: bool,
+    is_member: bool,
 ):
     latest_version = published_run.versions.latest()
 
@@ -175,47 +179,53 @@ def render_footer_breadcrumbs(
             className="flex-grow-1 d-flex align-items-end flex-wrap flex-lg-nowrap"
         ),
     ):
-        if not hide_version_notes and latest_version and latest_version.change_notes:
-            gui.caption(
-                f"{icons.notes} {html.escape(latest_version.change_notes)}",
-                unsafe_allow_html=True,
-                line_clamp=1,
-                lineClampExpand=False,
-            )
-            gui.div(className="newline-sm")
-
         if published_run.workspace.is_personal:
             show_workspace_author = False
         if show_workspace_author:
             # don't repeat author for personal workspaces
-            with gui.div(className="d-flex align-items-center"):
+            with gui.div():
                 render_author_from_workspace(
-                    published_run.workspace, image_size="24px", responsive=False
+                    published_run.workspace,
+                    image_size="24px",
+                    responsive=False,
                 )
 
         if not hide_last_editor and published_run.last_edited_by:
-            with gui.div(className="d-flex align-items-center text-truncate"):
+            with gui.div(className="text-truncate"):
                 render_author_from_user(
-                    published_run.last_edited_by, image_size="24px", responsive=False
+                    published_run.last_edited_by,
+                    image_size="24px",
+                    responsive=False,
                 )
-            if show_workspace_author:
-                gui.div(className="newline-sm")
+
+        if not hide_version_notes and latest_version and latest_version.change_notes:
+            with gui.div(
+                className="text-truncate text-muted",
+                style={"maxWidth": "250px"},
+            ):
+                gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
 
         updated_at = published_run.saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            gui.write(
-                f"{icons.time} {get_relative_time(updated_at)}",
-                unsafe_allow_html=True,
-            )
+        if (
+            updated_at
+            and isinstance(updated_at, datetime.datetime)
+            and not hide_last_editor
+        ):
+            with gui.div():
+                gui.write(
+                    f"{icons.time} {get_relative_time(updated_at)}",
+                    unsafe_allow_html=True,
+                    className="text-muted",
+                )
 
-        if published_run.run_count >= 50:
+        if published_run.run_count and (published_run.run_count >= 50 or is_member):
             run_count = format_number_with_suffix(published_run.run_count)
-            gui.write(
-                f"{icons.run} {run_count} runs",
-                unsafe_allow_html=True,
-                className="text-dark text-nowrap",
-            )
-            gui.div(className="newline-sm")
+            with gui.div():
+                gui.write(
+                    f"{icons.run} {run_count} runs",
+                    unsafe_allow_html=True,
+                    className="text-muted text-nowrap",
+                )
 
         if not hide_visibility_pill:
             gui.caption(

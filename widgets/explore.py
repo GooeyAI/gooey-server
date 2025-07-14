@@ -90,19 +90,15 @@ def render_image(page: BasePage):
 def _render_as_featured(page_cls: typing.Type[BasePage]):
     page = page_cls()
     render_image(page)
-    # total_runs = page.get_total_runs()
-    # render_description(page, state, total_runs)
     render_description(page)
 
 
-def _render_non_featured(page_cls):
+def _render_non_featured(page_cls: typing.Type[BasePage]):
     page = page_cls()
     col1, col2 = gui.columns([1, 2])
     with col1:
         render_image(page)
     with col2:
-        # total_runs = page.get_total_runs()
-        # render_description(page, state, total_runs)
         render_description(page)
 
 
@@ -113,10 +109,13 @@ def render_description(page: BasePage):
     root_pr = page.get_root_pr()
     with gui.div(className="mb-3"):
         gui.write(root_pr.notes, line_clamp=4)
+
     if root_pr.run_count >= 50:
         run_count = format_number_with_suffix(root_pr.run_count)
-        gui.caption(
-            f"{icons.run} {run_count} runs",
-            unsafe_allow_html=True,
-            style={"fontSize": "0.9rem"},
-        )
+        with gui.div(className="d-flex align-items-center"):
+            gui.caption(
+                f"{icons.run} {run_count} runs",
+                unsafe_allow_html=True,
+                className="text-muted",
+                style={"fontSize": "0.9rem"},
+            )
