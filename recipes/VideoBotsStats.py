@@ -323,14 +323,7 @@ class VideoBotsStatsPage(BasePage):
         gui.data_table(
             [columns]
             + [
-                [
-                    dict(
-                        readonly=True,
-                        displayData=str(df.iloc[idx, col]),
-                        data=str(df.iloc[idx, col]),
-                    )
-                    for col in range(len(columns))
-                ]
+                [str(df.iloc[idx, col]) for col in range(len(columns))]
                 for idx in range(min(500, len(df)))
             ]
         )

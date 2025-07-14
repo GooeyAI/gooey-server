@@ -121,6 +121,17 @@ SEAMLESS_v2_ASR_SUPPORTED = {
     "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "yor", "yue", "zul",
 }  # fmt: skip
 
+# Eleven Labs Scribe v1 - supports 99 languages with 3-letter ISO codes
+ELEVENLABS_SUPPORTED = {
+    "afr", "amh", "ara", "hye", "asm", "ast", "aze", "bel", "ben", "bos", "bul", "mya", "yue", "cat", "ceb", "nya",
+    "hrv", "ces", "dan", "nld", "eng", "est", "fil", "fin", "fra", "ful", "glg", "lug", "kat", "deu", "ell", "guj",
+    "hau", "heb", "hin", "hun", "isl", "ibo", "ind", "gle", "ita", "jpn", "jav", "kea", "kan", "kaz", "khm", "kor",
+    "kur", "kir", "lao", "lav", "lin", "lit", "luo", "ltz", "mkd", "msa", "mal", "mlt", "zho", "mri", "mar", "mon",
+    "nep", "nso", "nor", "oci", "ori", "pus", "fas", "pol", "por", "pan", "ron", "rus", "srp", "sna", "snd", "slk",
+    "slv", "som", "spa", "swa", "swe", "tam", "tgk", "tel", "tha", "tur", "ukr", "umb", "urd", "uzb", "vie", "cym",
+    "wol", "xho", "zul",
+}  # fmt: skip
+
 AZURE_SUPPORTED = {
     "af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA",
     "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ",
@@ -260,6 +271,7 @@ class AsrModels(Enum):
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
+    elevenlabs = "ElevenLabs Scribe v1"
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
@@ -329,6 +341,7 @@ asr_model_ids = {
     AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.lelapa: "lelapa-vulavula",
+    AsrModels.elevenlabs: "elevenlabs-scribe-v1",
 }
 
 forced_asr_languages = {
@@ -354,6 +367,7 @@ asr_supported_languages = {
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
+    AsrModels.elevenlabs: ELEVENLABS_SUPPORTED,
     AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
@@ -971,6 +985,33 @@ def get_google_auth_session(*scopes: str) -> tuple[AuthorizedSession, str]:
         return AuthorizedSession(credentials=creds), project
 
 
+def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
+    """
+    Call ElevenLabs Speech-to-Text API
+    """
+    audio_r = requests.get(audio_url)
+    raise_for_status(audio_r, is_user_url=True)
+
+    # Set up the files and form data for the multipart request
+    files = {"file": audio_r.content}
+    data = {"model_id": "scribe_v1"}
+    headers = {"xi-api-key": settings.ELEVEN_LABS_API_KEY}
+
+    # Language parameter is sent in the form data
+    if language:
+        data["language_code"] = language
+
+    response = requests.post(
+        "https://api.elevenlabs.io/v1/speech-to-text",
+        files=files,
+        headers=headers,
+        data=data,
+    )
+    raise_for_status(response)
+
+    return response.json()
+
+
 def run_asr(
     audio_url: str,
     selected_model: str,
@@ -1017,6 +1058,21 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.elevenlabs:
+        result = elevenlabs_asr(audio_url, language)
+        chunks = []
+        for word_data in result.get("words", []):
+            if word_data.get("type") == "word":
+                speaker = word_data.get("speaker_id", 0)
+            else:
+                speaker = None
+            chunk = {
+                "timestamp": (word_data["start"], word_data["end"]),
+                "text": word_data["text"],
+                "speaker": speaker,
+            }
+            chunks.append(chunk)
+        data = {"text": result["text"], "chunks": chunks}
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
