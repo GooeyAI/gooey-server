@@ -119,9 +119,6 @@ from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 from widgets.demo_button import render_demo_buttons_header
 
-if typing.TYPE_CHECKING:
-    pass
-
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
