@@ -415,6 +415,10 @@ class BasePage:
                 self._render_title(
                     tbreadcrumbs.h1_title, published_title=tbreadcrumbs.published_title
                 )
+                with gui.div(className="d-flex align-items-center my-auto"):
+                    if request_changed or (can_save and not is_example):
+                        self._render_unpublished_changes_indicator()
+                    self.render_social_buttons()
 
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
@@ -458,7 +462,7 @@ class BasePage:
                                     )
                             with gui.div(className="w-100 mb-md-2"):
                                 with gui.div(
-                                    className="d-flex justify-content-between align-items-center w-100 mb-md-2"
+                                    className="d-flex justify-content-between align-items-start w-100 mb-md-2"
                                 ):
                                     self._render_title(
                                         tbreadcrumbs.h1_title,
