@@ -1986,10 +1986,7 @@ class BasePage:
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
         )
-        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            raise gui.RedirectException(pr.get_app_url())
-        else:
-            raise gui.RedirectException(pr.get_app_url())
+        raise gui.RedirectException(pr.get_app_url())
 
     def on_submit(self, unsaved_state: dict[str, typing.Any] = None):
         sr = self.create_and_validate_new_run(enable_rate_limits=True)
