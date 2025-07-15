@@ -4,7 +4,6 @@ import html
 import inspect
 import json
 import math
-from textwrap import dedent
 import traceback
 import typing
 import uuid
@@ -13,6 +12,7 @@ from enum import Enum
 from functools import cached_property, partial
 from itertools import pairwise
 from random import Random
+from textwrap import dedent
 from time import sleep
 
 import gooey_gui as gui
