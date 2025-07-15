@@ -1,4 +1,5 @@
 import typing
+from enum import Enum
 
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
@@ -17,19 +18,53 @@ from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
-from workspaces.models import WorkspaceRole
+from workspaces.models import Workspace, WorkspaceRole
 
-if typing.TYPE_CHECKING:
-    from workspaces.models import Workspace
+
+class SortOptions(str, Enum):
+    FEATURED = "featured"
+    UPDATED_AT = "last_updated"
+    CREATED_AT = "created_at"
+    MOST_RUNS = "most_runs"
+
+    @classmethod
+    @property
+    def default(cls) -> "SortOptions":
+        return cls.FEATURED
+
+    @property
+    def label(self) -> str:
+        match self:
+            case SortOptions.FEATURED:
+                return "Featured"
+            case SortOptions.UPDATED_AT:
+                return "Last Updated"
+            case SortOptions.CREATED_AT:
+                return "Created At"
+            case SortOptions.MOST_RUNS:
+                return "Most Runs"
+
+    @property
+    def icon(self) -> str:
+        match self:
+            case SortOptions.FEATURED:
+                return icons.star
+            case SortOptions.UPDATED_AT:
+                return icons.time
+            case SortOptions.CREATED_AT:
+                return icons.calendar
+            case SortOptions.MOST_RUNS:
+                return icons.run
 
 
 class SearchFilters(BaseModel):
     search: str = ""
     workspace: str = ""
     workflow: str = ""
+    sort: str = ""
 
     def __bool__(self):
-        return bool(self.search or self.workspace or self.workflow)
+        return bool(self.search or self.workspace or self.workflow or self.sort)
 
 
 def render_search_filters(
@@ -40,11 +75,6 @@ def render_search_filters(
 
     with gui.div(className="d-lg-flex container-margin-reset gap-3"):
         with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
-            gui.caption(
-                icons.filter,
-                unsafe_allow_html=True,
-                className="text-muted d-flex align-items-center",
-            )
             with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
                 is_logged_in = current_user and not current_user.is_anonymous
                 if is_logged_in:
@@ -62,6 +92,41 @@ def render_search_filters(
                     search_filters.workflow = (
                         render_workflow_filter(value=search_filters.workflow) or ""
                     )
+
+        with gui.div(
+            className="col-lg-5 d-flex gap-2 justify-content-end",
+            style={"fontSize": "0.9rem"},
+        ):
+            gui.caption(
+                icons.filter,
+                unsafe_allow_html=True,
+                className="d-flex align-items-center",
+            )
+            sort_options: dict[str, str] = dict(
+                (opt.value, f"{opt.icon} {opt.label}") for opt in SortOptions
+            )
+            with (
+                gui.styled(
+                    """
+                    @media(min-width: 992px) {
+                        & .gui-input { min-width: 170px; }
+                    }
+                    """
+                ),
+                gui.div(),
+            ):
+                search_filters.sort = gui.selectbox(
+                    label="",
+                    label_visibility="collapsed",
+                    placeholder="Sort by",
+                    options=sort_options,
+                    key="search_sort",
+                    value=search_filters.sort,
+                    format_func=lambda v: sort_options.get(
+                        v, sort_options[SortOptions.default.value]
+                    ),
+                    className="w-100 mb-0 text-nowrap",
+                )
 
     return search_filters
 
@@ -283,16 +348,33 @@ def get_filtered_published_runs(
     qs = PublishedRun.objects.all()
     qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
-    qs = qs.annotate(
-        is_root_workflow=Q(published_run_id=""),
-    ).order_by(
-        F("is_created_by").desc(nulls_last=True),
-        "-is_member",
-        "-is_approved_example",
-        "-is_root_workflow",
-        "-updated_at",
+    qs = build_sort_filter(
+        qs,
+        search_filters.sort and SortOptions(search_filters.sort) or SortOptions.default,
     )
+    qs = qs.order_by()
     return qs[:25]
+
+
+def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
+    match sort:
+        case SortOptions.FEATURED:
+            qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
+            return qs.order_by(
+                "-is_approved_example",
+                "-example_priority",
+                "-is_root_workflow",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
+            )
+        case SortOptions.UPDATED_AT:
+            return qs.order_by("-updated_at")
+        case SortOptions.CREATED_AT:
+            return qs.order_by("-created_at")
+        case SortOptions.MOST_RUNS:
+            return qs.order_by(
+                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
+            )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
