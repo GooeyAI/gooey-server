@@ -527,7 +527,7 @@ class BasePage:
                         self._render_unpublished_changes_indicator()
                     self.render_social_buttons()
 
-        if self.tab == RecipeTabs.run:
+        if self.tab == RecipeTabs.run and is_example:
             with gui.div(className="container-margin-reset"):
                 self.render_notes()
 
