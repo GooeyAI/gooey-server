@@ -10,7 +10,7 @@ from time import time
 
 import gooey_gui as gui
 import sentry_sdk
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
@@ -248,16 +248,10 @@ def component_page(request: Request):
 
 @gui.route(app, "/explore/")
 def explore_page(
-    request: Request,
-    search: str = "",
-    workspace: str = "",
-    workflow: str = "",
+    request: Request, search_filters: typing.Annotated[SearchFilters, Query()]
 ):
     from widgets import explore
 
-    search_filters = SearchFilters(
-        search=search, workspace=workspace, workflow=workflow
-    )
     with page_wrapper(request, search_filters=search_filters):
         explore.render(request.user, search_filters)
 
