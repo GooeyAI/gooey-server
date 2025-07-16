@@ -12,6 +12,7 @@ from enum import Enum
 from functools import cached_property, partial
 from itertools import pairwise
 from random import Random
+from textwrap import dedent
 from time import sleep
 
 import gooey_gui as gui
@@ -69,6 +70,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
     should_attempt_auto_recharge,
 )
+from payments.plans import PricingPlan
 from routers.root import RecipeTabs
 from widgets.author import (
     render_author_as_breadcrumb,
@@ -339,7 +341,32 @@ class BasePage:
         if output:
             gui.session_state.update(output)
 
+    def render_unauthorized(self):
+        with gui.div(className="d-flex flex-column align-items-center"):
+            gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
+            gui.caption("Welcome to Gooey.AI")
+            gui.write("# You need access")
+            if not self.request.user or self.request.user.is_anonymous:
+                gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
+            else:
+                owner_workspace = (
+                    self.current_pr.workspace
+                    if self.current_pr.saved_run == self.current_sr
+                    else self.current_sr.workspace
+                )
+                gui.write(
+                    dedent(f"""
+                You currently don't have access to this resource. Please request access from the
+                {owner_workspace.display_name(current_user=self.request.user)} admin or sign in with another account. 
+                You are logged in as {self.request.user.email or self.request.user.phone_number}.
+                """)
+                )
+
     def render(self):
+        if not self.is_current_user_authorized():
+            self.render_unauthorized()
+            return
+
         self.setup_sentry()
 
         if self.get_run_state(gui.session_state) in (
@@ -1447,7 +1474,7 @@ class BasePage:
         uid: str,
         *,
         create: bool = False,
-        defaults: dict = None,
+        defaults: dict[str, typing.Any] | None = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
@@ -1457,9 +1484,8 @@ class BasePage:
 
     @classmethod
     def get_pr_from_example_id(cls, *, example_id: str):
-        return PublishedRun.objects.get(
-            workflow=cls.workflow,
-            published_run_id=example_id,
+        return PublishedRun.objects.select_related("saved_run", "workspace").get(
+            workflow=cls.workflow, published_run_id=example_id
         )
 
     @classmethod
@@ -2424,6 +2450,38 @@ class BasePage:
 
     def is_current_user_owner(self) -> bool:
         return bool(self.request.user and self.current_sr_user == self.request.user)
+
+    def is_user_authorized(self, user: AppUser | None = None) -> bool:
+        if self.is_user_admin(user):
+            return True
+
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id != sr.id:
+            # not published run
+            return (
+                # free workspace: allow anyone
+                not sr.workspace.subscription_id
+                or (
+                    PricingPlan.from_sub(sr.workspace.subscription)
+                    == PricingPlan.STARTER
+                )
+                # paid workspace: allow members
+                or bool(user and sr.workspace in user.cached_workspaces)
+            )
+
+        # published run
+        return (
+            pr.is_approved_example
+            or (
+                WorkflowAccessLevel(pr.public_access)
+                in (WorkflowAccessLevel.FIND_AND_VIEW, WorkflowAccessLevel.EDIT)
+            )
+            # current user is in the same workspace
+            or bool(user and pr.workspace in user.cached_workspaces)
+        )
+
+    def is_current_user_authorized(self) -> bool:
+        return self.is_user_authorized(self.request.user)
 
 
 def started_at_text(dt: datetime.datetime):

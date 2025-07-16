@@ -70,7 +70,11 @@ def render_search_filters(
     )
 
 
-def render_search_bar(key: str = "search_query", value: str = "") -> str:
+def render_search_bar(
+    key: str = "search_query", value: str = "", id: str | None = None
+) -> str:
+    id = id or f"--search_bar:{key}"
+
     with (
         gui.styled(
             r"""
@@ -109,10 +113,19 @@ def render_search_bar(key: str = "search_query", value: str = "") -> str:
             style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
             key=key,
             value=value,
+            id=id,
         )
 
         # add a hidden submit button to allow form submission on pressing Enter
-        gui.html('<input type="submit" hidden />')
+        gui.button(
+            "",
+            className="m-0 p-0",
+            hidden=True,
+            onClick=f"""
+            event.preventDefault();
+            document.getElementById("{id}").blur();
+            """,
+        )
 
         if search_query and gui.button(
             icons.cancel, type="link", className="clear_button"
@@ -185,20 +198,25 @@ def _render_selectbox(
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     qs = get_filtered_published_runs(user, search_filters)
     qs = qs.select_related("workspace", "created_by", "saved_run")
+
+    def _render_run(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+
+        show_workspace_author = not bool(search_filters and search_filters.workspace)
+        is_member = bool(getattr(pr, "is_member", False))
+        hide_last_editor = bool(pr.workspace_id and not is_member)
+
+        render_saved_workflow_preview(
+            workflow.page_cls,
+            pr,
+            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            hide_visibility_pill=True,
+            show_workspace_author=show_workspace_author,
+            hide_last_editor=hide_last_editor,
+            is_member=is_member,
+        )
+
     grid_layout(1, qs, _render_run)
-
-
-def _render_run(pr: PublishedRun):
-    workflow = Workflow(pr.workflow)
-    hide_last_editor = bool(pr.workspace_id and not getattr(pr, "is_member", False))
-    render_saved_workflow_preview(
-        workflow.page_cls,
-        pr,
-        workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-        hide_visibility_pill=True,
-        show_workspace_author=True,
-        hide_last_editor=hide_last_editor,
-    )
 
 
 def get_filtered_published_runs(
