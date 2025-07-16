@@ -483,15 +483,16 @@ def img2img(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
             )
-            
+
             from usage_costs.cost_utils import record_cost_auto
             from usage_costs.models import ModelSku
+
             record_cost_auto(
                 model=img2img_model_ids[Img2ImgModels[selected_model]],
                 sku=ModelSku.output_image_tokens,
                 quantity=num_outputs,
             )
-            
+
             return output_images
         case Img2ImgModels.gpt_image_1.name:
             from openai import NOT_GIVEN, OpenAI

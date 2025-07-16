@@ -417,10 +417,10 @@ def guidance_scale_setting(selected_model: str | None = None):
         Text2ImgModels.jack_qiao,
     ]:
         return
-    
+
     # Flux Pro Kontext requires guidance_scale >= 1.0
     min_value = 1.0 if selected_model == Img2ImgModels.flux_pro_kontext.name else 0.0
-    
+
     gui.slider(
         label="""
             ##### 🎨️ Artistic Pressure
