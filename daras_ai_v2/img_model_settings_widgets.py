@@ -74,6 +74,7 @@ def model_selector(
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
+        Img2ImgModels.flux_pro_kontext.name,
         Img2ImgModels.instruct_pix2pix.name,
         Img2ImgModels.dall_e.name,
         Img2ImgModels.gpt_image_1.name,
@@ -416,6 +417,10 @@ def guidance_scale_setting(selected_model: str | None = None):
         Text2ImgModels.jack_qiao,
     ]:
         return
+    
+    # Flux Pro Kontext requires guidance_scale >= 1.0
+    min_value = 1.0 if selected_model == Img2ImgModels.flux_pro_kontext.name else 0.0
+    
     gui.slider(
         label="""
             ##### 🎨️ Artistic Pressure
@@ -424,7 +429,7 @@ def guidance_scale_setting(selected_model: str | None = None):
             How much creative freedom do you want the AI to have when interpreting your prompt?
             """,
         key="guidance_scale",
-        min_value=0.0,
+        min_value=min_value,
         max_value=25.0,
         step=0.5,
     )

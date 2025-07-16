@@ -91,6 +91,8 @@ openai_model_ids = {
 
 
 class Img2ImgModels(Enum):
+    flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
+
     dream_shaper = "DreamShaper (Lykon)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
@@ -122,6 +124,7 @@ class Img2ImgModels(Enum):
 
 
 img2img_model_ids = {
+    Img2ImgModels.flux_pro_kontext: "fal-ai/flux-pro/kontext",
     Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
@@ -458,11 +461,38 @@ def img2img(
     guidance_scale: float,
     seed: int = 42,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
-):
+) -> typing.Generator[str, None, list[str]] | list[str]:
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
     match selected_model:
+        case Img2ImgModels.flux_pro_kontext.name:
+            # Flux Pro Kontext requires guidance_scale >= 1.0
+            if guidance_scale < 1.0:
+                guidance_scale = 1.0
+            payload = dict(
+                prompt=prompt,
+                image_url=init_image,
+                num_inference_steps=min(num_inference_steps, 50),
+                seed=seed,
+                guidance_scale=guidance_scale,
+                num_images=num_outputs,
+                enable_safety_checker=False,
+            )
+            output_images = yield from generate_fal_images(
+                model_id=img2img_model_ids[Img2ImgModels[selected_model]],
+                payload=payload,
+            )
+            
+            from usage_costs.cost_utils import record_cost_auto
+            from usage_costs.models import ModelSku
+            record_cost_auto(
+                model=img2img_model_ids[Img2ImgModels[selected_model]],
+                sku=ModelSku.output_image_tokens,
+                quantity=num_outputs,
+            )
+            
+            return output_images
         case Img2ImgModels.gpt_image_1.name:
             from openai import NOT_GIVEN, OpenAI
 
