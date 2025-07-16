@@ -55,6 +55,7 @@ class ModelProvider(models.IntegerChoices):
     fireworks = 8, "Fireworks AI"
     mistral = 9, "Mistral AI"
     sarvam = 10, "sarvam.ai"
+    fal_ai = 11, "fal.ai"
 
     aks = 5, "Azure Kubernetes Service"
 

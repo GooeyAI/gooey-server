@@ -192,7 +192,7 @@ class Img2ImgPage(BasePage):
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
-            state["output_images"] = img2img(
+            output_result = img2img(
                 selected_model=request.selected_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -204,12 +204,21 @@ class Img2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
             )
+            # Handle both generator and direct list returns
+            if hasattr(output_result, '__iter__') and not isinstance(output_result, (str, list)):
+                # It's a generator, use yield from
+                state["output_images"] = yield from output_result
+            else:
+                # It's a direct list return
+                state["output_images"] = output_result
 
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
             case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
                 unit_price = 20
+            case Img2ImgModels.flux_pro_kontext.name:
+                unit_price = 10
             case _:
                 unit_price = 5
 
