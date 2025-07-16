@@ -3,7 +3,12 @@ from functools import cached_property
 from time import sleep
 
 import aifail
+import re
 import requests
+import typing
+from furl import furl
+from enum import Enum
+import math
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
@@ -13,6 +18,11 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
+from aifail import retry_if
+
+
+class IVRPlatformMedium(Enum):
+    twilio_call = "twilio_call"
 
 
 class TwilioSMS(BotInterface):
@@ -278,3 +288,85 @@ def send_single_voice_call(
         resp_say_or_tts_play(bot, resp, text)
 
     return bot.start_voice_call_session(resp)
+
+
+class TwilioPriceError(Exception):
+    """Exception that carries duration data when price is not available."""
+
+    def __init__(self, message: str, duration: int = 0):
+        super().__init__(message)
+        self.duration = duration
+
+
+def should_retry_for_call_price(exc: Exception) -> bool:
+    """Retry if call.price is not available yet or on Twilio exceptions."""
+    return isinstance(exc, (TwilioRestException, TwilioPriceError))
+
+
+def extract_call_info_from_url(audio_url: str) -> tuple[str, str]:
+    parsed_url = furl(audio_url)
+    call_sid = None
+    path_parts = parsed_url.path.segments
+
+    call_sid_pattern = re.compile(r"^CA[0-9a-fA-F]{32}$")  # Twilio call SID pattern
+    for part in path_parts:
+        if call_sid_pattern.match(part):
+            call_sid = part
+            break
+
+    if not call_sid:
+        raise ValueError(f"Could not extract call_sid from URL: {audio_url}")
+
+    bi_id = parsed_url.args.get("bi_id")
+    if not bi_id:
+        raise ValueError(f"Could not extract bi_id from URL: {audio_url}")
+
+    return call_sid, bi_id
+
+
+@retry_if(should_retry_for_call_price, max_retry_delay=6, max_retries=1)
+def _get_twilio_call_pricing_with_retries(audio_url: str) -> tuple[float, int]:
+    from routers.bots_api import api_hashids
+
+    if not audio_url or not audio_url.startswith(("ws://", "wss://")):
+        raise ValueError(f"Invalid audio URL: {audio_url}")
+
+    call_sid, bi_id = extract_call_info_from_url(audio_url)
+
+    try:
+        bi_id_decoded = api_hashids.decode(bi_id)[0]
+        bi = BotIntegration.objects.get(id=bi_id_decoded)
+    except (IndexError, BotIntegration.DoesNotExist) as e:
+        logger.warning(f"Could not find bot integration with bi_id={bi_id}: {e}")
+        raise e
+
+    client = bi.get_twilio_client()
+    try:
+        call = client.calls(call_sid).fetch()
+        logger.info(
+            f"call.price={call.price}, duration={call.duration} for call_sid={call_sid}"
+        )
+    except TwilioRestException as e:
+        logger.error(f"Error getting Twilio call pricing from {audio_url}: {e}")
+        raise e
+
+    duration = int(call.duration) if call.duration else 0
+    if call.price is not None:
+        return abs(float(call.price)), duration
+    else:
+        # Retry, but carry duration data for final fallback
+        raise TwilioPriceError(f"call.price is None for call_sid={call_sid}", duration)
+
+
+def get_twilio_call_pricing(audio_url: str) -> tuple[float | None, int] | None:
+    """
+    Get Twilio call pricing. Retries when price is None.
+    After all retries fail, returns (fallback_price, duration) if duration is available.
+    """
+    try:
+        return _get_twilio_call_pricing_with_retries(audio_url)
+    except TwilioPriceError as e:
+        fallback_price = 0.0085  # $0.0085 per minute
+        price = fallback_price * math.ceil(e.duration / 60)
+
+        return price, e.duration
