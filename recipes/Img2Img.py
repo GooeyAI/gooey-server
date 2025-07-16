@@ -205,7 +205,9 @@ class Img2ImgPage(BasePage):
                 seed=request.seed,
             )
             # Handle both generator and direct list returns
-            if hasattr(output_result, '__iter__') and not isinstance(output_result, (str, list)):
+            if hasattr(output_result, "__iter__") and not isinstance(
+                output_result, (str, list)
+            ):
                 # It's a generator, use yield from
                 state["output_images"] = yield from output_result
             else:
