@@ -49,6 +49,7 @@ phone = '<i class="fa-solid fa-phone"></i>'
 stars = '<i class="fa-solid fa-stars"></i>'
 star = '<i class="fa-solid fa-star"></i>'
 filter = '<i class="fa-solid fa-bars-filter"></i>'
+sort = '<i class="fa-solid fa-sort"></i>'
 info = "<i class='fa-regular fa-circle-info'></i>"
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
 
