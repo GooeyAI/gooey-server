@@ -2361,16 +2361,18 @@ class BasePage:
 
         return total_credits + ivr_credits
 
-    def get_notes_for_twilio_call(self):
-        """Return the notes for the twilio call fropm usage objects."""
-        sr = self.current_sr
+    def _get_twilio_call_usage_cost(self):
         from usage_costs.models import ModelSku
         from daras_ai_v2.twilio_bot import IVRPlatformMedium
 
-        twilio_call = sr.usage_costs.filter(
+        return self.current_sr.usage_costs.filter(
             pricing__model_name=IVRPlatformMedium.twilio_call.name,
             pricing__sku=ModelSku.ivr_call,
         ).first()
+
+    def get_notes_for_twilio_call(self):
+        """Return the notes for the twilio call fropm usage objects."""
+        twilio_call = self._get_twilio_call_usage_cost()
         if not twilio_call:
             return ""
         # convert twilio_call.notes = duration in seconds to round up minutes
@@ -2378,18 +2380,11 @@ class BasePage:
         ivr_credits = math.ceil(
             twilio_call.dollar_amount * settings.ADDON_CREDITS_PER_DOLLAR
         )
-        return f"+ {ivr_credits}({minutes}min call)"
+        return f"+ {ivr_credits} ({minutes}min call)"
 
     def get_twilio_call_cost_in_credits(self):
         """Return the cost of the twilio call in gooey credits."""
-        sr = self.current_sr
-        from usage_costs.models import ModelSku
-        from daras_ai_v2.twilio_bot import IVRPlatformMedium
-
-        twilio_call = sr.usage_costs.filter(
-            pricing__model_name=IVRPlatformMedium.twilio_call.name,
-            pricing__sku=ModelSku.ivr_call,
-        ).first()
+        twilio_call = self._get_twilio_call_usage_cost()
         if not twilio_call:
             return 0
         ivr_credits = math.ceil(

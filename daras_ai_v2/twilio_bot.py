@@ -327,8 +327,9 @@ def extract_call_info_from_url(audio_url: str) -> tuple[str, str]:
 @retry_if(should_retry_for_call_price, max_retry_delay=6, max_retries=1)
 def _get_twilio_call_pricing_with_retries(audio_url: str) -> tuple[float, int]:
     from routers.bots_api import api_hashids
+    from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 
-    if not audio_url or not audio_url.startswith(("ws://", "wss://")):
+    if not is_realtime_audio_url(audio_url):
         raise ValueError(f"Invalid audio URL: {audio_url}")
 
     call_sid, bi_id = extract_call_info_from_url(audio_url)

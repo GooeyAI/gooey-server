@@ -8,7 +8,6 @@ import gooey_gui as gui
 from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
-from loguru import logger
 
 from bots.models import (
     BotIntegration,
@@ -1026,9 +1025,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
-        logger.info(
-            f"is_realtime_audio_url(state.get('input_audio')): {is_realtime_audio_url(state.get('input_audio'))}"
-        )
+
         if is_realtime_audio_url(state.get("input_audio")):
             total += self.get_twilio_call_cost_in_credits()
 
