@@ -52,7 +52,7 @@ class FunctionsPage(BasePage):
             CodeLanguages.javascript,
             title="Language",
             description="The programming language to use.\n\n"
-            "Your code is executed in a sandboxed environment via [Deno Deploy](https://deno.com/deploy) for JavaScript and [Modal Sandbox](https://modal.com/docs/reference/sandbox) for Python.",
+            "Your code is executed in a sandboxed environment via [Deno Deploy](https://deno.com/deploy) for JavaScript and [Modal Sandbox](https://modal.com/docs/guide/sandbox) for Python.",
         )
         variables: dict[str, typing.Any] = Field(
             {},

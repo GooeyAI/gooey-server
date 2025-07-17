@@ -180,10 +180,26 @@ class VideoBotsPage(BasePage):
     }
 
     class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None = None
-        input_audio: str | None = None
-        input_images: list[HttpUrlStr] | None = None
-        input_documents: list[HttpUrlStr] | None = None
+        input_prompt: str | None = Field(
+            None,
+            title="Input Prompt",
+            description="The text message / prompt sent to the copilot by the user",
+        )
+        input_audio: str | None = Field(
+            None,
+            title="Input Audio",
+            description="The audio message sent to the copilot by the user",
+        )
+        input_images: list[HttpUrlStr] | None = Field(
+            None,
+            title="Input Images",
+            description="The images sent to the copilot by the user",
+        )
+        input_documents: list[HttpUrlStr] | None = Field(
+            None,
+            title="Input Documents",
+            description="The documents sent to the copilot by the user. Note: this is not the same as the knowledge base documents.",
+        )
 
         doc_extract_url: str | None = Field(
             None,
@@ -194,7 +210,13 @@ class VideoBotsPage(BasePage):
         # conversation history/context
         messages: list[dict] | None = None
 
-        bot_script: str | None = None
+        bot_script: str | None = Field(
+            None,
+            title="Instructions",
+            description="The system prompt for the LLM. "
+            "Use this to set the personality of your copilot and provide instructions for bot's behavior. "
+            "Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating.",
+        )
 
         # llm model
         selected_model: (
@@ -208,10 +230,18 @@ class VideoBotsPage(BasePage):
         )
 
         # doc search
-        task_instructions: str | None = None
+        task_instructions: str | None = Field(
+            None,
+            title="Search Instructions",
+            description="How should the LLM interpret the results from your knowledge base?",
+        )
         query_instructions: str | None = None
         keyword_instructions: str | None = None
-        documents: list[HttpUrlStr] | None = None
+        documents: list[HttpUrlStr] | None = Field(
+            None,
+            title="Knowledge Base",
+            description="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
+        )
         max_references: int | None = None
         max_context_words: int | None = None
         scroll_jump: int | None = None
@@ -367,11 +397,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def render_form_v2(self):
         gui.code_editor(
-            label='#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> Instructions',
+            label=(
+                '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
+                + field_title(self.RequestModel, "bot_script")
+            ),
             key="bot_script",
             language="jinja",
             style=dict(maxHeight="50vh"),
-            help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
+            help=field_desc(self.RequestModel, "bot_script"),
         )
 
         language_model = language_model_selector(
@@ -380,11 +413,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         if not LargeLanguageModels[language_model].is_audio_model:
             bulk_documents_uploader(
-                """ 
-                #### <i class="fa-light fa-books" style="fontSize:20px"></i> Knowledge
-                """,
+                label=(
+                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
+                    + field_title(self.RequestModel, "documents")
+                ),
                 accept=["audio/*", "application/*", "video/*", "text/*"],
-                help="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
+                help=field_desc(self.RequestModel, "documents"),
             )
 
         gui.markdown("#### 💪 Capabilities")
@@ -604,10 +638,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if documents:
             gui.write("#### 📄 Knowledge Base")
             gui.text_area(
-                """
-            ###### 👩‍🏫 Search Instructions
-            How should the LLM interpret the results from your knowledge base?
-            """,
+                "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
+                help=field_desc(self.RequestModel, "task_instructions"),
                 key="task_instructions",
                 height=300,
             )
