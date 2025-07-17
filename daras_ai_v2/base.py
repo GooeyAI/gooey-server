@@ -45,6 +45,7 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
+from daras_ai_v2.gooey_builder import render_gooey_builder
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -1192,6 +1193,13 @@ class BasePage:
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                     return
+
+                if self.is_current_user_admin():
+                    render_gooey_builder(
+                        page_slug=self.slug_versions[-1],
+                        request_model=self.RequestModel,
+                        load_session_state=self.current_sr_to_session_state,
+                    )
 
                 with gui.styled(OUTPUT_TABS_CSS):
                     output_col, input_col = gui.tabs(
