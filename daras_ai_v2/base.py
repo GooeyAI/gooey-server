@@ -1563,7 +1563,7 @@ class BasePage:
         else:
             return "/account/"
 
-    def render_submit_button(self, key="--submit-1"):
+    def render_submit_button(self, key="-submit-workflow"):
         gui.write("---")
         with gui.div(
             className="position-sticky bottom-0 container-margin-reset p-2",

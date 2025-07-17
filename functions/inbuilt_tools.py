@@ -45,6 +45,11 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
             schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
             properties = schema["properties"]
 
+        properties["-submit-workflow"] = {
+            "type": "boolean",
+            "description": "Submit & Run the workflow.",
+        }
+
         super().__init__(
             name="update_gui_state",
             label="Update GUI State",
