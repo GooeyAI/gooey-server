@@ -204,10 +204,11 @@ class Img2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
             )
+
             # Handle both generator and direct list returns
-            if hasattr(output_result, "__iter__") and not isinstance(
-                output_result, (str, list)
-            ):
+            from collections.abc import Generator
+
+            if isinstance(output_result, Generator):
                 # It's a generator, use yield from
                 state["output_images"] = yield from output_result
             else:
