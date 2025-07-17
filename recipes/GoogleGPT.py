@@ -2,7 +2,7 @@ import typing
 
 import gooey_gui as gui
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
@@ -12,6 +12,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     query_instructions_widget,
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
+from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
@@ -22,6 +23,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -74,8 +76,15 @@ class GoogleGPTPage(BasePage):
     )
 
     class RequestModelBase(BasePage.RequestModel):
-        search_query: str
-        site_filter: str
+        search_query: str = Field(
+            title="Search Query",
+            description="The search query to be used for the Google search. You can use the full google search syntax to refine your search. [Learn more](https://support.google.com/websearch/answer/2466433)",
+        )
+        site_filter: OptionalHttpUrlStr = Field(
+            None,
+            title="Site Filter",
+            description="Only show results from this site *(optional)*",
+        )
 
         task_instructions: str | None = None
         query_instructions: str | None = None
@@ -109,8 +118,12 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None = None
 
     def render_form_v2(self):
-        gui.text_area("#### Search Query", key="search_query")
-        gui.text_input("Only show results from site: *(optional)*", key="site_filter")
+        gui.text_area(
+            "#### " + field_title(self.RequestModel, "search_query"),
+            key="search_query",
+            help=field_desc(self.RequestModel, "search_query"),
+        )
+        gui.text_input(field_desc(self.RequestModel, "site_filter"), key="site_filter")
 
         if gui.switch(
             "##### 💬 Generate Answer",
