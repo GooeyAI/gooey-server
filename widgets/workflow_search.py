@@ -73,10 +73,26 @@ def render_search_filters(
     if not search_filters:
         search_filters = SearchFilters()
 
-    is_logged_in = bool(current_user and not current_user.is_anonymous)
+    show_workspace_filter = bool(current_user and not current_user.is_anonymous)
+    show_sort_option = (
+        search_filters.search or search_filters.workflow or search_filters.workspace
+    )
     with gui.div(className="row container-margin-reset", style={"fontSize": "0.9rem"}):
-        with gui.div(className="col-7 d-flex align-items-center gap-2"):
-            if is_logged_in:
+        if not show_sort_option:
+            col_class = "col-12 col-md-7"
+        elif show_workspace_filter:
+            col_class = "col-9 col-md-7"
+        else:
+            col_class = "col-7"
+
+        with gui.div(className=f"{col_class} d-flex align-items-center gap-2"):
+            with gui.div(
+                className="col-6" if show_workspace_filter else "col-12 col-md-6"
+            ):
+                search_filters.workflow = (
+                    render_workflow_filter(value=search_filters.workflow) or ""
+                )
+            if show_workspace_filter:
                 with gui.div(className="col-6"):
                     search_filters.workspace = (
                         render_workspace_filter(
@@ -87,18 +103,13 @@ def render_search_filters(
                     )
             else:
                 search_filters.workspace = ""
-            with gui.div(className="col-6" if is_logged_in else "col-12 col-md-6"):
-                search_filters.workflow = (
-                    render_workflow_filter(value=search_filters.workflow) or ""
-                )
 
-        if not (
-            search_filters.search or search_filters.workflow or search_filters.workspace
-        ):
+        if not show_sort_option:
             search_filters.sort = ""
         else:
+            col_class = "col-3 col-md-5" if show_workspace_filter else "col-5"
             with gui.div(
-                className="col-5 d-flex gap-2 justify-content-end align-items-center",
+                className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
                 sort_options: dict[str, str] = dict(
                     (
@@ -107,19 +118,24 @@ def render_search_filters(
                     )
                     for opt in SortOptions
                 )
-                gui.caption(icons.sort, unsafe_allow_html=True)
+                if show_workspace_filter:
+                    hide_on_small_screens_style = """
+                    @media(max-width: 767px) {
+                        & div[class$="-control"] .hide-on-small-screens {
+                            display: none !important;
+                        }
+                    }
+                    """
+                else:
+                    hide_on_small_screens_style = ""
                 with (
                     gui.styled(
                         """
                         @media(min-width: 768px) {
                             & .gui-input { min-width: 170px; }
                         }
-                        @media(max-width: 767px) {
-                            & div[class$="-control"] .hide-on-small-screens {
-                                display: none !important;
-                            }
-                        }
                         """
+                        + hide_on_small_screens_style
                     ),
                     gui.div(),
                 ):
