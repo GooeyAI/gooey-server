@@ -55,12 +55,15 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
     def call(self, **kwargs) -> dict:
         if not self.channel:
             return {"success": False, "error": "update channel not found"}
+
         # sometimes the state is nested in the kwargs, so we need to get the state from the kwargs
         kwargs = kwargs.get("state", kwargs)
         # generate a nonce so UI can detect if the state has changed or not
         nonce_info = {"-gooey-builder-nonce": str(uuid.uuid4())}
         # push the state back to the UI, expire in 1 minute
         gui.realtime_push(self.channel, kwargs | nonce_info, ex=60)
+
+        return {"success": True, "updated": list(kwargs.keys())}
 
 
 class CallTransferLLMTool(BaseLLMTool):
