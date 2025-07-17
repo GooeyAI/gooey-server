@@ -42,11 +42,14 @@ def render_gooey_builder(
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
-    variables = config.setdefault("payload", {}).setdefault("variables", {})
-    variables["update_gui_state_params"] = dict(
-        channel=channel,
-        state=request_state,
-        page_slug=page_slug,
+    config.setdefault("payload", {}).setdefault("variables", {})
+    # will be added later in the js code
+    variables = dict(
+        update_gui_state_params=dict(
+            channel=channel,
+            state=request_state,
+            page_slug=page_slug,
+        )
     )
 
     gui.html(
@@ -64,6 +67,13 @@ async function onload() {
     if (typeof GooeyEmbed === "undefined" ||
         document.getElementById("gooey-builder-embed")?.children.length)
         return;
+    
+    // this is a trick to update the variables after the widget is already mounted
+    GooeyEmbed.setGooeyBuilderVariables = (value) => {
+        config.payload.variables = value;
+    };
+    GooeyEmbed.setGooeyBuilderVariables(variables);
+    
     GooeyEmbed.mount(config);
 }
 
@@ -71,6 +81,12 @@ const script = document.getElementById("gooey-builder-embed-script");
 if (script) script.onload = onload;
 onload();
 window.addEventListener("hydrated", onload);
+
+// if the widget is already mounted, update the variables
+if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.setGooeyBuilderVariables) {
+    GooeyEmbed.setGooeyBuilderVariables(variables);
+}
         """,
         config=config,
+        variables=variables,
     )
