@@ -73,60 +73,64 @@ def render_search_filters(
     if not search_filters:
         search_filters = SearchFilters()
 
-    with gui.div(className="d-lg-flex container-margin-reset gap-3"):
-        with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
-            with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
-                is_logged_in = current_user and not current_user.is_anonymous
-                if is_logged_in:
-                    with gui.div(className="col-6"):
-                        search_filters.workspace = (
-                            render_workspace_filter(
-                                current_user=current_user,
-                                value=search_filters.workspace,
-                            )
-                            or ""
+    is_logged_in = bool(current_user and not current_user.is_anonymous)
+    with gui.div(className="row container-margin-reset", style={"fontSize": "0.9rem"}):
+        with gui.div(className="col-7 d-flex align-items-center gap-2"):
+            if is_logged_in:
+                with gui.div(className="col-6"):
+                    search_filters.workspace = (
+                        render_workspace_filter(
+                            current_user=current_user,
+                            value=search_filters.workspace,
                         )
-                else:
-                    search_filters.workspace = ""
-                with gui.div(className="col-6" if is_logged_in else "col-12 col-lg-6"):
-                    search_filters.workflow = (
-                        render_workflow_filter(value=search_filters.workflow) or ""
+                        or ""
                     )
-
-        with gui.div(
-            className="col-lg-5 d-flex gap-2 justify-content-end",
-            style={"fontSize": "0.9rem"},
-        ):
-            gui.caption(
-                icons.filter,
-                unsafe_allow_html=True,
-                className="d-flex align-items-center",
-            )
-            sort_options: dict[str, str] = dict(
-                (opt.value, f"{opt.icon} {opt.label}") for opt in SortOptions
-            )
-            with (
-                gui.styled(
-                    """
-                    @media(min-width: 992px) {
-                        & .gui-input { min-width: 170px; }
-                    }
-                    """
-                ),
-                gui.div(),
-            ):
-                search_filters.sort = gui.selectbox(
-                    label="",
-                    label_visibility="collapsed",
-                    placeholder="Sort by",
-                    options=sort_options,
-                    key="search_sort",
-                    value=search_filters.sort,
-                    format_func=lambda v: sort_options.get(
-                        v, sort_options[SortOptions.default.value]
-                    ),
-                    className="w-100 mb-0 text-nowrap",
+            else:
+                search_filters.workspace = ""
+            with gui.div(className="col-6" if is_logged_in else "col-12 col-md-6"):
+                search_filters.workflow = (
+                    render_workflow_filter(value=search_filters.workflow) or ""
                 )
+
+        if not (
+            search_filters.search or search_filters.workflow or search_filters.workspace
+        ):
+            search_filters.sort = ""
+        else:
+            with gui.div(
+                className="col-5 d-flex gap-2 justify-content-end align-items-center",
+            ):
+                sort_options: dict[str, str] = dict(
+                    (
+                        opt.value if opt != SortOptions.default else "",
+                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>',
+                    )
+                    for opt in SortOptions
+                )
+                gui.caption(icons.sort, unsafe_allow_html=True)
+                with (
+                    gui.styled(
+                        """
+                        @media(min-width: 768px) {
+                            & .gui-input { min-width: 170px; }
+                        }
+                        @media(max-width: 767px) {
+                            & div[class$="-control"] .hide-on-small-screens {
+                                display: none !important;
+                            }
+                        }
+                        """
+                    ),
+                    gui.div(),
+                ):
+                    search_filters.sort = gui.selectbox(
+                        label="",
+                        options=sort_options,
+                        key="search_sort",
+                        value=search_filters.sort,
+                        format_func=sort_options.__getitem__,
+                        className="mb-0 text-nowrap",
+                    )
 
     return search_filters
 
@@ -415,11 +419,11 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
 
 
 def build_search_filter(
-    qs: QuerySet, search_filters: SearchFilters, user: AppUser
+    qs: QuerySet, search_filters: SearchFilters, user: AppUser | None
 ) -> QuerySet:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
-    if search_filters.workspace:
+    if user and search_filters.workspace:
         workspace = get_workspace_from_filter_value(user, search_filters.workspace)
         qs = qs.filter(workspace=workspace)
 
