@@ -502,6 +502,7 @@ def build_search_filter(
                 "created_by__display_name",
                 "workspace__handle__name",
                 "workspace__name",
+                "tags__name",
             ),
         )
 
