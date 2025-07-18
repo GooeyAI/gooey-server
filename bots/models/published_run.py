@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import typing
+from functools import cache
 
 from django.contrib import admin
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Upper
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
@@ -33,6 +35,7 @@ class PublishedRunQuerySet(models.QuerySet):
         notes: str = "",
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
+        tags: list[Tag] | None = None,
     ):
         return get_or_create_lazy(
             PublishedRun,
@@ -47,6 +50,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 notes=notes,
                 public_access=public_access,
                 photo_url=photo_url,
+                tags=tags,
             ),
         )
 
@@ -62,6 +66,7 @@ class PublishedRunQuerySet(models.QuerySet):
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
+        tags: list[Tag] | None = None,
     ):
         workspace_id = (
             workspace
@@ -91,6 +96,7 @@ class PublishedRunQuerySet(models.QuerySet):
                 public_access=public_access,
                 notes=notes,
                 photo_url=photo_url,
+                tags=tags,
             )
             return pr
 
@@ -146,6 +152,7 @@ class PublishedRun(models.Model):
         default=1,
         help_text="Priority of the example in the example list",
     )
+    tags = models.ManyToManyField("Tag", related_name="published_runs", blank=True)
 
     run_count = models.IntegerField(default=0)
 
@@ -238,6 +245,7 @@ class PublishedRun(models.Model):
             title=title,
             notes=notes,
             public_access=public_access,
+            tags=list(self.tags.all()),
         )
 
     def get_app_url(self, query_params: dict = None):
@@ -256,6 +264,7 @@ class PublishedRun(models.Model):
         notes: str = "",
         change_notes: str = "",
         photo_url: str = "",
+        tags: list[Tag] | None = None,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -263,6 +272,8 @@ class PublishedRun(models.Model):
             public_access = self.public_access
         if workspace_access is None:
             workspace_access = self.workspace_access
+        if tags is None:
+            tags = []
         with transaction.atomic():
             version = PublishedRunVersion(
                 published_run=self,
@@ -277,6 +288,7 @@ class PublishedRun(models.Model):
                 photo_url=photo_url,
             )
             version.save()
+            version.tags.add(*tags)
             self.update_fields_to_latest_version()
 
     def is_root(self):
@@ -291,6 +303,7 @@ class PublishedRun(models.Model):
         self.public_access = latest_version.public_access
         self.workspace_access = latest_version.workspace_access
         self.photo_url = latest_version.photo_url
+        self.tags.set(latest_version.tags.all())
 
         self.save()
 
@@ -378,6 +391,9 @@ class PublishedRunVersion(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     photo_url = CustomURLField(default="", blank=True)
+    tags = models.ManyToManyField(
+        "Tag", related_name="published_run_versions", blank=True
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -390,3 +406,44 @@ class PublishedRunVersion(models.Model):
 
     def __str__(self):
         return f"{self.published_run} - {self.version_id}"
+
+
+class TagCategory(models.TextChoices):
+    app = "App"
+    industry = "Industry"
+    medium = "Medium"
+    language = "Language"
+    region = "Region"
+    other = "Other"
+
+
+class Tag(models.Model):
+    name = models.CharField(max_length=64)
+    icon = models.TextField(blank=True, default="")
+    category = models.TextField(choices=TagCategory.choices, default=TagCategory.other)
+    featured_priority = models.IntegerField(
+        default=1,
+        help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    @cache
+    def get_options(cls) -> list["Tag"]:
+        return list(cls.objects.all())
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Upper("name"),
+                name="tag_upper_name_is_unique",
+                violation_error_message="This tag already exists",
+            )
+        ]
+        ordering = ["name"]
+        indexes = [models.Index(fields=["name"])]

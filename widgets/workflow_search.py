@@ -502,6 +502,7 @@ def build_search_filter(
         vector = (
             SearchVector("title", weight="A")
             + SearchVector(
+                "tags__name",
                 "workspace__name",
                 "workspace__handle__name",
                 "created_by__display_name",
