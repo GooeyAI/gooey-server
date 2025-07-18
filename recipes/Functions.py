@@ -48,38 +48,7 @@ class FunctionsPage(BasePage):
         code: str | None = Field(
             None,
             title="Code",
-            description="""
-The code to be executed. 
-
-### JavaScript
-
-Gooey will evaluate and call the last function defined in the code.
-Code is run inside a fast, deno powered V8 worker.
-
-Variables are passed an object to the function. 
-The JS destructuring syntax can be used to get the keys of the object.
-
-You can use console.log to debug your code 
-
-If you specify secrets in the workflow, you can access using environment variables
-
-Use the browser fetch() API to make any HTTP call: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-
-You can also define helper functions. Just make sure to put them before your entrypoint!
-
-### Python
-
-Define a main function and use kwargs to capture extra variables
-
-You can use print to debug your code 
-
-If you specify secrets in the workflow, you can access using environment variables
-
-Use the requests library to make any HTTP call: (make sure to include the `requests` package in requirements.txt)
-https://requests.readthedocs.io/en/latest/
-
-Finally, return a response as a dictionary. If you use this inside a workflow, Gooey will read the return value as an object, and make the keys available as variables in the workflow.
-""",
+            description="The code to be executed. [Javascript Guide](https://gooey.ai/functions/javascript-functions-rr1ppz3q7rxi/) | [Python Guide](https://gooey.ai/functions/python-functions-tvszfv0oa3iz/)",
         )
         language: CodeLanguages = Field(
             CodeLanguages.javascript,
