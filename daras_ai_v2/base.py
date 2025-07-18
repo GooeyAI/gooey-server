@@ -597,11 +597,11 @@ class BasePage:
         ):
             self._render_report_button()
             gui.write(get_relative_time(dt))
-            with gui.tooltip(
-                tooltip_content,
+            with (
+                gui.tooltip(tooltip_content),
+                gui.tag("span", className="text-muted d-inline-block"),
             ):
-                with gui.tag("span", className="text-muted d-inline-block"):
-                    gui.html("<i class='fa-regular fa-circle-info'></i>")
+                gui.html(icons.info)
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")

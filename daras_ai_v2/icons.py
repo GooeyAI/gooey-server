@@ -46,6 +46,7 @@ sparkles = '<i class="fa-solid fa-sparkles"></i>'
 phone = '<i class="fa-solid fa-phone"></i>'
 stars = '<i class="fa-solid fa-stars"></i>'
 filter = '<i class="fa-solid fa-bars-filter"></i>'
+info = "<i class='fa-regular fa-circle-info'></i>"
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
