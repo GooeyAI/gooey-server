@@ -550,6 +550,26 @@ class LargeLanguageModels(Enum):
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+    gemini_2_5_pro = LLMSpec(
+        label="Gemini 2.5 Pro (Google)",
+        model_id="google/gemini-2.5-pro",
+        llm_api=LLMApis.openai,
+        context_window=1_048_576,
+        max_output_tokens=65_535,
+        price=1,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_2_5_flash = LLMSpec(
+        label="Gemini 2.5 Flash (Google)",
+        model_id="google/gemini-2.5-flash",
+        llm_api=LLMApis.openai,
+        context_window=1_048_576,
+        max_output_tokens=65_535,
+        price=1,
+        is_vision_model=True,
+        supports_json=True,
+    )
     gemini_2_5_pro_preview = LLMSpec(
         label="Gemini 2.5 Pro (Google)",
         model_id="google/gemini-2.5-pro-preview-03-25",
@@ -559,6 +579,8 @@ class LargeLanguageModels(Enum):
         price=20,
         is_vision_model=True,
         supports_json=True,
+        is_deprecated=True,
+        redirect_to="gemini_2_5_pro",
     )
     gemini_2_5_flash_preview = LLMSpec(
         label="Gemini 2.5 Flash (Google)",
@@ -569,6 +591,8 @@ class LargeLanguageModels(Enum):
         price=20,
         is_vision_model=True,
         supports_json=True,
+        is_deprecated=True,
+        redirect_to="gemini_2_5_flash",
     )
     gemini_2_flash_lite = LLMSpec(
         label="Gemini 2 Flash Lite (Google)",
@@ -612,7 +636,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="gemini_2_5_pro_preview",
+        redirect_to="gemini_2_5_pro",
     )
     gemini_1_pro_vision = LLMSpec(
         label="Gemini 1.0 Pro Vision (Google)",
@@ -623,7 +647,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         is_chat_model=False,
         is_deprecated=True,
-        redirect_to="gemini_2_5_pro_preview",
+        redirect_to="gemini_2_5_pro",
     )
     gemini_1_pro = LLMSpec(
         label="Gemini 1.0 Pro (Google)",
@@ -632,7 +656,7 @@ class LargeLanguageModels(Enum):
         context_window=8192,
         price=15,
         is_deprecated=True,
-        redirect_to="gemini_2_5_pro_preview",
+        redirect_to="gemini_2_5_pro",
     )
     palm2_chat = LLMSpec(
         label="PaLM 2 Chat (Google)",
@@ -1492,8 +1516,8 @@ def run_openai_chat(
     elif model in [
         LargeLanguageModels.claude_4_sonnet,
         LargeLanguageModels.claude_4_opus,
-        LargeLanguageModels.gemini_2_5_pro_preview,
-        LargeLanguageModels.gemini_2_5_flash_preview,
+        LargeLanguageModels.gemini_2_5_pro,
+        LargeLanguageModels.gemini_2_5_flash,
     ]:
         # we want the lower bound for reasoning, but not the rest of openai's new changes
         max_tokens = max(25_000, max_completion_tokens)
@@ -1577,7 +1601,7 @@ def _stream_openai_chunked(
 
     completion_chunk = None
     for completion_chunk in r:
-        if completion_chunk.choices is None:
+        if not completion_chunk.choices:
             # not a valid completion chunk...
             # anthropic sends pings like this that must be ignored
             continue
@@ -1585,6 +1609,9 @@ def _stream_openai_chunked(
         changed = False
         for choice in completion_chunk.choices:
             delta = choice.delta
+            if not delta:
+                continue
+
             try:
                 # get the entry for this choice
                 entry = ret[choice.index]
