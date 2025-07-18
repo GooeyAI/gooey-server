@@ -1197,8 +1197,24 @@ class BasePage:
                 if self.is_current_user_admin():
                     render_gooey_builder(
                         page_slug=self.slug_versions[-1],
-                        request_model=self.RequestModel,
-                        load_session_state=self.current_sr_to_session_state,
+                        saved_state={
+                            k: v
+                            for k, v in gui.session_state.items()
+                            if k in self.fields_to_save()
+                        },
+                        builder_state=dict(
+                            status=dict(
+                                error_msg=gui.session_state.get(StateKeys.error_msg),
+                                run_status=gui.session_state.get(StateKeys.run_status),
+                                run_time=gui.session_state.get(StateKeys.run_time),
+                            ),
+                            request=extract_model_fields(
+                                model=self.RequestModel, state=gui.session_state
+                            ),
+                            response=extract_model_fields(
+                                model=self.ResponseModel, state=gui.session_state
+                            ),
+                        ),
                     )
 
                 with gui.styled(OUTPUT_TABS_CSS):
