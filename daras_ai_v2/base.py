@@ -779,7 +779,6 @@ class BasePage:
                     className="mt-1",
                     rows=5,
                 )
-                # mobile only
                 with gui.div(className="d-flex mb-3 align-items-center gap-2"):
                     change_notes = render_change_notes_input(
                         key="published_run_change_notes"

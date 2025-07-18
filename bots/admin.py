@@ -27,6 +27,7 @@ from bots.models import (
     PublishedRun,
     PublishedRunVersion,
     SavedRun,
+    Tag,
     Workflow,
     WorkflowMetadata,
 )
@@ -974,4 +975,19 @@ class WorkflowMetadataAdmin(admin.ModelAdmin):
     ]
     search_fields = ["workflow", "meta_title", "meta_description"]
     list_filter = ["workflow"]
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = [
+        "name",
+        "category",
+        "icon",
+        "featured_priority",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = ["name", "category"]
+    list_filter = ["category"]
     readonly_fields = ["created_at", "updated_at"]
