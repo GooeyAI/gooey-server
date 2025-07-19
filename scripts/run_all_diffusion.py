@@ -74,6 +74,7 @@ tasks = []
 
 for model in Img2ImgModels:
     if model in [
+        Img2ImgModels.flux_pro_kontext,
         Img2ImgModels.instruct_pix2pix,
         Img2ImgModels.dall_e,
         Img2ImgModels.jack_qiao,

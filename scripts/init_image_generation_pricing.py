@@ -1,8 +1,21 @@
-from daras_ai_v2.stable_diffusion import Text2ImgModels
+from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
 from usage_costs.models import ModelSku, ModelCategory, ModelProvider, ModelPricing
 
 
 def run():
+    # FLUX.1 Pro Kontext (fal.ai) - Per-image pricing (2.5x fal base price)
+    image_generation_pricing_create(
+        model_id="fal-ai/flux-pro/kontext",
+        model_name=Img2ImgModels.flux_pro_kontext.name,
+        unit_cost_text_input=None,  # No separate text input cost
+        unit_cost_image_input=None,  # No separate image input cost
+        unit_cost_output=0.10,  # $0.10 per image (10 credits at 100 credits per dollar)
+        unit_quantity=1,  # 1 image
+        provider=ModelProvider.fal_ai,
+        pricing_url="https://fal.ai/models/fal-ai/flux-pro/kontext",
+        notes="Per-image pricing: $0.10 per generated image (2.5x base fal pricing)",
+    )
+
     # GPT Image 1 (OpenAI) - Token-based pricing
     image_generation_pricing_create(
         model_id="gpt-image-1",
