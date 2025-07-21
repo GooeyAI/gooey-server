@@ -244,16 +244,20 @@ def twilio_voice_call_wait(audio_url: str = None):
     return twiml_response(resp)
 
 
-# uncomment for debugging:
 @router.post("/__/twilio/voice/status/")
 def twilio_voice_call_status(data: dict = fastapi_request_urlencoded_body):
     """Handle incoming Twilio voice call status update."""
+    is_bridged = data.get("DialBridged", [False])[0] == "true"
+    call_sid = None
+    duration_seconds = None
+    if is_bridged:
+        call_sid = data.get("DialCallSid")[0]
+        duration_seconds = data.get("DialCallDuration")[0]
+    else:
+        call_sid = data.get("CallSid")[0]
+        duration_seconds = data.get("CallDuration")[0]
 
-    call_status = data.get("CallStatus")[0]
-    call_sid = data.get("CallSid")[0]
-
-    if call_status == "completed":
-        duration_seconds = int(data.get("CallDuration")[0])
+    if call_sid and duration_seconds:
         get_redis_cache().set(
             f"gooey/twilio-call-duration/v1/{call_sid}", duration_seconds, ex=7200
         )  # 2 hours

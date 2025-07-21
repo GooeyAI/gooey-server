@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 import typing
 from datetime import datetime
@@ -8,10 +9,14 @@ import openai
 from furl import furl
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection
-
 from functions.inbuilt_tools import CallTransferLLMTool
 from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json
+import logging
+
+# Disable websocket logging
+logging.getLogger("websockets").setLevel(logging.WARNING)
+
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.language_model import LargeLanguageModels
@@ -44,6 +49,8 @@ class RealtimeSession:
         self.latest_media_ts: int = 0
         self.last_mark: str | None = None
         self.awaiting_threads: list[threading.Thread] = []
+        self.is_bridged: bool = False
+
         self.session_totals = {"input_tokens": 0, "output_tokens": 0}
         # transcript
         self.entry = {"role": "assistant", "content": "", "chunk": ""}
@@ -82,39 +89,7 @@ class RealtimeSession:
                     continue
                 handler(event)
         except ConnectionClosed:
-            from usage_costs.cost_utils import record_cost_auto
-            from usage_costs.models import ModelSku
-            from daras_ai_v2.twilio_bot import IVRPlatformMedium
-
-            if self.session_totals["input_tokens"] > 0:
-                record_cost_auto(
-                    model=self.model.model_id,
-                    sku=ModelSku.llm_prompt,
-                    quantity=self.session_totals["input_tokens"],
-                )
-
-            if self.session_totals["output_tokens"] > 0:
-                record_cost_auto(
-                    model=self.model.model_id,
-                    sku=ModelSku.llm_completion,
-                    quantity=self.session_totals["output_tokens"],
-                )
-
-            # Record Twilio call costs when connection is closed
-            from daras_ai_v2.twilio_bot import get_twilio_voice_duration
-            from daras_ai_v2.twilio_bot import get_twilio_voice_pricing
-
-            duration_seconds = get_twilio_voice_duration(self.call_sid)
-            pricing_per_minute = get_twilio_voice_pricing(self.bi_id, self.call_sid)
-
-            if duration_seconds > 0:
-                record_cost_auto(
-                    model=IVRPlatformMedium.twilio_voice.value,
-                    sku=ModelSku.ivr_call,
-                    quantity=duration_seconds,
-                    ivr_price_per_minute=pricing_per_minute,
-                )
-
+            self.record_session_and_call_costs()
         yield self.entry
 
     def on_speech_started(self, _):
@@ -223,6 +198,11 @@ class RealtimeSession:
     def call_tool(self, call_id: str, tool: BaseLLMTool, arguments: str):
         output = tool.call_json(arguments)
 
+        if isinstance(tool, CallTransferLLMTool):
+            output = json.loads(output)
+            if output.get("success"):
+                self.is_bridged = True
+
         self.messages.append(dict(role="tool", content=output, tool_call_id=call_id))
 
         send_json(
@@ -287,6 +267,46 @@ class RealtimeSession:
             line = f"\n\n{formatted_time} {role.title()}: {content}"
         self.entry["content"] = (self.entry["content"] + line).strip()
         self.messages.append(dict(role=role, content=content))
+
+    def record_session_and_call_costs(self):
+        from usage_costs.cost_utils import record_cost_auto
+        from usage_costs.models import ModelSku
+        from daras_ai_v2.twilio_bot import IVRPlatformMedium
+        from daras_ai_v2.twilio_bot import get_twilio_voice_duration
+        from daras_ai_v2.twilio_bot import get_twilio_voice_pricing
+        from daras_ai_v2.twilio_bot import get_child_call_sids
+
+        # record llm usage costs
+        if self.session_totals["input_tokens"] > 0:
+            record_cost_auto(
+                model=self.model.model_id,
+                sku=ModelSku.llm_prompt,
+                quantity=self.session_totals["input_tokens"],
+            )
+
+        if self.session_totals["output_tokens"] > 0:
+            record_cost_auto(
+                model=self.model.model_id,
+                sku=ModelSku.llm_completion,
+                quantity=self.session_totals["output_tokens"],
+            )
+
+        # record IVR usage costs
+        call_sids = [self.call_sid]
+        if self.is_bridged:
+            call_sids += get_child_call_sids(self.bi_id, self.call_sid)
+
+        for call_sid in call_sids:
+            duration_seconds = get_twilio_voice_duration(call_sid)
+            pricing_per_minute = get_twilio_voice_pricing(self.bi_id, call_sid)
+
+            if duration_seconds > 0:
+                record_cost_auto(
+                    model=IVRPlatformMedium.twilio_voice.value,
+                    sku=ModelSku.ivr_call,
+                    quantity=duration_seconds,
+                    ivr_price_per_minute=pricing_per_minute,
+                )
 
 
 T = typing.TypeVar("T")
