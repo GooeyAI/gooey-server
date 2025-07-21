@@ -23,6 +23,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.twilio_bot import TwilioVoice
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.custom_api_router import CustomAPIRouter
+from daras_ai_v2.redis_cache import get_redis_cache
 
 DEFAULT_INITIAL_TEXT = "Welcome to {bot_name}! Please ask your question and press 0 if the end of your question isn't detected."
 DEFAULT_WAITING_AUDIO_URLS = [
@@ -248,7 +249,14 @@ def twilio_voice_call_wait(audio_url: str = None):
 def twilio_voice_call_status(data: dict = fastapi_request_urlencoded_body):
     """Handle incoming Twilio voice call status update."""
 
-    print("Twilio status update", data)
+    call_status = data.get("CallStatus")[0]
+    call_sid = data.get("CallSid")[0]
+
+    if call_status == "completed":
+        duration_seconds = int(data.get("CallDuration")[0])
+        get_redis_cache().set(
+            f"gooey/twilio-call-duration/v1/{call_sid}", duration_seconds, ex=7200
+        )  # 2 hours
 
     return Response(status_code=204)
 

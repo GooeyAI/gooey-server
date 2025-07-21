@@ -1076,6 +1076,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
 
+        if is_realtime_audio_url(state.get("input_audio")):
+            total += self.get_twilio_call_cost_in_credits()
+
         if state.get("input_face"):
             total += 1
 
@@ -1086,16 +1089,19 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
+
+        notes = f"\nBreakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run"
 
         if (
             gui.session_state.get("tts_provider")
             == TextToSpeechProviders.ELEVEN_LABS.name
         ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+        if is_realtime_audio_url(gui.session_state.get("input_audio")):
+            notes += self.get_notes_for_twilio_call()
 
         if gui.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
+            notes += " + 1 (lipsync)"
 
         return notes
 

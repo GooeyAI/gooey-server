@@ -43,6 +43,7 @@ class ModelCategory(models.IntegerChoices):
     LLM = 1, "LLM"
     SELF_HOSTED = 2, "Self-Hosted"
     IMAGE_GENERATION = 3, "Image Generation"
+    IVR = 4, "IVR"
 
 
 class ModelProvider(models.IntegerChoices):
@@ -58,6 +59,8 @@ class ModelProvider(models.IntegerChoices):
     fal_ai = 11, "fal.ai"
 
     aks = 5, "Azure Kubernetes Service"
+
+    twilio = 11, "Twilio"
 
 
 def get_model_choices():
@@ -84,6 +87,8 @@ class ModelSku(models.IntegerChoices):
 
     input_image_tokens = 5, "Image Prompt"
     output_image_tokens = 6, "Image Generation (Output)"
+
+    ivr_call = 7, "IVR Call"
 
 
 class ModelPricing(models.Model):
