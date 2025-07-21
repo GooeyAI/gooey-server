@@ -5,6 +5,7 @@ from time import sleep
 import aifail
 import requests
 from loguru import logger
+from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml import TwiML
 from twilio.twiml.voice_response import VoiceResponse
@@ -13,6 +14,16 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
+from daras_ai_v2.redis_cache import get_redis_cache, redis_cache_decorator
+from django.db.models import TextChoices
+from aifail import retry_if
+
+TWILIO_DEFAULT_PRICE_PER_MINUTE = 0.0085
+
+
+class IVRPlatformMedium(TextChoices):
+    twilio_voice = "twilio_voice", "Twilio Voice"
+    twilio_sms = "twilio_sms", "Twilio SMS"
 
 
 class TwilioSMS(BotInterface):
@@ -278,3 +289,67 @@ def send_single_voice_call(
         resp_say_or_tts_play(bot, resp, text)
 
     return bot.start_voice_call_session(resp)
+
+
+class TwilioCallDurationError(Exception):
+    """
+    Unable to recover call duration from webhook or cache.
+    """
+
+    pass
+
+
+def should_try_to_get_call_duration(exc: Exception) -> bool:
+    return isinstance(exc, TwilioCallDurationError)
+
+
+@retry_if(should_try_to_get_call_duration, max_retry_delay=10, max_retries=6)
+@redis_cache_decorator(ex=7200)  # 2 hours
+def get_twilio_voice_duration(call_sid: str) -> int:
+    redis_cache = get_redis_cache()
+    cache_key = f"gooey/twilio-call-duration/v1/{call_sid}"
+    cached_duration = redis_cache.get(cache_key)
+    if cached_duration is not None:
+        duration = int(cached_duration)
+        logger.info(
+            f"Retrieved webhook-cached call duration for {cache_key} : {duration} seconds"
+        )
+        return duration
+    raise TwilioCallDurationError()
+
+
+def get_twilio_voice_pricing(bi_id: str, call_sid: str) -> float:
+    from routers.bots_api import api_hashids
+
+    try:
+        bi_id_decoded = api_hashids.decode(bi_id)[0]
+        bi = BotIntegration.objects.get(id=bi_id_decoded)
+    except (IndexError, BotIntegration.DoesNotExist) as e:
+        logger.debug(
+            f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
+        )
+        capture_exception(e)
+        raise e
+
+    try:
+        client = bi.get_twilio_client()
+        call = client.calls(call_sid).fetch()
+        number_pricing = client.pricing.v2.voice.numbers(call.to).fetch()
+    except TwilioRestException as e:
+        logger.error(f"Twilio API error while fetching call {call_sid}: {e}")
+        capture_exception(e)
+        return TWILIO_DEFAULT_PRICE_PER_MINUTE
+
+    price_per_minute = TWILIO_DEFAULT_PRICE_PER_MINUTE
+    if call.direction == "inbound":
+        if number_pricing.inbound_call_price and number_pricing.inbound_call_price.get(
+            "base_price"
+        ):
+            price_per_minute = float(number_pricing.inbound_call_price["base_price"])
+    else:
+        if number_pricing.outbound_call_prices:
+            price_per_minute = float(
+                number_pricing.outbound_call_prices[0]["base_price"]
+            )
+
+    return price_per_minute
