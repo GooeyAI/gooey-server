@@ -12,6 +12,8 @@ from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
 from functions.recipe_functions import BaseLLMTool, generate_tool_properties
 
+CALL_TRANSFER_TIMELIMIT = 60 * 60  # 1 hour
+
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
@@ -159,7 +161,7 @@ You can transfer the user's call to another phone number using this tool. Some e
         client = bi.get_twilio_client()
 
         resp = VoiceResponse()
-        resp.dial(phone_number)
+        resp.dial(phone_number, timeLimit=CALL_TRANSFER_TIMELIMIT)
 
         try:
             # try to transfer the call

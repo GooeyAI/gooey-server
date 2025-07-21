@@ -2367,10 +2367,75 @@ class BasePage:
     def get_total_linked_usage_cost_in_credits(self, default=1):
         """Return the sum of the linked usage costs in gooey credits."""
         sr = self.current_sr
-        total = sr.usage_costs.aggregate(total=Sum("dollar_amount"))["total"]
-        if not total:
+        from usage_costs.models import ModelSku
+        from daras_ai_v2.twilio_bot import IVRPlatformMedium
+
+        # Calculate IVR usage credits
+        ivr_total = (
+            sr.usage_costs.filter(
+                pricing__model_name=IVRPlatformMedium.twilio_voice.label,
+                pricing__sku=ModelSku.ivr_call,
+            ).aggregate(total=Sum("dollar_amount"))["total"]
+            or 0
+        )
+        ivr_credits = int(
+            math.ceil(float(ivr_total) * float(settings.ADDON_CREDITS_PER_DOLLAR) * 1.5)
+        )
+
+        # Calculate non-IVR usage credits
+        model_total = (
+            sr.usage_costs.exclude(
+                pricing__model_name=IVRPlatformMedium.twilio_voice.label,
+                pricing__sku=ModelSku.ivr_call,
+            ).aggregate(total=Sum("dollar_amount"))["total"]
+            or 0
+        )
+        total_credits = model_total * settings.ADDON_CREDITS_PER_DOLLAR
+
+        # Return total credits or default if no usage costs
+
+        if not total_credits:
             return default
-        return total * settings.ADDON_CREDITS_PER_DOLLAR
+
+        return total_credits + ivr_credits
+
+    def _get_twilio_call_usage_cost(self):
+        from usage_costs.models import ModelSku
+        from daras_ai_v2.twilio_bot import IVRPlatformMedium
+
+        return self.current_sr.usage_costs.filter(
+            pricing__model_name=IVRPlatformMedium.twilio_voice.label,
+            pricing__sku=ModelSku.ivr_call,
+        ).first()
+
+    def get_notes_for_twilio_call(self):
+        twilio_call = self._get_twilio_call_usage_cost()
+        if not twilio_call:
+            return ""
+
+        minutes = math.ceil(int(twilio_call.quantity) / 60)
+        ivr_credits = int(
+            math.ceil(
+                float(twilio_call.dollar_amount)
+                * float(settings.ADDON_CREDITS_PER_DOLLAR)
+                * 1.5
+            )
+        )
+        return f"+ {ivr_credits} ({minutes}min call)"
+
+    def get_twilio_call_cost_in_credits(self):
+        """Return the cost of the twilio call in gooey credits."""
+        twilio_call = self._get_twilio_call_usage_cost()
+        if not twilio_call:
+            return 0
+        ivr_credits = int(
+            math.ceil(
+                float(twilio_call.dollar_amount)
+                * float(settings.ADDON_CREDITS_PER_DOLLAR)
+                * 1.5
+            )
+        )
+        return ivr_credits
 
     def get_grouped_linked_usage_cost_in_credits(self):
         """Return the linked usage costs grouped by model name in gooey credits."""
