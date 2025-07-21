@@ -303,7 +303,7 @@ def should_try_to_get_call_duration(exc: Exception) -> bool:
     return isinstance(exc, TwilioCallDurationError)
 
 
-@retry_if(should_try_to_get_call_duration, max_retry_delay=10, max_retries=6)
+@retry_if(should_try_to_get_call_duration, max_retry_delay=120, max_retries=11)
 @redis_cache_decorator(ex=7200)  # 2 hours
 def get_twilio_voice_duration(call_sid: str) -> int:
     redis_cache = get_redis_cache()
@@ -353,3 +353,23 @@ def get_twilio_voice_pricing(bi_id: str, call_sid: str) -> float:
             )
 
     return price_per_minute
+
+
+# todo: pagination for the childcalls list
+def get_child_call_sids(bi_id: str, call_sid: str) -> list[str]:
+    from routers.bots_api import api_hashids
+
+    try:
+        bi_id_decoded = api_hashids.decode(bi_id)[0]
+        bi = BotIntegration.objects.get(id=bi_id_decoded)
+    except (IndexError, BotIntegration.DoesNotExist) as e:
+        logger.debug(
+            f"could not find bot integration with bot_id={bi_id}, call_sid={call_sid} {e}"
+        )
+
+    client = bi.get_twilio_client()
+    call = client.calls(call_sid).fetch()
+    calls = client.calls.list(parent_call_sid=call.sid)
+    child_sids = [c.sid for c in calls]
+    child_sids = list({sid for sid in child_sids if sid})
+    return child_sids

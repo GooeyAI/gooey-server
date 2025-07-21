@@ -56,6 +56,8 @@ class CallTransferLLMTool(BaseLLMTool):
 
     def call(self, phone_number: str) -> dict:
         from routers.bots_api import api_hashids
+        from daras_ai_v2.fastapi_tricks import get_api_route_url
+        from routers.twilio_api import twilio_voice_call_status
 
         try:
             self.call_sid, self.bi_id
@@ -87,7 +89,14 @@ class CallTransferLLMTool(BaseLLMTool):
         client = bi.get_twilio_client()
 
         resp = VoiceResponse()
-        resp.dial(phone_number, timeLimit=CALL_TRANSFER_TIMELIMIT)
+        resp.dial(
+            phone_number,
+            timeLimit=CALL_TRANSFER_TIMELIMIT,
+            action=get_api_route_url(twilio_voice_call_status),
+            method="POST",
+            status_callback=get_api_route_url(twilio_voice_call_status),
+            status_callback_event=["completed"],
+        )
 
         try:
             # try to transfer the call
