@@ -2371,15 +2371,16 @@ class BasePage:
         from daras_ai_v2.twilio_bot import IVRPlatformMedium
 
         # Calculate IVR usage credits
-        ivr_total = (
-            sr.usage_costs.filter(
-                pricing__model_name=IVRPlatformMedium.twilio_voice.label,
-                pricing__sku=ModelSku.ivr_call,
-            ).aggregate(total=Sum("dollar_amount"))["total"]
+        ivr_cost_dollar = (
+            self._get_twilio_voice_usage_cost_qs().aggregate(
+                total=Sum("dollar_amount")
+            )["total"]
             or 0
         )
         ivr_credits = int(
-            math.ceil(float(ivr_total) * float(settings.ADDON_CREDITS_PER_DOLLAR) * 1.5)
+            math.ceil(
+                float(ivr_cost_dollar) * float(settings.ADDON_CREDITS_PER_DOLLAR) * 1.5
+            )
         )
 
         # Calculate non-IVR usage credits
@@ -2399,24 +2400,31 @@ class BasePage:
 
         return total_credits + ivr_credits
 
-    def _get_twilio_call_usage_cost(self):
+    def _get_twilio_voice_usage_cost_qs(self):
         from usage_costs.models import ModelSku
         from daras_ai_v2.twilio_bot import IVRPlatformMedium
 
         return self.current_sr.usage_costs.filter(
             pricing__model_name=IVRPlatformMedium.twilio_voice.label,
             pricing__sku=ModelSku.ivr_call,
-        ).first()
+        )
 
     def get_notes_for_twilio_call(self):
-        twilio_call = self._get_twilio_call_usage_cost()
-        if not twilio_call:
+        twilio_call_qs = self._get_twilio_voice_usage_cost_qs()
+
+        twilio_cost_dollar = (
+            twilio_call_qs.aggregate(total=Sum("dollar_amount"))["total"] or 0
+        )
+        twilio_call_duration = (
+            twilio_call_qs.aggregate(total=Sum("quantity"))["total"] or 0
+        )
+        if not twilio_cost_dollar:
             return ""
 
-        minutes = math.ceil(int(twilio_call.quantity) / 60)
+        minutes = math.ceil(int(twilio_call_duration) / 60)
         ivr_credits = int(
             math.ceil(
-                float(twilio_call.dollar_amount)
+                float(twilio_cost_dollar)
                 * float(settings.ADDON_CREDITS_PER_DOLLAR)
                 * 1.5
             )
@@ -2425,12 +2433,16 @@ class BasePage:
 
     def get_twilio_call_cost_in_credits(self):
         """Return the cost of the twilio call in gooey credits."""
-        twilio_call = self._get_twilio_call_usage_cost()
-        if not twilio_call:
+        twilio_call_qs = self._get_twilio_voice_usage_cost_qs()
+        twilio_cost_dollar = (
+            twilio_call_qs.aggregate(total=Sum("dollar_amount"))["total"] or 0
+        )
+
+        if not twilio_cost_dollar:
             return 0
         ivr_credits = int(
             math.ceil(
-                float(twilio_call.dollar_amount)
+                float(twilio_cost_dollar)
                 * float(settings.ADDON_CREDITS_PER_DOLLAR)
                 * 1.5
             )
