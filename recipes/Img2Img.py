@@ -192,7 +192,7 @@ class Img2ImgPage(BasePage):
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
-            state["output_images"] = img2img(
+            state["output_images"] = yield from img2img(
                 selected_model=request.selected_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -210,6 +210,8 @@ class Img2ImgPage(BasePage):
         match selected_model:
             case Img2ImgModels.dall_e.name:
                 unit_price = 20
+            case Img2ImgModels.flux_pro_kontext.name:
+                unit_price = 10
             case Img2ImgModels.gpt_image_1.name:
                 unit_price = 45
             case _:

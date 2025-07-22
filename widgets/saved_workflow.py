@@ -205,15 +205,14 @@ def render_footer_breadcrumbs(
             ):
                 gui.html(f"{icons.notes} {html.escape(latest_version.change_notes)}")
 
-        updated_at = published_run.saved_run.updated_at
         if (
-            updated_at
-            and isinstance(updated_at, datetime.datetime)
+            published_run.updated_at
+            and isinstance(published_run.updated_at, datetime.datetime)
             and not hide_last_editor
         ):
             with gui.div():
                 gui.write(
-                    f"{icons.time} {get_relative_time(updated_at)}",
+                    f"{icons.time} {get_relative_time(published_run.updated_at)}",
                     unsafe_allow_html=True,
                     className="text-muted",
                 )
