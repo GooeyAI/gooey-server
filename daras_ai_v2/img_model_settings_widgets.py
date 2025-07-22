@@ -419,15 +419,18 @@ def guidance_scale_setting(selected_model: str | None = None):
         return
 
     # Flux Pro Kontext requires guidance_scale >= 1.0
-    min_value = 1.0 if selected_model == Img2ImgModels.flux_pro_kontext.name else 0.0
+    if selected_model == Img2ImgModels.flux_pro_kontext.name:
+        min_value = 1.0
+    else:
+        min_value = 0.0
 
     gui.slider(
         label="""
-            ##### 🎨️ Artistic Pressure
-            ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
-            How pressurized should the AI feel to produce what you want?
-            How much creative freedom do you want the AI to have when interpreting your prompt?
-            """,
+        ##### 🎨️ Artistic Pressure
+        ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
+        How pressurized should the AI feel to produce what you want?
+        How much creative freedom do you want the AI to have when interpreting your prompt?
+        """,
         key="guidance_scale",
         min_value=min_value,
         max_value=25.0,

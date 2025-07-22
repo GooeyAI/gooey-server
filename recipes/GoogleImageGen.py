@@ -163,7 +163,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
                 image_guidance_scale=request.image_guidance_scale,
             )
         else:
-            state["output_images"] = img2img(
+            state["output_images"] = yield from img2img(
                 prompt=request.text_prompt,
                 negative_prompt=request.negative_prompt,
                 init_image=selected_image_url,
