@@ -461,7 +461,7 @@ def img2img(
     guidance_scale: float,
     seed: int = 42,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
-) -> typing.Generator[str, None, list[str]] | list[str]:
+) -> typing.Generator[str, None, list[str]]:
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
