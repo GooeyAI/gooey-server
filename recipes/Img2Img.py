@@ -208,8 +208,10 @@ class Img2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
-            case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
+            case Img2ImgModels.dall_e.name:
                 unit_price = 20
+            case Img2ImgModels.gpt_image_1.name:
+                unit_price = 45
             case _:
                 unit_price = 5
 
