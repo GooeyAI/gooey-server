@@ -252,8 +252,8 @@ def explore_page(
 ):
     from widgets import explore
 
-    with page_wrapper(request, search_filters=search_filters):
-        explore.render(request.user, search_filters)
+    with page_wrapper(request, search_filters=search_filters, show_search_bar=False):
+        explore.render(request, search_filters)
 
     return {
         "meta": explore.build_meta_tags(
@@ -716,19 +716,19 @@ def get_js_hide_mobile_search():
     return dedent("""
     event.preventDefault();
     const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.classList.remove("hide__mobile"));
     const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
-    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
-    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
+    show_on_mobile_search.forEach(el => el.classList.remove("show__mobile"));
     """)
 
 
 def get_js_show_mobile_search():
     return dedent("""
     event.preventDefault();
-    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
     const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
-    hide_on_mobile_search.forEach(el => el.style.setProperty('display', 'none'));
-    show_on_mobile_search.forEach(el => el.style.setProperty('display', 'flex'));
+    show_on_mobile_search.forEach(el => el.classList.add("show__mobile"));
+    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
+    hide_on_mobile_search.forEach(el => el.classList.add("hide__mobile"));
     document.querySelector('#search_bar').focus();
     """)
 
@@ -738,19 +738,34 @@ def page_wrapper(
     request: Request,
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
+    show_search_bar: bool = True,
 ):
     from routers.account import explore_in_current_workspace
 
     context = {"request": request, "block_incognito": True}
 
-    with gui.div(className="d-flex flex-column min-vh-100"):
+    if show_search_bar:
+        custom_style = dedent("""
+        @media (max-width: 767px) {
+            & .hide__mobile {
+                display: none !important;
+            }
+            & .show__mobile {
+                display: flex !important;
+            }
+        }
+        """)
+    else:
+        custom_style = ""
+
+    with gui.styled(custom_style), gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
 
         with (
             gui.div(className="header"),
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
-            gui.div(className="w-100 d-flex gap-2"),
+            gui.div(className="w-100 d-flex justify-content-between gap-2"),
         ):
             with (
                 gui.div(className="hide_on_mobile_search d-md-block"),
@@ -771,34 +786,37 @@ def page_wrapper(
                     className="img-fluid logo d-sm-none",
                 )
 
-            with gui.div(
-                className="flex-grow-1 d-flex justify-content-center align-items-center"
-            ):
+            if show_search_bar:
                 with gui.div(
-                    className="show_on_mobile_search d-md-flex flex-grow-1 justify-content-center align-items-center",
-                    style={"display": "none"},
+                    className="flex-grow-1 d-flex justify-content-center align-items-center"
                 ):
-                    _render_search_bar_with_redirect(
-                        request, search_filters, id="search_bar"
-                    )
-                    gui.button(
-                        "Cancel",
-                        type="tertiary",
-                        className="show_on_mobile_search d-md-none fs-6 m-0 ms-1 p-1",
+                    with gui.div(
+                        className="show_on_mobile_search hide__mobile d-md-flex flex-grow-1 justify-content-center align-items-center",
                         style={"display": "none"},
-                        onClick=get_js_hide_mobile_search(),
-                    )
-                with gui.div(
-                    className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
-                    style={"display": "flex"},
-                ):
-                    gui.button(
-                        icons.search,
-                        type="tertiary",
-                        unsafe_allow_html=True,
-                        className="m-0",
-                        onClick=get_js_show_mobile_search(),
-                    )
+                    ):
+                        _render_search_bar_with_redirect(
+                            request=request,
+                            search_filters=search_filters,
+                            id="search_bar",
+                        )
+                        gui.button(
+                            "Cancel",
+                            type="tertiary",
+                            className="show_on_mobile_search d-md-none fs-6 m-0 ms-1 p-1",
+                            style={"display": "none"},
+                            onClick=get_js_hide_mobile_search(),
+                        )
+                    with gui.div(
+                        className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
+                        style={"display": "flex"},
+                    ):
+                        gui.button(
+                            icons.search,
+                            type="tertiary",
+                            unsafe_allow_html=True,
+                            className="m-0",
+                            onClick=get_js_show_mobile_search(),
+                        )
 
             with gui.div(
                 className="hide_on_mobile_search gap-2 d-md-flex justify-content-end flex-wrap align-items-center",

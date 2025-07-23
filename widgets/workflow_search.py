@@ -139,13 +139,16 @@ def render_search_filters(
                     ),
                     gui.div(),
                 ):
-                    search_filters.sort = gui.selectbox(
-                        label="",
-                        options=sort_options,
-                        key="search_sort",
-                        value=search_filters.sort,
-                        format_func=sort_options.__getitem__,
-                        className="mb-0 text-nowrap",
+                    search_filters.sort = (
+                        gui.selectbox(
+                            label="",
+                            options=sort_options,
+                            key="search_sort",
+                            value=search_filters.sort,
+                            format_func=sort_options.__getitem__,
+                            className="mb-0 text-nowrap",
+                        )
+                        or ""
                     )
 
     return search_filters
@@ -156,30 +159,31 @@ def render_search_bar(
     key: str = "search_query",
     current_user: AppUser | None = None,
     id: str | None = None,
+    max_width: str = "500px",
     **props,
 ) -> str:
     id = id or f"--search_bar:{key}"
 
     with (
         gui.styled(
-            r"""
-            & {
+            rf"""
+            & {{
                 position: relative;
-                max-width: 500px;
+                max-width: {max_width};
                 flex-grow: 1;
-            }
-            & .gui-input {
+            }}
+            & .gui-input {{
                 margin: 0;
                 width: 100%;
-            }
-            & .clear_button {
+            }}
+            & .clear_button {{
                 position: absolute;
                 top: 14px;
                 right: 18px;
                 font-size: 0.9em;
                 margin: 0 !important;
-            }
-            &::before {
+            }}
+            &::before {{
                 content: "\f002";              /* FontAwesome glyph */
                 font-family: "Font Awesome 6 Pro";
                 position: absolute;
@@ -188,7 +192,7 @@ def render_search_bar(
                 pointer-events: none;          /* let clicks go through to the input */
                 color: #888;
                 font-size: 0.9em;
-            }
+            }}
             """
         ),
         gui.div(),
