@@ -4,11 +4,15 @@ except KeyError:
     exit(0)
 
 import json
-import sys
 import uuid
 import io
 from pathlib import Path
 from urllib.parse import urljoin
+
+with open("/app/input.json") as f:
+    variables, prefix_url, output_limit = json.load(f)
+
+ret = main(**variables)
 
 
 def json_encoder(obj):
@@ -21,6 +25,7 @@ def json_encoder(obj):
 
     if isinstance(obj, bytes):
         path = Path(f"/workspace/unnamed/{uuid.uuid4()}.bin")
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(obj)
         obj = path
 
@@ -33,14 +38,10 @@ def json_encoder(obj):
     )
 
 
-kwargs_json = sys.argv[1]
-prefix_url = sys.argv[2]
-
-kwargs = json.loads(kwargs_json)
-ret = main(**kwargs)
-
-with open("/output/return_value.json", "wb") as f:
+with open("/app/return_value.json", "wb") as f:
     ret_json = json.dumps(ret, default=json_encoder).encode()
-    if len(ret_json) > 256_000:
-        raise ValueError("Return value is too large, must be less than 256KB.")
+    if len(ret_json) > output_limit:
+        raise ValueError(
+            f"Return value is too large, must be less than {output_limit} bytes."
+        )
     f.write(ret_json)

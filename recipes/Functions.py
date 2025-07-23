@@ -287,26 +287,40 @@ def execute_python(
 
     app = modal.App.lookup("gooey-functions", create_if_missing=True)
     with (
-        tempfile.NamedTemporaryFile(suffix=".txt") as f,
+        tempfile.TemporaryDirectory() as tmpdir,
         modal.Volume.ephemeral() as vol,
     ):
-        if python_requirements:
-            f.write(python_requirements.encode())
-            f.flush()
         bucket_path = f"workspaces/{workspace_id}/functions/"
         prefix_url = os.path.join(gcs_v2.GCS_BUCKET_URL, bucket_path)
+
+        input_json_path = os.path.join(tmpdir, "input.json")
+        with open(input_json_path, "w") as f:
+            json.dump([variables, prefix_url, output_limit], f)
+
+        code_path = os.path.join(tmpdir, "code.py")
+        with open(code_path, "w") as f:
+            f.write(code)
+
+        with vol.batch_upload() as batch:
+            batch.put_file(input_json_path, "input.json")
+            batch.put_file(code_path, "code.py")
+
+        image = modal.Image.debian_slim()
+        if python_requirements:
+            req_path = os.path.join(tmpdir, "requirements.txt")
+            with open(req_path, "w") as f:
+                f.write(python_requirements)
+            image = image.pip_install_from_requirements(req_path)
+
         sb = modal.Sandbox.create(
             "python",
-            "-c",
-            code,
-            json.dumps(variables),
-            prefix_url,
+            "/app/code.py",
             app=app,
-            image=modal.Image.debian_slim().pip_install_from_requirements(f.name),
+            image=image,
             secrets=[modal.Secret.from_dict(env or {})],
             workdir="/workspace",
             volumes={
-                "/output": vol,
+                "/app": vol,
                 "/workspace": modal.CloudBucketMount(
                     bucket_endpoint_url=gcs_v2.GCS_BASE_URL,
                     bucket_name=gcs_v2.GCS_BUCKET_NAME,
@@ -348,7 +362,10 @@ def execute_python(
 
 
 def extract_gcs_urls(
-    obj: typing.Any, prefix_url: str, ret: dict[str, str], mime_type: str | None = None
+    obj: typing.Any,
+    prefix_url: str,
+    ret: dict[str, str],
+    mime_type: str | None = None,
 ) -> dict[str, str]:
     import mimetypes
 
@@ -364,6 +381,7 @@ def extract_gcs_urls(
             mime_type = mime_type or mimetypes.guess_type(furl(obj).pathstr)[0]
             if mime_type:
                 ret[obj] = mime_type
+
     return ret
 
 
