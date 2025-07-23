@@ -805,9 +805,11 @@ def page_wrapper(
                             onClick=get_js_show_mobile_search(),
                         )
 
-            with gui.div(
-                className="d-flex gap-2 justify-content-end flex-wrap align-items-center",
-                style={"maxWidth": "50%"},
+            with (
+                gui.styled("& { max-width: 50%; } & > * { height: 24px; }"),
+                gui.div(
+                    className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                ),
             ):
                 if not show_search_bar:
                     render_header_link(
