@@ -721,20 +721,20 @@ def _render_search_bar_with_redirect(
 def get_js_hide_mobile_search():
     return dedent("""
     event.preventDefault();
-    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
-    hide_on_mobile_search.forEach(el => el.classList.remove("hide__mobile"));
-    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
-    show_on_mobile_search.forEach(el => el.classList.remove("show__mobile"));
+    const mobileSearchContainer = document.querySelector("#mobile_search_container");
+    mobileSearchContainer.classList.remove(
+        "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+    );
     """)
 
 
 def get_js_show_mobile_search():
     return dedent("""
     event.preventDefault();
-    const show_on_mobile_search = document.querySelectorAll('.show_on_mobile_search');
-    show_on_mobile_search.forEach(el => el.classList.add("show__mobile"));
-    const hide_on_mobile_search = document.querySelectorAll('.hide_on_mobile_search');
-    hide_on_mobile_search.forEach(el => el.classList.add("hide__mobile"));
+    const mobileSearchContainer = document.querySelector("#mobile_search_container");
+    mobileSearchContainer.classList.add(
+        "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+    )
     document.querySelector('#search_bar').focus();
     """)
 
@@ -750,31 +750,19 @@ def page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    if show_search_bar:
-        custom_style = dedent("""
-        @media (max-width: 767px) {
-            & .hide__mobile {
-                display: none !important;
-            }
-            & .show__mobile {
-                display: flex !important;
-            }
-        }
-        """)
-    else:
-        custom_style = ""
-
-    with gui.styled(custom_style), gui.div(className="d-flex flex-column min-vh-100"):
+    with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
 
         with (
             gui.div(className="header"),
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
-            gui.div(className="w-100 d-flex justify-content-between gap-2"),
+            gui.div(
+                className="position-relative w-100 d-flex justify-content-between gap-2"
+            ),
         ):
             with (
-                gui.div(className="hide_on_mobile_search d-md-block"),
+                gui.div(className="d-md-block"),
                 gui.tag("a", href="/"),
             ):
                 gui.tag(
@@ -797,8 +785,9 @@ def page_wrapper(
                     className="flex-grow-1 d-flex justify-content-center align-items-center"
                 ):
                     with gui.div(
-                        className="show_on_mobile_search hide__mobile d-md-flex flex-grow-1 justify-content-center align-items-center",
+                        className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
                         style={"display": "none"},
+                        id="mobile_search_container",
                     ):
                         _render_search_bar_with_redirect(
                             request=request,
@@ -808,13 +797,11 @@ def page_wrapper(
                         gui.button(
                             "Cancel",
                             type="tertiary",
-                            className="show_on_mobile_search d-md-none fs-6 m-0 ms-1 p-1",
-                            style={"display": "none"},
+                            className="d-md-none fs-6 m-0 ms-1 p-1",
                             onClick=get_js_hide_mobile_search(),
                         )
                     with gui.div(
-                        className="hide_on_mobile_search d-md-none flex-grow-1 justify-content-end",
-                        style={"display": "flex"},
+                        className="d-flex d-md-none flex-grow-1 justify-content-end",
                     ):
                         gui.button(
                             icons.search,
@@ -825,25 +812,27 @@ def page_wrapper(
                         )
 
             with gui.div(
-                className="hide_on_mobile_search gap-2 d-md-flex justify-content-end flex-wrap align-items-center",
-                style={"display": "flex", "maxWidth": "50%"},
+                className="d-flex gap-2 justify-content-end flex-wrap align-items-center",
+                style={"maxWidth": "50%"},
             ):
+                if not show_search_bar:
+                    render_header_link(
+                        url=get_route_path(explore_page),
+                        label="Explore",
+                        icon=icons.search,
+                    )
+
                 for url, label in settings.HEADER_LINKS:
-                    with gui.tag("a", href=url, className="pe-2 d-none d-xl-block"):
-                        if icon := settings.HEADER_ICONS.get(url):
-                            with gui.div(className="d-inline-block me-2 small"):
-                                gui.html(icon)
-                        gui.html(label)
+                    render_header_link(
+                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+                    )
 
                 if request.user and not request.user.is_anonymous:
-                    with gui.tag(
-                        "a",
-                        href=get_route_path(explore_in_current_workspace),
-                        className="pe-2 d-none d-xl-block",
-                    ):
-                        with gui.div(className="d-inline-block me-2 small"):
-                            gui.html(icons.save)
-                        gui.html("Saved")
+                    render_header_link(
+                        url=get_route_path(explore_in_current_workspace),
+                        label="Saved",
+                        icon=icons.save,
+                    )
 
                     current_workspace = global_workspace_selector(
                         request.user, request.session
@@ -887,10 +876,23 @@ def anonymous_login_container(request: Request, context: dict):
 
         gui.html('<hr class="my-1"/>')
 
+        render_link_in_dropdown(
+            url=get_route_path(explore_page),
+            label="Explore",
+            icon=icons.search,
+        )
         for url, label in settings.HEADER_LINKS:
             render_link_in_dropdown(
                 url=url, label=label, icon=settings.HEADER_ICONS.get(url)
             )
+
+
+def render_header_link(url: str, label: str, icon: str | None = None):
+    with gui.tag("a", href=url, className="pe-2 d-none d-xl-block"):
+        if icon:
+            with gui.div(className="d-inline-block me-2 small"):
+                gui.html(icon)
+        gui.html(label)
 
 
 class TabData(typing.NamedTuple):
