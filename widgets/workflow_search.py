@@ -1,5 +1,5 @@
 import gooey_gui as gui
-from django.contrib.postgres.search import SearchQuery, SearchVector
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.db.models import (
     BooleanField,
     F,
@@ -225,9 +225,9 @@ def get_filtered_published_runs(
     qs = PublishedRun.objects.all()
     qs = build_search_filter(qs, search_filters)
     qs = build_workflow_access_filter(qs, user)
-    qs = qs.annotate(
-        is_root_workflow=Q(published_run_id=""),
-    ).order_by(
+    qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
+    qs = qs.order_by(
+        "-rank",
         F("is_created_by").desc(nulls_last=True),
         "-is_member",
         "-is_approved_example",
@@ -294,34 +294,20 @@ def build_search_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet
             qs = qs.filter(workflow=workflow_page.workflow.value)
 
     if search_filters.search:
-        # build a raw tsquery like "foo:* & bar:*
-        tokens = []
-        for token in search_filters.search.strip().split():
-            # Only allow tokens that are alphanumeric
-            token = "".join(c for c in token if c.isalnum())
-            if not token:
-                continue
-            tokens.append(token + ":*")
-        raw_query = " & ".join(tokens)
-        search = SearchQuery(raw_query, search_type="raw")
-
-        # search by workflow title
-        workflow_search = PublishedRun.objects.filter(
-            published_run_id="", title__search=search
-        ).values("workflow")
-
-        # search by workflow metadata
-        qs = qs.annotate(
-            search=SearchVector(
-                "title",
-                "notes",
-                "created_by__display_name",
-                "workspace__handle__name",
+        query = SearchQuery(search_filters.search.strip())
+        vector = (
+            SearchVector("title", weight="A")
+            + SearchVector(
                 "workspace__name",
-            ),
+                "workspace__handle__name",
+                "created_by__display_name",
+                weight="B",
+            )
+            + SearchVector("notes", weight="C")
         )
+        qs = qs.annotate(search=vector, rank=SearchRank(vector, query))
 
         # filter on the search vector
-        qs = qs.filter(Q(search=search) | Q(workflow__in=workflow_search))
+        qs = qs.filter(search=query)
 
     return qs
