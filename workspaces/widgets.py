@@ -24,7 +24,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         profile_route,
         explore_in_current_workspace,
     )
-    from routers.root import logout
+    from routers.root import explore_page, logout
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -47,9 +47,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    popover, content = gui.popover(
-        interactive=True, placement="bottom", className="mt-2"
-    )
+    popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
@@ -143,6 +141,9 @@ def global_workspace_selector(user: AppUser, session: dict):
         )
 
         with gui.div(className="d-xl-none d-inline-block"):
+            render_link_in_dropdown(
+                url=get_route_path(explore_page), icon=icons.search, label="Explore"
+            )
             for url, label in settings.HEADER_LINKS:
                 render_link_in_dropdown(
                     url=url,
