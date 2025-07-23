@@ -77,76 +77,41 @@ def render_search_filters(
     show_sort_option = (
         search_filters.search or search_filters.workflow or search_filters.workspace
     )
-    with gui.div(className="row container-margin-reset", style={"fontSize": "0.9rem"}):
-        if not show_sort_option:
-            col_class = "col-12 col-md-7"
-        elif show_workspace_filter:
-            col_class = "col-9 col-md-7"
-        else:
-            col_class = "col-7"
+    if not show_sort_option:
+        col_class = "col-12 col-md-7"
+    elif show_workspace_filter:
+        col_class = "col-9 col-md-7"
+    else:
+        col_class = "col-7"
 
-        with gui.div(className=f"{col_class} d-flex align-items-center gap-2"):
-            with gui.div(
-                className="col-6" if show_workspace_filter else "col-12 col-md-6"
-            ):
-                search_filters.workflow = (
-                    render_workflow_filter(value=search_filters.workflow) or ""
-                )
-            if show_workspace_filter:
-                with gui.div(className="col-6"):
-                    search_filters.workspace = (
-                        render_workspace_filter(
-                            current_user=current_user,
-                            value=search_filters.workspace,
-                        )
-                        or ""
+    with gui.div(className=f"{col_class} d-flex align-items-center"):
+        with gui.div(
+            className="col-6 pe-1" if show_workspace_filter else "col-12 col-md-6"
+        ):
+            search_filters.workflow = (
+                render_workflow_filter(value=search_filters.workflow) or ""
+            )
+        if show_workspace_filter:
+            with gui.div(className="col-6 ps-1"):
+                search_filters.workspace = (
+                    render_workspace_filter(
+                        current_user=current_user,
+                        value=search_filters.workspace,
                     )
-            else:
-                search_filters.workspace = ""
-
-        if not show_sort_option:
-            search_filters.sort = ""
+                    or ""
+                )
         else:
-            col_class = "col-3 col-md-5" if show_workspace_filter else "col-5"
-            with gui.div(
-                className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
-            ):
-                sort_options: dict[str, str] = dict(
-                    (
-                        opt.value if opt != SortOptions.default else "",
-                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>',
-                    )
-                    for opt in SortOptions
-                )
-                if show_workspace_filter:
-                    hide_on_small_screens_style = """
-                    @media(max-width: 767px) {
-                        & div[class$="-control"] .hide-on-small-screens {
-                            display: none !important;
-                        }
-                    }
-                    """
-                else:
-                    hide_on_small_screens_style = ""
-                with (
-                    gui.styled(
-                        """
-                        @media(min-width: 768px) {
-                            & .gui-input { min-width: 170px; }
-                        }
-                        """
-                        + hide_on_small_screens_style
-                    ),
-                    gui.div(),
-                ):
-                    search_filters.sort = gui.selectbox(
-                        label="",
-                        options=sort_options,
-                        key="search_sort",
-                        value=search_filters.sort,
-                        format_func=sort_options.__getitem__,
-                        className="mb-0 text-nowrap",
-                    )
+            search_filters.workspace = ""
+
+    if not show_sort_option:
+        search_filters.sort = ""
+        return search_filters
+
+    col_class = "col-3 col-md-5" if show_workspace_filter else "col-5"
+    with gui.div(
+        className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
+    ):
+        search_filters.sort = render_sort_menu(value=search_filters.sort)
 
     return search_filters
 
@@ -156,30 +121,31 @@ def render_search_bar(
     key: str = "search_query",
     current_user: AppUser | None = None,
     id: str | None = None,
+    max_width: str = "500px",
     **props,
 ) -> str:
     id = id or f"--search_bar:{key}"
 
     with (
         gui.styled(
-            r"""
-            & {
+            rf"""
+            & {{
                 position: relative;
-                max-width: 500px;
+                max-width: {max_width};
                 flex-grow: 1;
-            }
-            & .gui-input {
+            }}
+            & .gui-input {{
                 margin: 0;
                 width: 100%;
-            }
-            & .clear_button {
+            }}
+            & .clear_button {{
                 position: absolute;
                 top: 14px;
                 right: 18px;
                 font-size: 0.9em;
                 margin: 0 !important;
-            }
-            &::before {
+            }}
+            &::before {{
                 content: "\f002";              /* FontAwesome glyph */
                 font-family: "Font Awesome 6 Pro";
                 position: absolute;
@@ -188,7 +154,7 @@ def render_search_bar(
                 pointer-events: none;          /* let clicks go through to the input */
                 color: #888;
                 font-size: 0.9em;
-            }
+            }}
             """
         ),
         gui.div(),
@@ -315,6 +281,40 @@ def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
         value=value,
         blank_label=f"{icons.example}&nbsp; Any",
     )
+
+
+def render_sort_menu(
+    key: str = "search_sort", value: str | None = None, responsive: bool = True
+) -> str:
+    sort_options = dict(
+        (opt.value if opt != SortOptions.default else "", opt) for opt in SortOptions
+    )
+
+    def format_func(v: str | None) -> str:
+        opt = sort_options.get(v, SortOptions.default)
+        if responsive:
+            return f'{opt.icon}<span class="d-none d-md-inline"> {opt.label}</span>'
+        return f"{opt.icon} {opt.label}"
+
+    with (
+        gui.styled(
+            """
+            @media(min-width: 768px) {
+                & .gui-input { min-width: 170px; }
+            }
+            """
+        ),
+        gui.div(),
+    ):
+        return gui.selectbox(
+            label="",
+            options=sort_options,
+            key="search_sort",
+            placeholder=f'<span class="d-md-none">{icons.sort}</span><span class="d-none d-md-inline">Sort by</span>',
+            value=value,
+            format_func=format_func,
+            className="mb-0 text-nowrap",
+        )
 
 
 def _render_selectbox(
