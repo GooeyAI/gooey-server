@@ -38,30 +38,27 @@ def render_search_filters(
     if not search_filters:
         search_filters = SearchFilters()
 
-    with gui.div(className="d-lg-flex container-margin-reset gap-3"):
-        with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
-            gui.caption(
-                icons.filter,
-                unsafe_allow_html=True,
-                className="text-muted d-flex align-items-center",
-            )
-            with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
-                is_logged_in = current_user and not current_user.is_anonymous
-                if is_logged_in:
-                    with gui.div(className="col-6"):
-                        search_filters.workspace = (
-                            render_workspace_filter(
-                                current_user=current_user,
-                                value=search_filters.workspace,
-                            )
-                            or ""
-                        )
-                else:
-                    search_filters.workspace = ""
-                with gui.div(className="col-6" if is_logged_in else "col-12 col-lg-6"):
-                    search_filters.workflow = (
-                        render_workflow_filter(value=search_filters.workflow) or ""
+    with gui.div(
+        className="col-md-7 d-flex align-items-center mw-100 container-margin-reset"
+    ):
+        is_logged_in = current_user and not current_user.is_anonymous
+        if is_logged_in:
+            with gui.div(className="col-6 pe-1"):
+                search_filters.workspace = (
+                    render_workspace_filter(
+                        current_user=current_user,
+                        value=search_filters.workspace,
                     )
+                    or ""
+                )
+        else:
+            search_filters.workspace = ""
+        with gui.div(
+            className="col-6 ps-1" if is_logged_in else "col-12 col-sm-9 col-md-6"
+        ):
+            search_filters.workflow = (
+                render_workflow_filter(value=search_filters.workflow) or ""
+            )
 
     return search_filters
 
@@ -71,30 +68,31 @@ def render_search_bar(
     key: str = "search_query",
     current_user: AppUser | None = None,
     id: str | None = None,
+    max_width: str = "500px",
     **props,
 ) -> str:
     id = id or f"--search_bar:{key}"
 
     with (
         gui.styled(
-            r"""
-            & {
+            rf"""
+            & {{
                 position: relative;
-                max-width: 500px;
+                max-width: {max_width};
                 flex-grow: 1;
-            }
-            & .gui-input {
+            }}
+            & .gui-input {{
                 margin: 0;
                 width: 100%;
-            }
-            & .clear_button {
+            }}
+            & .clear_button {{
                 position: absolute;
                 top: 14px;
                 right: 18px;
                 font-size: 0.9em;
                 margin: 0 !important;
-            }
-            &::before {
+            }}
+            &::before {{
                 content: "\f002";              /* FontAwesome glyph */
                 font-family: "Font Awesome 6 Pro";
                 position: absolute;
@@ -103,7 +101,7 @@ def render_search_bar(
                 pointer-events: none;          /* let clicks go through to the input */
                 color: #888;
                 font-size: 0.9em;
-            }
+            }}
             """
         ),
         gui.div(),
