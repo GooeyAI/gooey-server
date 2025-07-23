@@ -2,8 +2,8 @@ import typing
 from copy import copy
 
 import gooey_gui as gui
+from starlette.requests import Request
 
-from app_users.models import AppUser
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
@@ -50,22 +50,30 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
     )
 
 
-def render(user: AppUser | None, search_filters: SearchFilters | None):
-    heading_class = (
-        "d-none d-md-block" if search_filters and search_filters.search else ""
-    )
-    with gui.div(className=heading_class):
-        heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
+def render(request: Request, search_filters: SearchFilters | None):
+    from routers.root import _render_search_bar_with_redirect
 
-    search_filters = search_filters or SearchFilters()
-    new_filters = render_search_filters(
-        current_user=user, search_filters=copy(search_filters)
-    )
-    if new_filters != search_filters:
-        # if the search bar value has changed, redirect to the new search page
-        raise gui.QueryParamsRedirectException(
-            new_filters.model_dump(exclude_defaults=True)
+    user = request.user
+    with gui.div(className="my-4"):
+        if not search_filters:
+            gui.caption(DESCRIPTION, className="text-muted m-0")
+
+        search_filters = search_filters or SearchFilters()
+        _render_search_bar_with_redirect(
+            request=request,
+            search_filters=search_filters,
+            id="search_bar",
+            max_width="600px",
         )
+        with gui.div(className="mt-3"):
+            new_filters = render_search_filters(
+                current_user=user, search_filters=copy(search_filters)
+            )
+            if new_filters != search_filters:
+                # if the search bar value has changed, redirect to the new search page
+                raise gui.QueryParamsRedirectException(
+                    new_filters.model_dump(exclude_defaults=True)
+                )
 
     if search_filters:
         with gui.div(className="my-4"):
