@@ -53,7 +53,6 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
 def render(request: Request, search_filters: SearchFilters | None):
     from routers.root import _render_search_bar_with_redirect
 
-    user = request.user
     with gui.div(className="my-4"):
         if not search_filters:
             gui.caption(DESCRIPTION, className="text-muted m-0")
@@ -65,9 +64,9 @@ def render(request: Request, search_filters: SearchFilters | None):
             id="search_bar",
             max_width="600px",
         )
-        with gui.div(className="mt-3"):
+        with gui.div(className="d-flex mt-3"):
             new_filters = render_search_filters(
-                current_user=user, search_filters=copy(search_filters)
+                current_user=request.user, search_filters=copy(search_filters)
             )
             if new_filters != search_filters:
                 # if the search bar value has changed, redirect to the new search page
@@ -77,7 +76,7 @@ def render(request: Request, search_filters: SearchFilters | None):
 
     if search_filters:
         with gui.div(className="my-4"):
-            render_search_results(user, search_filters)
+            render_search_results(request.user, search_filters)
             return
 
     for category, pages in all_home_pages_by_category.items():
