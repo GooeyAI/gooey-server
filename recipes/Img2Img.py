@@ -19,6 +19,7 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 
 class Img2ImgPage(BasePage):
@@ -150,6 +151,14 @@ class Img2ImgPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.model_validate(state)
+
+        # Process variables in the text prompt
+        if request.text_prompt:
+            request.text_prompt = render_prompt_vars(request.text_prompt, state)
+
+        # Process variables in the negative prompt
+        if request.negative_prompt:
+            request.negative_prompt = render_prompt_vars(request.negative_prompt, state)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content
