@@ -411,6 +411,8 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will stream messages to the frontend",
     )
 
+    disable_rate_limits = models.BooleanField(default=False)
+
     public_visibility = models.IntegerField(
         choices=WorkflowAccessLevel.choices,
         default=WorkflowAccessLevel.VIEW_ONLY,

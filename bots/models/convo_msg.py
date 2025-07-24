@@ -26,6 +26,12 @@ if typing.TYPE_CHECKING:
     import pandas as pd
 
 
+class ConvoBlockedStatus(models.IntegerChoices):
+    NORMAL = 0, "Normal"
+    WARNING = 1, "Warning"
+    BLOCKED = 2, "Blocked"
+
+
 class ConvoState(models.IntegerChoices):
     INITIAL = 0, "Initial"
     ASK_FOR_FEEDBACK_THUMBS_UP = 1, "Ask for feedback (👍)"
@@ -244,6 +250,17 @@ class Conversation(models.Model):
         default=None,
         null=True,
         help_text="User's web user id (mandatory if platform is WEB)",
+    )
+
+    blocked_status = models.IntegerField(
+        choices=ConvoBlockedStatus.choices,
+        default=ConvoBlockedStatus.NORMAL,
+    )
+    blocked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Timestamp when the conversation was blocked.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

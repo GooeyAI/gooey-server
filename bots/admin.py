@@ -282,6 +282,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "streaming_enabled",
                     "show_feedback_buttons",
+                    "disable_rate_limits",
                     "view_analysis_results",
                 ]
             },

@@ -21,12 +21,14 @@ from bots.models import (
     MessageAttachment,
     BotIntegration,
 )
+from bots.models.convo_msg import ConvoBlockedStatus
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
@@ -48,6 +50,7 @@ DEFAULT_RESPONSE = (
 INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
 )
+
 
 ERROR_MSG = """
 ⚠️ Sorry, I ran into an error while processing your request. Please try again, or send "Reset" to start over.
@@ -298,8 +301,13 @@ def _echo(bot, input_text):
 
 
 def msg_handler(bot: BotInterface):
+    if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
+        return
     try:
-        _msg_handler(bot)
+        ensure_bot_rate_limits(bot.convo)
+        msg_handler_raw(bot)
+    except RateLimitExceeded as e:
+        bot.send_msg(text=e.detail["error"])
     except Exception as e:
         # send error msg as response
         bot.send_msg(text=ERROR_MSG.format(e))
@@ -307,7 +315,7 @@ def msg_handler(bot: BotInterface):
 
 
 @db_middleware
-def _msg_handler(bot: BotInterface):
+def msg_handler_raw(bot: BotInterface):
     recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
