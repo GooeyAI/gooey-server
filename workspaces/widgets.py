@@ -18,7 +18,7 @@ SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
-def global_workspace_selector(user: AppUser, session: dict):
+def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = False):
     from routers.account import (
         members_route,
         profile_route,
@@ -57,15 +57,18 @@ def global_workspace_selector(user: AppUser, session: dict):
             else:
                 display_name = "Personal"
         else:
-            display_name = current.display_name(user)
-        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
-            gui.html(f"{current.html_icon()}")
-            gui.html(
-                html.escape(display_name),
-                className="d-none d-md-inline text-truncate",
-                style={"maxWidth": "150px"},
-            )
-            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
+            display_name = html.escape(current.display_name(user))
+        gui.html(
+            " ".join(
+                [
+                    current.html_icon(),
+                    display_name if not hide_name else "",
+                    '<i class="ps-1 fa-regular fa-chevron-down"></i>'
+                    if not hide_name
+                    else "",
+                ],
+            ),
+        )
 
     with (
         content,

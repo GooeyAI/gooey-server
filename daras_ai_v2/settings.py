@@ -261,6 +261,7 @@ if not firebase_admin._apps:
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
 GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
+GOOEY_LOGO_FACE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bb2587e4-66eb-11f0-a197-02420a00013e/gooey-logo-robo.png"
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
@@ -309,7 +310,17 @@ HEADER_LINKS = [
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {}
+
+SIDEBAR_LINKS = [
+    ("/explore/", "Explore", "<i class='fa-solid fa-magnifying-glass'></i>"),
+    (DOCS_URL, "Docs", "<i class='fa-solid fa-book'></i>"),
+    ("/api/", "API", "<i class='fa-solid fa-code'></i>"),
+    (BLOG_URL, "Blog", "<i class='fa-solid fa-newspaper'></i>"),
+    ("/pricing", "Pricing", "<i class='fa-solid fa-credit-card'></i>"),
+    (CONTACT_URL, "Contact", "<i class='fa-solid fa-envelope'></i>"),
+]
+
+HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 

@@ -368,7 +368,6 @@ Authorization: Bearer GOOEY_API_KEY
 
     manage_api_keys(workspace=page.current_workspace, user=page.request.user)
 
-
 @gui.route(
     app,
     "/{page_slug}/examples/",
@@ -706,57 +705,99 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(
-    request: Request,
-    className="",
-    search_filters: typing.Optional[SearchFilters] = None,
-    show_search_bar: bool = True,
-):
-    from routers.account import explore_in_current_workspace
+def page_wrapper(request: Request, className=""):
+    context = {
+        "request": request,
+        "block_incognito": True,
+    }
+    sidebar_container, pane_container = gui.sidebar_layout(
+        toggle_key="main-sidebar-layout",
+    )
+    is_sidebar_open = bool(gui.session_state.get("main-sidebar-layout", True))
+    with sidebar_container:
+        with gui.div(className="overflow-hidden flex-grow-1 position-relative"):
+            with gui.div(
+                className="d-flex px-2 py-3 align-items-center justify-content-between overflow-hidden text-nowrap",
+                style={"min-width": "251px"},
+            ):
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_FACE,
+                    width="44px",
+                    height="44px",
+                    className=" logo-face",
+                )
+                current_workspace = None
+                if is_sidebar_open:
+                    if request.user and not request.user.is_anonymous:
+                        current_workspace = global_workspace_selector(
+                            request.user, request.session
+                        )
+                    else:
+                        current_workspace = None
+                        anonymous_login_container(request, context)
+                gui.button(
+                    "<i class='fa-light fa-sidebar-flip'></i>",
+                    unsafe_allow_html=True,
+                    type="tertiary",
+                    className="m-0",
+                    id="main-sidebar-layout",
+                )
 
-    context = {"request": request, "block_incognito": True}
+            with (
+                gui.styled("& i { font-size: 24px; }"),
+                gui.div(
+                    className="d-flex flex-column flex-grow-1 gap-3 px-3 my-3 text-nowrap",
+                    style={"min-width": "251px", "marginLeft": "4px"},
+                ),
+            ):
+                # saved
+                with gui.tag(
+                    "a", href="/saved/", className="pe-2 text-decoration-none d-flex"
+                ):
+                    with gui.div(className="d-inline-block me-4 small"):
+                        gui.html(
+                            "<i class='fa-regular fa-floppy-disk'></i>",
+                            className="me-2",
+                        )
+                    if is_sidebar_open:
+                        gui.html("Saved")
 
-    with gui.div(className="d-flex flex-column min-vh-100"):
-        gui.html(templates.get_template("gtag.html").render(**context))
+                for i, (url, label, icon) in enumerate(settings.SIDEBAR_LINKS):
+                    # closed sidebar
+                    if not is_sidebar_open:
+                        if i >= 1:
+                            break
+                        if icon:
+                            with gui.div(
+                                className="d-inline-block me-3 small",
+                                style={"height": "24px"},
+                            ):
+                                gui.html(icon)
+                    else:
+                        with gui.tag(
+                            "a", href=url, className="text-decoration-none d-flex"
+                        ):
+                            if icon:
+                                with gui.div(className="d-inline-block me-4 small"):
+                                    gui.html(icon)
+                            else:
+                                with gui.div(
+                                    className="d-inline-block me-3 small",
+                                    style={"width": "24px"},
+                                ):
+                                    gui.html("&nbsp;")
+                            gui.html(label)
 
         with (
-            gui.div(className="header"),
-            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
-            gui.div(className="container-xxl my-2"),
+            gui.styled("& img { width: 32px !important; height: 32px !important; }"),
             gui.div(
-                className="position-relative w-100 d-flex justify-content-between gap-2"
+                className="p-3 position-absolute bottom-0",
+                style={"width": "100%", "zIndex": 1000},
             ),
         ):
-            with (
-                gui.div(className="d-md-block"),
-                gui.tag("a", href="/"),
-            ):
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_IMG,
-                    width="300",
-                    height="142",
-                    className="img-fluid logo d-none d-sm-block",
-                )
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_RECT,
-                    width="145",
-                    height="40",
-                    className="img-fluid logo d-sm-none",
-                )
-
-            if show_search_bar:
-                _render_mobile_search_button(request, search_filters)
-
-            with gui.div(
-                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
-            ):
-                for url, label in settings.HEADER_LINKS:
-                    render_header_link(
-                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
-                    )
-
+            # workspace selector
+            if not is_sidebar_open:
                 if request.user and not request.user.is_anonymous:
                     render_header_link(
                         url=get_route_path(explore_in_current_workspace),
@@ -765,19 +806,23 @@ def page_wrapper(
                     )
 
                     current_workspace = global_workspace_selector(
-                        request.user, request.session
+                        request.user, request.session, hide_name=True
                     )
                 else:
                     current_workspace = None
                     anonymous_login_container(request, context)
 
-        gui.html(copy_to_clipboard_scripts)
+    with pane_container:
+        with gui.div(className="d-flex flex-column min-vh-100"):
+            gui.html(templates.get_template("gtag.html").render(**context))
 
-        with gui.div(id="main-content", className="container-xxl " + className):
-            yield current_workspace
+            gui.html(copy_to_clipboard_scripts)
 
-        gui.html(templates.get_template("footer.html").render(**context))
-        gui.html(templates.get_template("login_scripts.html").render(**context))
+            with gui.div(id="main-content", className="px-3 " + className):
+                yield current_workspace
+
+            gui.html(templates.get_template("footer.html").render(**context))
+            gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
