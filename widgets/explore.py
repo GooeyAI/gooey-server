@@ -54,8 +54,13 @@ def render(request: Request, search_filters: SearchFilters | None):
     from routers.root import _render_search_bar_with_redirect
 
     with gui.div(className="my-4"):
-        if not search_filters:
-            gui.caption(DESCRIPTION, className="text-muted m-0")
+        # note: using css instead of `if not search_filters: ...` stops re-render
+        # of the search bar. this preserves focus/blur between query-param redirects
+        gui.caption(
+            DESCRIPTION,
+            className="text-muted m-0",
+            style={"display": "none"} if search_filters else None,
+        )
 
         search_filters = search_filters or SearchFilters()
         _render_search_bar_with_redirect(
