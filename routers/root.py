@@ -696,9 +696,8 @@ def get_og_url_path(request) -> str:
 
 
 def _render_search_bar_with_redirect(
-    request: Request, search_filters: typing.Optional[SearchFilters], **props
+    request: Request, search_filters: SearchFilters, **props
 ):
-    search_filters = search_filters or SearchFilters()
     search_query = render_search_bar(
         current_user=request.user, search_filters=search_filters, **props
     )
@@ -785,7 +784,7 @@ def page_wrapper(
                     ):
                         _render_search_bar_with_redirect(
                             request=request,
-                            search_filters=search_filters,
+                            search_filters=search_filters or SearchFilters(),
                             id="search_bar",
                         )
                         gui.button(
