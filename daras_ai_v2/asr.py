@@ -1038,6 +1038,8 @@ def run_asr(
     import langcodes
 
     selected_model = AsrModels[selected_model]
+    if selected_model in AsrModels._deprecated():
+        raise UserError(f"Model {selected_model} is deprecated.")
     output_format = AsrOutputFormat[output_format]
     if is_yt_dlp_able_url(audio_url):
         audio_url, size = download_youtube_to_wav_url(audio_url)

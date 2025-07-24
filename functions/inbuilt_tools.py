@@ -40,10 +40,16 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
         try:
             page_cls = page_slug_map[normalize_slug(page_slug)]
         except KeyError:
-            properties = dict(generate_tool_properties(self.state, {}))
+            request = self.state.get("request", self.state)
+            properties = dict(generate_tool_properties(request, {}))
         else:
             schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
             properties = schema["properties"]
+
+        properties["-submit-workflow"] = {
+            "type": "boolean",
+            "description": "Submit & Run the workflow.",
+        }
 
         super().__init__(
             name="update_gui_state",
@@ -56,14 +62,17 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
         if not self.channel:
             return {"success": False, "error": "update channel not found"}
 
+        # collect all updates from the tool call into a single dict that can be pushed to the UI
+        updates = self.state.setdefault("updates", {})
         # sometimes the state is nested in the kwargs, so we need to get the state from the kwargs
-        kwargs = kwargs.get("state", kwargs)
+        updates.update(kwargs.get("state", kwargs))
+
         # generate a nonce so UI can detect if the state has changed or not
         nonce_info = {"-gooey-builder-nonce": str(uuid.uuid4())}
         # push the state back to the UI, expire in 1 minute
-        gui.realtime_push(self.channel, kwargs | nonce_info, ex=60)
+        gui.realtime_push(self.channel, updates | nonce_info, ex=60)
 
-        return {"success": True, "updated": list(kwargs.keys())}
+        return {"success": True, "updated": list(updates.keys())}
 
 
 class CallTransferLLMTool(BaseLLMTool):

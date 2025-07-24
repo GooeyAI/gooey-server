@@ -597,11 +597,11 @@ class BasePage:
         ):
             self._render_report_button()
             gui.write(get_relative_time(dt))
-            with gui.tooltip(
-                tooltip_content,
+            with (
+                gui.tooltip(tooltip_content),
+                gui.tag("span", className="text-muted d-inline-block"),
             ):
-                with gui.tag("span", className="text-muted d-inline-block"):
-                    gui.html("<i class='fa-regular fa-circle-info'></i>")
+                gui.html(icons.info)
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
@@ -1197,8 +1197,24 @@ class BasePage:
                 if self.is_current_user_admin():
                     render_gooey_builder(
                         page_slug=self.slug_versions[-1],
-                        request_model=self.RequestModel,
-                        load_session_state=self.current_sr_to_session_state,
+                        saved_state={
+                            k: v
+                            for k, v in gui.session_state.items()
+                            if k in self.fields_to_save()
+                        },
+                        builder_state=dict(
+                            status=dict(
+                                error_msg=gui.session_state.get(StateKeys.error_msg),
+                                run_status=gui.session_state.get(StateKeys.run_status),
+                                run_time=gui.session_state.get(StateKeys.run_time),
+                            ),
+                            request=extract_model_fields(
+                                model=self.RequestModel, state=gui.session_state
+                            ),
+                            response=extract_model_fields(
+                                model=self.ResponseModel, state=gui.session_state
+                            ),
+                        ),
                     )
 
                 with gui.styled(OUTPUT_TABS_CSS):
@@ -1563,7 +1579,7 @@ class BasePage:
         else:
             return "/account/"
 
-    def render_submit_button(self, key="--submit-1"):
+    def render_submit_button(self, key="-submit-workflow"):
         gui.write("---")
         with gui.div(
             className="position-sticky bottom-0 container-margin-reset p-2",

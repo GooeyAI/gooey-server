@@ -155,7 +155,7 @@ class Img2ImgPage(BasePage):
         # Process variables in the text prompt
         if request.text_prompt:
             request.text_prompt = render_prompt_vars(request.text_prompt, state)
-        
+
         # Process variables in the negative prompt
         if request.negative_prompt:
             request.negative_prompt = render_prompt_vars(request.negative_prompt, state)
@@ -217,10 +217,12 @@ class Img2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
-            case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
+            case Img2ImgModels.dall_e.name:
                 unit_price = 20
             case Img2ImgModels.flux_pro_kontext.name:
                 unit_price = 10
+            case Img2ImgModels.gpt_image_1.name:
+                unit_price = 45
             case _:
                 unit_price = 5
 
