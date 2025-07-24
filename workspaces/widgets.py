@@ -17,7 +17,7 @@ SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
-def global_workspace_selector(user: AppUser, session: dict):
+def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = False):
     from routers.account import profile_route, saved_route
 
     try:
@@ -55,8 +55,10 @@ def global_workspace_selector(user: AppUser, session: dict):
             " ".join(
                 [
                     current.html_icon(),
-                    display_name,
-                    '<i class="ps-1 fa-regular fa-chevron-down"></i>',
+                    display_name if not hide_name else "",
+                    '<i class="ps-1 fa-regular fa-chevron-down"></i>'
+                    if not hide_name
+                    else "",
                 ],
             ),
         )
