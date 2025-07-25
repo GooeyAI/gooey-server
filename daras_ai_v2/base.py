@@ -38,7 +38,8 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, render_breadcrumbs
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs, TitleBreadCrumbs, TitleUrl
+from widgets.base_header import render_breadcrumbs_with_author
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -73,10 +74,7 @@ from payments.auto_recharge import (
 )
 from payments.plans import PricingPlan
 from routers.root import RecipeTabs
-from widgets.author import (
-    render_author_as_breadcrumb,
-    render_author_from_user,
-)
+from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
@@ -390,7 +388,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div(className="mb-3")
+        header_placeholder = gui.div(className="my-3 w-100")
         with (
             gui.styled(
                 """
@@ -434,84 +432,126 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        with gui.div(
-            className="d-flex justify-content-between align-items-start mt-0 mt-md-3"
-        ):
-            if tbreadcrumbs.has_breadcrumbs():
-                with gui.div(
-                    className="d-block d-lg-flex align-items-center pt-2 mb-2"
-                ):
-                    with gui.div(className="me-3 mb-1 mb-lg-0"):
-                        render_breadcrumbs(
-                            tbreadcrumbs,
-                            is_api_call=(sr.is_api_call and self.tab == RecipeTabs.run),
-                        )
-                    if not is_root_example:
-                        render_author_as_breadcrumb(
-                            user=self.current_sr_user,
-                            pr=self.current_pr,
-                            sr=self.current_sr,
-                            current_workspace=(
-                                self.is_logged_in() and self.current_workspace or None
-                            ),
-                        )
-            else:
-                # render title in line with the social buttons
-                self._render_title(tbreadcrumbs.h1_title)
-
-            with gui.div(className="d-flex align-items-center my-auto"):
-                if request_changed or (can_save and not is_example):
-                    self._render_unpublished_changes_indicator()
-                self.render_social_buttons()
-
         if tbreadcrumbs.has_breadcrumbs():
             if self.tab != RecipeTabs.run:
-                with gui.styled("& h1 { margin-top: 0 }"):
-                    self._render_title(tbreadcrumbs.h1_title)
+                # Examples, API, Saved, etc
+                if self.tab == RecipeTabs.saved or self.tab == RecipeTabs.history:
+                    with gui.div(className="mb-2"):
+                        render_author_from_workspace(
+                            self.current_workspace,
+                            show_as_link=True,
+                        )
+                linked_title = (
+                    TitleUrl(
+                        tbreadcrumbs.h1_title,
+                        sr.get_app_url(),
+                    )
+                    if self.tab == RecipeTabs.run_as_api
+                    or self.tab == RecipeTabs.integrations
+                    else tbreadcrumbs.root_title
+                )
+                with gui.div(className="mb-2"):
+                    self._render_title(
+                        tbreadcrumbs.h1_title,
+                        title_prefix=tbreadcrumbs.title_prefix,
+                        linked_title=linked_title,
+                    )
             else:
+                # Run tab
                 img_style = dict(objectFit="cover", marginBottom=0)
                 if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
                     img_style["borderRadius"] = "50%"
                 else:
                     img_style["borderRadius"] = "12px"
-                with gui.div(className="d-flex gap-4 align-items-center"):
+                with gui.div(className="d-flex gap-4 w-100 mb-2"):
+                    # mobile image - smaller in size in parent div
                     if pr.photo_url:
                         with gui.div(className="d-none d-md-inline"):
                             gui.image(
                                 src=pr.photo_url,
-                                style=img_style | dict(width="150px", height="150px"),
+                                style=img_style | dict(width="96px", height="96px"),
                             )
-                    with (
-                        gui.styled(
-                            """
-                            & h1 { margin: 0 }
-                            @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
-                            """
-                        ),
-                        gui.div(className="w-100"),
-                    ):
-                        with gui.div(
-                            className="d-flex mt-3 mt-md-2 flex-row align-items-center gap-4 container-margin-reset"
-                        ):
-                            if pr.photo_url:
-                                with gui.div(className="d-inline d-md-none"):
-                                    gui.image(
-                                        src=pr.photo_url,
-                                        style=img_style
-                                        | dict(width="80px", height="80px"),
-                                    )
-                            self._render_title(tbreadcrumbs.h1_title)
-                        self.render_notes_and_extra()
-        # render notes below the title and social buttons
-        else:
-            self.render_notes_and_extra()
 
-    def render_notes_and_extra(self):
-        with gui.div(className="d-flex gap-2 w-100 align-items-center"):
-            with gui.div(className="flex-grow-1 container-margin-reset"):
-                if self.current_pr and self.current_pr.notes:
-                    gui.write(self.current_pr.notes, line_clamp=3)
+                    # desktop image and title, social buttons, extra and breadcrumbs
+                    with gui.div(
+                        className="d-flex align-items-md-center gap-2 gap-md-4 container-margin-reset w-100"
+                    ):
+                        if pr.photo_url:
+                            with gui.div(className="d-inline d-md-none"):
+                                gui.image(
+                                    src=pr.photo_url,
+                                    style=img_style | dict(width="56px", height="56px"),
+                                )
+                        with gui.div(
+                            className="w-100 mb-md-2 d-flex flex-column gap-2"
+                        ):
+                            with gui.div(
+                                className="d-flex justify-content-between align-items-start w-100"
+                            ):
+                                self._render_title(
+                                    tbreadcrumbs.h1_title,
+                                    title_prefix=tbreadcrumbs.title_prefix,
+                                    linked_title=tbreadcrumbs.published_title,
+                                )
+                                with gui.div(
+                                    className="d-flex align-items-xl-center flex-sm-column-reverse flex-xl-row gap-sm-2 gap-xl-0",
+                                    style={"whiteSpace": "nowrap"},
+                                ):
+                                    if request_changed or (can_save and not is_example):
+                                        self._render_unpublished_changes_indicator()
+                                    self.render_social_buttons()
+                            with gui.div(
+                                className="d-none d-md-flex flex-column gap-2"
+                            ):
+                                self.render_extra_and_breadcrumbs(
+                                    tbreadcrumbs, is_root_example
+                                )
+
+                # mobile extra and breadcrumbs - in parent div
+                with gui.div(className="d-flex flex-column gap-2 mb-2 d-md-none"):
+                    self.render_extra_and_breadcrumbs(tbreadcrumbs, is_root_example)
+        else:
+            with gui.div(
+                className="d-flex justify-content-between align-items-start mb-2 w-100"
+            ):
+                with gui.div(className="my-auto"):
+                    self._render_title(
+                        tbreadcrumbs.h1_title,
+                        linked_title=tbreadcrumbs.published_title,
+                    )
+                with gui.div(
+                    className="d-flex align-items-center",
+                    style={"whiteSpace": "nowrap"},
+                ):
+                    if request_changed or (can_save and not is_example):
+                        self._render_unpublished_changes_indicator()
+                    self.render_social_buttons()
+
+        if self.tab == RecipeTabs.run and is_example:
+            with gui.div(className="container-margin-reset"):
+                self.render_notes()
+
+    def render_extra_and_breadcrumbs(
+        self,
+        tbreadcrumbs: TitleBreadCrumbs,
+        is_root_example: bool,
+    ):
+        with gui.div(className="d-flex align-items-center gap-2 w-100 flex-wrap"):
             self.render_header_extra()
+            render_breadcrumbs_with_author(
+                tbreadcrumbs,
+                is_root_example=is_root_example,
+                user=self.current_sr_user,
+                pr=self.current_pr,
+                sr=self.current_sr,
+                current_workspace=(
+                    self.is_logged_in() and self.current_workspace or None
+                ),
+            )
+
+    def render_notes(self):
+        if self.current_pr and self.current_pr.notes:
+            gui.write(self.current_pr.notes, line_clamp=3)
 
     def render_header_extra(self):
         pass
@@ -540,9 +580,27 @@ class BasePage:
             )
         )
 
-    def _render_title(self, title: str):
-        with gui.div(className="container-margin-reset"):
-            gui.write(f"# {title}")
+    def _render_title(
+        self,
+        title: str,
+        title_prefix: str | None = None,
+        linked_title: TitleUrl | None = None,
+    ):
+        with (
+            gui.styled("""
+            & h1 { margin: 0 }
+            @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
+            """),
+            gui.div(className="container-margin-reset"),
+        ):
+            prefix = f"{title_prefix}: " if title_prefix else ""
+            if linked_title:
+                gui.write(
+                    f"# {prefix} <a href='{linked_title.url}'>{title}</a>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                gui.write(f"# {prefix} {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(
@@ -2243,8 +2301,8 @@ class BasePage:
                         unsafe_allow_html=True,
                         className="border border-dark",
                     )
-
-            gui.write(f"#### {tb.h1_title}")
+            prefix = f"{tb.title_prefix}: " if tb.title_prefix else ""
+            gui.write(f"#### {prefix} {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if (
