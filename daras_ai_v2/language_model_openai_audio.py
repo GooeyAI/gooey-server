@@ -68,7 +68,7 @@ def run_openai_audio(
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, tools, messages, audio_url
+                twilio_ws, openai_ws, tools, messages, audio_url, model
             ).stream():
                 yield [entry]
         else:
