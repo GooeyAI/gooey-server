@@ -645,6 +645,72 @@ def _save_msgs(
         assistant_msg.save()
 
 
+def _trigger_feedback_collection_llm(bot: BotInterface, feedback_type: str, feedback_id: int):
+    """Trigger an LLM run with feedback collection tool to ask for detailed feedback."""
+    
+    try:
+        # Set up variables for the LLM tool
+        system_vars, system_vars_schema = build_system_vars(bot.convo, bot.user_msg_id)
+        state = bot.saved_run.state
+        variables = (state.get("variables") or {}) | system_vars
+        variables["feedback_collection_params"] = {
+            "feedback_type": feedback_type,
+            "feedback_id": feedback_id
+        }
+        variables_schema = (state.get("variables_schema") or {}) | system_vars_schema
+        
+        # Create a prompt that instructs the LLM to collect feedback
+        if feedback_type == "thumbs_down":
+            input_prompt = "The user gave a thumbs down. Please use the collect_feedback tool to ask them for detailed feedback about what was wrong and how it could be improved."
+        else:
+            input_prompt = "The user gave a thumbs up. Please use the collect_feedback tool to ask them what they liked about the response."
+        
+        body = dict(
+            input_prompt=input_prompt,
+            messages=bot.convo.msgs_for_llm_context(),
+            variables=variables,
+            variables_schema=variables_schema,
+        )
+        
+        if bot.user_language:
+            body["user_language"] = bot.user_language
+        
+        # Submit the API call to run the LLM with the feedback collection tool
+        result, sr = submit_api_call(
+            page_cls=bot.page_cls,
+            query_params=bot.query_params, 
+            workspace=bot.workspace,
+            current_user=bot.current_user,
+            request_body=body,
+        )
+        bot.on_run_created(sr)
+        
+        # Wait for the result and send the LLM's response (feedback question) to the user
+        sr.wait_for_celery_result(result)
+        state = sr.to_dict()
+        
+        # Check for errors in the LLM run
+        err_msg = state.get(StateKeys.error_msg)
+        if err_msg:
+            raise Exception(f"LLM feedback collection failed: {err_msg}")
+        
+        # Get the response text from the LLM
+        text = state.get("output_text") and state.get("output_text")[0]
+        if text:
+            bot.send_msg(text=text, should_translate=False)
+        else:
+            # No response from LLM, fall back to default
+            raise Exception("LLM did not provide a response")
+            
+    except Exception as e:
+        # Log the error for debugging but don't crash the user experience
+        print(f"LLM feedback collection failed: {e}")
+        
+        # Fallback to the original feedback collection method
+        fallback_text = FEEDBACK_THUMBS_DOWN_MSG if feedback_type == "thumbs_down" else FEEDBACK_THUMBS_UP_MSG
+        bot.send_msg(text=fallback_text, should_translate=True)
+
+
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
     match button.button_id:
@@ -655,22 +721,27 @@ def _handle_interactive_msg(bot: BotInterface):
             )
             if button.button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                # response_text = FEEDBACK_THUMBS_UP_MSG
+                # For thumbs up, just save and confirm
+                response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
+                bot.convo.save()
+                # save the feedback
+                Feedback.objects.create(message=context_msg, rating=rating)
+                # send a confirmation msg
+                bot.send_msg(
+                    text=response_text,
+                    should_translate=True,
+                )
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                # response_text = FEEDBACK_THUMBS_DOWN_MSG
-            response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
-            bot.convo.save()
-            # save the feedback
-            Feedback.objects.create(message=context_msg, rating=rating)
-            # send a confirmation msg + post click buttons
-            bot.send_msg(
-                text=response_text,
-                # buttons=_feedback_post_click_buttons(),
-                should_translate=True,
-            )
+                # For thumbs down, trigger LLM tool to ask for detailed feedback
+                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                bot.convo.save()
+                
+                # Create feedback record first
+                feedback = Feedback.objects.create(message=context_msg, rating=rating)
+                
+                # Trigger LLM run with feedback collection tool
+                _trigger_feedback_collection_llm(bot, "thumbs_down", feedback.id)
             return True
 
         # handle skip

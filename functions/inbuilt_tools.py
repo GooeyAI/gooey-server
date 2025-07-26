@@ -29,6 +29,13 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
             update_gui_state_params.get("state"),
             update_gui_state_params.get("page_slug"),
         )
+    
+    # Add feedback collection tool if needed
+    feedback_collection_params = (state.get("variables") or {}).get("feedback_collection_params")
+    if feedback_collection_params:
+        feedback_type = feedback_collection_params.get("feedback_type")
+        if feedback_type in ["thumbs_up", "thumbs_down"]:
+            yield FeedbackCollectionLLMTool(feedback_type)
 
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
@@ -161,3 +168,38 @@ class CallTransferLLMTool(BaseLLMTool):
                 "success": True,
                 "message": f"Successfully initiated transfer to {phone_number}",
             }
+
+
+class FeedbackCollectionLLMTool(BaseLLMTool):
+    """In-Built tool for collecting detailed feedback from users."""
+    
+    def __init__(self, feedback_type: str):
+        self.feedback_type = feedback_type  # "thumbs_up" or "thumbs_down"
+        
+        if feedback_type == "thumbs_up":
+            description = "Collect detailed feedback about what the user liked about the response"
+            question = "What did you like about my response?"
+        else:
+            description = "Collect detailed feedback about what was wrong with the response and how it could be improved"  
+            question = "What was the issue with the response? How could it be improved?"
+            
+        super().__init__(
+            name="collect_feedback",
+            label="Collect Feedback", 
+            description=description,
+            properties={
+                "feedback_question": {
+                    "type": "string",
+                    "description": f"Ask the user this exact question: '{question}' and wait for their detailed response",
+                }
+            },
+            required=["feedback_question"],
+        )
+    
+    def call(self, feedback_question: str) -> dict:
+        # This tool's job is to ask the question and collect feedback
+        return {
+            "success": True,
+            "message": feedback_question,
+            "feedback_question": feedback_question
+        }
