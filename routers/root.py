@@ -779,7 +779,7 @@ def page_wrapper(
                 ):
                     with gui.div(
                         className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
-                        style={"display": "none"},
+                        style={"display": "none", "zIndex": "10"},
                         id="mobile_search_container",
                     ):
                         _render_search_bar_with_redirect(
@@ -804,11 +804,8 @@ def page_wrapper(
                             onClick=get_js_show_mobile_search(),
                         )
 
-            with (
-                gui.styled("& { max-width: 50%; } & > * { height: 24px; }"),
-                gui.div(
-                    className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
-                ),
+            with gui.div(
+                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
             ):
                 if not show_search_bar:
                     render_header_link(

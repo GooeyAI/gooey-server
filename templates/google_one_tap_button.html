@@ -1,4 +1,12 @@
-<span class="pe-2" style="height: 44px; min-width: 40px; max-width: 200px;" data-replace-login-spinner>
+<style>
+/* the google icon sometimes disappears from the button, this css hack fixes that */
+#g_id_signin_mobile div:has(> svg) {
+    min-width: 40px;
+    min-height: 40px;
+}
+</style>
+
+<span class="pe-2" style="min-width: 40px; max-width: 200px;" data-replace-login-spinner>
     <span id="g_id_signin_desktop" class="d-none d-md-inline"></span>
     <span id="g_id_signin_mobile" class="d-md-none"></span>
 </span>
@@ -23,7 +31,7 @@
         });
         google.accounts.id.renderButton(document.getElementById("g_id_signin_mobile"), {
             shape: "rectangular",
-            width: 60,
+            width: 40,
             type: "icon",
             size: "large",
         });
