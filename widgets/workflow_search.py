@@ -376,7 +376,6 @@ def get_filtered_published_runs(
         qs,
         search_filters.sort and SortOptions(search_filters.sort) or SortOptions.default,
     )
-    qs = qs.order_by()
     return qs[:25]
 
 
