@@ -352,15 +352,16 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
+        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.value
 
         render_saved_workflow_preview(
             workflow.page_cls,
             pr,
             workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-            hide_visibility_pill=True,
             show_workspace_author=show_workspace_author,
+            show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            is_member=is_member,
+            hide_visibility_pill=True,
         )
 
     grid_layout(1, qs, _render_run)
