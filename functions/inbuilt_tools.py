@@ -38,6 +38,7 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
             yield FeedbackCollectionLLMTool(feedback_type)
 
 
+
 class UpdateGuiStateLLMTool(BaseLLMTool):
     def __init__(self, channel, state, page_slug):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
@@ -203,3 +204,5 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
             "message": feedback_question,
             "feedback_question": feedback_question
         }
+
+
