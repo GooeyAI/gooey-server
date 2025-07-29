@@ -211,6 +211,10 @@ class BotIntegration(models.Model):
         default=False,
         help_text="Show 👍/👎 buttons with every response",
     )
+    ask_detailed_feedback = models.BooleanField(
+        default=False,
+        help_text="Ask for detailed feedback when users give a thumbs down (requires feedback buttons to be enabled)",
+    )
     platform = models.IntegerField(
         choices=Platform.choices,
         help_text="The platform that the bot is integrated with",

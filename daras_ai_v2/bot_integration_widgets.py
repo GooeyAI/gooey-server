@@ -85,6 +85,15 @@ def general_integration_settings(
                 key=f"_bi_show_feedback_buttons_{bi.id}",
                 help="Users can rate and provide feedback on every copilot response if enabled.",
             )
+        
+        # Show detailed feedback option only if feedback buttons are enabled
+        if bi.show_feedback_buttons:
+            bi.ask_detailed_feedback = gui.checkbox(
+                "**💬 Ask for Detailed Feedback**",
+                value=bi.ask_detailed_feedback,
+                key=f"_bi_ask_detailed_feedback_{bi.id}",
+                help="When users give a thumbs down, ask them to explain what was wrong and how it could be improved.",
+            )
 
     input_analysis_runs = analysis_runs_list_view(user, bi)
 
