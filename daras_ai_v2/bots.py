@@ -459,6 +459,8 @@ def _process_and_send_msg(
     bot.on_run_created(sr)
 
     send_feedback_buttons = bot.show_feedback_buttons
+    original_send_feedback_buttons = send_feedback_buttons  # preserve original value
+    feedback_buttons_sent = False  # track if buttons were already sent
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -492,6 +494,8 @@ def _process_and_send_msg(
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
+                    if streaming_done and send_feedback_buttons:
+                        feedback_buttons_sent = True  # mark that buttons were sent
                     last_idx = len(text)
                 else:
                     next_chunk = text[last_idx:]
@@ -507,6 +511,7 @@ def _process_and_send_msg(
                     sent_msg_id = update_msg_id
                     # don't show buttons again
                     send_feedback_buttons = False
+                    feedback_buttons_sent = True  # mark that buttons were sent
                 if streaming_done:
                     break  # we're done streaming, stop the loop
 
@@ -527,20 +532,21 @@ def _process_and_send_msg(
     video = state.get("output_video")
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or send_feedback_buttons):
+    final_send_feedback_buttons = original_send_feedback_buttons and not feedback_buttons_sent
+    if not (text or audio or video or documents or final_send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or send_feedback_buttons:
+    if text or audio or video or documents or final_send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
-            send_feedback_buttons=send_feedback_buttons,
+            send_feedback_buttons=final_send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
 
@@ -733,15 +739,28 @@ def _handle_interactive_msg(bot: BotInterface):
                 )
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                # For thumbs down, trigger LLM tool to ask for detailed feedback
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                bot.convo.save()
-                
-                # Create feedback record first
-                feedback = Feedback.objects.create(message=context_msg, rating=rating)
-                
-                # Trigger LLM run with feedback collection tool
-                _trigger_feedback_collection_llm(bot, "thumbs_down", feedback.id)
+                # For thumbs down, check if detailed feedback is enabled
+                if bot.bi.ask_detailed_feedback:
+                    # Trigger LLM tool to ask for detailed feedback
+                    bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                    bot.convo.save()
+                    
+                    # Create feedback record first
+                    feedback = Feedback.objects.create(message=context_msg, rating=rating)
+                    
+                    # Trigger LLM run with feedback collection tool
+                    _trigger_feedback_collection_llm(bot, "thumbs_down", feedback.id)
+                else:
+                    # Just save feedback and send confirmation (original behavior)
+                    response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
+                    bot.convo.save()
+                    # save the feedback
+                    Feedback.objects.create(message=context_msg, rating=rating)
+                    # send a confirmation msg
+                    bot.send_msg(
+                        text=response_text,
+                        should_translate=True,
+                    )
             return True
 
         # handle skip
