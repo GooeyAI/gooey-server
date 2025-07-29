@@ -11,6 +11,7 @@ from django.db.models import (
     QuerySet,
     Value,
 )
+from django.utils.translation import ngettext
 from pydantic import BaseModel
 
 from app_users.models import AppUser
@@ -70,7 +71,9 @@ class SearchFilters(BaseModel):
 
 
 def render_search_filters(
-    current_user: AppUser | None = None, search_filters: SearchFilters | None = None
+    current_user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+    result_count: int | None = None,
 ):
     if not search_filters:
         search_filters = SearchFilters()
@@ -113,6 +116,11 @@ def render_search_filters(
             with gui.div(
                 className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
+                if result_count is not None:
+                    gui.caption(
+                        f"{result_count} {ngettext('result', 'results', result_count)}",
+                        className="text-muted d-none d-md-block",
+                    )
                 sort_options: dict[str, str] = {
                     (opt.value if opt != SortOptions.get() else ""): (
                         f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
@@ -365,8 +373,9 @@ def _render_selectbox(
     )
 
 
-def render_search_results(user: AppUser | None, search_filters: SearchFilters):
-    qs = get_filtered_published_runs(user, search_filters)
+def render_search_results(
+    qs: QuerySet[PublishedRun], user: AppUser | None, search_filters: SearchFilters
+):
     qs = qs.select_related("workspace", "created_by", "saved_run")
 
     def _render_run(pr: PublishedRun):
