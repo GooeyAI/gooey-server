@@ -46,6 +46,7 @@ from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from workspaces.widgets import global_workspace_selector
+from widgets.sidebar import render_default_sidebar, sidebar_layout, use_sidebar
 
 app = CustomAPIRouter()
 
@@ -686,7 +687,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request):
+    with page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -703,60 +704,116 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
+def page_wrapper(request: Request, className="", page=None):
     context = {
         "request": request,
         "block_incognito": True,
     }
 
-    with gui.div(className="d-flex flex-column min-vh-100"):
-        gui.html(templates.get_template("gtag.html").render(**context))
+    sidebar_ref = use_sidebar("main-sidebar", default_open=True)
+    sidebar_container, pane_container = sidebar_layout(sidebar_ref)
 
-        with (
-            gui.div(className="header"),
-            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
-            gui.div(className="container-xxl my-2"),
-        ):
-            with gui.tag("a", href="/"):
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_IMG,
-                    width="300",
-                    height="142",
-                    className="img-fluid logo d-none d-sm-block",
-                )
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_RECT,
-                    width="145",
-                    height="40",
-                    className="img-fluid logo d-sm-none",
-                )
+    container = page if page else None
+    with sidebar_container:
+        with gui.styled("""
+            .gooey-sidebar-closed:hover {
+                & .hover-btn {
+                    display: block !important;
+                }
+                & .logo-face {
+                    display: none !important;
+                }
+            }
+        """):
             with gui.div(
-                className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
+                className="flex-grow-1 position-relative",
             ):
-                for url, label in settings.HEADER_LINKS:
-                    with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
-                        if icon := settings.HEADER_ICONS.get(url):
-                            with gui.div(className="d-inline-block me-2 small"):
-                                gui.html(icon)
-                        gui.html(label)
-
-                if request.user and not request.user.is_anonymous:
-                    current_workspace = global_workspace_selector(
-                        request.user, request.session
+                with gui.div(
+                    className="d-flex px-md-2 px-3 py-2 py-md-3 align-items-center justify-content-between overflow-hidden text-nowrap",
+                ):
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_FACE,
+                        width="44px",
+                        height="44px",
+                        className=" logo-face d-block",
                     )
-                else:
+                    open_sidebar_btn = gui.button(
+                        label=icons.sidebar_flip,
+                        className="m-0 d-none hover-btn",
+                        unsafe_allow_html=True,
+                        type="tertiary",
+                    )
+                    if open_sidebar_btn:
+                        sidebar_ref.set_open(True)
+                        raise gui.RerunException()
+
                     current_workspace = None
-                    anonymous_login_container(request, context)
+                    if gui.session_state.get("main-sidebar", True):
+                        if request.user and not request.user.is_anonymous:
+                            current_workspace = global_workspace_selector(
+                                request.user, request.session
+                            )
+                        else:
+                            current_workspace = None
+                            anonymous_login_container(request, context)
 
-        gui.html(copy_to_clipboard_scripts)
+                    close_mobile_sidebar = gui.button(
+                        label=icons.cancel,
+                        className="m-0 d-md-none",
+                        unsafe_allow_html=True,
+                        type="tertiary",
+                    )
+                    if close_mobile_sidebar:
+                        sidebar_ref.set_mobile_open(False)
+                        raise gui.RerunException()
 
-        with gui.div(id="main-content", className="container-xxl " + className):
-            yield current_workspace
+                    close_sidebar = gui.button(
+                        label=icons.sidebar_flip,
+                        className="m-0 d-none d-md-block",
+                        unsafe_allow_html=True,
+                        type="tertiary",
+                    )
+                    if close_sidebar:
+                        sidebar_ref.set_open(False)
+                        raise gui.RerunException()
 
-        gui.html(templates.get_template("footer.html").render(**context))
-        gui.html(templates.get_template("login_scripts.html").render(**context))
+                if container:
+                    container.render_sidebar(request, sidebar_ref)
+                else:
+                    render_default_sidebar()
+
+            # Bottom section with workspace selector when sidebar is closed
+            with (
+                gui.styled(
+                    "& img { width: 32px !important; height: 32px !important; }"
+                ),
+                gui.div(
+                    className="p-3 position-absolute bottom-0",
+                    style={"width": "100%", "zIndex": 1000},
+                ),
+            ):
+                if not gui.session_state.get("main-sidebar", True):
+                    if request.user and not request.user.is_anonymous:
+                        current_workspace = global_workspace_selector(
+                            request.user, request.session, hide_name=True
+                        )
+                    else:
+                        current_workspace = None
+                        anonymous_login_container(request, context)
+
+    # Main content pane
+    with pane_container:
+        with gui.div(className="d-flex flex-column min-vh-100 w-100"):
+            gui.html(templates.get_template("gtag.html").render(**context))
+
+            gui.html(copy_to_clipboard_scripts)
+
+            with gui.div(id="main-content", className="px-3 " + className):
+                yield current_workspace
+
+            gui.html(templates.get_template("footer.html").render(**context))
+            gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def anonymous_login_container(request: Request, context: dict):

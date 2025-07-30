@@ -47,6 +47,7 @@ phone = '<i class="fa-solid fa-phone"></i>'
 stars = '<i class="fa-solid fa-stars"></i>'
 filter = '<i class="fa-solid fa-bars-filter"></i>'
 info = "<i class='fa-regular fa-circle-info'></i>"
+sidebar_flip = "<i class='fa-light fa-sidebar-flip'></i>"
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

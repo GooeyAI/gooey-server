@@ -91,6 +91,7 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
+from widgets.sidebar import render_default_sidebar, sidebar_logo_header
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -192,6 +193,9 @@ class BasePage:
 
         self.tab = tab
         self.request = request
+
+    def render_sidebar(self, request, sidebar_ref):
+        render_default_sidebar()
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -434,8 +438,9 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
+        sidebar_logo_header()
         with gui.div(
-            className="d-flex justify-content-between align-items-start mt-0 mt-md-3"
+            className="d-flex justify-content-between align-items-center mt-0 mt-md-3"
         ):
             if tbreadcrumbs.has_breadcrumbs():
                 with gui.div(
@@ -541,8 +546,16 @@ class BasePage:
         )
 
     def _render_title(self, title: str):
-        with gui.div(className="container-margin-reset"):
-            gui.write(f"# {title}")
+        with gui.div(className="d-flex align-items-center"):
+            with (
+                gui.styled(
+                    """
+                    & h1 { margin: 0.25rem 0 }
+                    """
+                ),
+                gui.div(className="container-margin-reset"),
+            ):
+                gui.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
         with gui.tag(

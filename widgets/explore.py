@@ -13,6 +13,7 @@ from widgets.workflow_search import (
     render_search_filters,
     render_search_results,
 )
+from widgets.sidebar import sidebar_logo_header
 
 META_TITLE = "Explore AI workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
@@ -22,7 +23,10 @@ DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
 def render(user: AppUser | None, search_filters: SearchFilters | None):
-    heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
+    sidebar_logo_header()
+    heading(
+        title=TITLE, description=DESCRIPTION, margin_bottom="1rem", margin_top="1rem"
+    )
 
     new_filters = render_search_filters(
         current_user=user, search_filters=search_filters
