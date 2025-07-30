@@ -124,7 +124,7 @@ class StateKeys:
 class BasePageRequest:
     user: AppUser | None
     session: dict
-    query_params: dict
+    query_params: dict[str, str]
     url: URL | None
 
 
@@ -176,7 +176,7 @@ class BasePage:
         user: AppUser | None = None,
         request_session: dict | None = None,
         request_url: URL | None = None,
-        query_params: dict | None = None,
+        query_params: dict[str, str] | None = None,
     ):
         if request_session is None:
             request_session = {}
@@ -201,8 +201,8 @@ class BasePage:
         self,
         tab: RecipeTabs = RecipeTabs.run,
         *,
-        query_params: dict = None,
-        path_params: dict = None,
+        query_params: dict[str, str] | None = None,
+        path_params: dict | None = None,
     ) -> str:
         if query_params is None:
             query_params = {}
@@ -220,12 +220,12 @@ class BasePage:
     def app_url(
         cls,
         *,
-        tab: RecipeTabs = None,
-        example_id: str = None,
-        run_id: str = None,
-        uid: str = None,
-        query_params: dict = None,
-        path_params: dict = None,
+        tab: RecipeTabs | None = None,
+        example_id: str | None = None,
+        run_id: str | None = None,
+        uid: str | None = None,
+        query_params: dict[str, str] | None = None,
+        path_params: dict | None = None,
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
@@ -1507,7 +1507,7 @@ class BasePage:
             return SavedRun.objects.get(**config)
 
     @classmethod
-    def get_pr_from_example_id(cls, *, example_id: str):
+    def get_pr_from_example_id(cls, example_id: str):
         return PublishedRun.objects.select_related("saved_run", "workspace").get(
             workflow=cls.workflow, published_run_id=example_id
         )
