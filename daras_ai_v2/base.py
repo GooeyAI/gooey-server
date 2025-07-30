@@ -91,6 +91,7 @@ from workspaces.widgets import (
 )
 from routers.root import PREVIEW_ROUTE_WORKFLOWS
 
+from widgets.sidebar import render_default_sidebar, sidebar_logo_header
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -192,6 +193,9 @@ class BasePage:
 
         self.tab = tab
         self.request = request
+
+    def render_sidebar(self, request, sidebar_ref):
+        render_default_sidebar()
 
     @classmethod
     def api_endpoint(cls) -> str:
