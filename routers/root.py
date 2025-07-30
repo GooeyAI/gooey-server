@@ -729,7 +729,7 @@ def page_wrapper(request: Request, className="", page=None):
             }
         """):
             with gui.div(
-                className="overflow-hidden flex-grow-1 position-relative",
+                className="flex-grow-1 position-relative",
             ):
                 with gui.div(
                     className="d-flex px-md-2 px-3 py-2 py-md-3 align-items-center justify-content-between overflow-hidden text-nowrap",

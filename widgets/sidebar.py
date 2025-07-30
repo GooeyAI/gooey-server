@@ -138,6 +138,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 top: 0;
                 left: 0;
                 bottom: 0;
+                z-index: 2000;
             }
             & .gooey-sidebar-open {
                 min-width: 250px;
