@@ -1,4 +1,5 @@
 import mimetypes
+import random
 import typing
 from datetime import datetime
 
@@ -667,7 +668,14 @@ def _trigger_feedback_collection_llm(bot: BotInterface, feedback_type: str, feed
         
         # Create a prompt that instructs the LLM to collect feedback
         if feedback_type == "thumbs_down":
-            input_prompt = "The user gave a thumbs down. Please use the collect_feedback tool to ask them for detailed feedback about what was wrong and how it could be improved."
+            from functions.inbuilt_tools import FeedbackCollectionLLMTool
+            predefined_messages = FeedbackCollectionLLMTool.THUMBS_DOWN_MESSAGES
+            selected_message = random.choice(predefined_messages)
+            input_prompt = f"""The user gave a thumbs down. Please use the collect_feedback tool with EXACTLY this message (no modifications):
+
+"{selected_message}"
+
+Use the tool with feedback_question parameter set to exactly that message."""
         else:
             input_prompt = "The user gave a thumbs up. Please use the collect_feedback tool to ask them what they liked about the response."
         
