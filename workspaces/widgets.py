@@ -73,7 +73,8 @@ def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = Fa
     with (
         content,
         gui.div(
-            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
+            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 position-relative",
+            style={"width": "max-content"},
         ),
     ):
         row_height = "2.2rem"
