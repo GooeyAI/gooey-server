@@ -680,7 +680,7 @@ def render_recipe_page(
         request_session=request.session,
         request_url=request.url,
         # this is because the code still expects example_id to be in the query params
-        query_params=dict(request.query_params) | dict(example_id=example_id),
+        query_params=dict(request.query_params) | dict(example_id=example_id or ""),
     )
 
     if not gui.session_state:
