@@ -1481,14 +1481,21 @@ class BasePage:
         cls, example_id: str, run_id: str, uid: str
     ) -> tuple[SavedRun, PublishedRun]:
         if run_id and uid:
-            sr = cls.get_sr_from_ids(run_id, uid)
-            pr = sr.parent_published_run() or cls.get_root_pr()
+            sr = cls.get_sr_from_ids(run_id=run_id, uid=uid)
+            pr = (
+                example_id
+                and cls.get_pr_from_example_id(example_id)
+                or sr.parent_published_run()
+                or cls.get_root_pr()
+            )
         else:
-            if example_id:
-                pr = cls.get_pr_from_example_id(example_id=example_id)
-            else:
-                pr = cls.get_root_pr()
+            pr = (
+                example_id
+                and cls.get_pr_from_example_id(example_id)
+                or cls.get_root_pr()
+            )
             sr = pr.saved_run
+
         return sr, pr
 
     @classmethod
