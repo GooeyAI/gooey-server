@@ -12,12 +12,14 @@ from twilio.twiml.voice_response import Connect, VoiceResponse
 from websockets import ConnectionClosed
 
 from bots.models import BotIntegration
+from bots.models.convo_msg import ConvoBlockedStatus
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import msg_handler
+from daras_ai_v2.bots import msg_handler_raw
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_urlencoded_body,
     get_route_path,
 )
+from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.twilio_bot import TwilioVoice
 from routers.custom_api_router import CustomAPIRouter
 from routers.twilio_api import (
@@ -67,7 +69,18 @@ def twilio_voice_ws(
         resp.reject()
         return twiml_response(resp)
 
-    background_tasks.add_task(msg_handler, bot)
+    if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
+        resp = VoiceResponse()
+        resp.reject()
+        return twiml_response(resp)
+    try:
+        ensure_bot_rate_limits(bot.convo)
+    except RateLimitExceeded as e:
+        resp = VoiceResponse()
+        resp.say(e.detail["error"])
+        return twiml_response(resp)
+
+    background_tasks.add_task(msg_handler_raw, bot)
 
     resp = VoiceResponse()
 
