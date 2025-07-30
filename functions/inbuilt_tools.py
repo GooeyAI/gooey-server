@@ -1,5 +1,6 @@
 import typing
 import uuid
+import random
 
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
@@ -174,15 +175,23 @@ class CallTransferLLMTool(BaseLLMTool):
 class FeedbackCollectionLLMTool(BaseLLMTool):
     """In-Built tool for collecting detailed feedback from users."""
     
+    # Predefined feedback messages for thumbs down
+    THUMBS_DOWN_MESSAGES = [
+        "🙏  Thank you. I'd love to know what was off about my answer.",
+        "🙏 Thanks for the feedback — anything to be improved?",
+        "✅ Noted — feel free to share what didn't work.",
+        "🤔 Appreciate the feedback — have any suggestions?"
+    ]
+    
     def __init__(self, feedback_type: str):
         self.feedback_type = feedback_type  # "thumbs_up" or "thumbs_down"
         
         if feedback_type == "thumbs_up":
             description = "Collect detailed feedback about what the user liked about the response"
-            question = "What did you like about my response?"
+            instruction = "Ask the user what they liked about the response"
         else:
             description = "Collect detailed feedback about what was wrong with the response and how it could be improved"  
-            question = "What was the issue with the response? How could it be improved?"
+            instruction = "Ask the user for detailed feedback using one of the predefined messages"
             
         super().__init__(
             name="collect_feedback",
@@ -191,14 +200,14 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
             properties={
                 "feedback_question": {
                     "type": "string",
-                    "description": f"Ask the user this exact question: '{question}' and wait for their detailed response",
+                    "description": f"{instruction} and wait for their detailed response",
                 }
             },
             required=["feedback_question"],
         )
     
     def call(self, feedback_question: str) -> dict:
-        # This tool's job is to ask the question and collect feedback
+        # Use the exact feedback question provided by the LLM
         return {
             "success": True,
             "message": feedback_question,
