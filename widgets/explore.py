@@ -16,6 +16,7 @@ from widgets.workflow_search import (
     render_search_filters,
     render_search_results,
 )
+from widgets.sidebar import sidebar_logo_header
 
 META_TITLE = "Explore AI Workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
