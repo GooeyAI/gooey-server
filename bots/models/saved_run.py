@@ -256,8 +256,8 @@ class SavedRun(models.Model):
                 ),
             )
 
-    def wait_for_celery_result(self, result: "celery.result.AsyncResult"):
-        get_celery_result_db_safe(result)
+    def wait_for_celery_result(self, result: "celery.result.AsyncResult", timeout: int | None = None):
+        get_celery_result_db_safe(result, timeout=timeout)
         self.refresh_from_db()
 
     def get_creator(self) -> AppUser | None:
