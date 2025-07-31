@@ -1480,20 +1480,16 @@ class BasePage:
     def get_sr_pr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
     ) -> tuple[SavedRun, PublishedRun]:
+        if example_id:
+            example_pr = cls.get_pr_from_example_id(example_id)
+        else:
+            example_pr = None
+
         if run_id and uid:
             sr = cls.get_sr_from_ids(run_id=run_id, uid=uid)
-            pr = (
-                example_id
-                and cls.get_pr_from_example_id(example_id)
-                or sr.parent_published_run()
-                or cls.get_root_pr()
-            )
+            pr = example_pr or sr.parent_published_run() or cls.get_root_pr()
         else:
-            pr = (
-                example_id
-                and cls.get_pr_from_example_id(example_id)
-                or cls.get_root_pr()
-            )
+            pr = example_pr or cls.get_root_pr()
             sr = pr.saved_run
 
         return sr, pr
