@@ -810,7 +810,7 @@ const mobileSearchContainer = document.querySelector("#mobile_search_container")
 mobileSearchContainer.classList.add(
     "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
 )
-document.querySelector('#search_bar').focus();
+document.querySelector('#global_search_bar').focus();
 """
 
 JS_HIDE_MOBILE_SEARCH = """
