@@ -12,6 +12,8 @@ from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
 from functions.recipe_functions import BaseLLMTool, generate_tool_properties
 
+CALL_TRANSFER_TIMELIMIT = 60 * 60  # 1 hour
+
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
@@ -112,6 +114,8 @@ class CallTransferLLMTool(BaseLLMTool):
 
     def call(self, phone_number: str) -> dict:
         from routers.bots_api import api_hashids
+        from daras_ai_v2.fastapi_tricks import get_api_route_url
+        from routers.twilio_api import twilio_voice_call_status
 
         try:
             self.call_sid, self.bi_id
@@ -143,7 +147,14 @@ class CallTransferLLMTool(BaseLLMTool):
         client = bi.get_twilio_client()
 
         resp = VoiceResponse()
-        resp.dial(phone_number)
+        resp.dial(
+            phone_number,
+            timeLimit=CALL_TRANSFER_TIMELIMIT,
+            action=get_api_route_url(twilio_voice_call_status),
+            method="POST",
+            status_callback=get_api_route_url(twilio_voice_call_status),
+            status_callback_event=["completed"],
+        )
 
         try:
             # try to transfer the call
