@@ -47,7 +47,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    with gui.styled("& button { height: 24px; }"), gui.div():
+    with gui.styled("& button { padding-top: 5px; }"), gui.div():
         popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
@@ -131,7 +131,7 @@ def global_workspace_selector(user: AppUser, session: dict):
 
         gui.html('<hr class="my-1"/>')
 
-        render_link_in_dropdown(
+        workspace_selector_link(
             url=get_route_path(profile_route),
             icon=icons.profile,
             label="Profile",
@@ -142,29 +142,29 @@ def global_workspace_selector(user: AppUser, session: dict):
         )
 
         with gui.div(className="d-xl-none d-inline-block"):
-            render_link_in_dropdown(
+            workspace_selector_link(
                 url=get_route_path(explore_page), icon=icons.search, label="Explore"
             )
             for url, label in settings.HEADER_LINKS:
-                render_link_in_dropdown(
+                workspace_selector_link(
                     url=url,
                     label=label,
                     icon=settings.HEADER_ICONS.get(url),
                 )
-            render_link_in_dropdown(
+            workspace_selector_link(
                 url=get_route_path(explore_in_current_workspace),
                 icon=icons.save,
                 label="Saved",
             )
 
-        render_link_in_dropdown(
+        workspace_selector_link(
             url=get_route_path(logout), label="Log out", icon=icons.sign_out
         )
 
     return current
 
 
-def render_link_in_dropdown(
+def workspace_selector_link(
     url: str,
     label: str,
     caption: str | None = None,

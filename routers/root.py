@@ -5,7 +5,6 @@ import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
-from textwrap import dedent
 from time import time
 
 import gooey_gui as gui
@@ -35,7 +34,6 @@ from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
-    get_app_route_url,
     get_route_path,
     resolve_url,
 )
@@ -47,8 +45,8 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from workspaces.widgets import global_workspace_selector, render_link_in_dropdown
-from widgets.workflow_search import SearchFilters, render_search_bar
+from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
+from workspaces.widgets import global_workspace_selector, workspace_selector_link
 
 app = CustomAPIRouter()
 
@@ -695,43 +693,6 @@ def get_og_url_path(request) -> str:
     )
 
 
-def _render_search_bar_with_redirect(
-    request: Request, search_filters: SearchFilters, **props
-):
-    search_query = render_search_bar(
-        current_user=request.user, search_filters=search_filters, **props
-    )
-    if search_query != search_filters.search:
-        search_filters.search = search_query
-        raise gui.RedirectException(
-            get_app_route_url(
-                explore_page,
-                query_params=search_filters.model_dump(exclude_defaults=True),
-            )
-        )
-
-
-def get_js_hide_mobile_search():
-    return dedent("""
-    event.preventDefault();
-    const mobileSearchContainer = document.querySelector("#mobile_search_container");
-    mobileSearchContainer.classList.remove(
-        "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
-    );
-    """)
-
-
-def get_js_show_mobile_search():
-    return dedent("""
-    event.preventDefault();
-    const mobileSearchContainer = document.querySelector("#mobile_search_container");
-    mobileSearchContainer.classList.add(
-        "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
-    )
-    document.querySelector('#search_bar').focus();
-    """)
-
-
 @contextmanager
 def page_wrapper(
     request: Request,
@@ -774,35 +735,7 @@ def page_wrapper(
                 )
 
             if show_search_bar:
-                with gui.div(
-                    className="flex-grow-1 d-flex justify-content-center align-items-center"
-                ):
-                    with gui.div(
-                        className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
-                        style={"display": "none", "zIndex": "10"},
-                        id="mobile_search_container",
-                    ):
-                        _render_search_bar_with_redirect(
-                            request=request,
-                            search_filters=search_filters or SearchFilters(),
-                            id="search_bar",
-                        )
-                        gui.button(
-                            "Cancel",
-                            type="tertiary",
-                            className="d-md-none fs-6 m-0 ms-1 p-1",
-                            onClick=get_js_hide_mobile_search(),
-                        )
-                    with gui.div(
-                        className="d-flex d-md-none flex-grow-1 justify-content-end",
-                    ):
-                        gui.button(
-                            icons.search,
-                            type="tertiary",
-                            unsafe_allow_html=True,
-                            className="m-0",
-                            onClick=get_js_show_mobile_search(),
-                        )
+                _render_mobile_search_button(request, search_filters)
 
             with gui.div(
                 className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
@@ -842,6 +775,53 @@ def page_wrapper(
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
+def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
+    with gui.div(
+        className="d-flex d-md-none flex-grow-1 justify-content-end",
+    ):
+        gui.button(
+            icons.search,
+            type="tertiary",
+            unsafe_allow_html=True,
+            className="m-0",
+            onClick=JS_SHOW_MOBILE_SEARCH,
+        )
+
+    with gui.div(
+        className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
+        style={"display": "none", "zIndex": "10"},
+        id="mobile_search_container",
+    ):
+        render_search_bar_with_redirect(
+            request=request,
+            search_filters=search_filters or SearchFilters(),
+        )
+        gui.button(
+            "Cancel",
+            type="tertiary",
+            className="d-md-none fs-6 m-0 ms-1 p-1",
+            onClick=JS_HIDE_MOBILE_SEARCH,
+        )
+
+
+JS_SHOW_MOBILE_SEARCH = """
+event.preventDefault();
+const mobileSearchContainer = document.querySelector("#mobile_search_container");
+mobileSearchContainer.classList.add(
+    "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+)
+document.querySelector('#search_bar').focus();
+"""
+
+JS_HIDE_MOBILE_SEARCH = """
+event.preventDefault();
+const mobileSearchContainer = document.querySelector("#mobile_search_container");
+mobileSearchContainer.classList.remove(
+    "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+);
+"""
+
+
 def anonymous_login_container(request: Request, context: dict):
     next_url = str(furl(request.url).set(origin=None))
     login_url = str(furl("/login/", query_params=dict(next=next_url)))
@@ -864,17 +844,17 @@ def anonymous_login_container(request: Request, context: dict):
             style=dict(minWidth="200px"),
         ),
     ):
-        render_link_in_dropdown(url=login_url, label="Sign In", icon=icons.sign_in)
+        workspace_selector_link(url=login_url, label="Sign In", icon=icons.sign_in)
 
         gui.html('<hr class="my-1"/>')
 
-        render_link_in_dropdown(
+        workspace_selector_link(
             url=get_route_path(explore_page),
             label="Explore",
             icon=icons.search,
         )
         for url, label in settings.HEADER_LINKS:
-            render_link_in_dropdown(
+            workspace_selector_link(
                 url=url, label=label, icon=settings.HEADER_ICONS.get(url)
             )
 
