@@ -522,7 +522,11 @@ def _process_and_send_msg(
     try:
         sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
     except CeleryTimeoutError:
-        bot.send_msg(text=ERROR_MSG.format(f"Task timed out after {settings.CELERY_TASK_TIMEOUT} seconds"))
+        bot.send_msg(
+            text=ERROR_MSG.format(
+                f"Task timed out after {settings.CELERY_TASK_TIMEOUT} seconds"
+            )
+        )
         return
     # get the final state from db
     state = sr.to_dict()
@@ -712,8 +716,10 @@ Use the tool with feedback_question parameter set to exactly that message."""
         try:
             sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
         except CeleryTimeoutError:
-            raise Exception(f"LLM feedback collection timed out after {settings.CELERY_TASK_TIMEOUT} seconds")
-        
+            raise Exception(
+                f"LLM feedback collection timed out after {settings.CELERY_TASK_TIMEOUT} seconds"
+            )
+
         state = sr.to_dict()
 
         # Check for errors in the LLM run
