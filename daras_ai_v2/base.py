@@ -124,7 +124,7 @@ class StateKeys:
 class BasePageRequest:
     user: AppUser | None
     session: dict
-    query_params: dict
+    query_params: dict[str, str]
     url: URL | None
 
 
@@ -176,7 +176,7 @@ class BasePage:
         user: AppUser | None = None,
         request_session: dict | None = None,
         request_url: URL | None = None,
-        query_params: dict | None = None,
+        query_params: dict[str, str] | None = None,
     ):
         if request_session is None:
             request_session = {}
@@ -201,8 +201,8 @@ class BasePage:
         self,
         tab: RecipeTabs = RecipeTabs.run,
         *,
-        query_params: dict = None,
-        path_params: dict = None,
+        query_params: dict[str, str] | None = None,
+        path_params: dict | None = None,
     ) -> str:
         if query_params is None:
             query_params = {}
@@ -220,12 +220,12 @@ class BasePage:
     def app_url(
         cls,
         *,
-        tab: RecipeTabs = None,
-        example_id: str = None,
-        run_id: str = None,
-        uid: str = None,
-        query_params: dict = None,
-        path_params: dict = None,
+        tab: RecipeTabs | None = None,
+        example_id: str | None = None,
+        run_id: str | None = None,
+        uid: str | None = None,
+        query_params: dict[str, str] | None = None,
+        path_params: dict | None = None,
     ) -> str:
         if not tab:
             tab = RecipeTabs.run
@@ -398,7 +398,7 @@ class BasePage:
                     & button {
                         font-size: 0.9rem; 
                         padding: 0.3rem !important 
-                    }   
+                    }
                 }
                 & .nav-item {
                     font-size: smaller;
@@ -1480,15 +1480,18 @@ class BasePage:
     def get_sr_pr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
     ) -> tuple[SavedRun, PublishedRun]:
-        if run_id and uid:
-            sr = cls.get_sr_from_ids(run_id, uid)
-            pr = sr.parent_published_run() or cls.get_root_pr()
+        if example_id:
+            example_pr = cls.get_pr_from_example_id(example_id)
         else:
-            if example_id:
-                pr = cls.get_pr_from_example_id(example_id=example_id)
-            else:
-                pr = cls.get_root_pr()
+            example_pr = None
+
+        if run_id and uid:
+            sr = cls.get_sr_from_ids(run_id=run_id, uid=uid)
+            pr = example_pr or sr.parent_published_run() or cls.get_root_pr()
+        else:
+            pr = example_pr or cls.get_root_pr()
             sr = pr.saved_run
+
         return sr, pr
 
     @classmethod
@@ -1507,7 +1510,7 @@ class BasePage:
             return SavedRun.objects.get(**config)
 
     @classmethod
-    def get_pr_from_example_id(cls, *, example_id: str):
+    def get_pr_from_example_id(cls, example_id: str):
         return PublishedRun.objects.select_related("saved_run", "workspace").get(
             workflow=cls.workflow, published_run_id=example_id
         )

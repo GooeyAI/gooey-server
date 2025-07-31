@@ -25,12 +25,12 @@ def render_saved_workflow_preview(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     published_run: PublishedRun,
     *,
-    show_workspace_author: bool = False,
     workflow_pill: str | None = None,
+    show_workspace_author: bool = False,
+    show_run_count: bool = False,
     hide_visibility_pill: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
-    is_member: bool = False,
 ):
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
@@ -81,10 +81,10 @@ def render_saved_workflow_preview(
             render_footer_breadcrumbs(
                 published_run=published_run,
                 show_workspace_author=show_workspace_author,
+                show_run_count=show_run_count,
                 hide_version_notes=hide_version_notes,
                 hide_visibility_pill=hide_visibility_pill,
                 hide_last_editor=hide_last_editor,
-                is_member=is_member,
             )
 
         if output_url:
@@ -166,10 +166,10 @@ def render_footer_breadcrumbs(
     *,
     published_run: PublishedRun,
     show_workspace_author: bool,
+    show_run_count: bool,
     hide_visibility_pill: bool,
     hide_version_notes: bool,
     hide_last_editor: bool,
-    is_member: bool,
 ):
     latest_version = published_run.versions.latest()
 
@@ -217,7 +217,9 @@ def render_footer_breadcrumbs(
                     className="text-muted",
                 )
 
-        if published_run.run_count and (published_run.run_count >= 50 or is_member):
+        if show_run_count or (
+            published_run.run_count and published_run.run_count >= 50
+        ):
             run_count = format_number_with_suffix(published_run.run_count)
             with gui.div():
                 gui.write(
