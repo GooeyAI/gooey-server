@@ -1,9 +1,11 @@
 import mimetypes
+import random
 import typing
 from datetime import datetime
 
 import gooey_gui as gui
 import requests
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -32,6 +34,7 @@ from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
+from functions.inbuilt_tools import FeedbackCollectionLLMTool
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
@@ -459,6 +462,8 @@ def _process_and_send_msg(
     bot.on_run_created(sr)
 
     send_feedback_buttons = bot.show_feedback_buttons
+    original_send_feedback_buttons = send_feedback_buttons  # preserve original value
+    feedback_buttons_sent = False  # track if buttons were already sent
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -492,6 +497,8 @@ def _process_and_send_msg(
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
+                    if streaming_done and send_feedback_buttons:
+                        feedback_buttons_sent = True  # mark that buttons were sent
                     last_idx = len(text)
                 else:
                     next_chunk = text[last_idx:]
@@ -507,11 +514,20 @@ def _process_and_send_msg(
                     sent_msg_id = update_msg_id
                     # don't show buttons again
                     send_feedback_buttons = False
+                    feedback_buttons_sent = True  # mark that buttons were sent
                 if streaming_done:
                     break  # we're done streaming, stop the loop
 
     # wait for the celery task to finish
-    sr.wait_for_celery_result(result)
+    try:
+        sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
+    except CeleryTimeoutError:
+        bot.send_msg(
+            text=ERROR_MSG.format(
+                f"Task timed out after {settings.CELERY_TASK_TIMEOUT} seconds"
+            )
+        )
+        return
     # get the final state from db
     state = sr.to_dict()
     bot.recipe_run_state = bot.page_cls.get_run_state(state)
@@ -527,20 +543,23 @@ def _process_and_send_msg(
     video = state.get("output_video")
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or send_feedback_buttons):
+    final_send_feedback_buttons = (
+        original_send_feedback_buttons and not feedback_buttons_sent
+    )
+    if not (text or audio or video or documents or final_send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or send_feedback_buttons:
+    if text or audio or video or documents or final_send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
-            send_feedback_buttons=send_feedback_buttons,
+            send_feedback_buttons=final_send_feedback_buttons,
             update_msg_id=update_msg_id,
         )
 
@@ -645,6 +664,90 @@ def _save_msgs(
         assistant_msg.save()
 
 
+def _trigger_feedback_collection_llm(
+    bot: BotInterface, feedback_type: str, feedback_id: int
+):
+    """Trigger an LLM run with feedback collection tool to ask for detailed feedback."""
+
+    try:
+        # Set up variables for the LLM tool
+        system_vars, system_vars_schema = build_system_vars(bot.convo, bot.user_msg_id)
+        state = bot.saved_run.state
+        variables = (state.get("variables") or {}) | system_vars
+        variables["feedback_collection_params"] = {
+            "feedback_type": feedback_type,
+            "feedback_id": feedback_id,
+        }
+        variables_schema = (state.get("variables_schema") or {}) | system_vars_schema
+
+        # Create a prompt that instructs the LLM to collect feedback
+        if feedback_type == "thumbs_down":
+            predefined_messages = FeedbackCollectionLLMTool.THUMBS_DOWN_MESSAGES
+            selected_message = random.choice(predefined_messages)
+            input_prompt = f"""The user gave a thumbs down. Please use the collect_feedback tool with EXACTLY this message (no modifications):
+
+"{selected_message}"
+
+Use the tool with feedback_question parameter set to exactly that message."""
+        else:
+            input_prompt = "The user gave a thumbs up. Please use the collect_feedback tool to ask them what they liked about the response."
+
+        body = dict(
+            input_prompt=input_prompt,
+            messages=bot.convo.msgs_for_llm_context(),
+            variables=variables,
+            variables_schema=variables_schema,
+        )
+
+        if bot.user_language:
+            body["user_language"] = bot.user_language
+
+        # Submit the API call to run the LLM with the feedback collection tool
+        result, sr = submit_api_call(
+            page_cls=bot.page_cls,
+            query_params=bot.query_params,
+            workspace=bot.workspace,
+            current_user=bot.current_user,
+            request_body=body,
+        )
+        bot.on_run_created(sr)
+
+        # Wait for the result and send the LLM's response (feedback question) to the user
+        try:
+            sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
+        except CeleryTimeoutError:
+            raise Exception(
+                f"LLM feedback collection timed out after {settings.CELERY_TASK_TIMEOUT} seconds"
+            )
+
+        state = sr.to_dict()
+
+        # Check for errors in the LLM run
+        err_msg = state.get(StateKeys.error_msg)
+        if err_msg:
+            raise Exception(f"LLM feedback collection failed: {err_msg}")
+
+        # Get the response text from the LLM
+        text = state.get("output_text") and state.get("output_text")[0]
+        if text:
+            bot.send_msg(text=text, should_translate=False)
+        else:
+            # No response from LLM, fall back to default
+            raise Exception("LLM did not provide a response")
+
+    except Exception as e:
+        # Log the error for debugging but don't crash the user experience
+        print(f"LLM feedback collection failed: {e}")
+
+        # Fallback to the original feedback collection method
+        fallback_text = (
+            FEEDBACK_THUMBS_DOWN_MSG
+            if feedback_type == "thumbs_down"
+            else FEEDBACK_THUMBS_UP_MSG
+        )
+        bot.send_msg(text=fallback_text, should_translate=True)
+
+
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
     match button.button_id:
@@ -655,22 +758,43 @@ def _handle_interactive_msg(bot: BotInterface):
             )
             if button.button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                # response_text = FEEDBACK_THUMBS_UP_MSG
+                # For thumbs up, just save and confirm
+                response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
+                # save the feedback
+                Feedback.objects.create(message=context_msg, rating=rating)
+                # send a confirmation msg
+                bot.send_msg(
+                    text=response_text,
+                    should_translate=True,
+                )
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                # response_text = FEEDBACK_THUMBS_DOWN_MSG
-            response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
-            bot.convo.save()
-            # save the feedback
-            Feedback.objects.create(message=context_msg, rating=rating)
-            # send a confirmation msg + post click buttons
-            bot.send_msg(
-                text=response_text,
-                # buttons=_feedback_post_click_buttons(),
-                should_translate=True,
-            )
+                # For thumbs down, check if detailed feedback is enabled
+                if bot.bi.ask_detailed_feedback:
+                    # Trigger LLM tool to ask for detailed feedback
+                    bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                    bot.convo.save()
+
+                    # Create feedback record first
+                    feedback = Feedback.objects.create(
+                        message=context_msg, rating=rating
+                    )
+
+                    # Trigger LLM run with feedback collection tool
+                    _trigger_feedback_collection_llm(bot, "thumbs_down", feedback.id)
+                else:
+                    # Just save feedback and send confirmation (original behavior)
+                    response_text = FEEDBACK_CONFIRMED_MSG.format(
+                        bot_name=str(bot.bi.name)
+                    )
+                    bot.convo.save()
+                    # save the feedback
+                    Feedback.objects.create(message=context_msg, rating=rating)
+                    # send a confirmation msg
+                    bot.send_msg(
+                        text=response_text,
+                        should_translate=True,
+                    )
             return True
 
         # handle skip
