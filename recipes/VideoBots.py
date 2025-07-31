@@ -702,7 +702,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # language=JavaScript
         gui.js(
-            """document.querySelector("#gooey-embed")?.scrollIntoView({ behavior: "smooth", block: "start" })"""
+            """
+            let elem = document.querySelector("#gooey-embed");
+            if (!elem) return;
+            if (elem.scrollIntoViewIfNeeded) {
+                elem.scrollIntoViewIfNeeded(false);
+            } else {
+                elem.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            """
         )
 
     def render_output(self):

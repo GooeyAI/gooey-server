@@ -13,5 +13,13 @@ def html_spinner(text: str, scroll_into_view=True):
     if scroll_into_view:
         gui.js(
             # language=JavaScript
-            """document.querySelector(".gooey-spinner-top")?.scrollIntoViewIfNeeded(false)"""
+            """
+            let elem = document.querySelector(".gooey-spinner-top");
+            if (!elem) return;
+            if (elem.scrollIntoViewIfNeeded) {
+                elem.scrollIntoViewIfNeeded(false);
+            } else {
+                elem.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            """
         )
