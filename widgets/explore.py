@@ -12,6 +12,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from widgets.workflow_search import (
     SearchFilters,
+    render_search_bar_with_redirect,
     render_search_filters,
     render_search_results,
 )
@@ -51,8 +52,6 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
 
 
 def render(request: Request, search_filters: SearchFilters | None):
-    from routers.root import _render_search_bar_with_redirect
-
     with gui.div(className="my-4"):
         # note: using css instead of `if not search_filters: ...` stops re-render
         # of the search bar. this preserves focus/blur between query-param redirects
@@ -63,10 +62,9 @@ def render(request: Request, search_filters: SearchFilters | None):
         )
 
         search_filters = search_filters or SearchFilters()
-        _render_search_bar_with_redirect(
+        render_search_bar_with_redirect(
             request=request,
             search_filters=search_filters,
-            id="search_bar",
             max_width="600px",
         )
         with gui.div(className="mt-3"):

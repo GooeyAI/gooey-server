@@ -1,6 +1,6 @@
 import typing
-from enum import Enum
 
+from fastapi import Request
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -16,45 +16,47 @@ from pydantic import BaseModel
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
 from daras_ai_v2 import icons
+from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceRole
 
 
-class SortOptions(str, Enum):
-    FEATURED = "featured"
-    UPDATED_AT = "last_updated"
-    CREATED_AT = "created_at"
-    MOST_RUNS = "most_runs"
+class SortOption(typing.NamedTuple):
+    value: str
+    label: str
+    icon: str
+
+
+_icon_width = "1.3em"
+
+
+class SortOptions(SortOption, GooeyEnum):
+    FEATURED = SortOption(
+        value="featured",
+        label="Featured",
+        icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
+    )
+    UPDATED_AT = SortOption(
+        value="last_updated",
+        label="Last Updated",
+        icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
+    )
+    CREATED_AT = SortOption(
+        value="created_at",
+        label="Created At",
+        icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
+    )
+    MOST_RUNS = SortOption(
+        value="most_runs",
+        label="Most Runs",
+        icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
+    )
 
     @classmethod
-    @property
-    def default(cls) -> "SortOptions":
-        return cls.FEATURED
-
-    @property
-    def label(self) -> str:
-        match self:
-            case SortOptions.FEATURED:
-                return "Featured"
-            case SortOptions.UPDATED_AT:
-                return "Last Updated"
-            case SortOptions.CREATED_AT:
-                return "Created At"
-            case SortOptions.MOST_RUNS:
-                return "Most Runs"
-
-    @property
-    def icon(self) -> str:
-        match self:
-            case SortOptions.FEATURED:
-                return icons.star
-            case SortOptions.UPDATED_AT:
-                return icons.time
-            case SortOptions.CREATED_AT:
-                return icons.calendar
-            case SortOptions.MOST_RUNS:
-                return icons.run
+    def get(cls, key=None, default=None):
+        return super().get(key, default=cls.FEATURED)
 
 
 class SearchFilters(BaseModel):
@@ -111,31 +113,26 @@ def render_search_filters(
             with gui.div(
                 className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
-                sort_options: dict[str, str] = dict(
-                    (
-                        opt.value if opt != SortOptions.default else "",
-                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>',
+                sort_options: dict[str, str] = {
+                    (opt.value if opt != SortOptions.get() else ""): (
+                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
                     )
                     for opt in SortOptions
-                )
-                if show_workspace_filter:
-                    hide_on_small_screens_style = """
-                    @media(max-width: 767px) {
-                        & div[class$="-control"] .hide-on-small-screens {
-                            display: none !important;
-                        }
-                    }
-                    """
-                else:
-                    hide_on_small_screens_style = ""
+                }
                 with (
                     gui.styled(
                         """
                         @media(min-width: 768px) {
-                            & .gui-input { min-width: 170px; }
+                            & .gui-input {
+                                min-width: 170px;
+                            }
+                        }
+                        @media(max-width: 767px) {
+                            & div[class$="-control"] .hide-on-small-screens {
+                                display: none !important;
+                            }
                         }
                         """
-                        + hide_on_small_screens_style
                     ),
                     gui.div(),
                 ):
@@ -154,12 +151,38 @@ def render_search_filters(
     return search_filters
 
 
-def render_search_bar(
+def render_search_bar_with_redirect(
+    request: Request,
     search_filters: SearchFilters,
     key: str = "search_query",
-    current_user: AppUser | None = None,
-    id: str | None = None,
+    id: str = "search_bar",
     max_width: str = "500px",
+):
+    from routers.root import explore_page
+
+    search_query = render_search_bar(
+        current_user=request.user,
+        search_filters=search_filters,
+        key=key,
+        id=id,
+        max_width=max_width,
+    )
+    if search_query != search_filters.search:
+        search_filters.search = search_query
+        raise gui.RedirectException(
+            get_app_route_url(
+                explore_page,
+                query_params=search_filters.model_dump(exclude_defaults=True),
+            )
+        )
+
+
+def render_search_bar(
+    current_user: AppUser | None,
+    search_filters: SearchFilters,
+    key: str,
+    max_width: str,
+    id: str | None = None,
     **props,
 ) -> str:
     id = id or f"--search_bar:{key}"
@@ -247,11 +270,10 @@ def get_placeholder_by_search_filters(
         current_user, search_filters.workspace
     )
     if workspace:
-        workspace_text = (
-            "Personal Workspace"
-            if workspace.is_personal and workspace.created_by == current_user
-            else workspace.display_name(current_user=current_user)
-        )
+        if workspace.is_personal and workspace.created_by == current_user:
+            workspace_text = "Personal Workspace"
+        else:
+            workspace_text = workspace.display_name(current_user=current_user)
         text += f": {workspace_text}"
     else:
         text += f" {fallback_workspace_text}"
@@ -260,7 +282,7 @@ def get_placeholder_by_search_filters(
         try:
             workflow_page = page_slug_map[normalize_slug(search_filters.workflow)]
         except KeyError:
-            workflow_page = None
+            pass
         else:
             text += f" › {workflow_page.workflow.short_title}"
 
@@ -374,10 +396,7 @@ def get_filtered_published_runs(
     qs = PublishedRun.objects.all()
     qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
-    qs = build_sort_filter(
-        qs,
-        search_filters.sort and SortOptions(search_filters.sort) or SortOptions.default,
-    )
+    qs = build_sort_filter(qs, SortOptions.get(search_filters.sort))
     return qs[:25]
 
 
