@@ -5,6 +5,7 @@ from datetime import datetime
 
 import gooey_gui as gui
 import requests
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException
@@ -33,6 +34,7 @@ from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
+from functions.inbuilt_tools import FeedbackCollectionLLMTool
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
@@ -517,7 +519,11 @@ def _process_and_send_msg(
                     break  # we're done streaming, stop the loop
 
     # wait for the celery task to finish
-    sr.wait_for_celery_result(result)
+    try:
+        sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
+    except CeleryTimeoutError:
+        bot.send_msg(text=ERROR_MSG.format(f"Task timed out after {settings.CELERY_TASK_TIMEOUT} seconds"))
+        return
     # get the final state from db
     state = sr.to_dict()
     bot.recipe_run_state = bot.page_cls.get_run_state(state)
@@ -672,8 +678,6 @@ def _trigger_feedback_collection_llm(
 
         # Create a prompt that instructs the LLM to collect feedback
         if feedback_type == "thumbs_down":
-            from functions.inbuilt_tools import FeedbackCollectionLLMTool
-
             predefined_messages = FeedbackCollectionLLMTool.THUMBS_DOWN_MESSAGES
             selected_message = random.choice(predefined_messages)
             input_prompt = f"""The user gave a thumbs down. Please use the collect_feedback tool with EXACTLY this message (no modifications):
@@ -705,7 +709,11 @@ Use the tool with feedback_question parameter set to exactly that message."""
         bot.on_run_created(sr)
 
         # Wait for the result and send the LLM's response (feedback question) to the user
-        sr.wait_for_celery_result(result)
+        try:
+            sr.wait_for_celery_result(result, timeout=settings.CELERY_TASK_TIMEOUT)
+        except CeleryTimeoutError:
+            raise Exception(f"LLM feedback collection timed out after {settings.CELERY_TASK_TIMEOUT} seconds")
+        
         state = sr.to_dict()
 
         # Check for errors in the LLM run
@@ -746,7 +754,6 @@ def _handle_interactive_msg(bot: BotInterface):
                 rating = Feedback.Rating.RATING_THUMBS_UP
                 # For thumbs up, just save and confirm
                 response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
-                bot.convo.save()
                 # save the feedback
                 Feedback.objects.create(message=context_msg, rating=rating)
                 # send a confirmation msg
