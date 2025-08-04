@@ -60,7 +60,7 @@ def render_saved_workflow_preview(
         ):
             with gui.div(className="d-flex align-items-center"):
                 with gui.link(to=published_run.get_app_url()):
-                    gui.write(f"#### {truncate_text_words(tb.h1_title, 80)}")
+                    gui.write(f"#### {truncate_text_words(tb.title_with_prefix(), 80)}")
                 render_title_pills(published_run, workflow_pill)
 
             with gui.div(className="row"):

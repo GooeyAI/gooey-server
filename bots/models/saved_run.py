@@ -158,7 +158,7 @@ class SavedRun(models.Model):
 
         title = get_title_breadcrumbs(
             Workflow(self.workflow).page_cls, self, self.parent_published_run()
-        ).h1_title
+        ).title_with_prefix()
         return title or self.get_app_url()
 
     def parent_published_run(self) -> PublishedRun | None:

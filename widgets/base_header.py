@@ -6,12 +6,23 @@ from widgets.author import (
     render_author_as_breadcrumb,
 )
 from app_users.models import AppUser
-from daras_ai_v2.breadcrumbs import render_breadcrumbs
+from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
 from bots.models import (
     PublishedRun,
     SavedRun,
 )
 from workspaces.models import Workspace
+
+
+def render_header_title(tb: TitleBreadCrumbs):
+    with (
+        gui.styled("""
+        & h1 { margin: 0 }
+        @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
+        """),
+        gui.div(className="container-margin-reset"),
+    ):
+        gui.write("# " + tb.title_with_prefix_url())
 
 
 def render_help_button(workflow: Workflow):
@@ -33,7 +44,7 @@ def render_help_button(workflow: Workflow):
 
 
 def render_breadcrumbs_with_author(
-    tbreadcrumbs,
+    breadcrumbs: TitleBreadCrumbs,
     *,
     is_root_example: bool = False,
     user: AppUser | None = None,
@@ -44,8 +55,14 @@ def render_breadcrumbs_with_author(
     with gui.div(
         className="d-flex flex-wrap align-items-center container-margin-reset"
     ):
-        with gui.div(className="me-2"):
-            render_breadcrumbs(tbreadcrumbs)
+        if breadcrumbs.root_title:
+            with gui.breadcrumbs(className="container-margin-reset me-2"):
+                gui.breadcrumb_item(
+                    breadcrumbs.root_title.title,
+                    link_to=breadcrumbs.root_title.url,
+                    className="text-muted",
+                )
+
         if not is_root_example:
             with gui.div(className="d-flex align-items-center"):
                 gui.write("by", className="me-2 d-none d-md-block text-muted")
