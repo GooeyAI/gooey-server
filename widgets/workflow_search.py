@@ -87,15 +87,17 @@ def render_search_filters(
         else:
             col_class = "col-7"
 
-        with gui.div(className=f"{col_class} d-flex align-items-center gap-2"):
+        with gui.div(className=f"{col_class} d-flex align-items-center"):
             with gui.div(
-                className="col-6" if show_workspace_filter else "col-12 col-md-6"
+                className="col-6 pe-1"
+                if show_workspace_filter
+                else "col-12 col-md-6 pe-md-1"
             ):
                 search_filters.workflow = (
                     render_workflow_filter(value=search_filters.workflow) or ""
                 )
             if show_workspace_filter:
-                with gui.div(className="col-6"):
+                with gui.div(className="col-6 ps-1"):
                     search_filters.workspace = (
                         render_workspace_filter(
                             current_user=current_user,
