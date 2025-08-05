@@ -787,10 +787,13 @@ def _render_mobile_search_button(request: Request, search_filters: SearchFilters
             onClick=JS_SHOW_MOBILE_SEARCH,
         )
 
-    with gui.div(
-        className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
-        style={"display": "none", "zIndex": "10"},
-        id="mobile_search_container",
+    with (
+        gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
+        gui.div(
+            className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
+            style={"display": "none", "zIndex": "10"},
+            id="mobile_search_container",
+        ),
     ):
         render_search_bar_with_redirect(
             request=request,
