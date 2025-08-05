@@ -370,7 +370,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.eval_runs = []
         for url in request.eval_urls:
             page_cls, sr, pr = url_to_runs(url)
-            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).h1_title}..."
+            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix()}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).model_dump(exclude_unset=True)

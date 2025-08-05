@@ -2,6 +2,27 @@ import gooey_gui as gui
 
 from bots.models import Workflow
 from daras_ai_v2 import icons
+from widgets.author import (
+    render_author_as_breadcrumb,
+)
+from app_users.models import AppUser
+from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
+from bots.models import (
+    PublishedRun,
+    SavedRun,
+)
+from workspaces.models import Workspace
+
+
+def render_header_title(tb: TitleBreadCrumbs):
+    with (
+        gui.styled("""
+        & h1 { margin: 0 }
+        @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
+        """),
+        gui.div(className="container-margin-reset"),
+    ):
+        gui.write("# " + tb.title_with_prefix_url())
 
 
 def render_help_button(workflow: Workflow):
@@ -20,3 +41,34 @@ def render_help_button(workflow: Workflow):
         gui.html(
             f'{icons.help_guide} <span class="text-muted d-none d-lg-inline">Help Guide</span>'
         )
+
+
+def render_breadcrumbs_with_author(
+    breadcrumbs: TitleBreadCrumbs,
+    *,
+    is_root_example: bool = False,
+    user: AppUser | None = None,
+    pr: PublishedRun | None = None,
+    sr: SavedRun | None = None,
+    current_workspace: Workspace | None = None,
+):
+    with gui.div(
+        className="d-flex flex-wrap align-items-center container-margin-reset"
+    ):
+        if breadcrumbs.root_title:
+            with gui.breadcrumbs(className="container-margin-reset me-2"):
+                gui.breadcrumb_item(
+                    breadcrumbs.root_title.title,
+                    link_to=breadcrumbs.root_title.url,
+                    className="text-muted",
+                )
+
+        if not is_root_example:
+            with gui.div(className="d-flex align-items-center"):
+                gui.write("by", className="me-2 d-none d-md-block text-muted")
+                render_author_as_breadcrumb(
+                    user=user,
+                    pr=pr,
+                    sr=sr,
+                    current_workspace=current_workspace,
+                )

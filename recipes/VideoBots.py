@@ -1565,7 +1565,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             integrations_q
         ).order_by("platform", "-created_at")
 
-        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).h1_title
+        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).title_with_prefix()
 
         # no connected integrations on this run
         if not (integrations_qs and integrations_qs.exists()):

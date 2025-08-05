@@ -373,13 +373,8 @@ def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
             fn_sr,
             fn_sr.parent_published_run(),
         )
-        title = (
-            (tb.published_title and tb.published_title.title)
-            or (tb.root_title and tb.root_title.title)
-            or tb.h1_title
-        )
         key = f"fn-call-details-{called_fn.id}"
-        with gui.expander(f"🧩 Called `{title}`", key=key):
+        with gui.expander(f"🧩 Called `{tb.h1_title.title}`", key=key):
             if not gui.session_state.get(key):
                 continue
             gui.html(
