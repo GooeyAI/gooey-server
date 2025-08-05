@@ -47,8 +47,9 @@ def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = Fa
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    with gui.styled("& > button { padding-top: 5px; }"), gui.div():
-        popover, content = gui.popover(interactive=True, placement="bottom")
+    popover, content = gui.popover(
+        interactive=True, placement="bottom", className="w-100"
+    )
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
@@ -70,11 +71,15 @@ def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = Fa
     with (
         content,
         gui.div(
-            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 position-relative",
-            style={"width": "max-content"},
+            className="d-flex flex-column flex-nowrap bg-white border border-dark rounded shadow mx-2 position-relative",
+            style={
+                "width": "max-content",
+                "max-height": "80dvh",
+                "overflow-y": "auto",
+            },
         ),
     ):
-        row_height = "2.2rem"
+        row_height = "36px"
 
         for workspace in workspaces:
             with gui.tag(
@@ -83,7 +88,7 @@ def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = Fa
                 name=SWITCH_WORKSPACE_KEY,
                 type="submit",
                 value=str(workspace.id),
-                style=dict(height=row_height),
+                style=dict(minHeight=row_height),
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):

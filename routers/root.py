@@ -730,15 +730,18 @@ def page_wrapper(request: Request, className="", page=None):
         """):
             with gui.div(
                 className="flex-grow-1 position-relative",
+                id="sidebar-click-container",
             ):
                 with gui.div(
-                    className="d-flex px-md-2 px-3 py-2 py-md-3 align-items-center justify-content-between overflow-hidden text-nowrap",
+                    className="d-flex px-md-2 px-3 py-2 align-items-center justify-content-between text-nowrap",
+                    style={"height": "64px"},
                 ):
+                    # sidebar header
                     gui.tag(
                         "img",
                         src=settings.GOOEY_LOGO_FACE,
-                        width="44px",
-                        height="44px",
+                        width=settings.SIDEBAR_ICON_SIZE,
+                        height=settings.SIDEBAR_ICON_SIZE,
                         className=" logo-face d-block",
                     )
                     open_sidebar_btn = gui.button(
@@ -752,18 +755,35 @@ def page_wrapper(request: Request, className="", page=None):
                         raise gui.RerunException()
 
                     current_workspace = None
-                    if gui.session_state.get("main-sidebar", True):
-                        if request.user and not request.user.is_anonymous:
-                            current_workspace = global_workspace_selector(
-                                request.user, request.session
-                            )
-                        else:
-                            current_workspace = None
-                            anonymous_login_container(request, context)
+                    with (
+                        gui.styled(
+                            """
+                        & > button {
+                            max-width: 100%;
+                            overflow-x: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                            height: 100%;
+                            margin: auto;
+                        }
+                    """,
+                        ),
+                        gui.div(
+                            className="position-relative", style={"maxWidth": "50%"}
+                        ),
+                    ):
+                        if sidebar_ref.is_open:
+                            if request.user and not request.user.is_anonymous:
+                                current_workspace = global_workspace_selector(
+                                    request.user, request.session
+                                )
+                            else:
+                                current_workspace = None
+                                anonymous_login_container(request, context)
 
                     close_mobile_sidebar = gui.button(
                         label=icons.cancel,
-                        className="m-0 d-md-none",
+                        className="m-0 d-md-none p-2",
                         unsafe_allow_html=True,
                         type="tertiary",
                     )
@@ -797,7 +817,7 @@ def page_wrapper(request: Request, className="", page=None):
                     style={"width": "100%", "zIndex": 1000},
                 ),
             ):
-                if not gui.session_state.get("main-sidebar", True):
+                if not sidebar_ref.is_open:
                     if request.user and not request.user.is_anonymous:
                         current_workspace = global_workspace_selector(
                             request.user, request.session, hide_name=True

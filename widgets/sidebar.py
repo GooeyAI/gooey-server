@@ -45,41 +45,61 @@ def use_sidebar(key: str, default_open: bool = True) -> SidebarRef:
     return ref
 
 
-def sidebar_list_item(icon, title, is_sidebar_open):
+def sidebar_list_item(icon, title, is_sidebar_open, url=None):
     with (
         gui.styled(
             """
-            & i {
-                font-size: 1.2rem;
+            & a {
+                font-size: 1rem;
+                text-decoration: none;
+            }
+            & .sidebar-list-item {
+                min-height: 24px;
+            }
+            & .sidebar-list-item-icon {
                 max-width: 18px;
+                min-width: 18px;
+            }
+            & a:hover {
+                .sidebar-list-item-title {
+                    text-decoration: underline !important;
+                    text-decoration-color: #000 !important;
+                    text-decoration-thickness: 2px !important;
+                    text-underline-offset: 2px !important;
+                }
             }
         """
         ),
-        gui.div(className="d-inline-block me-4"),
+        gui.div(className="d-flex align-items-center"),
     ):
-        gui.html(icon, className="me-2")
-    if is_sidebar_open:
-        gui.html(title)
+        with gui.div(className="d-flex align-items-center w-100"):
+            with gui.tag(
+                "a",
+                href=url,
+                className="d-flex align-items-center sidebar-list-item w-100",
+            ):
+                if icon:
+                    gui.html(
+                        icon,
+                        className="sidebar-list-item-icon me-2 d-flex justify-content-center",
+                    )
+                if is_sidebar_open:
+                    gui.html(title, className="sidebar-list-item-title d-block")
 
 
 def sidebar_item_list(is_sidebar_open):
     for i, (url, label, icon) in enumerate(settings.SIDEBAR_LINKS):
         if not is_sidebar_open and i >= 1:
             break
-        with gui.tag("a", href=url, className="text-decoration-none d-flex"):
-            if icon:
-                with gui.div(
-                    className="d-inline-block me-3",
-                    style={"height": "24px"},
-                ):
-                    sidebar_list_item(icon, label, is_sidebar_open)
-            else:
-                with gui.div(
-                    className="d-inline-block me-3 small",
-                    style={"width": "24px"},
-                ):
-                    gui.html("&nbsp;")
-                gui.html(label)
+        if icon:
+            with gui.div():
+                sidebar_list_item(icon, label, is_sidebar_open, url)
+        else:
+            with gui.div(
+                className="d-inline-block me-2 small",
+            ):
+                gui.html("&nbsp;")
+            gui.html(label)
 
 
 def render_default_sidebar():
@@ -88,13 +108,12 @@ def render_default_sidebar():
         className="d-flex flex-column flex-grow-1 gap-3 px-3 my-3 text-nowrap",
         style={"marginLeft": "4px"},
     ):
-        with gui.tag(
-            "a",
-            href="/saved/",
-            className="pe-2 text-decoration-none d-flex",
-        ):
+        with gui.div(className="pe-2"):
             sidebar_list_item(
-                "<i class='fa-regular fa-floppy-disk'></i>", "Saved", is_sidebar_open
+                "<i class='fa-regular fa-floppy-disk'></i>",
+                "Saved",
+                is_sidebar_open,
+                "/saved/",
             )
 
         sidebar_item_list(is_sidebar_open)
@@ -102,14 +121,15 @@ def render_default_sidebar():
 
 def sidebar_logo_header():
     with gui.div(
-        className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2"
+        className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2",
+        style={"height": "64px"},
     ):
         sidebar_ref = use_sidebar("main-sidebar", default_open=True)
         gui.tag(
             "img",
             src=settings.GOOEY_LOGO_FACE,
-            width="44px",
-            height="44px",
+            width=settings.SIDEBAR_ICON_SIZE,
+            height=settings.SIDEBAR_ICON_SIZE,
             className=" logo-face",
         )
         open_mobile_sidebar = gui.button(
@@ -119,7 +139,6 @@ def sidebar_logo_header():
             type="tertiary",
         )
         if open_mobile_sidebar:
-            print(sidebar_ref.set_mobile_open, ">>>")
             sidebar_ref.set_mobile_open(True)
             raise gui.RerunException()
 
@@ -131,6 +150,11 @@ def sidebar_layout(sidebar_ref: SidebarRef):
     )
     side_bar_styles = dedent(
         """
+            html {
+                /* override margin-left from app.css */
+                margin-left: 0 !important;
+            }
+
             & .gooey-sidebar {
                 transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 background-color: #f9f9f9;
@@ -149,6 +173,10 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 min-width: 60px;
                 width: 60px;
                 max-width: 60px;
+            }
+
+            & .gooey-sidebar-closed:hover {
+                cursor: e-resize;
             }
 
             @media (max-width: 767px) {
@@ -185,9 +213,28 @@ def sidebar_layout(sidebar_ref: SidebarRef):
     with (
         gui.styled(side_bar_styles),
         gui.div(
-            className="d-flex w-100 h-100 position-relative", style={"height": "100dvh"}
+            className="d-flex w-100 h-100 position-relative sidebar-click-container",
+            style={"height": "100dvh"},
+            onClick=dedent(
+                """
+                if (event.target.id === "sidebar-click-container") {
+                    document.getElementById("sidebar-hidden-btn").click();
+                }
+                """
+                if not sidebar_ref.is_open
+                else ""
+            ),
         ),
     ):
+        open_sidebar_btn = gui.button(
+            label="",
+            className="d-none",
+            id="sidebar-hidden-btn",
+        )
+        if open_sidebar_btn:
+            sidebar_ref.set_open(True)
+            raise gui.RerunException()
+
         sidebar_content_placeholder = gui.div(
             className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_funtion_classes}",
             style={"height": "100dvh"},

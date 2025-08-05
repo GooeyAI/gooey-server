@@ -618,11 +618,6 @@ a.text-primary:hover {
     font-size: 14px;
 }
 
-html {
-    /* fix for jumping scrollbar issue - https://css-tricks.com/elegant-fix-jumping-scrollbar-issue/ */
-    margin-left: calc(100vw - 100%);
-}
-
 .gui-img {
     width: 100%;
     max-width: 450px;
