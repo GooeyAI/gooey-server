@@ -63,9 +63,6 @@ def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = Fa
                 [
                     current.html_icon(),
                     display_name if not hide_name else "",
-                    '<i class="ps-1 fa-regular fa-chevron-down"></i>'
-                    if not hide_name
-                    else "",
                 ],
             ),
         )

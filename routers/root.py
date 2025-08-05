@@ -771,15 +771,16 @@ def page_wrapper(request: Request, className="", page=None):
                         sidebar_ref.set_mobile_open(False)
                         raise gui.RerunException()
 
-                    close_sidebar = gui.button(
-                        label=icons.sidebar_flip,
-                        className="m-0 d-none d-md-block",
-                        unsafe_allow_html=True,
-                        type="tertiary",
-                    )
-                    if close_sidebar:
-                        sidebar_ref.set_open(False)
-                        raise gui.RerunException()
+                    if sidebar_ref.is_open:
+                        close_sidebar = gui.button(
+                            label=icons.sidebar_flip,
+                            className="m-0 d-none d-md-block",
+                            unsafe_allow_html=True,
+                            type="tertiary",
+                        )
+                        if close_sidebar:
+                            sidebar_ref.set_open(False)
+                            raise gui.RerunException()
 
                 if container:
                     container.render_sidebar(request, sidebar_ref)
@@ -792,7 +793,7 @@ def page_wrapper(request: Request, className="", page=None):
                     "& img { width: 32px !important; height: 32px !important; }"
                 ),
                 gui.div(
-                    className="p-3 position-absolute bottom-0",
+                    className="p-3 position-absolute bottom-0 d-md-block d-none",
                     style={"width": "100%", "zIndex": 1000},
                 ),
             ):
