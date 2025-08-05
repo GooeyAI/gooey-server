@@ -1,6 +1,6 @@
+import re
 import typing
 
-from fastapi import Request
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.db.models import (
@@ -21,6 +21,9 @@ from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceRole
+
+if typing.TYPE_CHECKING:
+    from fastapi import Request
 
 
 class SortOption(typing.NamedTuple):
@@ -57,6 +60,9 @@ class SortOptions(SortOption, GooeyEnum):
     @classmethod
     def get(cls, key=None, default=None):
         return super().get(key, default=cls.FEATURED)
+
+
+SEARCH_TOKEN_ALLOWED_CHARS = re.compile(r"[\w]+")
 
 
 class SearchFilters(BaseModel):
@@ -152,7 +158,7 @@ def render_search_filters(
 
 
 def render_search_bar_with_redirect(
-    request: Request,
+    request: "Request",
     search_filters: SearchFilters,
     key: str = "global_search_query",
     id: str = "global_search_bar",
@@ -477,7 +483,14 @@ def build_search_filter(
             qs = qs.filter(workflow=workflow_page.workflow.value)
 
     if search_filters.search:
-        query = SearchQuery(search_filters.search.strip())
+        # build a raw tsquery like "foo:* & bar:*
+        tokens = []
+        for word in search_filters.search.strip().split():
+            for token in re.findall(SEARCH_TOKEN_ALLOWED_CHARS, word):
+                tokens.append(token + ":*")
+        raw_query = " & ".join(tokens)
+        query = SearchQuery(raw_query, search_type="raw")
+
         vector = (
             SearchVector("title", weight="A")
             + SearchVector(
