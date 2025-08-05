@@ -460,8 +460,8 @@ class BasePage:
                         )
 
                 # desktop image and title, social buttons, extra and breadcrumbs
-                with gui.div(className="w-100 mb-md-2 d-flex flex-column gap-2"):
-                    with gui.div(className="d-flex align-items-start w-100"):
+                with gui.div(className="w-100 d-flex flex-column gap-2"):
+                    with gui.div(className="d-flex align-items-start w-100 my-auto"):
                         if pr.photo_url:
                             with gui.div(className="d-inline d-md-none me-2"):
                                 gui.image(
