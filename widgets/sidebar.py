@@ -138,7 +138,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 top: 0;
                 left: 0;
                 bottom: 0;
-                z-index: 2000;
+                z-index: 999;
             }
             & .gooey-sidebar-open {
                 min-width: 250px;
@@ -164,6 +164,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                     min-width: 0px;
                     width: 0px;
                     max-width: 0px;
+                    overflow: hidden;
                 }
             }
         """
@@ -181,7 +182,6 @@ def sidebar_layout(sidebar_ref: SidebarRef):
         """
         )
 
-    print(side_bar_styles, ">>>")
     with (
         gui.styled(side_bar_styles),
         gui.div(
