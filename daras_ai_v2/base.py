@@ -461,9 +461,7 @@ class BasePage:
 
                 # desktop image and title, social buttons, extra and breadcrumbs
                 with gui.div(className="w-100 mb-md-2 d-flex flex-column gap-2"):
-                    with gui.div(
-                        className="d-flex justify-content-between align-items-start w-100"
-                    ):
+                    with gui.div(className="d-flex align-items-start w-100"):
                         if pr.photo_url:
                             with gui.div(className="d-inline d-md-none me-2"):
                                 gui.image(
@@ -471,15 +469,18 @@ class BasePage:
                                     style=img_style | dict(width="56px", height="56px"),
                                 )
 
-                        render_header_title(tbreadcrumbs)
-
                         with gui.div(
-                            className="d-flex align-items-end flex-column-reverse gap-2",
-                            style={"whiteSpace": "nowrap"},
+                            className="d-flex justify-content-between w-100 align-items-start my-auto"
                         ):
-                            if request_changed or (can_save and not is_example):
-                                self._render_unpublished_changes_indicator()
-                            self.render_social_buttons()
+                            render_header_title(tbreadcrumbs)
+
+                            with gui.div(
+                                className="d-flex align-items-end flex-column-reverse gap-2",
+                                style={"whiteSpace": "nowrap"},
+                            ):
+                                if request_changed or (can_save and not is_example):
+                                    self._render_unpublished_changes_indicator()
+                                self.render_social_buttons()
 
                     with gui.div(
                         className="d-flex align-items-center gap-2 w-100 flex-wrap"
