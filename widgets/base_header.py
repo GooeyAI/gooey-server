@@ -20,7 +20,7 @@ def render_header_title(tb: TitleBreadCrumbs):
         & h1 { margin: 0 }
         @media (max-width: 768px) { & h1 { font-size: 1.5rem; line-height: 1.2 } }
         """),
-        gui.div(className="container-margin-reset"),
+        gui.div(className="container-margin-reset my-auto"),
     ):
         gui.write("# " + tb.title_with_prefix_url())
 
