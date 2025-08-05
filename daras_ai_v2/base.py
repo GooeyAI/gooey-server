@@ -38,9 +38,7 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
-from daras_ai_v2.breadcrumbs import (
-    get_title_breadcrumbs,
-)
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from widgets.base_header import render_breadcrumbs_with_author, render_header_title
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
@@ -807,8 +805,11 @@ class BasePage:
             # neither action was taken - nothing to do now
             return
 
-        is_root_published_run = user_can_edit and pr.is_root()
-        if not is_root_published_run:
+        if pressed_save_as_new and published_run_title == pr.title:
+            published_run_title = f"{published_run_title} (Copy)"
+
+        editing_root_published_run = pressed_save and user_can_edit and pr.is_root()
+        if not editing_root_published_run:
             try:
                 self._validate_published_run_title(published_run_title)
             except TitleValidationError as e:
