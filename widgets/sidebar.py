@@ -5,16 +5,23 @@ from daras_ai_v2 import icons
 
 
 class SidebarRef:
-    def __init__(self, key: str, is_open: bool = True, is_mobile_open: bool = False):
+    def __init__(
+        self,
+        key: str,
+        session: dict,
+        is_open: bool = True,
+        is_mobile_open: bool = False,
+    ):
         self.key = key
+        self.session = session
         self.is_open = is_open
         self.is_mobile_open = is_mobile_open
 
     def set_open(self, value: bool):
-        self.is_open = gui.session_state[self.key] = value
+        self.is_open = self.session[self.key] = value
 
     def set_mobile_open(self, value: bool):
-        self.is_mobile_open = gui.session_state[self.mobile_key] = value
+        self.is_mobile_open = self.session[self.mobile_key] = value
         self.set_open(value)
 
     @property
@@ -34,12 +41,13 @@ class SidebarRef:
         return self.key + ":open"
 
 
-def use_sidebar(key: str, default_open: bool = True) -> SidebarRef:
+def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRef:
     """Create or get a sidebar reference with state management."""
     ref = SidebarRef(
         key=key,
-        is_open=bool(gui.session_state.get(key, default_open)),
-        is_mobile_open=bool(gui.session_state.get(key + ":mobile", False)),
+        session=session,
+        is_open=bool(session.get(key, default_open)),
+        is_mobile_open=bool(session.get(key + ":mobile", False)),
     )
 
     return ref
@@ -102,8 +110,8 @@ def sidebar_item_list(is_sidebar_open):
             gui.html(label)
 
 
-def render_default_sidebar():
-    is_sidebar_open = gui.session_state.get("main-sidebar", True)
+def render_default_sidebar(session: dict):
+    is_sidebar_open = session.get("main-sidebar", True)
     with gui.div(
         className="d-flex flex-column flex-grow-1 gap-3 px-3 my-3 text-nowrap",
         style={"marginLeft": "4px"},
@@ -119,12 +127,12 @@ def render_default_sidebar():
         sidebar_item_list(is_sidebar_open)
 
 
-def sidebar_logo_header():
+def sidebar_logo_header(session: dict):
     with gui.div(
         className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2",
         style={"height": "64px"},
     ):
-        sidebar_ref = use_sidebar("main-sidebar", default_open=True)
+        sidebar_ref = use_sidebar("main-sidebar", session, default_open=True)
         gui.tag(
             "img",
             src=settings.GOOEY_LOGO_FACE,
