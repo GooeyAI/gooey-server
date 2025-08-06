@@ -1485,7 +1485,7 @@ def run_openai_chat(
     response_format_type: ResponseFormatType | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
-    from openai._types import NOT_GIVEN
+    from openai import NOT_GIVEN
 
     messages_for_completion = deepcopy(messages)
 
