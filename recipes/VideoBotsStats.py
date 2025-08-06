@@ -590,11 +590,11 @@ def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
     )
     positive_feedbacks = Feedback.objects.filter(
         message__conversation__bot_integration=bi,
-        rating=Feedback.Rating.RATING_THUMBS_UP,
+        rating=Feedback.Rating.POSITIVE,
     ).count()
     negative_feedbacks = Feedback.objects.filter(
         message__conversation__bot_integration=bi,
-        rating=Feedback.Rating.RATING_THUMBS_DOWN,
+        rating=Feedback.Rating.NEGATIVE,
     ).count()
     run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
     if bi.get_display_name() != bi.name:
@@ -660,7 +660,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
             created_at__date__gte=start_date,
             created_at__date__lte=end_date,
             message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.RATING_THUMBS_UP,
+            rating=Feedback.Rating.POSITIVE,
         )
         .order_by()
         .annotate(date=trunc_fn("created_at"))
@@ -674,7 +674,7 @@ def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn
             created_at__date__gte=start_date,
             created_at__date__lte=end_date,
             message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.RATING_THUMBS_DOWN,
+            rating=Feedback.Rating.NEGATIVE,
         )
         .order_by()
         .annotate(date=trunc_fn("created_at"))
@@ -1012,7 +1012,7 @@ def get_tabular_data(
     elif details == "Feedback Positive":
         pos_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.RATING_THUMBS_UP,
+            rating=Feedback.Rating.POSITIVE,
         )  # type: ignore
         if start_date and end_date:
             pos_feedbacks = pos_feedbacks.filter(
@@ -1022,7 +1022,7 @@ def get_tabular_data(
     elif details == "Feedback Negative":
         neg_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.RATING_THUMBS_DOWN,
+            rating=Feedback.Rating.NEGATIVE,
         )  # type: ignore
         if start_date and end_date:
             neg_feedbacks = neg_feedbacks.filter(

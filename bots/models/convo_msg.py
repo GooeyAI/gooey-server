@@ -32,12 +32,6 @@ class ConvoBlockedStatus(models.IntegerChoices):
     BLOCKED = 2, "Blocked"
 
 
-class ConvoState(models.IntegerChoices):
-    INITIAL = 0, "Initial"
-    ASK_FOR_FEEDBACK_THUMBS_UP = 1, "Ask for feedback (👍)"
-    ASK_FOR_FEEDBACK_THUMBS_DOWN = 2, "Ask for feedback (👎)"
-
-
 class ConversationQuerySet(models.QuerySet):
     def distinct_by_user_id(self) -> QuerySet["Conversation"]:
         """Get unique conversations"""
@@ -90,10 +84,10 @@ class ConversationQuerySet(models.QuerySet):
                     analysis_result__contains={"Answered": True}
                 ).count(),
                 "Thumbs up": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_UP
+                    feedbacks__rating=Feedback.Rating.POSITIVE
                 ).count(),
                 "Thumbs down": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_DOWN
+                    feedbacks__rating=Feedback.Rating.NEGATIVE
                 ).count(),
             }
             try:
@@ -154,11 +148,6 @@ class ConversationQuerySet(models.QuerySet):
 class Conversation(models.Model):
     bot_integration = models.ForeignKey(
         "BotIntegration", on_delete=models.CASCADE, related_name="conversations"
-    )
-
-    state = models.IntegerField(
-        choices=ConvoState.choices,
-        default=ConvoState.INITIAL,
     )
 
     fb_page_id = models.TextField(
@@ -359,8 +348,11 @@ class Conversation(models.Model):
     d30.short_description = "D30"
     d30.boolean = True
 
-    def msgs_for_llm_context(self):
-        return self.messages.all().as_llm_context(reset_at=self.reset_at)
+    def last_n_msgs_as_entries(self) -> list["ConversationEntry"]:
+        return self.messages.all().last_n_msgs_as_entries(reset_at=self.reset_at)
+
+    def last_n_msgs(self) -> list["Message"]:
+        return self.messages.all().last_n_msgs(reset_at=self.reset_at)
 
     def api_integration_id(self) -> str:
         from routers.bots_api import api_hashids
@@ -476,22 +468,31 @@ class MessageQuerySet(models.QuerySet):
             if "user_message" in row and "assistant_message" in row
         ]
 
-    def as_llm_context(
-        self, limit: int = 50, reset_at: datetime.datetime = None
+    def last_n_msgs_as_entries(
+        self, n: int = 50, reset_at: datetime.datetime = None
     ) -> list["ConversationEntry"]:
+        return db_msgs_to_entries(self.last_n_msgs(n, reset_at))
+
+    def last_n_msgs(
+        self, n: int = 50, reset_at: datetime.datetime = None
+    ) -> list["Message"]:
         if reset_at:
             self = self.filter(created_at__gt=reset_at)
-        msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
-        entries = [None] * len(msgs)
-        for i, msg in enumerate(reversed(msgs)):
-            entries[i] = format_chat_entry(
-                role=msg.role,
-                content_text=msg.content,
-                input_images=msg.attachments.filter(
-                    metadata__mime_type__startswith="image/"
-                ).values_list("url", flat=True),
-            )
-        return entries
+        msgs = self.order_by("-created_at").prefetch_related("attachments")[:n]
+        return list(reversed(msgs))
+
+
+def db_msgs_to_entries(msgs: list["Message"]) -> list["ConversationEntry"]:
+    entries = [None] * len(msgs)
+    for i, msg in enumerate(msgs):
+        entries[i] = format_chat_entry(
+            role=msg.role,
+            content_text=msg.content,
+            input_images=msg.attachments.filter(
+                metadata__mime_type__startswith="image/"
+            ).values_list("url", flat=True),
+        )
+    return entries
 
 
 class Message(models.Model):
@@ -698,51 +699,16 @@ class Feedback(models.Model):
     )
 
     class Rating(models.IntegerChoices):
-        RATING_THUMBS_UP = 1, "👍🏾"
-        RATING_THUMBS_DOWN = 2, "👎🏾"
+        POSITIVE = 1, "👍🏾"
+        NEGATIVE = 2, "👎🏾"
+        NEUTRAL = 3, "🤔"
 
-    class FeedbackCategory(models.IntegerChoices):
-        UNSPECIFIED = 1, "Unspecified"
-        INCOMING = 2, "Incoming"
-        TRANSLATION = 3, "Translation"
-        RETRIEVAL = 4, "Retrieval"
-        SUMMARIZATION = 5, "Summarization"
-        TRANSLATION_OF_ANSWER = 6, "Translation of answer"
-
-    class FeedbackCreator(models.IntegerChoices):
-        UNSPECIFIED = 1, "Unspecified"
-        USER = 2, "User"
-        FARMER = 3, "Farmer"
-        AGENT = 4, "Agent"
-        ADMIN = 5, "Admin"
-        GOOEY_TEAM_MEMBER = 6, "Gooey team member"
-
-    class Status(models.IntegerChoices):
-        UNTRIAGED = 1, "Untriaged"
-        TEST = 2, "Test"
-        NEEDS_INVESTIGATION = 3, "Needs investigation"
-        RESOLVED = 4, "Resolved"
-
-    rating = models.IntegerField(
-        choices=Rating.choices,
-    )
+    rating = models.IntegerField(choices=Rating.choices)
     text = models.TextField(
         blank=True, default="", verbose_name="Feedback Text (Original)"
     )
     text_english = models.TextField(
         blank=True, default="", verbose_name="Feedback Text (English)"
-    )
-    status = models.IntegerField(
-        choices=Status.choices,
-        default=Status.UNTRIAGED,
-    )
-    category = models.IntegerField(
-        choices=FeedbackCategory.choices,
-        default=FeedbackCategory.UNSPECIFIED,
-    )
-    creator = models.IntegerField(
-        choices=FeedbackCreator.choices,
-        default=FeedbackCreator.UNSPECIFIED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

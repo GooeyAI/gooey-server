@@ -40,8 +40,6 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import (
     get_title_breadcrumbs,
-    TitleBreadCrumbs,
-    TitleUrl,
 )
 from widgets.base_header import render_breadcrumbs_with_author, render_header_title
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button

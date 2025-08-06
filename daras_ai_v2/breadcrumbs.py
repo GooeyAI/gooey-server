@@ -1,6 +1,5 @@
 import typing
 
-import gooey_gui as gui
 
 from bots.models import SavedRun, PublishedRun
 

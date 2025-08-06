@@ -74,7 +74,7 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         fill_req_vars_from_state(msg.saved_run.state, variables)
     if "messages" in variables:
         variables["messages"] = messages_as_prompt(
-            msg.conversation.msgs_for_llm_context()
+            msg.conversation.last_n_msgs_as_entries()
         )
     if "conversations" in variables:
         variables["conversations"] = conversations_as_prompt(msg)
@@ -125,7 +125,7 @@ def conversations_as_prompt(msg: Message) -> str:
     for convo in msg.conversation.bot_integration.conversations.order_by("-created_at"):
         if len(ret) > MAX_PROMPT_LEN:
             break
-        ret += messages_as_prompt(convo.msgs_for_llm_context()) + "\n####\n"
+        ret += messages_as_prompt(convo.last_n_msgs_as_entries()) + "\n####\n"
     return ret.strip()
 
 

@@ -321,8 +321,6 @@ GOOGLE_MAPS_API_KEY_HOSTNAMES = config(
 
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
-# timeout for Celery task completion (default: 10 minutes)
-CELERY_TASK_TIMEOUT = config("CELERY_TASK_TIMEOUT", 600)
 
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)

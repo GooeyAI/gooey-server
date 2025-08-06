@@ -92,14 +92,14 @@ def main():
 
                 positive_feedbacks = Feedback.objects.filter(
                     message__conversation__bot_integration=bot,
-                    rating=Feedback.Rating.RATING_THUMBS_UP,
+                    rating=Feedback.Rating.POSITIVE,
                     created_at__date__gte=date,
                     created_at__date__lt=date + delta,
                 ).count()
 
                 negative_feedbacks = Feedback.objects.filter(
                     message__conversation__bot_integration=bot,
-                    rating=Feedback.Rating.RATING_THUMBS_DOWN,
+                    rating=Feedback.Rating.NEGATIVE,
                     created_at__date__gte=date,
                     created_at__date__lt=date + delta,
                 ).count()

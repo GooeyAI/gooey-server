@@ -1010,24 +1010,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             gui.write("###### `references`")
             gui.json(references, collapseStringsAfterLength=False)
 
+        tools = list(
+            get_inbuilt_tools_from_state(gui.session_state),
+        )
         if gui.session_state.get("functions"):
             try:
-                tools = list(
+                tools += list(
                     get_workflow_tools_from_state(
                         gui.session_state, FunctionTrigger.prompt
                     ),
-                ) + list(
-                    get_inbuilt_tools_from_state(gui.session_state),
                 )
             except Exception:
-                tools = None
-            if tools:
-                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                gui.json(
-                    [tool.spec_function for tool in tools],
-                    depth=3,
-                    collapseStringsAfterLength=False,
-                )
+                pass
+        if tools:
+            gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+            gui.json(
+                [tool.spec_function for tool in tools],
+                depth=3,
+                collapseStringsAfterLength=False,
+            )
 
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
