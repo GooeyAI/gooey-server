@@ -16,6 +16,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.workflow_url_input import workflow_url_input
+from functions.inbuilt_tools import FeedbackCollectionLLMTool
 from recipes.BulkRunner import list_view_editor
 from recipes.CompareLLM import CompareLLMPage
 from routers.root import chat_lib_route
@@ -88,12 +89,21 @@ def general_integration_settings(
 
         # Show detailed feedback option only if feedback buttons are enabled
         if bi.show_feedback_buttons:
-            bi.ask_detailed_feedback = gui.checkbox(
-                "**💬 Ask for Detailed Feedback**",
-                value=bi.ask_detailed_feedback,
-                key=f"_bi_ask_detailed_feedback_{bi.id}",
-                help="When users give a thumbs down, ask them to explain what was wrong and how it could be improved.",
-            )
+            with gui.div(className="d-flex align-items-center gap-3"):
+                bi.ask_detailed_feedback = gui.checkbox(
+                    "**💬 Ask for Detailed Feedback**",
+                    value=bi.ask_detailed_feedback,
+                    key=f"_bi_ask_detailed_feedback_{bi.id}",
+                    help=(
+                        "When users give a thumbs down, ask them to explain what was wrong and how it could be improved. "
+                        "Make sure to use our suggested prompt in your copilot to make this work well."
+                    ),
+                )
+                copy_to_clipboard_button(
+                    label=f"{icons.copy_solid} Copy Prompt",
+                    value=FeedbackCollectionLLMTool.system_prompt,
+                    type="link",
+                )
 
     input_analysis_runs = analysis_runs_list_view(user, bi)
 
