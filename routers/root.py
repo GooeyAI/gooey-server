@@ -717,7 +717,7 @@ def page_wrapper(
         "block_incognito": True,
     }
 
-    sidebar_ref = use_sidebar("main-sidebar", default_open=True)
+    sidebar_ref = use_sidebar("main-sidebar", request.session, default_open=True)
     sidebar_container, pane_container = sidebar_layout(sidebar_ref)
 
     container = page if page else None
@@ -809,7 +809,7 @@ def page_wrapper(
                 if container:
                     container.render_sidebar(request, sidebar_ref)
                 else:
-                    render_default_sidebar()
+                    render_default_sidebar(request.session)
 
             # Bottom section with workspace selector when sidebar is closed
             with (
@@ -832,7 +832,7 @@ def page_wrapper(
 
     # Main content pane
     with pane_container:
-        with gui.div(className="d-flex flex-column min-vh-100 w-100"):
+        with gui.div(className="d-flex flex-column min-vh-100 w-100 pt-md-2"):
             gui.html(templates.get_template("gtag.html").render(**context))
 
             gui.html(copy_to_clipboard_scripts)

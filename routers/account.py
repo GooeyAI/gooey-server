@@ -382,7 +382,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
         raise gui.RedirectException(str(redirect_url))
 
     with page_wrapper(request) as current_workspace:
-        sidebar_logo_header()
+        sidebar_logo_header(request.session)
         with gui.nav_tabs():
             for tab in AccountTabs.get_tabs_for_user(request.user, current_workspace):
                 with gui.nav_item(tab.url_path, active=tab == current_tab):

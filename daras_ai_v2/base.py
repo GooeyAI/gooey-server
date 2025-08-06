@@ -195,7 +195,7 @@ class BasePage:
         self.request = request
 
     def render_sidebar(self, request, sidebar_ref):
-        render_default_sidebar()
+        render_default_sidebar(request.session)
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -394,7 +394,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        sidebar_logo_header()
+        sidebar_logo_header(self.request.session)
         header_placeholder = gui.div(className="my-1 w-100")
         with (
             gui.styled(NAV_TABS_CSS),
