@@ -96,9 +96,9 @@ class QRCodeGeneratorPage(BasePage):
         image_prompt_pos_x: float | None = None
         image_prompt_pos_y: float | None = None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None = (
-            None
-        )
+        selected_model: (
+            typing.Literal[tuple(e.name for e in Text2ImgModels._available())] | None
+        ) = None
         selected_controlnet_model: (
             list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
         ) = None
