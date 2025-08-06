@@ -396,6 +396,7 @@ class MessageQuerySet(models.QuerySet):
                 "Analysis Result": row.get("analysis_result"),
                 "Feedback": row.get("feedback"),
                 "Run Time": row.get("run_time_sec"),
+                "Credits Used": row.get("credits_used", 0),
                 "Run URL": row.get("run_url"),
                 "Input Images": ", ".join(row.get("input_images") or []),
                 "Input Audio": row.get("input_audio"),
@@ -436,6 +437,7 @@ class MessageQuerySet(models.QuerySet):
                 if saved_run:
                     row["run_time_sec"] = int(saved_run.run_time.total_seconds())
                     row["run_url"] = saved_run.get_app_url()
+                    row["credits_used"] = saved_run.price or 0
                     input_images = saved_run.state.get("input_images")
                     if input_images:
                         row["input_images"] = input_images
