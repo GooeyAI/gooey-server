@@ -392,7 +392,8 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div(className="my-3 w-100")
+        sidebar_logo_header()
+        header_placeholder = gui.div(className="my-1 w-100")
         with (
             gui.styled(
                 """
