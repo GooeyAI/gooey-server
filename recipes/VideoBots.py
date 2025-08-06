@@ -118,7 +118,7 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
 from widgets.demo_button import render_demo_buttons_header
-
+from widgets.prompt_library import render_prompt_library
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -406,6 +406,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             style=dict(maxHeight="50vh"),
             help=field_desc(self.RequestModel, "bot_script"),
         )
+        render_prompt_library()
 
         language_model = language_model_selector(
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """

@@ -85,6 +85,15 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
 class CallTransferLLMTool(BaseLLMTool):
     """In-Built tool for transferring phone calls."""
 
+    system_prompt = """
+## Transfer Call
+You can transfer the user's call to another phone number using this tool. Some examples of when to use this tool:
+- When the user has directly asked to transfer their call or connect them with a phone number.
+- When responding with a phone number, offer to transfer their call, even if they haven't explicitly asked to be transferred.
+- Before transferring the call, say "Transferring you now..." and then call this tool.
+- You MUST NOT make up telephone numbers. You MUST ensure you know the phone number is explicitly from a Knowledge Base before offering to transfer or providing it.
+""".strip()
+
     def __init__(self):
         super().__init__(
             name="transfer_call",
@@ -172,6 +181,12 @@ class CallTransferLLMTool(BaseLLMTool):
 
 class FeedbackCollectionLLMTool(BaseLLMTool):
     """In-Built tool for collecting detailed feedback from users."""
+
+    system_prompt = (
+        "If the user is providing any feedback, suggestions or corrections instead of a question, "
+        "save the feedback by calling the collect_feedback tool. "
+        "Don't give an alternative answer, simply accept the feedback as-is."
+    )
 
     def __init__(self, platform_msg_id: str, conversation_id: str):
         from bots.models.convo_msg import Feedback

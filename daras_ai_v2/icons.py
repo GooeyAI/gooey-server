@@ -52,6 +52,7 @@ filter = '<i class="fa-solid fa-bars-filter"></i>'
 sort = '<i class="fa-solid fa-sort"></i>'
 info = "<i class='fa-regular fa-circle-info'></i>"
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
+library = '<i class="fa-solid fa-book"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
