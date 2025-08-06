@@ -28,18 +28,6 @@ class SidebarRef:
     def mobile_key(self):
         return self.key + ":mobile"
 
-    @property
-    def toggle_btn_key(self):
-        return self.key + ":toggle"
-
-    @property
-    def close_btn_key(self):
-        return self.key + ":close"
-
-    @property
-    def open_btn_key(self):
-        return self.key + ":open"
-
 
 def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRef:
     """Create or get a sidebar reference with state management."""
