@@ -1486,6 +1486,7 @@ def run_openai_chat(
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai import NOT_GIVEN
+    from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
     messages_for_completion = deepcopy(messages)
 
@@ -1548,27 +1549,30 @@ def run_openai_chat(
     model_ids = model.model_id
     if isinstance(model_ids, str):
         model_ids = [model_ids]
-    completion, used_model = try_all(
-        *[
-            _get_chat_completions_create(
-                model=model_id,
-                messages=messages_for_completion,
-                max_tokens=max_tokens,
-                max_completion_tokens=max_completion_tokens,
-                stop=stop or NOT_GIVEN,
-                n=num_outputs,
-                temperature=temperature,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-                tools=tools,
-                response_format=response_format,
-                stream=stream,
-            )
-            for model_id in model_ids
-        ],
-    )
-    if stream:
-        return _stream_openai_chunked(completion.__stream__(), used_model, messages)
+
+    with capture_openai_content_policy_violation():
+        completion, used_model = try_all(
+            *[
+                _get_chat_completions_create(
+                    model=model_id,
+                    messages=messages_for_completion,
+                    max_tokens=max_tokens,
+                    max_completion_tokens=max_completion_tokens,
+                    stop=stop or NOT_GIVEN,
+                    n=num_outputs,
+                    temperature=temperature,
+                    frequency_penalty=frequency_penalty,
+                    presence_penalty=presence_penalty,
+                    tools=tools,
+                    response_format=response_format,
+                    stream=stream,
+                )
+                for model_id in model_ids
+            ],
+        )
+        if stream:
+            return _stream_openai_chunked(completion.__stream__(), used_model, messages)
+
     if not completion or not completion.choices:
         return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
     else:

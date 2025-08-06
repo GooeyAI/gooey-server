@@ -7,7 +7,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatten
 from recipes.CompareLLM import CompareLLMPage
 
-SAFETY_CHECKER_MSG = "Your request was rejected as a result of our safety system. Your input image may contain contents that are not allowed by our safety system."
+SAFETY_CHECKER_MSG = "Your request was rejected as a result of our safety system. Your input may contain contents that are not allowed by our safety system."
 
 
 def safety_checker(*, text: str | None = None, image: str | None = None):
@@ -65,6 +65,9 @@ def capture_openai_content_policy_violation():
     try:
         yield
     except openai.BadRequestError as e:
-        if e.response.status_code == 400 and "content_policy_violation" in e.message:
+        if e.response.status_code == 400 and e.code in (
+            "content_policy_violation",
+            "content_filter",
+        ):
             raise UserError(SAFETY_CHECKER_MSG) from e
         raise
