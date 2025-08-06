@@ -312,7 +312,7 @@ HEADER_LINKS = [
 ]
 
 SIDEBAR_LINKS = [
-    ("/explore/", "Explore", "<i class='fa-solid fa-magnifying-glass'></i>"),
+    ("/explore/", "Search", "<i class='fa-solid fa-magnifying-glass'></i>"),
     (DOCS_URL, "Docs", "<i class='fa-regular fa-book'></i>"),
     ("/api/", "API", "<i class='fa-regular fa-code'></i>"),
     (BLOG_URL, "Blog", "<i class='fa-regular fa-newspaper'></i>"),
