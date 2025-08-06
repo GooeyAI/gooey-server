@@ -251,7 +251,7 @@ def explore_page(
 ):
     from widgets import explore
 
-    with page_wrapper(request, search_filters=search_filters, show_search_bar=False):
+    with page_wrapper(request):
         explore.render(request, search_filters)
 
     return {
@@ -707,7 +707,11 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className="", page=None):
+def page_wrapper(
+    request: Request,
+    className="",
+    page=None,
+):
     context = {
         "request": request,
         "block_incognito": True,
@@ -840,35 +844,36 @@ def page_wrapper(request: Request, className="", page=None):
             gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
-def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
-    with gui.div(
-        className="d-flex d-md-none flex-grow-1 justify-content-end",
-    ):
-        gui.button(
-            icons.search,
-            type="tertiary",
-            className="m-0",
-            onClick=JS_SHOW_MOBILE_SEARCH,
-        )
+# def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
+#     with gui.div(
+#         className="d-flex d-md-none flex-grow-1 justify-content-end",
+#     ):
+#         gui.button(
+#             icons.search,
+#             type="tertiary",
+#             unsafe_allow_html=True,
+#             className="m-0",
+#             onClick=JS_SHOW_MOBILE_SEARCH,
+#         )
 
-    with (
-        gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
-        gui.div(
-            className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
-            style={"display": "none", "zIndex": "10"},
-            id="mobile_search_container",
-        ),
-    ):
-        render_search_bar_with_redirect(
-            request=request,
-            search_filters=search_filters or SearchFilters(),
-        )
-        gui.button(
-            "Cancel",
-            type="tertiary",
-            className="d-md-none fs-6 m-0 ms-1 p-1",
-            onClick=JS_HIDE_MOBILE_SEARCH,
-        )
+#     with (
+#         gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
+#         gui.div(
+#             className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
+#             style={"display": "none", "zIndex": "10"},
+#             id="mobile_search_container",
+#         ),
+#     ):
+#         render_search_bar_with_redirect(
+#             request=request,
+#             search_filters=search_filters or SearchFilters(),
+#         )
+#         gui.button(
+#             "Cancel",
+#             type="tertiary",
+#             className="d-md-none fs-6 m-0 ms-1 p-1",
+#             onClick=JS_HIDE_MOBILE_SEARCH,
+#         )
 
 
 JS_SHOW_MOBILE_SEARCH = """

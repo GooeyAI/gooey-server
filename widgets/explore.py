@@ -53,6 +53,7 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
 
 
 def render(request: Request, search_filters: SearchFilters | None):
+    sidebar_logo_header()
     with gui.div(className="my-4"):
         # note: using css instead of `if not search_filters: ...` stops re-render
         # of the search bar. this preserves focus/blur between query-param redirects
