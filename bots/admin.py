@@ -836,7 +836,7 @@ class FeedbackCommentInline(admin.StackedInline):
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ["message"]
-    list_filter = ["rating", "status", "message__conversation__bot_integration"]
+    list_filter = ["rating", "message__conversation__bot_integration"]
     search_fields = (
         ["text", "text_english"]
         + [f"message__{field}" for field in MessageAdmin.search_fields]
@@ -850,6 +850,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "prev_msg",
         "msg",
         "text",
+        "text_english",
         "created_at",
         "conversation_link",
     ]
@@ -896,12 +897,6 @@ class FeedbackAdmin(admin.ModelAdmin):
                     "messsage_display_content",
                     "text",
                 ),
-            },
-        ),
-        (
-            "Annotations",
-            {
-                "fields": ("category", "creator", "status"),
             },
         ),
     )

@@ -1,6 +1,5 @@
 import typing
 import uuid
-import random
 
 import gooey_gui as gui
 from django.core.exceptions import ValidationError
@@ -21,24 +20,22 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     if is_realtime_audio_url(audio_url):
         yield CallTransferLLMTool()
 
-    update_gui_state_params = (state.get("variables") or {}).get(
-        "update_gui_state_params"
-    )
+    variables = state.get("variables") or {}
+
+    update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
         yield UpdateGuiStateLLMTool(
-            update_gui_state_params.get("channel"),
-            update_gui_state_params.get("state"),
-            update_gui_state_params.get("page_slug"),
+            channel=update_gui_state_params.get("channel"),
+            state=update_gui_state_params.get("state"),
+            page_slug=update_gui_state_params.get("page_slug"),
         )
 
-    # Add feedback collection tool if needed
-    feedback_collection_params = (state.get("variables") or {}).get(
-        "feedback_collection_params"
-    )
-    if feedback_collection_params:
-        feedback_type = feedback_collection_params.get("feedback_type")
-        if feedback_type in ["thumbs_up", "thumbs_down"]:
-            yield FeedbackCollectionLLMTool(feedback_type)
+    collect_feedback = variables.get("collect_feedback")
+    if collect_feedback:
+        yield FeedbackCollectionLLMTool(
+            platform_msg_id=collect_feedback.get("last_bot_message_id"),
+            conversation_id=variables.get("conversation_id"),
+        )
 
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
@@ -176,43 +173,67 @@ class CallTransferLLMTool(BaseLLMTool):
 class FeedbackCollectionLLMTool(BaseLLMTool):
     """In-Built tool for collecting detailed feedback from users."""
 
-    # Predefined feedback messages for thumbs down
-    THUMBS_DOWN_MESSAGES = [
-        "🙏  Thank you. I'd love to know what was off about my answer.",
-        "🙏 Thanks for the feedback — anything to be improved?",
-        "✅ Noted — feel free to share what didn't work.",
-        "🤔 Appreciate the feedback — have any suggestions?",
-    ]
+    def __init__(self, platform_msg_id: str, conversation_id: str):
+        from bots.models.convo_msg import Feedback
 
-    def __init__(self, feedback_type: str):
-        self.feedback_type = feedback_type  # "thumbs_up" or "thumbs_down"
-
-        if feedback_type == "thumbs_up":
-            description = (
-                "Collect detailed feedback about what the user liked about the response"
-            )
-            instruction = "Ask the user what they liked about the response"
-        else:
-            description = "Collect detailed feedback about what was wrong with the response and how it could be improved"
-            instruction = "Ask the user for detailed feedback using one of the predefined messages"
+        self.platform_msg_id = platform_msg_id
+        self.conversation_id = conversation_id
 
         super().__init__(
             name="collect_feedback",
             label="Collect Feedback",
-            description=description,
+            description=(
+                "Collect and save any feedback from the user. "
+                "Use this when the user shares feedback about the quality of your response or corrections / comments on your response."
+            ),
             properties={
-                "feedback_question": {
+                "sentiment": {
                     "type": "string",
-                    "description": f"{instruction} and wait for their detailed response",
-                }
+                    "description": (
+                        "The sentiment of the user's last message. "
+                        "If the user is appreciating your response, choose positive. "
+                        "If the user is not happy, is criticizing or is correcting you, choose negative. "
+                        "If you are not sure, choose neutral. "
+                    ),
+                    "enum": Feedback.Rating.names,
+                },
+                "feedback_text": {
+                    "type": "string",
+                    "description": "The feedback text from the user. This will be used to improve the bot's response.",
+                },
             },
-            required=["feedback_question"],
+            required=["feedback_text"],
         )
 
-    def call(self, feedback_question: str) -> dict:
-        # Use the exact feedback question provided by the LLM
-        return {
-            "success": True,
-            "message": feedback_question,
-            "feedback_question": feedback_question,
-        }
+    def call(self, sentiment: str, feedback_text: str) -> dict:
+        from bots.models import Feedback, Message
+        from routers.bots_api import api_hashids
+
+        try:
+            last_msg = Message.objects.get(
+                platform_msg_id=self.platform_msg_id,
+                conversation_id=api_hashids.decode(self.conversation_id)[0],
+            )
+        except (IndexError, Message.DoesNotExist):
+            return {
+                "success": False,
+                "error": f"Message not found for platform_msg_id={self.platform_msg_id} and conversation_id={self.conversation_id}",
+            }
+
+        try:
+            rating = Feedback.Rating[sentiment]
+        except Feedback.DoesNotExist:
+            return {
+                "success": False,
+                "error": f"Invalid sentiment: {sentiment}. Must be one of {Feedback.Rating.names}",
+            }
+
+        try:
+            feedback = last_msg.feedbacks.get(rating=rating, text="", text_english="")
+        except Feedback.DoesNotExist:
+            feedback = Feedback(message=last_msg, rating=rating)
+
+        feedback.text_english = feedback_text
+        feedback.save()
+
+        return {"success": True}
