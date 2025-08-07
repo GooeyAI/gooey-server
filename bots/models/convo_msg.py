@@ -73,7 +73,7 @@ class ConversationQuerySet(models.QuerySet):
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all()
+        qs = self.all().select_related("bot_integration")
         rows = []
         for convo in qs[:row_limit]:
             convo: Conversation
@@ -420,7 +420,7 @@ class MessageQuerySet(models.QuerySet):
         conversations = defaultdict(list)
 
         qs = self.order_by("-created_at").prefetch_related(
-            "feedbacks", "conversation", "saved_run"
+            "feedbacks", "conversation", "saved_run", "conversation__bot_integration"
         )
         for message in qs[:row_limit]:
             message: Message
@@ -627,7 +627,9 @@ class FeedbackQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().prefetch_related("message", "message__conversation")
+        qs = self.all().prefetch_related(
+            "message", "message__conversation", "message__conversation__bot_integration"
+        )
         rows = []
         for feedback in qs[:10000]:
             feedback: Feedback
@@ -661,7 +663,9 @@ class FeedbackQuerySet(models.QuerySet):
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().prefetch_related("message", "message__conversation")
+        qs = self.all().prefetch_related(
+            "message", "message__conversation", "message__conversation__bot_integration"
+        )
         rows = []
         for feedback in qs[:row_limit]:
             feedback: Feedback
