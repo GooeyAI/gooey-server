@@ -120,6 +120,7 @@ class ConversationQuerySet(models.QuerySet):
             row |= {
                 "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
                 "Bot": str(convo.bot_integration),
+                "Integration Name": convo.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -140,6 +141,7 @@ class ConversationQuerySet(models.QuerySet):
                 "Delta Hours",
                 "Created At",
                 "Bot",
+                "Integration Name",
             ],
         )
         return df
@@ -402,6 +404,7 @@ class MessageQuerySet(models.QuerySet):
                 "Input Audio": row.get("input_audio"),
                 "User Message ID": row.get("user_message_id"),
                 "Conversation ID": row.get("conversation_id"),
+                "Integration Name": row.get("integration_name"),
             }
             for row in self.to_json(tz=tz, row_limit=row_limit)
             if row.get("sent")
@@ -458,6 +461,7 @@ class MessageQuerySet(models.QuerySet):
                             and message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
                         ),
                         "conversation_id": message.conversation.api_integration_id(),
+                        "integration_name": message.conversation.bot_integration.name,
                     }
                 )
 
@@ -675,6 +679,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)": feedback.text_english,
                 "Feedback (Local)": feedback.text,
                 "Run URL": feedback.message.saved_run.get_app_url(),
+                "Integration Name": feedback.message.conversation.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -690,6 +695,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)",
                 "Feedback (Local)",
                 "Run URL",
+                "Integration Name",
             ],
         )
         return df
