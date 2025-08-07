@@ -13,6 +13,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from widgets.workflow_search import (
     SearchFilters,
     render_search_bar_with_redirect,
+    get_filtered_published_runs,
     render_search_filters,
     render_search_results,
 )
@@ -62,6 +63,7 @@ def render(request: Request, search_filters: SearchFilters | None):
         )
 
         search_filters = search_filters or SearchFilters()
+        qs = get_filtered_published_runs(request.user, search_filters)
         render_search_bar_with_redirect(
             request=request,
             search_filters=search_filters,
@@ -69,7 +71,9 @@ def render(request: Request, search_filters: SearchFilters | None):
         )
         with gui.div(className="mt-3"):
             new_filters = render_search_filters(
-                current_user=request.user, search_filters=copy(search_filters)
+                current_user=request.user,
+                search_filters=copy(search_filters),
+                result_count=len(qs),
             )
             if new_filters != search_filters:
                 # if the search bar value has changed, redirect to the new search page
@@ -79,7 +83,7 @@ def render(request: Request, search_filters: SearchFilters | None):
 
     if search_filters:
         with gui.div(className="my-4"):
-            render_search_results(request.user, search_filters)
+            render_search_results(qs, request.user, search_filters)
             return
 
     for category, pages in all_home_pages_by_category.items():
