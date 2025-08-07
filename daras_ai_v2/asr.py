@@ -282,7 +282,7 @@ class AsrModels(Enum):
 
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
     lelapa = "Vulavula (Lelapa AI)"
-    whisper_sunbird_large_v3 = "Whisper Large v3 Salt (Sunbird AI)"
+    whisper_sunbird_large_v3 = "Sunbird Ugandan Whisper v3 (Sunbird AI)"
     whisper_swahili_medium_v3 = "Jacaranda Health Swahili Whisper v3 (Jacaranda Health)"
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
