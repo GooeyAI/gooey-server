@@ -89,6 +89,7 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
+from widgets.sidebar import render_default_sidebar, sidebar_logo_header
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -190,6 +191,9 @@ class BasePage:
 
         self.tab = tab
         self.request = request
+
+    def render_sidebar(self, request, sidebar_ref):
+        render_default_sidebar(request.session)
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -388,7 +392,8 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div(className="my-3 w-100")
+        sidebar_logo_header(self.request.session)
+        header_placeholder = gui.div(className="my-1 w-100")
         with (
             gui.styled(
                 """
