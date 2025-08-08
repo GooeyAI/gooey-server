@@ -1,14 +1,16 @@
 import mimetypes
 import random
+import traceback
 import typing
 from datetime import datetime
 
 import gooey_gui as gui
 import requests
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -432,10 +434,16 @@ def _process_and_send_msg(
         current_user=current_user,
         request_body=body,
     )
-    sr.platform = bot.platform
-    sr.user_message_id = bot.user_msg_id
-    sr.save(update_fields=["platform", "user_message_id"])
     bot.on_run_created(sr)
+
+    try:
+        sr.platform = bot.platform
+        sr.user_message_id = bot.user_msg_id
+        sr.save(update_fields=["platform", "user_message_id"])
+    except IntegrityError as e:
+        # Likely duplicate (platform, user_message_id). Log and proceed.
+        traceback.print_exc()
+        capture_exception(e)
 
     send_feedback_buttons = bot.show_feedback_buttons
 
