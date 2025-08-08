@@ -431,6 +431,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "updated_at",
         "run_status",
         "error_msg",
+        "platform",
     ]
     list_filter = [
         "workflow",
@@ -440,6 +441,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         ("error_msg", admin.EmptyFieldListFilter),
         "created_at",
         "retention_policy",
+        "platform",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version", "workspace"]

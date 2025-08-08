@@ -6,13 +6,11 @@ from django.core.exceptions import ValidationError
 from loguru import logger
 from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
-from twilio.twiml.voice_response import VoiceResponse
+from twilio.twiml.voice_response import Dial, VoiceResponse
 
 from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
 from functions.recipe_functions import BaseLLMTool, generate_tool_properties
-
-CALL_TRANSFER_TIMELIMIT = 60 * 60  # 1 hour
 
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
@@ -163,14 +161,7 @@ You can transfer the user's call to another phone number using this tool. Some e
         client = bi.get_twilio_client()
 
         resp = VoiceResponse()
-        resp.dial(
-            phone_number,
-            timeLimit=CALL_TRANSFER_TIMELIMIT,
-            action=get_api_route_url(twilio_voice_call_status),
-            method="POST",
-            status_callback=get_api_route_url(twilio_voice_call_status),
-            status_callback_event=["completed"],
-        )
+        resp.dial(phone_number, action=get_api_route_url(twilio_voice_call_status))
 
         try:
             # try to transfer the call

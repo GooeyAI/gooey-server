@@ -12,6 +12,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
 from bots.models import Conversation, BotIntegration
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import normalised_lang_in_collection
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import UserError
@@ -23,7 +24,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.twilio_bot import TwilioVoice
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.custom_api_router import CustomAPIRouter
-from daras_ai_v2.redis_cache import get_redis_cache
+from usage_costs.twilio_usage_cost import record_twilio_voice_call_cost
 
 DEFAULT_INITIAL_TEXT = "Welcome to {bot_name}! Please ask your question and press 0 if the end of your question isn't detected."
 DEFAULT_WAITING_AUDIO_URLS = [
@@ -246,21 +247,13 @@ def twilio_voice_call_wait(audio_url: str = None):
 
 @router.post("/__/twilio/voice/status/")
 def twilio_voice_call_status(data: dict = fastapi_request_urlencoded_body):
-    """Handle incoming Twilio voice call status update."""
-    is_bridged = data.get("DialBridged", [False])[0] == "true"
-    call_sid = None
-    duration_seconds = None
-    if is_bridged:
-        call_sid = data.get("DialCallSid")[0]
-        duration_seconds = data.get("DialCallDuration")[0]
-    else:
-        call_sid = data.get("CallSid")[0]
-        duration_seconds = data.get("CallDuration")[0]
+    logger.debug(data)
 
-    if call_sid and duration_seconds:
-        get_redis_cache().set(
-            f"gooey/twilio-call-duration/v1/{call_sid}", duration_seconds, ex=7200
-        )  # 2 hours
+    status = data["CallStatus"][0]
+    account_sid = data["AccountSid"][0]
+    # only record cost for completed calls from our account - don't record usage for customer accounts
+    if status == "completed" and account_sid == settings.TWILIO_ACCOUNT_SID:
+        record_twilio_voice_call_cost(data)
 
     return Response(status_code=204)
 
