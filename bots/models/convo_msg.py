@@ -119,7 +119,6 @@ class ConversationQuerySet(models.QuerySet):
                 pass
             row |= {
                 "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
-                "Bot": str(convo.bot_integration),
                 "Integration Name": convo.bot_integration.name,
             }
             rows.append(row)
@@ -140,7 +139,6 @@ class ConversationQuerySet(models.QuerySet):
                 "R30",
                 "Delta Hours",
                 "Created At",
-                "Bot",
                 "Integration Name",
             ],
         )
