@@ -1,54 +1,57 @@
+from __future__ import annotations
+
+import typing
+
 from loguru import logger
 
-from celeryapp.tasks import get_running_saved_run
-from usage_costs.models import (
-    UsageCost,
-    ModelSku,
-    ModelPricing,
-)
+
+if typing.TYPE_CHECKING:
+    from usage_costs.models import ModelSku, ModelPricing, UsageCost
+    from bots.models.saved_run import SavedRun
 
 
-def record_cost_auto(model: str, sku: ModelSku, quantity: int, **kwargs):
-    """
-    Record a usage cost for the given model and SKU.
+def record_cost_auto(model: str, sku: ModelSku, quantity: int) -> UsageCost | None:
+    from celeryapp.tasks import get_running_saved_run
 
-    Args:
-        model (str): The model ID.
-        sku (ModelSku): The SKU for the usage.
-        quantity (int): The quantity of usage.
-        **kwargs: Optional keyword arguments for special SKUs.
-            For ModelSku.ivr_call, must include:
-                - ivr_price_per_minute (float): Price per minute (required for IVR calls).
-    """
     sr = get_running_saved_run()
     if not sr:
-        return
+        return None
+    pricing = get_model_pricing(model, sku)
+    if not pricing:
+        return None
+    return create_usage_cost(
+        sr=sr,
+        pricing=pricing,
+        quantity=quantity,
+        unit_cost=pricing.unit_cost,
+        unit_quantity=pricing.unit_quantity,
+    )
+
+
+def get_model_pricing(model_id: str, sku: ModelSku) -> ModelPricing | None:
+    from usage_costs.models import ModelPricing
 
     try:
-        pricing = ModelPricing.objects.get(model_id=model, sku=sku)
-    except ModelPricing.DoesNotExist as e:
-        logger.warning(f"Cant find pricing for {model=} {sku=}: {e=}")
-        return
+        return ModelPricing.objects.get(model_id=model_id, sku=sku)
+    except ModelPricing.DoesNotExist:
+        logger.warning(f"Model pricing not found for model_id: {model_id}, sku: {sku}")
+        return None
 
-    match sku:
-        case ModelSku.ivr_call:
-            price_per_minute = kwargs.get("ivr_price_per_minute")
-            if price_per_minute is None:
-                raise ValueError(
-                    "ivr_price_per_minute is required for IVR call cost calculations"
-                )
-            dollar_amount = quantity * price_per_minute / 60
-            unit_cost_for_record = price_per_minute
 
-        case _:
-            dollar_amount = pricing.unit_cost * quantity / pricing.unit_quantity
-            unit_cost_for_record = pricing.unit_cost
+def create_usage_cost(
+    sr: SavedRun,
+    pricing: ModelPricing,
+    quantity: int,
+    unit_cost: float,
+    unit_quantity: int,
+) -> UsageCost:
+    from usage_costs.models import UsageCost
 
-    UsageCost.objects.create(
+    return UsageCost.objects.create(
         saved_run=sr,
         pricing=pricing,
         quantity=quantity,
-        unit_cost=unit_cost_for_record,
-        unit_quantity=pricing.unit_quantity,
-        dollar_amount=dollar_amount,
+        unit_cost=unit_cost,
+        unit_quantity=unit_quantity,
+        dollar_amount=unit_cost * quantity / unit_quantity,
     )

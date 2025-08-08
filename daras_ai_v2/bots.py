@@ -432,6 +432,9 @@ def _process_and_send_msg(
         current_user=current_user,
         request_body=body,
     )
+    sr.platform = bot.platform
+    sr.user_message_id = bot.user_msg_id
+    sr.save(update_fields=["platform", "user_message_id"])
     bot.on_run_created(sr)
 
     send_feedback_buttons = bot.show_feedback_buttons

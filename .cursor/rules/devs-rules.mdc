@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+---
+
+Make sure you always format code in reverse topological order, i.e. put the main() function at the top and the dependencies of the function below it.
+
+E.g.
+
+```python
+def main():
+    dependency1()
+
+def dependency1():
+    dependency2()
+    dependency3()
+
+def dependency2():
+    dependency3()
+
+def dependency3():
+    pass
+```
