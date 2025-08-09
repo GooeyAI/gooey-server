@@ -2,9 +2,9 @@ import json
 import math
 import typing
 from itertools import zip_longest
-import typing_extensions
 
 import gooey_gui as gui
+import typing_extensions
 from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
@@ -117,6 +117,10 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from usage_costs.twilio_usage_cost import (
+    get_non_ivr_price_credits,
+    get_ivr_price_credits_and_seconds,
+)
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
 
@@ -1055,7 +1059,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             gui.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+        total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -1063,6 +1067,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
+
+        if is_realtime_audio_url(state.get("input_audio")):
+            total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
 
         if state.get("input_face"):
             total += 1
@@ -1074,7 +1081,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
+
+        llm_cost = get_non_ivr_price_credits(self.current_sr)
+        notes = (
+            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+        )
 
         if (
             gui.session_state.get("tts_provider")
@@ -1082,8 +1093,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
 
+        if is_realtime_audio_url(gui.session_state.get("input_audio")):
+            credits, duration_sec = get_ivr_price_credits_and_seconds(self.current_sr)
+            if credits:
+                duration_min = math.ceil(int(duration_sec) / 60)
+                notes += f" + {credits} ({duration_min}min call)"
+
         if gui.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
+            notes += " + 1 (lipsync)"
 
         return notes
 
