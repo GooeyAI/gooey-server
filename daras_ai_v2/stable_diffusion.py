@@ -65,8 +65,7 @@ class Text2ImgModels(Enum):
 
     @classmethod
     def _available(cls):
-        deprecated_models = cls._deprecated()
-        return [model for model in cls if model not in deprecated_models]
+        return set(cls) - cls._deprecated()
 
     @classmethod
     def _deprecated(cls):
