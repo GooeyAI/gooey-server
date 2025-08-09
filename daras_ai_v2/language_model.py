@@ -84,6 +84,47 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.openai.com/docs/models/gpt-5
+    gpt_5 = LLMSpec(
+        label="GPT-5 (openai)",
+        model_id="gpt-5-2025-08-07",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-5-mini
+    gpt_5_mini = LLMSpec(
+        label="GPT-5 Mini (openai)",
+        model_id="gpt-5-mini-2025-08-07",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-5-nano
+    gpt_5_nano = LLMSpec(
+        label="GPT-5 Nano (openai)",
+        model_id="gpt-5-nano-2025-08-07",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    # https://platform.openai.com/docs/models/gpt-5-chat-latest
+    gpt_5_chat = LLMSpec(
+        label="GPT-5 Chat (openai)",
+        model_id="gpt-5-chat-latest",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
+
     # https://platform.openai.com/docs/models/gpt-4-1
     gpt_4_1 = LLMSpec(
         label="GPT-4.1 (openai)",
@@ -233,7 +274,7 @@ class LargeLanguageModels(Enum):
         model_id="gpt-4o-realtime-preview-2025-06-03",
         llm_api=LLMApis.openai_audio,
         context_window=128_000,
-        max_output_tokens=16_384,
+        max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
     )
@@ -243,7 +284,7 @@ class LargeLanguageModels(Enum):
         model_id="gpt-4o-mini-realtime-preview-2024-12-17",
         llm_api=LLMApis.openai_audio,
         context_window=128_000,
-        max_output_tokens=16_384,
+        max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
     )
@@ -1495,6 +1536,9 @@ def run_openai_chat(
         LargeLanguageModels.o3_mini,
         LargeLanguageModels.o3,
         LargeLanguageModels.o4_mini,
+        LargeLanguageModels.gpt_5,
+        LargeLanguageModels.gpt_5_mini,
+        LargeLanguageModels.gpt_5_nano,
     ]:
         # fuck you, openai
         for entry in messages_for_completion:
@@ -1532,14 +1576,21 @@ def run_openai_chat(
     else:
         frequency_penalty = 0
         presence_penalty = 0
-    if temperature is not None:
-        temperature = temperature
-    else:
+
+    # fuck you, openai
+    if temperature is None or model in [
+        LargeLanguageModels.gpt_5,
+        LargeLanguageModels.gpt_5_mini,
+        LargeLanguageModels.gpt_5_nano,
+        LargeLanguageModels.gpt_5_chat,
+    ]:
         temperature = NOT_GIVEN
+
     if tools:
         tools = [tool.spec_openai for tool in tools]
     else:
         tools = NOT_GIVEN
+
     if response_format_type:
         response_format = {"type": response_format_type}
     else:
