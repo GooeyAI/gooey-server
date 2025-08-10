@@ -111,6 +111,7 @@ from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
     render_called_functions,
+    render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
@@ -826,6 +827,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 buttons, text, disable_feedback = parse_bot_html(text)
             else:
                 buttons = []
+            text = "\n\n".join(
+                filter(
+                    None,
+                    [
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                        ),
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+                        ),
+                        text,
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.post
+                        ),
+                    ],
+                )
+            )
             messages.append(
                 dict(
                     role=CHATML_ROLE_ASSISTANT,
@@ -915,12 +933,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             ),
             messages=messages,
         )
-
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
-        render_called_functions(
-            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
-        )
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
 
     def _render_regenerate_button(self):
         pass
