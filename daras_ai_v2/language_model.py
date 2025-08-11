@@ -1327,17 +1327,6 @@ def _run_chat_model(
                     ),
                 },
             ]
-        # case LLMApis.together:
-        #     if tools:
-        #         raise UserError("Only OpenAI chat models support Tools")
-        #     return _run_together_chat(
-        #         model=model,
-        #         messages=messages,
-        #         max_tokens=max_tokens,
-        #         num_outputs=num_outputs,
-        #         temperature=temperature,
-        #         repetition_penalty=1.15 if avoid_repetition else 1,
-        #     )
         case _:
             raise UserError(f"Unsupported chat api: {model.llm_api}")
 
@@ -2035,75 +2024,6 @@ def _mistral_ref_chunk_to_str(chunk: dict) -> str | None:
     if ref_ids:
         return " [" + ", ".join(map(str, ref_ids)) + "]"
     return None
-
-
-# def _run_together_chat(
-#     *,
-#     model: str,
-#     messages: list[ConversationEntry],
-#     max_tokens: int,
-#     temperature: float,
-#     repetition_penalty: float,
-#     num_outputs: int,
-# ) -> list[ConversationEntry]:
-#     """
-#     Args:
-#         model: The model version to use for the request.
-#         messages: List of messages to generate model response. Will be converted to a single prompt.
-#         max_tokens: The maximum number of tokens to generate.
-#         temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
-#         repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
-#         num_outputs: The number of responses to generate.
-#     """
-#     results = map_parallel(
-#         lambda _: requests.post(
-#             "https://api.together.xyz/inference",
-#             json={
-#                 "model": model,
-#                 "prompt": build_llama_prompt(messages),
-#                 "max_tokens": max_tokens,
-#                 "stop": [B_INST],
-#                 "temperature": temperature,
-#                 "repetition_penalty": repetition_penalty,
-#             },
-#             headers={
-#                 "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
-#             },
-#         ),
-#         range(num_outputs),
-#     )
-#     ret = []
-#     prompt_tokens = 0
-#     completion_tokens = 0
-#     for r in results:
-#         raise_for_status(r)
-#         data = r.json()
-#         output = data["output"]
-#         error = output.get("error")
-#         if error:
-#             raise ValueError(error)
-#         ret.append(
-#             {
-#                 "role": CHATML_ROLE_ASSISTANT,
-#                 "content": output["choices"][0]["text"],
-#             }
-#         )
-#         prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
-#         completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
-#     from usage_costs.cost_utils import record_cost_auto
-#     from usage_costs.models import ModelSku
-#
-#     record_cost_auto(
-#         model=model,
-#         sku=ModelSku.llm_prompt,
-#         quantity=prompt_tokens,
-#     )
-#     record_cost_auto(
-#         model=model,
-#         sku=ModelSku.llm_completion,
-#         quantity=completion_tokens,
-#     )
-#     return ret
 
 
 gemini_role_map = {
