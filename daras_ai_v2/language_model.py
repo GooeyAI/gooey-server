@@ -86,7 +86,7 @@ class LLMSpec(typing.NamedTuple):
 class LargeLanguageModels(Enum):
     # https://platform.openai.com/docs/models/gpt-5
     gpt_5 = LLMSpec(
-        label="GPT-5 (openai)",
+        label="GPT-5 • openai",
         model_id="gpt-5-2025-08-07",
         llm_api=LLMApis.openai,
         context_window=400_000,
@@ -96,7 +96,7 @@ class LargeLanguageModels(Enum):
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
     gpt_5_mini = LLMSpec(
-        label="GPT-5 Mini (openai)",
+        label="GPT-5 Mini • openai",
         model_id="gpt-5-mini-2025-08-07",
         llm_api=LLMApis.openai,
         context_window=400_000,
@@ -106,7 +106,7 @@ class LargeLanguageModels(Enum):
     )
     # https://platform.openai.com/docs/models/gpt-5-nano
     gpt_5_nano = LLMSpec(
-        label="GPT-5 Nano (openai)",
+        label="GPT-5 Nano • openai",
         model_id="gpt-5-nano-2025-08-07",
         llm_api=LLMApis.openai,
         context_window=400_000,
@@ -116,7 +116,7 @@ class LargeLanguageModels(Enum):
     )
     # https://platform.openai.com/docs/models/gpt-5-chat-latest
     gpt_5_chat = LLMSpec(
-        label="GPT-5 Chat (openai)",
+        label="GPT-5 Chat • openai",
         model_id="gpt-5-chat-latest",
         llm_api=LLMApis.openai,
         context_window=400_000,
