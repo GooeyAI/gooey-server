@@ -15,18 +15,8 @@ import typing_extensions
 from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
 from loguru import logger
-from openai.types.chat import (
-    ChatCompletionContentPartParam,
-    ChatCompletionChunk,
-    ChatCompletion,
-    ChatCompletionMessageToolCallParam,
-)
 
-from daras_ai.image_input import (
-    gs_url_to_uri,
-    bytes_to_cv2_img,
-    cv2_img_to_bytes,
-)
+from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
@@ -34,6 +24,15 @@ from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import BaseLLMTool
+
+if typing.TYPE_CHECKING:
+    from openai.types.chat import (
+        ChatCompletionContentPartParam,
+        ChatCompletionChunk,
+        ChatCompletion,
+        ChatCompletionMessageToolCallParam,
+    )
+
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
@@ -1027,6 +1026,7 @@ def run_language_model(
     response_format_type: ResponseFormatType = None,
     audio_url: str | None = None,
     audio_session_extra: dict | None = None,
+    verbosity: typing.Literal["low", "medium", "high"] | None = None,
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
@@ -1088,6 +1088,7 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             tools=tools,
             response_format_type=response_format_type,
+            verbosity=verbosity,
             # we can't stream with tools or json yet
             stream=stream and not response_format_type,
             audio_url=audio_url,
@@ -1219,6 +1220,7 @@ def _run_chat_model(
     avoid_repetition: bool,
     tools: list[BaseLLMTool] | None,
     response_format_type: ResponseFormatType | None,
+    verbosity: typing.Literal["low", "medium", "high"] | None,
     stream: bool = False,
     audio_url: str | None = None,
     audio_session_extra: dict | None = None,
@@ -1271,6 +1273,7 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+                verbosity=verbosity,
                 stream=stream,
             )
         case LLMApis.gemini:
@@ -1513,6 +1516,7 @@ def run_openai_chat(
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
+    verbosity: typing.Literal["low", "medium", "high"] | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
@@ -1602,6 +1606,7 @@ def run_openai_chat(
                 presence_penalty=presence_penalty,
                 tools=tools,
                 response_format=response_format,
+                verbosity=verbosity,
                 stream=stream,
             )
             for model_id in model_ids

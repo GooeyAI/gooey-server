@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 import gooey_gui as gui
@@ -16,6 +18,7 @@ class LanguageModelSettings(BaseModel):
         None,
         title="Response Format",
     )
+    verbosity: Literal["low", "medium", "high"] | None = Field(None, title="Verbosity")
 
 
 def language_model_selector(
@@ -115,4 +118,14 @@ Generate multiple responses and choose the best one
                 min_value=1.0,
                 max_value=5.0,
                 step=0.1,
+            )
+
+    col1, col2 = gui.columns(2)
+    if any(llm.llm_api == LLMApis.openai for llm in llms):
+        with col1:
+            gui.selectbox(
+                f"###### {field_title_desc(LanguageModelSettings, 'verbosity')}",
+                options=[None, "low", "medium", "high"],
+                key="verbosity",
+                format_func=lambda s: s and s.capitalize() or BLANK_OPTION,
             )
