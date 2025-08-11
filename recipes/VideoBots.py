@@ -2,9 +2,9 @@ import json
 import math
 import typing
 from itertools import zip_longest
-import typing_extensions
 
 import gooey_gui as gui
+import typing_extensions
 from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
@@ -111,14 +111,19 @@ from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
     render_called_functions,
+    render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from usage_costs.twilio_usage_cost import (
+    get_non_ivr_price_credits,
+    get_ivr_price_credits_and_seconds,
+)
 from widgets.demo_button import render_demo_buttons_header
-
+from widgets.prompt_library import render_prompt_library
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -406,6 +411,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             style=dict(maxHeight="50vh"),
             help=field_desc(self.RequestModel, "bot_script"),
         )
+        render_prompt_library()
 
         language_model = language_model_selector(
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
@@ -702,7 +708,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         # language=JavaScript
         gui.js(
-            """document.querySelector("#recipe-nav-tabs")?.scrollIntoView({ behaviour: "smooth", block: "start"  })"""
+            """
+            let elem = document.querySelector("#recipe-nav-tabs");
+            if (!elem) return;
+            if (elem.scrollIntoViewIfNeeded) {
+                elem.scrollIntoViewIfNeeded(false);
+            } else {
+                elem.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            """
         )
 
     def render_output(self):
@@ -817,6 +831,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 buttons, text, disable_feedback = parse_bot_html(text)
             else:
                 buttons = []
+            text = "\n\n".join(
+                filter(
+                    None,
+                    [
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                        ),
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+                        ),
+                        text,
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.post
+                        ),
+                    ],
+                )
+            )
             messages.append(
                 dict(
                     role=CHATML_ROLE_ASSISTANT,
@@ -907,12 +938,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             messages=messages,
         )
 
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
-        render_called_functions(
-            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
-        )
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
-
     def _render_regenerate_button(self):
         pass
 
@@ -1002,24 +1027,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             gui.write("###### `references`")
             gui.json(references, collapseStringsAfterLength=False)
 
+        tools = list(
+            get_inbuilt_tools_from_state(gui.session_state),
+        )
         if gui.session_state.get("functions"):
             try:
-                tools = list(
+                tools += list(
                     get_workflow_tools_from_state(
                         gui.session_state, FunctionTrigger.prompt
                     ),
-                ) + list(
-                    get_inbuilt_tools_from_state(gui.session_state),
                 )
             except Exception:
-                tools = None
-            if tools:
-                gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-                gui.json(
-                    [tool.spec_function for tool in tools],
-                    depth=3,
-                    collapseStringsAfterLength=False,
-                )
+                pass
+        if tools:
+            gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+            gui.json(
+                [tool.spec_function for tool in tools],
+                depth=3,
+                collapseStringsAfterLength=False,
+            )
 
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
@@ -1045,7 +1071,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             gui.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+        total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -1053,6 +1079,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
+
+        if is_realtime_audio_url(state.get("input_audio")):
+            total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
 
         if state.get("input_face"):
             total += 1
@@ -1064,7 +1093,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
+
+        llm_cost = get_non_ivr_price_credits(self.current_sr)
+        notes = (
+            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+        )
 
         if (
             gui.session_state.get("tts_provider")
@@ -1072,8 +1105,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
 
+        if is_realtime_audio_url(gui.session_state.get("input_audio")):
+            credits, duration_sec = get_ivr_price_credits_and_seconds(self.current_sr)
+            if credits:
+                duration_min = math.ceil(int(duration_sec) / 60)
+                notes += f" + {credits} ({duration_min}min call)"
+
         if gui.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
+            notes += " + 1 (lipsync)"
 
         return notes
 
@@ -1558,7 +1597,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             integrations_q
         ).order_by("platform", "-created_at")
 
-        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).h1_title
+        run_title = get_title_breadcrumbs(VideoBotsPage, sr, pr).title_with_prefix()
 
         # no connected integrations on this run
         if not (integrations_qs and integrations_qs.exists()):

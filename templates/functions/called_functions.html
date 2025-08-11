@@ -1,0 +1,33 @@
+{# Renders a list of called functions with inputs and return values.
+Context:
+- called_functions: [
+    {
+      title: str,
+      url: str,
+      inputs: object,
+      return_value: object|None,
+    }
+  ]
+#}
+
+{% for item in called_functions %}
+<details>
+<summary>🧩 Called <strong>{{ item.title }}</strong></summary>
+<p><a target="_blank" href="{{ item.url }}">View Run</a></p>
+
+{% if item.inputs %}
+<strong>Inputs</strong>
+```json
+{{ item.inputs | tojson(indent=2) }}
+```
+{% endif %}
+
+{% if item.return_value is not none %}
+<strong>Return value</strong>
+```json
+{{ item.return_value | tojson(indent=2) }}
+```
+{% endif %}
+
+</details>
+{% endfor %}

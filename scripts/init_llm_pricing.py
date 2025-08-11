@@ -5,6 +5,44 @@ category = ModelCategory.LLM
 
 
 def run():
+    # gpt-5
+    llm_pricing_create(
+        model_id="gpt-5-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5.name,
+        unit_cost_input=1.25,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-mini-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5_mini.name,
+        unit_cost_input=0.25,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-mini",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-nano-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5_nano.name,
+        unit_cost_input=0.05,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-nano",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-chat-latest",
+        model_name=LargeLanguageModels.gpt_5_chat.name,
+        unit_cost_input=1.25,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-chat",
+    )
+
     # gpt-4.1
     llm_pricing_create(
         model_id="gpt-4.1-2025-04-14",
@@ -586,6 +624,15 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="google/gemini-2.5-pro",
+        model_name=LargeLanguageModels.gemini_2_5_pro.name,
+        unit_cost_input=1.25,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro",
+    )
+    llm_pricing_create(
         model_id="google/gemini-2.5-pro-preview-03-25",
         model_name=LargeLanguageModels.gemini_2_5_pro_preview.name,
         unit_cost_input=1.25,  # actually 2.5 when len(input) >= 200K
@@ -593,6 +640,15 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.google,
         pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro-preview",
+    )
+    llm_pricing_create(
+        model_id="google/gemini-2.5-flash",
+        model_name=LargeLanguageModels.gemini_2_5_flash.name,
+        unit_cost_input=0.30,
+        unit_cost_output=2.5,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash",
     )
     llm_pricing_create(
         model_id="google/gemini-2.5-flash-preview-04-17",

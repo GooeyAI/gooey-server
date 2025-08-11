@@ -115,7 +115,7 @@ def init_workflow_selector(
             url = pr.get_app_url()
         else:
             url = sr.get_app_url()
-        title = get_title_breadcrumbs(page_cls, sr, pr).h1_title
+        title = get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix()
 
         internal_state["workflow"] = workflow
         internal_state["url"] = url
@@ -134,7 +134,9 @@ def url_to_runs(
     page_cls = page_slug_map[normalize_slug(match.matched_params["page_slug"])]
     example_id, run_id, uid = extract_query_params(furl(url).query.params)
     sr, pr = page_cls.get_sr_pr_from_query_params(
-        example_id or match.matched_params.get("example_id"), run_id, uid
+        example_id=example_id or match.matched_params.get("example_id") or "",
+        run_id=run_id,
+        uid=uid,
     )
     return page_cls, sr, pr
 
@@ -165,7 +167,9 @@ def get_published_run_options(
         ),
     )
     options_dict = {
-        pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
+        pr.get_app_url(): get_title_breadcrumbs(
+            page_cls, pr.saved_run, pr
+        ).title_with_prefix()
         for pr in saved_runs_and_examples
     }
 

@@ -15,8 +15,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
-from workspaces.models import Workspace
-
+from . import Platform
 from .workflow import Workflow
 
 if typing.TYPE_CHECKING:
@@ -126,6 +125,11 @@ class SavedRun(models.Model):
 
     is_api_call = models.BooleanField(default=False)
 
+    platform = models.IntegerField(
+        choices=Platform.choices, null=True, blank=True, default=None
+    )
+    user_message_id = models.TextField(null=True, blank=True, default=None)
+
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:
@@ -133,6 +137,7 @@ class SavedRun(models.Model):
         unique_together = [
             ["workflow", "example_id"],
             ["run_id", "uid"],
+            ["platform", "user_message_id"],
         ]
         constraints = [
             models.CheckConstraint(
@@ -158,7 +163,7 @@ class SavedRun(models.Model):
 
         title = get_title_breadcrumbs(
             Workflow(self.workflow).page_cls, self, self.parent_published_run()
-        ).h1_title
+        ).title_with_prefix()
         return title or self.get_app_url()
 
     def parent_published_run(self) -> PublishedRun | None:

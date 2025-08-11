@@ -155,6 +155,8 @@ def get_top_k_references(
     from recipes.BulkRunner import url_to_runs
 
     input_docs = request.documents or []
+    if not input_docs:
+        return []
 
     if request.doc_extract_url:
         page_cls, sr, pr = url_to_runs(request.doc_extract_url)
@@ -574,6 +576,9 @@ def do_check_document_updates(
         list[tuple[dict, FileMetadata, list[tuple[str, FileMetadata]]]],
     ],
 ]:
+    if not input_docs:
+        return [], []
+
     lookups = {}
     q = Q()
     for f_url in input_docs:

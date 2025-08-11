@@ -124,7 +124,7 @@ def meta_title_for_page(
             parts = []
 
             tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
-            parts.append(tbreadcrumbs.h1_title)
+            parts.append(tbreadcrumbs.title_with_prefix())
 
             if (
                 pr
@@ -136,8 +136,6 @@ def meta_title_for_page(
             else:
                 # use the short title for non-root examples
                 part = metadata.short_title
-                if tbreadcrumbs.published_title:
-                    part = f"{pr.title} {part}"
                 # add the creator's name
                 user = sr.get_creator()
                 if user and user.display_name:

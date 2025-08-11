@@ -1,42 +1,85 @@
 import typing
+from copy import copy
 
 import gooey_gui as gui
+from starlette.requests import Request
 
-from app_users.models import AppUser
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
+from daras_ai_v2.meta_content import raw_build_meta_tags
 from widgets.workflow_search import (
     SearchFilters,
+    render_search_bar_with_redirect,
     render_search_filters,
     render_search_results,
 )
 
-META_TITLE = "Explore AI workflows"
+META_TITLE = "Explore AI Workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
 
 TITLE = "Explore"
 DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
-def render(user: AppUser | None, search_filters: SearchFilters | None):
-    heading(title=TITLE, description=DESCRIPTION, margin_bottom="1rem")
+def build_meta_tags(url: str, search_filters: SearchFilters | None):
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
-    new_filters = render_search_filters(
-        current_user=user, search_filters=search_filters
+    if not search_filters:
+        search_filters = SearchFilters()
+
+    match search_filters.search, search_filters.workflow:
+        case "", "":
+            title = META_TITLE
+        case query, "":
+            title = f"{query} AI Workflows"
+        case query, workflow:
+            page = page_slug_map.get(normalize_slug(workflow))
+            if page:
+                title = f"{query} {page.workflow.short_title} Workflows".lstrip()
+            else:
+                title = META_TITLE
+
+    title += " | Gooey.AI"
+
+    return raw_build_meta_tags(
+        url=url,
+        title=title,
+        description=META_DESCRIPTION,
     )
-    if search_filters and not new_filters:
-        # if the search bar is empty, redirect to the explore page
-        raise gui.QueryParamsRedirectException(dict())
-    if new_filters and new_filters != search_filters:
-        # if the search bar value has changed, redirect to the new search page
-        raise gui.QueryParamsRedirectException(new_filters.model_dump())
+
+
+def render(request: Request, search_filters: SearchFilters | None):
+    with gui.div(className="my-4"):
+        # note: using css instead of `if not search_filters: ...` stops re-render
+        # of the search bar. this preserves focus/blur between query-param redirects
+        gui.caption(
+            DESCRIPTION,
+            className="text-muted m-0",
+            style={"display": "none"} if search_filters else None,
+        )
+
+        search_filters = search_filters or SearchFilters()
+        render_search_bar_with_redirect(
+            request=request,
+            search_filters=search_filters,
+            max_width="600px",
+        )
+        with gui.div(className="mt-3"):
+            new_filters = render_search_filters(
+                current_user=request.user, search_filters=copy(search_filters)
+            )
+            if new_filters != search_filters:
+                # if the search bar value has changed, redirect to the new search page
+                raise gui.QueryParamsRedirectException(
+                    new_filters.model_dump(exclude_defaults=True)
+                )
 
     if search_filters:
         with gui.div(className="my-4"):
-            render_search_results(user, search_filters)
+            render_search_results(request.user, search_filters)
             return
 
     for category, pages in all_home_pages_by_category.items():
@@ -52,7 +95,7 @@ def render(user: AppUser | None, search_filters: SearchFilters | None):
 def heading(
     title: str, description: str, margin_top: str = "2rem", margin_bottom: str = "2rem"
 ):
-    with gui.tag("div", style={"marginTop": margin_top, "marginBottom": margin_bottom}):
+    with gui.div(style={"marginTop": margin_top, "marginBottom": margin_bottom}):
         with gui.tag(
             "p",
             style={"marginTop": "0rem", "marginBottom": "0rem"},

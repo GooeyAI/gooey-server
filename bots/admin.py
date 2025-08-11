@@ -282,6 +282,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "streaming_enabled",
                     "show_feedback_buttons",
+                    "disable_rate_limits",
                     "view_analysis_results",
                 ]
             },
@@ -430,6 +431,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "updated_at",
         "run_status",
         "error_msg",
+        "platform",
     ]
     list_filter = [
         "workflow",
@@ -439,6 +441,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         ("error_msg", admin.EmptyFieldListFilter),
         "created_at",
         "retention_policy",
+        "platform",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version", "workspace"]
@@ -835,7 +838,7 @@ class FeedbackCommentInline(admin.StackedInline):
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ["message"]
-    list_filter = ["rating", "status", "message__conversation__bot_integration"]
+    list_filter = ["rating", "message__conversation__bot_integration"]
     search_fields = (
         ["text", "text_english"]
         + [f"message__{field}" for field in MessageAdmin.search_fields]
@@ -849,6 +852,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "prev_msg",
         "msg",
         "text",
+        "text_english",
         "created_at",
         "conversation_link",
     ]
@@ -895,12 +899,6 @@ class FeedbackAdmin(admin.ModelAdmin):
                     "messsage_display_content",
                     "text",
                 ),
-            },
-        ),
-        (
-            "Annotations",
-            {
-                "fields": ("category", "creator", "status"),
             },
         ),
     )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import typing
 
@@ -7,6 +9,7 @@ from django.utils.text import slugify
 from app_users.models import AppUser
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.settings import templates
 from functions.models import CalledFunction, FunctionTrigger
 
 if typing.TYPE_CHECKING:
@@ -102,11 +105,11 @@ class WorkflowLLMTool(BaseLLMTool):
 
     def bind(
         self,
-        saved_run: "SavedRun",
-        workspace: "Workspace",
+        saved_run: SavedRun,
+        workspace: Workspace,
         current_user: AppUser,
-        request_model: typing.Type["BasePage.RequestModel"],
-        response_model: typing.Type["BasePage.ResponseModel"],
+        request_model: typing.Type[BasePage.RequestModel],
+        response_model: typing.Type[BasePage.ResponseModel],
         state: dict,
         trigger: FunctionTrigger,
     ) -> "WorkflowLLMTool":
@@ -229,11 +232,11 @@ def get_tool_from_call(
 
 def call_recipe_functions(
     *,
-    saved_run: "SavedRun",
-    workspace: "Workspace",
+    saved_run: SavedRun,
+    workspace: Workspace,
     current_user: AppUser,
-    request_model: typing.Type["BasePage.RequestModel"],
-    response_model: typing.Type["BasePage.ResponseModel"],
+    request_model: typing.Type[BasePage.RequestModel],
+    response_model: typing.Type[BasePage.ResponseModel],
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Iterable[str]:
@@ -356,52 +359,83 @@ def functions_input(current_user: AppUser, key="functions"):
         gui.session_state.pop(key, None)
 
 
-def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
-    from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
+    items = _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    if not items:
+        return
+    for item in items:
+        key = f"fn-call-details-{item['id']}"
+        with gui.expander(f"🧩 Called `{item['title']}`", key=key):
+            if not gui.session_state.get(key):
+                continue
+            gui.html(
+                f'<i class="fa-regular fa-external-link-square"></i> '
+                f'<a target="_blank" href="{item["url"]}">'
+                "Inspect Function Call"
+                "</a>"
+            )
+
+            gui.write("**Inputs**")
+            gui.json(item["inputs"])
+
+            if item["return_value"] is not None:
+                gui.write("**Return value**")
+                gui.json(item["return_value"])
+
+
+def render_called_functions_as_html(
+    *, saved_run: SavedRun, trigger: FunctionTrigger
+) -> str:
+    """Return HTML for functions called for a given run and trigger using a template."""
+    context_items = [
+        {
+            "title": item["title"],
+            "url": item["url"],
+            "inputs": item["inputs"],
+            "return_value": item["return_value"],
+        }
+        for item in _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    ]
+    if not context_items:
+        return ""
+
+    context = {"called_functions": context_items}
+    template = templates.get_template("functions/called_functions.html")
+    return template.render(context)
+
+
+def _get_called_functions_items(
+    *, saved_run: SavedRun, trigger: FunctionTrigger
+) -> typing.Iterable[dict]:
+    """Generate data for called functions for reuse across renderers."""
     from bots.models import Workflow
 
     if not is_functions_enabled():
         return
     qs = saved_run.called_functions.filter(trigger=trigger.db_value)
-    if not qs.exists():
-        return
     for called_fn in qs:
         fn_sr = called_fn.function_run
         page_cls = Workflow(fn_sr.workflow).page_cls
-        tb = get_title_breadcrumbs(
-            page_cls,
-            fn_sr,
-            fn_sr.parent_published_run(),
-        )
-        title = (
-            (tb.published_title and tb.published_title.title)
-            or (tb.root_title and tb.root_title.title)
-            or tb.h1_title
-        )
-        key = f"fn-call-details-{called_fn.id}"
-        with gui.expander(f"🧩 Called `{title}`", key=key):
-            if not gui.session_state.get(key):
-                continue
-            gui.html(
-                f'<i class="fa-regular fa-external-link-square"></i> <a target="_blank" href="{fn_sr.get_app_url()}">'
-                "Inspect Function Call"
-                "</a>"
-            )
 
-            if fn_sr.workflow == Workflow.FUNCTIONS:
-                fn_vars = fn_sr.state.get("variables", {})
-                fn_vars_schema = fn_sr.state.get("variables_schema", {})
-                inputs = {
-                    key: value
-                    for key, value in fn_vars.items()
-                    if fn_vars_schema.get(key, {}).get("role") != "system"
-                }
-            else:
-                inputs = page_cls.get_example_request(fn_sr.state)[1]
-            gui.write("**Inputs**")
-            gui.json(inputs)
+        pr = fn_sr.parent_published_run()
+        title = pr and pr.title or "Function"
 
-            return_value = fn_sr.state.get("return_value")
-            if return_value is not None:
-                gui.write("**Return value**")
-                gui.json(return_value)
+        if fn_sr.workflow == Workflow.FUNCTIONS:
+            fn_vars = fn_sr.state.get("variables", {})
+            fn_vars_schema = fn_sr.state.get("variables_schema", {})
+            inputs = {
+                key: value
+                for key, value in fn_vars.items()
+                if fn_vars_schema.get(key, {}).get("role") != "system"
+            }
+        else:
+            inputs = page_cls.get_example_request(fn_sr.state)[1]
+        return_value = fn_sr.state.get("return_value")
+
+        yield dict(
+            id=called_fn.id,
+            title=title,
+            url=fn_sr.get_app_url(),
+            inputs=inputs,
+            return_value=return_value,
+        )

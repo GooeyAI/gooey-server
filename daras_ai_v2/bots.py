@@ -1,13 +1,16 @@
 import mimetypes
+import random
+import traceback
 import typing
 from datetime import datetime
 
 import gooey_gui as gui
 import requests
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -16,17 +19,19 @@ from bots.models import (
     Conversation,
     Feedback,
     SavedRun,
-    ConvoState,
     Workflow,
     MessageAttachment,
     BotIntegration,
+    db_msgs_to_entries,
 )
+from bots.models.convo_msg import ConvoBlockedStatus
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
@@ -49,19 +54,22 @@ INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
 )
 
+
 ERROR_MSG = """
 ⚠️ Sorry, I ran into an error while processing your request. Please try again, or send "Reset" to start over.
 
 `{}`
 """.strip()
 
-FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
-FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
+FEEDBACK_THUMBS_DOWN_MSGS = [
+    "🙏  Thank you. I'd love to know what was off about my answer.",
+    "🙏 Thanks for the feedback — anything to be improved?",
+    "✅ Noted — feel free to share what didn't work.",
+    "🤔 Appreciate the feedback — have any suggestions?",
+]
 FEEDBACK_CONFIRMED_MSG = (
     "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
-
-TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 SLACK_MAX_SIZE = 3000
 
@@ -186,7 +194,7 @@ class BotInterface:
             text = ""
 
         if send_feedback_buttons:
-            buttons = _feedback_start_buttons()
+            buttons = _feedback_buttons()
 
         return self._send_msg(
             text=text,
@@ -298,8 +306,13 @@ def _echo(bot, input_text):
 
 
 def msg_handler(bot: BotInterface):
+    if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
+        return
     try:
-        _msg_handler(bot)
+        ensure_bot_rate_limits(bot.convo)
+        msg_handler_raw(bot)
+    except RateLimitExceeded as e:
+        bot.send_msg(text=e.detail["error"])
     except Exception as e:
         # send error msg as response
         bot.send_msg(text=ERROR_MSG.format(e))
@@ -307,7 +320,7 @@ def msg_handler(bot: BotInterface):
 
 
 @db_middleware
-def _msg_handler(bot: BotInterface):
+def msg_handler_raw(bot: BotInterface):
     recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
@@ -360,17 +373,8 @@ def _msg_handler(bot: BotInterface):
     if input_text.lower().strip("/ ") in RESET_KEYWORDS:
         # record the reset time so we don't send context
         bot.convo.reset_at = timezone.now()
-        # reset convo state
-        bot.convo.state = ConvoState.INITIAL
-        bot.convo.save()
         # let the user know we've reset
         bot.send_msg(text=RESET_MSG)
-    # handle feedback submitted
-    elif bot.convo.state in [
-        ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP,
-        ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN,
-    ]:
-        _handle_feedback_msg(bot, input_text)
     else:
         _process_and_send_msg(
             workspace=bot.workspace,
@@ -382,28 +386,6 @@ def _msg_handler(bot: BotInterface):
             input_audio=input_audio,
             recieved_time=recieved_time,
         )
-
-
-def _handle_feedback_msg(bot: BotInterface, input_text):
-    last_feedback = Feedback.objects.filter(message__conversation=bot.convo).latest()
-    # save the feedback
-    last_feedback.text = input_text
-    # translate feedback to english
-    last_feedback.text_english = " ".join(
-        run_google_translate([input_text], "en", glossary_url=bot.input_glossary)
-    )
-    last_feedback.save()
-    # send back a confirmation msg
-    bot.show_feedback_buttons = False  # don't show feedback for this confirmation
-    bot_name = str(bot.bi.name)
-    # reset convo state
-    bot.convo.state = ConvoState.INITIAL
-    bot.convo.save()
-    # let the user know we've received their feedback
-    bot.send_msg(
-        text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
-        should_translate=True,
-    )
 
 
 def _process_and_send_msg(
@@ -418,9 +400,13 @@ def _process_and_send_msg(
     recieved_time: datetime,
 ):
     # get latest messages for context
-    saved_msgs = bot.convo.msgs_for_llm_context()
+    saved_msgs = bot.convo.last_n_msgs()
 
-    system_vars, system_vars_schema = build_system_vars(bot.convo, bot.user_msg_id)
+    system_vars, system_vars_schema = build_system_vars(
+        bot.convo,
+        bot.user_msg_id,
+        saved_msgs and saved_msgs[-1] or None,
+    )
     state = bot.saved_run.state
     variables = (state.get("variables") or {}) | system_vars
     variables_schema = (state.get("variables_schema") or {}) | system_vars_schema
@@ -429,7 +415,7 @@ def _process_and_send_msg(
         input_audio=input_audio,
         input_images=input_images,
         input_documents=input_documents,
-        messages=saved_msgs,
+        messages=db_msgs_to_entries(saved_msgs),
         variables=variables,
         variables_schema=variables_schema,
     )
@@ -449,6 +435,15 @@ def _process_and_send_msg(
         request_body=body,
     )
     bot.on_run_created(sr)
+
+    try:
+        sr.platform = bot.platform
+        sr.user_message_id = bot.user_msg_id
+        sr.save(update_fields=["platform", "user_message_id"])
+    except IntegrityError as e:
+        # Likely duplicate (platform, user_message_id). Log and proceed.
+        traceback.print_exc()
+        capture_exception(e)
 
     send_feedback_buttons = bot.show_feedback_buttons
 
@@ -549,7 +544,9 @@ def _process_and_send_msg(
     )
 
 
-def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict]:
+def build_system_vars(
+    convo: Conversation, user_msg_id: str, last_msg: Message | None
+) -> tuple[dict, dict]:
     from routers.bots_api import MSG_ID_PREFIX
 
     bi = convo.bot_integration
@@ -562,6 +559,12 @@ def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict
         conversation_id=convo.api_integration_id(),
         user_message_id=user_msg_id,
     )
+
+    if bi.ask_detailed_feedback and last_msg and last_msg.platform_msg_id:
+        variables["collect_feedback"] = dict(
+            last_bot_message_id=last_msg.platform_msg_id
+        )
+
     match bi.platform:
         case Platform.FACEBOOK:
             variables["user_fb_page_name"] = convo.fb_page_name
@@ -589,6 +592,7 @@ def build_system_vars(convo: Conversation, user_msg_id: str) -> tuple[dict, dict
             variables["bot_twilio_phone_number"] = (
                 bi.twilio_phone_number and bi.twilio_phone_number.as_international
             )
+
     variables_schema = {var: {"role": "system"} for var in variables}
     return variables, variables_schema
 
@@ -640,56 +644,69 @@ def _save_msgs(
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
     match button.button_id:
-        # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
-            context_msg = Message.objects.get(
-                platform_msg_id=button.context_msg_id, conversation=bot.convo
-            )
-            if button.button_id == ButtonIds.feedback_thumbs_up:
-                rating = Feedback.Rating.RATING_THUMBS_UP
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                # response_text = FEEDBACK_THUMBS_UP_MSG
-            else:
-                rating = Feedback.Rating.RATING_THUMBS_DOWN
-                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                # response_text = FEEDBACK_THUMBS_DOWN_MSG
-            response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=str(bot.bi.name))
-            bot.convo.save()
-            # save the feedback
-            Feedback.objects.create(message=context_msg, rating=rating)
-            # send a confirmation msg + post click buttons
-            bot.send_msg(
-                text=response_text,
-                # buttons=_feedback_post_click_buttons(),
-                should_translate=True,
-            )
+            _handle_feedback_button_press(bot, button)
             return True
-
-        # handle skip
-        case ButtonIds.action_skip:
-            bot.send_msg(text=TAPPED_SKIP_MSG, should_translate=True)
-            # reset state
-            bot.convo.state = ConvoState.INITIAL
-            bot.convo.save()
-            return True
-
-        # not sure what button was pressed, ignore
         case _:
-            import glom
-
-            # encoded by parse_html
-            target, title = None, None
-            parts = csv_decode_row(button.button_id)
-            if len(parts) >= 3:
-                target = parts[1]
-                title = parts[-1]
-            bot.request_overrides = bot.request_overrides or {}
-            glom.assign(
-                bot.request_overrides,
-                target or "input_prompt",
-                title or button.button_title,
-            )
+            _handle_generic_button_press(bot, button)
             return False
+
+
+class ButtonIds:
+    feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
+    feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
+
+
+def _feedback_buttons() -> list[ReplyButton]:
+    """
+    Buttons to show for collecting feedback after the bot has sent a response
+    """
+    return [
+        {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
+        {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
+    ]
+
+
+def _handle_feedback_button_press(bot: BotInterface, button: ButtonPressed):
+    if button.button_id == ButtonIds.feedback_thumbs_up:
+        rating = Feedback.Rating.POSITIVE
+    else:
+        rating = Feedback.Rating.NEGATIVE
+
+    # save the feedback
+    context_msg = Message.objects.get(
+        platform_msg_id=button.context_msg_id, conversation=bot.convo
+    )
+    Feedback.objects.create(message=context_msg, rating=rating)
+
+    # For thumbs down, check if detailed feedback is enabled and accordingly trigger tool call
+    if (
+        bot.bi.ask_detailed_feedback
+        and button.button_id == ButtonIds.feedback_thumbs_down
+    ):
+        response_text = random.choice(FEEDBACK_THUMBS_DOWN_MSGS)
+    else:
+        response_text = FEEDBACK_CONFIRMED_MSG
+
+    # send a confirmation msg
+    bot.send_msg(
+        text=response_text.format(bot_name=str(bot.bi.name)), should_translate=True
+    )
+
+
+def _handle_generic_button_press(bot: BotInterface, button: ButtonPressed):
+    import glom
+
+    # encoded by parse_html
+    target, title = None, None
+    parts = csv_decode_row(button.button_id)
+    if len(parts) >= 3:
+        target = parts[1]
+        title = parts[-1]
+    bot.request_overrides = bot.request_overrides or {}
+    glom.assign(
+        bot.request_overrides, target or "input_prompt", title or button.button_title
+    )
 
 
 def handle_location_msg(input_location: dict[str, float]) -> str:
@@ -712,28 +729,3 @@ def handle_location_msg(input_location: dict[str, float]) -> str:
         input_text += f"Geocoding Response: {formatted_address}"
 
     return input_text
-
-
-class ButtonIds:
-    action_skip = "ACTION_SKIP"
-    feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
-    feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
-
-
-def _feedback_post_click_buttons() -> list[ReplyButton]:
-    """
-    Buttons to show after the user has clicked on a feedback button
-    """
-    return [
-        {"id": ButtonIds.action_skip, "title": "🔀 Skip"},
-    ]
-
-
-def _feedback_start_buttons() -> list[ReplyButton]:
-    """
-    Buttons to show for collecting feedback after the bot has sent a response
-    """
-    return [
-        {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
-        {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
-    ]

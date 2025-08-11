@@ -26,10 +26,10 @@ if typing.TYPE_CHECKING:
     import pandas as pd
 
 
-class ConvoState(models.IntegerChoices):
-    INITIAL = 0, "Initial"
-    ASK_FOR_FEEDBACK_THUMBS_UP = 1, "Ask for feedback (👍)"
-    ASK_FOR_FEEDBACK_THUMBS_DOWN = 2, "Ask for feedback (👎)"
+class ConvoBlockedStatus(models.IntegerChoices):
+    NORMAL = 0, "Normal"
+    WARNING = 1, "Warning"
+    BLOCKED = 2, "Blocked"
 
 
 class ConversationQuerySet(models.QuerySet):
@@ -73,7 +73,7 @@ class ConversationQuerySet(models.QuerySet):
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all()
+        qs = self.all().select_related("bot_integration")
         rows = []
         for convo in qs[:row_limit]:
             convo: Conversation
@@ -84,10 +84,10 @@ class ConversationQuerySet(models.QuerySet):
                     analysis_result__contains={"Answered": True}
                 ).count(),
                 "Thumbs up": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_UP
+                    feedbacks__rating=Feedback.Rating.POSITIVE
                 ).count(),
                 "Thumbs down": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_DOWN
+                    feedbacks__rating=Feedback.Rating.NEGATIVE
                 ).count(),
             }
             try:
@@ -119,7 +119,7 @@ class ConversationQuerySet(models.QuerySet):
                 pass
             row |= {
                 "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
-                "Bot": str(convo.bot_integration),
+                "Integration Name": convo.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -139,7 +139,7 @@ class ConversationQuerySet(models.QuerySet):
                 "R30",
                 "Delta Hours",
                 "Created At",
-                "Bot",
+                "Integration Name",
             ],
         )
         return df
@@ -148,11 +148,6 @@ class ConversationQuerySet(models.QuerySet):
 class Conversation(models.Model):
     bot_integration = models.ForeignKey(
         "BotIntegration", on_delete=models.CASCADE, related_name="conversations"
-    )
-
-    state = models.IntegerField(
-        choices=ConvoState.choices,
-        default=ConvoState.INITIAL,
     )
 
     fb_page_id = models.TextField(
@@ -244,6 +239,17 @@ class Conversation(models.Model):
         default=None,
         null=True,
         help_text="User's web user id (mandatory if platform is WEB)",
+    )
+
+    blocked_status = models.IntegerField(
+        choices=ConvoBlockedStatus.choices,
+        default=ConvoBlockedStatus.NORMAL,
+    )
+    blocked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Timestamp when the conversation was blocked.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -342,8 +348,11 @@ class Conversation(models.Model):
     d30.short_description = "D30"
     d30.boolean = True
 
-    def msgs_for_llm_context(self):
-        return self.messages.all().as_llm_context(reset_at=self.reset_at)
+    def last_n_msgs_as_entries(self) -> list["ConversationEntry"]:
+        return self.messages.all().last_n_msgs_as_entries(reset_at=self.reset_at)
+
+    def last_n_msgs(self) -> list["Message"]:
+        return self.messages.all().last_n_msgs(reset_at=self.reset_at)
 
     def api_integration_id(self) -> str:
         from routers.bots_api import api_hashids
@@ -387,11 +396,13 @@ class MessageQuerySet(models.QuerySet):
                 "Analysis Result": row.get("analysis_result"),
                 "Feedback": row.get("feedback"),
                 "Run Time": row.get("run_time_sec"),
+                "Credits Used": row.get("credits_used", 0),
                 "Run URL": row.get("run_url"),
                 "Input Images": ", ".join(row.get("input_images") or []),
                 "Input Audio": row.get("input_audio"),
                 "User Message ID": row.get("user_message_id"),
                 "Conversation ID": row.get("conversation_id"),
+                "Integration Name": row.get("integration_name"),
             }
             for row in self.to_json(tz=tz, row_limit=row_limit)
             if row.get("sent")
@@ -407,7 +418,7 @@ class MessageQuerySet(models.QuerySet):
         conversations = defaultdict(list)
 
         qs = self.order_by("-created_at").prefetch_related(
-            "feedbacks", "conversation", "saved_run"
+            "feedbacks", "conversation", "saved_run", "conversation__bot_integration"
         )
         for message in qs[:row_limit]:
             message: Message
@@ -427,6 +438,7 @@ class MessageQuerySet(models.QuerySet):
                 if saved_run:
                     row["run_time_sec"] = int(saved_run.run_time.total_seconds())
                     row["run_url"] = saved_run.get_app_url()
+                    row["credits_used"] = saved_run.price or 0
                     input_images = saved_run.state.get("input_images")
                     if input_images:
                         row["input_images"] = input_images
@@ -447,6 +459,7 @@ class MessageQuerySet(models.QuerySet):
                             and message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
                         ),
                         "conversation_id": message.conversation.api_integration_id(),
+                        "integration_name": message.conversation.bot_integration.name,
                     }
                 )
 
@@ -459,22 +472,31 @@ class MessageQuerySet(models.QuerySet):
             if "user_message" in row and "assistant_message" in row
         ]
 
-    def as_llm_context(
-        self, limit: int = 50, reset_at: datetime.datetime = None
+    def last_n_msgs_as_entries(
+        self, n: int = 50, reset_at: datetime.datetime = None
     ) -> list["ConversationEntry"]:
+        return db_msgs_to_entries(self.last_n_msgs(n, reset_at))
+
+    def last_n_msgs(
+        self, n: int = 50, reset_at: datetime.datetime = None
+    ) -> list["Message"]:
         if reset_at:
             self = self.filter(created_at__gt=reset_at)
-        msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
-        entries = [None] * len(msgs)
-        for i, msg in enumerate(reversed(msgs)):
-            entries[i] = format_chat_entry(
-                role=msg.role,
-                content_text=msg.content,
-                input_images=msg.attachments.filter(
-                    metadata__mime_type__startswith="image/"
-                ).values_list("url", flat=True),
-            )
-        return entries
+        msgs = self.order_by("-created_at").prefetch_related("attachments")[:n]
+        return list(reversed(msgs))
+
+
+def db_msgs_to_entries(msgs: list["Message"]) -> list["ConversationEntry"]:
+    entries = [None] * len(msgs)
+    for i, msg in enumerate(msgs):
+        entries[i] = format_chat_entry(
+            role=msg.role,
+            content_text=msg.content,
+            input_images=msg.attachments.filter(
+                metadata__mime_type__startswith="image/"
+            ).values_list("url", flat=True),
+        )
+    return entries
 
 
 class Message(models.Model):
@@ -603,7 +625,9 @@ class FeedbackQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().prefetch_related("message", "message__conversation")
+        qs = self.all().prefetch_related(
+            "message", "message__conversation", "message__conversation__bot_integration"
+        )
         rows = []
         for feedback in qs[:10000]:
             feedback: Feedback
@@ -637,7 +661,9 @@ class FeedbackQuerySet(models.QuerySet):
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().prefetch_related("message", "message__conversation")
+        qs = self.all().prefetch_related(
+            "message", "message__conversation", "message__conversation__bot_integration"
+        )
         rows = []
         for feedback in qs[:row_limit]:
             feedback: Feedback
@@ -655,6 +681,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)": feedback.text_english,
                 "Feedback (Local)": feedback.text,
                 "Run URL": feedback.message.saved_run.get_app_url(),
+                "Integration Name": feedback.message.conversation.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -670,6 +697,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)",
                 "Feedback (Local)",
                 "Run URL",
+                "Integration Name",
             ],
         )
         return df
@@ -681,51 +709,16 @@ class Feedback(models.Model):
     )
 
     class Rating(models.IntegerChoices):
-        RATING_THUMBS_UP = 1, "👍🏾"
-        RATING_THUMBS_DOWN = 2, "👎🏾"
+        POSITIVE = 1, "👍🏾"
+        NEGATIVE = 2, "👎🏾"
+        NEUTRAL = 3, "🤔"
 
-    class FeedbackCategory(models.IntegerChoices):
-        UNSPECIFIED = 1, "Unspecified"
-        INCOMING = 2, "Incoming"
-        TRANSLATION = 3, "Translation"
-        RETRIEVAL = 4, "Retrieval"
-        SUMMARIZATION = 5, "Summarization"
-        TRANSLATION_OF_ANSWER = 6, "Translation of answer"
-
-    class FeedbackCreator(models.IntegerChoices):
-        UNSPECIFIED = 1, "Unspecified"
-        USER = 2, "User"
-        FARMER = 3, "Farmer"
-        AGENT = 4, "Agent"
-        ADMIN = 5, "Admin"
-        GOOEY_TEAM_MEMBER = 6, "Gooey team member"
-
-    class Status(models.IntegerChoices):
-        UNTRIAGED = 1, "Untriaged"
-        TEST = 2, "Test"
-        NEEDS_INVESTIGATION = 3, "Needs investigation"
-        RESOLVED = 4, "Resolved"
-
-    rating = models.IntegerField(
-        choices=Rating.choices,
-    )
+    rating = models.IntegerField(choices=Rating.choices)
     text = models.TextField(
         blank=True, default="", verbose_name="Feedback Text (Original)"
     )
     text_english = models.TextField(
         blank=True, default="", verbose_name="Feedback Text (English)"
-    )
-    status = models.IntegerField(
-        choices=Status.choices,
-        default=Status.UNTRIAGED,
-    )
-    category = models.IntegerField(
-        choices=FeedbackCategory.choices,
-        default=FeedbackCategory.UNSPECIFIED,
-    )
-    creator = models.IntegerField(
-        choices=FeedbackCreator.choices,
-        default=FeedbackCreator.UNSPECIFIED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -22,6 +22,7 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -299,14 +300,13 @@ BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 
 HEADER_LINKS = [
-    ("/explore/", "Explore"),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
     (BLOG_URL, "Blog"),
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
+HEADER_ICONS = {}
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
@@ -486,6 +486,9 @@ MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)
 MAX_RPM_ANON = config("MAX_RPM_ANON", 3, cast=int)
 MAX_RPM_FREE = config("MAX_RPM_FREE", 6, cast=int)
 MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
+
+MAX_MESSAGES_PER_DAY_WARNING = config("MAX_MESSAGES_PER_DAY_WARN", 50, cast=int)
+MAX_MESSAGES_PER_DAY_BLOCK = config("MAX_MESSAGES_PER_DAY_BLOCK", 100, cast=int)
 
 DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
 DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")

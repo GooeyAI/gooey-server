@@ -1,4 +1,5 @@
 import typing
+import html
 
 import gooey_gui as gui
 from furl import furl
@@ -18,7 +19,12 @@ SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
 def global_workspace_selector(user: AppUser, session: dict):
-    from routers.account import profile_route, saved_route
+    from routers.account import (
+        members_route,
+        profile_route,
+        explore_in_current_workspace,
+    )
+    from routers.root import explore_page, logout
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -29,7 +35,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     if switch_workspace_id := gui.session_state.pop(SWITCH_WORKSPACE_KEY, None):
         try:
             if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
-                raise gui.RedirectException(get_route_path(saved_route))
+                raise gui.RedirectException(get_route_path(members_route))
         except KeyError:
             pass
         set_current_workspace(session, int(switch_workspace_id))
@@ -41,7 +47,8 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    popover, content = gui.popover(interactive=True, placement="bottom")
+    with gui.styled("& button { padding-top: 5px; }"), gui.div():
+        popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
@@ -51,15 +58,14 @@ def global_workspace_selector(user: AppUser, session: dict):
                 display_name = "Personal"
         else:
             display_name = current.display_name(user)
-        gui.html(
-            " ".join(
-                [
-                    current.html_icon(),
-                    display_name,
-                    '<i class="ps-1 fa-regular fa-chevron-down"></i>',
-                ],
-            ),
-        )
+        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
+            gui.html(f"{current.html_icon()}")
+            gui.html(
+                html.escape(display_name),
+                className="d-none d-md-inline text-truncate",
+                style={"maxWidth": "150px"},
+            )
+            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
 
     with (
         content,
@@ -110,7 +116,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         else:
             gui.html('<hr class="my-1"/>')
             with gui.link(
-                to=get_route_path(saved_route),
+                to=get_route_path(members_route),
                 className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
                 style=dict(height=row_height),
             ):
@@ -125,64 +131,66 @@ def global_workspace_selector(user: AppUser, session: dict):
 
         gui.html('<hr class="my-1"/>')
 
-        with gui.link(
-            to=get_route_path(profile_route),
-            className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-            style=dict(height=row_height),
-        ):
-            with gui.div(className="row align-items-center"):
-                with gui.div(className="col-2 d-flex justify-content-center"):
-                    gui.html(icons.profile)
-                with gui.div(
-                    className="col-10 d-flex justify-content-between align-items-end"
-                ):
+        workspace_selector_link(
+            url=get_route_path(profile_route),
+            icon=icons.profile,
+            label="Profile",
+            caption=(
+                user.email
+                or str(user.phone_number and obscure_phone_number(user.phone_number))
+            ),
+        )
+
+        with gui.div(className="d-xl-none d-inline-block"):
+            workspace_selector_link(
+                url=get_route_path(explore_page), icon=icons.search, label="Explore"
+            )
+            for url, label in settings.HEADER_LINKS:
+                workspace_selector_link(
+                    url=url,
+                    label=label,
+                    icon=settings.HEADER_ICONS.get(url),
+                )
+            workspace_selector_link(
+                url=get_route_path(explore_in_current_workspace),
+                icon=icons.save,
+                label="Saved",
+            )
+
+        workspace_selector_link(
+            url=get_route_path(logout), label="Log out", icon=icons.sign_out
+        )
+
+    return current
+
+
+def workspace_selector_link(
+    url: str,
+    label: str,
+    caption: str | None = None,
+    icon: str | None = None,
+    row_height: str = "2.2rem",
+):
+    with gui.tag(
+        "a",
+        href=url,
+        className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
+        style=dict(height=row_height),
+    ):
+        with gui.div(className="row align-items-center"):
+            with gui.div(className="col-2 d-flex justify-content-center"):
+                if icon:
+                    gui.html(icon)
+            with gui.div(
+                className="col-10 d-flex justify-content-between align-items-end"
+            ):
+                gui.html(label)
+                if caption:
                     gui.html(
-                        "Profile",
-                        className="d-inline-block",
-                    )
-                    gui.html(
-                        user.email
-                        or str(
-                            user.phone_number
-                            and obscure_phone_number(user.phone_number)
-                        ),
+                        caption,
                         className="d-inline-block text-muted small ms-2",
                         style=dict(marginBottom="0.1rem"),
                     )
-
-        with gui.div(className="d-lg-none d-inline-block"):
-            for url, label in settings.HEADER_LINKS:
-                with gui.tag(
-                    "a",
-                    href=url,
-                    className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-                    style=dict(height=row_height),
-                ):
-                    col1, col2 = gui.columns(
-                        [2, 10], responsive=False, className="row align-items-center"
-                    )
-                    if icon := settings.HEADER_ICONS.get(url):
-                        with (
-                            col1,
-                            gui.div(className="d-flex justify-content-center"),
-                        ):
-                            gui.html(icon)
-                    with col2:
-                        gui.html(label)
-
-        with gui.tag(
-            "a",
-            href="/logout/",
-            className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-            style=dict(height=row_height),
-        ):
-            with gui.div(className="row align-items-center"):
-                with gui.div(className="col-2 d-flex justify-content-center"):
-                    gui.html(icons.sign_out)
-                with gui.div(className="col-10"):
-                    gui.html("Log out")
-
-    return current
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:

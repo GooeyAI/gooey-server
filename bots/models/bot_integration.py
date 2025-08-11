@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing
+
 import phonenumber_field.formfields
 import phonenumber_field.modelfields
 from django.conf import settings
@@ -13,13 +15,14 @@ from furl import furl
 
 from app_users.models import AppUser
 from bots.custom_fields import CustomURLField
+from bots.models.workflow import WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_api_route_url, get_app_route_url
 from managed_secrets.models import ManagedSecret
-from workspaces.models import Workspace
-from .published_run import PublishedRun
-from .saved_run import SavedRun
-from bots.models.workflow import WorkflowAccessLevel
+
+if typing.TYPE_CHECKING:
+    from .published_run import PublishedRun
+    from .saved_run import SavedRun
 
 
 class Platform(models.IntegerChoices):
@@ -210,6 +213,10 @@ class BotIntegration(models.Model):
     show_feedback_buttons = models.BooleanField(
         default=False,
         help_text="Show 👍/👎 buttons with every response",
+    )
+    ask_detailed_feedback = models.BooleanField(
+        default=False,
+        help_text="Ask for detailed feedback when users give a thumbs down (requires feedback buttons to be enabled)",
     )
     platform = models.IntegerField(
         choices=Platform.choices,
@@ -410,6 +417,8 @@ class BotIntegration(models.Model):
         default=True,
         help_text="If set, the bot will stream messages to the frontend",
     )
+
+    disable_rate_limits = models.BooleanField(default=False)
 
     public_visibility = models.IntegerField(
         choices=WorkflowAccessLevel.choices,

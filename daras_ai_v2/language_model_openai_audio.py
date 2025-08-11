@@ -38,6 +38,8 @@ def run_openai_audio(
 ):
     openai_ws, created = get_or_create_ws(model)
 
+    temperature = max(min(temperature, 0.6), 1.2)
+
     twilio_ws = None
     audio_data = None
     if is_realtime_audio_url(audio_url):
@@ -68,7 +70,7 @@ def run_openai_audio(
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, tools, messages, audio_url
+                twilio_ws, openai_ws, tools, messages, audio_url, model
             ).stream():
                 yield [entry]
         else:

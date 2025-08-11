@@ -9,7 +9,7 @@ from time import time
 
 import gooey_gui as gui
 import sentry_sdk
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
@@ -45,7 +45,8 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from workspaces.widgets import global_workspace_selector
+from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
+from workspaces.widgets import global_workspace_selector, workspace_selector_link
 
 app = CustomAPIRouter()
 
@@ -245,26 +246,16 @@ def component_page(request: Request):
 
 @gui.route(app, "/explore/")
 def explore_page(
-    request: Request,
-    search: str | None = None,
-    workspace: str | None = None,
-    workflow: str | None = None,
+    request: Request, search_filters: typing.Annotated[SearchFilters, Query()]
 ):
     from widgets import explore
-    from widgets.workflow_search import SearchFilters
 
-    search_filters = SearchFilters(
-        search=search, workspace=workspace, workflow=workflow
-    )
-
-    with page_wrapper(request):
-        explore.render(request.user, search_filters)
+    with page_wrapper(request, search_filters=search_filters, show_search_bar=False):
+        explore.render(request, search_filters)
 
     return {
-        "meta": raw_build_meta_tags(
-            url=get_og_url_path(request),
-            title=explore.META_TITLE,
-            description=explore.META_DESCRIPTION,
+        "meta": explore.build_meta_tags(
+            url=get_og_url_path(request), search_filters=search_filters
         ),
     }
 
@@ -692,7 +683,7 @@ def render_recipe_page(
         request_session=request.session,
         request_url=request.url,
         # this is because the code still expects example_id to be in the query params
-        query_params=dict(request.query_params) | dict(example_id=example_id),
+        query_params=dict(request.query_params) | dict(example_id=example_id or ""),
     )
 
     if not gui.session_state:
@@ -715,11 +706,15 @@ def get_og_url_path(request) -> str:
 
 
 @contextmanager
-def page_wrapper(request: Request, className=""):
-    context = {
-        "request": request,
-        "block_incognito": True,
-    }
+def page_wrapper(
+    request: Request,
+    className="",
+    search_filters: typing.Optional[SearchFilters] = None,
+    show_search_bar: bool = True,
+):
+    from routers.account import explore_in_current_workspace
+
+    context = {"request": request, "block_incognito": True}
 
     with gui.div(className="d-flex flex-column min-vh-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
@@ -728,8 +723,14 @@ def page_wrapper(request: Request, className=""):
             gui.div(className="header"),
             gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
             gui.div(className="container-xxl my-2"),
+            gui.div(
+                className="position-relative w-100 d-flex justify-content-between gap-2"
+            ),
         ):
-            with gui.tag("a", href="/"):
+            with (
+                gui.div(className="d-md-block"),
+                gui.tag("a", href="/"),
+            ):
                 gui.tag(
                     "img",
                     src=settings.GOOEY_LOGO_IMG,
@@ -744,17 +745,32 @@ def page_wrapper(request: Request, className=""):
                     height="40",
                     className="img-fluid logo d-sm-none",
                 )
+
+            if show_search_bar:
+                _render_mobile_search_button(request, search_filters)
+
             with gui.div(
-                className="mt-2 gap-2 d-flex flex-grow-1 justify-content-end flex-wrap align-items-center"
+                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
             ):
+                if not show_search_bar:
+                    render_header_link(
+                        url=get_route_path(explore_page),
+                        label="Explore",
+                        icon=icons.search,
+                    )
+
                 for url, label in settings.HEADER_LINKS:
-                    with gui.tag("a", href=url, className="pe-2 d-none d-lg-block"):
-                        if icon := settings.HEADER_ICONS.get(url):
-                            with gui.div(className="d-inline-block me-2 small"):
-                                gui.html(icon)
-                        gui.html(label)
+                    render_header_link(
+                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+                    )
 
                 if request.user and not request.user.is_anonymous:
+                    render_header_link(
+                        url=get_route_path(explore_in_current_workspace),
+                        label="Saved",
+                        icon=icons.save,
+                    )
+
                     current_workspace = global_workspace_selector(
                         request.user, request.session
                     )
@@ -771,6 +787,56 @@ def page_wrapper(request: Request, className=""):
         gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
+def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
+    with gui.div(
+        className="d-flex d-md-none flex-grow-1 justify-content-end",
+    ):
+        gui.button(
+            icons.search,
+            type="tertiary",
+            unsafe_allow_html=True,
+            className="m-0",
+            onClick=JS_SHOW_MOBILE_SEARCH,
+        )
+
+    with (
+        gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
+        gui.div(
+            className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
+            style={"display": "none", "zIndex": "10"},
+            id="mobile_search_container",
+        ),
+    ):
+        render_search_bar_with_redirect(
+            request=request,
+            search_filters=search_filters or SearchFilters(),
+        )
+        gui.button(
+            "Cancel",
+            type="tertiary",
+            className="d-md-none fs-6 m-0 ms-1 p-1",
+            onClick=JS_HIDE_MOBILE_SEARCH,
+        )
+
+
+JS_SHOW_MOBILE_SEARCH = """
+event.preventDefault();
+const mobileSearchContainer = document.querySelector("#mobile_search_container");
+mobileSearchContainer.classList.add(
+    "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+)
+document.querySelector('#global_search_bar').focus();
+"""
+
+JS_HIDE_MOBILE_SEARCH = """
+event.preventDefault();
+const mobileSearchContainer = document.querySelector("#mobile_search_container");
+mobileSearchContainer.classList.remove(
+    "d-flex", "position-absolute", "top-0", "start-0", "bottom-0", "end-0"
+);
+"""
+
+
 def anonymous_login_container(request: Request, context: dict):
     next_url = str(furl(request.url).set(origin=None))
     login_url = str(furl("/login/", query_params=dict(next=next_url)))
@@ -783,7 +849,7 @@ def anonymous_login_container(request: Request, context: dict):
     with popover, gui.div(className="d-flex align-items-center"):
         gui.html(
             templates.get_template("google_one_tap_button.html").render(**context)
-            + '<i class="ps-2 fa-regular fa-chevron-down d-lg-none"></i>'
+            + '<i class="ps-2 fa-regular fa-chevron-down d-xl-none"></i>'
         )
 
     with (
@@ -793,37 +859,27 @@ def anonymous_login_container(request: Request, context: dict):
             style=dict(minWidth="200px"),
         ),
     ):
-        row_height = "2.2rem"
-
-        with gui.tag(
-            "a",
-            href=login_url,
-            className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-            style=dict(height=row_height),
-        ):
-            with gui.div(className="row align-items-center"):
-                with gui.div(className="col-2 d-flex justify-content-center"):
-                    gui.html('<i class="fa-regular fa-circle-user"></i>')
-                with gui.div(className="col-10"):
-                    gui.html("Sign In")
+        workspace_selector_link(url=login_url, label="Sign In", icon=icons.sign_in)
 
         gui.html('<hr class="my-1"/>')
 
+        workspace_selector_link(
+            url=get_route_path(explore_page),
+            label="Explore",
+            icon=icons.search,
+        )
         for url, label in settings.HEADER_LINKS:
-            with gui.tag(
-                "a",
-                href=url,
-                className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-                style=dict(height=row_height),
-            ):
-                col1, col2 = gui.columns(
-                    [2, 10], responsive=False, className="row align-items-center"
-                )
-                if icon := settings.HEADER_ICONS.get(url):
-                    with col1, gui.div(className="d-flex justify-content-center"):
-                        gui.html(icon)
-                with col2:
-                    gui.html(label)
+            workspace_selector_link(
+                url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+            )
+
+
+def render_header_link(url: str, label: str, icon: str | None = None):
+    with gui.tag("a", href=url, className="pe-2 d-none d-xl-block"):
+        if icon:
+            with gui.div(className="d-inline-block me-2 small"):
+                gui.html(icon)
+        gui.html(label)
 
 
 class TabData(typing.NamedTuple):

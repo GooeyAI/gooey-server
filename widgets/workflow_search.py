@@ -1,3 +1,6 @@
+import typing
+
+from fastapi import Request
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -8,31 +11,62 @@ from django.db.models import (
     QuerySet,
     Value,
 )
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
 from daras_ai_v2 import icons
+from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
-from workspaces.models import WorkspaceRole
+from workspaces.models import Workspace, WorkspaceRole
+
+
+class SortOption(typing.NamedTuple):
+    value: str
+    label: str
+    icon: str
+
+
+_icon_width = "1.3em"
+
+
+class SortOptions(SortOption, GooeyEnum):
+    FEATURED = SortOption(
+        value="featured",
+        label="Featured",
+        icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
+    )
+    UPDATED_AT = SortOption(
+        value="last_updated",
+        label="Last Updated",
+        icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
+    )
+    CREATED_AT = SortOption(
+        value="created_at",
+        label="Created At",
+        icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
+    )
+    MOST_RUNS = SortOption(
+        value="most_runs",
+        label="Most Runs",
+        icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
+    )
+
+    @classmethod
+    def get(cls, key=None, default=None):
+        return super().get(key, default=cls.FEATURED)
 
 
 class SearchFilters(BaseModel):
-    search: str | None = None
-    workspace: str | None = None
-    workflow: str | None = None
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def empty_str_to_none(cls, v: str | None) -> str | None:
-        # to clear query params from URL when they are empty
-        if v == "":
-            return None
-        return v
+    search: str = ""
+    workspace: str = ""
+    workflow: str = ""
+    sort: str = ""
 
     def __bool__(self):
-        return bool(self.search or self.workspace or self.workflow)
+        return bool(self.search or self.workspace or self.workflow or self.sort)
 
 
 def render_search_filters(
@@ -41,58 +75,140 @@ def render_search_filters(
     if not search_filters:
         search_filters = SearchFilters()
 
-    with gui.div(className="d-lg-flex container-margin-reset gap-3"):
-        with gui.div(className="col-lg-5 mb-2 mb-lg-0"):
-            search_query = render_search_bar(value=search_filters.search)
+    show_workspace_filter = bool(current_user and not current_user.is_anonymous)
+    show_sort_option = (
+        search_filters.search or search_filters.workflow or search_filters.workspace
+    )
+    with gui.div(className="row container-margin-reset", style={"fontSize": "0.9rem"}):
+        if not show_sort_option:
+            col_class = "col-12 col-md-7"
+        elif show_workspace_filter:
+            col_class = "col-9 col-md-7"
+        else:
+            col_class = "col-7"
 
-        with gui.div(className="col-lg-7 d-flex align-items-center gap-2 mw-100"):
-            gui.caption(
-                f'{icons.filter}<span class="d-none d-lg-inline"> Filter</span>',
-                unsafe_allow_html=True,
-                className="text-nowrap text-muted",
-            )
-            with gui.div(className="flex-grow-1 d-flex gap-2 me-2 me-lg-4"):
-                is_logged_in = current_user and not current_user.is_anonymous
-                if is_logged_in:
-                    with gui.div(className="col-6"):
-                        workspace_filter = render_workspace_filter(
-                            current_user=current_user, value=search_filters.workspace
+        with gui.div(className=f"{col_class} d-flex align-items-center"):
+            with gui.div(
+                className="col-6 pe-1"
+                if show_workspace_filter
+                else "col-12 col-md-6 pe-md-1"
+            ):
+                search_filters.workflow = (
+                    render_workflow_filter(value=search_filters.workflow) or ""
+                )
+            if show_workspace_filter:
+                with gui.div(className="col-6 ps-1"):
+                    search_filters.workspace = (
+                        render_workspace_filter(
+                            current_user=current_user,
+                            value=search_filters.workspace,
                         )
-                else:
-                    workspace_filter = None
-                with gui.div(className="col-6" if is_logged_in else "col-12 col-lg-6"):
-                    workflow_filter = render_workflow_filter(
-                        value=search_filters.workflow
+                        or ""
+                    )
+            else:
+                search_filters.workspace = ""
+
+        if not show_sort_option:
+            search_filters.sort = ""
+        else:
+            col_class = "col-3 col-md-5" if show_workspace_filter else "col-5"
+            with gui.div(
+                className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
+            ):
+                sort_options: dict[str, str] = {
+                    (opt.value if opt != SortOptions.get() else ""): (
+                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
+                    )
+                    for opt in SortOptions
+                }
+                with (
+                    gui.styled(
+                        """
+                        @media(min-width: 768px) {
+                            & .gui-input {
+                                min-width: 170px;
+                            }
+                        }
+                        @media(max-width: 767px) {
+                            & div[class$="-control"] .hide-on-small-screens {
+                                display: none !important;
+                            }
+                        }
+                        """
+                    ),
+                    gui.div(),
+                ):
+                    search_filters.sort = (
+                        gui.selectbox(
+                            label="",
+                            options=sort_options,
+                            key="search_sort",
+                            value=search_filters.sort,
+                            format_func=sort_options.__getitem__,
+                            className="mb-0 text-nowrap",
+                        )
+                        or ""
                     )
 
-    return SearchFilters(
-        search=search_query, workspace=workspace_filter, workflow=workflow_filter
+    return search_filters
+
+
+def render_search_bar_with_redirect(
+    request: Request,
+    search_filters: SearchFilters,
+    key: str = "global_search_query",
+    id: str = "global_search_bar",
+    max_width: str = "500px",
+):
+    from routers.root import explore_page
+
+    search_query = render_search_bar(
+        current_user=request.user,
+        search_filters=search_filters,
+        key=key,
+        id=id,
+        max_width=max_width,
     )
+    if search_query != search_filters.search:
+        search_filters.search = search_query
+        raise gui.RedirectException(
+            get_app_route_url(
+                explore_page,
+                query_params=search_filters.model_dump(exclude_defaults=True),
+            )
+        )
 
 
 def render_search_bar(
-    key: str = "search_query", value: str = "", id: str | None = None
+    current_user: AppUser | None,
+    search_filters: SearchFilters,
+    key: str,
+    max_width: str,
+    id: str | None = None,
+    **props,
 ) -> str:
     id = id or f"--search_bar:{key}"
 
     with (
         gui.styled(
-            r"""
-            & {
+            rf"""
+            & {{
                 position: relative;
-            }
-            & .gui-input {
+                max-width: {max_width};
+                flex-grow: 1;
+            }}
+            & .gui-input {{
                 margin: 0;
                 width: 100%;
-            }
-            & .clear_button {
+            }}
+            & .clear_button {{
                 position: absolute;
                 top: 14px;
                 right: 18px;
                 font-size: 0.9em;
                 margin: 0 !important;
-            }
-            &::before {
+            }}
+            &::before {{
                 content: "\f002";              /* FontAwesome glyph */
                 font-family: "Font Awesome 6 Pro";
                 position: absolute;
@@ -101,19 +217,27 @@ def render_search_bar(
                 pointer-events: none;          /* let clicks go through to the input */
                 color: #888;
                 font-size: 0.9em;
-            }
+            }}
             """
         ),
         gui.div(),
     ):
+        placeholder = get_placeholder_by_search_filters(
+            search_filters=search_filters, current_user=current_user
+        )
         search_query = gui.text_input(
             "",
-            placeholder="Search Workflows",
-            className="bg-light border-0 rounded-pill",
-            style=dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem"),
+            placeholder=placeholder,
+            className="bg-light border-0 rounded-pill " + props.pop("className", ""),
+            style=(
+                dict(resize="none", paddingLeft="2.7rem", paddingRight="2.7rem")
+                | props.pop("style", {})
+            ),
             key=key,
-            value=value,
             id=id,
+            value=search_filters.search,
+            autocomplete="off",
+            **props,
         )
 
         # add a hidden submit button to allow form submission on pressing Enter
@@ -136,6 +260,37 @@ def render_search_bar(
     return search_query
 
 
+def get_placeholder_by_search_filters(
+    search_filters: SearchFilters,
+    current_user: AppUser | None,
+    fallback_workspace_text: str = "Gooey.AI",
+) -> str:
+    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+
+    text = "Search"
+    workspace = current_user and get_workspace_from_filter_value(
+        current_user, search_filters.workspace
+    )
+    if workspace:
+        if workspace.is_personal and workspace.created_by == current_user:
+            workspace_text = "Personal Workspace"
+        else:
+            workspace_text = workspace.display_name(current_user=current_user)
+        text += f": {workspace_text}"
+    else:
+        text += f" {fallback_workspace_text}"
+
+    if search_filters.workflow:
+        try:
+            workflow_page = page_slug_map[normalize_slug(search_filters.workflow)]
+        except KeyError:
+            pass
+        else:
+            text += f" › {workflow_page.workflow.short_title}"
+
+    return text
+
+
 def render_workspace_filter(
     current_user: AppUser | None = None, key: str = "workspace_filter", value: str = ""
 ) -> str | None:
@@ -143,7 +298,7 @@ def render_workspace_filter(
         return None
 
     workspace_options = {
-        w.handle_id and w.handle.name or str(w.id): w.display_html(
+        get_filter_value_from_workspace(w): w.display_html(
             current_user=current_user, icon_size="20px"
         )
         for w in current_user.cached_workspaces
@@ -156,6 +311,23 @@ def render_workspace_filter(
         value=value,
         blank_label=f"{icons.octopus}&nbsp; Any",
     )
+
+
+def get_filter_value_from_workspace(workspace: "Workspace") -> str:
+    return (workspace.handle_id and workspace.handle.name) or str(workspace.id)
+
+
+def get_workspace_from_filter_value(
+    user: AppUser, value: str
+) -> typing.Optional["Workspace"]:
+    if not value:
+        return None
+
+    for w in user.cached_workspaces:
+        if str(w.id) == value or (w.handle_id and w.handle.name == value):
+            return w
+
+    return None
 
 
 def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
@@ -205,15 +377,16 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
+        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.value
 
         render_saved_workflow_preview(
             workflow.page_cls,
             pr,
             workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-            hide_visibility_pill=True,
             show_workspace_author=show_workspace_author,
+            show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            is_member=is_member,
+            hide_visibility_pill=True,
         )
 
     grid_layout(1, qs, _render_run)
@@ -223,18 +396,31 @@ def get_filtered_published_runs(
     user: AppUser | None, search_filters: SearchFilters
 ) -> QuerySet:
     qs = PublishedRun.objects.all()
-    qs = build_search_filter(qs, search_filters)
+    qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
-    qs = qs.annotate(
-        is_root_workflow=Q(published_run_id=""),
-    ).order_by(
-        F("is_created_by").desc(nulls_last=True),
-        "-is_member",
-        "-is_approved_example",
-        "-is_root_workflow",
-        "-updated_at",
-    )
+    qs = build_sort_filter(qs, SortOptions.get(search_filters.sort))
     return qs[:25]
+
+
+def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
+    match sort:
+        case SortOptions.FEATURED:
+            qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
+            return qs.order_by(
+                "-is_approved_example",
+                "-example_priority",
+                "-is_root_workflow",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
+            )
+        case SortOptions.UPDATED_AT:
+            return qs.order_by("-updated_at")
+        case SortOptions.CREATED_AT:
+            return qs.order_by("-created_at")
+        case SortOptions.MOST_RUNS:
+            return qs.order_by(
+                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
+            )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -274,16 +460,14 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
     return qs.filter(workflow_access_filter)
 
 
-def build_search_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
+def build_search_filter(
+    qs: QuerySet, search_filters: SearchFilters, user: AppUser | None
+) -> QuerySet:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
-    if search_filters.workspace:
-        try:
-            workspace = int(search_filters.workspace)
-        except ValueError:
-            qs = qs.filter(workspace__handle__name=search_filters.workspace)
-        else:
-            qs = qs.filter(workspace=workspace)
+    if user and search_filters.workspace:
+        workspace = get_workspace_from_filter_value(user, search_filters.workspace)
+        qs = qs.filter(workspace=workspace)
 
     if search_filters.workflow:
         try:

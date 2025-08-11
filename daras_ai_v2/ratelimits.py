@@ -1,12 +1,67 @@
 from datetime import timedelta
 
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.utils import timezone
 from starlette.exceptions import HTTPException
 
 from app_users.models import AppUser
 from bots.models import Workflow, SavedRun
+from bots.models.convo_msg import (
+    CHATML_ROLE_USER,
+    ConvoBlockedStatus,
+    Conversation,
+    Message,
+)
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
+
+
+def ensure_bot_rate_limits(convo: Conversation):
+    if convo.bot_integration.disable_rate_limits:
+        return
+
+    msgs_today = Message.objects.filter(
+        role=CHATML_ROLE_USER,
+        created_at__gte=timezone.now() - timedelta(days=1),
+        conversation__bot_integration=convo.bot_integration,
+        **{
+            f"conversation__{field}": getattr(convo, field)
+            for field in Conversation.user_id_fields
+        },
+    )
+    num_msgs = msgs_today.count()
+
+    if num_msgs > settings.MAX_MESSAGES_PER_DAY_BLOCK:
+        # block the conversation
+        if convo.blocked_status != ConvoBlockedStatus.BLOCKED:
+            convo.blocked_status = ConvoBlockedStatus.BLOCKED
+            convo.blocked_at = timezone.now()
+            convo.save(update_fields=["blocked_status", "blocked_at"])
+        raise RateLimitExceeded(
+            retry_after=0,
+            msg="You have been blocked from using this bot.",
+        )
+
+    if num_msgs > settings.MAX_MESSAGES_PER_DAY_WARNING:
+        if convo.blocked_status != ConvoBlockedStatus.WARNING:
+            convo.blocked_status = ConvoBlockedStatus.WARNING
+            convo.blocked_at = timezone.now()
+            convo.save(update_fields=["blocked_status", "blocked_at"])
+        retry_after = timedelta(hours=25) - (
+            timezone.now() - msgs_today.latest("created_at").created_at
+        )
+        raise RateLimitExceeded(
+            retry_after=retry_after.total_seconds(),
+            msg=(
+                "You've reached your daily message limit for today. "
+                f"Please try again after {naturaltime(timezone.now() + retry_after)}. "
+            ),
+        )
+
+    if convo.blocked_status != ConvoBlockedStatus.NORMAL:
+        convo.blocked_status = ConvoBlockedStatus.NORMAL
+        convo.blocked_at = None
+        convo.save(update_fields=["blocked_status", "blocked_at"])
 
 
 def ensure_rate_limits(

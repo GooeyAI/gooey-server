@@ -50,7 +50,7 @@ def _render_bi(bi: BotIntegration):
         VideoBotsPage, bi.published_run.saved_run, bi.published_run
     )
     with gui.link(to=bi.published_run.get_app_url()):
-        gui.write(tb.h1_title, className="container-margin-reset")
+        gui.write(tb.title_with_prefix(), className="container-margin-reset")
 
     with gui.div(className="d-flex align-items-center justify-content-between"):
         with gui.div():

@@ -12,6 +12,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
 from bots.models import Conversation, BotIntegration
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import normalised_lang_in_collection
 from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import UserError
@@ -23,6 +24,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.twilio_bot import TwilioVoice
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.custom_api_router import CustomAPIRouter
+from usage_costs.twilio_usage_cost import record_twilio_voice_call_cost
 
 DEFAULT_INITIAL_TEXT = "Welcome to {bot_name}! Please ask your question and press 0 if the end of your question isn't detected."
 DEFAULT_WAITING_AUDIO_URLS = [
@@ -243,12 +245,15 @@ def twilio_voice_call_wait(audio_url: str = None):
     return twiml_response(resp)
 
 
-# uncomment for debugging:
 @router.post("/__/twilio/voice/status/")
 def twilio_voice_call_status(data: dict = fastapi_request_urlencoded_body):
-    """Handle incoming Twilio voice call status update."""
+    logger.debug(data)
 
-    print("Twilio status update", data)
+    status = data["CallStatus"][0]
+    account_sid = data["AccountSid"][0]
+    # only record cost for completed calls from our account - don't record usage for customer accounts
+    if status == "completed" and account_sid == settings.TWILIO_ACCOUNT_SID:
+        record_twilio_voice_call_cost(data)
 
     return Response(status_code=204)
 

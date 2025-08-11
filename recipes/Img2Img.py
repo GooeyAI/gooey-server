@@ -19,6 +19,7 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
 )
+from daras_ai_v2.variables_widget import render_prompt_vars
 
 
 class Img2ImgPage(BasePage):
@@ -151,6 +152,14 @@ class Img2ImgPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.model_validate(state)
 
+        # Process variables in the text prompt
+        if request.text_prompt:
+            request.text_prompt = render_prompt_vars(request.text_prompt, state)
+
+        # Process variables in the negative prompt
+        if request.negative_prompt:
+            request.negative_prompt = render_prompt_vars(request.negative_prompt, state)
+
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content
 
@@ -192,7 +201,7 @@ class Img2ImgPage(BasePage):
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
-            state["output_images"] = img2img(
+            state["output_images"] = yield from img2img(
                 selected_model=request.selected_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
@@ -208,8 +217,12 @@ class Img2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model")
         match selected_model:
-            case Img2ImgModels.dall_e.name | Img2ImgModels.gpt_image_1.name:
+            case Img2ImgModels.dall_e.name:
                 unit_price = 20
+            case Img2ImgModels.flux_pro_kontext.name:
+                unit_price = 10
+            case Img2ImgModels.gpt_image_1.name:
+                unit_price = 45
             case _:
                 unit_price = 5
 

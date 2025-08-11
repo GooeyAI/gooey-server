@@ -10,7 +10,6 @@ from workspaces.models import Workspace
 from .models import (
     BotIntegration,
     Conversation,
-    ConvoState,
     Message,
     Platform,
 )
@@ -72,7 +71,6 @@ def test_create_bot_integration_conversation_message(transactional_db):
     # Create a Conversation that uses the BotIntegration
     conversation = Conversation.objects.create(
         bot_integration=bot_integration,
-        state=ConvoState.INITIAL,
         wa_phone_number="user_whatsapp_number",
     )
 
@@ -133,7 +131,6 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     # valid option and data
     convo = Conversation.objects.create(
         bot_integration=bi,
-        state=ConvoState.INITIAL,
         wa_phone_number="+919876543210",
     )
     Message.objects.create(
