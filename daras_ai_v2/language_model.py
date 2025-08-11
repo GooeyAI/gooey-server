@@ -1540,8 +1540,6 @@ def run_openai_chat(
         # unsupported API options
         max_tokens = NOT_GIVEN
         avoid_repetition = False
-        if model == LargeLanguageModels.o1:
-            stream = False
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
