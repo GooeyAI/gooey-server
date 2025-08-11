@@ -110,7 +110,6 @@ from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
-    render_called_functions,
     render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -1232,7 +1231,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 target_language="en",
             )
         for text in ocr_texts:
-            user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
         return user_input
 
     def build_final_prompt(self, request, response, user_input, model):
