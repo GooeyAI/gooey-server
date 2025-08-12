@@ -38,7 +38,8 @@ def run_openai_audio(
 ):
     openai_ws, created = get_or_create_ws(model)
 
-    temperature = max(min(temperature, 0.6), 1.2)
+    if temperature:
+        temperature = min(max(temperature, 0.6), 1.2)
 
     twilio_ws = None
     audio_data = None
