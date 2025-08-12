@@ -56,7 +56,6 @@ class LLMApis(Enum):
     palm2 = 1
     gemini = 2
     openai = 3
-    # together = 4
     fireworks = 4
     groq = 5
     anthropic = 6
