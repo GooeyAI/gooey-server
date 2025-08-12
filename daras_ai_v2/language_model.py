@@ -721,6 +721,15 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_4_1_opus = LLMSpec(
+        label="Claude 4.1 Opus • Anthropic",
+        model_id="claude-opus-4-1",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=32_000,
+        is_vision_model=True,
+        supports_json=True,
+    )
     claude_4_sonnet = LLMSpec(
         label="Claude 4 Sonnet • Anthropic",
         model_id="claude-4-sonnet-20250514",
@@ -1546,6 +1555,7 @@ def run_openai_chat(
     elif model in [
         LargeLanguageModels.claude_4_sonnet,
         LargeLanguageModels.claude_4_opus,
+        LargeLanguageModels.claude_4_1_opus,
         LargeLanguageModels.gemini_2_5_pro,
         LargeLanguageModels.gemini_2_5_flash,
     ]:
@@ -1825,7 +1835,7 @@ def get_openai_client(model: str):
             max_retries=0,
             base_url="https://api.sarvam.ai/v1",
         )
-    elif model.startswith("claude-4-"):
+    elif model.startswith("claude-"):
         client = openai.OpenAI(
             api_key=settings.ANTHROPIC_API_KEY,
             max_retries=0,
