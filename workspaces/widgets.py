@@ -47,7 +47,7 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    with gui.styled("& button { padding-top: 5px; }"), gui.div():
+    with gui.styled("& > button { padding-top: 5px; }"), gui.div():
         popover, content = gui.popover(interactive=True, placement="bottom")
 
     with popover:
