@@ -90,7 +90,7 @@ def profile_header(request: Request, handle: Handle):
             with gui.tag("h1", className="d-inline my-0 me-2"):
                 gui.html(escape_html(get_profile_title(workspace)))
 
-            if request.user in workspace.get_admins():
+            if request.user and workspace in request.user.cached_workspaces:
                 _render_edit_profile_button(request=request, workspace=workspace)
 
         with gui.tag("p", className="lead text-secondary mb-0"):
@@ -114,7 +114,10 @@ def _render_edit_profile_button(request: Request, workspace: Workspace):
         label = f"{icons.edit} Edit Profile"
         link = AccountTabs.profile.url_path
     else:
-        label = f"{icons.octopus} Manage Workspace"
+        if request.user in workspace.get_admins():
+            label = f"{icons.octopus} Manage Workspace"
+        else:
+            label = f"{icons.octopus} Open Workspace"
         link = AccountTabs.members.url_path
 
     if gui.button(label, type="secondary"):
