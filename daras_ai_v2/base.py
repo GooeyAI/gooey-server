@@ -91,6 +91,7 @@ from workspaces.widgets import (
 )
 from routers.root import PREVIEW_ROUTE_WORKFLOWS
 
+
 MAX_SEED = 4294967294
 gooey_rng = Random()
 
@@ -391,74 +392,18 @@ class BasePage:
 
         header_placeholder = gui.div(className="my-3 w-100")
         with (
-            gui.styled(
-                """
-                @media (max-width: 768px) { 
-                    & button {
-                        font-size: 0.9rem; 
-                        padding: 0.3rem !important 
-                    }
-                }
-                & .nav-item {
-                    font-size: smaller;
-                    font-weight: bold;
-                }
-                & button {
-                    padding: 0.4rem !important;
-                }
-
-                & a:has(span.mobile-only-recipe-tab) {
-                    display: block !important;
-                }
-
-                & li.nav-item:first-of-type button {
-                    margin-left: 0 !important;
-                }
-
-                & ul.nav-tabs {
-                    overflow-x: auto;
-                    overflow-y: hidden;
-                    white-space: nowrap;
-                    flex-wrap: nowrap !important;
-                    display: flex;
-                    -webkit-overflow-scrolling: touch;
-                    scrollbar-width: none;
-                    gap: 0.5rem;
-                }
-
-                @media (min-width: 768px) {
-                    & a:has(span.mobile-only-recipe-tab) {
-                        display: none !important;
-                    }
-
-                    /* RUN as active tab in lg view for preview route */
-                    & span.active-lg button {
-                        color: #000;
-                        border-bottom: 2px solid black;
-                    }
-
-                    & ul.nav-tabs {
-                        gap: 0;
-                    }
-                }
-                """
-            ),
+            gui.styled(NAV_TABS_CSS),
             gui.div(className="position-relative", id="recipe-nav-tabs"),
             gui.nav_tabs(),
         ):
             for tab in self.get_tabs():
                 url = self.current_app_url(tab)
-                with gui.tag(
-                    "span",
-                    className="active-lg"
-                    if (tab == RecipeTabs.run and self.tab == RecipeTabs.preview)
-                    else "",
-                ):
-                    with gui.nav_item(
-                        url,
-                        active=tab == self.tab,
-                    ):
-                        gui.html(tab.title)
+                if tab == RecipeTabs.run and self.tab == RecipeTabs.preview:
+                    force_active_lg = gui.tag("span", className="active-lg")
+                else:
+                    force_active_lg = gui.dummy()
+                with force_active_lg, gui.nav_item(url, active=tab == self.tab):
+                    gui.html(tab.title)
 
                 self._render_saved_generated_timestamp()
         with gui.nav_tab_content():
@@ -1246,11 +1191,8 @@ class BasePage:
                         ),
                     )
 
-                with gui.styled(OUTPUT_TABS_CSS):
-                    input_col, output_col = gui.columns(
-                        [3, 2],
-                        gap="medium",
-                    )
+                with gui.styled(INPUT_OUTPUT_COLS_CSS):
+                    input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
                         submitted = self._render_input_col()
                     with output_col:
@@ -1808,9 +1750,11 @@ class BasePage:
     show_settings = True
 
     def _render_input_col(self):
-        with gui.div(
-            className="d-none d-lg-block" if self.tab == RecipeTabs.preview else ""
-        ):
+        if self.tab == RecipeTabs.preview:
+            hide_on_mobile = "d-none d-lg-block"
+        else:
+            hide_on_mobile = ""
+        with gui.div(className=hide_on_mobile):
             self.render_form_v2()
             placeholder = gui.div()
 
@@ -1881,11 +1825,12 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
+        if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            hide_on_mobile = "d-none d-lg-block pb-2"
+        else:
+            hide_on_mobile = ""
         with gui.div(
-            style=dict(position="sticky", top="0.5rem"),
-            className="d-none d-lg-block pb-2"
-            if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS
-            else "",
+            style=dict(position="sticky", top="0.5rem"), className=hide_on_mobile
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
@@ -1960,11 +1905,10 @@ class BasePage:
         if not sr:
             return
         if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            raise gui.RedirectException(
-                self.app_url(run_id=sr.run_id, uid=sr.uid, tab=RecipeTabs.preview)
-            )
+            tab = RecipeTabs.preview
         else:
-            raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+            tab = None
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -2614,26 +2558,76 @@ class TitleValidationError(Exception):
     pass
 
 
-OUTPUT_TABS_CSS = """
+INPUT_OUTPUT_COLS_CSS = """
+& {
+    margin: -1rem 0 1rem 0;
+    padding-top: 1rem;
+}
+
+/* reset col padding in mobile */
+& > div {
+    padding: 0; 
+}
+
+@media (min-width: 768px) {
     & {
-        margin: -1rem 0 1rem 0;
-        padding-top: 1rem;
+        background-color: #f9f9f9;
     }
-    
-    /* reset col padding in mobile */
+    /* set col padding in mobile */
     & > div {
-        padding: 0; 
+        padding-left: calc(var(--bs-gutter-x) * .5);
+        padding-right: calc(var(--bs-gutter-x) * .5);
+    }
+}
+"""
+
+NAV_TABS_CSS = """
+@media (max-width: 768px) { 
+    & button {
+        font-size: 0.9rem; 
+        padding: 0.3rem !important 
+    }
+}
+& .nav-item {
+    font-size: smaller;
+    font-weight: bold;
+}
+& button {
+    padding: 0.4rem !important;
+}
+
+& a:has(span.mobile-only-recipe-tab) {
+    display: block !important;
+}
+
+& li.nav-item:first-of-type button {
+    margin-left: 0 !important;
+}
+
+& ul.nav-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap !important;
+    display: flex;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+    & a:has(span.mobile-only-recipe-tab) {
+        display: none !important;
     }
 
-    @media (min-width: 768px) {
-        & {
-            background-color: #f9f9f9;
-        }
-        /* set col padding in mobile */
-        & > div {
-            padding-left: calc(var(--bs-gutter-x) * .5);
-            padding-right: calc(var(--bs-gutter-x) * .5);
-        }
+    /* RUN as active tab in lg view for preview route */
+    & span.active-lg button {
+        color: #000;
+        border-bottom: 2px solid black;
     }
 
+    & ul.nav-tabs {
+        gap: 0;
+    }
+}
 """

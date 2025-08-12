@@ -898,7 +898,7 @@ class RecipeTabs(TabData, Enum):
         route=preview_route,
     )
     run = TabData(
-        title=f"{icons.run} Run</span>",
+        title=f"{icons.run} Run",
         label="",
         route=recipe_or_handle_or_static,
     )
