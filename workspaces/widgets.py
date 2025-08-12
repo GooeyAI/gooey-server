@@ -18,7 +18,7 @@ SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 SWITCH_WORKSPACE_KEY = "--switch-workspace"
 
 
-def global_workspace_selector(user: AppUser, session: dict):
+def global_workspace_selector(user: AppUser, session: dict, hide_name: bool = False):
     from routers.account import (
         members_route,
         profile_route,
@@ -47,8 +47,9 @@ def global_workspace_selector(user: AppUser, session: dict):
     except (KeyError, IndexError):
         current = workspaces[0]
 
-    with gui.styled("& button { padding-top: 5px; }"), gui.div():
-        popover, content = gui.popover(interactive=True, placement="bottom")
+    popover, content = gui.popover(
+        interactive=True, placement="bottom", className="w-100"
+    )
 
     with popover:
         if current.is_personal and current.created_by_id == user.id:
@@ -57,23 +58,28 @@ def global_workspace_selector(user: AppUser, session: dict):
             else:
                 display_name = "Personal"
         else:
-            display_name = current.display_name(user)
-        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
-            gui.html(f"{current.html_icon()}")
-            gui.html(
-                html.escape(display_name),
-                className="d-none d-md-inline text-truncate",
-                style={"maxWidth": "150px"},
-            )
-            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
+            display_name = html.escape(current.display_name(user))
+        gui.html(
+            " ".join(
+                [
+                    current.html_icon(),
+                    display_name if not hide_name else "",
+                ],
+            ),
+        )
 
     with (
         content,
         gui.div(
-            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
+            className="d-flex flex-column flex-nowrap bg-white border border-dark rounded shadow mx-2 position-relative",
+            style={
+                "width": "max-content",
+                "max-height": "80dvh",
+                "overflow-y": "auto",
+            },
         ),
     ):
-        row_height = "2.2rem"
+        row_height = "36px"
 
         for workspace in workspaces:
             with gui.tag(
@@ -82,7 +88,7 @@ def global_workspace_selector(user: AppUser, session: dict):
                 name=SWITCH_WORKSPACE_KEY,
                 type="submit",
                 value=str(workspace.id),
-                style=dict(height=row_height),
+                style=dict(minHeight=row_height),
             ):
                 with gui.div(className="row align-items-center"):
                     with gui.div(className="col-2 d-flex justify-content-center"):
