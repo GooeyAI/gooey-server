@@ -948,7 +948,16 @@ def run():
         unit_cost_output=15,
         unit_quantity=10**6,
         provider=ModelProvider.anthropic,
-        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
+    )
+    llm_pricing_create(
+        model_id="claude-opus-4-1",
+        model_name=LargeLanguageModels.claude_4_1_opus.name,
+        unit_cost_input=15,
+        unit_cost_output=75,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
     )
     llm_pricing_create(
         model_id="claude-4-opus-20250514",
@@ -957,7 +966,7 @@ def run():
         unit_cost_output=75,
         unit_quantity=10**6,
         provider=ModelProvider.anthropic,
-        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
     )
     llm_pricing_create(
         model_id="claude-3-7-sonnet-20250219",
