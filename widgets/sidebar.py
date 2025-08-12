@@ -235,7 +235,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_funtion_classes}",
             style={"height": "100dvh"},
         )
-        pane_content_placeholder = gui.div(className="d-flex flex-grow-1")
+        pane_content_placeholder = gui.div(className="d-flex flex-grow-1 mw-100")
         # sidebar content
         sidebar_content_placeholder
         pane_content_placeholder
