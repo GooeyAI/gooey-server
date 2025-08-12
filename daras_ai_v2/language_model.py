@@ -93,6 +93,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=128_000,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
     gpt_5_mini = LLMSpec(
@@ -103,6 +104,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=128_000,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-nano
     gpt_5_nano = LLMSpec(
@@ -113,6 +115,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=128_000,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-chat-latest
     gpt_5_chat = LLMSpec(
@@ -123,6 +126,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=128_000,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
 
     # https://platform.openai.com/docs/models/gpt-4-1
@@ -1515,7 +1519,7 @@ def run_openai_chat(
     response_format_type: ResponseFormatType | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
-    from openai._types import NOT_GIVEN
+    from openai import NOT_GIVEN
 
     messages_for_completion = deepcopy(messages)
 
@@ -1564,13 +1568,7 @@ def run_openai_chat(
         frequency_penalty = 0
         presence_penalty = 0
 
-    # fuck you, openai
-    if temperature is None or model in [
-        LargeLanguageModels.gpt_5,
-        LargeLanguageModels.gpt_5_mini,
-        LargeLanguageModels.gpt_5_nano,
-        LargeLanguageModels.gpt_5_chat,
-    ]:
+    if temperature is None or not model.supports_temperature:
         temperature = NOT_GIVEN
 
     if tools:
