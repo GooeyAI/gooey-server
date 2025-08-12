@@ -703,12 +703,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     scroll_into_view = False
 
     def _render_running_output(self):
-        ## The embedded web widget includes a running output, so just scroll it into view
+        ## The embedded web widget includes a running output, so just scroll it into view to tabs which just above the widget
 
         # language=JavaScript
         gui.js(
             """
-            let elem = document.querySelector("#gooey-embed");
+            let elem = document.querySelector("#recipe-nav-tabs");
             if (!elem) return;
             if (elem.scrollIntoViewIfNeeded) {
                 elem.scrollIntoViewIfNeeded(false);
@@ -1545,11 +1545,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 response.output_video.append(lip_state["output_video"])
 
     def render_header_extra(self):
-        if self.tab == RecipeTabs.run:
+        if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
 
     def get_tabs(self):
         tabs = super().get_tabs()
+        tabs.insert(1, RecipeTabs.preview)
         tabs.extend([RecipeTabs.integrations])
         return tabs
 

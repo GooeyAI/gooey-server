@@ -89,6 +89,8 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
+from routers.root import PREVIEW_ROUTE_WORKFLOWS
+
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -390,29 +392,17 @@ class BasePage:
 
         header_placeholder = gui.div(className="my-3 w-100")
         with (
-            gui.styled(
-                """
-                @media (max-width: 768px) { 
-                    & button {
-                        font-size: 0.9rem; 
-                        padding: 0.3rem !important 
-                    }
-                }
-                & .nav-item {
-                    font-size: smaller;
-                    font-weight: bold;
-                }
-                & button {
-                    padding: 0.4rem !important;
-                }
-                """
-            ),
-            gui.div(className="position-relative"),
+            gui.styled(NAV_TABS_CSS),
+            gui.div(className="position-relative", id="recipe-nav-tabs"),
             gui.nav_tabs(),
         ):
             for tab in self.get_tabs():
                 url = self.current_app_url(tab)
-                with gui.nav_item(url, active=tab == self.tab):
+                if tab == RecipeTabs.run and self.tab == RecipeTabs.preview:
+                    force_active_lg = gui.tag("span", className="active-lg")
+                else:
+                    force_active_lg = gui.dummy()
+                with force_active_lg, gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
                 self._render_saved_generated_timestamp()
@@ -432,7 +422,7 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        if self.tab != RecipeTabs.run:
+        if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
             # Examples, API, Saved, etc
             if self.tab == RecipeTabs.saved or self.tab == RecipeTabs.history:
                 with gui.div(className="mb-2"):
@@ -609,7 +599,7 @@ class BasePage:
         ):
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
 
-            if self.tab == RecipeTabs.run:
+            if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
                 if self.current_pr.is_root():
                     render_help_button(self.workflow)
                 if self.is_logged_in():
@@ -1173,7 +1163,7 @@ class BasePage:
 
     def render_selected_tab(self):
         match self.tab:
-            case RecipeTabs.run:
+            case RecipeTabs.run | RecipeTabs.preview:
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                     return
@@ -1201,10 +1191,8 @@ class BasePage:
                         ),
                     )
 
-                with gui.styled(OUTPUT_TABS_CSS):
-                    output_col, input_col = gui.tabs(
-                        [f"{icons.preview} Preview", f"{icons.edit} Edit"]
-                    )
+                with gui.styled(INPUT_OUTPUT_COLS_CSS):
+                    input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
                         submitted = self._render_input_col()
                     with output_col:
@@ -1762,25 +1750,30 @@ class BasePage:
     show_settings = True
 
     def _render_input_col(self):
-        self.render_form_v2()
-        placeholder = gui.div()
+        if self.tab == RecipeTabs.preview:
+            hide_on_mobile = "d-none d-lg-block"
+        else:
+            hide_on_mobile = ""
+        with gui.div(className=hide_on_mobile):
+            self.render_form_v2()
+            placeholder = gui.div()
 
-        if self.show_settings:
-            with gui.div(className="bg-white"):
-                with gui.expander("⚙️ Settings"):
-                    self.render_settings()
-                    if self.functions_in_settings:
-                        functions_input(self.request.user)
+            if self.show_settings:
+                with gui.div(className="bg-white"):
+                    with gui.expander("⚙️ Settings"):
+                        self.render_settings()
+                        if self.functions_in_settings:
+                            functions_input(self.request.user)
 
-        with placeholder:
-            self.render_variables()
+            with placeholder:
+                self.render_variables()
 
-        submitted = self.render_submit_button()
-        with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
-            terms_caption = self.get_terms_caption()
-            gui.caption(f"_{terms_caption}_")
+            submitted = self.render_submit_button()
+            with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
+                terms_caption = self.get_terms_caption()
+                gui.caption(f"_{terms_caption}_")
 
-        return submitted
+            return submitted
 
     def get_terms_caption(self):
         return "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
@@ -1832,7 +1825,13 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
-        with gui.div(style=dict(position="sticky", top="0.5rem")):
+        if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            hide_on_mobile = "d-none d-lg-block pb-2"
+        else:
+            hide_on_mobile = ""
+        with gui.div(
+            style=dict(position="sticky", top="0.5rem"), className=hide_on_mobile
+        ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
                 self._render_failed_output()
@@ -1905,7 +1904,11 @@ class BasePage:
         sr = self.on_submit(unsaved_state=unsaved_state)
         if not sr:
             return
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            tab = RecipeTabs.preview
+        else:
+            tab = None
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -2555,36 +2558,76 @@ class TitleValidationError(Exception):
     pass
 
 
-OUTPUT_TABS_CSS = """
-& [data-reach-tab-list] {  
-    text-align: center; margin-top: 0 
+INPUT_OUTPUT_COLS_CSS = """
+& {
+    margin: -1rem 0 1rem 0;
+    padding-top: 1rem;
 }
+
+/* reset col padding in mobile */
+& > div {
+    padding: 0; 
+}
+
 @media (min-width: 768px) {
-    & [data-reach-tab-list] {
-        display: none;
-    }
-    & [data-reach-tab-panels] {
-        display: flex;
-        flex-direction: row-reverse;
-        width: 100%;
+    & {
         background-color: #f9f9f9;
-        padding: 10px;
-        margin-top: -1rem;
     }
-    & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 0 1 auto;
-        width: 60%;
-        max-width: 100%;
-        padding-right: 0.75rem;
+    /* set col padding in mobile */
+    & > div {
+        padding-left: calc(var(--bs-gutter-x) * .5);
+        padding-right: calc(var(--bs-gutter-x) * .5);
     }
-    & [data-reach-tab-panels] > div:nth-child(1) {
-        flex: 0 0 auto;
-        width: 40%;
-        max-width: 100%;
-        padding-left: 0.75rem;
+}
+"""
+
+NAV_TABS_CSS = """
+@media (max-width: 768px) { 
+    & button {
+        font-size: 0.9rem; 
+        padding: 0.3rem !important 
     }
-    & [data-reach-tab-panel][hidden] {
-        display: block !important;
+}
+& .nav-item {
+    font-size: smaller;
+    font-weight: bold;
+}
+& button {
+    padding: 0.4rem !important;
+}
+
+& a:has(span.mobile-only-recipe-tab) {
+    display: block !important;
+}
+
+& li.nav-item:first-of-type button {
+    margin-left: 0 !important;
+}
+
+& ul.nav-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap !important;
+    display: flex;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+    & a:has(span.mobile-only-recipe-tab) {
+        display: none !important;
+    }
+
+    /* RUN as active tab in lg view for preview route */
+    & span.active-lg button {
+        color: #000;
+        border-bottom: 2px solid black;
+    }
+
+    & ul.nav-tabs {
+        gap: 0;
     }
 }
 """
