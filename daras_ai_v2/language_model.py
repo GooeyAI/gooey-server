@@ -122,8 +122,8 @@ class LargeLanguageModels(Enum):
         label="GPT-5 Chat • openai",
         model_id="gpt-5-chat-latest",
         llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
+        context_window=128_000,
+        max_output_tokens=16_384,
         is_vision_model=True,
         supports_json=True,
         supports_temperature=False,
@@ -1532,6 +1532,7 @@ def run_openai_chat(
         LargeLanguageModels.gpt_5,
         LargeLanguageModels.gpt_5_mini,
         LargeLanguageModels.gpt_5_nano,
+        LargeLanguageModels.gpt_5_chat,
     ]:
         # fuck you, openai
         for entry in messages_for_completion:
@@ -1547,7 +1548,8 @@ def run_openai_chat(
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
-        max_completion_tokens = max(25_000, max_completion_tokens)
+        if model.max_output_tokens and model.max_output_tokens > 25_000:
+            max_completion_tokens = max(25_000, max_completion_tokens)
     elif model in [
         LargeLanguageModels.claude_4_sonnet,
         LargeLanguageModels.claude_4_opus,
