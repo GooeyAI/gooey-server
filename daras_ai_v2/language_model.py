@@ -22,11 +22,7 @@ from openai.types.chat import (
     ChatCompletionMessageToolCallParam,
 )
 
-from daras_ai.image_input import (
-    gs_url_to_uri,
-    bytes_to_cv2_img,
-    cv2_img_to_bytes,
-)
+from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
@@ -74,6 +70,7 @@ class LLMSpec(typing.NamedTuple):
     price: int = 1
     is_chat_model: bool = True
     is_vision_model: bool = False
+    is_thinking_model: bool = False
     supports_json: bool = False
     supports_temperature: bool = True
     is_audio_model: bool = False
@@ -91,6 +88,7 @@ class LargeLanguageModels(Enum):
         context_window=400_000,
         max_output_tokens=128_000,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
@@ -101,6 +99,7 @@ class LargeLanguageModels(Enum):
         context_window=400_000,
         max_output_tokens=128_000,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-5-nano
@@ -111,6 +110,7 @@ class LargeLanguageModels(Enum):
         context_window=400_000,
         max_output_tokens=128_000,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
     # https://platform.openai.com/docs/models/gpt-5-chat-latest
@@ -118,9 +118,10 @@ class LargeLanguageModels(Enum):
         label="GPT-5 Chat • openai",
         model_id="gpt-5-chat-latest",
         llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
+        context_window=128_000,
+        max_output_tokens=16_384,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
 
@@ -174,6 +175,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         max_output_tokens=100_000,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
     )
@@ -186,6 +188,7 @@ class LargeLanguageModels(Enum):
         context_window=200_000,
         max_output_tokens=100_000,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
     )
@@ -199,6 +202,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=100_000,
         price=13,
         is_vision_model=False,
+        is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
     )
@@ -212,6 +216,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=100_000,
         price=50,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
     )
@@ -225,6 +230,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=32_768,
         price=50,
         is_vision_model=False,
+        is_thinking_model=True,
         supports_json=False,
         supports_temperature=False,
         is_deprecated=True,
@@ -240,6 +246,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=65_536,
         price=13,
         is_vision_model=False,
+        is_thinking_model=True,
         supports_json=False,
         supports_temperature=False,
     )
@@ -600,6 +607,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=65_535,
         price=1,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
     gemini_2_5_flash = LLMSpec(
@@ -610,6 +618,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=65_535,
         price=1,
         is_vision_model=True,
+        is_thinking_model=True,
         supports_json=True,
     )
     gemini_2_5_flash_lite = LLMSpec(
@@ -632,6 +641,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
+        is_thinking_model=True,
         redirect_to="gemini_2_5_pro",
     )
     gemini_2_5_flash_preview = LLMSpec(
@@ -644,6 +654,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
+        is_thinking_model=True,
         redirect_to="gemini_2_5_flash",
     )
     gemini_2_flash_lite = LLMSpec(
@@ -959,6 +970,7 @@ class LargeLanguageModels(Enum):
         self.is_deprecated = spec.is_deprecated
         self.is_chat_model = spec.is_chat_model
         self.is_vision_model = spec.is_vision_model
+        self.is_thinking_model = spec.is_thinking_model
         self.supports_json = spec.supports_json
         self.supports_temperature = spec.supports_temperature
         self.is_audio_model = spec.is_audio_model
@@ -1540,15 +1552,16 @@ def run_openai_chat(
     messages_for_completion = deepcopy(messages)
 
     if model in [
-        LargeLanguageModels.o1_mini,
-        LargeLanguageModels.o1,
-        LargeLanguageModels.o3_mini,
-        LargeLanguageModels.o3,
-        LargeLanguageModels.o4_mini,
-        LargeLanguageModels.gpt_5,
-        LargeLanguageModels.gpt_5_mini,
-        LargeLanguageModels.gpt_5_nano,
+        LargeLanguageModels.gemini_2_5_pro,
+        LargeLanguageModels.gemini_2_5_flash,
+        LargeLanguageModels.claude_4_sonnet,
+        LargeLanguageModels.claude_4_opus,
+        LargeLanguageModels.claude_4_1_opus,
     ]:
+        # we want the lower bound for reasoning, but not the rest of openai's new changes
+        max_tokens = max(25_000, max_completion_tokens)
+        max_completion_tokens = NOT_GIVEN
+    elif model.is_thinking_model and model.llm_api == LLMApis.openai:
         # fuck you, openai
         for entry in messages_for_completion:
             if entry["role"] == CHATML_ROLE_SYSTEM:
@@ -1563,17 +1576,10 @@ def run_openai_chat(
 
         # reserved tokens for reasoning...
         # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
-        max_completion_tokens = max(25_000, max_completion_tokens)
-    elif model in [
-        LargeLanguageModels.claude_4_sonnet,
-        LargeLanguageModels.claude_4_opus,
-        LargeLanguageModels.claude_4_1_opus,
-        LargeLanguageModels.gemini_2_5_pro,
-        LargeLanguageModels.gemini_2_5_flash,
-    ]:
-        # we want the lower bound for reasoning, but not the rest of openai's new changes
-        max_tokens = max(25_000, max_completion_tokens)
-        max_completion_tokens = NOT_GIVEN
+        if model.max_output_tokens:
+            max_completion_tokens = min(
+                max(25_000, max_completion_tokens), model.max_output_tokens
+            )
     else:
         max_tokens = max_completion_tokens
         max_completion_tokens = NOT_GIVEN
