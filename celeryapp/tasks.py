@@ -123,13 +123,11 @@ def runner_task(
 
     # render errors nicely
     except Exception as e:
-        if isinstance(e, UserError):
-            sentry_level = e.sentry_level
+        if not isinstance(e, UserError):
             logger.warning("\n".join(map(str, [e, e.__cause__])))
         else:
-            sentry_level = "error"
             traceback.print_exc()
-        sentry_sdk.capture_exception(e, level=sentry_level)
+            sentry_sdk.capture_exception(e, level="error")
         error_msg = err_msg_for_exc(e)
         sr.error_type = type(e).__qualname__
         sr.error_code = getattr(e, "status_code", None)
