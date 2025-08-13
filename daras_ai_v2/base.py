@@ -1171,35 +1171,7 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                if self.is_current_user_admin():
-                    render_gooey_builder(
-                        page_slug=self.slug_versions[-1],
-                        saved_state={
-                            k: v
-                            for k, v in gui.session_state.items()
-                            if k in self.fields_to_save()
-                        }
-                        | {
-                            "--has-request-changed": True,
-                        },
-                        builder_state=dict(
-                            status=dict(
-                                error_msg=gui.session_state.get(StateKeys.error_msg),
-                                run_status=gui.session_state.get(StateKeys.run_status),
-                                run_time=gui.session_state.get(StateKeys.run_time),
-                            ),
-                            request=extract_model_fields(
-                                model=self.RequestModel, state=gui.session_state
-                            ),
-                            response=extract_model_fields(
-                                model=self.ResponseModel, state=gui.session_state
-                            ),
-                            metadata=dict(
-                                title=self.current_pr.title,
-                                description=self.current_pr.notes,
-                            ),
-                        ),
-                    )
+                self._render_gooey_builder()
 
                 with gui.styled(INPUT_OUTPUT_COLS_CSS):
                     input_col, output_col = gui.columns([3, 2], gap="medium")
@@ -1227,6 +1199,46 @@ class BasePage:
 
             case RecipeTabs.saved:
                 self._saved_tab()
+
+    def _render_gooey_builder(self):
+        update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
+        if update_gui_state:
+            new_state = (
+                {
+                    k: v
+                    for k, v in gui.session_state.items()
+                    if k in self.fields_to_save()
+                }
+                | {
+                    "--has-request-changed": True,
+                }
+                | update_gui_state
+            )
+            gui.session_state.clear()
+            gui.session_state.update(new_state)
+
+        if not self.is_current_user_admin():
+            return
+        render_gooey_builder(
+            page_slug=self.slug_versions[-1],
+            builder_state=dict(
+                status=dict(
+                    error_msg=gui.session_state.get(StateKeys.error_msg),
+                    run_status=gui.session_state.get(StateKeys.run_status),
+                    run_time=gui.session_state.get(StateKeys.run_time),
+                ),
+                request=extract_model_fields(
+                    model=self.RequestModel, state=gui.session_state
+                ),
+                response=extract_model_fields(
+                    model=self.ResponseModel, state=gui.session_state
+                ),
+                metadata=dict(
+                    title=self.current_pr.title,
+                    description=self.current_pr.notes,
+                ),
+            ),
+        )
 
     def _render_version_history(self):
         versions = self.current_pr.versions.all()

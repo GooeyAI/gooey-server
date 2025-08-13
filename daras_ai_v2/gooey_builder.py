@@ -6,18 +6,9 @@ from bots.models import BotIntegration
 from daras_ai_v2 import settings
 
 
-def render_gooey_builder(
-    page_slug: str,
-    saved_state: dict,
-    builder_state: dict,
-):
+def render_gooey_builder(page_slug: str, builder_state: dict):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
-
-    update_gui_state = gui.session_state.pop("update_gui_state", None)
-    if update_gui_state:
-        gui.session_state.clear()
-        gui.session_state.update(saved_state | update_gui_state)
 
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     config = bi.get_web_widget_config(
