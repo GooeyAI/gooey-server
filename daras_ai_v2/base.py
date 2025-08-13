@@ -39,7 +39,6 @@ from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from widgets.base_header import render_breadcrumbs_with_author, render_header_title
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -75,7 +74,11 @@ from payments.auto_recharge import (
 from payments.plans import PricingPlan
 from routers.root import RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
-from widgets.base_header import render_help_button
+from widgets.base_header import (
+    render_breadcrumbs_with_author,
+    render_header_title,
+    render_help_button,
+)
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
