@@ -68,7 +68,7 @@ class DeforumSDPage(BasePage):
         rotation_3d_y: str | None = None
         rotation_3d_z: str | None = None
         fps: int | None = None
-
+        aspect_ratio: typing.Literal["1:1", "9:16", "16:9"] | None = "1:1"
         seed: int | None = None
 
     class ResponseModel(BaseModel):
@@ -111,6 +111,34 @@ class DeforumSDPage(BasePage):
         gui.write("#### Step 1: Draft & Refine Keyframes")
 
         animation_prompts_editor(prev_fps_slider, fps_slider)
+
+        # Row: Aspect Ratio (left)
+        with gui.div():
+            gui.write("Aspect Ratio")
+            options = [
+                f"{icons.aspect_square} Square",
+                f"{icons.aspect_portrait} 9:16 Portrait",
+                f"{icons.aspect_landscape} 16:9 Landscape",
+            ]
+            selected = gui.horizontal_radio(
+                label="",
+                options=options,
+                value=(
+                    f"{icons.aspect_square} Square"
+                    if (gui.session_state.get("aspect_ratio") or "1:1") == "1:1"
+                    else (
+                        f"{icons.aspect_portrait} 9:16 Portrait"
+                        if gui.session_state.get("aspect_ratio") == "9:16"
+                        else f"{icons.aspect_landscape} 16:9 Landscape"
+                    )
+                ),
+            )
+            if "Square" in selected:
+                gui.session_state["aspect_ratio"] = "1:1"
+            elif "Portrait" in selected:
+                gui.session_state["aspect_ratio"] = "9:16"
+            else:
+                gui.session_state["aspect_ratio"] = "16:9"
 
         gui.write("#### Step 2: Increase Animation Quality")
         gui.caption(
@@ -167,6 +195,7 @@ class DeforumSDPage(BasePage):
             )
 
             gui.selectbox("Animation Mode", key="animation_mode", options=["2D", "3D"])
+        # Right column currently empty (reserved for future settings)
 
     #         gui.selectbox(
     #             """
@@ -285,6 +314,7 @@ class DeforumSDPage(BasePage):
             safety_checker(text=self.preview_input(state))
 
         try:
+            width, height = dims_for_ratio(request.aspect_ratio or "1:1")
             state["output_video"] = call_celery_task_outfile(
                 "deforum",
                 pipeline=dict(
@@ -292,11 +322,14 @@ class DeforumSDPage(BasePage):
                     seed=request.seed,
                 ),
                 inputs=dict(
+                    args=dict(W=512, H=512),
                     animation_mode=request.animation_mode,
                     animation_prompts={
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
                     },
                     max_frames=request.max_frames,
+                    width=width,
+                    height=height,
                     zoom=request.zoom or "0:(1)",
                     translation_x=request.translation_x or "0:(0)",
                     translation_y=request.translation_y or "0:(0)",
@@ -305,6 +338,7 @@ class DeforumSDPage(BasePage):
                     rotation_3d_z=request.rotation_3d_z or "0:(0)",
                     translation_z="0:(0)",
                     fps=request.fps,
+                    aspect_ratio=request.aspect_ratio,
                 ),
                 content_type="video/mp4",
                 filename=f"gooey.ai animation {request.animation_prompts}.mp4",
@@ -695,6 +729,16 @@ def frames_to_seconds(frames: int, fps: int) -> float:
 
 def seconds_to_frames(seconds: float, fps: int) -> int:
     return int(float(seconds) * int(fps))
+
+
+def dims_for_ratio(aspect_ratio: str) -> tuple[int, int]:
+    # Defaults chosen for good quality while keeping GPU usage reasonable
+    if aspect_ratio == "9:16":
+        return 540, 960
+    if aspect_ratio == "16:9":
+        return 960, 540
+    # Fallback to square
+    return 768, 768
 
 
 def key_frames_to_str(key_frames: dict[int, float], default_val: float = 0.0) -> str:
