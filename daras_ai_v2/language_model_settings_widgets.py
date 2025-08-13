@@ -1,3 +1,5 @@
+import typing
+
 from pydantic import BaseModel, Field
 
 import gooey_gui as gui
@@ -12,9 +14,11 @@ class LanguageModelSettings(BaseModel):
     quality: float | None = None
     max_tokens: int | None = None
     sampling_temperature: float | None = None
+    reasoning_effort: typing.Literal["minimal", "low", "medium", "high"] | None = Field(
+        None, title="Reasoning Effort"
+    )
     response_format_type: ResponseFormatType | None = Field(
-        None,
-        title="Response Format",
+        None, title="Response Format"
     )
 
 
@@ -115,4 +119,14 @@ Generate multiple responses and choose the best one
                 min_value=1.0,
                 max_value=5.0,
                 step=0.1,
+            )
+
+    if any(llm.is_thinking_model and llm.llm_api == LLMApis.openai for llm in llms):
+        col1, _ = gui.columns(2)
+        with col1:
+            gui.selectbox(
+                label=f"###### {field_title_desc(LanguageModelSettings, 'reasoning_effort')}",
+                options=[None, "minimal", "low", "medium", "high"],
+                key="reasoning_effort",
+                format_func=lambda x: x.capitalize() if x else BLANK_OPTION,
             )
