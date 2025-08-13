@@ -715,17 +715,20 @@ class BasePage:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="secondary",
+                        key="save_published_run_as_new",
                         className="mb-0 py-2 px-4",
                     )
                     pressed_save = gui.button(
                         f"{icons.save} Save",
                         type="primary",
+                        key="save_published_run",
                         className="mb-0 ms-2 py-2 px-4",
                     )
                 else:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="primary",
+                        key="save_published_run",
                         className="mb-0 py-2 px-4",
                     )
                     pressed_save = False
@@ -1175,6 +1178,9 @@ class BasePage:
                             k: v
                             for k, v in gui.session_state.items()
                             if k in self.fields_to_save()
+                        }
+                        | {
+                            "--has-request-changed": True,
                         },
                         builder_state=dict(
                             status=dict(
@@ -1187,6 +1193,10 @@ class BasePage:
                             ),
                             response=extract_model_fields(
                                 model=self.ResponseModel, state=gui.session_state
+                            ),
+                            metadata=dict(
+                                title=self.current_pr.title,
+                                description=self.current_pr.notes,
                             ),
                         ),
                     )
