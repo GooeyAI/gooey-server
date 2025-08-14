@@ -1,4 +1,3 @@
-import uuid
 
 import gooey_gui as gui
 

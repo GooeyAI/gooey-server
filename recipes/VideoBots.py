@@ -123,6 +123,7 @@ from usage_costs.twilio_usage_cost import (
 )
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
+from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -315,6 +316,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             title="🛠️ Tools",
             description="Use `functions` instead.",
             deprecated=True,
+        )
+
+        bulk_runs: list[dict] | None = Field(
+            None,
+            title="Bulk Evaluation",
+            description="Add a [bulk](https://gooey.ai/bulk-runner) workflow with your golden evaluation data to rate workflows on cost, speed and latency.",
         )
 
     class RequestModel(
@@ -578,6 +585,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.newline()
         else:
             gui.session_state["document_model"] = None
+
+    def render_variables(self):
+        super().render_variables()
+
+        with gui.expander("Analytics & Evaluation"):
+            render_workflow_bulk_runs_list(
+                user=self.request.user,
+                workspace=self.current_workspace,
+                sr=self.current_sr,
+                pr=self.current_pr,
+            )
 
     def validate_form_v2(self):
         input_glossary = gui.session_state.get("input_glossary_document", "")
