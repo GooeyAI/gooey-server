@@ -427,6 +427,8 @@ class LargeLanguageModels(Enum):
         max_output_tokens=32_768,
         price=1,
         supports_json=True,
+        is_deprecated=True,
+        redirect_to="llama4_maverick_17b_128e",
     )
     llama3_2_90b_vision = LLMSpec(
         label="Llama 3.2 90B + Vision • Meta AI",
