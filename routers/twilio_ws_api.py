@@ -123,6 +123,7 @@ def twilio_voice_ws(
         bot = TwilioVoiceWs.from_webhook_data(data)
     except NeedsExtensionGathering as e:
         resp = VoiceResponse()
+        resp.say("Hi from Gooey.AI, Please enter an extension")
         resp.gather(
             action=get_api_route_url(twilio_extension_input),
             method="POST",
@@ -138,7 +139,19 @@ def twilio_voice_ws(
         resp.reject()
         return twiml_response(resp)
 
-    logger.debug(f"bot: {bot=}")
+
+
+    if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
+        resp = VoiceResponse()
+        resp.reject()
+        return twiml_response(resp)
+    try:
+        ensure_bot_rate_limits(bot.convo)
+    except RateLimitExceeded as e:
+        resp = VoiceResponse()
+        resp.say(e.detail["error"])
+        return twiml_response(resp)
+    
     background_tasks.add_task(msg_handler_raw, bot)
     return connect_to_stream(bot)
 
@@ -231,7 +244,7 @@ def create_twilio_voice_ws_bot(
     bi: BotIntegration,
     user_number: str,
     call_sid: str,
-    extension: BotExtension,
+    extension: BotExtension | None = None,
     text: str | None = None,
     audio_url: str | None = None,
 ):

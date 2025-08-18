@@ -58,7 +58,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import UserError, UnavailablePhoneNumber
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -1725,12 +1725,21 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(pr.id)
                 case Platform.TWILIO:
-                    bi, _ = create_bot_integration_with_extension(
-                        name=run_title,
-                        created_by=self.request.user,
-                        workspace=self.current_workspace,
-                        platform=Platform.TWILIO,
-                    )
+                    
+                    try :
+                        bi, _ = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.TWILIO,
+                        )
+                    except UnavailablePhoneNumber as e:
+                        gui.caption(
+                            f"{e}",
+                            className="text-center text-danger",
+                        )
+                        return
+
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
 
                 case _:
