@@ -75,8 +75,3 @@ card_icons = {
 integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
 
 help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'
-
-# aspect ratio icons
-aspect_square = '<i class="fa-sharp fa-regular fa-square"></i>'
-aspect_portrait = '<i class="fa-sharp fa-solid fa-image-portrait"></i>'
-aspect_landscape = '<i class="fa-sharp fa-regular fa-image-landscape"></i>'
