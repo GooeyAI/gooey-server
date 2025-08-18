@@ -1781,11 +1781,10 @@ class BasePage:
             placeholder = gui.div()
 
             if self.show_settings:
-                with gui.div(className="bg-white"):
-                    with gui.expander("⚙️ Settings"):
-                        self.render_settings()
-                        if self.functions_in_settings:
-                            functions_input(self.request.user)
+                with gui.div(className="bg-white mt-2"), gui.expander("⚙️ Settings"):
+                    self.render_settings()
+                    if self.functions_in_settings:
+                        functions_input(self.request.user)
 
             with placeholder:
                 self.render_variables()

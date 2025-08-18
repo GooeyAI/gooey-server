@@ -11,6 +11,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.settings import templates
 from functions.models import CalledFunction, FunctionTrigger
+from widgets.switch_with_section import switch_with_section
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
@@ -312,7 +313,7 @@ def functions_input(current_user: AppUser, key="functions"):
     from daras_ai_v2.base import BasePage
     from recipes.BulkRunner import list_view_editor
 
-    def render_function_input(list_key: str, del_key: str, d: dict):
+    def render_inputs(list_key: str, del_key: str, d: dict):
         from daras_ai_v2.workflow_url_input import workflow_url_input
         from recipes.Functions import FunctionsPage
 
@@ -336,26 +337,24 @@ def functions_input(current_user: AppUser, key="functions"):
             )
         col2.node.children[0].props["className"] += " col-12"
 
-    if gui.switch(
+    def render_section():
+        gui.session_state.setdefault(key, [{}])
+        with gui.div(className="d-flex align-items-center"):
+            gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
+        list_view_editor(
+            add_btn_label="Add Function",
+            add_btn_type="tertiary",
+            key=key,
+            render_inputs=render_inputs,
+        )
+
+    functions_enabled = switch_with_section(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
         key=f"--enable-{key}",
-        value=key in gui.session_state,
-        className="mb-2",
-    ):
-        with gui.div(className="ps-1"):
-            gui.session_state.setdefault(key, [{}])
-            with gui.div(className="d-flex align-items-center"):
-                gui.write(
-                    "###### Functions",
-                    help=FUNCTIONS_HELP_TEXT,
-                )
-            list_view_editor(
-                add_btn_label="Add Function",
-                add_btn_type="tertiary",
-                key=key,
-                render_inputs=render_function_input,
-            )
-    else:
+        control_keys=[key],
+        render_section=render_section,
+    )
+    if not functions_enabled:
         gui.session_state.pop(key, None)
 
 

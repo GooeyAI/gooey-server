@@ -121,6 +121,7 @@ from usage_costs.twilio_usage_cost import (
     get_non_ivr_price_credits,
     get_ivr_price_credits_and_seconds,
 )
+from widgets.switch_with_section import switch_with_section
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
@@ -435,94 +436,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         gui.markdown("#### 💪 Capabilities")
 
-        if gui.switch(
-            "##### 🦻 Speech Recognition & Translation",
-            value=bool(
-                gui.session_state.get("user_language")
-                or gui.session_state.get("asr_model")
-            ),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                gui.caption(field_desc(self.RequestModel, "user_language"))
-
-                # drop down to filter models based on the selected language
-                selected_filter_language = language_filter_selector(
-                    options=asr_languages_without_dialects()
-                )
-
-                col1, col2 = gui.columns(2, responsive=False)
-                with col1:
-                    asr_model = asr_model_selector(
-                        key="asr_model",
-                        language_filter=selected_filter_language,
-                        label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                        format_func=lambda x: (
-                            AsrModels[x].value if x else "Auto Select"
-                        ),
-                    )
-                with col2:
-                    if asr_model:
-                        asr_language = asr_language_selector(
-                            asr_model,
-                            language_filter=selected_filter_language,
-                            label=f"###### {field_title(self.RequestModel, 'asr_language')}",
-                            key="asr_language",
-                        )
-                    else:
-                        asr_language = None
-
-                if asr_model.supports_input_prompt():
-                    gui.text_area(
-                        f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
-                        key="asr_prompt",
-                        value="Transcribe the recording as accurately as possible.",
-                        height=300,
-                    )
-
-                gui.newline()
-                if gui.checkbox(
-                    "🔠 **Translate to & from English**",
-                    value=bool(gui.session_state.get("translation_model")),
-                ):
-                    gui.caption(
-                        "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
-                    )
-
-                    if asr_model and asr_model.supports_speech_translation():
-                        with gui.div(className="text-muted"):
-                            if gui.checkbox(
-                                label=field_desc(self.RequestModel, "asr_task").format(
-                                    asr_model=asr_model.value,
-                                    asr_language=asr_language or "Detected Language",
-                                ),
-                                value=gui.session_state.get("asr_task") == "translate",
-                            ):
-                                gui.session_state["asr_task"] = "translate"
-                            else:
-                                gui.session_state.pop("asr_task", None)
-                    else:
-                        gui.session_state.pop("asr_task", None)
-
-                    col1, col2 = gui.columns(2)
-                    with col1:
-                        translation_model = translation_model_selector(
-                            allow_none=False,
-                            language_filter=selected_filter_language,
-                        )
-                    with col2:
-                        translation_language_selector(
-                            model=translation_model,
-                            language_filter=selected_filter_language,
-                            label=f"###### {field_title(self.RequestModel, 'user_language')}",
-                            key="user_language",
-                        )
-                else:
-                    gui.session_state["asr_task"] = None
-                    gui.session_state["translation_model"] = None
-                    gui.session_state["user_language"] = None
-
-                gui.newline()
-        else:
+        speech_recognition_enabled = switch_with_section(
+            label="##### 🦻 Speech Recognition & Translation",
+            key="_speech_recognition_enabled",
+            control_keys=["user_language", "asr_model"],
+            render_section=self.speech_recognition_settings,
+        )
+        if not speech_recognition_enabled:
             gui.session_state["asr_model"] = None
             gui.session_state["asr_language"] = None
             gui.session_state["asr_prompt"] = None
@@ -531,71 +451,161 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.session_state["translation_model"] = None
             gui.session_state["user_language"] = None
 
-        if gui.switch(
-            "##### 🗣️ Text to Speech & Lipsync",
-            value=bool(gui.session_state.get("tts_provider")),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                text_to_speech_provider_selector(self)
-
-            gui.newline()
-
-            enable_video = gui.switch(
-                "##### 🫦 Add Lipsync Video",
-                value=bool(gui.session_state.get("input_face")),
-            )
-        else:
+        text_to_speech_enabled = switch_with_section(
+            label="##### 🗣️ Text to Speech & Lipsync",
+            key="_text_to_speech_enabled",
+            control_keys=["tts_provider"],
+            render_section=self.text_to_speech_settings,
+        )
+        if not text_to_speech_enabled:
             gui.session_state["tts_provider"] = None
-            enable_video = False
-        if enable_video:
-            with gui.div(className="pt-2 ps-1"):
-                gui.file_uploader(
-                    """
-                    ###### 👩‍🦰 Input Face
-                    Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
-                    """,
-                    key="input_face",
-                )
-                enum_selector(
-                    LipsyncModel,
-                    label="###### Lipsync Model",
-                    key="lipsync_model",
-                    use_selectbox=True,
-                )
-            gui.newline()
-        else:
-            gui.session_state["input_face"] = None
-            gui.session_state.pop("lipsync_model", None)
 
-        if gui.switch(
-            "##### 🩻 Photo & Document Intelligence",
-            value=bool(gui.session_state.get("document_model")),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                if settings.AZURE_FORM_RECOGNIZER_KEY:
-                    doc_model_descriptions = azure_form_recognizer_models()
-                else:
-                    doc_model_descriptions = {}
-                gui.selectbox(
-                    f"{field_desc(self.RequestModel, 'document_model')}",
-                    key="document_model",
-                    options=doc_model_descriptions,
-                    format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
-                )
-            gui.newline()
-        else:
+        document_intelligence_enabled = switch_with_section(
+            label="##### 🩻 Photo & Document Intelligence",
+            key="_document_intelligence_enabled",
+            control_keys=["document_model"],
+            render_section=self.document_intelligence_settings,
+        )
+        if not document_intelligence_enabled:
             gui.session_state["document_model"] = None
 
-    def render_variables(self):
-        super().render_variables()
-
-        with gui.expander("Analytics & Evaluation"):
-            render_workflow_bulk_runs_list(
+        switch_with_section(
+            label="##### 📊 Analytics & Evaluation",
+            control_keys=["bulk_runs"],
+            render_section=lambda: render_workflow_bulk_runs_list(
                 user=self.request.user,
                 workspace=self.current_workspace,
                 sr=self.current_sr,
                 pr=self.current_pr,
+            ),
+        )
+
+    def speech_recognition_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            gui.caption(field_desc(self.RequestModel, "user_language"))
+
+            # drop down to filter models based on the selected language
+            selected_filter_language = language_filter_selector(
+                options=asr_languages_without_dialects()
             )
+
+            col1, col2 = gui.columns(2, responsive=False)
+            with col1:
+                asr_model = asr_model_selector(
+                    key="asr_model",
+                    language_filter=selected_filter_language,
+                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
+                    format_func=lambda x: (AsrModels[x].value if x else "Auto Select"),
+                )
+            with col2:
+                if asr_model:
+                    asr_language = asr_language_selector(
+                        asr_model,
+                        language_filter=selected_filter_language,
+                        label=f"###### {field_title(self.RequestModel, 'asr_language')}",
+                        key="asr_language",
+                    )
+                else:
+                    asr_language = None
+
+            if asr_model.supports_input_prompt():
+                gui.text_area(
+                    f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
+                    key="asr_prompt",
+                    value="Transcribe the recording as accurately as possible.",
+                    height=300,
+                )
+
+            gui.newline()
+            if gui.checkbox(
+                "🔠 **Translate to & from English**",
+                value=bool(gui.session_state.get("translation_model")),
+            ):
+                gui.caption(
+                    "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
+                )
+
+                if asr_model and asr_model.supports_speech_translation():
+                    with gui.div(className="text-muted"):
+                        if gui.checkbox(
+                            label=field_desc(self.RequestModel, "asr_task").format(
+                                asr_model=asr_model.value,
+                                asr_language=asr_language or "Detected Language",
+                            ),
+                            value=gui.session_state.get("asr_task") == "translate",
+                        ):
+                            gui.session_state["asr_task"] = "translate"
+                        else:
+                            gui.session_state.pop("asr_task", None)
+                else:
+                    gui.session_state.pop("asr_task", None)
+
+                col1, col2 = gui.columns(2)
+                with col1:
+                    translation_model = translation_model_selector(
+                        allow_none=False,
+                        language_filter=selected_filter_language,
+                    )
+                with col2:
+                    translation_language_selector(
+                        model=translation_model,
+                        language_filter=selected_filter_language,
+                        label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                        key="user_language",
+                    )
+            else:
+                gui.session_state["asr_task"] = None
+                gui.session_state["translation_model"] = None
+                gui.session_state["user_language"] = None
+            gui.div(className="pb-1")
+
+    def text_to_speech_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            text_to_speech_provider_selector(self)
+
+        gui.newline()
+
+        if gui.checkbox(
+            label="**🫦 Add Lipsync Video**",
+            value=bool(gui.session_state.get("input_face")),
+        ):
+            self.lipsync_settings()
+        else:
+            gui.session_state["input_face"] = None
+            gui.session_state.pop("lipsync_model", None)
+
+        gui.div(className="pb-1")
+
+    def lipsync_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            gui.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
+                """,
+                key="input_face",
+            )
+            enum_selector(
+                LipsyncModel,
+                label="###### Lipsync Model",
+                key="lipsync_model",
+                use_selectbox=True,
+            )
+            gui.newline()
+
+    def document_intelligence_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            if settings.AZURE_FORM_RECOGNIZER_KEY:
+                doc_model_descriptions = azure_form_recognizer_models()
+            else:
+                doc_model_descriptions = {}
+            gui.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=doc_model_descriptions,
+                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
+            )
+            gui.newline()
 
     def validate_form_v2(self):
         input_glossary = gui.session_state.get("input_glossary_document", "")

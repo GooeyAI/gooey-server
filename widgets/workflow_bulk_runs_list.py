@@ -1,6 +1,4 @@
 from functools import partial
-from math import e
-from textwrap import dedent
 
 import gooey_gui as gui
 
