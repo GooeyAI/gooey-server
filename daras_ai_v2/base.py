@@ -417,7 +417,6 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
-        is_root_example = is_example and pr.is_root()
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
@@ -474,7 +473,6 @@ class BasePage:
                         self.render_header_extra()
                         render_breadcrumbs_with_author(
                             tbreadcrumbs,
-                            is_root_example=is_root_example,
                             user=self.current_sr_user,
                             pr=self.current_pr,
                             sr=self.current_sr,
