@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.text_format import format_timedelta
 from daras_ai_v2 import icons
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
@@ -310,13 +311,10 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     sr.wait_for_celery_result(result)
 
-                    run_time = datetime.timedelta(
-                        seconds=int(sr.run_time.total_seconds())
-                    )
                     state = sr.to_dict()
                     state["run_url"] = sr.get_app_url()
-                    state["price"] = sr.price
-                    state["run_time"] = str(run_time)
+                    state["price"] = f"{sr.price} credits"
+                    state["run_time"] = format_timedelta(sr.run_time)
                     state["error_msg"] = sr.error_msg
 
                     for field, col in request.output_columns.items():

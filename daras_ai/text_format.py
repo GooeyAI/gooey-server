@@ -1,4 +1,5 @@
 import ast
+import datetime
 
 import markdown_it
 import markdown_it.presets
@@ -29,10 +30,16 @@ def daras_ai_format_str(format_str, variables):
     return format_str
 
 
+def format_timedelta(td: datetime.timedelta) -> str:
+    seconds = max(round(td.total_seconds()), 1)  # avoid 0s, dont show ms
+    return str(datetime.timedelta(seconds=seconds))
+
+
 def format_number_with_suffix(num: int) -> str:
     """
     Formats large number with a suffix.
 
+        return f"{td.seconds}s"
     Ref: https://stackoverflow.com/a/45846841
     """
     num_float = float("{:.3g}".format(num))
