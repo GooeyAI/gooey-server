@@ -166,5 +166,5 @@ class ProvisionedNumber(models.Model):
             return random.choice(available_numbers)
 
         raise UnavailablePhoneNumber(
-            f"currently no {platform.label} phone numbers are available"
+            f"Sorry, {platform.label} phone numbers are currently Unavailable to assign. Please contact us or try again later."
         )
