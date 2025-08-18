@@ -5,7 +5,7 @@ import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models.published_run import PublishedRun, PublishedRunVersion
 from bots.models.saved_run import SavedRun
-from daras_ai_v2 import icons
+from daras_ai_v2 import breadcrumbs, icons
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from recipes.BulkRunner import list_view_editor
@@ -19,10 +19,11 @@ def render_workflow_bulk_runs_list(
     workspace: Workspace,
     sr: SavedRun,
     pr: PublishedRun,
+    default_url: str = "https://gooey.ai/bulk/copilot-evaluator-g179r9bdulc1/",
 ):
     from recipes.VideoBots import VideoBotsPage
 
-    list_items = gui.session_state.setdefault(f"--list-view:{key}", [{}])
+    gui.session_state.setdefault(key, [default_url])
 
     with gui.div(className="d-flex align-items-center gap-2"):
         gui.write(
@@ -35,7 +36,9 @@ def render_workflow_bulk_runs_list(
             className="p-1 mb-2",
             key=f"add_{key}",
         ):
-            list_items.append({})
+            gui.session_state.setdefault(f"--list-view:{key}", []).append(
+                {"url": default_url}
+            )
 
     bulk_runs = []
     list_view_editor(
@@ -43,12 +46,9 @@ def render_workflow_bulk_runs_list(
         render_inputs=partial(render_inputs, bulk_runs=bulk_runs, user=user),
         flatten_dict_key="url",
     )
-
     submit_evaluation_button(
         user=user, workspace=workspace, key=key, bulk_runs=bulk_runs, sr=sr, pr=pr
     )
-
-    return bulk_runs
 
 
 def render_inputs(
@@ -110,7 +110,7 @@ def submit_evaluation_button(
 
     bulk_run_urls = gui.session_state.get("_bulk_run_urls")
     if success_alert.is_open and bulk_run_urls:
-        render_success_alert(success_alert=success_alert, bulk_run_urls=bulk_run_urls)
+        render_success_alert(success_alert, bulk_run_urls)
     else:
         gui.session_state.pop("_bulk_run_urls", None)
 
@@ -124,6 +124,8 @@ def on_submit(
     sr: SavedRun,
     pr: PublishedRun,
 ):
+    from recipes.BulkRunner import BulkRunnerPage
+
     if pr and pr.saved_run_id != sr.id:
         # published run is not the same as the current run, so we can compare the two directly
         v1_url = pr.get_app_url()
@@ -150,27 +152,23 @@ def on_submit(
             request_body=dict(run_urls=[v1_url, v2_url]),
             current_user=user,
         )
-        bulk_run_urls.append(new_sr.get_app_url())
+
+        url = new_sr.get_app_url()
+        title = breadcrumbs.get_title_breadcrumbs(
+            page_cls=BulkRunnerPage, sr=new_sr, pr=run_dict["published_run"]
+        ).title_with_prefix()
+        bulk_run_urls.append((url, title))
 
 
-def render_success_alert(
-    *,
-    success_alert: gui.AlertDialogRef,
-    bulk_run_urls: list[str],
-):
+def render_success_alert(success_alert: gui.AlertDialogRef, bulk_run_urls: list[str]):
     with (
-        gui.alert_dialog(success_alert, modal_title="### ✅ Evaluation submitted"),
-        gui.div(className="d-flex justify-content-center"),
+        gui.alert_dialog(success_alert, modal_title="#### ✅ Evaluation submitted"),
+        gui.div(
+            className="d-flex flex-column justify-content-center align-items-center gap-2"
+        ),
     ):
-        onclick = (
-            "event.preventDefault();"
-            "window.open(%r);"
-            "gui.update_session_state({ _bulk_run_urls: [] })"
-        ) % ",".join(bulk_run_urls)
-        gui.write(
-            '#### <i class="fa fa-external-link"></i> '
-            f'<a href="#" onclick="{onclick}">'
-            "View Results"
-            "</a>",
-            unsafe_allow_html=True,
-        )
+        for url, title in bulk_run_urls:
+            gui.write(
+                f'##### <i class="fa fa-external-link"></i> <a href="{url}" target="_blank">{title}</a>',
+                unsafe_allow_html=True,
+            )

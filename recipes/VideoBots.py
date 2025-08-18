@@ -319,7 +319,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             deprecated=True,
         )
 
-        bulk_runs: list[dict] | None = Field(
+        bulk_runs: list[str] | None = Field(
             None,
             title="Bulk Evaluation",
             description="Add a [bulk](https://gooey.ai/bulk-runner) workflow with your golden evaluation data to rate workflows on cost, speed and latency.",
@@ -508,7 +508,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 else:
                     asr_language = None
 
-            if asr_model.supports_input_prompt():
+            if asr_model and asr_model.supports_input_prompt():
                 gui.text_area(
                     f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
                     key="asr_prompt",
