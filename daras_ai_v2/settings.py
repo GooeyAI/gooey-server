@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "api_keys",
     "managed_secrets",
     "ai_models",
+    "number_cycling",
 ]
 
 MIDDLEWARE = [
