@@ -70,7 +70,8 @@ class GPUError(UserError):
 
 
 class UnavailablePhoneNumber(UserError):
-    pass
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
 class InsufficientCredits(UserError):
