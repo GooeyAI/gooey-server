@@ -6,27 +6,9 @@ from bots.models import BotIntegration
 from daras_ai_v2 import settings
 
 
-def render_gooey_builder(
-    page_slug: str,
-    saved_state: dict,
-    builder_state: dict,
-):
+def render_gooey_builder(page_slug: str, builder_state: dict):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
-
-    # pull updates from UpdateWorkflowLLMTool
-    channel_key = "-gooey-builder-channel"
-    channel = gui.session_state.setdefault(
-        channel_key, f"gooey-bot-builder/{uuid.uuid4()}"
-    )
-    updates = gui.realtime_pull([channel])[0]
-
-    # use the nonce to detect if the state has changed, avoid re-applying the state if it has not changed
-    nonce_key = "-gooey-builder-nonce"
-    if updates and updates.get(nonce_key) != gui.session_state.get(nonce_key):
-        gui.session_state.clear()
-        gui.session_state.update(saved_state | updates)
-        gui.session_state[channel_key] = channel
 
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     config = bi.get_web_widget_config(
@@ -39,9 +21,7 @@ def render_gooey_builder(
     config.setdefault("payload", {}).setdefault("variables", {})
     # will be added later in the js code
     variables = dict(
-        update_gui_state_params=dict(
-            channel=channel, state=builder_state, page_slug=page_slug
-        ),
+        update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
 
     gui.html(

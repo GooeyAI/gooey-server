@@ -281,7 +281,6 @@ os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
 
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
-TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 FAL_API_KEY = config("FAL_API_KEY", default="")
 
 APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore

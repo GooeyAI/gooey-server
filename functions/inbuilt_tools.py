@@ -1,7 +1,5 @@
 import typing
-import uuid
 
-import gooey_gui as gui
 from django.core.exceptions import ValidationError
 from loguru import logger
 from sentry_sdk import capture_exception
@@ -25,10 +23,10 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
         yield UpdateGuiStateLLMTool(
-            channel=update_gui_state_params.get("channel"),
             state=update_gui_state_params.get("state"),
             page_slug=update_gui_state_params.get("page_slug"),
         )
+        yield RunJS()
 
     collect_feedback = variables.get("collect_feedback")
     if collect_feedback:
@@ -39,10 +37,9 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
 
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
-    def __init__(self, channel, state, page_slug):
+    def __init__(self, state, page_slug):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
-        self.channel = channel
         self.state = state or {}
         try:
             page_cls = page_slug_map[normalize_slug(page_slug)]
@@ -65,21 +62,28 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
             properties=properties,
         )
 
-    def call(self, **kwargs) -> dict:
-        if not self.channel:
-            return {"success": False, "error": "update channel not found"}
+    def call(self, **kwargs) -> str:
+        # handled by the frontend in gooey-web-widget
+        return "ok"
 
-        # collect all updates from the tool call into a single dict that can be pushed to the UI
-        updates = self.state.setdefault("updates", {})
-        # sometimes the state is nested in the kwargs, so we need to get the state from the kwargs
-        updates.update(kwargs.get("state", kwargs))
 
-        # generate a nonce so UI can detect if the state has changed or not
-        nonce_info = {"-gooey-builder-nonce": str(uuid.uuid4())}
-        # push the state back to the UI, expire in 1 minute
-        gui.realtime_push(self.channel, updates | nonce_info, ex=60)
+class RunJS(BaseLLMTool):
+    def __init__(self):
+        super().__init__(
+            name="run_js",
+            label="Run JS",
+            description="Run arbitrary JS code on the frontend",
+            properties={
+                "js_code": {
+                    "type": "string",
+                    "description": "The JS code to run on the frontend.",
+                }
+            },
+        )
 
-        return {"success": True, "updated": list(updates.keys())}
+    def call(self, js_code: str) -> str:
+        # handled by the frontend in gooey-web-widget
+        return "ok"
 
 
 class CallTransferLLMTool(BaseLLMTool):
@@ -128,6 +132,8 @@ You can transfer the user's call to another phone number using this tool. Some e
 
     def call(self, phone_number: str) -> dict:
         from routers.bots_api import api_hashids
+        from daras_ai_v2.fastapi_tricks import get_api_route_url
+        from routers.twilio_api import twilio_voice_call_status
 
         try:
             self.call_sid, self.bi_id
@@ -159,7 +165,7 @@ You can transfer the user's call to another phone number using this tool. Some e
         client = bi.get_twilio_client()
 
         resp = VoiceResponse()
-        resp.dial(phone_number)
+        resp.dial(phone_number, action=get_api_route_url(twilio_voice_call_status))
 
         try:
             # try to transfer the call

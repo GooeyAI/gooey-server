@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+generally prefer if statements over ternary operators or inline if-else expressions. for null checks, prefer using the `x or <default>` syntax.

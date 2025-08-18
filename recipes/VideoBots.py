@@ -2,9 +2,9 @@ import json
 import math
 import typing
 from itertools import zip_longest
-import typing_extensions
 
 import gooey_gui as gui
+import typing_extensions
 from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
@@ -110,7 +110,6 @@ from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
-    render_called_functions,
     render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -118,6 +117,10 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from usage_costs.twilio_usage_cost import (
+    get_non_ivr_price_credits,
+    get_ivr_price_credits_and_seconds,
+)
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
 
@@ -700,12 +703,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     scroll_into_view = False
 
     def _render_running_output(self):
-        ## The embedded web widget includes a running output, so just scroll it into view
+        ## The embedded web widget includes a running output, so just scroll it into view to tabs which just above the widget
 
         # language=JavaScript
         gui.js(
             """
-            let elem = document.querySelector("#gooey-embed");
+            let elem = document.querySelector("#recipe-nav-tabs");
             if (!elem) return;
             if (elem.scrollIntoViewIfNeeded) {
                 elem.scrollIntoViewIfNeeded(false);
@@ -1067,7 +1070,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             gui.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+        total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -1075,6 +1078,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
+
+        if is_realtime_audio_url(state.get("input_audio")):
+            total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
 
         if state.get("input_face"):
             total += 1
@@ -1086,7 +1092,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             model = LargeLanguageModels[gui.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
+
+        llm_cost = get_non_ivr_price_credits(self.current_sr)
+        notes = (
+            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+        )
 
         if (
             gui.session_state.get("tts_provider")
@@ -1094,8 +1104,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
 
+        if is_realtime_audio_url(gui.session_state.get("input_audio")):
+            credits, duration_sec = get_ivr_price_credits_and_seconds(self.current_sr)
+            if credits:
+                duration_min = math.ceil(int(duration_sec) / 60)
+                notes += f" + {credits} ({duration_min}min call)"
+
         if gui.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
+            notes += " + 1 (lipsync)"
 
         return notes
 
@@ -1232,7 +1248,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 target_language="en",
             )
         for text in ocr_texts:
-            user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
         return user_input
 
     def build_final_prompt(self, request, response, user_input, model):
@@ -1529,11 +1545,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 response.output_video.append(lip_state["output_video"])
 
     def render_header_extra(self):
-        if self.tab == RecipeTabs.run:
+        if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
 
     def get_tabs(self):
         tabs = super().get_tabs()
+        tabs.insert(1, RecipeTabs.preview)
         tabs.extend([RecipeTabs.integrations])
         return tabs
 
