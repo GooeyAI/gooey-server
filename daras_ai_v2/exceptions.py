@@ -69,6 +69,10 @@ class GPUError(UserError):
     pass
 
 
+class UnavailablePhoneNumber(UserError):
+    pass
+
+
 class InsufficientCredits(UserError):
     def __init__(self, user: "AppUser", sr: "SavedRun"):
         from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q

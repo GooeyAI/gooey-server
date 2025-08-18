@@ -233,6 +233,15 @@ class Conversation(models.Model):
         help_text="Twilio call sid (only used if each call is a new conversation)",
     )
 
+    extension = models.ForeignKey(
+        "number_cycling.BotExtension",
+        on_delete=models.SET_NULL,
+        related_name="conversations",
+        null=True,
+        blank=True,
+        help_text="The extension this conversation is associated with (if any)",
+    )
+
     web_user_id = models.CharField(
         max_length=512,
         blank=True,
@@ -282,7 +291,12 @@ class Conversation(models.Model):
                 ],
             ),
             models.Index(
-                fields=["bot_integration", "twilio_phone_number", "twilio_call_sid"]
+                fields=[
+                    "bot_integration",
+                    "twilio_phone_number",
+                    "twilio_call_sid",
+                    "extension",
+                ]
             ),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
