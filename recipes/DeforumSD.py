@@ -4,7 +4,7 @@ from functools import partial
 
 import gooey_gui as gui
 from django.db.models import TextChoices
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from bots.models import Workflow
@@ -68,7 +68,10 @@ class DeforumSDPage(BasePage):
         rotation_3d_y: str | None = None
         rotation_3d_z: str | None = None
         fps: int | None = None
-        aspect_ratio: typing.Literal["1:1", "9:16", "16:9"] | None = "1:1"
+
+        output_width: int | None = Field(512)
+        output_height: int | None = Field(512)
+
         seed: int | None = None
 
     class ResponseModel(BaseModel):
@@ -112,33 +115,7 @@ class DeforumSDPage(BasePage):
 
         animation_prompts_editor(prev_fps_slider, fps_slider)
 
-        # Row: Aspect Ratio (left)
-        with gui.div():
-            gui.write("Aspect Ratio")
-            options = [
-                f"{icons.aspect_square} Square",
-                f"{icons.aspect_portrait} 9:16 Portrait",
-                f"{icons.aspect_landscape} 16:9 Landscape",
-            ]
-            selected = gui.horizontal_radio(
-                label="",
-                options=options,
-                value=(
-                    f"{icons.aspect_square} Square"
-                    if (gui.session_state.get("aspect_ratio") or "1:1") == "1:1"
-                    else (
-                        f"{icons.aspect_portrait} 9:16 Portrait"
-                        if gui.session_state.get("aspect_ratio") == "9:16"
-                        else f"{icons.aspect_landscape} 16:9 Landscape"
-                    )
-                ),
-            )
-            if "Square" in selected:
-                gui.session_state["aspect_ratio"] = "1:1"
-            elif "Portrait" in selected:
-                gui.session_state["aspect_ratio"] = "9:16"
-            else:
-                gui.session_state["aspect_ratio"] = "16:9"
+        aspect_ratio_selector()
 
         gui.write("#### Step 2: Increase Animation Quality")
         gui.caption(
@@ -195,7 +172,6 @@ class DeforumSDPage(BasePage):
             )
 
             gui.selectbox("Animation Mode", key="animation_mode", options=["2D", "3D"])
-        # Right column currently empty (reserved for future settings)
 
     #         gui.selectbox(
     #             """
@@ -314,7 +290,6 @@ class DeforumSDPage(BasePage):
             safety_checker(text=self.preview_input(state))
 
         try:
-            width, height = dims_for_ratio(request.aspect_ratio or "1:1")
             state["output_video"] = call_celery_task_outfile(
                 "deforum",
                 pipeline=dict(
@@ -322,14 +297,12 @@ class DeforumSDPage(BasePage):
                     seed=request.seed,
                 ),
                 inputs=dict(
-                    args=dict(W=512, H=512),
+                    args=dict(W=request.output_width, H=request.output_height),
                     animation_mode=request.animation_mode,
                     animation_prompts={
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
                     },
                     max_frames=request.max_frames,
-                    width=width,
-                    height=height,
                     zoom=request.zoom or "0:(1)",
                     translation_x=request.translation_x or "0:(0)",
                     translation_y=request.translation_y or "0:(0)",
@@ -338,7 +311,6 @@ class DeforumSDPage(BasePage):
                     rotation_3d_z=request.rotation_3d_z or "0:(0)",
                     translation_z="0:(0)",
                     fps=request.fps,
-                    aspect_ratio=request.aspect_ratio,
                 ),
                 content_type="video/mp4",
                 filename=f"gooey.ai animation {request.animation_prompts}.mp4",
@@ -731,16 +703,6 @@ def seconds_to_frames(seconds: float, fps: int) -> int:
     return int(float(seconds) * int(fps))
 
 
-def dims_for_ratio(aspect_ratio: str) -> tuple[int, int]:
-    # Defaults chosen for good quality while keeping GPU usage reasonable
-    if aspect_ratio == "9:16":
-        return 540, 960
-    if aspect_ratio == "16:9":
-        return 960, 540
-    # Fallback to square
-    return 768, 768
-
-
 def key_frames_to_str(key_frames: dict[int, float], default_val: float = 0.0) -> str:
     key_frames.setdefault(0, default_val)
     return ", ".join(
@@ -771,3 +733,35 @@ def parse_key_frames(string, prompt_parser=None):
     # if frames == {} and len(string) != 0:
     #     raise RuntimeError("Key Frame string not correctly formatted")
     return frames
+
+
+resolution_options = {
+    "512x512": '<i class="fa-sharp fa-regular fa-square"></i> Square',
+    "512x768": '<i class="fa-sharp fa-solid fa-image-portrait"></i> Portrait',
+    "768x512": '<i class="fa-sharp fa-regular fa-image-landscape"></i> Landscape',
+}
+
+
+def aspect_ratio_selector():
+    if not gui.session_state.get("_aspect_ratio"):
+        output_width = gui.session_state.get("output_width")
+        output_height = gui.session_state.get("output_height")
+        if output_width and output_height:
+            if output_width > output_height:
+                gui.session_state["_aspect_ratio"] = "768x512"
+            elif output_width < output_height:
+                gui.session_state["_aspect_ratio"] = "512x768"
+            else:
+                gui.session_state["_aspect_ratio"] = "512x512"
+
+    aspect_ratio = gui.horizontal_radio(
+        label="",
+        options=resolution_options,
+        format_func=resolution_options.__getitem__,
+        key="_aspect_ratio",
+    )
+
+    if aspect_ratio:
+        gui.session_state["output_width"], gui.session_state["output_height"] = map(
+            int, aspect_ratio.split("x")
+        )
