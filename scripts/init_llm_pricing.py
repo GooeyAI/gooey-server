@@ -624,6 +624,15 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="google/gemini-2.5-flash-lite",
+        model_name=LargeLanguageModels.gemini_2_5_flash_lite.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite",
+    )
+    llm_pricing_create(
         model_id="google/gemini-2.5-pro",
         model_name=LargeLanguageModels.gemini_2_5_pro.name,
         unit_cost_input=1.25,

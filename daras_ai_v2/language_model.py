@@ -601,11 +601,21 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
     gemini_2_5_flash = LLMSpec(
-        label="Gemini 2.5 Flash (Google)",
+        label="Gemini 2.5 Flash • Google",
         model_id="google/gemini-2.5-flash",
         llm_api=LLMApis.openai,
         context_window=1_048_576,
         max_output_tokens=65_535,
+        price=1,
+        is_vision_model=True,
+        supports_json=True,
+    )
+    gemini_2_5_flash_lite = LLMSpec(
+        label="Gemini 2.5 Flash Lite • Google",
+        model_id="google/gemini-2.5-flash-lite",
+        llm_api=LLMApis.openai,
+        context_window=1_048_576,
+        max_output_tokens=65_536,
         price=1,
         is_vision_model=True,
         supports_json=True,
