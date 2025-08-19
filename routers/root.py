@@ -794,7 +794,6 @@ def _render_mobile_search_button(request: Request, search_filters: SearchFilters
         gui.button(
             icons.search,
             type="tertiary",
-            unsafe_allow_html=True,
             className="m-0",
             onClick=JS_SHOW_MOBILE_SEARCH,
         )

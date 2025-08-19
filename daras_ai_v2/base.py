@@ -1607,7 +1607,6 @@ class BasePage:
                     f"{icons.run} Run",
                     key=key,
                     type="primary",
-                    unsafe_allow_html=True,
                     className="my-0 py-2",
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )

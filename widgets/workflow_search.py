@@ -236,7 +236,7 @@ def render_search_bar(
             key=key,
             id=id,
             value=search_filters.search,
-            autocomplete="off",
+            autoComplete="off",
             **props,
         )
 
