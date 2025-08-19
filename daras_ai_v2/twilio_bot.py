@@ -13,47 +13,109 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
+from number_cycling.models import ProvisionedNumber, BotExtensionUser
+from django.utils import timezone
+from django.db import transaction
+
+
+DISCONNECT_EXTENSION_TEXT = "disconnect"
+
+
+class ExtensionGatheringSMS(Exception):
+    """Exception raised when a user needs to provide an extension number."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
 
 
 class TwilioSMS(BotInterface):
     platform = Platform.TWILIO
 
-    def __init__(self, data: dict):
+    @classmethod
+    def from_webhook_data(cls, data: dict):
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
-        bi = BotIntegration.objects.get(
-            twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
-        )
-        self.convo = Conversation.objects.get_or_create(
+        bot_extension = None
+        is_provisioned = False
+        try:
+            ProvisionedNumber.objects.get(phone_number=data["To"][0])
+            is_provisioned = True
+            extension_user = (
+                BotExtensionUser.objects.filter(twilio_phone_number=data["From"][0])
+                .order_by("-created_at")
+                .first()
+            )
+
+            logger.info(f"Extension: {extension_user}")
+            if extension_user:
+                bot_extension = extension_user.extension
+                bi = bot_extension.bot_integration
+            else:
+                logger.info(f"No extension found for phone number: {data['To'][0]}")
+                raise ExtensionGatheringSMS(
+                    "Hi from Gooey.AI, Please call the number and enter your extension to continue"
+                )
+
+        except ProvisionedNumber.DoesNotExist:
+            bi = BotIntegration.objects.get(
+                twilio_account_sid=account_sid, twilio_phone_number=data["From"][0]
+            )
+
+        convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             twilio_phone_number=data["From"][0],
             twilio_call_sid="",
+            extension=bot_extension,
         )[0]
-
-        self.bot_id = bi.twilio_phone_number.as_e164
-        self.user_id = self.convo.twilio_phone_number.as_e164
-
+        bot_id = bi.twilio_phone_number.as_e164
+        user_id = convo.twilio_phone_number.as_e164
         num_media = int(data.get("NumMedia", [0])[0])
         if num_media > 0:
-            self._text = ""
-            self._media_urls = [data[f"MediaUrl{i}"][0] for i in range(num_media)]
+            text = ""
+            media_urls = [data[f"MediaUrl{i}"][0] for i in range(num_media)]
             content_type = data.get("MediaContentType0", [""])[0]
             if content_type.startswith("image/"):
-                self.input_type = "image"
+                input_type = "image"
             elif content_type.startswith("audio/"):
-                self.input_type = "audio"
+                input_type = "audio"
             elif content_type.startswith("video/"):
-                self.input_type = "video"
+                input_type = "video"
             else:
-                self.input_type = "document"
+                input_type = "document"
         else:
-            self._text = data["Body"][0]
-            self._media_urls = []
-            self.input_type = "text"
+            text = data["Body"][0]
+            media_urls = []
+            input_type = "text"
+        user_msg_id = data["MessageSid"][0]
 
-        self.user_msg_id = data["MessageSid"][0]
+        if is_provisioned:
+            handle_disconnect_extension(text, user_id, convo)
 
+        return cls(
+            convo,
+            text=text,
+            media_urls=media_urls,
+            input_type=input_type,
+            user_msg_id=user_msg_id,
+        )
+
+    def __init__(
+        self,
+        convo: Conversation,
+        text: str | None,
+        media_urls: list[str] | None,
+        input_type: str,
+        user_msg_id: str,
+    ):
+        self.convo = convo
+        self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
+        self.user_id = convo.twilio_phone_number.as_e164
+        self.input_type = input_type
+        self.user_msg_id = user_msg_id
+        self._text = text
+        self._media_urls = media_urls
         super().__init__()
 
     def get_input_text(self) -> str | None:
@@ -278,3 +340,20 @@ def send_single_voice_call(
         resp_say_or_tts_play(bot, resp, text)
 
     return bot.start_voice_call_session(resp)
+
+
+def handle_disconnect_extension(text: str, user_id: str, convo: Conversation):
+    if text.lower() in ["/disconnect"]:
+        with transaction.atomic():
+            extensions = BotExtensionUser.objects.filter(twilio_phone_number=user_id)
+            if extensions.exists():
+                count = extensions.count()
+                extensions.delete()
+
+                logger.info(f"Deleted {count} extension(s) for phone number: {user_id}")
+
+                convo.reset_at = timezone.now()
+                convo.save()
+                raise ExtensionGatheringSMS("Extension disconnected")
+            else:
+                logger.info(f"No extension found for phone number: {user_id}")

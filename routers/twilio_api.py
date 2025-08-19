@@ -337,8 +337,16 @@ def twilio_sms(
     """Handle incoming Twilio SMS."""
     from daras_ai_v2.twilio_bot import TwilioSMS
     from daras_ai_v2.bots import msg_handler
+    from daras_ai_v2.twilio_bot import ExtensionGatheringSMS
 
-    bot = TwilioSMS(data)
+    logger.info(f"SMS data: {data}")
+    try:
+        bot = TwilioSMS.from_webhook_data(data)
+    except ExtensionGatheringSMS as e:
+        resp = MessagingResponse()
+        resp.message(e.message)
+        return twiml_response(resp)
+
     background_tasks.add_task(msg_handler, bot)
 
     resp = MessagingResponse()
