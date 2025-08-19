@@ -21,7 +21,9 @@ def generate_unique_extension_number(
     for attempt in range(5):
         seed = seed + attempt
         hashid = extension_hashids.encode(seed)
-        extension_number = abs(hash(hashid)) % (10**length)
+        extension_number = (10 ** (length - 1)) + (
+            abs(hash(hashid)) % (10 ** (length - 1))
+        )
 
         try:
             with transaction.atomic():
