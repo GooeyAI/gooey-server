@@ -1725,8 +1725,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(pr.id)
                 case Platform.TWILIO:
-                    
-                    try :
+                    try:
                         bi, _ = create_bot_integration_with_extension(
                             name=run_title,
                             created_by=self.request.user,
@@ -1816,11 +1815,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         and subscription.plan == PricingPlan.ENTERPRISE.db_value
                     ):
                         gui.write(
-                            f"As a premium customer, please contact us to setup a managed number"
+                            "As a premium customer, please contact us to setup a managed number"
                         )
                     else:
                         gui.write(
-                            f"[Upgrade](https://gooey.ai/pricing) for a number managed by Gooey.AI"
+                            "[Upgrade](https://gooey.ai/pricing) for a number managed by Gooey.AI"
                         )
                 with col2:
                     if (
