@@ -127,7 +127,7 @@ def twilio_voice_ws(
         bot = TwilioVoiceWs.from_webhook_data(data)
     except ExtensionGatheringVoice as e:
         resp = VoiceResponse()
-        resp.say("Hi from GooeyAI, Please enter an extension")
+        resp.say("Please dial an extension")
         resp.gather(
             action=get_api_route_url(twilio_extension_input),
             method="POST",
@@ -177,7 +177,7 @@ def twilio_extension_input(
         extension = BotExtension.objects.get(extension_number=int(digits))
     except (BotExtension.DoesNotExist, ValueError):
         resp = VoiceResponse()
-        resp.say("Invalid extension entered. Goodbye.")
+        resp.say("Sorry, I couldn't find that extension on Gooey-AI.")
         resp.reject()
         return twiml_response(resp)
 
