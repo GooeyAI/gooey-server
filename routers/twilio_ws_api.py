@@ -36,7 +36,7 @@ app = CustomAPIRouter()
 T = typing.TypeVar("T")
 
 
-class NeedsExtensionGathering(Exception):
+class ExtensionGatheringVoice(Exception):
     """Exception raised when a user needs to provide an extension number."""
 
     def __init__(self, call_sid: str, user_number: str):
@@ -76,18 +76,22 @@ class TwilioVoiceWs(TwilioVoice):
             account_sid = ""
         call_sid = data["CallSid"][0]
         user_number, bot_number = data["From"][0], data["To"][0]
-        current_ext = None
+        bot_extension = None
+        bi = None
 
         try:
             ProvisionedNumber.objects.get(phone_number=bot_number)
-            try:
-                existing_mapping = BotExtensionUser.objects.get(
-                    twilio_phone_number=user_number
-                )
-                current_ext = existing_mapping.extension
-                bi = current_ext.bot_integration
-            except BotExtensionUser.DoesNotExist:
-                raise NeedsExtensionGathering(call_sid, user_number)
+            existing_user = (
+                BotExtensionUser.objects.filter(twilio_phone_number=user_number)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if existing_user:
+                bot_extension = existing_user.extension
+                bi = bot_extension.bot_integration
+            else:
+                raise ExtensionGatheringVoice(call_sid, user_number)
 
         except ProvisionedNumber.DoesNotExist:
             try:
@@ -106,7 +110,7 @@ class TwilioVoiceWs(TwilioVoice):
             bi=bi,
             user_number=user_number,
             call_sid=call_sid,
-            extension=current_ext,
+            extension=bot_extension,
             text=data.get("SpeechResult", [None])[0],
             audio_url=data.get("RecordingUrl", [None])[0],
         )
@@ -121,7 +125,7 @@ def twilio_voice_ws(
 ):
     try:
         bot = TwilioVoiceWs.from_webhook_data(data)
-    except NeedsExtensionGathering as e:
+    except ExtensionGatheringVoice as e:
         resp = VoiceResponse()
         resp.say("Hi from Gooey.AI, Please enter an extension")
         resp.gather(
@@ -139,8 +143,6 @@ def twilio_voice_ws(
         resp.reject()
         return twiml_response(resp)
 
-
-
     if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
         resp = VoiceResponse()
         resp.reject()
@@ -151,7 +153,7 @@ def twilio_voice_ws(
         resp = VoiceResponse()
         resp.say(e.detail["error"])
         return twiml_response(resp)
-    
+
     background_tasks.add_task(msg_handler_raw, bot)
     return connect_to_stream(bot)
 
