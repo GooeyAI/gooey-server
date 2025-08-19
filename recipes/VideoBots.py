@@ -1845,6 +1845,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         icon = Platform(bi.platform).get_icon()
         with gui.div(className="w-100 text-start"):
             test_link = bi.get_bot_test_link()
+            extension_number = bi.get_extension_number()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Connected to")
@@ -1876,7 +1877,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Test")
-                gui.caption(f"Send a test message via {Platform(bi.platform).label}.")
+
+                if extension_number:
+                    test_caption = f"Call or send a text message via {Platform(bi.platform).label} (with extension {extension_number})."
+                else:
+                    test_caption = f"Call or send a text message via {Platform(bi.platform).label}."
+
+                gui.caption(test_caption)
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
@@ -1928,7 +1935,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     ),
                     new_tab=True,
                 )
-                if bi.platform == Platform.TWILIO and bi.twilio_phone_number_sid:
+                if (
+                    bi.platform == Platform.TWILIO
+                    and bi.twilio_phone_number_sid
+                    and not extension_number
+                ):
                     gui.anchor(
                         f"{icon} Open Twilio Console",
                         str(
