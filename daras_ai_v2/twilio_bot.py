@@ -346,14 +346,9 @@ def handle_disconnect_extension(text: str, user_id: str, convo: Conversation):
     if text.lower() in ["/disconnect"]:
         with transaction.atomic():
             extensions = BotExtensionUser.objects.filter(twilio_phone_number=user_id)
-            if extensions.exists():
-                count = extensions.count()
-                extensions.delete()
+            count = extensions.delete()[0]
+            logger.info(f"Deleted {count} extension(s) for phone number: {user_id}")
 
-                logger.info(f"Deleted {count} extension(s) for phone number: {user_id}")
-
-                convo.reset_at = timezone.now()
-                convo.save()
-                raise ExtensionGatheringSMS("Extension disconnected")
-            else:
-                logger.info(f"No extension found for phone number: {user_id}")
+            convo.reset_at = timezone.now()
+            convo.save()
+        raise ExtensionGatheringSMS("Extension disconnected")
