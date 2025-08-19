@@ -127,7 +127,7 @@ def twilio_voice_ws(
         bot = TwilioVoiceWs.from_webhook_data(data)
     except ExtensionGatheringVoice as e:
         resp = VoiceResponse()
-        resp.say("Hi from Gooey.AI, Please enter an extension")
+        resp.say("Hi from GooeyAI, Please enter an extension")
         resp.gather(
             action=get_api_route_url(twilio_extension_input),
             method="POST",
