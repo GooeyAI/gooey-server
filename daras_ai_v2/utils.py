@@ -1,4 +1,3 @@
-from tkinter import NO
 import typing
 from datetime import datetime, timedelta
 
