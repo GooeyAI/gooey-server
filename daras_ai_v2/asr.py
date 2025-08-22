@@ -284,7 +284,7 @@ class AsrModels(Enum):
     lelapa = "Vulavula (Lelapa AI)"
     whisper_sunbird_large_v3 = "Sunbird Ugandan Whisper v3 (Sunbird AI)"
     whisper_swahili_medium_v3 = "Jacaranda Health Swahili Whisper v3 (Jacaranda Health)"
-    nemo_mbaza = "Mbaza Conformer LG (MbazaNLP)"
+    mbaza_ctc_large = "Mbaza Conformer LG (MbazaNLP)"
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
     whisper_chichewa_large_v3 = (
@@ -352,7 +352,7 @@ asr_model_ids = {
     AsrModels.elevenlabs: "elevenlabs-scribe-v1",
     AsrModels.whisper_sunbird_large_v3: "Sunbird/asr-whisper-large-v3-salt",
     AsrModels.whisper_swahili_medium_v3: "Jacaranda-Health/ASR-STT",
-    AsrModels.nemo_mbaza: "mbazaNLP/stt_rw_sw_lg_conformer_ctc_large",
+    AsrModels.mbaza_ctc_large: "mbazaNLP/stt_rw_sw_lg_conformer_ctc_large",
 }
 
 forced_asr_languages = {
@@ -386,7 +386,7 @@ asr_supported_languages = {
     AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
     AsrModels.whisper_sunbird_large_v3: SUNBIRD_SUPPORTED_LANGUAGES,
     AsrModels.whisper_swahili_medium_v3: {"sw", "en"},
-    AsrModels.nemo_mbaza: {"sw", "rw", "lg"},
+    AsrModels.mbaza_ctc_large: {"sw", "rw", "lg"},
 }
 
 
