@@ -1,4 +1,3 @@
-import random
 from typing import Tuple
 from django.db import transaction, IntegrityError
 from bots.models.bot_integration import BotIntegration, Platform
@@ -26,11 +25,10 @@ def generate_unique_extension_number(
         )
 
         try:
-            with transaction.atomic():
-                if not BotExtension.objects.filter(
-                    extension_number=extension_number
-                ).exists():
-                    return extension_number
+            if not BotExtension.objects.filter(
+                extension_number=extension_number
+            ).exists():
+                return extension_number
         except IntegrityError:
             continue
 

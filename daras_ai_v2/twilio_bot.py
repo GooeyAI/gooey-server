@@ -40,7 +40,7 @@ class TwilioSMS(BotInterface):
         bot_extension = None
         is_provisioned = False
         try:
-            ProvisionedNumber.objects.get(phone_number=data["To"][0])
+            ProvisionedNumber.objects.get(phone_number=data["To"][0], is_active=True)
             is_provisioned = True
             extension_user = (
                 BotExtensionUser.objects.filter(twilio_phone_number=data["From"][0])
@@ -60,7 +60,7 @@ class TwilioSMS(BotInterface):
 
         except ProvisionedNumber.DoesNotExist:
             bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=data["From"][0]
+                twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
             )
 
         convo = Conversation.objects.get_or_create(
@@ -69,6 +69,7 @@ class TwilioSMS(BotInterface):
             twilio_call_sid="",
             extension=bot_extension,
         )[0]
+
         bot_id = bi.twilio_phone_number.as_e164
         user_id = convo.twilio_phone_number.as_e164
         num_media = int(data.get("NumMedia", [0])[0])

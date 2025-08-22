@@ -126,7 +126,6 @@ from widgets.switch_with_section import switch_with_section
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
-from workspaces.models import Workspace
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -1799,48 +1798,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             with gui.div(className="w-100"):
                 gui.write("---")
 
-        if bi.platform == Platform.TWILIO:
-            with gui.div(className="w-100 text-start"):
-                col1, col2 = gui.columns(2, style={"alignItems": "center"})
-                with col1:
-                    gui.write("###### Setup a Phone Number")
-                    # Check if current workspace has enterprise subscription
-                    try:
-                        subscription = self.current_workspace.subscription
-                    except Workspace.DoesNotExist:
-                        subscription = None
-                    if (
-                        subscription
-                        and subscription.plan == PricingPlan.ENTERPRISE.db_value
-                    ):
-                        gui.write(
-                            "As a premium customer, please contact us to setup a managed number"
-                        )
-                    else:
-                        gui.write(
-                            "[Upgrade](https://gooey.ai/pricing) for a number managed by Gooey.AI"
-                        )
-                with col2:
-                    if (
-                        self.current_workspace.subscription
-                        and self.current_workspace.subscription.plan
-                        == PricingPlan.ENTERPRISE.db_value
-                    ):
-                        gui.anchor(
-                            "Contact",
-                            href="https://gooey.ai/contact",
-                            style={"width": "225px"},
-                            type="primary",
-                        )
-                    else:
-                        gui.anchor(
-                            "Upgrade",
-                            href="https://gooey.ai/pricing",
-                            style={"width": "225px"},
-                            type="primary",
-                        )
-                gui.write("---")
-
         icon = Platform(bi.platform).get_icon()
         with gui.div(className="w-100 text-start"):
             test_link = bi.get_bot_test_link()
@@ -1913,7 +1870,39 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-
+            if bi.platform == Platform.TWILIO:
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+                with col1:
+                    if is_enterprise:
+                        gui.write("###### Buy a Phone Number")
+                        gui.write(
+                            "As a premium customer, please contact us to set up a managed number"
+                        )
+                    else:
+                        gui.write("###### Get a Dedicated Number")
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={"width": "225px"},
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={"width": "225px"},
+                            type="primary",
+                        )
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Understand your Users")
