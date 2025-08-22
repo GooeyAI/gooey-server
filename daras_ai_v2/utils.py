@@ -1,3 +1,4 @@
+from tkinter import NO
 import typing
 from datetime import datetime, timedelta
 
@@ -31,5 +32,7 @@ def get_relative_time(timestamp: datetime) -> str:
     return "Just now"
 
 
-def clamp(x: float, min_value: float, max_value: float) -> float:
+def clamp(x: float | None, min_value: float, max_value: float) -> float:
+    if x is None:
+        return min_value
     return max(min_value, min(x, max_value))
