@@ -1427,6 +1427,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
             tools=list(tools_by_name.values()),
             stream=True,
             audio_url=request.input_audio,
