@@ -1,5 +1,3 @@
-import uuid
-
 import gooey_gui as gui
 
 from bots.models import BotIntegration

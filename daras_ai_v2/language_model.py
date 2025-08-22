@@ -5,7 +5,6 @@ import json
 import mimetypes
 import re
 import typing
-from copy import deepcopy
 from enum import Enum
 from functools import wraps
 
@@ -24,6 +23,7 @@ from openai.types.chat import (
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
@@ -121,7 +121,6 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         max_output_tokens=16_384,
         is_vision_model=True,
-        is_thinking_model=True,
         supports_json=True,
     )
 
@@ -230,7 +229,6 @@ class LargeLanguageModels(Enum):
         max_output_tokens=32_768,
         price=50,
         is_vision_model=False,
-        is_thinking_model=True,
         supports_json=False,
         supports_temperature=False,
         is_deprecated=True,
@@ -740,6 +738,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=32_000,
         is_vision_model=True,
         supports_json=True,
+        is_thinking_model=True,
     )
     claude_4_sonnet = LLMSpec(
         label="Claude 4 Sonnet • Anthropic",
@@ -750,6 +749,7 @@ class LargeLanguageModels(Enum):
         price=15,
         is_vision_model=True,
         supports_json=True,
+        is_thinking_model=True,
     )
     claude_4_opus = LLMSpec(
         label="Claude 4 Opus • Anthropic",
@@ -760,6 +760,7 @@ class LargeLanguageModels(Enum):
         price=15,
         is_vision_model=True,
         supports_json=True,
+        is_thinking_model=True,
     )
     claude_3_7_sonnet = LLMSpec(
         label="Claude 3.7 Sonnet • Anthropic",
@@ -769,6 +770,7 @@ class LargeLanguageModels(Enum):
         price=15,
         is_vision_model=True,
         supports_json=True,
+        is_thinking_model=True,
     )
     claude_3_5_sonnet = LLMSpec(
         label="Claude 3.5 Sonnet • Anthropic",
@@ -980,6 +982,19 @@ class LargeLanguageModels(Enum):
         return {model for model in cls if model.is_deprecated}
 
 
+class _ReasoningEffort(typing.NamedTuple):
+    name: str
+    label: str
+    thinking_budget: int
+
+
+class ReasoningEffort(_ReasoningEffort, GooeyEnum):
+    minimal = _ReasoningEffort(name="minimal", label="Minimal", thinking_budget=1024)
+    low = _ReasoningEffort(name="low", label="Low", thinking_budget=4096)
+    medium = _ReasoningEffort(name="medium", label="Medium", thinking_budget=8192)
+    high = _ReasoningEffort(name="high", label="High", thinking_budget=24576)
+
+
 def calc_gpt_tokens(
     prompt: str | list[str] | dict | list[dict],
 ) -> int:
@@ -1045,6 +1060,7 @@ def run_language_model(
     tools: list[BaseLLMTool] = None,
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
+    reasoning_effort: ReasoningEffort.api_choices | None = None,
     audio_url: str | None = None,
     audio_session_extra: dict | None = None,
 ) -> (
@@ -1108,6 +1124,7 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             tools=tools,
             response_format_type=response_format_type,
+            reasoning_effort=reasoning_effort,
             # we can't stream with tools or json yet
             stream=stream and not response_format_type,
             audio_url=audio_url,
@@ -1239,6 +1256,7 @@ def _run_chat_model(
     avoid_repetition: bool,
     tools: list[BaseLLMTool] | None,
     response_format_type: ResponseFormatType | None,
+    reasoning_effort: ReasoningEffort.api_choices | None,
     stream: bool = False,
     audio_url: str | None = None,
     audio_session_extra: dict | None = None,
@@ -1251,7 +1269,7 @@ def _run_chat_model(
             return _run_mistral_chat(
                 model=model.model_id,
                 avoid_repetition=avoid_repetition,
-                max_completion_tokens=max_tokens,
+                max_tokens=max_tokens,
                 messages=messages,
                 num_outputs=num_outputs,
                 stop=stop,
@@ -1263,7 +1281,7 @@ def _run_chat_model(
             return _run_fireworks_chat(
                 model=model.model_id,
                 avoid_repetition=avoid_repetition,
-                max_completion_tokens=max_tokens,
+                max_tokens=max_tokens,
                 messages=messages,
                 num_outputs=num_outputs,
                 stop=stop,
@@ -1284,13 +1302,14 @@ def _run_chat_model(
             return run_openai_chat(
                 model=model,
                 avoid_repetition=avoid_repetition,
-                max_completion_tokens=max_tokens,
+                max_tokens=max_tokens,
                 messages=messages,
                 num_outputs=num_outputs,
                 stop=stop,
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+                reasoning_effort=reasoning_effort,
                 stream=stream,
             )
         case LLMApis.gemini:
@@ -1526,77 +1545,80 @@ def run_openai_chat(
     *,
     model: LargeLanguageModels,
     messages: list[ConversationEntry],
-    max_completion_tokens: int,
+    max_tokens: int,
     num_outputs: int,
     temperature: float | None = None,
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
+    reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
-    messages_for_completion = deepcopy(messages)
+    kwargs = {}
 
-    if model in [
-        LargeLanguageModels.gemini_2_5_pro,
-        LargeLanguageModels.gemini_2_5_flash,
-        LargeLanguageModels.claude_4_sonnet,
-        LargeLanguageModels.claude_4_opus,
-        LargeLanguageModels.claude_4_1_opus,
-    ]:
-        # we want the lower bound for reasoning, but not the rest of openai's new changes
-        max_tokens = max(25_000, max_completion_tokens)
-        max_completion_tokens = NOT_GIVEN
-    elif model.is_thinking_model and model.llm_api == LLMApis.openai:
-        # fuck you, openai
-        for entry in messages_for_completion:
-            if entry["role"] == CHATML_ROLE_SYSTEM:
-                if model == LargeLanguageModels.o1_mini:
-                    entry["role"] = CHATML_ROLE_USER
-                else:
-                    entry["role"] = "developer"
+    if model.is_thinking_model:
+        thinking_budget = ReasoningEffort.high.thinking_budget
+        if model.name.startswith("o"):
+            # o-series models dont support reasoning_effort
+            reasoning_effort = None
+        if reasoning_effort:
+            re = ReasoningEffort.from_api(reasoning_effort)
+            if "gemini" in model.name:
+                thinking_budget = re.thinking_budget
+                kwargs["extra_body"] = {
+                    "google": {
+                        "thinking_config": {
+                            "thinking_budget": thinking_budget,
+                        },
+                    }
+                }
+            elif "claude" in model.name:
+                # claude requires thinking blocks from previous turns for tool calls, which we don't have
+                if not any(entry.get("role") == "tool" for entry in messages):
+                    thinking_budget = re.thinking_budget
+                    kwargs["extra_body"] = {
+                        "thinking": {
+                            "type": "enabled",
+                            "budget_tokens": thinking_budget,
+                        }
+                    }
+                    # claude doesn't support temperature if thinking is enabled
+                    temperature = None
+            else:
+                kwargs["reasoning_effort"] = re.name
+        # add some extra tokens for thinking
+        max_tokens = max(thinking_budget + 1000, max_tokens)
 
-        # unsupported API options
-        max_tokens = NOT_GIVEN
+    if model.max_output_tokens:
+        # cap the max tokens at the model's max limit
+        max_tokens = min(max_tokens, model.max_output_tokens)
+
+    if "openai" in model.value:
+        # openai renamed max_tokens to max_completion_tokens
+        kwargs["max_completion_tokens"] = max_tokens
+    else:
+        kwargs["max_tokens"] = max_tokens
+
+    if "openai" in model.value and model.is_thinking_model:
+        # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
-        # reserved tokens for reasoning...
-        # https://platform.openai.com/docs/guides/reasoning#allocating-space-for-reasoning
-        if model.max_output_tokens:
-            max_completion_tokens = min(
-                max(25_000, max_completion_tokens), model.max_output_tokens
-            )
-    else:
-        max_tokens = max_completion_tokens
-        max_completion_tokens = NOT_GIVEN
+    if "gpt_5" in model.name:
+        # gpt-5 doesn't support temperature
+        temperature = None
 
     if avoid_repetition:
-        frequency_penalty = 0.1
-        presence_penalty = 0.25
-    else:
-        frequency_penalty = 0
-        presence_penalty = 0
-
-    # fuck you, openai
-    if temperature is None or model in [
-        LargeLanguageModels.gpt_5,
-        LargeLanguageModels.gpt_5_mini,
-        LargeLanguageModels.gpt_5_nano,
-        LargeLanguageModels.gpt_5_chat,
-    ]:
-        temperature = NOT_GIVEN
+        kwargs["frequency_penalty"] = 0.1
+        kwargs["presence_penalty"] = 0.25
 
     if tools:
-        tools = [tool.spec_openai for tool in tools]
-    else:
-        tools = NOT_GIVEN
+        kwargs["tools"] = [tool.spec_openai for tool in tools]
 
     if response_format_type:
-        response_format = {"type": response_format_type}
-    else:
-        response_format = NOT_GIVEN
+        kwargs["response_format"] = {"type": response_format_type}
 
     model_ids = model.model_id
     if isinstance(model_ids, str):
@@ -1605,17 +1627,12 @@ def run_openai_chat(
         *[
             _get_chat_completions_create(
                 model=model_id,
-                messages=messages_for_completion,
-                max_tokens=max_tokens,
-                max_completion_tokens=max_completion_tokens,
+                messages=messages,
                 stop=stop or NOT_GIVEN,
                 n=num_outputs,
-                temperature=temperature,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-                tools=tools,
-                response_format=response_format,
+                temperature=temperature or NOT_GIVEN,
                 stream=stream,
+                **kwargs,
             )
             for model_id in model_ids
         ],
@@ -1635,6 +1652,7 @@ def _get_chat_completions_create(model: str, **kwargs):
 
     @wraps(client.chat.completions.create)
     def wrapper():
+        # logger.debug(f"{model=} {kwargs=}")
         return client.chat.completions.create(model=model, **kwargs), model
 
     return wrapper
@@ -1755,7 +1773,10 @@ def record_openai_llm_usage(
 
     if completion.usage:
         prompt_tokens = completion.usage.prompt_tokens
-        completion_tokens = completion.usage.completion_tokens
+        completion_tokens = (
+            completion.usage.completion_tokens
+            or completion.usage.completion_tokens_details.reasoning_tokens
+        )
     else:
         prompt_tokens = sum(
             default_length_function(get_entry_text(entry), model=completion.model)
@@ -1766,16 +1787,18 @@ def record_openai_llm_usage(
             for entry in choices
         )
 
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_prompt,
-        quantity=prompt_tokens,
-    )
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_completion,
-        quantity=completion_tokens,
-    )
+    if prompt_tokens:
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.llm_prompt,
+            quantity=prompt_tokens,
+        )
+    if completion_tokens:
+        record_cost_auto(
+            model=model,
+            sku=ModelSku.llm_completion,
+            quantity=completion_tokens,
+        )
 
 
 @retry_if(openai_should_retry)
@@ -1915,7 +1938,7 @@ def _run_fireworks_chat(
     *,
     model: str,
     messages: list[ConversationEntry],
-    max_completion_tokens: int,
+    max_tokens: int,
     num_outputs: int,
     temperature: float | None = None,
     stop: list[str] | None = None,
@@ -1929,7 +1952,7 @@ def _run_fireworks_chat(
     data = dict(
         model=model,
         messages=messages,
-        max_tokens=max_completion_tokens,
+        max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
     )
@@ -1968,7 +1991,7 @@ def _run_mistral_chat(
     *,
     model: str,
     messages: list[ConversationEntry],
-    max_completion_tokens: int,
+    max_tokens: int,
     num_outputs: int,
     temperature: float | None = None,
     stop: list[str] | None = None,
@@ -1982,7 +2005,7 @@ def _run_mistral_chat(
     data = dict(
         model=model,
         messages=messages,
-        max_tokens=max_completion_tokens,
+        max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
     )
