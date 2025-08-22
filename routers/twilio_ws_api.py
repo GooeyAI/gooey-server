@@ -80,7 +80,7 @@ class TwilioVoiceWs(TwilioVoice):
         bi = None
 
         try:
-            ProvisionedNumber.objects.get(phone_number=bot_number)
+            ProvisionedNumber.objects.get(phone_number=bot_number, is_active=True)
             existing_user = (
                 BotExtensionUser.objects.filter(twilio_phone_number=user_number)
                 .order_by("-created_at")
@@ -166,7 +166,6 @@ def twilio_extension_input(
     user_number = data["From"][0]
     digits = data.get("Digits", [None])[0]
 
-    logger.debug(f"Extension input: {digits=} {call_sid=} {user_number=}")
     if not digits:
         resp = VoiceResponse()
         resp.say("No extension entered. Goodbye.")
@@ -190,9 +189,6 @@ def twilio_extension_input(
         mapping.extension = extension
         mapping.save()
 
-    logger.debug(
-        f"Creating twilio voice ws bot instance for {user_number=} {call_sid=} {extension=}"
-    )
     bi = extension.bot_integration
     bot = create_twilio_voice_ws_bot(
         bi=bi,
