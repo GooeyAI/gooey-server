@@ -149,7 +149,7 @@ class ProvisionedNumber(models.Model):
                         & models.Q(wa_phone_number_id__isnull=False)
                     )
                 ),
-                name="whatsapp_requires_both_fields",
+                name="wa_phone_number_and_wa_phone_number_id",
             ),
         ]
 

@@ -13,6 +13,7 @@ from websockets import ConnectionClosed
 
 from bots.models import BotIntegration, Conversation
 from bots.models.convo_msg import ConvoBlockedStatus
+from bots.models.bot_integration import Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import msg_handler_raw
 from daras_ai_v2.fastapi_tricks import (
@@ -80,18 +81,19 @@ class TwilioVoiceWs(TwilioVoice):
         bi = None
 
         try:
-            ProvisionedNumber.objects.get(phone_number=bot_number, is_active=True)
-            existing_user = (
-                BotExtensionUser.objects.filter(twilio_phone_number=user_number)
-                .order_by("-created_at")
-                .first()
+            ProvisionedNumber.objects.get(
+                phone_number=bot_number, platform=Platform.TWILIO, is_active=True
             )
-
-            if existing_user:
-                bot_extension = existing_user.extension
-                bi = bot_extension.bot_integration
-            else:
+            try:
+                existing_user = BotExtensionUser.objects.get(
+                    twilio_phone_number=user_number,
+                    extension__bot_integration__twilio_phone_number=bot_number,
+                )
+            except BotExtensionUser.DoesNotExist:
                 raise ExtensionGatheringVoice(call_sid, user_number)
+
+            bot_extension = existing_user.extension
+            bi = bot_extension.bot_integration
 
         except ProvisionedNumber.DoesNotExist:
             try:
