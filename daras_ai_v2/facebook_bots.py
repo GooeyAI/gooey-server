@@ -29,20 +29,17 @@ def get_wa_auth_header(access_token: str | None = None):
 class WhatsappBot(BotInterface):
     platform = Platform.WHATSAPP
 
-    def __init__(self, message: dict, metadata: dict):
+    def __init__(
+        self, convo: Conversation, message: dict, metadata: dict | None = None
+    ):
+        self.convo = convo
         self.input_message = message
         self.user_msg_id = message["id"]
         self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
         self.user_id = message["from"]  # this is a phone number
         self.input_type = message["type"]
+        self.access_token = convo.bot_integration.wa_business_access_token
 
-        bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
-
-        self.access_token = bi.wa_business_access_token
-        self.convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            wa_phone_number="+" + self.user_id,
-        )[0]
         super().__init__()
 
     def get_input_text(self) -> str | None:

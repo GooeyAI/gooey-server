@@ -1,5 +1,5 @@
 import json
-
+import re
 import requests
 from fastapi.responses import RedirectResponse
 from furl import furl
@@ -7,7 +7,7 @@ from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings, db
 from daras_ai_v2.bot_integration_connect import (
     connect_bot_to_published_run,
@@ -20,8 +20,20 @@ from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.widgets import get_current_workspace
+from daras_ai_v2.facebook_bots import send_wa_msgs_raw
+from number_cycling.models import BotExtension, BotExtensionUser, ProvisionedNumber
+from sentry_sdk import capture_exception
+from django.db import transaction
+from django.utils import timezone
+
 
 app = CustomAPIRouter()
+
+
+class ExtensionGatheringWhatsapp(Exception):
+    def __init__(self, phone_number_id: str, bot_phone_number: str):
+        self.phone_number_id = phone_number_id
+        self.bot_phone_number = bot_phone_number
 
 
 @app.get("/__/fb/connect_whatsapp/")
@@ -215,8 +227,84 @@ def fb_webhook(
             case "whatsapp_business_account":
                 value = glom.glom(entry, "changes.0.value", default={})
                 for message in value.get("messages", []):
+                    user_phone_number = "+" + message["from"]
+                    message_text = ""
+                    bot_number = value["metadata"]["phone_number_id"]
+                    bot_extension = None
+                    is_provisioned = False
+                    bi = None
+
+                    if message["type"] == "text":
+                        message_text = message.get("text", {}).get("body", "")
+
                     try:
-                        bot = WhatsappBot(message, value["metadata"])
+                        bi, bot_extension, is_provisioned = wa_extension_routing(
+                            user_phone_number, bot_number, is_provisioned
+                        )
+                    except ExtensionGatheringWhatsapp:
+                        bot_extension_number = wa_get_extension_number(message_text)
+                        if bot_extension_number:
+                            try:
+                                bot_extension = BotExtension.objects.get(
+                                    extension_number=bot_extension_number
+                                )
+                                bi = bot_extension.bot_integration
+                                # override the message text from "/extension 12345" to "hi"
+                                message["text"]["body"] = "hi"
+
+                            except (BotExtension.DoesNotExist, ValueError):
+                                send_wa_msgs_raw(
+                                    bot_number=bot_number,
+                                    user_number=user_phone_number,
+                                    messages=[
+                                        {
+                                            "type": "text",
+                                            "text": {
+                                                "body": "Bot extension not found, Please try a different extension number"
+                                            },
+                                        }
+                                    ],
+                                )
+                                return Response("OK")
+
+                        else:
+                            send_wa_msgs_raw(
+                                bot_number=bot_number,
+                                user_number=user_phone_number,
+                                messages=[
+                                    {
+                                        "type": "text",
+                                        "text": {
+                                            "body": "Hi from Gooey.AI, enter your extension number to continue"
+                                        },
+                                    },
+                                ],
+                            )
+                            return Response("OK")
+
+                    with transaction.atomic():
+                        mapping, created = BotExtensionUser.objects.get_or_create(
+                            wa_phone_number=user_phone_number,
+                            defaults={"extension": bot_extension},
+                        )
+
+                        if not created:
+                            mapping.extension = bot_extension
+                            mapping.save()
+
+                    try:
+                        convo = Conversation.objects.create(
+                            bot_integration=bi,
+                            wa_phone_number=user_phone_number,
+                            extension=bot_extension,
+                        )
+
+                        if is_provisioned and handle_disconnect_ext_wa(
+                            message_text, bot_number, convo
+                        ):
+                            return Response("OK")
+
+                        bot = WhatsappBot(convo, message, value["metadata"])
                     except ValueError:
                         continue
                     background_tasks.add_task(msg_handler, bot)
@@ -235,6 +323,90 @@ def fb_webhook(
                         continue
                     background_tasks.add_task(msg_handler, bot)
     return Response("OK")
+
+
+def wa_get_extension_number(message_text: str) -> int | None:
+    if not message_text:
+        return None
+
+    message_text = message_text.strip().lower()
+
+    # Pattern to match extension formats that start with slash
+    patterns = [
+        r"^/(?:extension|ext)\s+(\d{5})$",  # "/extension 12345" or "/ext 12345"
+        r"\b(\d{5})\b",  # any standalone 5-digit number in the message
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message_text)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
+def wa_extension_routing(
+    user_phone_number: str, bot_number: str, is_provisioned: bool
+) -> tuple[BotIntegration, BotExtension | None, bool]:
+    bot_extension = None
+    existing_user = None
+
+    try:
+        ProvisionedNumber.objects.get(
+            wa_phone_number_id=bot_number, platform=Platform.WHATSAPP, is_active=True
+        )
+        is_provisioned = True
+        try:
+            existing_user = BotExtensionUser.objects.get(
+                wa_phone_number=user_phone_number,
+                extension__bot_integration__wa_phone_number_id=bot_number,
+            )
+        except BotExtensionUser.DoesNotExist:
+            raise ExtensionGatheringWhatsapp(bot_number, user_phone_number)
+
+        bot_extension = existing_user.extension
+        bi = bot_extension.bot_integration
+
+    except ProvisionedNumber.DoesNotExist:
+        try:
+            bi = BotIntegration.objects.get(wa_phone_number_id=bot_number)
+        except BotIntegration.DoesNotExist as e:
+            capture_exception(e)
+    return bi, bot_extension, is_provisioned
+
+
+def handle_disconnect_ext_wa(message_text: str, bot_number: str, convo: Conversation):
+    from daras_ai_v2.bots import DISCONNECT_EXT_KEYWORDS
+
+    if message_text and message_text.lower().strip("/ ") in DISCONNECT_EXT_KEYWORDS:
+        with transaction.atomic():
+            try:
+                extension_user = BotExtensionUser.objects.get(
+                    wa_phone_number=convo.wa_phone_number,
+                    extension__bot_integration__wa_phone_number_id=bot_number,
+                )
+                extension_user.delete()
+            except BotExtensionUser.DoesNotExist as e:
+                capture_exception(e)
+                return
+            convo.reset_at = timezone.now()
+            convo.save()
+
+        send_wa_msgs_raw(
+            bot_number=bot_number,
+            user_number=convo.wa_phone_number.as_e164,
+            messages=[
+                {
+                    "type": "text",
+                    "text": {"body": "Extension disconnected"},
+                }
+            ],
+            access_token=convo.bot_integration.wa_business_access_token,
+        )
+
+        return True
+
+    return False
 
 
 wa_connect_redirect_url = (

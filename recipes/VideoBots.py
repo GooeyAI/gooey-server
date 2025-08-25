@@ -1656,7 +1656,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
 
     def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
-        from routers.facebook_api import fb_connect_url, wa_connect_url
+        from routers.facebook_api import fb_connect_url
         from routers.slack_api import slack_connect_url
         from number_cycling.utils import create_bot_integration_with_extension
 
@@ -1717,14 +1717,28 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     )
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(pr.id)
+                    try:
+                        bi = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.WHATSAPP,
+                        )
+                    except UnavailablePhoneNumber as e:
+                        gui.caption(
+                            f"{e}",
+                            className="text-center text-danger",
+                        )
+                        return
+
+                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.SLACK:
                     redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(pr.id)
                 case Platform.TWILIO:
                     try:
-                        bi, _ = create_bot_integration_with_extension(
+                        bi = create_bot_integration_with_extension(
                             name=run_title,
                             created_by=self.request.user,
                             workspace=self.current_workspace,
@@ -1761,6 +1775,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         self, integrations: list[BotIntegration], run_title: str
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+        from routers.facebook_api import wa_connect_url
 
         gui.markdown("#### Configure your Copilot")
         gui.newline()
@@ -1870,7 +1885,76 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
-            if bi.platform == Platform.TWILIO:
+
+            if bi.platform == Platform.WHATSAPP and extension_number:
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Get a Dedicated Number")
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write(
+                        f"Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
+                        style={"margin-bottom": "0px"},
+                    )
+
+                with col2:
+                    # get pr id from bi
+                    pr_id = bi.published_run.id
+                    gui.anchor(
+                        "Connect to your number",
+                        href=wa_connect_url(pr_id),
+                        style={
+                            "backgroundColor": "#1877F2",
+                            "color": "white",
+                            "width": "225px",
+                        },
+                        type="secondary",
+                    )
+
+                gui.html("""
+                        <div class="d-flex align-items-center my-2">
+                            <hr class="flex-grow-1">
+                            <span class="px-3 text-muted">or</span>
+                            <hr class="flex-grow-1">
+                        </div>
+                        """)
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    # Check if current workspace has enterprise subscription
+                    if is_enterprise:
+                        gui.write(
+                            f"As a premium customer, please contact us to setup a managed number"
+                        )
+                    else:
+                        gui.write("###### Get a Dedicated Number")
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={"width": "225px"},
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={"width": "225px"},
+                            type="primary",
+                        )
+
+                gui.write("---")
+            if bi.platform == Platform.TWILIO and extension_number:
                 col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 is_enterprise = (
                     self.current_workspace.subscription
@@ -1878,15 +1962,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     == PricingPlan.ENTERPRISE
                 )
                 with col1:
+                    gui.write("###### Get a Dedicated Number")
                     if is_enterprise:
-                        gui.write("###### Buy a Phone Number")
                         gui.write(
                             "As a premium customer, please contact us to set up a managed number"
                         )
                     else:
-                        gui.write("###### Get a Dedicated Number")
                         gui.write(
-                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a dedicated number managed by Gooey.AI"
                         )
                 with col2:
                     if is_enterprise:
