@@ -31,13 +31,14 @@ def generate_video(
     *,
     model: VideoGenerationModels,
     prompt: str,
-    duration: int = 5,
+    duration: int = 8,
     reference_image: str = None,
     aspect_ratio: str = "16:9",
+    resolution: str = "1080p",
+    frames_per_second: int = 30,
     style: str = None,
     negative_prompt: str = None,
     seed: int = None,
-    quality: str = "standard",
 ) -> OptionalHttpUrlStr:
     """
     Generate a video using the specified model and parameters.
@@ -45,13 +46,14 @@ def generate_video(
     Args:
         model: The video generation model to use
         prompt: Text description of the video to generate
-        duration: Duration of video in seconds (3-10)
+        duration: Duration of video in seconds (3-30)
         reference_image: Optional reference image URL for style/subject
         aspect_ratio: Video aspect ratio (16:9, 9:16, 1:1)
+        resolution: Video resolution (720p, 1080p, 4K)
+        frames_per_second: Video frame rate (24, 30, 60)
         style: Optional style parameter
         negative_prompt: What to avoid in the video
         seed: Random seed for reproducibility
-        quality: Generation quality (standard, high)
     
     Returns:
         URL of the generated video
@@ -64,8 +66,9 @@ def generate_video(
                 duration=duration,
                 reference_image=reference_image,
                 aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                frames_per_second=frames_per_second,
                 seed=seed,
-                quality=quality,
             )
         case VideoGenerationModels.google_veo_3:
             return _generate_veo3_video(
@@ -73,8 +76,9 @@ def generate_video(
                 duration=duration,
                 reference_image=reference_image,
                 aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                frames_per_second=frames_per_second,
                 seed=seed,
-                quality=quality,
             )
         case VideoGenerationModels.runway_gen_3:
             return _generate_runway_video(
@@ -82,6 +86,8 @@ def generate_video(
                 duration=duration,
                 reference_image=reference_image,
                 aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                frames_per_second=frames_per_second,
                 seed=seed,
             )
         case VideoGenerationModels.pika_labs:
@@ -90,6 +96,8 @@ def generate_video(
                 duration=duration,
                 reference_image=reference_image,
                 aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                frames_per_second=frames_per_second,
                 negative_prompt=negative_prompt,
                 seed=seed,
             )
@@ -102,15 +110,17 @@ def _generate_sora_video(
     duration: int,
     reference_image: str = None,
     aspect_ratio: str = "16:9",
+    resolution: str = "1080p",
+    frames_per_second: int = 30,
     seed: int = None,
-    quality: str = "standard",
 ) -> OptionalHttpUrlStr:
     """Generate video using OpenAI Sora"""
     return call_celery_task_outfile(
         "sora_video_generation",
         pipeline=dict(
             model_id=video_model_ids[VideoGenerationModels.openai_sora],
-            quality=quality,
+            resolution=resolution,
+            frames_per_second=frames_per_second,
         ),
         inputs=dict(
             prompt=prompt,
@@ -129,15 +139,17 @@ def _generate_veo3_video(
     duration: int,
     reference_image: str = None,
     aspect_ratio: str = "16:9",
+    resolution: str = "1080p",
+    frames_per_second: int = 30,
     seed: int = None,
-    quality: str = "standard",
 ) -> OptionalHttpUrlStr:
     """Generate video using Google Veo 3"""
     return call_celery_task_outfile(
         "veo3_video_generation",
         pipeline=dict(
             model_id=video_model_ids[VideoGenerationModels.google_veo_3],
-            quality=quality,
+            resolution=resolution,
+            frames_per_second=frames_per_second,
         ),
         inputs=dict(
             prompt=prompt,
@@ -156,6 +168,8 @@ def _generate_runway_video(
     duration: int,
     reference_image: str = None,
     aspect_ratio: str = "16:9",
+    resolution: str = "1080p",
+    frames_per_second: int = 30,
     seed: int = None,
 ) -> OptionalHttpUrlStr:
     """Generate video using Runway Gen-3"""
@@ -163,6 +177,8 @@ def _generate_runway_video(
         "runway_video_generation",
         pipeline=dict(
             model_id=video_model_ids[VideoGenerationModels.runway_gen_3],
+            resolution=resolution,
+            frames_per_second=frames_per_second,
         ),
         inputs=dict(
             prompt=prompt,
@@ -181,6 +197,8 @@ def _generate_pika_video(
     duration: int,
     reference_image: str = None,
     aspect_ratio: str = "16:9",
+    resolution: str = "1080p",
+    frames_per_second: int = 30,
     negative_prompt: str = None,
     seed: int = None,
 ) -> OptionalHttpUrlStr:
@@ -189,6 +207,8 @@ def _generate_pika_video(
         "pika_video_generation",
         pipeline=dict(
             model_id=video_model_ids[VideoGenerationModels.pika_labs],
+            resolution=resolution,
+            frames_per_second=frames_per_second,
         ),
         inputs=dict(
             prompt=prompt,
