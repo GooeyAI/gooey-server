@@ -447,9 +447,14 @@ def annotate_bot_versions(
     if dt_index.empty:
         return
 
-    versions = bi.published_run.versions.filter(
-        created_at__range=(dt_index.iloc[0], dt_index.iloc[-1]),
-    ).annotate(dt=trunc_fn("created_at"))
+    versions = (
+        bi.published_run.versions.filter(
+            created_at__range=(dt_index.iloc[0], dt_index.iloc[-1]),
+        )
+        .annotate(dt=trunc_fn("created_at"))
+        .values("dt")
+        .distinct()
+    )
     if not versions.exists():
         return
 
@@ -469,7 +474,7 @@ def annotate_bot_versions(
             text += f"Renamed to: {version.title}"
         if version.changed_by:
             text += f" by {version.changed_by.full_name()}"
-        text = truncate_text_words(text, 5)
+        text = truncate_text_words(text, 25)
         text += f" ({version.dt.strftime('%b %d %Y')})"
         labels[idx] = text
 
