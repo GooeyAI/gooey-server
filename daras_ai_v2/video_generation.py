@@ -42,7 +42,7 @@ def generate_video(
 ) -> OptionalHttpUrlStr:
     """
     Generate a video using the specified model and parameters.
-    
+
     Args:
         model: The video generation model to use
         prompt: Text description of the video to generate
@@ -54,11 +54,11 @@ def generate_video(
         style: Optional style parameter
         negative_prompt: What to avoid in the video
         seed: Random seed for reproducibility
-    
+
     Returns:
         URL of the generated video
     """
-    
+
     match model:
         case VideoGenerationModels.openai_sora:
             return _generate_sora_video(
