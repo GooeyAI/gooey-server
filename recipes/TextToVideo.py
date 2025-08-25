@@ -23,9 +23,10 @@ class TextToVideoPage(BasePage):
     ]
 
     sane_defaults = {
-        "duration": 5,
+        "duration": 8,
         "aspect_ratio": "16:9",
-        "quality": "standard",
+        "resolution": "1080p",
+        "frames_per_second": 30,
         "selected_models": [VideoGenerationModels.openai_sora.name],
     }
 
@@ -40,18 +41,22 @@ class TextToVideoPage(BasePage):
         
         # Video generation parameters
         duration: int = Field(
-            default=5,
+            default=8,
             ge=3,
-            le=10,
-            description="Duration of the video in seconds (3-10)"
+            le=30,
+            description="Duration of the video in seconds"
         )
         aspect_ratio: typing.Literal["16:9", "9:16", "1:1"] = Field(
             default="16:9",
             description="Video aspect ratio"
         )
-        quality: typing.Literal["standard", "high"] = Field(
-            default="standard",
-            description="Generation quality"
+        resolution: typing.Literal["720p", "1080p", "4K"] = Field(
+            default="1080p",
+            description="Video resolution"
+        )
+        frames_per_second: typing.Literal[24, 30, 60] = Field(
+            default=30,
+            description="Frames per second"
         )
         
         # Model selection
@@ -110,10 +115,11 @@ class TextToVideoPage(BasePage):
                     duration=request.duration,
                     reference_image=request.reference_image,
                     aspect_ratio=request.aspect_ratio,
+                    resolution=request.resolution,
+                    frames_per_second=request.frames_per_second,
                     style=request.style,
                     negative_prompt=request.negative_prompt,
                     seed=request.seed,
-                    quality=request.quality,
                 )
                 
                 yield f"✅ Completed {model.value}"
@@ -142,8 +148,9 @@ class TextToVideoPage(BasePage):
         Using 1.3x pricing multiplier as mentioned in the requirements.
         """
         selected_models = state.get("selected_models", [])
-        duration = state.get("duration", 5)
-        quality = state.get("quality", "standard")
+        duration = state.get("duration", 8)
+        resolution = state.get("resolution", "1080p")
+        frames_per_second = state.get("frames_per_second", 30)
         
         total_credits = 0
         
@@ -153,12 +160,15 @@ class TextToVideoPage(BasePage):
             base_cost = self._get_model_base_cost(model)
             
             # Duration multiplier (longer videos cost more)
-            duration_multiplier = duration / 5  # Base duration is 5 seconds
+            duration_multiplier = duration / 8  # Base duration is 8 seconds
             
-            # Quality multiplier
-            quality_multiplier = 1.5 if quality == "high" else 1.0
+            # Resolution multiplier
+            resolution_multiplier = self._get_resolution_multiplier(resolution)
             
-            model_cost = base_cost * duration_multiplier * quality_multiplier
+            # FPS multiplier
+            fps_multiplier = frames_per_second / 30  # Base FPS is 30
+            
+            model_cost = base_cost * duration_multiplier * resolution_multiplier * fps_multiplier
             total_credits += model_cost
         
         # Apply 1.3x pricing multiplier as specified
@@ -174,8 +184,17 @@ class TextToVideoPage(BasePage):
         }
         return base_costs.get(model, 40)  # Default cost
 
+    def _get_resolution_multiplier(self, resolution: str) -> float:
+        """Get cost multiplier based on resolution"""
+        resolution_multipliers = {
+            "720p": 0.8,
+            "1080p": 1.0,  # Base resolution
+            "4K": 2.5,     # Much higher cost for 4K
+        }
+        return resolution_multipliers.get(resolution, 1.0)
+
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
-        return ["selected_models", "duration", "aspect_ratio"]
+        return ["selected_models", "duration", "aspect_ratio", "resolution"]
 
     def related_workflows(self) -> list:
         from recipes.Lipsync import LipsyncPage
