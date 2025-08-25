@@ -1632,6 +1632,9 @@ def run_openai_chat(
     if response_format_type:
         kwargs["response_format"] = {"type": response_format_type}
 
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+
     model_ids = model.model_id
     if isinstance(model_ids, str):
         model_ids = [model_ids]
@@ -1642,7 +1645,6 @@ def run_openai_chat(
                 messages=messages,
                 stop=stop or NOT_GIVEN,
                 n=num_outputs,
-                temperature=temperature or NOT_GIVEN,
                 stream=stream,
                 **kwargs,
             )
