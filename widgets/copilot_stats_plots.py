@@ -20,6 +20,7 @@ from django.db.models.functions import (
 )
 from django.db.models.functions.datetime import TruncBase
 import pytz
+from regex import D
 
 from bots.models import BotIntegration, Message
 from bots.models.convo_msg import CHATML_ROLE_ASSISTANT, Feedback
@@ -91,6 +92,8 @@ def render_copilot_stats_plots(
     plot_average_runtime(fig, bi, start_date, end_date, trunc_fn, pd_freq)
     plot_total_price(fig, bi, start_date, end_date, trunc_fn, pd_freq)
     plot_retention(fig, bi, start_date, end_date, trunc_fn, pd_freq, dt_index)
+
+    annotate_bot_versions(fig, bi, trunc_fn, pd_freq, dt_index, tz)
 
     gui.plotly_chart(fig, config=defaultPlotlyConfig)
 
@@ -430,6 +433,61 @@ def plot_retention(
         )
     )
     add_legend(fig, "Retention", color_idx=9, row=5)
+
+
+def annotate_bot_versions(
+    fig: go.Figure,
+    bi: BotIntegration,
+    trunc_fn: TruncBase,
+    pd_freq: str,
+    dt_index: pd.Index,
+    tz: pytz.timezone,
+    color="#d3d3d3",  # light gray
+):
+    versions = bi.published_run.versions.filter(
+        created_at__range=(dt_index.iloc[0], dt_index.iloc[-1]),
+    ).annotate(dt=trunc_fn("created_at"))
+
+    dates = dt_index.to_list()
+    labels = [""] * len(dates)
+    cur_dt_idx = 0
+
+    for version in reversed(versions):
+        for cur_dt_idx in range(cur_dt_idx, len(dates)):
+            if dates[cur_dt_idx] > version.dt:
+                break
+
+        text = "✏️ "
+        if version.change_notes:
+            text += version.change_notes
+        elif version.title and bi.published_run.title != version.title:
+            text += f"Renamed to: {version.title}"
+        if version.changed_by:
+            text += f" by {version.changed_by.full_name()}"
+        text += f" ({version.dt.strftime('%b %d %Y')})"
+
+        labels[cur_dt_idx] = text
+
+        # add vertical line to all subplots
+        for row in range(1, fig.layout.grid.rows + 1):
+            fig.add_vline(
+                x=dates[cur_dt_idx],
+                line=dict(color=color, width=1, dash="dash"),
+                yref=f"y{row}",
+            )
+
+    # add a hidden scatter trace to show the hover labels
+    fig.add_trace(
+        go.Scatter(
+            x=dates,
+            y=[0] * len(dates),
+            mode="markers",
+            customdata=labels,
+            hovertemplate="%{customdata}<extra></extra>",
+            showlegend=False,
+            marker=dict(size=0.01, color=color),
+        )
+    )
 
 
 def get_line_marker(*, color_idx: int, gradient: bool = False):

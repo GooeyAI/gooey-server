@@ -26,6 +26,7 @@ def apply_consistent_styling(fig: "go.Figure") -> "go.Figure":
         autosize=True,
         hovermode="x unified",
         hoverdistance=1000,
+        hoversubplots="axis",
     )
     fig.update_xaxes(
         spikemode="across",
