@@ -40,8 +40,8 @@ def create_bot_integration_with_extension(
     created_by,
     workspace,
     platform: Platform,
-) -> Tuple[BotIntegration, BotExtension]:
-    if platform != Platform.TWILIO:
+) -> BotIntegration:
+    if platform != Platform.TWILIO and platform != Platform.WHATSAPP:
         raise ValueError("Invalid platform")
 
     with transaction.atomic():
@@ -53,14 +53,20 @@ def create_bot_integration_with_extension(
             workspace=workspace,
             platform=platform.value,
         )
-        bot_integration.twilio_phone_number = available_number.phone_number
+
+        if platform == Platform.TWILIO:
+            bot_integration.twilio_phone_number = available_number.phone_number
+        elif platform == Platform.WHATSAPP:
+            bot_integration.wa_phone_number_id = available_number.wa_phone_number_id
+            bot_integration.wa_phone_number = available_number.phone_number
+
         bot_integration.save()
 
         extension_number = generate_unique_extension_number(bot_integration, 5)
 
-        extension = BotExtension.objects.create(
+        BotExtension.objects.create(
             bot_integration=bot_integration,
             extension_number=extension_number,
         )
 
-        return bot_integration, extension
+        return bot_integration

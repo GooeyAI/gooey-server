@@ -13,10 +13,10 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
-from number_cycling.models import ProvisionedNumber, BotExtensionUser
 from django.utils import timezone
 from django.db import transaction
-
+from number_cycling.models import ProvisionedNumber, BotExtensionUser
+from sentry_sdk import capture_exception
 
 DISCONNECT_EXTENSION_TEXT = "disconnect"
 
@@ -45,21 +45,18 @@ class TwilioSMS(BotInterface):
         try:
             ProvisionedNumber.objects.get(phone_number=data["To"][0], is_active=True)
             is_provisioned = True
-            extension_user = (
-                BotExtensionUser.objects.filter(twilio_phone_number=data["From"][0])
-                .order_by("-created_at")
-                .first()
-            )
-
-            logger.info(f"Extension: {extension_user}")
-            if extension_user:
-                bot_extension = extension_user.extension
-                bi = bot_extension.bot_integration
-            else:
-                logger.info(f"No extension found for phone number: {data['To'][0]}")
+            try:
+                extension_user = BotExtensionUser.objects.get(
+                    twilio_phone_number=data["From"][0],
+                    extension__bot_integration__twilio_phone_number=data["To"][0],
+                )
+            except BotExtensionUser.DoesNotExist:
                 raise ExtensionGatheringSMS(
                     "Hi from Gooey.AI, Please call the number and enter your extension to continue"
                 )
+
+            bot_extension = extension_user.extension
+            bi = bot_extension.bot_integration
 
         except ProvisionedNumber.DoesNotExist:
             bi = BotIntegration.objects.get(
@@ -95,7 +92,7 @@ class TwilioSMS(BotInterface):
         user_msg_id = data["MessageSid"][0]
 
         if is_provisioned:
-            handle_disconnect_extension(text, user_id, convo)
+            handle_disconnect_ext_twilio(text, user_id, convo)
 
         return cls(
             convo,
@@ -349,12 +346,20 @@ def send_single_voice_call(
     return bot.start_voice_call_session(resp)
 
 
-def handle_disconnect_extension(text: str, user_id: str, convo: Conversation):
-    if text.lower() in ["/disconnect"]:
+def handle_disconnect_ext_twilio(text: str, user_id: str, convo: Conversation):
+    from daras_ai_v2.bots import DISCONNECT_EXT_KEYWORDS
+
+    if text.lower().strip("/ ") in DISCONNECT_EXT_KEYWORDS:
         with transaction.atomic():
-            extensions = BotExtensionUser.objects.filter(twilio_phone_number=user_id)
-            count = extensions.delete()[0]
-            logger.info(f"Deleted {count} extension(s) for phone number: {user_id}")
+            try:
+                extension_user = BotExtensionUser.objects.get(
+                    twilio_phone_number=user_id,
+                    extension__bot_integration__twilio_phone_number=convo.bot_integration.twilio_phone_number,
+                )
+                extension_user.delete()
+            except BotExtensionUser.DoesNotExist as e:
+                capture_exception(e)
+                return
 
             convo.reset_at = timezone.now()
             convo.save()

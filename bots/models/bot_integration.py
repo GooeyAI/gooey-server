@@ -266,7 +266,6 @@ class BotIntegration(models.Model):
         blank=True,
         default=None,
         null=True,
-        unique=True,
         help_text="Bot's WhatsApp phone number id (mandatory)",
     )
 
@@ -476,6 +475,14 @@ class BotIntegration(models.Model):
                     self.twilio_phone_number
                     and self.twilio_phone_number.as_international
                 )
+        elif self.platform == Platform.WHATSAPP:
+            bot_extension_number = self.get_extension_number()
+            if bot_extension_number:
+                return (
+                    f"{self.wa_phone_number.as_international} ex {bot_extension_number}"
+                )
+            else:
+                return self.wa_phone_number.as_international
 
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
@@ -500,7 +507,13 @@ class BotIntegration(models.Model):
         from routers.root import chat_route
 
         if self.wa_phone_number:
-            return (furl("https://wa.me/") / self.wa_phone_number.as_e164).tostr()
+            bot_extension_number = self.get_extension_number()
+            if bot_extension_number:
+                wa_url = furl("https://wa.me/") / self.wa_phone_number.as_e164
+                wa_url.args["text"] = f"/extension {bot_extension_number}"
+                return wa_url.tostr()
+            else:
+                return (furl("https://wa.me/") / self.wa_phone_number.as_e164).tostr()
         elif self.slack_team_id and self.slack_channel_id:
             return (
                 furl("https://app.slack.com/client")
