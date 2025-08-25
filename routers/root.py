@@ -173,7 +173,7 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
 
 @app.get("/logout/")
 async def logout(request: Request):
-    request.session.pop(FIREBASE_SESSION_COOKIE, None)
+    request.session.clear()
     return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
 
 
