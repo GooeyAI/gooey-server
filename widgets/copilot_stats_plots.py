@@ -23,6 +23,7 @@ import pytz
 
 from bots.models import BotIntegration, Message
 from bots.models.convo_msg import CHATML_ROLE_ASSISTANT, Feedback
+from daras_ai.image_input import truncate_text_words
 from widgets.plotly_theme import (
     COLOR_PALETTE,
     apply_consistent_styling,
@@ -468,6 +469,7 @@ def annotate_bot_versions(
             text += f"Renamed to: {version.title}"
         if version.changed_by:
             text += f" by {version.changed_by.full_name()}"
+        text = truncate_text_words(text, 5)
         text += f" ({version.dt.strftime('%b %d %Y')})"
         labels[idx] = text
 
