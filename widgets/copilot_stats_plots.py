@@ -469,9 +469,7 @@ def annotate_bot_versions(
             text += f"Renamed to: {version.title}"
         if version.changed_by:
             text += f" by {version.changed_by.full_name()}"
-        text = truncate_text_words(
-            text,
-        )
+        text = truncate_text_words(text, 25)
         text += f" ({version.dt.strftime('%b %d %Y')})"
         labels[idx] = text
 
