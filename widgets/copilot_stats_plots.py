@@ -487,6 +487,7 @@ def annotate_bot_versions(
             customdata=labels,
             hovertemplate="%{customdata}<extra></extra>",
             showlegend=False,
+            mode="lines",
             line=dict(width=0, color=color),
         )
     )
