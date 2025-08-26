@@ -1,7 +1,6 @@
 import typing
 from datetime import datetime, timedelta
 
-import gooey_gui as gui
 from django.utils import timezone
 
 T = typing.TypeVar("T")
@@ -32,11 +31,7 @@ def get_relative_time(timestamp: datetime) -> str:
     return "Just now"
 
 
-def use_session_state(
-    key: str, *, default: T = None
-) -> tuple[T, typing.Callable[[T], None]]:
-    def set_state(value: T) -> None:
-        gui.session_state[key] = value
-
-    current_value = gui.session_state.setdefault(key, default)
-    return current_value, set_state
+def clamp(x: float | None, min_value: float, max_value: float) -> float:
+    if x is None:
+        return min_value
+    return max(min_value, min(x, max_value))

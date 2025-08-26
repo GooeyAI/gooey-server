@@ -286,9 +286,13 @@ Here's what you uploaded:
         aggregations = gui.session_state.get("aggregations", [])
 
         for file, results in zip_longest(files, aggregations):
-            gui.write(file)
+            gui.html(
+                '<span class="float-end">'
+                '<i class="fa fa-file-csv"></i>'
+                f' <a href="{file}" target="_blank">Download</a>'
+                "</span><br>"
+            )
             gui.data_table(file)
-
             if not results:
                 continue
 

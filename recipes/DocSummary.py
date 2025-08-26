@@ -240,6 +240,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
         )[0]
 
     state["prompt_tree"] = prompt_tree = []

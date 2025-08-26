@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import typing
 
@@ -7,7 +9,9 @@ from django.utils.text import slugify
 from app_users.models import AppUser
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.settings import templates
 from functions.models import CalledFunction, FunctionTrigger
+from widgets.switch_with_section import switch_with_section
 
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
@@ -102,11 +106,11 @@ class WorkflowLLMTool(BaseLLMTool):
 
     def bind(
         self,
-        saved_run: "SavedRun",
-        workspace: "Workspace",
+        saved_run: SavedRun,
+        workspace: Workspace,
         current_user: AppUser,
-        request_model: typing.Type["BasePage.RequestModel"],
-        response_model: typing.Type["BasePage.ResponseModel"],
+        request_model: typing.Type[BasePage.RequestModel],
+        response_model: typing.Type[BasePage.ResponseModel],
         state: dict,
         trigger: FunctionTrigger,
     ) -> "WorkflowLLMTool":
@@ -229,11 +233,11 @@ def get_tool_from_call(
 
 def call_recipe_functions(
     *,
-    saved_run: "SavedRun",
-    workspace: "Workspace",
+    saved_run: SavedRun,
+    workspace: Workspace,
     current_user: AppUser,
-    request_model: typing.Type["BasePage.RequestModel"],
-    response_model: typing.Type["BasePage.ResponseModel"],
+    request_model: typing.Type[BasePage.RequestModel],
+    response_model: typing.Type[BasePage.ResponseModel],
     state: dict,
     trigger: FunctionTrigger,
 ) -> typing.Iterable[str]:
@@ -309,7 +313,7 @@ def functions_input(current_user: AppUser, key="functions"):
     from daras_ai_v2.base import BasePage
     from recipes.BulkRunner import list_view_editor
 
-    def render_function_input(list_key: str, del_key: str, d: dict):
+    def render_inputs(list_key: str, del_key: str, d: dict):
         from daras_ai_v2.workflow_url_input import workflow_url_input
         from recipes.Functions import FunctionsPage
 
@@ -333,70 +337,104 @@ def functions_input(current_user: AppUser, key="functions"):
             )
         col2.node.children[0].props["className"] += " col-12"
 
-    if gui.switch(
+    def render_section():
+        gui.session_state.setdefault(key, [{}])
+        with gui.div(className="d-flex align-items-center"):
+            gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
+        list_view_editor(
+            add_btn_label="Add Function",
+            add_btn_type="tertiary",
+            key=key,
+            render_inputs=render_inputs,
+        )
+
+    functions_enabled = switch_with_section(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
         key=f"--enable-{key}",
-        value=key in gui.session_state,
-        className="mb-2",
-    ):
-        with gui.div(className="ps-1"):
-            gui.session_state.setdefault(key, [{}])
-            with gui.div(className="d-flex align-items-center"):
-                gui.write(
-                    "###### Functions",
-                    help=FUNCTIONS_HELP_TEXT,
-                )
-            list_view_editor(
-                add_btn_label="Add Function",
-                add_btn_type="tertiary",
-                key=key,
-                render_inputs=render_function_input,
-            )
-    else:
+        control_keys=[key],
+        render_section=render_section,
+    )
+    if not functions_enabled:
         gui.session_state.pop(key, None)
 
 
-def render_called_functions(*, saved_run: "SavedRun", trigger: FunctionTrigger):
-    from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
+    items = _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    if not items:
+        return
+    for item in items:
+        key = f"fn-call-details-{item['id']}"
+        with gui.expander(f"🧩 Called `{item['title']}`", key=key):
+            if not gui.session_state.get(key):
+                continue
+            gui.html(
+                f'<i class="fa-regular fa-external-link-square"></i> '
+                f'<a target="_blank" href="{item["url"]}">'
+                "Inspect Function Call"
+                "</a>"
+            )
+
+            gui.write("**Inputs**")
+            gui.json(item["inputs"])
+
+            if item["return_value"] is not None:
+                gui.write("**Return value**")
+                gui.json(item["return_value"])
+
+
+def render_called_functions_as_html(
+    *, saved_run: SavedRun, trigger: FunctionTrigger
+) -> str:
+    """Return HTML for functions called for a given run and trigger using a template."""
+    context_items = [
+        {
+            "title": item["title"],
+            "url": item["url"],
+            "inputs": item["inputs"],
+            "return_value": item["return_value"],
+        }
+        for item in _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    ]
+    if not context_items:
+        return ""
+
+    context = {"called_functions": context_items}
+    template = templates.get_template("functions/called_functions.html")
+    return template.render(context)
+
+
+def _get_called_functions_items(
+    *, saved_run: SavedRun, trigger: FunctionTrigger
+) -> typing.Iterable[dict]:
+    """Generate data for called functions for reuse across renderers."""
     from bots.models import Workflow
 
     if not is_functions_enabled():
         return
     qs = saved_run.called_functions.filter(trigger=trigger.db_value)
-    if not qs.exists():
-        return
     for called_fn in qs:
         fn_sr = called_fn.function_run
         page_cls = Workflow(fn_sr.workflow).page_cls
-        tb = get_title_breadcrumbs(
-            page_cls,
-            fn_sr,
-            fn_sr.parent_published_run(),
+
+        pr = fn_sr.parent_published_run()
+        title = pr and pr.title or "Function"
+
+        if fn_sr.workflow == Workflow.FUNCTIONS:
+            fn_vars = fn_sr.state.get("variables", {})
+            fn_vars_schema = fn_sr.state.get("variables_schema", {})
+            inputs = {
+                key: value
+                for key, value in fn_vars.items()
+                if fn_vars_schema.get(key, {}).get("role") != "system"
+            }
+        else:
+            inputs = page_cls.get_example_request(fn_sr.state)[1]
+        return_value = fn_sr.state.get("return_value")
+
+        yield dict(
+            id=called_fn.id,
+            title=title,
+            url=fn_sr.get_app_url(),
+            inputs=inputs,
+            return_value=return_value,
         )
-        key = f"fn-call-details-{called_fn.id}"
-        with gui.expander(f"🧩 Called `{tb.h1_title.title}`", key=key):
-            if not gui.session_state.get(key):
-                continue
-            gui.html(
-                f'<i class="fa-regular fa-external-link-square"></i> <a target="_blank" href="{fn_sr.get_app_url()}">'
-                "Inspect Function Call"
-                "</a>"
-            )
-
-            if fn_sr.workflow == Workflow.FUNCTIONS:
-                fn_vars = fn_sr.state.get("variables", {})
-                fn_vars_schema = fn_sr.state.get("variables_schema", {})
-                inputs = {
-                    key: value
-                    for key, value in fn_vars.items()
-                    if fn_vars_schema.get(key, {}).get("role") != "system"
-                }
-            else:
-                inputs = page_cls.get_example_request(fn_sr.state)[1]
-            gui.write("**Inputs**")
-            gui.json(inputs)
-
-            return_value = fn_sr.state.get("return_value")
-            if return_value is not None:
-                gui.write("**Return value**")
-                gui.json(return_value)

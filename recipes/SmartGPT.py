@@ -117,6 +117,7 @@ class SmartGPTPage(BasePage):
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
         )
         state["prompt_tree"] = prompt_tree = [
             {
@@ -139,6 +140,7 @@ class SmartGPTPage(BasePage):
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 response_format_type=request.response_format_type,
+                reasoning_effort=request.reasoning_effort,
             )[0],
             prompt_tree,
         )
@@ -172,6 +174,7 @@ class SmartGPTPage(BasePage):
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
         )
         state["output_text"] = dera_outputs
 

@@ -243,6 +243,11 @@ MMS_SUPPORTED = {
     'zpt', 'zpu', 'zpz', 'ztq', 'zty', 'zul', 'zyb', 'zyp', 'zza'
 }  # fmt: skip
 
+SUNBIRD_SUPPORTED_LANGUAGES = {
+    "eng", "swa", "ach", "lgg", "lug", "nyn",
+    "teo", "xog", "ttj", "kin", "myx",
+}  # fmt: skip
+
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
@@ -277,6 +282,9 @@ class AsrModels(Enum):
 
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
     lelapa = "Vulavula (Lelapa AI)"
+    whisper_sunbird_large_v3 = "Sunbird Ugandan Whisper v3 (Sunbird AI)"
+    whisper_swahili_medium_v3 = "Jacaranda Health Swahili Whisper v3 (Jacaranda Health)"
+    mbaza_ctc_large = "Mbaza Conformer LG (MbazaNLP)"
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
     whisper_chichewa_large_v3 = (
@@ -342,6 +350,9 @@ asr_model_ids = {
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.lelapa: "lelapa-vulavula",
     AsrModels.elevenlabs: "elevenlabs-scribe-v1",
+    AsrModels.whisper_sunbird_large_v3: "Sunbird/asr-whisper-large-v3-salt",
+    AsrModels.whisper_swahili_medium_v3: "Jacaranda-Health/ASR-STT",
+    AsrModels.mbaza_ctc_large: "mbazaNLP/stt_rw_sw_lg_conformer_ctc_large",
 }
 
 forced_asr_languages = {
@@ -373,6 +384,9 @@ asr_supported_languages = {
     AsrModels.mms_1b_all: MMS_SUPPORTED,
     AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
     AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
+    AsrModels.whisper_sunbird_large_v3: SUNBIRD_SUPPORTED_LANGUAGES,
+    AsrModels.whisper_swahili_medium_v3: {"sw", "en"},
+    AsrModels.mbaza_ctc_large: {"sw", "rw", "lg"},
 }
 
 
@@ -1204,7 +1218,7 @@ def run_asr(
             for result in batch.transcript.results  # SpeechRecognitionResult
             if result.alternatives
         )
-    elif "nemo" in selected_model.name:
+    elif selected_model == AsrModels.mbaza_ctc_large:
         data = call_celery_task(
             "nemo_asr",
             pipeline=dict(

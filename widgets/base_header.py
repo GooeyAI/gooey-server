@@ -2,15 +2,10 @@ import gooey_gui as gui
 
 from bots.models import Workflow
 from daras_ai_v2 import icons
-from widgets.author import (
-    render_author_as_breadcrumb,
-)
+from widgets.author import render_author_as_breadcrumb
 from app_users.models import AppUser
 from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
-from bots.models import (
-    PublishedRun,
-    SavedRun,
-)
+from bots.models import PublishedRun, SavedRun
 from workspaces.models import Workspace
 
 
@@ -46,10 +41,9 @@ def render_help_button(workflow: Workflow):
 def render_breadcrumbs_with_author(
     breadcrumbs: TitleBreadCrumbs,
     *,
-    is_root_example: bool = False,
     user: AppUser | None = None,
-    pr: PublishedRun | None = None,
-    sr: SavedRun | None = None,
+    pr: PublishedRun,
+    sr: SavedRun,
     current_workspace: Workspace | None = None,
 ):
     with gui.div(
@@ -63,6 +57,7 @@ def render_breadcrumbs_with_author(
                     className="text-muted",
                 )
 
+        is_root_example = pr.is_root() and pr.saved_run_id == sr.id
         if not is_root_example:
             with gui.div(className="d-flex align-items-center"):
                 gui.write("by", className="me-2 d-none d-md-block text-muted")

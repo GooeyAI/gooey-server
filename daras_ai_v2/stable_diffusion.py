@@ -465,6 +465,12 @@ def img2img(
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
+    if not prompt and selected_model in (
+        Img2ImgModels.flux_pro_kontext.name,
+        Img2ImgModels.gpt_image_1.name,
+    ):
+        raise UserError("Text prompt is required for this model")
+
     match selected_model:
         case Img2ImgModels.flux_pro_kontext.name:
             # Flux Pro Kontext requires guidance_scale >= 1.0

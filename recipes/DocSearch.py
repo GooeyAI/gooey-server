@@ -202,6 +202,7 @@ class DocSearchPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
         )
 
         citation_style = (

@@ -162,18 +162,20 @@ def render_share_options_for_team_workspace(
             )
         )
 
-    if can_user_edit and pr.workspace.can_have_private_published_runs():
-        is_disabled = updates["workspace_access"] == WorkflowAccessLevel.VIEW_ONLY
-        if is_disabled:
+    if user.is_admin() or pr.workspace.can_have_private_published_runs():
+        is_workflow_private = (
+            updates["workspace_access"] == WorkflowAccessLevel.VIEW_ONLY
+        )
+        if is_workflow_private:
             gui.session_state["workflow-is-public"] = False
         is_public = gui.checkbox(
             label=WorkflowAccessLevel.FIND_AND_VIEW.get_public_sharing_text(pr),
             key="workflow-is-public",
             value=(
-                not is_disabled
+                not is_workflow_private
                 and pr.public_access == WorkflowAccessLevel.FIND_AND_VIEW.value
             ),
-            disabled=is_disabled,
+            disabled=is_workflow_private or not can_user_edit,
         )
         if is_public:
             updates["public_access"] = WorkflowAccessLevel.FIND_AND_VIEW

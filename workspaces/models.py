@@ -276,6 +276,11 @@ class Workspace(SafeDeleteModel):
         When credits are deducted due to a run -- invoice_id is of the
         form "gooey_in_{uuid}"
         """
+        return self.add_balance_raw(amount, invoice_id, user=user, **kwargs)
+
+    def add_balance_raw(
+        self, amount: int, invoice_id: str, *, user: AppUser | None = None, **kwargs
+    ) -> "AppUserTransaction":
         from app_users.models import AppUserTransaction
 
         # if an invoice entry exists

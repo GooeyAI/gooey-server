@@ -4,7 +4,7 @@ from functools import partial
 
 import gooey_gui as gui
 from django.db.models import TextChoices
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from bots.models import Workflow
@@ -69,6 +69,9 @@ class DeforumSDPage(BasePage):
         rotation_3d_z: str | None = None
         fps: int | None = None
 
+        output_width: int | None = Field(512)
+        output_height: int | None = Field(512)
+
         seed: int | None = None
 
     class ResponseModel(BaseModel):
@@ -111,6 +114,8 @@ class DeforumSDPage(BasePage):
         gui.write("#### Step 1: Draft & Refine Keyframes")
 
         animation_prompts_editor(prev_fps_slider, fps_slider)
+
+        aspect_ratio_selector()
 
         gui.write("#### Step 2: Increase Animation Quality")
         gui.caption(
@@ -292,6 +297,7 @@ class DeforumSDPage(BasePage):
                     seed=request.seed,
                 ),
                 inputs=dict(
+                    args=dict(W=request.output_width, H=request.output_height),
                     animation_mode=request.animation_mode,
                     animation_prompts={
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
@@ -727,3 +733,35 @@ def parse_key_frames(string, prompt_parser=None):
     # if frames == {} and len(string) != 0:
     #     raise RuntimeError("Key Frame string not correctly formatted")
     return frames
+
+
+resolution_options = {
+    "512x512": '<i class="fa-sharp fa-regular fa-square"></i> Square',
+    "512x768": '<i class="fa-sharp fa-solid fa-image-portrait"></i> Portrait',
+    "768x512": '<i class="fa-sharp fa-regular fa-image-landscape"></i> Landscape',
+}
+
+
+def aspect_ratio_selector():
+    if not gui.session_state.get("_aspect_ratio"):
+        output_width = gui.session_state.get("output_width")
+        output_height = gui.session_state.get("output_height")
+        if output_width and output_height:
+            if output_width > output_height:
+                gui.session_state["_aspect_ratio"] = "768x512"
+            elif output_width < output_height:
+                gui.session_state["_aspect_ratio"] = "512x768"
+            else:
+                gui.session_state["_aspect_ratio"] = "512x512"
+
+    aspect_ratio = gui.horizontal_radio(
+        label="",
+        options=resolution_options,
+        format_func=resolution_options.__getitem__,
+        key="_aspect_ratio",
+    )
+
+    if aspect_ratio:
+        gui.session_state["output_width"], gui.session_state["output_height"] = map(
+            int, aspect_ratio.split("x")
+        )

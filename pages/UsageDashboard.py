@@ -1,5 +1,6 @@
 import numpy as np
 
+from daras_ai.text_format import format_timedelta
 from gooeysite import wsgi
 
 assert wsgi
@@ -161,7 +162,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
                         "run_id": sr.run_id,
                         "uid": sr.uid,
                         "url": sr.get_app_url(),
-                        "run_time": str(sr.run_time),
+                        "run_time": format_timedelta(sr.run_time),
                         "run_status": sr.run_status,
                     }
                     for sr in saved_runs_qs

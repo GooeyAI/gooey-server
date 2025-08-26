@@ -19,97 +19,103 @@ if typing.TYPE_CHECKING:
 def variables_input(
     *,
     template_keys: typing.Iterable[str],
-    label: str = "###### ⌥ Variables",
+    label: str = '###### <i class="fa-solid fa-brackets-curly pe-1"></i> Variables',
     description: str = "Variables let you pass custom parameters to your workflow. Access a variable in your instruction prompt with <a href='https://jinja.palletsprojects.com/en/3.1.x/templates/' target='_blank'>Jinja</a>, e.g. `{{ my_variable }}`\n  ",
     key: str = "variables",
     allow_add: bool = False,
     exclude: typing.Iterable[str] = (),
 ):
-    from recipes.BulkRunner import list_view_editor
+    with gui.div(className="bg-light p-2 pb-0 rounded my-2"):
+        from recipes.BulkRunner import list_view_editor
 
-    variables = gui.session_state.get(key) or {}
-    schema_key = key + "_schema"
-    variables_schema = gui.session_state.get(schema_key) or {}
+        variables = gui.session_state.get(key) or {}
+        schema_key = key + "_schema"
+        variables_schema = gui.session_state.get(schema_key) or {}
 
-    # find all variables in the prompts
-    env = jinja2.sandbox.SandboxedEnvironment()
-    template_var_names = set()
-    error = None
-    for k in template_keys:
-        try:
-            parsed = env.parse(gui.session_state.get(k, ""))
-        except jinja2.exceptions.TemplateSyntaxError as e:
-            error = e
-        else:
-            template_var_names |= jinja2.meta.find_undeclared_variables(parsed)
+        # find all variables in the prompts
+        env = jinja2.sandbox.SandboxedEnvironment()
+        template_var_names = set()
+        error = None
+        for k in template_keys:
+            try:
+                parsed = env.parse(gui.session_state.get(k, ""))
+            except jinja2.exceptions.TemplateSyntaxError as e:
+                error = e
+            else:
+                template_var_names |= jinja2.meta.find_undeclared_variables(parsed)
 
-    var_names = (
-        (template_var_names | set(variables.keys()))
-        - set(context_globals().keys())  # dont show global context variables
-        - set(exclude)  # used for hiding request/response fields
-    )
-    pressed_add = False
-    if var_names or allow_add:
-        with gui.div(className="d-flex align-items-center gap-3 mb-2"):
-            gui.write(
-                label,
-                help=f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
+        var_names = (
+            (template_var_names | set(variables.keys()))
+            - set(context_globals().keys())  # dont show global context variables
+            - set(exclude)  # used for hiding request/response fields
+        )
+        pressed_add = False
+        if var_names or allow_add:
+            with gui.div(className="d-flex align-items-center gap-3"):
+                gui.write(
+                    label,
+                    help=f"{description} <a href='/variables-help' target='_blank'>Learn more</a>.",
+                    unsafe_allow_html=True,
+                )
+                pressed_add = allow_add and gui.button(
+                    f"{icons.add} Add", type="tertiary", className="p-1 mb-2"
+                )
+
+        list_key = key + ":list"
+        list_items = gui.session_state.setdefault(list_key, [])
+
+        var_names -= {item["name"] for item in list_items}
+        var_names = sorted(
+            var_names, key=lambda x: variables_schema.get(x, {}).get("role") or ""
+        )
+        for var in var_names:
+            list_items.append(
+                {
+                    "name": var,
+                    "value": variables.get(var),
+                    "schema": variables_schema.get(var, {}),
+                }
             )
-            pressed_add = allow_add and gui.button(
-                f"{icons.add} Add", type="tertiary", className="p-1 mb-2"
+
+        if pressed_add:
+            list_items.insert(
+                0, {"name": "", "value": None, "schema": {}, "_edit": True}
             )
 
-    list_key = key + ":list"
-    list_items = gui.session_state.setdefault(list_key, [])
+        # if the user clicks the button to clear system variables, remove all system variables
+        if gui.session_state.pop(list_key + ":clear-system", None):
+            gui.session_state[list_key] = [
+                item
+                for item in list_items
+                if item.get("schema", {}).get("role") != "system"
+            ]
 
-    var_names -= {item["name"] for item in list_items}
-    var_names = sorted(
-        var_names, key=lambda x: variables_schema.get(x, {}).get("role") or ""
-    )
-    for var in var_names:
-        list_items.append(
-            {
-                "name": var,
-                "value": variables.get(var),
-                "schema": variables_schema.get(var, {}),
-            }
+        list_items = list_view_editor(
+            key=list_key,
+            render_inputs=partial(
+                render_list_item, template_var_names=template_var_names
+            ),
         )
 
-    if pressed_add:
-        list_items.insert(0, {"name": "", "value": None, "schema": {}, "_edit": True})
+        if error:
+            gui.error(f"{type(error).__qualname__}: {error.message}")
 
-    # if the user clicks the button to clear system variables, remove all system variables
-    if gui.session_state.pop(list_key + ":clear-system", None):
-        gui.session_state[list_key] = [
-            item
-            for item in list_items
-            if item.get("schema", {}).get("role") != "system"
-        ]
+        if not list_items and gui.session_state.get(key) is None:
+            return
 
-    list_items = list_view_editor(
-        key=list_key,
-        render_inputs=partial(render_list_item, template_var_names=template_var_names),
-    )
+        # button to clear system variables
+        if any(item.get("schema", {}).get("role") == "system" for item in list_items):
+            gui.button(
+                f"{icons.clear}<i class='ps-1'>Clear System Variables</i>",
+                type="link",
+                className="text-muted",
+                key=list_key + ":clear-system",
+            )
 
-    if error:
-        gui.error(f"{type(error).__qualname__}: {error.message}")
-
-    if not list_items and gui.session_state.get(key) is None:
-        return
-
-    # button to clear system variables
-    if any(item.get("schema", {}).get("role") == "system" for item in list_items):
-        gui.button(
-            f"{icons.clear}<i class='ps-1'>Clear System Variables</i>",
-            type="link",
-            className="text-muted",
-            key=list_key + ":clear-system",
-        )
-
-    gui.session_state[key] = {item["name"]: item["value"] for item in list_items}
-    gui.session_state[schema_key] = {
-        item["name"]: item["schema"] for item in list_items
-    }
+        gui.session_state[key] = {item["name"]: item["value"] for item in list_items}
+        gui.session_state[schema_key] = {
+            item["name"]: item["schema"] for item in list_items
+        }
 
 
 def render_list_item(

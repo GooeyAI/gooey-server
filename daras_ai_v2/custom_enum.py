@@ -3,6 +3,8 @@ from enum import Enum
 
 import typing_extensions
 
+from daras_ai_v2.exceptions import UserError
+
 T = typing.TypeVar("T", bound="GooeyEnum")
 
 
@@ -35,4 +37,4 @@ class GooeyEnum(Enum):
         for e in cls:
             if e.name == name:
                 return e
-        raise ValueError(f"Invalid {cls.__name__} {name=}")
+        raise UserError(f"Invalid {cls.__name__} {name=}")
