@@ -260,7 +260,7 @@ def fb_webhook(
                                         {
                                             "type": "text",
                                             "text": {
-                                                "body": "Bot extension not found, Please try a different extension number"
+                                                "body": "Sorry, I couldn't find that extension on Gooey.AI. Please enter another."
                                             },
                                         }
                                     ],
@@ -275,7 +275,7 @@ def fb_webhook(
                                     {
                                         "type": "text",
                                         "text": {
-                                            "body": "Hi from Gooey.AI, enter your extension number to continue"
+                                            "body": "Hi from Gooey.AI. Please text me an extension."
                                         },
                                     },
                                 ],
