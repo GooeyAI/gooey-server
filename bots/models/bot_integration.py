@@ -361,7 +361,6 @@ class BotIntegration(models.Model):
         blank=True,
         null=True,
         default=None,
-        unique=True,
         help_text="Twilio phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
     )
     twilio_phone_number_sid = models.TextField(
@@ -446,7 +445,6 @@ class BotIntegration(models.Model):
         ordering = ["-updated_at"]
         unique_together = [
             ("slack_channel_id", "slack_team_id"),
-            ("twilio_phone_number", "twilio_account_sid"),
         ]
         indexes = [
             models.Index(fields=["workspace", "platform"]),
@@ -469,6 +467,16 @@ class BotIntegration(models.Model):
             return None
 
     def get_display_name(self):
+        if self.platform == Platform.TWILIO:
+            bot_extension_number = self.get_extension_number()
+            if bot_extension_number:
+                return f"{self.twilio_phone_number.as_international} ex {bot_extension_number}"
+            else:
+                return (
+                    self.twilio_phone_number
+                    and self.twilio_phone_number.as_international
+                )
+
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.wa_phone_number_id
@@ -512,8 +520,20 @@ class BotIntegration(models.Model):
                 ),
             )
         elif self.twilio_phone_number:
-            return str(furl("tel:") / self.twilio_phone_number.as_e164)
+            bot_extension_number = self.get_extension_number()
+            tel_url = furl("tel:") / self.twilio_phone_number.as_e164
+            if bot_extension_number:
+                return f"{tel_url.tostr()},{bot_extension_number}"
+            return tel_url.tostr()
         else:
+            return None
+
+    def get_extension_number(self) -> str | None:
+        from number_cycling.models import BotExtension
+
+        try:
+            return str(BotExtension.objects.get(bot_integration=self).extension_number)
+        except BotExtension.DoesNotExist:
             return None
 
     def api_integration_id(self) -> str:
