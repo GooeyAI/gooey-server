@@ -1928,13 +1928,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
                 col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 with col1:
+                    gui.write("###### Get a Dedicated Number")
                     # Check if current workspace has enterprise subscription
                     if is_enterprise:
                         gui.write(
                             f"As a premium customer, please contact us to setup a managed number"
                         )
                     else:
-                        gui.write("###### Get a Dedicated Number")
                         gui.write(
                             f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
                         )
