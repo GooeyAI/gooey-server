@@ -45,6 +45,7 @@ PAGE_NOT_CONNECTED_ERROR = (
 )
 RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
+DISCONNECT_EXT_KEYWORDS = {"disconnect"}
 
 DEFAULT_RESPONSE = (
     "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
