@@ -1819,7 +1819,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             extension_number = bi.get_extension_number()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Connected to")
+                if extension_number:
+                    gui.write("###### Connected to Extension")
+                else:
+                    gui.write("###### Connected to")
+
                 gui.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
                 if not test_link:
@@ -1892,27 +1896,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     and PricingPlan.from_sub(self.current_workspace.subscription)
                     == PricingPlan.ENTERPRISE
                 )
-                col1, col2 = gui.columns(2, style={"alignItems": "center"})
-                with col1:
-                    gui.write("###### Get a Dedicated Number")
 
                 col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 with col1:
+                    gui.write("###### Bring your own number")
                     gui.write(
-                        f"Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
-                        style={"margin-bottom": "0px"},
+                        f"Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-whatsapp)",
                     )
 
                 with col2:
                     # get pr id from bi
                     pr_id = bi.published_run.id
                     gui.anchor(
-                        "Connect to your number",
+                        "Connect number",
                         href=wa_connect_url(pr_id),
                         style={
                             "backgroundColor": "#1877F2",
                             "color": "white",
-                            "width": "225px",
+                            "width": "100%",
+                            "maxWidth": "225px",
                         },
                         type="secondary",
                     )
@@ -1927,7 +1929,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
                 col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 with col1:
-                    gui.write("###### Get a Dedicated Number")
+                    gui.write("###### Buy a dedicated number")
                     # Check if current workspace has enterprise subscription
                     if is_enterprise:
                         gui.write(
@@ -1942,14 +1944,20 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         gui.anchor(
                             "Contact",
                             href=settings.CONTACT_URL,
-                            style={"width": "225px"},
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
                             type="primary",
                         )
                     else:
                         gui.anchor(
                             "Upgrade",
                             href=settings.PRICING_DETAILS_URL,
-                            style={"width": "225px"},
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
                             type="primary",
                         )
 
@@ -1976,14 +1984,20 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         gui.anchor(
                             "Contact",
                             href=settings.CONTACT_URL,
-                            style={"width": "225px"},
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
                             type="primary",
                         )
                     else:
                         gui.anchor(
                             "Upgrade",
                             href=settings.PRICING_DETAILS_URL,
-                            style={"width": "225px"},
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
                             type="primary",
                         )
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
