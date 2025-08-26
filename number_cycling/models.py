@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import models
 import phonenumber_field.modelfields
 import random
-from daras_ai_v2.exceptions import UnavailablePhoneNumber
+from daras_ai_v2.exceptions import UnavailableProvisionedNumber
 from bots.models.bot_integration import (
     Platform,
     WhatsappPhoneNumberField,
@@ -164,6 +164,6 @@ class ProvisionedNumber(models.Model):
         if available_numbers:
             return random.choice(available_numbers)
 
-        raise UnavailablePhoneNumber(
+        raise UnavailableProvisionedNumber(
             f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
         )
