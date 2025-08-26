@@ -1827,12 +1827,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 elif bi.platform == Platform.TWILIO:
                     copy_to_clipboard_button(
                         f"{icons.copy_solid} Copy Phone Number",
-                        value=test_link,
+                        value=test_link.lstrip("tel:"),
                         type="secondary",
                     )
                 else:
                     copy_to_clipboard_button(
-                        f"{icons.link} Copy {Platform(bi.platform).label} Link",
+                        f"{icons.copy_solid} Copy {Platform(bi.platform).label} Link",
                         value=test_link,
                         type="secondary",
                     )
