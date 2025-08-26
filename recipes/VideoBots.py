@@ -58,7 +58,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import UserError, UnavailablePhoneNumber
+from daras_ai_v2.exceptions import UserError, UnavailableProvisionedNumber
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -1659,6 +1659,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
     def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
         from routers.facebook_api import fb_connect_url
         from routers.slack_api import slack_connect_url
+        from routers.facebook_api import wa_connect_url
         from number_cycling.utils import create_bot_integration_with_extension
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
@@ -1725,14 +1726,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                             workspace=self.current_workspace,
                             platform=Platform.WHATSAPP,
                         )
-                    except UnavailablePhoneNumber as e:
-                        gui.caption(
-                            f"{e}",
-                            className="text-center text-danger",
+                        redirect_url = connect_bot_to_published_run(
+                            bi, pr, overwrite=True
                         )
-                        return
+                    except UnavailableProvisionedNumber as e:
+                        redirect_url = wa_connect_url(pr.id)
 
-                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.SLACK:
                     redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
@@ -1745,7 +1744,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                             workspace=self.current_workspace,
                             platform=Platform.TWILIO,
                         )
-                    except UnavailablePhoneNumber as e:
+                    except UnavailableProvisionedNumber as e:
                         gui.caption(
                             f"{e}",
                             className="text-center text-danger",
