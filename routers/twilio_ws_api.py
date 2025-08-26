@@ -127,7 +127,7 @@ def twilio_voice_ws(
 ):
     try:
         bot = TwilioVoiceWs.from_webhook_data(data)
-    except ExtensionGatheringVoice as e:
+    except ExtensionGatheringVoice:
         resp = VoiceResponse()
         resp.say("Please dial an extension")
         resp.gather(
