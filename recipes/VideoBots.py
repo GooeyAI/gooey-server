@@ -2167,6 +2167,6 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.TWILIO,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
-        label="Connect to a Twilio Phone Number. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-twilio)",
+        label="Call or text your copilot with a free test number (or buy one).",
     ),
 ]
