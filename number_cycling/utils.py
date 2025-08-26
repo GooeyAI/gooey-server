@@ -10,31 +10,6 @@ extension_hashids = hashids.Hashids(
 )
 
 
-def generate_unique_extension_number(
-    bot_integration: BotIntegration, length: int = 5
-) -> int:
-    """
-    Generate a unique extension number for a bot integration.
-    """
-    seed = bot_integration.id
-    for attempt in range(5):
-        seed = seed + attempt
-        hashid = extension_hashids.encode(seed)
-        extension_number = (10 ** (length - 1)) + (
-            abs(hash(hashid)) % (10 ** (length - 1))
-        )
-
-        try:
-            if not BotExtension.objects.filter(
-                extension_number=extension_number
-            ).exists():
-                return extension_number
-        except IntegrityError:
-            continue
-
-    raise RuntimeError(f"Unable to generate unique {length}-digit extension number")
-
-
 def create_bot_integration_with_extension(
     name: str,
     created_by,
@@ -62,11 +37,36 @@ def create_bot_integration_with_extension(
 
         bot_integration.save()
 
-        extension_number = generate_unique_extension_number(bot_integration, 5)
+        for _ in range(5):
+            extension_number = generate_unique_extension_number(bot_integration, 5)
+            try:
+                BotExtension.objects.create(
+                    bot_integration=bot_integration,
+                    extension_number=extension_number,
+                )
+                return bot_integration
+            except IntegrityError:
+                # Retry with a different generated number
+                continue
 
-        BotExtension.objects.create(
-            bot_integration=bot_integration,
-            extension_number=extension_number,
+        raise RuntimeError("Unable to create unique 5-digit extension number")
+
+
+def generate_unique_extension_number(
+    bot_integration: BotIntegration, length: int = 5
+) -> int:
+    """
+    Generate a unique extension number candidate for a bot integration.
+    """
+    seed = bot_integration.id
+    for attempt in range(5):
+        seed = seed + attempt
+        hashid = extension_hashids.encode(seed)
+        extension_number = (10 ** (length - 1)) + (
+            abs(hash(hashid)) % (10 ** (length - 1))
         )
 
-        return bot_integration
+        if not BotExtension.objects.filter(extension_number=extension_number).exists():
+            return extension_number
+
+    raise RuntimeError(f"Unable to generate unique {length}-digit extension number")

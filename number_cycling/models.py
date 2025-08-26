@@ -20,8 +20,7 @@ class BotExtension(models.Model):
     )
     extension_number = models.IntegerField(
         unique=True,
-        db_index=True,
-        help_text="The extension number for dialing ",
+        help_text="Extension number for provisioned numbers",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -166,5 +165,5 @@ class ProvisionedNumber(models.Model):
             return random.choice(available_numbers)
 
         raise UnavailablePhoneNumber(
-            f"Sorry, {platform.label} phone numbers are currently available to assign. Please contact us or try again later."
+            f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
         )
