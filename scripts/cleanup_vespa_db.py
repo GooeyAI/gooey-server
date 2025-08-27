@@ -37,13 +37,12 @@ def cleanup_stale_cache():
 
             def vespa_callback(response: "VespaResponse", id: str):
                 nonlocal total_deleted
-                if response.is_successful:
+                if response.is_successful():
                     total_deleted += 1
                 else:
                     print(
-                        f"Failed to delete document {id} from Vespa: {response.status_code} - {response.get_json()}"
+                        f"Failed to delete document {id} from Vespa: {getattr(response,'status_code', 'NA')} - {response.get_json()}"
                     )
-
             vespa.feed_iterable(
                 docs_to_delete,
                 schema=settings.VESPA_SCHEMA,
