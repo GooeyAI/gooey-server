@@ -19,37 +19,40 @@ def cleanup_stale_cache():
     vespa = get_vespa_app()
 
     while True:
-        stale_qs = EmbeddedFile.objects.prefetch_related(
-            "embeddings_references"
-        ).filter(
-            updated_at__lt=timezone.now() - timedelta(days=STALENESS_THRESHOLD_DAYS)
-        ).order_by("updated_at")[:BATCH_SIZE]
+        stale_qs = (
+            EmbeddedFile.objects.prefetch_related("embeddings_references")
+            .filter(
+                updated_at__lt=timezone.now() - timedelta(days=STALENESS_THRESHOLD_DAYS)
+            )
+            .order_by("updated_at")[:BATCH_SIZE]
+        )
         stale_files = list(stale_qs)
         if not stale_files:
             break
+
         docs_to_delete = (
             {"id": ref.vespa_doc_id}
             for ef in stale_files
             for ref in ef.embeddings_references.all()
         )
-        if docs_to_delete:
-            total_deleted = 0
+        total_deleted = 0
 
-            def vespa_callback(response: "VespaResponse", id: str):
-                nonlocal total_deleted
-                if response.is_successful():
-                    total_deleted += 1
-                else:
-                    print(
-                        f"Failed to delete document {id} from Vespa: {getattr(response,'status_code', 'NA')} - {response.get_json()}"
-                    )
-            vespa.feed_iterable(
-                docs_to_delete,
-                schema=settings.VESPA_SCHEMA,
-                operation_type="delete",
-                callback=vespa_callback,
-            )
-            print(f"Deleted {total_deleted} documents from Vespa.")
+        def vespa_callback(response: "VespaResponse", id: str):
+            nonlocal total_deleted
+            if response.is_successful():
+                total_deleted += 1
+            else:
+                print(
+                    f"Failed to delete document {id} from Vespa: {getattr(response, 'status_code', 'NA')} - {response.get_json()}"
+                )
+
+        vespa.feed_iterable(
+            docs_to_delete,
+            schema=settings.VESPA_SCHEMA,
+            operation_type="delete",
+            callback=vespa_callback,
+        )
+        print(f"Deleted {total_deleted} documents from Vespa.")
 
         deleted_per_model = EmbeddedFile.objects.filter(
             id__in=[ef.id for ef in stale_files]
