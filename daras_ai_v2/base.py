@@ -1861,9 +1861,8 @@ class BasePage:
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
                 self.click_preview_tab()
                 self._render_running_output()
-            else:
-                if not is_deleted:
-                    self._render_after_output()
+            elif not is_deleted:
+                self._render_after_output()
 
     def _render_failed_output(self):
         err_msg = gui.session_state.get(StateKeys.error_msg)
@@ -2633,7 +2632,7 @@ NAV_TABS_CSS = """
     gap: 0.5rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 992px) {
     & a:has(span.mobile-only-recipe-tab) {
         display: none !important;
     }
