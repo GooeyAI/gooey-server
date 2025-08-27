@@ -19,14 +19,14 @@ def cleanup_stale_cache():
     vespa = get_vespa_app()
 
     while True:
-        stale_files = EmbeddedFile.objects.prefetch_related(
+        stale_qs = EmbeddedFile.objects.prefetch_related(
             "embeddings_references"
         ).filter(
             updated_at__lt=timezone.now() - timedelta(days=STALENESS_THRESHOLD_DAYS)
-        )[:BATCH_SIZE]
+        ).order_by("updated_at")[:BATCH_SIZE]
+        stale_files = list(stale_qs)
         if not stale_files:
             break
-
         docs_to_delete = (
             {"id": ref.vespa_doc_id}
             for ef in stale_files
