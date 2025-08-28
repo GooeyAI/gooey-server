@@ -18,7 +18,7 @@ class TextToVideoPage(BasePage):
     workflow = Workflow.TEXT_VIDEO
     slug_versions = [
         "TextToVideo",
-        "text-to-video", 
+        "text-to-video",
         "text-video",
         "video-generation",
         "video",
@@ -64,14 +64,22 @@ class TextToVideoPage(BasePage):
 
         # Style and creative controls
         style: str | None = Field(
-            default=None, description="Optional style preset (e.g., cyberpunk noir, watercolor, Pixar-like)"
+            default=None,
+            description="Optional style preset (e.g., cyberpunk noir, watercolor, Pixar-like)",
         )
         negative_prompt: str | None = Field(
             default=None, description="Things to avoid in the video generation"
         )
-        camera_motion: typing.Literal["Auto", "Static", "Pan Left", "Pan Right", "Zoom In", "Zoom Out", "Dolly Forward", "Dolly Backward"] = Field(
-            default="Auto", description="Camera movement pattern"
-        )
+        camera_motion: typing.Literal[
+            "Auto",
+            "Static",
+            "Pan Left",
+            "Pan Right",
+            "Zoom In",
+            "Zoom Out",
+            "Dolly Forward",
+            "Dolly Backward",
+        ] = Field(default="Auto", description="Camera movement pattern")
         seed: int | None = Field(
             default=None, description="Random seed for reproducible results"
         )
@@ -108,7 +116,7 @@ class TextToVideoPage(BasePage):
                 enhanced_prompt = request.text_prompt
                 if request.camera_motion and request.camera_motion != "Auto":
                     enhanced_prompt += f"; {request.camera_motion.lower()}"
-                
+
                 output_videos[selected_model] = generate_video(
                     model=model,
                     prompt=enhanced_prompt,
@@ -152,8 +160,10 @@ class TextToVideoPage(BasePage):
             placeholder="e.g., an atmospheric night-time city street in monsoon rain; slow dolly forward; neon reflections; cinematic lighting; end with a close-up of an umbrella",
             height=120,
         )
-        gui.caption("Tip: Use short sentences and shot directions (camera, motion, framing). You can also add negative prompts in Settings.")
-        
+        gui.caption(
+            "Tip: Use short sentences and shot directions (camera, motion, framing). You can also add negative prompts in Settings."
+        )
+
         # Optional image upload
         gui.write("🖼️ **OPTIONAL IMAGE**")
         gui.caption("Used for style or subject guidance")
@@ -161,30 +171,36 @@ class TextToVideoPage(BasePage):
             "Drag & drop or click to upload",
             key="reference_image",
             accept=["png", "jpg", "jpeg"],
-            help="PNG, JPG, up to 10 MB"
+            help="PNG, JPG, up to 10 MB",
         )
-        
+
         # Model selection with checkboxes
         gui.write("🧪 **COMPARE VIDEO MODELS**")
-        gui.caption("Each selected model will render a separate video. Some models may be region- or access-restricted.")
-        
+        gui.caption(
+            "Each selected model will render a separate video. Some models may be region- or access-restricted."
+        )
+
         # Create model selection checkboxes
         col1, col2 = gui.columns(2)
-        
+
         with col1:
-            sora_checked = gui.checkbox("🔴 **Sora** limited access", key="__sora_selected", value=True)
-            gui.caption("High-fidelity text→video. Great for complex scenes and long shots.")
-            
-            pika_checked = gui.checkbox("🟣 **Pika**", key="__pika_selected")  
+            sora_checked = gui.checkbox(
+                "🔴 **Sora** limited access", key="__sora_selected", value=True
+            )
+            gui.caption(
+                "High-fidelity text→video. Great for complex scenes and long shots."
+            )
+
+            pika_checked = gui.checkbox("🟣 **Pika**", key="__pika_selected")
             gui.caption("Fast iterations; strong stylization and motion dynamics.")
-            
+
         with col2:
             veo3_checked = gui.checkbox("🔵 **Veo 3**", key="__veo3_selected")
             gui.caption("Cinematic look, strong prompt control and camera directions.")
-            
+
             runway_checked = gui.checkbox("🟡 **Runway**", key="__runway_selected")
             gui.caption("Reliable visuals with editing tools in the broader ecosystem.")
-        
+
         # Convert checkbox selections to selected_models list
         selected_models = []
         if sora_checked:
@@ -195,18 +211,26 @@ class TextToVideoPage(BasePage):
             selected_models.append(VideoGenerationModels.pika_labs.name)
         if runway_checked:
             selected_models.append(VideoGenerationModels.runway_gen_3.name)
-            
-        gui.session_state["selected_models"] = selected_models or [VideoGenerationModels.openai_sora.name]
-        
-        gui.caption("Confused about model differences? See our [prompt & model guide](#).")
+
+        gui.session_state["selected_models"] = selected_models or [
+            VideoGenerationModels.openai_sora.name
+        ]
+
+        gui.caption(
+            "Confused about model differences? See our [prompt & model guide](#)."
+        )
 
     def validate_form_v2(self):
-        assert gui.session_state.get("text_prompt", "").strip(), "Please enter a video prompt"
-        assert gui.session_state.get("selected_models"), "Please select at least one video model"
+        assert gui.session_state.get("text_prompt", "").strip(), (
+            "Please enter a video prompt"
+        )
+        assert gui.session_state.get("selected_models"), (
+            "Please select at least one video model"
+        )
 
     def render_settings(self):
         gui.write("⚙️ **SETTINGS**")
-        
+
         # Top row: Duration and Aspect Ratio
         col1, col2 = gui.columns(2)
         with col1:
@@ -216,14 +240,14 @@ class TextToVideoPage(BasePage):
                 format_func=lambda x: f"{x}s",
                 key="duration",
             )
-        
+
         with col2:
             gui.selectbox(
                 "**Aspect Ratio**",
                 options=["16:9", "9:16", "1:1"],
                 key="aspect_ratio",
             )
-        
+
         # Second row: Resolution and Frames per Second
         col3, col4 = gui.columns(2)
         with col3:
@@ -232,7 +256,7 @@ class TextToVideoPage(BasePage):
                 options=["720p", "1080p", "4K"],
                 key="resolution",
             )
-        
+
         with col4:
             gui.selectbox(
                 "**Frames per Second**",
@@ -240,7 +264,7 @@ class TextToVideoPage(BasePage):
                 format_func=lambda x: f"{x}",
                 key="frames_per_second",
             )
-        
+
         # Style Preset
         gui.text_area(
             "**Style Preset** _(optional)_",
@@ -248,79 +272,89 @@ class TextToVideoPage(BasePage):
             placeholder="e.g., cyberpunk noir, watercolor, Pixar-like, Wes Anderson, anime",
             height=80,
         )
-        
+
         # Negative Prompt
         gui.text_area(
             "**Negative Prompt** _(things to avoid)_",
-            key="negative_prompt", 
+            key="negative_prompt",
             placeholder="e.g., text artifacts, extra limbs, flicker, low contrast",
             height=80,
         )
-        
+
         # Bottom row: Camera Motion and Seed
         col5, col6 = gui.columns(2)
         with col5:
             gui.selectbox(
                 "**Camera Motion**",
-                options=["Auto", "Static", "Pan Left", "Pan Right", "Crane Up", "Dolly In", "Dolly Out"],
+                options=[
+                    "Auto",
+                    "Static",
+                    "Pan Left",
+                    "Pan Right",
+                    "Crane Up",
+                    "Dolly In",
+                    "Dolly Out",
+                ],
                 key="camera_motion",
             )
-        
+
         with col6:
             gui.text_input(
                 "**Seed**",
                 key="seed",
                 placeholder="random",
-                help="Enter a number for reproducible results"
+                help="Enter a number for reproducible results",
             )
-        
+
         # Use audio bed checkbox
         gui.checkbox(
             "**Use audio bed** _(royalty-free ambient track)_",
             key="use_audio_bed",
-            value=True
+            value=True,
         )
-        
-        gui.caption("*4K availability varies by model. Longer durations and higher resolutions increase cost and render time.")
+
+        gui.caption(
+            "*4K availability varies by model. Longer durations and higher resolutions increase cost and render time."
+        )
 
     def render_output(self):
         output_videos = gui.session_state.get("output_videos", {})
-        
+
         if not output_videos:
             gui.write("#### 🎬 RESULTS")
             gui.write("Videos will appear here after generation...")
             return
-        
+
         gui.write("#### 🎬 RESULTS")
-        
+
         # Create 2x2 grid for video results
         if len(output_videos) <= 2:
             cols = gui.columns(2)
         else:
             cols = gui.columns(2)  # Keep 2x2 grid even for 3-4 videos
-        
+
         for i, (model_name, video_url) in enumerate(output_videos.items()):
             model = VideoGenerationModels[model_name]
             col_idx = i % 2
-            
+
             with cols[col_idx]:
                 # Model status card
                 status_colors = {
                     VideoGenerationModels.openai_sora.name: "🔴",
-                    VideoGenerationModels.google_veo_3.name: "🔵", 
+                    VideoGenerationModels.google_veo_3.name: "🔵",
                     VideoGenerationModels.pika_labs.name: "🟣",
-                    VideoGenerationModels.runway_gen_3.name: "🟡"
+                    VideoGenerationModels.runway_gen_3.name: "🟡",
                 }
-                
+
                 status_color = status_colors.get(model_name, "⚪")
                 gui.write(f"{status_color} **{model.value.split(' (')[0]}** ready")
-                
+
                 if video_url:
                     gui.video(video_url, autoplay=False, show_download_button=True)
                     gui.caption("~8s • 1080p • 30fps")
                 else:
                     gui.write("🔄 Processing...")
-                    
+
                 gui.write("---")  # Separator between videos
 
     def get_raw_price(self, state: dict) -> int:
@@ -374,7 +408,13 @@ class TextToVideoPage(BasePage):
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
-        return ["text_prompt", "selected_models", "duration", "aspect_ratio", "resolution"]
+        return [
+            "text_prompt",
+            "selected_models",
+            "duration",
+            "aspect_ratio",
+            "resolution",
+        ]
 
     def related_workflows(self) -> list:
         from recipes.Lipsync import LipsyncPage
@@ -391,7 +431,10 @@ class TextToVideoPage(BasePage):
 
     def _render_header(self):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
-        from widgets.base_header import render_header_title, render_breadcrumbs_with_author
+        from widgets.base_header import (
+            render_header_title,
+            render_breadcrumbs_with_author,
+        )
         from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
         from widgets.author import render_author_from_workspace
         from routers.root import RecipeTabs
