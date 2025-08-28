@@ -2118,7 +2118,7 @@ def _run_gemini_pro(
                     "parts": [{"text": "OK"}],
                 },
             )
-    msg = _call_gemini_api(
+    msg = call_gemini_api(
         model_id=model_id,
         contents=contents,
         max_output_tokens=max_output_tokens,
@@ -2155,7 +2155,7 @@ def _run_gemini_pro_vision(
         }
     ]
     return [
-        _call_gemini_api(
+        call_gemini_api(
             model_id=model_id,
             contents=contents,
             max_output_tokens=max_output_tokens,
@@ -2166,7 +2166,7 @@ def _run_gemini_pro_vision(
 
 
 @retry_if(vertex_ai_should_retry)
-def _call_gemini_api(
+def call_gemini_api(
     *,
     model_id: str,
     contents: list[dict],

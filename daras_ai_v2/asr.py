@@ -110,6 +110,15 @@ WHISPER_LARGE_V3_SUPPORTED = {
     "uz": "uzbek", "vi": "vietnamese", "cy": "welsh", "yi": "yiddish", "yo": "yoruba",
 }  # fmt: skip
 
+GEMINI_SUPPORTED = {
+   "af", "sq", "am", "ar", "hy", "as", "az", "eu", "be", "bn", "bs", "bg", "ca", "ceb", "zh",  "co", "hr", "cs", "da",
+    "dv", "nl", "en", "eo", "et", "fil", "fi", "fr", "fy", "gl", "ka", "de", "el", "gu", "ht", "ha", "haw", "iw", "hi",
+    "hmn", "hu", "is", "ig", "id", "ga", "it", "ja", "jv", "kn", "kk", "km", "ko", "kri", "ku", "ky", "lo", "la", "lv",
+    "lt", "lb", "mk", "mg", "ms", "ml", "mt", "mi", "mr", "mni-Mtei", "mn", "my", "ne", "no", "ny", "or", "ps",  "fa",
+    "pl", "pt", "pa", "ro", "ru", "sm", "gd", "sr", "st", "sn", "sd", "si", "sk", "sl", "so", "es", "su", "sw", "sv",
+    "tg", "ta", "te", "th", "tr", "uk", "ur", "ug", "uz", "vi", "cy", "xh", "yi", "yo", "zu"
+}  # fmt: skip
+
 # https://huggingface.co/facebook/seamless-m4t-v2-large#supported-languages
 # For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
 SEAMLESS_v2_ASR_SUPPORTED = {
@@ -272,6 +281,9 @@ class AsrModels(Enum):
     whisper_large_v3 = "Whisper Large v3 (openai)"
     gpt_4_o_audio = "GPT-4o (openai)"
     gpt_4_o_mini_audio = "GPT-4o mini (openai)"
+    gemini_2_5_flash_lite = "Gemini 2.5 Flash Lite (Google)"
+    gemini_2_5_flash = "Gemini 2.5 Flash (Google)"
+    gemini_2_5_pro = "Gemini 2.5 Pro (Google)"
     gcp_v1 = "Google Cloud V1"
     usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
@@ -336,6 +348,9 @@ class AsrModels(Enum):
 
 
 asr_model_ids = {
+    AsrModels.gemini_2_5_flash_lite: "gemini-2.5-flash-lite",
+    AsrModels.gemini_2_5_flash: "gemini-2.5-flash",
+    AsrModels.gemini_2_5_pro: "gemini-2.5-pro",
     AsrModels.gpt_4_o_audio: "gpt-4o-transcribe",
     AsrModels.gpt_4_o_mini_audio: "gpt-4o-mini-transcribe",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
@@ -365,6 +380,9 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.gemini_2_5_flash_lite: GEMINI_SUPPORTED,
+    AsrModels.gemini_2_5_flash: GEMINI_SUPPORTED,
+    AsrModels.gemini_2_5_pro: GEMINI_SUPPORTED,
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
     AsrModels.gpt_4_o_audio: WHISPER_LARGE_V2_SUPPORTED,  # https://platform.openai.com/docs/guides/speech-to-text#supported-languages
     AsrModels.gpt_4_o_mini_audio: WHISPER_LARGE_V2_SUPPORTED,
@@ -1283,6 +1301,38 @@ def run_asr(
             file=(audio_url, audio_r.content),
             prompt=input_prompt,
             response_format="text",
+        )
+    elif selected_model in {
+        AsrModels.gemini_2_5_flash_lite,
+        AsrModels.gemini_2_5_flash,
+        AsrModels.gemini_2_5_pro,
+    }:
+        from daras_ai_v2.language_model import CHATML_ROLE_USER, call_gemini_api
+
+        if language:
+            lobj = langcodes.Language.get(language.strip())
+            prompt = f"Transcribe this audio without translation. The spoken language is {lobj.display_name()}."
+        else:
+            prompt = "Transcribe this audio."
+
+        return call_gemini_api(
+            model_id=asr_model_ids[selected_model],
+            contents=[
+                {
+                    "role": CHATML_ROLE_USER,
+                    "parts": [
+                        {
+                            "fileData": {
+                                "fileUri": audio_url,
+                                "mimeType": "audio/wav",
+                            }
+                        },
+                        {"text": prompt},
+                    ],
+                }
+            ],
+            max_output_tokens=16384,
+            temperature=0.0,
         )
     # call one of the self-hosted models
     else:
