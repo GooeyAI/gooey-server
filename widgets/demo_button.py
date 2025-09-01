@@ -122,7 +122,13 @@ def render_demo_text(bi: BotIntegration):
         )
 
     if bi.platform == Platform.TWILIO:
-        sms_link = str(furl("sms:") / bi.twilio_phone_number.as_e164)
+        extension_number = bi.get_extension_number()
+        if extension_number:
+            sms_url = furl("sms:") / bi.twilio_phone_number.as_e164
+            sms_url.args["body"] = f"{extension_number}"
+            sms_link = str(sms_url)
+        else:
+            sms_link = str(furl("sms:") / bi.twilio_phone_number.as_e164)
         gui.write(f"or [Send SMS]({sms_link})", className="fs-5 fw-bold")
 
     if bi.demo_notes:

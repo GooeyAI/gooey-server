@@ -227,7 +227,7 @@ def fb_webhook(
             case "whatsapp_business_account":
                 value = glom.glom(entry, "changes.0.value", default={})
                 for message in value.get("messages", []):
-                    user_phone_number = "+" + message["from"]
+                    user_id = "+" + message["from"]
                     message_text = ""
                     bot_number = value["metadata"]["phone_number_id"]
                     bot_extension = None
@@ -239,10 +239,12 @@ def fb_webhook(
 
                     try:
                         bi, bot_extension, is_provisioned = wa_extension_routing(
-                            user_phone_number, bot_number, is_provisioned
+                            user_id, bot_number, is_provisioned
                         )
                     except ExtensionGatheringWhatsapp:
-                        bot_extension_number = wa_get_extension_number(message_text)
+                        from number_cycling.utils import get_extension_number
+
+                        bot_extension_number = get_extension_number(message_text)
                         if bot_extension_number:
                             try:
                                 bot_extension = BotExtension.objects.get(
@@ -252,10 +254,15 @@ def fb_webhook(
                                 # override the message text from "/extension 12345" to "hi"
                                 message["text"]["body"] = "hi"
 
+                                BotExtensionUser.objects.create(
+                                    wa_phone_number=user_id,
+                                    extension=bot_extension,
+                                )
+
                             except (BotExtension.DoesNotExist, ValueError):
                                 send_wa_msgs_raw(
                                     bot_number=bot_number,
-                                    user_number=user_phone_number,
+                                    user_number=user_id,
                                     messages=[
                                         {
                                             "type": "text",
@@ -270,7 +277,7 @@ def fb_webhook(
                         else:
                             send_wa_msgs_raw(
                                 bot_number=bot_number,
-                                user_number=user_phone_number,
+                                user_number=user_id,
                                 messages=[
                                     {
                                         "type": "text",
@@ -282,20 +289,10 @@ def fb_webhook(
                             )
                             return Response("OK")
 
-                    with transaction.atomic():
-                        mapping, created = BotExtensionUser.objects.get_or_create(
-                            wa_phone_number=user_phone_number,
-                            defaults={"extension": bot_extension},
-                        )
-
-                        if not created:
-                            mapping.extension = bot_extension
-                            mapping.save()
-
                     try:
-                        convo = Conversation.objects.create(
+                        convo = Conversation.objects.get_or_create(
                             bot_integration=bi,
-                            wa_phone_number=user_phone_number,
+                            wa_phone_number=user_id,
                             extension=bot_extension,
                         )
 
@@ -325,28 +322,8 @@ def fb_webhook(
     return Response("OK")
 
 
-def wa_get_extension_number(message_text: str) -> int | None:
-    if not message_text:
-        return None
-
-    message_text = message_text.strip().lower()
-
-    # Pattern to match extension formats that start with slash
-    patterns = [
-        r"^/(?:extension|ext)\s+(\d{5})$",  # "/extension 12345" or "/ext 12345"
-        r"\b(\d{5})\b",  # any standalone 5-digit number in the message
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, message_text)
-        if match:
-            return int(match.group(1))
-
-    return None
-
-
 def wa_extension_routing(
-    user_phone_number: str, bot_number: str, is_provisioned: bool
+    user_id: str, bot_number: str, is_provisioned: bool
 ) -> tuple[BotIntegration, BotExtension | None, bool]:
     bot_extension = None
     existing_user = None
@@ -358,11 +335,11 @@ def wa_extension_routing(
         is_provisioned = True
         try:
             existing_user = BotExtensionUser.objects.get(
-                wa_phone_number=user_phone_number,
+                wa_phone_number=user_id,
                 extension__bot_integration__wa_phone_number_id=bot_number,
             )
         except BotExtensionUser.DoesNotExist:
-            raise ExtensionGatheringWhatsapp(bot_number, user_phone_number)
+            raise ExtensionGatheringWhatsapp(bot_number, user_id)
 
         bot_extension = existing_user.extension
         bi = bot_extension.bot_integration
@@ -378,7 +355,7 @@ def wa_extension_routing(
 def handle_disconnect_ext_wa(message_text: str, bot_number: str, convo: Conversation):
     from daras_ai_v2.bots import DISCONNECT_EXT_KEYWORDS
 
-    if message_text and message_text.lower().strip("/ ") in DISCONNECT_EXT_KEYWORDS:
+    if message_text and message_text.lower() in DISCONNECT_EXT_KEYWORDS:
         with transaction.atomic():
             try:
                 extension_user = BotExtensionUser.objects.get(
