@@ -312,14 +312,14 @@ HEADER_LINKS = [
 ]
 
 SIDEBAR_LINKS = [
-    ("/explore/", "Search", "<i class='fa-solid fa-magnifying-glass'></i>"),
+    # ("/explore/", "Search", "<i class='fa-solid fa-magnifying-glass'></i>"),
     (DOCS_URL, "Docs", "<i class='fa-regular fa-book'></i>"),
     ("/api/", "API", "<i class='fa-regular fa-code'></i>"),
     (BLOG_URL, "Blog", "<i class='fa-regular fa-newspaper'></i>"),
     ("/pricing", "Pricing", "<i class='fa-regular fa-circle-dollar'></i>"),
     (CONTACT_URL, "Contact", "<i class='fa-regular fa-envelope'></i>"),
 ]
-SIDEBAR_ICON_SIZE = "40px"
+SIDEBAR_ICON_SIZE = "32px"
 
 HEADER_ICONS = {"/explore/": '<i class="fa-solid fa-magnifying-glass"></i>'}
 
