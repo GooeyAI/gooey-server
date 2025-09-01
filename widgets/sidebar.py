@@ -41,7 +41,7 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
     return ref
 
 
-def sidebar_list_item(icon, title, is_sidebar_open, url=None):
+def sidebar_list_item(icon, title, is_sidebar_open, url=None, hover_icon=None):
     with (
         gui.styled(
             """
@@ -50,46 +50,60 @@ def sidebar_list_item(icon, title, is_sidebar_open, url=None):
                 text-decoration: none;
             }
             & .sidebar-list-item {
-                min-height: 24px;
+                border-radius: 8px;
+                height: 36px;
+                width: min-content;
+                padding: 6px 10px;
             }
-            & .sidebar-list-item-icon {
-                max-width: 18px;
-                min-width: 18px;
+            & .sidebar-list-item-hover-icon {
+                display: none;
             }
-            & a:hover {
-                .sidebar-list-item-title {
-                    text-decoration: underline !important;
-                    text-decoration-color: #000 !important;
-                    text-decoration-thickness: 2px !important;
-                    text-underline-offset: 2px !important;
+            & .sidebar-list-item:hover {
+                background-color: #f0f0f0;
+                .sidebar-list-item-hover-icon {
+                    display: block;
                 }
+            }
+            & .sidebar-list-item-title {
+                font-size: 0.875rem;
             }
         """
         ),
-        gui.div(className="d-flex align-items-center"),
+        gui.div(),
     ):
-        with gui.div(className="d-flex align-items-center w-100"):
-            with gui.tag(
-                "a",
-                href=url,
-                className="d-flex align-items-center sidebar-list-item w-100",
-            ):
+        link_classes = "d-block sidebar-list-item ms-2"
+        if is_sidebar_open:
+            link_classes += " d-flex align-items-baseline justify-content-between w-100"
+        with gui.tag(
+            "a",
+            href=url,
+            className=link_classes,
+        ):
+            with gui.div(className="d-flex align-items-baseline"):
+                icon_classes = "d-block sidebar-list-item-icon"
+                if is_sidebar_open:
+                    icon_classes += " me-2"
+
                 if icon:
                     gui.html(
                         icon,
-                        className="sidebar-list-item-icon me-2 d-flex justify-content-center",
+                        className=icon_classes,
                     )
                 if is_sidebar_open:
                     gui.html(title, className="sidebar-list-item-title d-block")
 
+            if hover_icon:
+                with gui.div(className="sidebar-list-item-hover-icon"):
+                    gui.html(hover_icon, className="text-secondary")
+
 
 def sidebar_item_list(is_sidebar_open):
     for i, (url, label, icon) in enumerate(settings.SIDEBAR_LINKS):
-        if not is_sidebar_open and i >= 1:
-            break
         if icon:
             with gui.div():
-                sidebar_list_item(icon, label, is_sidebar_open, url)
+                sidebar_list_item(
+                    icon, label, is_sidebar_open, url, icons.arrow_up_right
+                )
         else:
             with gui.div(
                 className="d-inline-block me-2 small",
@@ -99,28 +113,34 @@ def sidebar_item_list(is_sidebar_open):
 
 
 def render_default_sidebar(session: dict):
-    is_sidebar_open = session.get("main-sidebar", True)
+    is_sidebar_open = use_sidebar("main-sidebar", session, default_open=True).is_open
     with gui.div(
-        className="d-flex flex-column flex-grow-1 gap-3 px-3 my-3 text-nowrap",
-        style={"marginLeft": "4px"},
+        className=f"d-flex flex-column flex-grow-1 {'pe-3' if is_sidebar_open else ''} my-3 text-nowrap",
     ):
-        with gui.div(className="pe-2"):
+        with gui.div(className="mb-4"):
             sidebar_list_item(
                 "<i class='fa-regular fa-floppy-disk'></i>",
                 "Saved",
                 is_sidebar_open,
-                "/saved/",
+                "/account/saved/",
+            )
+            sidebar_list_item(
+                icons.search,
+                "Explore",
+                is_sidebar_open,
+                "/explore/",
             )
 
-        sidebar_item_list(is_sidebar_open)
+        if is_sidebar_open:
+            sidebar_item_list(is_sidebar_open)
 
 
 def sidebar_logo_header(session: dict):
     with gui.div(
         className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2",
-        style={"height": "64px"},
+        style={"height": "54px"},
     ):
-        sidebar_ref = use_sidebar("main-sidebar", session, default_open=True)
+        sidebar_ref = use_sidebar("main-sidebar", session)
         gui.tag(
             "img",
             src=settings.GOOEY_LOGO_FACE,
@@ -133,10 +153,17 @@ def sidebar_logo_header(session: dict):
             className="m-0",
             unsafe_allow_html=True,
             type="tertiary",
+            style={"padding": "6px 10px"},
         )
         if open_mobile_sidebar:
             sidebar_ref.set_mobile_open(True)
             raise gui.RerunException()
+
+
+# Sidebar width variables
+sidebar_open_width = "245px"
+sidebar_closed_width = "53px"
+sidebar_mobile_width = "80vw"
 
 
 def sidebar_layout(sidebar_ref: SidebarRef):
@@ -144,14 +171,21 @@ def sidebar_layout(sidebar_ref: SidebarRef):
     sidebar_funtion_classes = (
         "gooey-sidebar-open" if sidebar_ref.is_open else "gooey-sidebar-closed"
     )
+
     side_bar_styles = dedent(
-        """
-            html {
+        f"""
+            html {{
                 /* override margin-left from app.css */
                 margin-left: 0 !important;
-            }
+            }}
+            & .gooey-btn {{
+                padding: 6px 10px !important;
+            }}
+            & .gooey-btn:hover {{
+                background-color: #f0f0f0 !important;
+            }}
 
-            & .gooey-sidebar {
+            & .gooey-sidebar {{
                 transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 background-color: #f9f9f9;
                 position: sticky;
@@ -159,38 +193,40 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 left: 0;
                 bottom: 0;
                 z-index: 999;
-            }
-            & .gooey-sidebar-open {
-                min-width: 250px;
-                width: 250px;
-                max-width: 250px;
-            }
-            & .gooey-sidebar-closed {
-                min-width: 60px;
-                width: 60px;
-                max-width: 60px;
-            }
+                border-right: 1px solid #e0e0e0;
+            }}
 
-            & .gooey-sidebar-closed:hover {
+            & .gooey-sidebar-open {{
+                min-width: {sidebar_open_width};
+                width: {sidebar_open_width};
+                max-width: {sidebar_open_width};
+            }}
+            & .gooey-sidebar-closed {{
+                min-width: {sidebar_closed_width};
+                width: {sidebar_closed_width};
+                max-width: {sidebar_closed_width};
+            }}
+
+            & .gooey-sidebar-closed:hover {{
                 cursor: e-resize;
-            }
+            }}
 
-            @media (max-width: 767px) {
-                & .gooey-sidebar-open {
+            @media (max-width: 767px) {{
+                & .gooey-sidebar-open {{
                     position: fixed;
-                    min-width: 100vw;
-                    width: 100vw;
-                    max-width: 100vw;
+                    min-width: {sidebar_mobile_width};
+                    width: {sidebar_mobile_width};
+                    max-width: {sidebar_mobile_width};
                     z-index: 2000;
-                }
-                & .gooey-sidebar-closed {
+                }}
+                & .gooey-sidebar-closed {{
                     position: fixed;
                     min-width: 0px;
                     width: 0px;
                     max-width: 0px;
                     overflow: hidden;
-                }
-            }
+                }}
+            }}
         """
     )
     if not is_mobile_open:

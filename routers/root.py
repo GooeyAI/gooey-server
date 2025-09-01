@@ -738,7 +738,7 @@ def page_wrapper(
             ):
                 with gui.div(
                     className="d-flex px-md-2 px-3 py-2 align-items-center justify-content-between text-nowrap",
-                    style={"height": "64px"},
+                    style={"height": "54px"},
                 ):
                     # sidebar header
                     gui.tag(
@@ -750,7 +750,7 @@ def page_wrapper(
                     )
                     open_sidebar_btn = gui.button(
                         label=icons.sidebar_flip,
-                        className="m-0 d-none hover-btn",
+                        className="m-0 d-none hover-btn gooey-btn",
                         unsafe_allow_html=True,
                         type="tertiary",
                     )
@@ -787,7 +787,7 @@ def page_wrapper(
 
                     close_mobile_sidebar = gui.button(
                         label=icons.cancel,
-                        className="m-0 d-md-none p-2",
+                        className="m-0 d-md-none gooey-btn",
                         unsafe_allow_html=True,
                         type="tertiary",
                     )
@@ -798,7 +798,7 @@ def page_wrapper(
                     if sidebar_ref.is_open:
                         close_sidebar = gui.button(
                             label=icons.sidebar_flip,
-                            className="m-0 d-none d-md-block",
+                            className="m-0 d-none d-md-block gooey-btn",
                             unsafe_allow_html=True,
                             type="tertiary",
                         )
