@@ -18,7 +18,9 @@ from django.db import transaction
 from number_cycling.models import ProvisionedNumber, BotExtensionUser
 from sentry_sdk import capture_exception
 
-DISCONNECT_EXTENSION_TEXT = "disconnect"
+DISCONNECT_EXTENSION_TEXT = "Extension disconnected"
+
+INITIATE_EXTENSION_TEXT = "Hi from Gooey.AI, Please enter your extension number"
 
 
 class ExtensionGatheringSMS(Exception):
@@ -42,36 +44,68 @@ class TwilioSMS(BotInterface):
             account_sid = ""
         bot_extension = None
         is_provisioned = False
+        user_id = data["From"][0]
+        bot_id = data["To"][0]
+
         try:
-            ProvisionedNumber.objects.get(phone_number=data["To"][0], is_active=True)
+            ProvisionedNumber.objects.get(phone_number=bot_id, is_active=True)
             is_provisioned = True
             try:
                 extension_user = BotExtensionUser.objects.get(
-                    twilio_phone_number=data["From"][0],
-                    extension__bot_integration__twilio_phone_number=data["To"][0],
+                    twilio_phone_number=user_id,
+                    extension__bot_integration__twilio_phone_number=bot_id,
                 )
             except BotExtensionUser.DoesNotExist:
-                raise ExtensionGatheringSMS(
-                    "Hi from Gooey.AI, Please call the number and enter your extension to continue"
-                )
+                raise ExtensionGatheringSMS(INITIATE_EXTENSION_TEXT)
 
             bot_extension = extension_user.extension
             bi = bot_extension.bot_integration
 
         except ProvisionedNumber.DoesNotExist:
             bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
+                twilio_account_sid=account_sid, twilio_phone_number=bot_id
             )
 
-        convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            twilio_phone_number=data["From"][0],
-            twilio_call_sid="",
-            extension=bot_extension,
-        )[0]
+        convo = (
+            Conversation.objects.filter(
+                bot_integration=bi,
+                twilio_phone_number=user_id,
+                twilio_call_sid="",
+                extension=bot_extension,
+            )
+            .order_by("created_at")
+            .last()
+        )
 
-        bot_id = bi.twilio_phone_number.as_e164
-        user_id = convo.twilio_phone_number.as_e164
+        if not convo:
+            with transaction.atomic():
+                convo = Conversation.objects.create(
+                    bot_integration=bi,
+                    twilio_phone_number=user_id,
+                    twilio_call_sid="",
+                    extension=bot_extension,
+                )
+
+        text, media_urls, input_type = cls._extract_media_info(data)
+        user_msg_id = data["MessageSid"][0]
+
+        if is_provisioned:
+            try:
+                handle_disconnect_ext_twilio(text, user_id, convo)
+            except ExtensionGatheringSMS:
+                raise
+
+        return cls(
+            convo,
+            text=text,
+            media_urls=media_urls,
+            input_type=input_type,
+            user_msg_id=user_msg_id,
+        )
+
+    @staticmethod
+    def _extract_media_info(data: dict) -> tuple[str, list[str], str]:
+        """Extract media information from webhook data."""
         num_media = int(data.get("NumMedia", [0])[0])
         if num_media > 0:
             text = ""
@@ -89,18 +123,8 @@ class TwilioSMS(BotInterface):
             text = data["Body"][0]
             media_urls = []
             input_type = "text"
-        user_msg_id = data["MessageSid"][0]
 
-        if is_provisioned:
-            handle_disconnect_ext_twilio(text, user_id, convo)
-
-        return cls(
-            convo,
-            text=text,
-            media_urls=media_urls,
-            input_type=input_type,
-            user_msg_id=user_msg_id,
-        )
+        return text, media_urls, input_type
 
     def __init__(
         self,
@@ -349,18 +373,20 @@ def send_single_voice_call(
 def handle_disconnect_ext_twilio(text: str, user_id: str, convo: Conversation):
     from daras_ai_v2.bots import DISCONNECT_EXT_KEYWORDS
 
-    if text.lower().strip("/ ") in DISCONNECT_EXT_KEYWORDS:
+    if text and text.lower() in DISCONNECT_EXT_KEYWORDS:
         with transaction.atomic():
             try:
                 extension_user = BotExtensionUser.objects.get(
                     twilio_phone_number=user_id,
                     extension__bot_integration__twilio_phone_number=convo.bot_integration.twilio_phone_number,
                 )
+
                 extension_user.delete()
             except BotExtensionUser.DoesNotExist as e:
                 capture_exception(e)
+
                 return
 
             convo.reset_at = timezone.now()
             convo.save()
-        raise ExtensionGatheringSMS("Extension disconnected")
+        raise ExtensionGatheringSMS(DISCONNECT_EXTENSION_TEXT)

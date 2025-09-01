@@ -182,14 +182,10 @@ def twilio_extension_input(
         resp.reject()
         return twiml_response(resp)
 
-    # Create or update the user extension mapping
-    mapping, created = BotExtensionUser.objects.get_or_create(
-        twilio_phone_number=user_number, defaults={"extension": extension}
+    BotExtensionUser.objects.create(
+        twilio_phone_number=user_number,
+        extension=extension,
     )
-
-    if not created:
-        mapping.extension = extension
-        mapping.save()
 
     bi = extension.bot_integration
     bot = create_twilio_voice_ws_bot(
@@ -263,12 +259,24 @@ def create_twilio_voice_ws_bot(
             extension=extension,
         )[0]
     else:
-        convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            twilio_phone_number=user_number,
-            twilio_call_sid="",
-            extension=extension,
-        )[0]
+        convo = (
+            Conversation.objects.filter(
+                bot_integration=bi,
+                twilio_phone_number=user_number,
+                twilio_call_sid="",
+                extension=extension,
+            )
+            .order_by("created_at")
+            .last()
+        )
+
+        if not convo:
+            convo = Conversation.objects.create(
+                bot_integration=bi,
+                twilio_phone_number=user_number,
+                twilio_call_sid="",
+                extension=extension,
+            )
 
     return TwilioVoiceWs(
         convo,

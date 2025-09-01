@@ -1,9 +1,10 @@
-from typing import Tuple
 from django.db import transaction, IntegrityError
 from bots.models.bot_integration import BotIntegration, Platform
 from number_cycling.models import BotExtension, ProvisionedNumber
 from daras_ai_v2 import settings
 import hashids
+import re
+
 
 extension_hashids = hashids.Hashids(
     salt=settings.HASHIDS_API_SALT + "EXTENSIONS", min_length=3
@@ -70,3 +71,23 @@ def generate_unique_extension_number(
             return extension_number
 
     raise RuntimeError(f"Unable to generate unique {length}-digit extension number")
+
+
+def get_extension_number(message_text: str) -> int | None:
+    if not message_text:
+        return None
+
+    message_text = message_text.strip().lower()
+
+    # Pattern to match extension formats that start with slash
+    patterns = [
+        r"^/(?:extension|ext)\s+(\d{5})$",  # "/extension 12345" or "/ext 12345"
+        r"\b(\d{5})\b",  # any standalone 5-digit number in the message
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message_text)
+        if match:
+            return int(match.group(1))
+
+    return None
