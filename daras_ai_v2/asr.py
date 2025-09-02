@@ -1297,9 +1297,9 @@ def run_asr(
             kwargs["chunk_length_s"] = 60
             kwargs["stride_length_s"] = (6, 0)
             kwargs["batch_size"] = 32
-        elif "akera" in selected_model.name:
+        elif selected_model == AsrModels.whisper_akera_large_v3:
             # don't pass language or task
-            kwargs.pop("task")
+            kwargs.pop("task", None)
             kwargs["max_length"] = 448
         elif "whisper" in selected_model.name:
             forced_lang = forced_asr_languages.get(selected_model)
