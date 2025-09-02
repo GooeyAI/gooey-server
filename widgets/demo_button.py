@@ -146,10 +146,15 @@ def render_demo_button_settings(
     ):
         enabled = bi.public_visibility > WorkflowAccessLevel.VIEW_ONLY
         new_value = gui.switch(
-            "###### Show Demo Button",
+            f"###### Show {Platform(bi.platform).label} Button",
             value=enabled,
         )
-        gui.caption("Add 'Try Demo' to connected Copilot page")
+
+        workspace_url = bi.workspace.handle_id and bi.workspace.handle.get_app_url()
+
+        gui.caption(f"""Add a {Platform(bi.platform).label} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
+                      Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace.""")
+
         if new_value != enabled:
             enabled = new_value
             if enabled:
