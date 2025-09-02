@@ -1,5 +1,5 @@
 import typing
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import gooey_gui as gui
 from bots.models import Workflow
@@ -31,7 +31,7 @@ class TextToVideoPage(BasePage):
         "frames_per_second": 30,
         "camera_motion": "Auto",
         "use_audio_bed": True,
-        "selected_models": [VideoGenerationModels.openai_sora.name],
+        "selected_models": [VideoGenerationModels.fal_wan_v2_2_turbo.name],
     }
 
     class RequestModel(BasePage.RequestModel):
@@ -46,7 +46,7 @@ class TextToVideoPage(BasePage):
         aspect_ratio: typing.Literal["16:9", "9:16", "1:1"] = Field(
             default="16:9", description="Video aspect ratio"
         )
-        resolution: typing.Literal["720p", "1080p", "4K"] = Field(
+        resolution: typing.Literal["480p", "580p", "720p", "1080p", "4K"] = Field(
             default="1080p", description="Video resolution"
         )
         frames_per_second: typing.Literal[24, 30, 60] = Field(
@@ -87,6 +87,18 @@ class TextToVideoPage(BasePage):
             default=True, description="Use royalty-free ambient track"
         )
 
+        @field_validator("seed", mode="before")
+        @classmethod
+        def validate_seed(cls, v):
+            # Convert empty string to None
+            if v == "" or v is None:
+                return None
+            # Try to convert to int
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return None
+
     class ResponseModel(BaseModel):
         output_videos: dict[str, HttpUrlStr] = Field(
             description="Generated videos for each selected model"
@@ -117,7 +129,7 @@ class TextToVideoPage(BasePage):
                 if request.camera_motion and request.camera_motion != "Auto":
                     enhanced_prompt += f"; {request.camera_motion.lower()}"
 
-                output_videos[selected_model] = generate_video(
+                output_videos[selected_model] = yield from generate_video(
                     model=model,
                     prompt=enhanced_prompt,
                     duration=request.duration,
@@ -157,7 +169,7 @@ class TextToVideoPage(BasePage):
         gui.text_area(
             "🧠 **PROMPT**",
             key="text_prompt",
-            placeholder="e.g., an atmospheric night-time city street in monsoon rain; slow dolly forward; neon reflections; cinematic lighting; end with a close-up of an umbrella",
+            placeholder="an 1970s pastel party atmospheric on the streets of Venice, California; slow dolly forward; sunny lens flairs; cinematic lighting; end with a close-up of a VW bus made of flowers",
             height=120,
         )
         gui.caption(
@@ -184,25 +196,34 @@ class TextToVideoPage(BasePage):
         col1, col2 = gui.columns(2)
 
         with col1:
+            fal_wan_checked = gui.checkbox(
+                "⚡ **FAL wan v2.2 turbo (Image-to-Video)**", key="__fal_wan_selected", value=True
+            )
+            gui.caption(
+                "Text-to-video using image-to-video model with generated placeholder image."
+            )
+
             sora_checked = gui.checkbox(
-                "🔴 **Sora** limited access", key="__sora_selected", value=True
+                "🔴 **Sora** - Coming Soon", key="__sora_selected", disabled=True
             )
             gui.caption(
                 "High-fidelity text→video. Great for complex scenes and long shots."
             )
 
-            pika_checked = gui.checkbox("🟣 **Pika**", key="__pika_selected")
+            pika_checked = gui.checkbox("🟣 **Pika** - Coming Soon", key="__pika_selected", disabled=True)
             gui.caption("Fast iterations; strong stylization and motion dynamics.")
 
         with col2:
-            veo3_checked = gui.checkbox("🔵 **Veo 3**", key="__veo3_selected")
+            veo3_checked = gui.checkbox("🔵 **Veo 3** - Coming Soon", key="__veo3_selected", disabled=True)
             gui.caption("Cinematic look, strong prompt control and camera directions.")
 
-            runway_checked = gui.checkbox("🟡 **Runway**", key="__runway_selected")
+            runway_checked = gui.checkbox("🟡 **Runway** - Coming Soon", key="__runway_selected", disabled=True)
             gui.caption("Reliable visuals with editing tools in the broader ecosystem.")
 
         # Convert checkbox selections to selected_models list
         selected_models = []
+        if fal_wan_checked:
+            selected_models.append(VideoGenerationModels.fal_wan_v2_2_turbo.name)
         if sora_checked:
             selected_models.append(VideoGenerationModels.openai_sora.name)
         if veo3_checked:
@@ -213,7 +234,7 @@ class TextToVideoPage(BasePage):
             selected_models.append(VideoGenerationModels.runway_gen_3.name)
 
         gui.session_state["selected_models"] = selected_models or [
-            VideoGenerationModels.openai_sora.name
+            VideoGenerationModels.fal_wan_v2_2_turbo.name
         ]
 
         gui.caption(
@@ -253,7 +274,7 @@ class TextToVideoPage(BasePage):
         with col3:
             gui.selectbox(
                 "**Resolution**",
-                options=["720p", "1080p", "4K"],
+                options=["480p", "580p", "720p", "1080p", "4K"],
                 key="resolution",
             )
 
@@ -327,6 +348,11 @@ class TextToVideoPage(BasePage):
 
         gui.write("#### 🎬 RESULTS")
 
+        # Get the actual settings from session state
+        duration = gui.session_state.get("duration", 8)
+        resolution = gui.session_state.get("resolution", "1080p")
+        frames_per_second = gui.session_state.get("frames_per_second", 30)
+
         # Create 2x2 grid for video results
         if len(output_videos) <= 2:
             cols = gui.columns(2)
@@ -338,24 +364,13 @@ class TextToVideoPage(BasePage):
             col_idx = i % 2
 
             with cols[col_idx]:
-                # Model status card
-                status_colors = {
-                    VideoGenerationModels.openai_sora.name: "🔴",
-                    VideoGenerationModels.google_veo_3.name: "🔵",
-                    VideoGenerationModels.pika_labs.name: "🟣",
-                    VideoGenerationModels.runway_gen_3.name: "🟡",
-                }
-
-                status_color = status_colors.get(model_name, "⚪")
-                gui.write(f"{status_color} **{model.value.split(' (')[0]}** ready")
-
                 if video_url:
+                    # Only show the video - clean interface
                     gui.video(video_url, autoplay=False, show_download_button=True)
-                    gui.caption("~8s • 1080p • 30fps")
+                    # Show actual settings instead of hardcoded values
+                    gui.caption(f"{duration}s • {resolution} • {frames_per_second}fps")
                 else:
                     gui.write("🔄 Processing...")
-
-                gui.write("---")  # Separator between videos
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
@@ -400,9 +415,11 @@ class TextToVideoPage(BasePage):
     def _get_resolution_multiplier(self, resolution: str) -> float:
         """Get cost multiplier based on resolution"""
         resolution_multipliers = {
-            "720p": 0.8,
+            "480p": 0.6,   # Lower cost for 480p
+            "580p": 0.7,   # Lower cost for 580p
+            "720p": 0.8,   # Lower cost for 720p
             "1080p": 1.0,  # Base resolution
-            "4K": 2.5,  # Much higher cost for 4K
+            "4K": 2.5,     # Much higher cost for 4K
         }
         return resolution_multipliers.get(resolution, 1.0)
 
