@@ -9,7 +9,7 @@ from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr
 
 
 class VideoGenerationModels(Enum):
-    fal_wan_v2_2_turbo = "FAL wan v2.2 turbo (Image-to-Video)"
+    fal_wan_v2_2_turbo = "FAL wan v2.2 turbo"
     openai_sora = "Sora (OpenAI) - Coming Soon"
     google_veo_3 = "Veo 3 (Google) - Coming Soon"
     runway_gen_3 = "Runway Gen-3 - Coming Soon"
@@ -258,26 +258,9 @@ def _generate_fal_wan_video(
             duration=duration,
     )
     
-    # Add image parameter (required for image-to-video model)
+    # Add image parameter only if reference image is provided
     if reference_image:
         payload["image_url"] = reference_image
-    else:
-        # Since this is an image-to-video model, we need a placeholder image for text-to-video
-        # Create a simple solid color image based on resolution
-        if resolution == "480p":
-            placeholder_url = "https://via.placeholder.com/854x480/000000/FFFFFF.png?text=AI+Video"
-        elif resolution == "580p":
-            placeholder_url = "https://via.placeholder.com/1032x580/000000/FFFFFF.png?text=AI+Video"
-        elif resolution == "720p":
-            placeholder_url = "https://via.placeholder.com/1280x720/000000/FFFFFF.png?text=AI+Video"
-        elif resolution == "1080p":
-            placeholder_url = "https://via.placeholder.com/1920x1080/000000/FFFFFF.png?text=AI+Video"
-        elif resolution == "4K":
-            placeholder_url = "https://via.placeholder.com/3840x2160/000000/FFFFFF.png?text=AI+Video"
-        else:
-            placeholder_url = "https://via.placeholder.com/1920x1080/000000/FFFFFF.png?text=AI+Video"
-        
-        payload["image_url"] = placeholder_url
     
     if style:
         payload["style"] = style
