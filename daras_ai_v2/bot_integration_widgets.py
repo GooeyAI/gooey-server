@@ -240,10 +240,10 @@ def twilio_specific_settings(bi: BotIntegration):
         gui.caption(
             f"[Upgrade]({settings.PRICING_DETAILS_URL}) for missed call support."
         )
-    else:
-        gui.caption(
-            "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
-        )
+
+    gui.caption(
+        "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
+    )
 
     bi.twilio_fresh_conversation_per_call = gui.checkbox(
         "🔄 Fresh Conversation History for Each Call",

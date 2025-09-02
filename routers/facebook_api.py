@@ -290,7 +290,7 @@ def fb_webhook(
                             return Response("OK")
 
                     try:
-                        convo = Conversation.objects.get_or_create(
+                        convo, _ = Conversation.objects.get_or_create(
                             bot_integration=bi,
                             wa_phone_number=user_id,
                             extension=bot_extension,
