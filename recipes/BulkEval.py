@@ -430,8 +430,9 @@ def iterate(
                 cols = [agg["column"]]
             else:
                 cols = out_df.select_dtypes(include=["float", "int"]).columns
-                cols = set(cols) - input_cols  # dont aggregate inputs
             for col in cols:
+                if col in input_cols:
+                    continue
                 col_values = out_df[col].dropna()
                 agg_value = col_values.agg(agg["function"])
                 aggs.append(
