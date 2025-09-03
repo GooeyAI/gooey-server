@@ -1,6 +1,8 @@
 import random
 import uuid
 
+import pytz
+from daras_ai_v2 import settings
 from app_users.models import AppUser
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
@@ -115,12 +117,14 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
         wa_phone_number="my_whatsapp_number",
         wa_phone_number_id="my_whatsapp_number_id",
     )
+    tz = pytz.timezone(settings.TIME_ZONE)
     convos = Conversation.objects.filter(bot_integration=bi)
     msgs = Message.objects.filter(conversation__in=convos)
 
     # valid option but no data
     df = get_tabular_data(
         bi=bi,
+        tz=tz,
         conversations=convos,
         messages=msgs,
         details="Answered Successfully",
@@ -151,6 +155,7 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     assert msgs.count() == 2
     df = get_tabular_data(
         bi=bi,
+        tz=tz,
         conversations=convos,
         messages=msgs,
         details="Answered Successfully",
@@ -162,6 +167,7 @@ def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
     # invalid sort option should be ignored
     df = get_tabular_data(
         bi=bi,
+        tz=tz,
         conversations=convos,
         messages=msgs,
         details="Answered Successfully",

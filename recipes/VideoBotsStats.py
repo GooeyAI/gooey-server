@@ -1,21 +1,13 @@
 import base64
 import json
 import typing
-from datetime import datetime, timedelta
+import datetime
 from functools import partial
 from textwrap import dedent
 
 import gooey_gui as gui
-from dateutil.relativedelta import relativedelta
 from django.db import transaction
-from django.db.models import Avg, CharField, Count, Q
-from django.db.models.functions import (
-    Concat,
-    TruncDay,
-    TruncMonth,
-    TruncWeek,
-    TruncYear,
-)
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -23,6 +15,7 @@ from fastapi.encoders import jsonable_encoder
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, ValidationError
+import pytz
 
 from app_users.models import AppUser
 from bots.models import (
@@ -53,6 +46,8 @@ from recipes.Functions import FunctionsPage
 from recipes.VideoBots import VideoBotsPage
 from widgets.author import render_author_from_user
 
+# calculate daily active users - using subquery to avoid Django limitation
+
 
 class VideoBotsStatsPage(BasePage):
     title = "Copilot Analytics"  # "Create Interactive Video Bots"
@@ -79,49 +74,6 @@ class VideoBotsStatsPage(BasePage):
         path_params: dict = None,
     ) -> str:
         return str(furl(settings.APP_BASE_URL) / self.request.url.path)
-
-    def show_title_breadcrumb_share(
-        self, bi: BotIntegration, run_title: str, run_url: str
-    ):
-        with gui.div(className="d-flex justify-content-between mt-4"):
-            with gui.div(className="d-lg-flex d-block align-items-center"):
-                with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                    with gui.breadcrumbs():
-                        metadata = VideoBotsPage.workflow.get_or_create_metadata()
-                        gui.breadcrumb_item(
-                            metadata.short_title,
-                            link_to=VideoBotsPage.app_url(),
-                            className="text-muted",
-                        )
-                        if not (bi.published_run_id and bi.published_run.is_root()):
-                            gui.breadcrumb_item(
-                                run_title,
-                                link_to=run_url,
-                                className="text-muted",
-                            )
-                        gui.breadcrumb_item(
-                            "Integrations",
-                            link_to=VideoBotsPage.app_url(
-                                tab=RecipeTabs.integrations,
-                                example_id=(
-                                    bi.published_run
-                                    and bi.published_run.published_run_id
-                                ),
-                                path_params=dict(
-                                    integration_id=bi.api_integration_id()
-                                ),
-                            ),
-                        )
-
-                render_author_from_user(
-                    bi.created_by,
-                    show_as_link=self.is_current_user_admin(),
-                )
-
-            with gui.div(className="d-flex align-items-center"):
-                self.render_social_buttons()
-
-        gui.markdown("# " + self.get_dynamic_meta_title())
 
     def get_dynamic_meta_title(self):
         if self.bi:
@@ -199,38 +151,26 @@ class VideoBotsStatsPage(BasePage):
                 run_url=run_url,
             )
 
+            tz = self.timezone_selector()
+            if not tz:
+                return
+
             (
                 start_date,
                 end_date,
-                view,
-                factor,
-                trunc_fn,
+                frequency,
             ) = self.render_date_view_inputs(bi)
+
+            start_date = start_date.replace(tzinfo=tz)
+            end_date = end_date.replace(tzinfo=tz)
 
         gui.newline()
         render_analysis_section(self.request.user, bi, start_date, end_date)
 
-        df = calculate_stats_binned_by_time(
-            bi=bi,
-            start_date=start_date,
-            end_date=end_date,
-            factor=factor,
-            trunc_fn=trunc_fn,
-        )
-
-        if df.empty or "date" not in df.columns:
-            gui.write("No data to show yet.")
-            self.update_url(
-                view,
-                gui.session_state.get("details"),
-                start_date,
-                end_date,
-                gui.session_state.get("sort_by"),
-            )
-            return
-
         with col2:
-            plot_graphs(view, df)
+            from widgets.copilot_stats_plots import render_copilot_stats_plots
+
+            render_copilot_stats_plots(bi, tz, start_date, end_date, frequency)
 
         gui.write("---")
         gui.session_state.setdefault(
@@ -305,6 +245,7 @@ class VideoBotsStatsPage(BasePage):
 
         df = get_tabular_data(
             bi=bi,
+            tz=tz,
             conversations=conversations,
             messages=messages,
             details=details,
@@ -316,7 +257,7 @@ class VideoBotsStatsPage(BasePage):
 
         if df.empty:
             gui.write("No data to show yet.")
-            self.update_url(view, details, start_date, end_date, sort_by)
+            self.update_url(frequency, details, start_date, end_date, sort_by)
             return
 
         columns = df.columns.tolist()
@@ -337,6 +278,7 @@ class VideoBotsStatsPage(BasePage):
             if gui.button("Download CSV file"):
                 df = get_tabular_data(
                     bi=bi,
+                    tz=tz,
                     conversations=conversations,
                     messages=messages,
                     details=details,
@@ -362,7 +304,50 @@ class VideoBotsStatsPage(BasePage):
                     )
                 )
 
-        self.update_url(view, details, start_date, end_date, sort_by)
+        self.update_url(frequency, details, start_date, end_date, sort_by)
+
+    def show_title_breadcrumb_share(
+        self, bi: BotIntegration, run_title: str, run_url: str
+    ):
+        with gui.div(className="d-flex justify-content-between mt-4"):
+            with gui.div(className="d-lg-flex d-block align-items-center"):
+                with gui.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                    with gui.breadcrumbs():
+                        metadata = VideoBotsPage.workflow.get_or_create_metadata()
+                        gui.breadcrumb_item(
+                            metadata.short_title,
+                            link_to=VideoBotsPage.app_url(),
+                            className="text-muted",
+                        )
+                        if not (bi.published_run_id and bi.published_run.is_root()):
+                            gui.breadcrumb_item(
+                                run_title,
+                                link_to=run_url,
+                                className="text-muted",
+                            )
+                        gui.breadcrumb_item(
+                            "Integrations",
+                            link_to=VideoBotsPage.app_url(
+                                tab=RecipeTabs.integrations,
+                                example_id=(
+                                    bi.published_run
+                                    and bi.published_run.published_run_id
+                                ),
+                                path_params=dict(
+                                    integration_id=bi.api_integration_id()
+                                ),
+                            ),
+                        )
+
+                render_author_from_user(
+                    bi.created_by,
+                    show_as_link=self.is_current_user_admin(),
+                )
+
+            with gui.div(className="d-flex align-items-center"):
+                self.render_social_buttons()
+
+        gui.markdown("# " + self.get_dynamic_meta_title())
 
     def render_scheduled_export_options(self, bi: BotIntegration):
         scheduled_runs = bi.scheduled_runs.select_related(
@@ -452,9 +437,9 @@ class VideoBotsStatsPage(BasePage):
     def render_date_view_inputs(self, bi):
         if gui.checkbox("Show All"):
             start_date = bi.created_at
-            end_date = timezone.now() + timedelta(days=1)
+            end_date = timezone.now() + datetime.timedelta(days=1)
         else:
-            fifteen_days_ago = timezone.now() - timedelta(days=15)
+            fifteen_days_ago = timezone.now() - datetime.timedelta(days=15)
             fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
             gui.session_state.setdefault(
                 "start_date",
@@ -462,51 +447,51 @@ class VideoBotsStatsPage(BasePage):
                     "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
                 ),
             )
-            start_date: datetime = (
+            start_date: datetime.datetime = (
                 gui.date_input("Start date", key="start_date") or fifteen_days_ago
             )
             gui.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
                     "end_date",
-                    (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
+                    (timezone.now() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
                 ),
             )
-            end_date: datetime = (
+            end_date: datetime.datetime = (
                 gui.date_input("End date", key="end_date") or timezone.now()
             )
             gui.session_state.setdefault(
                 "view", self.request.query_params.get("view", "Daily")
             )
         gui.write("---")
-        view = gui.horizontal_radio(
+        frequency = gui.horizontal_radio(
             "### View",
             options=["Daily", "Weekly", "Monthly"],
             key="view",
             label_visibility="collapsed",
         )
-        factor = 1
-        if view == "Weekly":
-            trunc_fn = TruncWeek
-        elif view == "Daily":
-            if end_date - start_date > timedelta(days=31):
-                gui.write(
-                    "**Note: Date ranges greater than 31 days show weekly averages in daily view**"
-                )
-                factor = 1.0 / 7.0
-                trunc_fn = TruncWeek
-            else:
-                trunc_fn = TruncDay
-        elif view == "Monthly":
-            trunc_fn = TruncMonth
-            start_date = start_date.replace(day=1)
-            gui.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
-            if end_date.day != 1:
-                end_date = end_date.replace(day=1) + relativedelta(months=1)
-                gui.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
-        else:
-            trunc_fn = TruncYear
-        return start_date, end_date, view, factor, trunc_fn
+
+        return start_date, end_date, frequency
+
+    def timezone_selector(self) -> typing.Optional[pytz.timezone]:
+        gui.js(
+            """
+            if (gui.session_state.timezone) return;
+            let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            gui.update_session_state({ timezone });
+            """
+        )
+        timezone = gui.selectbox(
+            "",
+            options=pytz.all_timezones,
+            key="timezone",
+            value=self.request.session.get("timezone"),
+            allow_none=True,
+        )
+        if not timezone:
+            return None
+        self.request.session["timezone"] = timezone
+        return pytz.timezone(timezone)
 
 
 def render_scheduled_run_input(
@@ -575,7 +560,7 @@ def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
     num_active_users_last_7_days = (
         user_messages.filter(
             conversation__in=users,
-            created_at__gte=timezone.now() - timedelta(days=7),
+            created_at__gte=timezone.now() - datetime.timedelta(days=7),
         )
         .distinct_by_user_id()
         .count()
@@ -583,7 +568,7 @@ def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
     num_active_users_last_30_days = (
         user_messages.filter(
             conversation__in=users,
-            created_at__gte=timezone.now() - timedelta(days=30),
+            created_at__gte=timezone.now() - datetime.timedelta(days=30),
         )
         .distinct_by_user_id()
         .count()
@@ -622,376 +607,17 @@ def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
     )
 
 
-def calculate_stats_binned_by_time(*, bi, start_date, end_date, factor, trunc_fn):
-    import pandas as pd
-
-    messages_received = (
-        Message.objects.filter(
-            created_at__date__gte=start_date,
-            created_at__date__lte=end_date,
-            conversation__bot_integration=bi,
-            role=CHATML_ROLE_ASSISTANT,
-        )
-        .order_by()
-        .annotate(date=trunc_fn("created_at"))
-        .values("date")
-        .annotate(Messages_Sent=Count("id"))
-        .annotate(Convos=Count("conversation_id", distinct=True))
-        .annotate(
-            Senders=Count(
-                Concat(*Message.convo_user_id_fields, output_field=CharField()),
-                distinct=True,
-            ),
-        )
-        .annotate(Average_runtime=Avg("saved_run__run_time"))
-        .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
-        .values(
-            "date",
-            "Messages_Sent",
-            "Convos",
-            "Senders",
-            "Unique_feedback_givers",
-            "Average_runtime",
-        )
-    )
-
-    positive_feedbacks = (
-        Feedback.objects.filter(
-            created_at__date__gte=start_date,
-            created_at__date__lte=end_date,
-            message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.POSITIVE,
-        )
-        .order_by()
-        .annotate(date=trunc_fn("created_at"))
-        .values("date")
-        .annotate(Pos_feedback=Count("id"))
-        .values("date", "Pos_feedback")
-    )
-
-    negative_feedbacks = (
-        Feedback.objects.filter(
-            created_at__date__gte=start_date,
-            created_at__date__lte=end_date,
-            message__conversation__bot_integration=bi,
-            rating=Feedback.Rating.NEGATIVE,
-        )
-        .order_by()
-        .annotate(date=trunc_fn("created_at"))
-        .values("date")
-        .annotate(Neg_feedback=Count("id"))
-        .values("date", "Neg_feedback")
-    )
-
-    successfully_answered = (
-        Message.objects.filter(
-            conversation__bot_integration=bi,
-            created_at__date__gte=start_date,
-            created_at__date__lte=end_date,
-        )
-        .filter(
-            Q(analysis_result__contains={"Answered": True})
-            | Q(analysis_result__contains={"assistant": {"answer": "Found"}}),
-        )
-        .order_by()
-        .annotate(date=trunc_fn("created_at"))
-        .values("date")
-        .annotate(Successfully_Answered=Count("id"))
-        .values("date", "Successfully_Answered")
-    )
-
-    df = pd.DataFrame(
-        messages_received,
-        columns=[
-            "date",
-            "Messages_Sent",
-            "Convos",
-            "Senders",
-            "Unique_feedback_givers",
-            "Average_runtime",
-        ],
-    )
-    df = df.merge(
-        pd.DataFrame(positive_feedbacks, columns=["date", "Pos_feedback"]),
-        how="outer",
-        left_on="date",
-        right_on="date",
-    )
-    df = df.merge(
-        pd.DataFrame(negative_feedbacks, columns=["date", "Neg_feedback"]),
-        how="outer",
-        left_on="date",
-        right_on="date",
-    )
-    df = df.merge(
-        pd.DataFrame(successfully_answered, columns=["date", "Successfully_Answered"]),
-        how="outer",
-        left_on="date",
-        right_on="date",
-    )
-    df["Messages_Sent"] = df["Messages_Sent"] * factor
-    df["Convos"] = df["Convos"] * factor
-    df["Senders"] = df["Senders"] * factor
-    df["Unique_feedback_givers"] = df["Unique_feedback_givers"] * factor
-    df["Pos_feedback"] = df["Pos_feedback"] * factor
-    df["Neg_feedback"] = df["Neg_feedback"] * factor
-    df["Percentage_positive_feedback"] = (
-        df["Pos_feedback"] / df["Messages_Sent"]
-    ) * 100
-    df["Percentage_negative_feedback"] = (
-        df["Neg_feedback"] / df["Messages_Sent"]
-    ) * 100
-    df["Percentage_successfully_answered"] = (
-        df["Successfully_Answered"] / df["Messages_Sent"]
-    ) * 100
-    df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
-    df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
-    df.fillna(0, inplace=True)
-    df = df.round(0).astype("int32", errors="ignore")
-    df = df.sort_values(by=["date"], ascending=True).reset_index()
-    return df
-
-
-def plot_graphs(view, df):
-    import plotly.graph_objects as go
-
-    dateformat = "%B %Y" if view == "Monthly" else "%x"
-    xaxis_ticks = dict(
-        tickmode="array",
-        tickvals=list(df["date"]),
-        ticktext=list(df["date"].apply(lambda x: x.strftime(dateformat))),
-    )
-
-    fig = go.Figure(
-        data=[
-            go.Bar(
-                x=list(df["date"]),
-                y=list(df["Messages_Sent"]),
-                text=list(df["Messages_Sent"]),
-                texttemplate="<b>%{text}</b>",
-                insidetextanchor="middle",
-                insidetextfont=dict(size=24),
-                hovertemplate="Messages Sent: %{y:.0f}<extra></extra>",
-            ),
-        ],
-        layout=dict(
-            margin=dict(l=0, r=0, t=28, b=0),
-            yaxis=dict(
-                title="User Messages Sent",
-                range=[
-                    0,
-                    df["Messages_Sent"].max() + 1,
-                ],
-                tickvals=[
-                    *range(
-                        int(df["Messages_Sent"].max() / 10),
-                        int(df["Messages_Sent"].max()) + 1,
-                        int(df["Messages_Sent"].max() / 10) + 1,
-                    )
-                ],
-            ),
-            xaxis=xaxis_ticks,
-            title=dict(
-                text=f"{view} Messages Sent",
-            ),
-            height=300,
-            template="plotly_white",
-        ),
-    )
-    gui.plotly_chart(fig)
-    gui.write("---")
-    fig = go.Figure(
-        data=[
-            go.Scatter(
-                name="Senders",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Senders"]),
-                text=list(df["Senders"]),
-                hovertemplate="Active Users: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Conversations",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Convos"]),
-                text=list(df["Convos"]),
-                hovertemplate="Conversations: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Feedback Givers",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Unique_feedback_givers"]),
-                text=list(df["Unique_feedback_givers"]),
-                hovertemplate="Feedback Givers: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Positive Feedbacks",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Pos_feedback"]),
-                text=list(df["Pos_feedback"]),
-                hovertemplate="Positive Feedbacks: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Negative Feedbacks",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Neg_feedback"]),
-                text=list(df["Neg_feedback"]),
-                hovertemplate="Negative Feedbacks: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Messages per Convo",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Msgs_per_convo"]),
-                text=list(df["Msgs_per_convo"]),
-                hovertemplate="Messages per Convo: %{y:.0f}<extra></extra>",
-            ),
-            go.Scatter(
-                name="Messages per Sender",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Msgs_per_user"]),
-                text=list(df["Msgs_per_user"]),
-                hovertemplate="Messages per User: %{y:.0f}<extra></extra>",
-            ),
-        ],
-        layout=dict(
-            margin=dict(l=0, r=0, t=28, b=0),
-            yaxis=dict(
-                title="Unique Count",
-            ),
-            title=dict(
-                text=f"{view} Usage Trends",
-            ),
-            xaxis=xaxis_ticks,
-            height=300,
-            template="plotly_white",
-        ),
-    )
-    max_value = (
-        df[
-            [
-                "Senders",
-                "Convos",
-                "Unique_feedback_givers",
-                "Pos_feedback",
-                "Neg_feedback",
-                "Msgs_per_convo",
-                "Msgs_per_user",
-            ]
-        ]
-        .max()
-        .max()
-    )
-    if max_value < 10:
-        # only set fixed axis scale if the data doesn't have enough values to make it look good
-        # otherwise default behaviour is better since it adapts when user deselects a line
-        fig.update_yaxes(
-            range=[
-                -0.2,
-                max_value + 10,
-            ],
-            tickvals=[
-                *range(
-                    int(max_value / 10),
-                    int(max_value) + 10,
-                    int(max_value / 10) + 1,
-                )
-            ],
-        )
-    gui.plotly_chart(fig)
-    gui.write("---")
-    fig = go.Figure(
-        data=[
-            go.Scatter(
-                name="Average Run Time",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Average_runtime"]),
-                text=list(df["Average_runtime"]),
-                hovertemplate="Average Runtime: %{y:.0f}<extra></extra>",
-            ),
-        ],
-        layout=dict(
-            margin=dict(l=0, r=0, t=28, b=0),
-            yaxis=dict(
-                title="Seconds",
-            ),
-            title=dict(
-                text=f"{view} Performance Metrics",
-            ),
-            xaxis=xaxis_ticks,
-            height=300,
-            template="plotly_white",
-        ),
-    )
-    gui.plotly_chart(fig)
-    gui.write("---")
-    fig = go.Figure(
-        data=[
-            go.Scatter(
-                name="Positive Feedback",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Percentage_positive_feedback"]),
-                text=list(df["Percentage_positive_feedback"]),
-                hovertemplate="Positive Feedback: %{y:.0f}%<extra></extra>",
-            ),
-            go.Scatter(
-                name="Negative Feedback",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Percentage_negative_feedback"]),
-                text=list(df["Percentage_negative_feedback"]),
-                hovertemplate="Negative Feedback: %{y:.0f}%<extra></extra>",
-            ),
-            go.Scatter(
-                name="Successfully Answered",
-                mode="lines+markers",
-                x=list(df["date"]),
-                y=list(df["Percentage_successfully_answered"]),
-                text=list(df["Percentage_successfully_answered"]),
-                hovertemplate="Successfully Answered: %{y:.0f}%<extra></extra>",
-            ),
-        ],
-        layout=dict(
-            margin=dict(l=0, r=0, t=28, b=0),
-            yaxis=dict(
-                title="Percentage",
-                range=[0, 100],
-                tickvals=[
-                    *range(
-                        0,
-                        101,
-                        10,
-                    )
-                ],
-            ),
-            xaxis=xaxis_ticks,
-            title=dict(
-                text=f"{view} Feedback Distribution",
-            ),
-            height=300,
-            template="plotly_white",
-        ),
-    )
-    gui.plotly_chart(fig)
-
-
 def get_tabular_data(
     *,
-    bi,
-    conversations,
-    messages,
-    details,
-    sort_by,
-    rows=10000,
-    start_date=None,
-    end_date=None,
+    bi: BotIntegration,
+    tz: pytz.timezone,
+    conversations: ConversationQuerySet,
+    messages: MessageQuerySet,
+    details: str,
+    sort_by: str,
+    rows: int = 10000,
+    start_date: datetime.datetime | None = None,
+    end_date: datetime.datetime | None = None,
 ):
     import pandas as pd
 
@@ -1002,13 +628,13 @@ def get_tabular_data(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
             conversations = conversations.filter(messages__in=messages).distinct()
-        df = conversations.to_df_format(row_limit=rows)
+        df = conversations.to_df(tz=tz, row_limit=rows)
     elif details == "Messages":
         if start_date and end_date:
             messages = messages.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = messages.to_df(row_limit=rows)
+        df = messages.to_df(tz=tz, row_limit=rows)
     elif details == "Feedback Positive":
         pos_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
@@ -1018,7 +644,7 @@ def get_tabular_data(
             pos_feedbacks = pos_feedbacks.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = pos_feedbacks.to_df_format(row_limit=rows)
+        df = pos_feedbacks.to_df(tz=tz, row_limit=rows)
     elif details == "Feedback Negative":
         neg_feedbacks = Feedback.objects.filter(
             message__conversation__bot_integration=bi,
@@ -1028,7 +654,7 @@ def get_tabular_data(
             neg_feedbacks = neg_feedbacks.filter(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
-        df = neg_feedbacks.to_df_format(row_limit=rows)
+        df = neg_feedbacks.to_df(tz=tz, row_limit=rows)
     elif details == "Answered Successfully":
         qs = Message.objects.filter(
             Q(analysis_result__contains={"Answered": True})
@@ -1040,7 +666,7 @@ def get_tabular_data(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
         qs |= qs.previous_by_created_at()
-        df = qs.to_df(row_limit=rows)
+        df = qs.to_df(tz=tz, row_limit=rows)
     elif details == "Answered Unsuccessfully":
         qs = Message.objects.filter(
             Q(analysis_result__contains={"Answered": False})
@@ -1052,7 +678,7 @@ def get_tabular_data(
                 created_at__date__gte=start_date, created_at__date__lte=end_date
             )
         qs |= qs.previous_by_created_at()
-        df = qs.to_df(row_limit=rows)
+        df = qs.to_df(tz=tz, row_limit=rows)
 
     if sort_by and sort_by in df.columns:
         df.sort_values(by=[sort_by], ascending=False, inplace=True)

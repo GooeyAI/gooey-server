@@ -1218,7 +1218,7 @@ def run_asr(
             for result in batch.transcript.results  # SpeechRecognitionResult
             if result.alternatives
         )
-    elif "nemo" in selected_model.name:
+    elif selected_model == AsrModels.mbaza_ctc_large:
         data = call_celery_task(
             "nemo_asr",
             pipeline=dict(
