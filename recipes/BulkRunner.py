@@ -324,8 +324,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     state = sr.to_dict()
                     state["run_url"] = sr.get_app_url()
-                    state["price"] = f"{sr.price} credits"
-                    state["run_time"] = format_timedelta(sr.run_time)
+                    state["price"] = sr.price
+                    state["run_time"] = round(sr.run_time.total_seconds(), 2)
                     state["error_msg"] = sr.error_msg
 
                     for field, col in request.output_columns.items():

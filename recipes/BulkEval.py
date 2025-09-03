@@ -410,6 +410,7 @@ def iterate(
             yield "Uploading Results..."
 
         result = fut.result()
+        input_cols = set(result.current_rec.keys())
 
         for metric_name, metric_value in result.llm_output.items():
             col = f"{result.ep['name']} - {metric_name}"
@@ -429,6 +430,7 @@ def iterate(
                 cols = [agg["column"]]
             else:
                 cols = out_df.select_dtypes(include=["float", "int"]).columns
+                cols = set(cols) - input_cols  # dont aggregate inputs
             for col in cols:
                 col_values = out_df[col].dropna()
                 agg_value = col_values.agg(agg["function"])
