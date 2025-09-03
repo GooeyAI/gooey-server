@@ -291,7 +291,7 @@ class AsrModels(Enum):
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
     lelapa = "Vulavula (Lelapa AI)"
     whisper_sunbird_large_v3 = "Sunbird Ugandan Whisper v3 (Sunbird AI)"
-    whisper_akera_large_v3 = "Akera Whisper v3 (akera)"
+    whisper_akera_large_v3 = "Kikuyu v2 Whisper (akera)"
     whisper_swahili_medium_v3 = "Jacaranda Health Swahili Whisper v3 (Jacaranda Health)"
     mbaza_ctc_large = "Mbaza Conformer LG (MbazaNLP)"
 
