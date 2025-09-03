@@ -64,17 +64,19 @@ def generate_video(
 
     match model:
         case VideoGenerationModels.fal_wan_v2_2_turbo:
-            return (yield from _generate_fal_wan_video(
-                prompt=prompt,
-                duration=duration,
-                reference_image=reference_image,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                frames_per_second=frames_per_second,
-                style=style,
-                negative_prompt=negative_prompt,
-                seed=seed,
-            ))
+            return (
+                yield from _generate_fal_wan_video(
+                    prompt=prompt,
+                    duration=duration,
+                    reference_image=reference_image,
+                    aspect_ratio=aspect_ratio,
+                    resolution=resolution,
+                    frames_per_second=frames_per_second,
+                    style=style,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                )
+            )
         case VideoGenerationModels.openai_sora:
             return _generate_sora_video(
                 prompt=prompt,
@@ -251,24 +253,24 @@ def _generate_fal_wan_video(
 ) -> typing.Generator[str, None, OptionalHttpUrlStr]:
     """Generate video using FAL wan v2.2 turbo"""
     from daras_ai_v2.fal_ai import generate_on_fal
-    
+
     # Build payload for FAL API
     payload = dict(
-            prompt=prompt,
-            duration=duration,
+        prompt=prompt,
+        duration=duration,
     )
-    
+
     # Add image parameter only if reference image is provided
     if reference_image:
         payload["image_url"] = reference_image
-    
+
     if style:
         payload["style"] = style
     if negative_prompt:
         payload["negative_prompt"] = negative_prompt
     if seed:
         payload["seed"] = seed
-    
+
     # Convert resolution and aspect ratio to dimensions
     # FAL expects width and height parameters
     if aspect_ratio == "16:9":
@@ -313,23 +315,23 @@ def _generate_fal_wan_video(
         elif resolution == "1080p":
             payload["width"] = 1080
             payload["height"] = 1080
-    
+
     # Call FAL API directly (with streaming)
     result = yield from generate_on_fal(
         model_id=video_model_ids[VideoGenerationModels.fal_wan_v2_2_turbo],
         payload=payload,
     )
-    
+
     # Record cost for usage tracking
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
-    
+
     record_cost_auto(
         model=video_model_ids[VideoGenerationModels.fal_wan_v2_2_turbo],
         sku=ModelSku.video_generation,
         quantity=1,  # 1 video generated
     )
-    
+
     # Extract video URL from result
     if "video" in result and "url" in result["video"]:
         return result["video"]["url"]

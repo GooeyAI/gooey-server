@@ -197,7 +197,9 @@ class TextToVideoPage(BasePage):
 
         with col1:
             fal_wan_checked = gui.checkbox(
-                "⚡ **FAL wan v2.2 turbo (Image-to-Video)**", key="__fal_wan_selected", value=True
+                "⚡ **FAL wan v2.2 turbo (Image-to-Video)**",
+                key="__fal_wan_selected",
+                value=True,
             )
             gui.caption(
                 "Text-to-video using image-to-video model with generated placeholder image."
@@ -210,14 +212,20 @@ class TextToVideoPage(BasePage):
                 "High-fidelity text→video. Great for complex scenes and long shots."
             )
 
-            pika_checked = gui.checkbox("🟣 **Pika** - Coming Soon", key="__pika_selected", disabled=True)
+            pika_checked = gui.checkbox(
+                "🟣 **Pika** - Coming Soon", key="__pika_selected", disabled=True
+            )
             gui.caption("Fast iterations; strong stylization and motion dynamics.")
 
         with col2:
-            veo3_checked = gui.checkbox("🔵 **Veo 3** - Coming Soon", key="__veo3_selected", disabled=True)
+            veo3_checked = gui.checkbox(
+                "🔵 **Veo 3** - Coming Soon", key="__veo3_selected", disabled=True
+            )
             gui.caption("Cinematic look, strong prompt control and camera directions.")
 
-            runway_checked = gui.checkbox("🟡 **Runway** - Coming Soon", key="__runway_selected", disabled=True)
+            runway_checked = gui.checkbox(
+                "🟡 **Runway** - Coming Soon", key="__runway_selected", disabled=True
+            )
             gui.caption("Reliable visuals with editing tools in the broader ecosystem.")
 
         # Convert checkbox selections to selected_models list
@@ -415,11 +423,11 @@ class TextToVideoPage(BasePage):
     def _get_resolution_multiplier(self, resolution: str) -> float:
         """Get cost multiplier based on resolution"""
         resolution_multipliers = {
-            "480p": 0.6,   # Lower cost for 480p
-            "580p": 0.7,   # Lower cost for 580p
-            "720p": 0.8,   # Lower cost for 720p
+            "480p": 0.6,  # Lower cost for 480p
+            "580p": 0.7,  # Lower cost for 580p
+            "720p": 0.8,  # Lower cost for 720p
             "1080p": 1.0,  # Base resolution
-            "4K": 2.5,     # Much higher cost for 4K
+            "4K": 2.5,  # Much higher cost for 4K
         }
         return resolution_multipliers.get(resolution, 1.0)
 
