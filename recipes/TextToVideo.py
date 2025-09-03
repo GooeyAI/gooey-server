@@ -30,7 +30,7 @@ class TextToVideoPage(BasePage):
         "resolution": "1080p",
         "frames_per_second": 30,
         "camera_motion": "Auto",
-        "use_audio_bed": True,
+        "use_audio_bed": False,
         "selected_models": [VideoGenerationModels.fal_wan_v2_2_turbo.name],
     }
 
@@ -84,7 +84,7 @@ class TextToVideoPage(BasePage):
             default=None, description="Random seed for reproducible results"
         )
         use_audio_bed: bool = Field(
-            default=True, description="Use royalty-free ambient track"
+            default=False, description="Use royalty-free ambient track"
         )
 
         @field_validator("seed", mode="before")
@@ -339,7 +339,6 @@ class TextToVideoPage(BasePage):
         gui.checkbox(
             "**Use audio bed** _(royalty-free ambient track)_",
             key="use_audio_bed",
-            value=True,
         )
 
         gui.caption(
