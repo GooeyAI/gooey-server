@@ -25,6 +25,7 @@ class TextToVideoPage(BasePage):
     ]
 
     sane_defaults = {
+        "text_prompt": "an 1970s pastel party atmospheric on the streets of Venice, California; slow dolly forward; sunny lens flairs; cinematic lighting; end with a close-up of a VW bus made of flowers",
         "duration": 8,
         "aspect_ratio": "16:9",
         "resolution": "1080p",
