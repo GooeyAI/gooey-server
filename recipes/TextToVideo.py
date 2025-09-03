@@ -176,8 +176,8 @@ class TextToVideoPage(BasePage):
             "Tip: Use short sentences and shot directions (camera, motion, framing). You can also add negative prompts in Settings."
         )
 
-        # Optional image upload
-        gui.write("🖼️ **OPTIONAL IMAGE**")
+        # Image upload
+        gui.write("🖼️ **IMAGE**")
         gui.caption("Used for style or subject guidance")
         gui.file_uploader(
             "Drag & drop or click to upload",
