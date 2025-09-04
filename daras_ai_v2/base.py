@@ -994,21 +994,12 @@ class BasePage:
     def _saved_options_modal(self):
         assert self.is_logged_in()
 
-        is_latest_version = self.current_pr.saved_run == self.current_sr
-
         with gui.div(
             className="mb-3 d-flex justify-content-around align-items-center gap-3"
         ):
-            duplicate_button = None
-            save_as_new_button = None
-            if is_latest_version:
-                duplicate_button = gui.button(
-                    f"{icons.fork} Duplicate", className="w-100"
-                )
-            else:
-                save_as_new_button = gui.button(
-                    f"{icons.fork} Save as New", className="w-100"
-                )
+            is_latest_version = self.current_pr.saved_run == self.current_sr
+            label = "Duplicate" if is_latest_version else "Save as New"
+            save_as_new_button = gui.button(f"{icons.fork} {label}", className="w-100")
 
             if (
                 self.request.user
@@ -1045,23 +1036,13 @@ class BasePage:
         else:
             notes = self.current_pr.notes
 
-        if duplicate_button:
-            duplicate_pr = self.current_pr.duplicate(
-                user=self.request.user,
-                workspace=self.current_workspace,
-                title=title,
-                notes=notes,
-            )
-            raise gui.RedirectException(
-                self.app_url(example_id=duplicate_pr.published_run_id)
-            )
-
         if save_as_new_button:
             new_pr = self.create_published_run(
                 published_run_id=get_random_doc_id(),
                 saved_run=self.current_sr,
                 user=self.request.user,
                 workspace=self.current_workspace,
+                tags=list(self.current_pr.tags.all()),
                 title=title,
                 notes=notes,
             )
@@ -1071,10 +1052,7 @@ class BasePage:
 
         with gui.div(className="mt-4"):
             with gui.div(className="mb-4"):
-                gui.write(
-                    f"#### {icons.time} Version History",
-                    unsafe_allow_html=True,
-                )
+                gui.write(f"#### {icons.time} Version History", unsafe_allow_html=True)
             self._render_version_history()
 
     def _unsaved_options_modal(self):
