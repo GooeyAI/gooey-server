@@ -2263,7 +2263,7 @@ class BasePage:
                 self,
                 pr,
                 show_workspace_author=True,
-                hide_visibility_pill=True,
+                hide_access_level=True,
                 hide_version_notes=True,
             )
 
