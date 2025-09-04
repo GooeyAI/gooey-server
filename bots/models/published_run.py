@@ -432,6 +432,9 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+    def render(self) -> str:
+        return f"{self.icon} {self.name}" if self.icon else self.name
+
     @classmethod
     @cache
     def get_options(cls) -> list["Tag"]:
