@@ -804,7 +804,7 @@ class BasePage:
                     tag_pks = gui.multiselect(
                         label="",
                         options=options,
-                        format_func=lambda pk: f"{options[pk].icon} {options[pk].name}",
+                        format_func=lambda pk: options[pk].render(),
                         key="published_run_tags",
                         allow_none=True,
                     )
