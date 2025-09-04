@@ -37,6 +37,7 @@ from bots.models import (
     Workflow,
     WorkflowAccessLevel,
 )
+from bots.models.published_run import Tag
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -779,7 +780,7 @@ class BasePage:
                     className="mt-1",
                     rows=5,
                 )
-                with gui.div(className="d-flex mb-3 align-items-center gap-2"):
+                with gui.div(className="d-flex align-items-center gap-2"):
                     change_notes = render_change_notes_input(
                         key="published_run_change_notes"
                     )
@@ -791,6 +792,23 @@ class BasePage:
                     title=published_run_title,
                     description=published_run_description,
                 )
+
+            with gui.div(className="d-flex mb-3 align-items-center gap-2"):
+                options = {t.pk: t for t in Tag.get_options()}
+                gui.write("Tags", className="fs-5 mb-3")
+                if not isinstance(gui.session_state.get("published_run_tags"), list):
+                    gui.session_state["published_run_tags"] = [
+                        tag.pk for tag in pr.tags.all()
+                    ]
+                with gui.div(className="flex-grow-1"):
+                    tag_pks = gui.multiselect(
+                        label="",
+                        options=options,
+                        format_func=lambda pk: f"{options[pk].icon} {options[pk].name}",
+                        key="published_run_tags",
+                        allow_none=True,
+                    )
+                    tags = [options[pk] for pk in tag_pks]
 
         self._render_admin_options(sr, pr)
 
@@ -849,6 +867,7 @@ class BasePage:
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
                 photo_url=photo_url,
+                tags=tags,
             )
         else:
             if not WorkflowAccessLevel.can_user_edit_published_run(
@@ -863,6 +882,7 @@ class BasePage:
                 title=published_run_title.strip(),
                 notes=published_run_description.strip(),
                 photo_url=photo_url,
+                tags=tags,
             )
             if not self._has_published_run_changed(published_run=pr, **updates):
                 gui.error("No changes to publish", icon="⚠️")
@@ -940,12 +960,14 @@ class BasePage:
         title: str,
         notes: str,
         photo_url: str,
+        tags: list[Tag],
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
             or published_run.photo_url != photo_url
+            or set(published_run.tags.all()) != set(tags)
         )
 
     def _has_request_changed(self) -> bool:
@@ -1143,6 +1165,7 @@ class BasePage:
                         saved_run=published_run.saved_run,
                         public_access=WorkflowAccessLevel.FIND_AND_VIEW,
                         change_notes=change_notes,
+                        tags=list(published_run.tags.all()),
                     )
                     raise gui.RedirectException(self.app_url())
 
@@ -1561,8 +1584,10 @@ class BasePage:
 
     @classmethod
     def get_pr_from_example_id(cls, example_id: str):
-        return PublishedRun.objects.select_related("saved_run", "workspace").get(
-            workflow=cls.workflow, published_run_id=example_id
+        return (
+            PublishedRun.objects.select_related("saved_run", "workspace")
+            .prefetch_related("tags")
+            .get(workflow=cls.workflow, published_run_id=example_id)
         )
 
     @classmethod
@@ -1593,6 +1618,7 @@ class BasePage:
         notes: str,
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
+        tags: list[Tag] | None = None,
     ):
         return PublishedRun.objects.create_with_version(
             workflow=cls.workflow,
@@ -1604,6 +1630,7 @@ class BasePage:
             notes=notes,
             public_access=public_access,
             photo_url=photo_url,
+            tags=tags,
         )
 
     @classmethod
@@ -2031,6 +2058,7 @@ class BasePage:
             workspace=self.current_workspace,
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
+            tags=list(self.current_pr.tags.all()),
         )
         raise gui.RedirectException(pr.get_app_url())
 
