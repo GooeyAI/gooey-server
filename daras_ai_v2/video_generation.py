@@ -61,6 +61,21 @@ def generate_video(
     Returns:
         URL of the generated video
     """
+    # Input validation
+    if not (3 <= duration <= 30):
+        raise UserError(f"Invalid duration: {duration}. Duration must be between 3 and 30 seconds inclusive.")
+    
+    valid_aspect_ratios = {"16:9", "9:16", "1:1"}
+    if aspect_ratio not in valid_aspect_ratios:
+        raise UserError(f"Invalid aspect_ratio: {aspect_ratio}. Must be one of {sorted(valid_aspect_ratios)}.")
+    
+    valid_resolutions = {"480p", "580p", "720p", "1080p", "4K"}
+    if resolution not in valid_resolutions:
+        raise UserError(f"Invalid resolution: {resolution}. Must be one of {sorted(valid_resolutions)}.")
+    
+    valid_frames_per_second = {24, 30, 60}
+    if frames_per_second not in valid_frames_per_second:
+        raise UserError(f"Invalid frames_per_second: {frames_per_second}. Must be one of {sorted(valid_frames_per_second)}.")
 
     match model:
         case VideoGenerationModels.fal_wan_v2_2_turbo:
@@ -268,53 +283,38 @@ def _generate_fal_wan_video(
         payload["style"] = style
     if negative_prompt:
         payload["negative_prompt"] = negative_prompt
-    if seed:
+    if seed is not None:
         payload["seed"] = seed
 
     # Convert resolution and aspect ratio to dimensions
     # FAL expects width and height parameters
-    if aspect_ratio == "16:9":
-        if resolution == "480p":
-            payload["width"] = 854
-            payload["height"] = 480
-        elif resolution == "580p":
-            payload["width"] = 1032
-            payload["height"] = 580
-        elif resolution == "720p":
-            payload["width"] = 1280
-            payload["height"] = 720
-        elif resolution == "1080p":
-            payload["width"] = 1920
-            payload["height"] = 1080
-        elif resolution == "4K":
-            payload["width"] = 3840
-            payload["height"] = 2160
-    elif aspect_ratio == "9:16":
-        if resolution == "480p":
-            payload["width"] = 480
-            payload["height"] = 854
-        elif resolution == "580p":
-            payload["width"] = 580
-            payload["height"] = 1032
-        elif resolution == "720p":
-            payload["width"] = 720
-            payload["height"] = 1280
-        elif resolution == "1080p":
-            payload["width"] = 1080
-            payload["height"] = 1920
-    elif aspect_ratio == "1:1":
-        if resolution == "480p":
-            payload["width"] = 480
-            payload["height"] = 480
-        elif resolution == "580p":
-            payload["width"] = 580
-            payload["height"] = 580
-        elif resolution == "720p":
-            payload["width"] = 720
-            payload["height"] = 720
-        elif resolution == "1080p":
-            payload["width"] = 1080
-            payload["height"] = 1080
+    dimension_mapping = {
+        ("16:9", "480p"): (854, 480),
+        ("16:9", "580p"): (1032, 580),
+        ("16:9", "720p"): (1280, 720),
+        ("16:9", "1080p"): (1920, 1080),
+        ("16:9", "4K"): (3840, 2160),
+        ("9:16", "480p"): (480, 854),
+        ("9:16", "580p"): (580, 1032),
+        ("9:16", "720p"): (720, 1280),
+        ("9:16", "1080p"): (1080, 1920),
+        ("9:16", "4K"): (2160, 3840),
+        ("1:1", "480p"): (480, 480),
+        ("1:1", "580p"): (580, 580),
+        ("1:1", "720p"): (720, 720),
+        ("1:1", "1080p"): (1080, 1080),
+        ("1:1", "4K"): (3840, 3840),
+    }
+    
+    # Validate and set dimensions
+    dimension_key = (aspect_ratio, resolution)
+    if dimension_key not in dimension_mapping:
+        raise UserError(f"Unsupported combination: aspect_ratio={aspect_ratio}, resolution={resolution}. "
+                       f"Supported combinations: {sorted(dimension_mapping.keys())}")
+    
+    width, height = dimension_mapping[dimension_key]
+    payload["width"] = width
+    payload["height"] = height
 
     # Call FAL API directly (with streaming)
     result = yield from generate_on_fal(
