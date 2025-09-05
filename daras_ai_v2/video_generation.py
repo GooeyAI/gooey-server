@@ -63,19 +63,27 @@ def generate_video(
     """
     # Input validation
     if not (3 <= duration <= 30):
-        raise UserError(f"Invalid duration: {duration}. Duration must be between 3 and 30 seconds inclusive.")
-    
+        raise UserError(
+            f"Invalid duration: {duration}. Duration must be between 3 and 30 seconds inclusive."
+        )
+
     valid_aspect_ratios = {"16:9", "9:16", "1:1"}
     if aspect_ratio not in valid_aspect_ratios:
-        raise UserError(f"Invalid aspect_ratio: {aspect_ratio}. Must be one of {sorted(valid_aspect_ratios)}.")
-    
+        raise UserError(
+            f"Invalid aspect_ratio: {aspect_ratio}. Must be one of {sorted(valid_aspect_ratios)}."
+        )
+
     valid_resolutions = {"480p", "580p", "720p", "1080p", "4K"}
     if resolution not in valid_resolutions:
-        raise UserError(f"Invalid resolution: {resolution}. Must be one of {sorted(valid_resolutions)}.")
-    
+        raise UserError(
+            f"Invalid resolution: {resolution}. Must be one of {sorted(valid_resolutions)}."
+        )
+
     valid_frames_per_second = {24, 30, 60}
     if frames_per_second not in valid_frames_per_second:
-        raise UserError(f"Invalid frames_per_second: {frames_per_second}. Must be one of {sorted(valid_frames_per_second)}.")
+        raise UserError(
+            f"Invalid frames_per_second: {frames_per_second}. Must be one of {sorted(valid_frames_per_second)}."
+        )
 
     match model:
         case VideoGenerationModels.fal_wan_v2_2_turbo:
@@ -305,13 +313,15 @@ def _generate_fal_wan_video(
         ("1:1", "1080p"): (1080, 1080),
         ("1:1", "4K"): (3840, 3840),
     }
-    
+
     # Validate and set dimensions
     dimension_key = (aspect_ratio, resolution)
     if dimension_key not in dimension_mapping:
-        raise UserError(f"Unsupported combination: aspect_ratio={aspect_ratio}, resolution={resolution}. "
-                       f"Supported combinations: {sorted(dimension_mapping.keys())}")
-    
+        raise UserError(
+            f"Unsupported combination: aspect_ratio={aspect_ratio}, resolution={resolution}. "
+            f"Supported combinations: {sorted(dimension_mapping.keys())}"
+        )
+
     width, height = dimension_mapping[dimension_key]
     payload["width"] = width
     payload["height"] = height
