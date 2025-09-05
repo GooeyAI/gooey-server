@@ -373,7 +373,12 @@ class TextToVideoPage(BasePage):
             for model_name, video_url in output_videos.items():
                 model = VideoGenerationModels[model_name]
                 if video_url:
-                    gui.video(video_url, caption=model.value, autoplay=False, show_download_button=True)
+                    gui.video(
+                        video_url,
+                        caption=model.value,
+                        autoplay=False,
+                        show_download_button=True,
+                    )
                     gui.caption(f"{duration}s • {resolution} • {frames_per_second}fps")
                 else:
                     gui.write(f"🔄 Processing {model.value}...")
