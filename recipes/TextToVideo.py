@@ -76,10 +76,9 @@ class TextToVideoPage(BasePage):
             "Static",
             "Pan Left",
             "Pan Right",
-            "Zoom In",
-            "Zoom Out",
-            "Dolly Forward",
-            "Dolly Backward",
+            "Crane Up",
+            "Dolly In",
+            "Dolly Out",
         ] = Field(default="Auto", description="Camera movement pattern")
         seed: int | None = Field(
             default=None, description="Random seed for reproducible results"
