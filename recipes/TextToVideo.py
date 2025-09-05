@@ -183,7 +183,7 @@ class TextToVideoPage(BasePage):
         gui.file_uploader(
             "Drag & drop or click to upload",
             key="reference_image",
-            accept=["png", "jpg", "jpeg"],
+            accept=["image/*"],
             help="PNG, JPG, up to 10 MB",
         )
 
@@ -361,24 +361,23 @@ class TextToVideoPage(BasePage):
         resolution = gui.session_state.get("resolution", "1080p")
         frames_per_second = gui.session_state.get("frames_per_second", 30)
 
-        # Create 2x2 grid for video results
-        if len(output_videos) <= 2:
-            cols = gui.columns(2)
-        else:
-            cols = gui.columns(2)  # Keep 2x2 grid even for 3-4 videos
-
-        for i, (model_name, video_url) in enumerate(output_videos.items()):
-            model = VideoGenerationModels[model_name]
-            col_idx = i % 2
-
-            with cols[col_idx]:
+        if len(output_videos) == 1:
+            for model_name, video_url in output_videos.items():
+                model = VideoGenerationModels[model_name]
                 if video_url:
-                    # Only show the video - clean interface
                     gui.video(video_url, autoplay=False, show_download_button=True)
-                    # Show actual settings instead of hardcoded values
                     gui.caption(f"{duration}s • {resolution} • {frames_per_second}fps")
                 else:
                     gui.write("🔄 Processing...")
+        else:
+            # Multiple videos displayed naturally without forced column constraints
+            for model_name, video_url in output_videos.items():
+                model = VideoGenerationModels[model_name]
+                if video_url:
+                    gui.video(video_url, caption=model.value, autoplay=False, show_download_button=True)
+                    gui.caption(f"{duration}s • {resolution} • {frames_per_second}fps")
+                else:
+                    gui.write(f"🔄 Processing {model.value}...")
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
