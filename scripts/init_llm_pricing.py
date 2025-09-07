@@ -5,6 +5,17 @@ category = ModelCategory.LLM
 
 
 def run():
+    # gpt-realtime
+    llm_pricing_create(
+        model_id="gpt-realtime-2025-08-28",
+        model_name=LargeLanguageModels.gpt_realtime.name,
+        unit_cost_input=4,
+        unit_cost_output=16,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-realtime",
+    )
+
     # gpt-5
     llm_pricing_create(
         model_id="gpt-5-2025-08-07",

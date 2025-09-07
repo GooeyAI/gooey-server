@@ -282,6 +282,16 @@ class LargeLanguageModels(Enum):
         price=10,
         is_audio_model=True,
     )
+    # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
+    gpt_realtime = LLMSpec(
+        label="GPT-Realtime • openai",
+        model_id="gpt-realtime-2025-08-28",
+        llm_api=LLMApis.openai_audio,
+        context_window=32_000,
+        max_output_tokens=4_096,
+        price=10,
+        is_audio_model=True,
+    )
     # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
     gpt_4_o_mini_audio = LLMSpec(
         label="GPT-4o-mini Audio • openai",
