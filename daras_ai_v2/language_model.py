@@ -80,6 +80,18 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://docs.sea-lion.ai/models/sea-lion-v4/gemma-sea-lion-v4-27b#usage
+    sea_lion_v4_gemma_3_27b_it = LLMSpec(
+        label="SEA-LION v4 • aisingapore",
+        model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        max_output_tokens=8_192,
+        is_vision_model=False,
+        is_thinking_model=False,
+        supports_json=False,
+    )
+
     # https://platform.openai.com/docs/models/gpt-5
     gpt_5 = LLMSpec(
         label="GPT-5 • openai",
@@ -1899,6 +1911,12 @@ def get_openai_client(model: str):
             api_key=get_google_auth_token(),
             max_retries=0,
             base_url=f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
+        )
+    elif model.startswith("aisingapore/"):
+        client = openai.OpenAI(
+            api_key=settings.SEA_LION_API_KEY,
+            max_retries=0,
+            base_url="https://api.sea-lion.ai/v1",
         )
     else:
         client = openai.OpenAI(
