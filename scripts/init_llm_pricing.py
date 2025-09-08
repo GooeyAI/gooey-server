@@ -5,6 +5,17 @@ category = ModelCategory.LLM
 
 
 def run():
+    # SEA-LION
+    llm_pricing_create(
+        model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",
+        model_name=LargeLanguageModels.sea_lion_v4_gemma_3_27b_it.name,
+        unit_cost_input=0.09,
+        unit_cost_output=0.16,
+        unit_quantity=10**6,
+        provider=ModelProvider.sea_lion,
+        pricing_url="https://openrouter.ai/google/gemma-3-27b-it",  # pricing same as gemma 3
+    )
+
     # gpt-realtime
     llm_pricing_create(
         model_id="gpt-realtime-2025-08-28",
