@@ -1302,7 +1302,7 @@ def run_asr(
             # don't pass language or task
             kwargs.pop("task", None)
             kwargs["max_length"] = 448
-        elif selected_model == AsrModels.whisper_sunbird_large_v3:
+        elif selected_model == AsrModels.whisper_sunbird_large_v3 and language:
             kwargs["language"] = SUNBIRD_SUPPORTED_LANGUAGES[language.strip()]
         elif "whisper" in selected_model.name:
             forced_lang = forced_asr_languages.get(selected_model)
