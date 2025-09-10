@@ -523,7 +523,7 @@ class BasePage:
 
     def _render_saved_generated_timestamp(self):
         sr, pr = self.current_sr_pr
-        if not (pr and self.tab == RecipeTabs.run):
+        if not (pr and (self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview)):
             return
         if pr.saved_run_id == sr.id or pr.is_root():
             dt = pr.updated_at
