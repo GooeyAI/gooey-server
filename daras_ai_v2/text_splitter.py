@@ -51,6 +51,7 @@ def default_length_function(text: str, model: str = "gpt-4") -> int:
             "claude-",
             "google/",
             "aisingapore/",
+            "swiss-ai/",
         ]
     ):
         model = "gpt-4o"

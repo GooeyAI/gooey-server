@@ -63,6 +63,7 @@ class ModelProvider(models.IntegerChoices):
     fal_ai = 11, "fal.ai"
     twilio = 12, "Twilio"
     sea_lion = 13, "sea-lion.ai"
+    publicai = 14, "PublicAI"
 
     aks = 5, "Azure Kubernetes Service"
 

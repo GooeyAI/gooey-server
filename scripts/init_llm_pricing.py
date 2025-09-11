@@ -13,7 +13,20 @@ def run():
         unit_cost_output=0.16,
         unit_quantity=10**6,
         provider=ModelProvider.sea_lion,
-        pricing_url="https://openrouter.ai/google/gemma-3-27b-it",  # pricing same as gemma 3
+        pricing_url="https://openrouter.ai/google/gemma-3-27b-it",
+        notes="Pricing same as Gemma 3",
+    )
+
+    # Swiss AI Apertus
+    llm_pricing_create(
+        model_id="swiss-ai/apertus-70b-instruct",
+        model_name=LargeLanguageModels.apertus_70b_instruct.name,
+        unit_cost_input=0.25,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.publicai,
+        pricing_url="https://platform.publicai.co/api/~endpoints",
+        notes="Pricing same as GPT-5 Mini",
     )
 
     # gpt-realtime
