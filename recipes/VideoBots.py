@@ -625,7 +625,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             gui.write("---")
 
         lipsync_model = gui.session_state.get("lipsync_model")
-        if lipsync_model:
+        if lipsync_model and gui.session_state.get("input_face"):
             lipsync_settings(lipsync_model)
             gui.write("---")
 
