@@ -351,8 +351,13 @@ def submit_api_call(
 
     # get saved state from db
     state = page.current_sr_to_session_state()
-    # load request data
+    # extract variables
+    variables = request_body.pop("variables", None)
+    # merge request data
     state.update(request_body)
+    # merge variables
+    if variables:
+        state.setdefault("variables", {}).update(variables)
 
     # set streamlit session state
     gui.set_session_state(state)
