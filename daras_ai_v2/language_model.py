@@ -80,6 +80,15 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    # https://platform.publicai.co/api/~endpoints
+    apertus_70b_instruct = LLMSpec(
+        label="Apertus 70B Instruct • SwissAI via PublicAI",
+        model_id="swiss-ai/apertus-70b-instruct",
+        llm_api=LLMApis.openai,
+        context_window=65_536,
+        max_output_tokens=4_096,
+    )
+
     # https://docs.sea-lion.ai/models/sea-lion-v4/gemma-sea-lion-v4-27b#usage
     sea_lion_v4_gemma_3_27b_it = LLMSpec(
         label="SEA-LION v4 • aisingapore",
@@ -1644,6 +1653,10 @@ def run_openai_chat(
         # gpt-5 doesn't support temperature
         temperature = None
 
+    if model == LargeLanguageModels.apertus_70b_instruct:
+        # Swiss AI Apertus model doesn't support tool calling
+        tools = None
+
     if avoid_repetition:
         kwargs["frequency_penalty"] = 0.1
         kwargs["presence_penalty"] = 0.25
@@ -1917,6 +1930,13 @@ def get_openai_client(model: str):
             api_key=settings.SEA_LION_API_KEY,
             max_retries=0,
             base_url="https://api.sea-lion.ai/v1",
+        )
+    elif model.startswith("swiss-ai/"):
+        client = openai.OpenAI(
+            api_key=settings.PUBLICAI_API_KEY,
+            max_retries=0,
+            base_url="https://api.publicai.co/v1",
+            default_headers={"User-Agent": "gooey/openai-sdk"},
         )
     else:
         client = openai.OpenAI(
