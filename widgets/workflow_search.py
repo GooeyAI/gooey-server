@@ -386,7 +386,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
             show_workspace_author=show_workspace_author,
             show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            hide_visibility_pill=True,
+            hide_access_level=True,
         )
 
     grid_layout(1, qs, _render_run)
@@ -502,6 +502,7 @@ def build_search_filter(
                 "created_by__display_name",
                 "workspace__handle__name",
                 "workspace__name",
+                "tags__name",
             ),
         )
 
