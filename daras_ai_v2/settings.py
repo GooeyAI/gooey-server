@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "workspaces",
     "api_keys",
     "managed_secrets",
+    "number_cycling",
 ]
 
 MIDDLEWARE = [
