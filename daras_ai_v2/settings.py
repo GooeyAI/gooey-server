@@ -299,6 +299,7 @@ BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 
 HEADER_LINKS = [
+    (EXPLORE_URL, "Explore"),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
     (BLOG_URL, "Blog"),
