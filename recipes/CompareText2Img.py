@@ -116,8 +116,15 @@ class CompareText2ImgPage(BasePage):
         )
         gui.write("#### 🧨 Compare Image Models")
         gui.caption(
-            "Each selected model costs 2 credits to run except for Dall-E which is 15 credits per rendered image."
+            """
+            Each selected model costs 2 credits ($.02) / image except where noted.
+
+            Dalle-3: 15 Cr
+            Nano banana: 8 Cr
+            GPT-image: 3, 10 or 40 Cr
+            """
         )
+
         gui.caption(
             """
         Confused about what each model looks like?
