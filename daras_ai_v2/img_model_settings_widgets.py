@@ -8,6 +8,7 @@ from daras_ai_v2.stable_diffusion import (
     ControlNetModels,
     Schedulers,
     controlnet_model_explanations,
+    gemini_model_ids,
     openai_model_ids,
 )
 
@@ -80,6 +81,7 @@ def model_selector(
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.jack_qiao.name,
         Img2ImgModels.sd_2.name,
+        Img2ImgModels.nano_banana.name,
     ]
     col1, col2 = gui.columns(2)
     with col1:
@@ -243,11 +245,12 @@ def quality_setting(selected_models=None):
     if any(
         (
             selected_model
-            and selected_model not in map(lambda m: m.name, openai_model_ids)
+            and selected_model
+            not in map(lambda m: m.name, openai_model_ids | gemini_model_ids)
         )
         for selected_model in selected_models
     ):
-        # not applicable for openai models
+        # not applicable for openai and gemini models
         gui.slider(
             label="""
             ##### Quality
@@ -337,6 +340,8 @@ def output_resolution_setting():
     allowed_shapes = None
     if selected_models and selected_models <= {Text2ImgModels.flux_1_dev.name}:
         pixel_options = [1024]
+    elif selected_models and selected_models <= {Text2ImgModels.nano_banana.name}:
+        pixel_options = [1024]
     elif selected_models and selected_models <= {Text2ImgModels.dall_e.name}:
         pixel_options = [256, 512, 1024]
         allowed_shapes = ["square"]
@@ -394,6 +399,7 @@ def scheduler_setting(selected_model: str | None = None):
         Text2ImgModels.dall_e.name,
         Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.jack_qiao,
+        Text2ImgModels.nano_banana.name,
     ]:
         return
     enum_selector(
@@ -415,6 +421,7 @@ def guidance_scale_setting(selected_model: str | None = None):
         Text2ImgModels.dall_e.name,
         Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.jack_qiao,
+        Text2ImgModels.nano_banana.name,
     ]:
         return
 
@@ -463,6 +470,7 @@ def prompt_strength_setting(selected_model: str = None):
         Img2ImgModels.dall_e.name,
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.instruct_pix2pix.name,
+        Img2ImgModels.nano_banana.name,
     ]:
         return
 
@@ -484,7 +492,11 @@ def prompt_strength_setting(selected_model: str = None):
 
 
 def negative_prompt_setting(selected_model: str | None = None):
-    if selected_model in [Text2ImgModels.dall_e.name, Text2ImgModels.gpt_image_1.name]:
+    if selected_model in [
+        Text2ImgModels.dall_e.name,
+        Text2ImgModels.gpt_image_1.name,
+        Text2ImgModels.nano_banana.name,
+    ]:
         return
 
     gui.text_area(
