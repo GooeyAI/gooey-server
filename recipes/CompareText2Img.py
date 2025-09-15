@@ -288,6 +288,8 @@ class CompareText2ImgPage(BasePage):
                             total += 10
                         case _:
                             total += 40
+                case Text2ImgModels.nano_banana.name:
+                    total += 8
                 case _:
                     total += 2
         num_outputs = state.get("num_outputs") or 0
