@@ -752,13 +752,6 @@ def page_wrapper(
             with gui.div(
                 className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
             ):
-                if not show_search_bar:
-                    render_header_link(
-                        url=get_route_path(explore_page),
-                        label="Explore",
-                        icon=icons.search,
-                    )
-
                 for url, label in settings.HEADER_LINKS:
                     render_header_link(
                         url=url, label=label, icon=settings.HEADER_ICONS.get(url)
@@ -862,11 +855,6 @@ def anonymous_login_container(request: Request, context: dict):
 
         gui.html('<hr class="my-1"/>')
 
-        workspace_selector_link(
-            url=get_route_path(explore_page),
-            label="Explore",
-            icon=icons.search,
-        )
         for url, label in settings.HEADER_LINKS:
             workspace_selector_link(
                 url=url, label=label, icon=settings.HEADER_ICONS.get(url)

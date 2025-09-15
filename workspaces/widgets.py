@@ -24,7 +24,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         profile_route,
         explore_in_current_workspace,
     )
-    from routers.root import explore_page, logout
+    from routers.root import logout
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -142,9 +142,6 @@ def global_workspace_selector(user: AppUser, session: dict):
         )
 
         with gui.div(className="d-xl-none d-inline-block"):
-            workspace_selector_link(
-                url=get_route_path(explore_page), icon=icons.search, label="Explore"
-            )
             for url, label in settings.HEADER_LINKS:
                 workspace_selector_link(
                     url=url,
