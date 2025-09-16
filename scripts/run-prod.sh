@@ -3,6 +3,7 @@
 set -ex
 
 if [ "$RUN_LIVEKIT" ]; then
+  python livekit_agent.py download-files
   SENTRY_ENVIRONMENT="livekit" exec python livekit_agent.py start
 elif [ "$RUN_DJANGO" ]; then
   ./manage.py runscript setup_vespa_db
