@@ -70,6 +70,7 @@ EXPOSE 8501
 HEALTHCHECK CMD \
     wget 127.0.0.1:8000 \
     || wget 127.0.0.1:8501 \
+    || wget 127.0.0.1:8081 \
     || bash -c 'poetry run celery -A celeryapp inspect ping -d celery@$HOSTNAME' \
     || exit 1
 
