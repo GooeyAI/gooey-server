@@ -2,9 +2,8 @@
 
 set -ex
 
-if [ "$RUN_JUPYTER" ]; then
-  pip install jupyterlab
-  jupyter lab --allow-root --ip 0.0.0.0 --port 8000
+if [ "$RUN_LIVEKIT" ]; then
+  python livekit_agent.py start
 elif [ "$RUN_DJANGO" ]; then
   ./manage.py runscript setup_vespa_db
   ./manage.py migrate
