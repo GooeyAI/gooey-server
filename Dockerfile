@@ -48,6 +48,13 @@ RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only
 # install playwright
 RUN poetry run playwright install-deps && poetry run playwright install chromium
 
+# Conditionally install mediapipe if RUN_LIVEKIT is not set
+ARG RUN_LIVEKIT=${RUN_LIVEKIT}
+ENV RUN_LIVEKIT=${RUN_LIVEKIT}
+RUN if [ -z "$RUN_LIVEKIT" ]; then \
+        pip install --no-cache-dir mediapipe; \
+    fi
+
 # copy the code into the container
 COPY . .
 
