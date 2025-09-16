@@ -8,6 +8,7 @@ from bots.models import (
     BotIntegration,
     PublishedRun,
     WorkflowAccessLevel,
+    WorkflowMetadata,
 )
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
@@ -91,6 +92,9 @@ def get_objects(*args):
     user_qs = AppUser.objects.filter(email=settings.SAFETY_CHECKER_BILLING_EMAIL)
     for user in user_qs:
         yield from export_user(user)
+
+    for metadata in WorkflowMetadata.objects.all():
+        yield export(metadata)
 
 
 def export_pr(pr: PublishedRun):
