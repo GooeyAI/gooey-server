@@ -33,6 +33,7 @@ class TextToSpeechProviders(TTSProvider, GooeyEnum):
     AZURE_TTS = TTSProvider(value="Azure Text-to-Speech", sample_rate=16000)
     OPEN_AI = TTSProvider(value="OpenAI", sample_rate=24000)
     GHANA_NLP = TTSProvider(value="GhanaNLP Text-To-Speech", sample_rate=16000)
+    MMS_TTS = TTSProvider(value="MMS TTS (Meta)", sample_rate=16000)
 
 
 UBERDUCK_VOICES = {
@@ -175,6 +176,8 @@ def text_to_speech_provider_selector(page):
                 openai_tts_selector()
             case TextToSpeechProviders.GHANA_NLP.name:
                 ghana_nlp_tts_selector()
+            case TextToSpeechProviders.MMS_TTS.name:
+                mms_tts_selector()
     return tts_provider
 
 
@@ -201,6 +204,29 @@ def ghana_nlp_tts_selector():
         key="ghana_nlp_tts_language",
         use_selectbox=True,
     )
+
+
+def mms_tts_selector():
+    options = mms_tts_language_options()
+    gui.selectbox(
+        label="""
+        ###### MMS TTS Language
+        """,
+        key="mms_tts_language",
+        format_func=lambda lang: options[lang],
+        options=options,
+    )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def mms_tts_language_options():
+    import langcodes
+    from daras_ai_v2.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
+
+    result = {}
+    for lang in MMS_TTS_SUPPORTED_LANGUAGES:
+        result[lang] = langcodes.Language.get(lang).display_name()
+    return result
 
 
 def openai_tts_selector():
