@@ -158,7 +158,7 @@ def render_search_bar_with_redirect(
     search_filters: SearchFilters,
     key: str = "global_search_query",
     id: str = "global_search_bar",
-    max_width: str = "500px",
+    max_width: str = "450px",
 ):
     from routers.root import explore_page
 
