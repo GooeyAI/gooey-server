@@ -24,7 +24,7 @@ from workspaces.models import Workspace, WorkspaceRole
 
 
 class SortOption(typing.NamedTuple):
-    value: str
+    key: str
     label: str
     icon: str
 
@@ -34,29 +34,31 @@ _icon_width = "1.3em"
 
 class SortOptions(SortOption, GooeyEnum):
     FEATURED = SortOption(
-        value="featured",
+        key="featured",
         label="Featured",
         icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
     )
     UPDATED_AT = SortOption(
-        value="last_updated",
+        key="last_updated",
         label="Last Updated",
         icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
     )
     CREATED_AT = SortOption(
-        value="created_at",
+        key="created_at",
         label="Created At",
         icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
     )
     MOST_RUNS = SortOption(
-        value="most_runs",
+        key="most_runs",
         label="Most Runs",
         icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
     )
 
     @classmethod
     def get(cls, key=None, default=None):
-        return super().get(key, default=cls.FEATURED)
+        return next(
+            (option for option in cls if option.key == key), default or cls.FEATURED
+        )
 
 
 class SearchFilters(BaseModel):
@@ -116,7 +118,7 @@ def render_search_filters(
                 className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
                 sort_options: dict[str, str] = {
-                    (opt.value if opt != SortOptions.get() else ""): (
+                    (opt.key if opt != SortOptions.get() else ""): (
                         f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
                     )
                     for opt in SortOptions
