@@ -20,6 +20,9 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
 
     variables = state.get("variables") or {}
 
+    if variables.get("platform_medium") == "VOICE":
+        yield VectorSearchLLMTool(state)
+
     update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
         yield UpdateGuiStateLLMTool(
@@ -34,6 +37,58 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
             platform_msg_id=collect_feedback.get("last_bot_message_id"),
             conversation_id=variables.get("conversation_id"),
         )
+
+
+class VectorSearchLLMTool(BaseLLMTool):
+    system_prompt = """
+## file_search
+Before answering a question, call this tool to lookup information from the knowledge base to inform your responses.
+- Given the user's question, formulate a natural language search query that is slightly verbose and precise about intent, entities, and constraints.
+- Use the Search Results to produce a coherent answer.
+- Search results may be incomplete or irrelevant. Don't make assumptions on the Search Results beyond strictly what's returned.
+- Leverage information from multiple search results to respond comprehensively
+"""
+
+    def __init__(self, state: dict):
+        self.state = state
+        super().__init__(
+            name="file_search",
+            label="File Search",
+            description="""
+Performs semantic search across a collection of files.
+Parts of the documents uploaded by users will returned by this tool.
+Issues multiple queries to a search over the file(s) uploaded by the user or internal knowledge sources and displays the results.
+You can issue up to five queries at a time.
+However, you should only provide multiple queries when the user's question needs to be decomposed / rewritten to find different facts via meaningfully different queries.
+Otherwise, prefer providing a single well-written query. Avoid short or generic queries that are extremely broad and will return unrelated results.
+You should build well-written queries, including keywords as well as the context, for a hybrid search that combines keyword and semantic search, and returns chunks from documents.
+            """,
+            properties={
+                "queries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                    },
+                    "description": "The search queries to use.",
+                },
+            },
+            required=["queries"],
+        )
+
+    def call(self, queries: list[str]) -> str:
+        from daras_ai_v2.vector_search import get_top_k_references, DocSearchRequest
+        from daras_ai_v2.language_model_openai_realtime import yield_from
+
+        return {
+            query: yield_from(
+                get_top_k_references(
+                    DocSearchRequest.model_validate(
+                        self.state | {"search_query": query}
+                    )
+                )
+            )
+            for query in queries
+        }
 
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
@@ -90,7 +145,7 @@ class CallTransferLLMTool(BaseLLMTool):
     """In-Built tool for transferring phone calls."""
 
     system_prompt = """
-## Transfer Call
+## transfer_call
 You can transfer the user's call to another phone number using this tool. Some examples of when to use this tool:
 - When the user has directly asked to transfer their call or connect them with a phone number.
 - When responding with a phone number, offer to transfer their call, even if they haven't explicitly asked to be transferred.
