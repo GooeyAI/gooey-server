@@ -1,10 +1,10 @@
 import typing
 
 import gooey_gui as gui
-from absl.flags import ValidationError
 from daras_ai_v2 import icons
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 
 from managed_secrets.models import ManagedSecret
 

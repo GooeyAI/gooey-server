@@ -69,6 +69,10 @@ jobs:
           poetry-version: ${{matrix.poetry-version}}
           install-args: --only main
 
+      - name: Install mediapipe
+        run: |
+          pip install --no-cache-dir mediapipe
+
       - name: Run tests
         env:
           PGHOST: localhost
