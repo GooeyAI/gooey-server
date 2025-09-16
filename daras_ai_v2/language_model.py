@@ -96,9 +96,8 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.openai,
         context_window=128_000,
         max_output_tokens=8_192,
-        is_vision_model=False,
-        is_thinking_model=False,
-        supports_json=False,
+        is_vision_model=True,
+        supports_json=True,
     )
 
     # https://platform.openai.com/docs/models/gpt-5
