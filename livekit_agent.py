@@ -134,47 +134,61 @@ async def create_stt_llm_tts_session(
     from livekit.plugins import silero
 
     match llm_model.llm_api:
+        case _ if "gemini" in llm_model.model_id:
+            from livekit.plugins import google
+
+            llm = google.LLM(
+                model=llm_model.model_id.removeprefix("google/"),
+                temperature=request.sampling_temperature,
+                vertexai=True,
+            )
+
+        case _ if "claude" in llm_model.model_id:
+            from livekit.plugins import anthropic
+
+            llm = anthropic.LLM(
+                model=llm_model.model_id,
+                temperature=request.sampling_temperature,
+                api_key=settings.ANTHROPIC_API_KEY,
+            )
+
         case LLMApis.openai:
             from livekit.plugins import openai
 
             model_id = llm_model.model_id
             if isinstance(model_id, tuple):
                 model_id = model_id[-1]
-            llm = openai.LLM(model=model_id, temperature=request.sampling_temperature)
-
-        case _ if "gemini" in llm_model.model_id:
-            from livekit.plugins import google
-
-            llm = google.LLM(
-                model=llm_model.model_id, temperature=request.sampling_temperature
-            )
-
-        case _ if "claude" in llm_model.model_id:
-            from livekit.plugins import anthropic
-
-            llm = anthropic.Claude(
-                model=llm_model.model_id, temperature=request.sampling_temperature
+            llm = openai.LLM(
+                model=model_id,
+                temperature=request.sampling_temperature,
+                api_key=settings.OPENAI_API_KEY,
             )
 
         case LLMApis.mistral:
             from livekit.plugins import mistralai
 
             llm = mistralai.LLM(
-                model=llm_model.model_id, temperature=request.sampling_temperature
+                model=llm_model.model_id,
+                temperature=request.sampling_temperature,
+                api_key=settings.MISTRAL_API_KEY,
             )
 
         case LLMApis.fireworks:
             from livekit.plugins import openai
 
             llm = openai.LLM.with_fireworks(
-                model=llm_model.model_id, temperature=request.sampling_temperature
+                model=llm_model.model_id,
+                temperature=request.sampling_temperature,
+                api_key=settings.FIREWORKS_API_KEY,
             )
 
         case LLMApis.groq:
             from livekit.plugins import groq
 
             llm = groq.LLM(
-                model=llm_model.model_id, temperature=request.sampling_temperature
+                model=llm_model.model_id,
+                temperature=request.sampling_temperature,
+                api_key=settings.GROQ_API_KEY,
             )
 
         case _:
