@@ -48,6 +48,7 @@ class ModelCategory(models.IntegerChoices):
     SELF_HOSTED = 2, "Self-Hosted"
     IMAGE_GENERATION = 3, "Image Generation"
     IVR = 4, "IVR"
+    VIDEO_GENERATION = 5, "Video Generation"
 
 
 class ModelProvider(models.IntegerChoices):
@@ -72,6 +73,7 @@ def get_model_choices():
     from daras_ai_v2.language_model import LargeLanguageModels
     from recipes.DeforumSD import AnimationModels
     from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
+    from daras_ai_v2.video_generation import VideoGenerationModels
 
     return (
         [(api.name, api.value) for api in LargeLanguageModels]
@@ -79,6 +81,7 @@ def get_model_choices():
         + [(model.name, model.value) for model in Text2ImgModels]
         + [(model.name, model.value) for model in Img2ImgModels]
         + [(model.name, model.value) for model in InpaintingModels]
+        + [(model.name, model.value) for model in VideoGenerationModels]
         + [("wav2lip", "LipSync (wav2lip)")]
         + [("sadtalker", "LipSync (sadtalker)")]
         + [(model.name, model.label) for model in IVRPlatformMedium]
@@ -95,6 +98,7 @@ class ModelSku(models.IntegerChoices):
     output_image_tokens = 6, "Image Generation (Output)"
 
     ivr_call = 7, "IVR Call"
+    video_generation = 8, "Video Generation"
 
 
 class ModelPricing(models.Model):
