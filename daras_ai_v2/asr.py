@@ -596,7 +596,7 @@ def google_translate_target_languages() -> dict[str, str]:
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
     """
-    from google.cloud import translate
+    from google.cloud import translate_v3 as translate
 
     _, project = get_google_auth_session()
     parent = f"projects/{project}/locations/global"
@@ -617,7 +617,7 @@ def google_translate_source_languages() -> dict[str, str]:
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
     """
-    from google.cloud import translate
+    from google.cloud import translate_v3 as translate
 
     _, project = get_google_auth_session()
     parent = f"projects/{project}/locations/global"

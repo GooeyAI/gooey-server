@@ -353,6 +353,436 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         finish_reason: list[str] | None = None
 
+    def run_v2(
+        self,
+        request: "VideoBotsPage.RequestModel",
+        response: "VideoBotsPage.ResponseModel",
+    ) -> typing.Iterator[str | None]:
+        if request.tts_provider == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
+                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                """
+            )
+
+        llm_model = LargeLanguageModels[request.selected_model]
+        user_input = (request.input_prompt or "").strip()
+        if not (
+            user_input
+            or request.input_audio
+            or request.input_images
+            or request.input_documents
+        ):
+            return
+
+        asr_msg, user_input = yield from self.asr_step(
+            model=llm_model, request=request, response=response, user_input=user_input
+        )
+
+        ocr_texts = yield from self.document_understanding_step(request=request)
+
+        request.translation_model = (
+            request.translation_model or DEFAULT_TRANSLATION_MODEL
+        )
+        user_input = yield from self.input_translation_step(
+            request=request, user_input=user_input, ocr_texts=ocr_texts
+        )
+
+        yield from self.build_final_prompt(
+            request=request, response=response, user_input=user_input, model=llm_model
+        )
+
+        yield from self.llm_loop(
+            request=request,
+            response=response,
+            model=llm_model,
+            asr_msg=asr_msg,
+        )
+
+        yield from self.tts_step(model=llm_model, request=request, response=response)
+
+        yield from self.lipsync_step(request, response)
+
+    def document_understanding_step(self, request):
+        ocr_texts = []
+        if request.document_model and request.input_images:
+            yield "Running Azure Form Recognizer..."
+            for url in request.input_images:
+                ocr_text = (
+                    azure_form_recognizer(url, model_id="prebuilt-read")
+                    .get("content", "")
+                    .strip()
+                )
+                if not ocr_text:
+                    continue
+                ocr_texts.append(ocr_text)
+        if request.input_documents:
+            import pandas as pd
+
+            file_url_metas = yield from flatapply_parallel(
+                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
+                request.input_documents,
+                message="Extracting Input Documents...",
+            )
+            for f_url, file_meta in file_url_metas:
+                pages = doc_url_to_text_pages(
+                    f_url=f_url,
+                    file_meta=file_meta,
+                    selected_asr_model=request.asr_model,
+                )
+                if isinstance(pages, pd.DataFrame):
+                    ocr_texts.append(pages.to_csv(index=False))
+                elif len(pages) <= 1:
+                    ocr_texts.append("\n\n---\n\n".join(pages))
+                else:
+                    ocr_texts.append(json.dumps(pages))
+        return ocr_texts
+
+    def asr_step(self, model, request, response, user_input):
+        if request.input_audio and not model.is_audio_model:
+            if not request.asr_model:
+                request.asr_model, request.asr_language = infer_asr_model_and_language(
+                    request.user_language or ""
+                )
+            selected_model = AsrModels[request.asr_model]
+            yield f"Transcribing using {selected_model.value}..."
+            asr_output = run_asr(
+                audio_url=request.input_audio,
+                selected_model=request.asr_model,
+                language=request.asr_language,
+                speech_translation_target=(
+                    "en" if request.asr_task == "translate" else None
+                ),
+                input_prompt=request.asr_prompt,
+            )
+            asr_msg = f'🎧: "{asr_output}"'
+            response.output_text = [asr_msg] * request.num_outputs
+            user_input = f"{asr_output}\n\n{user_input}".strip()
+        else:
+            asr_msg = None
+        return asr_msg, user_input
+
+    def input_translation_step(self, request, user_input, ocr_texts):
+        # translate input text
+        if (
+            should_translate_lang(request.user_language)
+            and not request.asr_task == "translate"
+        ):
+            yield "Translating Input to English..."
+            user_input = run_translate(
+                texts=[user_input],
+                source_language=request.user_language,
+                target_language="en",
+                glossary_url=request.input_glossary_document,
+                model=request.translation_model,
+            )[0]
+        if ocr_texts and request.user_language:
+            yield "Translating Input Documents to English..."
+            ocr_texts = run_translate(
+                texts=ocr_texts,
+                source_language="auto",
+                target_language="en",
+            )
+        for text in ocr_texts:
+            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
+        return user_input
+
+    def build_final_prompt(self, request, response, user_input, model):
+        # construct the system prompt
+        bot_script = (request.bot_script or "").strip()
+        if bot_script:
+            bot_script = render_prompt_vars(bot_script, gui.session_state)
+            # insert to top
+            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
+        else:
+            system_prompt = None
+        # save raw input for reference
+        response.raw_input_text = user_input
+        user_input = yield from self.search_step(request, response, user_input, model)
+        # construct user prompt
+        user_prompt = format_chat_entry(
+            role=CHATML_ROLE_USER,
+            content_text=user_input,
+            input_images=request.input_images,
+            input_audio=request.input_audio,
+            input_documents=request.input_documents,
+        )
+        # truncate the history to fit the model's max tokens
+        max_history_tokens = (
+            model.context_window
+            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
+            - request.max_tokens
+            - SAFETY_BUFFER
+        )
+        clip_idx = convo_window_clipper(
+            request.messages,
+            max_history_tokens,
+        )
+        history_prompt = request.messages[clip_idx:]
+        response.final_prompt = list(
+            filter(None, [system_prompt, *history_prompt, user_prompt])
+        )
+        # ensure input script is not too big
+        max_allowed_tokens = model.context_window - calc_gpt_tokens(
+            response.final_prompt
+        )
+        if max_allowed_tokens < 0:
+            raise UserError("Input Script is too long! Please reduce the script size.")
+        request.max_tokens = min(max_allowed_tokens, request.max_tokens)
+
+    def search_step(self, request, response, user_input, model):
+        # if documents are provided, run doc search on the saved msgs and get back the references
+        if request.documents:
+            # formulate the search query as a history of all the messages
+            query_msgs = request.messages + [
+                format_chat_entry(role=CHATML_ROLE_USER, content_text=user_input)
+            ]
+            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
+            query_msgs = query_msgs[clip_idx:]
+
+            chat_history = messages_as_prompt(query_msgs)
+
+            query_instructions = (request.query_instructions or "").strip()
+            if query_instructions:
+                yield "Creating search query..."
+                response.final_search_query = generate_final_search_query(
+                    request=request,
+                    response=response,
+                    instructions=query_instructions,
+                    context={"messages": chat_history},
+                ).strip()
+            else:
+                query_msgs.reverse()
+                response.final_search_query = "\n---\n".join(
+                    get_entry_text(entry) for entry in query_msgs
+                )
+
+            keyword_instructions = (request.keyword_instructions or "").strip()
+            if keyword_instructions:
+                yield "Finding keywords..."
+                k_request = request.model_copy()
+                # other models dont support JSON mode
+                k_request.selected_model = LargeLanguageModels.gpt_4_o.name
+                k_request.max_tokens = 4096
+                keyword_query = json.loads(
+                    generate_final_search_query(
+                        request=k_request,
+                        response=response,
+                        instructions=keyword_instructions,
+                        context={"messages": chat_history},
+                        response_format_type="json_object",
+                    ),
+                )
+                if keyword_query and isinstance(keyword_query, dict):
+                    keyword_query = list(keyword_query.values())[0]
+                response.final_keyword_query = keyword_query
+
+            if response.final_search_query:  # perform doc search
+                response.references = yield from get_top_k_references(
+                    DocSearchRequest.model_validate(
+                        {
+                            **request.model_dump(),
+                            **response.model_dump(),
+                            "search_query": response.final_search_query,
+                            "keyword_query": response.final_keyword_query,
+                        },
+                    ),
+                    current_user=self.request.user,
+                )
+            if request.use_url_shortener:
+                for reference in response.references:
+                    reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
+                        url=reference["url"],
+                        user=self.request.user,
+                        workflow=Workflow.VIDEO_BOTS,
+                    )[0].shortened_url()
+        # if doc search is successful, add the search results to the user prompt
+        if response.references:
+            # add task instructions
+            task_instructions = render_prompt_vars(
+                request.task_instructions, gui.session_state
+            )
+            user_input = (
+                references_as_prompt(response.references)
+                + f"\n**********\n{task_instructions.strip()}\n**********\n"
+                + user_input
+            )
+        return user_input
+
+    def llm_loop(
+        self,
+        *,
+        request: "VideoBotsPage.RequestModel",
+        response: "VideoBotsPage.ResponseModel",
+        model: LargeLanguageModels,
+        asr_msg: str | None = None,
+        prev_output_text: list[str] | None = None,
+    ) -> typing.Iterator[str | None]:
+        yield f"Summarizing with {model.value}..."
+
+        audio_session_extra = None
+        if model.is_audio_model:
+            audio_session_extra = {}
+            if request.openai_voice_name:
+                audio_session_extra["voice"] = request.openai_voice_name
+
+        tools_by_name = self.get_current_llm_tools()
+        chunks: typing.Generator[list[dict], None, None] = run_language_model(
+            model=request.selected_model,
+            messages=response.final_prompt,
+            max_tokens=request.max_tokens,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
+            tools=list(tools_by_name.values()),
+            stream=True,
+            audio_url=request.input_audio,
+            audio_session_extra=audio_session_extra,
+        )
+
+        tool_calls = None
+        output_text = None
+
+        for i, choices in enumerate(chunks):
+            if not choices:
+                continue
+
+            tool_calls = choices[0].get("tool_calls")
+            output_text = [
+                (prev_text + "\n\n" + entry["content"]).strip()
+                for prev_text, entry in zip_longest(
+                    (prev_output_text or []), choices, fillvalue=""
+                )
+            ]
+
+            try:
+                response.raw_input_text = choices[0]["input_audio_transcript"]
+            except KeyError:
+                pass
+            try:
+                response.output_audio += [choices[0]["audio_url"]]
+            except KeyError:
+                pass
+
+            # save raw model response without citations and translation for history
+            response.raw_output_text = [
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
+                for text in output_text
+            ]
+
+            output_text = yield from self.output_translation_step(
+                request, response, output_text
+            )
+
+            if response.references:
+                citation_style = (
+                    request.citation_style and CitationStyles[request.citation_style]
+                ) or None
+                all_refs_list = apply_response_formattings_prefix(
+                    output_text, response.references, citation_style
+                )
+            else:
+                citation_style = None
+                all_refs_list = None
+
+            if asr_msg:
+                output_text = [asr_msg + "\n\n" + text for text in output_text]
+
+            response.output_text = output_text
+
+            finish_reason = [entry.get("finish_reason") for entry in choices]
+            if all(finish_reason):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, response.output_text, citation_style
+                    )
+                response.finish_reason = finish_reason
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+
+        if not tool_calls:
+            return
+        response.final_prompt.append(
+            dict(
+                role=choices[0]["role"],
+                content=choices[0]["content"],
+                tool_calls=tool_calls,
+            )
+        )
+        for call in tool_calls:
+            tool, arguments = get_tool_from_call(call["function"], tools_by_name)
+            yield f"🛠 {tool.label}..."
+            output = tool.call_json(arguments)
+            response.final_prompt.append(
+                dict(
+                    role="tool",
+                    content=output,
+                    tool_call_id=call["id"],
+                ),
+            )
+        yield from self.llm_loop(
+            request=request,
+            response=response,
+            model=model,
+            prev_output_text=output_text,
+        )
+
+    def output_translation_step(self, request, response, output_text):
+        from daras_ai_v2.bots import parse_bot_html
+
+        # translate response text
+        if should_translate_lang(request.user_language):
+            yield f"Translating response to {request.user_language}..."
+            output_text = run_translate(
+                texts=output_text,
+                source_language="en",
+                target_language=request.user_language,
+                glossary_url=request.output_glossary_document,
+                model=request.translation_model,
+            )
+            # save translated response for tts
+            response.raw_tts_text = [
+                "".join(snippet for snippet, _ in parse_refs(text, response.references))
+                for text in output_text
+            ]
+
+        # remove html tags from the output text for tts
+        raw_tts_text = [
+            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
+        ]
+        if raw_tts_text != output_text:
+            response.raw_tts_text = raw_tts_text
+
+        return output_text
+
+    def tts_step(self, model, request, response):
+        if request.tts_provider and not model.is_audio_model:
+            response.output_audio = []
+            for text in response.raw_tts_text or response.raw_output_text:
+                tts_state = TextToSpeechPage.RequestModel.model_validate(
+                    {**gui.session_state, "text_prompt": text}
+                ).model_dump()
+                yield from TextToSpeechPage(request=self.request).run(tts_state)
+                response.output_audio.append(tts_state["audio_url"])
+
+    def lipsync_step(self, request, response):
+        if request.input_face and response.output_audio:
+            response.output_video = []
+            for audio_url in response.output_audio:
+                lip_state = LipsyncPage.RequestModel.model_validate(
+                    {
+                        **gui.session_state,
+                        "input_audio": audio_url,
+                        "selected_model": request.lipsync_model,
+                    }
+                ).model_dump()
+                yield from LipsyncPage(request=self.request).run(lip_state)
+                response.output_video.append(lip_state["output_video"])
+
     def related_workflows(self):
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
@@ -1194,384 +1624,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         yield from self.tts_step(model=llm_model, request=request, response=response)
 
         yield from self.lipsync_step(request, response)
-
-    def document_understanding_step(self, request):
-        ocr_texts = []
-        if request.document_model and request.input_images:
-            yield "Running Azure Form Recognizer..."
-            for url in request.input_images:
-                ocr_text = (
-                    azure_form_recognizer(url, model_id="prebuilt-read")
-                    .get("content", "")
-                    .strip()
-                )
-                if not ocr_text:
-                    continue
-                ocr_texts.append(ocr_text)
-        if request.input_documents:
-            import pandas as pd
-
-            file_url_metas = yield from flatapply_parallel(
-                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
-                request.input_documents,
-                message="Extracting Input Documents...",
-            )
-            for f_url, file_meta in file_url_metas:
-                pages = doc_url_to_text_pages(
-                    f_url=f_url,
-                    file_meta=file_meta,
-                    selected_asr_model=request.asr_model,
-                )
-                if isinstance(pages, pd.DataFrame):
-                    ocr_texts.append(pages.to_csv(index=False))
-                elif len(pages) <= 1:
-                    ocr_texts.append("\n\n---\n\n".join(pages))
-                else:
-                    ocr_texts.append(json.dumps(pages))
-        return ocr_texts
-
-    def asr_step(self, model, request, response, user_input):
-        if request.input_audio and not model.is_audio_model:
-            if not request.asr_model:
-                request.asr_model, request.asr_language = infer_asr_model_and_language(
-                    request.user_language or ""
-                )
-            selected_model = AsrModels[request.asr_model]
-            yield f"Transcribing using {selected_model.value}..."
-            asr_output = run_asr(
-                audio_url=request.input_audio,
-                selected_model=request.asr_model,
-                language=request.asr_language,
-                speech_translation_target=(
-                    "en" if request.asr_task == "translate" else None
-                ),
-                input_prompt=request.asr_prompt,
-            )
-            asr_msg = f'🎧: "{asr_output}"'
-            response.output_text = [asr_msg] * request.num_outputs
-            user_input = f"{asr_output}\n\n{user_input}".strip()
-        else:
-            asr_msg = None
-        return asr_msg, user_input
-
-    def input_translation_step(self, request, user_input, ocr_texts):
-        # translate input text
-        if (
-            should_translate_lang(request.user_language)
-            and not request.asr_task == "translate"
-        ):
-            yield "Translating Input to English..."
-            user_input = run_translate(
-                texts=[user_input],
-                source_language=request.user_language,
-                target_language="en",
-                glossary_url=request.input_glossary_document,
-                model=request.translation_model,
-            )[0]
-        if ocr_texts and request.user_language:
-            yield "Translating Input Documents to English..."
-            ocr_texts = run_translate(
-                texts=ocr_texts,
-                source_language="auto",
-                target_language="en",
-            )
-        for text in ocr_texts:
-            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
-        return user_input
-
-    def build_final_prompt(self, request, response, user_input, model):
-        # construct the system prompt
-        bot_script = (request.bot_script or "").strip()
-        if bot_script:
-            bot_script = render_prompt_vars(bot_script, gui.session_state)
-            # insert to top
-            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
-        else:
-            system_prompt = None
-        # save raw input for reference
-        response.raw_input_text = user_input
-        user_input = yield from self.search_step(request, response, user_input, model)
-        # construct user prompt
-        user_prompt = format_chat_entry(
-            role=CHATML_ROLE_USER,
-            content_text=user_input,
-            input_images=request.input_images,
-            input_audio=request.input_audio,
-            input_documents=request.input_documents,
-        )
-        # truncate the history to fit the model's max tokens
-        max_history_tokens = (
-            model.context_window
-            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
-            - request.max_tokens
-            - SAFETY_BUFFER
-        )
-        clip_idx = convo_window_clipper(
-            request.messages,
-            max_history_tokens,
-        )
-        history_prompt = request.messages[clip_idx:]
-        response.final_prompt = list(
-            filter(None, [system_prompt, *history_prompt, user_prompt])
-        )
-        # ensure input script is not too big
-        max_allowed_tokens = model.context_window - calc_gpt_tokens(
-            response.final_prompt
-        )
-        if max_allowed_tokens < 0:
-            raise UserError("Input Script is too long! Please reduce the script size.")
-        request.max_tokens = min(max_allowed_tokens, request.max_tokens)
-
-    def search_step(self, request, response, user_input, model):
-        # if documents are provided, run doc search on the saved msgs and get back the references
-        if request.documents:
-            # formulate the search query as a history of all the messages
-            query_msgs = request.messages + [
-                format_chat_entry(role=CHATML_ROLE_USER, content_text=user_input)
-            ]
-            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
-            query_msgs = query_msgs[clip_idx:]
-
-            chat_history = messages_as_prompt(query_msgs)
-
-            query_instructions = (request.query_instructions or "").strip()
-            if query_instructions:
-                yield "Creating search query..."
-                response.final_search_query = generate_final_search_query(
-                    request=request,
-                    response=response,
-                    instructions=query_instructions,
-                    context={"messages": chat_history},
-                ).strip()
-            else:
-                query_msgs.reverse()
-                response.final_search_query = "\n---\n".join(
-                    get_entry_text(entry) for entry in query_msgs
-                )
-
-            keyword_instructions = (request.keyword_instructions or "").strip()
-            if keyword_instructions:
-                yield "Finding keywords..."
-                k_request = request.model_copy()
-                # other models dont support JSON mode
-                k_request.selected_model = LargeLanguageModels.gpt_4_o.name
-                k_request.max_tokens = 4096
-                keyword_query = json.loads(
-                    generate_final_search_query(
-                        request=k_request,
-                        response=response,
-                        instructions=keyword_instructions,
-                        context={"messages": chat_history},
-                        response_format_type="json_object",
-                    ),
-                )
-                if keyword_query and isinstance(keyword_query, dict):
-                    keyword_query = list(keyword_query.values())[0]
-                response.final_keyword_query = keyword_query
-
-            if response.final_search_query:  # perform doc search
-                response.references = yield from get_top_k_references(
-                    DocSearchRequest.model_validate(
-                        {
-                            **request.model_dump(),
-                            **response.model_dump(),
-                            "search_query": response.final_search_query,
-                            "keyword_query": response.final_keyword_query,
-                        },
-                    ),
-                    current_user=self.request.user,
-                )
-            if request.use_url_shortener:
-                for reference in response.references:
-                    reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
-                        url=reference["url"],
-                        user=self.request.user,
-                        workflow=Workflow.VIDEO_BOTS,
-                    )[0].shortened_url()
-        # if doc search is successful, add the search results to the user prompt
-        if response.references:
-            # add task instructions
-            task_instructions = render_prompt_vars(
-                request.task_instructions, gui.session_state
-            )
-            user_input = (
-                references_as_prompt(response.references)
-                + f"\n**********\n{task_instructions.strip()}\n**********\n"
-                + user_input
-            )
-        return user_input
-
-    def llm_loop(
-        self,
-        *,
-        request: "VideoBotsPage.RequestModel",
-        response: "VideoBotsPage.ResponseModel",
-        model: LargeLanguageModels,
-        asr_msg: str | None = None,
-        prev_output_text: list[str] | None = None,
-    ) -> typing.Iterator[str | None]:
-        yield f"Summarizing with {model.value}..."
-
-        audio_session_extra = None
-        if model.is_audio_model:
-            audio_session_extra = {}
-            if request.openai_voice_name:
-                audio_session_extra["voice"] = request.openai_voice_name
-
-        tools_by_name = self.get_current_llm_tools()
-        chunks: typing.Generator[list[dict], None, None] = run_language_model(
-            model=request.selected_model,
-            messages=response.final_prompt,
-            max_tokens=request.max_tokens,
-            num_outputs=request.num_outputs,
-            temperature=request.sampling_temperature,
-            avoid_repetition=request.avoid_repetition,
-            response_format_type=request.response_format_type,
-            reasoning_effort=request.reasoning_effort,
-            tools=list(tools_by_name.values()),
-            stream=True,
-            audio_url=request.input_audio,
-            audio_session_extra=audio_session_extra,
-        )
-
-        tool_calls = None
-        output_text = None
-
-        for i, choices in enumerate(chunks):
-            if not choices:
-                continue
-
-            tool_calls = choices[0].get("tool_calls")
-            output_text = [
-                (prev_text + "\n\n" + entry["content"]).strip()
-                for prev_text, entry in zip_longest(
-                    (prev_output_text or []), choices, fillvalue=""
-                )
-            ]
-
-            try:
-                response.raw_input_text = choices[0]["input_audio_transcript"]
-            except KeyError:
-                pass
-            try:
-                response.output_audio += [choices[0]["audio_url"]]
-            except KeyError:
-                pass
-
-            # save raw model response without citations and translation for history
-            response.raw_output_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, response.references))
-                for text in output_text
-            ]
-
-            output_text = yield from self.output_translation_step(
-                request, response, output_text
-            )
-
-            if response.references:
-                citation_style = (
-                    request.citation_style and CitationStyles[request.citation_style]
-                ) or None
-                all_refs_list = apply_response_formattings_prefix(
-                    output_text, response.references, citation_style
-                )
-            else:
-                citation_style = None
-                all_refs_list = None
-
-            if asr_msg:
-                output_text = [asr_msg + "\n\n" + text for text in output_text]
-
-            response.output_text = output_text
-
-            finish_reason = [entry.get("finish_reason") for entry in choices]
-            if all(finish_reason):
-                if all_refs_list:
-                    apply_response_formattings_suffix(
-                        all_refs_list, response.output_text, citation_style
-                    )
-                response.finish_reason = finish_reason
-            else:
-                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
-
-        if not tool_calls:
-            return
-        response.final_prompt.append(
-            dict(
-                role=choices[0]["role"],
-                content=choices[0]["content"],
-                tool_calls=tool_calls,
-            )
-        )
-        for call in tool_calls:
-            tool, arguments = get_tool_from_call(call["function"], tools_by_name)
-            yield f"🛠 {tool.label}..."
-            output = tool.call_json(arguments)
-            response.final_prompt.append(
-                dict(
-                    role="tool",
-                    content=output,
-                    tool_call_id=call["id"],
-                ),
-            )
-        yield from self.llm_loop(
-            request=request,
-            response=response,
-            model=model,
-            prev_output_text=output_text,
-        )
-
-    def output_translation_step(self, request, response, output_text):
-        from daras_ai_v2.bots import parse_bot_html
-
-        # translate response text
-        if should_translate_lang(request.user_language):
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-                model=request.translation_model,
-            )
-            # save translated response for tts
-            response.raw_tts_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, response.references))
-                for text in output_text
-            ]
-
-        # remove html tags from the output text for tts
-        raw_tts_text = [
-            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
-        ]
-        if raw_tts_text != output_text:
-            response.raw_tts_text = raw_tts_text
-
-        return output_text
-
-    def tts_step(self, model, request, response):
-        if request.tts_provider and not model.is_audio_model:
-            response.output_audio = []
-            for text in response.raw_tts_text or response.raw_output_text:
-                tts_state = TextToSpeechPage.RequestModel.model_validate(
-                    {**gui.session_state, "text_prompt": text}
-                ).model_dump()
-                yield from TextToSpeechPage(request=self.request).run(tts_state)
-                response.output_audio.append(tts_state["audio_url"])
-
-    def lipsync_step(self, request, response):
-        if request.input_face and response.output_audio:
-            response.output_video = []
-            for audio_url in response.output_audio:
-                lip_state = LipsyncPage.RequestModel.model_validate(
-                    {
-                        **gui.session_state,
-                        "input_audio": audio_url,
-                        "selected_model": request.lipsync_model,
-                    }
-                ).model_dump()
-                yield from LipsyncPage(request=self.request).run(lip_state)
-                response.output_video.append(lip_state["output_video"])
 
     def render_header_extra(self):
         if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:

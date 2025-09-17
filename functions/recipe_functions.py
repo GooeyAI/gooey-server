@@ -18,7 +18,6 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage, JsonTypes
     from workspaces.models import Workspace
 
-
 FUNCTIONS_HELP_TEXT = """\
 Functions give your workflow the ability run Javascript code (with webcalls!) \
 allowing it execute logic, use common JS libraries or make external API calls \

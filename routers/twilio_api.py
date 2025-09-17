@@ -317,7 +317,8 @@ def resolve_twilio_tts_voice(bot: TwilioVoice) -> str | None:
         return None
 
     # use twilio inbuilt tts, disable the gooey tts
-    bot.request_overrides = dict(tts_provider=None)
+    bot.request_overrides = bot.request_overrides or {}
+    bot.request_overrides["tts_provider"] = None
     return twilio_voice
 
 

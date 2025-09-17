@@ -34,9 +34,7 @@ from workspaces.models import Workspace
 
 
 class TextToSpeechSettings(BaseModel):
-    tts_provider: (
-        typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
-    ) = None
+    tts_provider: TextToSpeechProviders.api_choices | None = None
 
     uberduck_voice_name: str | None = None
     uberduck_speaking_rate: float | None = None
