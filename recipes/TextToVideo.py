@@ -24,17 +24,6 @@ class TextToVideoPage(BasePage):
         "video",
     ]
 
-    sane_defaults = {
-        "text_prompt": "an 1970s pastel party atmospheric on the streets of Venice, California; slow dolly forward; sunny lens flairs; cinematic lighting; end with a close-up of a VW bus made of flowers",
-        "duration": 8,
-        "aspect_ratio": "16:9",
-        "resolution": "1080p",
-        "frames_per_second": 30,
-        "camera_motion": "Auto",
-        "use_audio_bed": False,
-        "selected_models": [VideoGenerationModels.fal_wan_v2_2_turbo.name],
-    }
-
     class RequestModel(BasePage.RequestModel):
         text_prompt: str = Field(
             description="Describe your scene and optional look-and-feel. Choose one or more video models to compare"
