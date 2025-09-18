@@ -28,7 +28,7 @@ def render_saved_workflow_preview(
     workflow_pill: str | None = None,
     show_workspace_author: bool = False,
     show_run_count: bool = False,
-    hide_visibility_pill: bool = False,
+    hide_access_level: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
 ):
@@ -72,6 +72,8 @@ def render_saved_workflow_preview(
                         gui.caption(
                             published_run.notes, line_clamp=2, lineClampExpand=False
                         )
+                    for tag in published_run.tags.all():
+                        gui.pill(tag.render(), className="border border-dark me-1")
                 if not output_url:
                     with gui.div(className="col-2 text-center m-auto"):
                         workflow = Workflow(published_run.workflow)
@@ -83,7 +85,7 @@ def render_saved_workflow_preview(
                 show_workspace_author=show_workspace_author,
                 show_run_count=show_run_count,
                 hide_version_notes=hide_version_notes,
-                hide_visibility_pill=hide_visibility_pill,
+                hide_access_level=hide_access_level,
                 hide_last_editor=hide_last_editor,
             )
 
@@ -164,7 +166,7 @@ def render_footer_breadcrumbs(
     published_run: PublishedRun,
     show_workspace_author: bool,
     show_run_count: bool,
-    hide_visibility_pill: bool,
+    hide_access_level: bool,
     hide_version_notes: bool,
     hide_last_editor: bool,
 ):
@@ -225,11 +227,8 @@ def render_footer_breadcrumbs(
                     className="text-muted text-nowrap",
                 )
 
-        if not hide_visibility_pill:
-            gui.caption(
-                published_run.get_share_badge_html(),
-                unsafe_allow_html=True,
-            )
+        if not hide_access_level:
+            gui.caption(published_run.get_share_badge_html(), unsafe_allow_html=True)
 
 
 def render_workflow_media(output_url: str, published_run: PublishedRun):
