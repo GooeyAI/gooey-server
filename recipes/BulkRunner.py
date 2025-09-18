@@ -412,65 +412,126 @@ To get started:
         """
         )
 
-    def render_run_url_inputs(self, key: str, del_key: str, d: dict):
+    def _render_url_input_only(self, key: str, del_key: str, d: dict, is_mobile: bool):
+        columns = [8, 4] if is_mobile else [9, 3]
+        col1, col2 = gui.columns(
+            columns, responsive=False, style={"--bs-gutter-x": "0.25rem"}
+        )
+
+        with col1:
+            url = gui.text_input(
+                "",
+                key=key,
+                value=d.get("url"),
+                placeholder="https://gooey.ai/.../?run_id=...",
+            )
+
+        with col2:
+            with gui.div(className="d-flex justify-content-between"):
+                edit_done_button(key)
+                gui.url_button(url)
+                del_button(del_key)
+
+        return url
+
+    def _render_workflow_selector(self, key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 
-        init_workflow_selector(d, key)
+        options = {
+            page_cls.workflow: page_cls.get_recipe_short_title()
+            for page_cls in all_home_pages
+        }
+        last_workflow_key = "__last_run_url_workflow"
+        workflow = gui.selectbox(
+            "",
+            key=key + ":workflow",
+            value=(d.get("workflow") or gui.session_state.get(last_workflow_key)),
+            options=options,
+            format_func=lambda x: options[x],
+        )
+        d["workflow"] = workflow
+        # use this to set default for next time
+        gui.session_state[last_workflow_key] = workflow
+        return workflow
 
-        col1, col2, col3, col4 = gui.columns([9, 1, 1, 1], responsive=False)
-        if not d.get("workflow") and d.get("url"):
-            with col1:
-                url = gui.text_input(
-                    "",
-                    key=key,
-                    value=d.get("url"),
-                    placeholder="https://gooey.ai/.../?run_id=...",
-                )
-            with col2:
-                edit_done_button(key)
-        else:
-            with col1:
-                scol1, scol2 = gui.columns([1, 1], responsive=False)
+    def _render_url_selector(self, key: str, d: dict, workflow):
+        page_cls = Workflow(workflow).page_cls
+        url_options = get_published_run_options(
+            page_cls, current_user=self.request.user
+        )
+        url_options.update(d.get("--added_workflows", {}))
+
+        url = gui.selectbox(
+            "",
+            key=key,
+            options=url_options,
+            value=d.get("url"),
+            format_func=lambda x: url_options[x],
+        )
+        return url
+
+    def _render_workflow_mode_mobile(self, key: str, del_key: str, d: dict):
+        wcol1, wcol2 = gui.columns(
+            [8, 4], responsive=False, style={"--bs-gutter-x": "0.25rem"}
+        )
+
+        with wcol1:
+            with gui.div(className="pt-1"):
+                workflow = self._render_workflow_selector(key, d)
+
+        with wcol2:
+            with gui.div(className="d-flex justify-content-between"):
+                edit_button(key)
+                gui.url_button(d.get("url", ""))
+                del_button(del_key)
+
+        with gui.div(className="pt-2"):
+            url = self._render_url_selector(key, d, workflow)
+
+        return url
+
+    def _render_workflow_mode_desktop(self, key: str, del_key: str, d: dict):
+        col1, col2 = gui.columns(
+            [9, 3], responsive=False, style={"--bs-gutter-x": "0.25rem"}
+        )
+
+        with col1:
+            scol1, scol2 = gui.columns(
+                [3, 9], responsive=False, style={"--bs-gutter-x": "0.5rem"}
+            )
+
             with scol1:
                 with gui.div(className="pt-1"):
-                    options = {
-                        page_cls.workflow: page_cls.get_recipe_title()
-                        for page_cls in all_home_pages
-                    }
-                    last_workflow_key = "__last_run_url_workflow"
-                    workflow = gui.selectbox(
-                        "",
-                        key=key + ":workflow",
-                        value=(
-                            d.get("workflow")
-                            or gui.session_state.get(last_workflow_key)
-                        ),
-                        options=options,
-                        format_func=lambda x: options[x],
-                    )
-                    d["workflow"] = workflow
-                    # use this to set default for next time
-                    gui.session_state[last_workflow_key] = workflow
+                    workflow = self._render_workflow_selector(key, d)
+
             with scol2:
-                page_cls = Workflow(workflow).page_cls
-                options = get_published_run_options(
-                    page_cls, current_user=self.request.user
-                )
-                options.update(d.get("--added_workflows", {}))
                 with gui.div(className="pt-1"):
-                    url = gui.selectbox(
-                        "",
-                        key=key,
-                        options=options,
-                        value=d.get("url"),
-                        format_func=lambda x: options[x],
-                    )
-            with col2:
+                    url = self._render_url_selector(key, d, workflow)
+
+        with col2:
+            with gui.div(className="d-flex justify-content-between"):
                 edit_button(key)
-        with col3:
-            gui.url_button(url)
-        with col4:
-            del_button(del_key)
+                gui.url_button(url)
+                del_button(del_key)
+
+        return url
+
+    def render_run_url_inputs(self, key: str, del_key: str, d: dict):
+        init_workflow_selector(d, key)
+
+        if not d.get("workflow") and d.get("url"):
+            with gui.div(className="d-block d-lg-none"):
+                url = self._render_url_input_only(key, del_key, d, is_mobile=True)
+
+            with gui.div(className="d-none d-lg-block"):
+                url = self._render_url_input_only(key, del_key, d, is_mobile=False)
+
+        else:
+            with gui.div(className="d-block d-lg-none"):
+                url = self._render_workflow_mode_mobile(key, del_key, d)
+
+            with gui.div(className="d-none d-lg-block"):
+                url = self._render_workflow_mode_desktop(key, del_key, d)
 
         try:
             url_to_runs(url)
