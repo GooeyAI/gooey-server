@@ -242,7 +242,7 @@ def get_top_k_references(
 
 def vespa_search_results_to_refs(
     search_result: dict,
-) -> typing.Iterable[SearchReference]:
+) -> typing.Iterable[tuple[str, SearchReference]]:
     for hit in search_result["root"].get("children", []):
         try:
             ref = EmbeddingsReference.objects.get(vespa_doc_id=hit["fields"]["id"])
@@ -250,7 +250,6 @@ def vespa_search_results_to_refs(
         except EmbeddingsReference.DoesNotExist:
             continue
         if "text/html" in ref.embedded_file.metadata.mime_type:
-            # logger.debug(f"Generating fragments {ref['url']} as it is a HTML file")
             ref.url = generate_text_fragment_url(url=ref.url, text=ref.snippet)
         yield (
             ref_key,
