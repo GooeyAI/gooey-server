@@ -74,18 +74,6 @@ class TextToSpeechPage(BasePage):
         "compare-text-to-speech-engines",
     ]
 
-    sane_defaults = {
-        "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,
-        "google_voice_name": "en-IN-Wavenet-A",
-        "google_pitch": 0.0,
-        "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "Aiden Botha",
-        "uberduck_speaking_rate": 1.0,
-        "elevenlabs_model": "eleven_multilingual_v2",
-        "elevenlabs_stability": 0.5,
-        "elevenlabs_similarity_boost": 0.75,
-    }
-
     class RequestModelBase(BasePage.RequestModel):
         text_prompt: str
 

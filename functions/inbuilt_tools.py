@@ -75,7 +75,7 @@ You should build well-written queries, including keywords as well as the context
             required=["queries"],
         )
 
-    def call(self, queries: list[str]) -> str:
+    def call(self, queries: list[str]) -> dict[str, list[str]]:
         from daras_ai_v2.vector_search import get_top_k_references, DocSearchRequest
         from daras_ai_v2.language_model_openai_realtime import yield_from
 

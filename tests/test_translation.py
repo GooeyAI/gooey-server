@@ -1,3 +1,6 @@
+import pytest
+from decouple import config
+
 from conftest import flaky
 from daras_ai_v2.asr import run_google_translate
 
@@ -47,6 +50,10 @@ TRANSLATION_TESTS = [
 ]
 
 
+@pytest.mark.skipif(
+    not config("RUN_GOOGLE_TRANSLATE_TESTS", None),
+    reason="No run google translate tests",
+)
 def test_google_translate(threadpool_subtest):
     for lang, text, expected in TRANSLATION_TESTS:
         threadpool_subtest(google_translate_check, text, expected, source_language=lang)

@@ -1,4 +1,5 @@
 import pytest
+from decouple import config
 
 from daras_ai.image_input import gcs_blob_for
 from daras_ai_v2 import settings
@@ -74,7 +75,10 @@ def glossary_url():
         GlossaryResource.objects.all().delete()
 
 
-@pytest.mark.skipif(not settings.GS_BUCKET_NAME, reason="No GCS bucket")
+@pytest.mark.skipif(
+    not settings.GS_BUCKET_NAME or not config("RUN_GOOGLE_TRANSLATE_TESTS", None),
+    reason="No bucket name or run google translate tests",
+)
 def test_google_translate_glossary(transactional_db, glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
