@@ -1573,58 +1573,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
         return notes
 
-    def run_v2(
-        self,
-        request: "VideoBotsPage.RequestModel",
-        response: "VideoBotsPage.ResponseModel",
-    ) -> typing.Iterator[str | None]:
-        if request.tts_provider == TextToSpeechProviders.ELEVEN_LABS.name and not (
-            self.is_current_user_paying() or self.is_current_user_admin()
-        ):
-            raise UserError(
-                """
-                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
-                """
-            )
-
-        llm_model = LargeLanguageModels[request.selected_model]
-        user_input = (request.input_prompt or "").strip()
-        if not (
-            user_input
-            or request.input_audio
-            or request.input_images
-            or request.input_documents
-        ):
-            return
-
-        asr_msg, user_input = yield from self.asr_step(
-            model=llm_model, request=request, response=response, user_input=user_input
-        )
-
-        ocr_texts = yield from self.document_understanding_step(request=request)
-
-        request.translation_model = (
-            request.translation_model or DEFAULT_TRANSLATION_MODEL
-        )
-        user_input = yield from self.input_translation_step(
-            request=request, user_input=user_input, ocr_texts=ocr_texts
-        )
-
-        yield from self.build_final_prompt(
-            request=request, response=response, user_input=user_input, model=llm_model
-        )
-
-        yield from self.llm_loop(
-            request=request,
-            response=response,
-            model=llm_model,
-            asr_msg=asr_msg,
-        )
-
-        yield from self.tts_step(model=llm_model, request=request, response=response)
-
-        yield from self.lipsync_step(request, response)
-
     def render_header_extra(self):
         if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)

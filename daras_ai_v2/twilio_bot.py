@@ -18,11 +18,11 @@ from daras_ai_v2.fastapi_tricks import get_api_route_url
 class TwilioSMS(BotInterface):
     platform = Platform.TWILIO
 
-    request_overrides = dict(
-        variables=dict(platform_medium="SMS"),
-    )
-
     def __init__(self, data: dict):
+        self.request_overrides = dict(
+            variables=dict(platform_medium="SMS"),
+        )
+
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
@@ -117,10 +117,6 @@ def send_sms_message(
 class TwilioVoice(BotInterface):
     platform = Platform.TWILIO
 
-    request_overrides = dict(
-        variables=dict(platform_medium="VOICE"),
-    )
-
     @classmethod
     def from_webhook_data(cls, data: dict):
         ## data samples:
@@ -182,6 +178,9 @@ class TwilioVoice(BotInterface):
         text: str = None,
         audio_url: str = None,
     ):
+        self.request_overrides = dict(
+            variables=dict(platform_medium="VOICE"),
+        )
         self.convo = convo
 
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164

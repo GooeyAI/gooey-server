@@ -52,7 +52,7 @@ RUN poetry run playwright install-deps && poetry run playwright install chromium
 ARG RUN_LIVEKIT=${RUN_LIVEKIT}
 ENV RUN_LIVEKIT=${RUN_LIVEKIT}
 RUN if [ -z "$RUN_LIVEKIT" ]; then \
-        pip install --no-cache-dir mediapipe; \
+        poetry run pip install --no-cache-dir mediapipe; \
     fi
 
 # copy the code into the container

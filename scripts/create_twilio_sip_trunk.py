@@ -114,7 +114,7 @@ def get_or_create_origination_url(
     priority: int = 1,
     weight: int = 1,
     enabled: bool = True,
-) -> str:
+):
     existing = client.trunking.v1.trunks(trunk_sid).origination_urls.list()
     for ou in existing:
         if ou.sip_url != sip_url:
@@ -136,11 +136,11 @@ def get_or_create_credential_list(
     list_friendly_name: str,
 ):
     try:
-        cl = client.sip.credential_lists.create(friendly_name=list_friendly_name)
+        clists = client.sip.credential_lists.create(friendly_name=list_friendly_name)
     except TwilioException as exc:
         if exc.code == 21240:
-            cl = client.sip.credential_lists.list()
-            for cl in cl:
+            clists = client.sip.credential_lists.list()
+            for cl in clists:
                 if cl.friendly_name == list_friendly_name:
                     return cl
         raise
