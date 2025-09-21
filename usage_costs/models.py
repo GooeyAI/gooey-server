@@ -73,7 +73,6 @@ def get_model_choices():
     from daras_ai_v2.language_model import LargeLanguageModels
     from recipes.DeforumSD import AnimationModels
     from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
-    from daras_ai_v2.video_generation import VideoGenerationModels
 
     return (
         [(api.name, api.value) for api in LargeLanguageModels]
@@ -81,7 +80,6 @@ def get_model_choices():
         + [(model.name, model.value) for model in Text2ImgModels]
         + [(model.name, model.value) for model in Img2ImgModels]
         + [(model.name, model.value) for model in InpaintingModels]
-        + [(model.name, model.value) for model in VideoGenerationModels]
         + [("wav2lip", "LipSync (wav2lip)")]
         + [("sadtalker", "LipSync (sadtalker)")]
         + [(model.name, model.label) for model in IVRPlatformMedium]
@@ -131,6 +129,8 @@ class ModelPricing(models.Model):
         max_length=255,
         choices=get_model_choices(),
         help_text="The name of the model. Only used for Display purposes.",
+        blank=True,
+        default="",
     )
 
     notes = models.TextField(
@@ -152,4 +152,4 @@ class ModelPricing(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_provider_display()} / {self.get_model_name_display()} / {self.get_sku_display()}"
+        return f"{self.get_provider_display()} / {self.get_model_name_display() or self.model_id} / {self.get_sku_display()}"
