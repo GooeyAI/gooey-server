@@ -47,6 +47,8 @@ SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", cast=bool, default=not D
 
 # CSP settings
 CSP_DEFAULT_SRC = ("*",)
+CSP_STYLE_SRC = ("*", "'unsafe-inline'")
+CSP_SCRIPT_SRC = ("*", "'unsafe-inline'")
 
 # Application definition
 
@@ -76,6 +78,7 @@ INSTALLED_APPS = [
     "workspaces",
     "api_keys",
     "managed_secrets",
+    "ai_models",
 ]
 
 MIDDLEWARE = [

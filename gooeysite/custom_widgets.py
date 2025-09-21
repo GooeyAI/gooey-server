@@ -11,6 +11,9 @@ class JSONEditorWidget(forms.Textarea):
             "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js",
             "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/lint.min.js",
             "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/javascript-lint.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/searchcursor.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/search.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/dialog/dialog.min.js",
             "https://unpkg.com/jshint@2.13.2/dist/jshint.js",
         ]
         css = {
@@ -18,5 +21,6 @@ class JSONEditorWidget(forms.Textarea):
                 "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css",
                 "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/monokai.min.css",
                 "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/lint.min.css",
+                "https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/dialog/dialog.min.css",
             ]
         }
