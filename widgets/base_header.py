@@ -72,4 +72,4 @@ def render_breadcrumbs_with_author(
             return
 
         for tag in pr.tags.all():
-            gui.pill(tag.render(), className="ms-2 border", unsafe_allow_html=True)
+            gui.pill(tag.render(), className="ms-2", unsafe_allow_html=True)
