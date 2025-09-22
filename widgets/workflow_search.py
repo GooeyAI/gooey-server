@@ -8,6 +8,7 @@ from django.db.models import (
     F,
     FilteredRelation,
     Q,
+    OrderBy,
     QuerySet,
     Value,
 )
@@ -424,24 +425,30 @@ def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
     match SortOptions.get(search_filters.sort):
         case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            order_by = [
+            fields = (
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
                 F("is_created_by").desc(nulls_last=True),
                 "-updated_at",
-            ]
-            if search_filters.search:
-                order_by.insert(0, "-rank")
-            return qs.order_by(*order_by)
-        case SortOptions.last_updated:
-            return qs.order_by("-updated_at")
-        case SortOptions.created_at:
-            return qs.order_by("-created_at")
-        case SortOptions.most_runs:
-            return qs.order_by(
-                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
             )
+            if search_filters.search:
+                fields = ("-rank", *fields)
+        case SortOptions.last_updated:
+            fields = ("-updated_at",)
+        case SortOptions.created_at:
+            fields = ("-created_at",)
+        case SortOptions.most_runs:
+            fields = (
+                "-run_count",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
+            )
+
+    return qs.order_by(*fields).distinct(
+        "id",
+        *(get_field_from_ordering(f) for f in fields),
+    )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -524,3 +531,13 @@ def build_search_filter(
         qs = qs.filter(search=query)
 
     return qs
+
+
+def get_field_from_ordering(value: str | OrderBy) -> str:
+    match value:
+        case OrderBy():
+            return value.expression.name
+        case str():
+            return value.lstrip("-")
+        case _:
+            raise ValueError(f"Invalid value: {value}")
