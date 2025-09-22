@@ -8,6 +8,7 @@ from django.db.models import (
     F,
     FilteredRelation,
     Q,
+    OrderBy,
     QuerySet,
     Value,
 )
@@ -406,7 +407,7 @@ def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
     match sort:
         case SortOptions.FEATURED:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            return qs.order_by(
+            fields = (
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
@@ -414,13 +415,20 @@ def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
                 "-updated_at",
             )
         case SortOptions.UPDATED_AT:
-            return qs.order_by("-updated_at")
+            fields = ("-updated_at",)
         case SortOptions.CREATED_AT:
-            return qs.order_by("-created_at")
+            fields = ("-created_at",)
         case SortOptions.MOST_RUNS:
-            return qs.order_by(
-                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
+            fields = (
+                "-run_count",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
             )
+
+    return qs.order_by(*fields).distinct(
+        "id",
+        *(get_field_from_ordering(f) for f in fields),
+    )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -510,3 +518,13 @@ def build_search_filter(
         qs = qs.filter(Q(search=search) | Q(workflow__in=workflow_search))
 
     return qs
+
+
+def get_field_from_ordering(value: str | OrderBy) -> str:
+    match value:
+        case OrderBy():
+            return value.expression.name
+        case str():
+            return value.lstrip("-")
+        case _:
+            raise ValueError(f"Invalid value: {value}")
