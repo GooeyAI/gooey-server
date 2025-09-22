@@ -436,65 +436,68 @@ class BasePage:
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
-            # Examples, API, Saved, etc
-            if self.tab == RecipeTabs.saved or self.tab == RecipeTabs.history:
-                with gui.div(className="mb-2"):
-                    render_author_from_workspace(self.current_workspace)
+        if self.tab in {RecipeTabs.saved, RecipeTabs.history}:
+            with gui.div(className="mb-2"):
+                render_author_from_workspace(self.current_workspace)
+
+        if self.tab not in {RecipeTabs.run, RecipeTabs.preview}:
+            # tabs: Examples, API, Saved, History, Integrations, ...
             with gui.div(className="mb-2"):
                 render_header_title(tbreadcrumbs)
+
+            return
+
+        # tabs: Run & Preview
+        img_style = dict(objectFit="cover", marginBottom=0)
+        if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
+            img_style["borderRadius"] = "50%"
         else:
-            # Run tab
-            img_style = dict(objectFit="cover", marginBottom=0)
-            if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
-                img_style["borderRadius"] = "50%"
-            else:
-                img_style["borderRadius"] = "12px"
+            img_style["borderRadius"] = "12px"
 
-            with gui.div(className="d-flex gap-4 w-100 mb-2"):
-                if pr.photo_url:
-                    with gui.div(className="d-none d-md-inline"):
-                        gui.image(
-                            src=pr.photo_url,
-                            style=img_style | dict(width="96px", height="96px"),
-                        )
+        with gui.div(className="d-flex gap-4 w-100 mb-2"):
+            if pr.photo_url:
+                with gui.div(className="d-none d-md-inline"):
+                    gui.image(
+                        src=pr.photo_url,
+                        style=img_style | dict(width="96px", height="96px"),
+                    )
 
-                # desktop image and title, social buttons, extra and breadcrumbs
-                with gui.div(className="w-100 d-flex flex-column gap-2"):
-                    with gui.div(className="d-flex align-items-start w-100 my-auto"):
-                        if pr.photo_url:
-                            with gui.div(className="d-inline d-md-none me-2"):
-                                gui.image(
-                                    src=pr.photo_url,
-                                    style=img_style | dict(width="56px", height="56px"),
-                                )
-
-                        with gui.div(
-                            className="d-flex justify-content-between w-100 align-items-start my-auto"
-                        ):
-                            render_header_title(tbreadcrumbs)
-
-                            with gui.div(
-                                className="d-flex align-items-end flex-column-reverse gap-2",
-                                style={"whiteSpace": "nowrap"},
-                            ):
-                                if request_changed or (can_save and not is_example):
-                                    self._render_unpublished_changes_indicator()
-                                self.render_social_buttons()
+            # desktop image and title, social buttons, extra and breadcrumbs
+            with gui.div(className="w-100 d-flex flex-column gap-2"):
+                with gui.div(className="d-flex align-items-start w-100 my-auto"):
+                    if pr.photo_url:
+                        with gui.div(className="d-inline d-md-none me-2"):
+                            gui.image(
+                                src=pr.photo_url,
+                                style=img_style | dict(width="56px", height="56px"),
+                            )
 
                     with gui.div(
-                        className="d-flex align-items-center gap-2 w-100 flex-wrap"
+                        className="d-flex justify-content-between w-100 align-items-start my-auto"
                     ):
-                        self.render_header_extra()
-                        render_breadcrumbs_with_author(
-                            tbreadcrumbs,
-                            user=self.current_sr_user,
-                            pr=self.current_pr,
-                            sr=self.current_sr,
-                            current_workspace=(
-                                self.is_logged_in() and self.current_workspace or None
-                            ),
-                        )
+                        render_header_title(tbreadcrumbs)
+
+                        with gui.div(
+                            className="d-flex align-items-end flex-column-reverse gap-2",
+                            style={"whiteSpace": "nowrap"},
+                        ):
+                            if request_changed or (can_save and not is_example):
+                                self._render_unpublished_changes_indicator()
+                            self.render_social_buttons()
+
+                with gui.div(
+                    className="d-flex align-items-center gap-2 w-100 flex-wrap"
+                ):
+                    self.render_header_extra()
+                    render_breadcrumbs_with_author(
+                        tbreadcrumbs,
+                        user=self.current_sr_user,
+                        pr=self.current_pr,
+                        sr=self.current_sr,
+                        current_workspace=(
+                            self.is_logged_in() and self.current_workspace or None
+                        ),
+                    )
 
         if self.tab == RecipeTabs.run and is_example:
             with gui.div(className="container-margin-reset d-flex flex-column gap-2"):
