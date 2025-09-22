@@ -67,3 +67,11 @@ def render_breadcrumbs_with_author(
                     sr=sr,
                     current_workspace=current_workspace,
                 )
+
+        if pr.saved_run_id != sr.id:
+            return
+
+        if tags := list(pr.tags.all()):
+            with gui.div(className="ms-2"):
+                for tag in tags:
+                    gui.pill(tag.render(), className="me-1", unsafe_allow_html=True)
