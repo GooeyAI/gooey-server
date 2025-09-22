@@ -110,6 +110,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         is_thinking_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
     gpt_5_mini = LLMSpec(
@@ -121,6 +122,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         is_thinking_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-nano
     gpt_5_nano = LLMSpec(
@@ -132,6 +134,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         is_thinking_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-5-chat-latest
     gpt_5_chat = LLMSpec(
@@ -142,6 +145,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=16_384,
         is_vision_model=True,
         supports_json=True,
+        supports_temperature=False,
     )
 
     # https://platform.openai.com/docs/models/gpt-4-1
@@ -1647,10 +1651,6 @@ def run_openai_chat(
     if "openai" in model.value and model.is_thinking_model:
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
-
-    if "gpt_5" in model.name:
-        # gpt-5 doesn't support temperature
-        temperature = None
 
     if model == LargeLanguageModels.apertus_70b_instruct:
         # Swiss AI Apertus model doesn't support tool calling
