@@ -448,5 +448,5 @@ class Tag(models.Model):
                 violation_error_message="This tag already exists",
             )
         ]
-        ordering = ["name"]
+        ordering = ["-featured_priority", "name"]
         indexes = [models.Index(fields=["name"])]
