@@ -72,8 +72,6 @@ def render_saved_workflow_preview(
                         gui.caption(
                             published_run.notes, line_clamp=2, lineClampExpand=False
                         )
-                    for tag in published_run.tags.all():
-                        gui.pill(tag.render(), className="border border-dark me-1")
                 if not output_url:
                     with gui.div(className="col-2 text-center m-auto"):
                         workflow = Workflow(published_run.workflow)
@@ -123,6 +121,9 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
                 style=style,
             ):
                 gui.html(label)
+
+        for tag in published_run.tags.all():
+            gui.pill(tag.render(), className="border ms-2", unsafe_allow_html=True)
 
 
 FOOTER_CSS = """

@@ -503,12 +503,6 @@ class BasePage:
             with gui.div(className="container-margin-reset d-flex flex-column gap-2"):
                 if self.current_pr.notes:
                     gui.write(self.current_pr.notes, line_clamp=3)
-                if tags := list(self.current_pr.tags.all()):
-                    with gui.div(className=""):
-                        for tag in tags:
-                            gui.pill(
-                                tag.render(), className="border border-secondary me-1"
-                            )
 
     def render_header_extra(self):
         pass
