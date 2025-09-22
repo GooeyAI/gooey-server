@@ -123,7 +123,7 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
                 gui.html(label)
 
         for tag in published_run.tags.all():
-            gui.pill(tag.render(), className="border ms-2", unsafe_allow_html=True)
+            gui.pill(tag.render(), className="ms-2", unsafe_allow_html=True)
 
 
 FOOTER_CSS = """
