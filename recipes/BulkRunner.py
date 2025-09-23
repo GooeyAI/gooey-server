@@ -485,7 +485,7 @@ To get started:
                 gui.url_button(d.get("url", ""))
                 del_button(del_key)
 
-        with gui.div(className="pt-2"):
+        with gui.div(className="pb-2"):
             url = self._render_url_selector(key, d, workflow)
 
         return url
