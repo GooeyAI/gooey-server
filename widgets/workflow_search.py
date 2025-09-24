@@ -11,7 +11,7 @@ from django.db.models import (
     Value,
 )
 from fastapi import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
@@ -32,26 +32,26 @@ _icon_width = "1.3em"
 
 
 class SortOptions(SortOption, GooeyEnum):
-    FEATURED = SortOption(
+    featured = SortOption(
         label="Featured",
         icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
     )
-    UPDATED_AT = SortOption(
+    last_updated = SortOption(
         label="Last Updated",
         icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
     )
-    CREATED_AT = SortOption(
+    created_at = SortOption(
         label="Created At",
         icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
     )
-    MOST_RUNS = SortOption(
+    most_runs = SortOption(
         label="Most Runs",
         icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
     )
 
     @classmethod
     def get(cls, key=None):
-        return super().get(key, default=cls.FEATURED)
+        return super().get(key, default=cls.featured)
 
     def html_icon_label(self) -> str:
         return f'{self.icon}<span class="hide-on-small-screens"> {self.label}</span>'
@@ -65,6 +65,11 @@ class SearchFilters(BaseModel):
 
     def __bool__(self):
         return bool(self.search or self.workspace or self.workflow or self.sort)
+
+    @field_validator("sort", "workflow", mode="before")
+    @classmethod
+    def to_lower(cls, v):
+        return v.lower() if isinstance(v, str) else v
 
 
 def render_search_filters(
@@ -375,7 +380,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
-        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.name
+        show_run_count = is_member or search_filters.sort == SortOptions.most_runs.name
 
         render_saved_workflow_preview(
             workflow.page_cls,
@@ -402,7 +407,7 @@ def get_filtered_published_runs(
 
 def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
     match sort:
-        case SortOptions.FEATURED:
+        case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
             return qs.order_by(
                 "-is_approved_example",
@@ -411,11 +416,11 @@ def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
                 F("is_created_by").desc(nulls_last=True),
                 "-updated_at",
             )
-        case SortOptions.UPDATED_AT:
+        case SortOptions.last_updated:
             return qs.order_by("-updated_at")
-        case SortOptions.CREATED_AT:
+        case SortOptions.created_at:
             return qs.order_by("-created_at")
-        case SortOptions.MOST_RUNS:
+        case SortOptions.most_runs:
             return qs.order_by(
                 "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
             )
