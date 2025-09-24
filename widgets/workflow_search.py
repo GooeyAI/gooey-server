@@ -8,13 +8,14 @@ from django.db.models import (
     F,
     FilteredRelation,
     Q,
+    OrderBy,
     QuerySet,
     Value,
 )
 from pydantic import BaseModel
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
+from bots.models import PublishedRun, WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -67,6 +68,9 @@ class SearchFilters(BaseModel):
 
     def __bool__(self):
         return bool(self.search or self.workspace or self.workflow or self.sort)
+
+    def get_query_params(self) -> dict[str, str]:
+        return self.model_dump(exclude_defaults=True)
 
 
 def render_search_filters(
@@ -173,8 +177,7 @@ def render_search_bar_with_redirect(
         search_filters.search = search_query
         raise gui.RedirectException(
             get_app_route_url(
-                explore_page,
-                query_params=search_filters.model_dump(exclude_defaults=True),
+                explore_page, query_params=search_filters.get_query_params()
             )
         )
 
@@ -369,24 +372,24 @@ def _render_selectbox(
 
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     qs = get_filtered_published_runs(user, search_filters)
-    qs = qs.select_related("workspace", "created_by", "saved_run")
+    qs = qs.prefetch_related("tags", "versions").select_related(
+        "workspace", "last_edited_by", "saved_run"
+    )
 
     def _render_run(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
         show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.value
 
         render_saved_workflow_preview(
-            workflow.page_cls,
             pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            show_workflow_pill=True,
             show_workspace_author=show_workspace_author,
             show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            hide_visibility_pill=True,
+            hide_access_level=True,
+            search_filters=search_filters,
         )
 
     grid_layout(1, qs, _render_run)
@@ -406,7 +409,7 @@ def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
     match sort:
         case SortOptions.FEATURED:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            return qs.order_by(
+            fields = (
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
@@ -414,13 +417,20 @@ def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
                 "-updated_at",
             )
         case SortOptions.UPDATED_AT:
-            return qs.order_by("-updated_at")
+            fields = ("-updated_at",)
         case SortOptions.CREATED_AT:
-            return qs.order_by("-created_at")
+            fields = ("-created_at",)
         case SortOptions.MOST_RUNS:
-            return qs.order_by(
-                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
+            fields = (
+                "-run_count",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
             )
+
+    return qs.order_by(*fields).distinct(
+        "id",
+        *(get_field_from_ordering(f) for f in fields),
+    )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -502,6 +512,7 @@ def build_search_filter(
                 "created_by__display_name",
                 "workspace__handle__name",
                 "workspace__name",
+                "tags__name",
             ),
         )
 
@@ -509,3 +520,13 @@ def build_search_filter(
         qs = qs.filter(Q(search=search) | Q(workflow__in=workflow_search))
 
     return qs
+
+
+def get_field_from_ordering(value: str | OrderBy) -> str:
+    match value:
+        case OrderBy():
+            return value.expression.name
+        case str():
+            return value.lstrip("-")
+        case _:
+            raise ValueError(f"Invalid value: {value}")
