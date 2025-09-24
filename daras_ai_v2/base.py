@@ -963,14 +963,15 @@ class BasePage:
         title: str,
         notes: str,
         photo_url: str,
-        tags: list[Tag],
+        tags: list[Tag] | None,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
             or published_run.photo_url != photo_url
-            or set(published_run.tags.all()) != set(tags)
+            or set(published_run.tags.values_list("pk", flat=True))
+            != {t.pk for t in (tags or [])}
         )
 
     def _has_request_changed(self) -> bool:
