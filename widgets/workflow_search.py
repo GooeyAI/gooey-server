@@ -24,7 +24,6 @@ from workspaces.models import Workspace, WorkspaceRole
 
 
 class SortOption(typing.NamedTuple):
-    key: str
     label: str
     icon: str
 
@@ -34,31 +33,28 @@ _icon_width = "1.3em"
 
 class SortOptions(SortOption, GooeyEnum):
     FEATURED = SortOption(
-        key="featured",
         label="Featured",
         icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
     )
     UPDATED_AT = SortOption(
-        key="last_updated",
         label="Last Updated",
         icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
     )
     CREATED_AT = SortOption(
-        key="created_at",
         label="Created At",
         icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
     )
     MOST_RUNS = SortOption(
-        key="most_runs",
         label="Most Runs",
         icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
     )
 
     @classmethod
-    def get(cls, key=None, default=None):
-        return next(
-            (option for option in cls if option.key == key), default or cls.FEATURED
-        )
+    def get(cls, key=None):
+        return super().get(key, default=cls.FEATURED)
+
+    def html_icon_label(self) -> str:
+        return f'{self.icon}<span class="hide-on-small-screens"> {self.label}</span>'
 
 
 class SearchFilters(BaseModel):
@@ -117,12 +113,6 @@ def render_search_filters(
             with gui.div(
                 className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
-                sort_options: dict[str, str] = {
-                    (opt.key if opt != SortOptions.get() else ""): (
-                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
-                    )
-                    for opt in SortOptions
-                }
                 with (
                     gui.styled(
                         """
@@ -140,6 +130,12 @@ def render_search_filters(
                     ),
                     gui.div(),
                 ):
+                    sort_options = {
+                        opt.name if opt != SortOptions.get() else None: (
+                            opt.html_icon_label()
+                        )
+                        for opt in SortOptions
+                    }
                     search_filters.sort = (
                         gui.selectbox(
                             label="",
@@ -379,7 +375,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
-        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.value
+        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.name
 
         render_saved_workflow_preview(
             workflow.page_cls,
