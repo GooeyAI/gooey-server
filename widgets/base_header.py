@@ -1,15 +1,21 @@
+import typing
 import gooey_gui as gui
 
-from bots.models import Workflow
 from daras_ai_v2 import icons
+from daras_ai_v2.fastapi_tricks import get_app_route_url
+from widgets.saved_workflow import render_pill_with_link
 from widgets.author import render_author_as_breadcrumb
-from app_users.models import AppUser
-from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
-from bots.models import PublishedRun, SavedRun
-from workspaces.models import Workspace
+from widgets.workflow_search import SearchFilters
 
 
-def render_header_title(tb: TitleBreadCrumbs):
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from bots.models import PublishedRun, SavedRun, Workflow
+    from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
+    from workspaces.models import Workspace
+
+
+def render_header_title(tb: "TitleBreadCrumbs"):
     with (
         gui.styled("""
         & h1 { margin: 0 }
@@ -20,7 +26,7 @@ def render_header_title(tb: TitleBreadCrumbs):
         gui.write("# " + tb.title_with_prefix_url())
 
 
-def render_help_button(workflow: Workflow):
+def render_help_button(workflow: "Workflow"):
     meta = workflow.get_or_create_metadata()
     if not meta.help_url:
         return
@@ -39,13 +45,15 @@ def render_help_button(workflow: Workflow):
 
 
 def render_breadcrumbs_with_author(
-    breadcrumbs: TitleBreadCrumbs,
+    breadcrumbs: "TitleBreadCrumbs",
     *,
-    user: AppUser | None = None,
-    pr: PublishedRun,
-    sr: SavedRun,
-    current_workspace: Workspace | None = None,
+    pr: "PublishedRun",
+    sr: "SavedRun",
+    user: typing.Optional["AppUser"] = None,
+    current_workspace: typing.Optional["Workspace"] = None,
 ):
+    from routers.root import explore_page
+
     with gui.div(
         className="d-flex flex-wrap align-items-center container-margin-reset"
     ):
@@ -62,14 +70,16 @@ def render_breadcrumbs_with_author(
             with gui.div(className="d-flex align-items-center"):
                 gui.write("by", className="me-2 d-none d-md-block text-muted")
                 render_author_as_breadcrumb(
-                    user=user,
-                    pr=pr,
-                    sr=sr,
-                    current_workspace=current_workspace,
+                    user=user, pr=pr, sr=sr, current_workspace=current_workspace
                 )
 
         if pr.saved_run_id != sr.id:
             return
 
         for tag in pr.tags.all():
-            tag.render(className="ms-2")
+            query_params = SearchFilters(search=tag.name).get_query_params()
+            render_pill_with_link(
+                tag.render(),
+                link_to=get_app_route_url(explore_page, query_params=query_params),
+                className="ms-2 border",
+            )
