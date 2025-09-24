@@ -25,7 +25,8 @@ class VideoModelSpec(models.Model):
         blank=True,
         default=None,
         help_text="The pricing of the model. Only for display purposes. "
-        "The actual pricing lookup uses the model_id, so make sure the video model's model_id matches the pricing's model_id.",
+        "The actual pricing lookup uses the model_id, so make sure the video model's model_id matches the pricing's model_id."
+        "To setup a price multiplier, create a WorkflowMetadata for the workflow and set the price_multiplier field.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from textwrap import dedent
 import typing
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
@@ -9,7 +10,7 @@ from django.db.models import Q
 from pydantic import BaseModel
 
 from ai_models.models import VideoModelSpec
-from bots.models import Workflow
+from bots.models import Workflow, SavedRun, PublishedRun
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fal_ai import generate_on_fal
@@ -19,10 +20,11 @@ from daras_ai_v2.safety_checker import safety_checker, SAFETY_CHECKER_MSG
 from daras_ai_v2.variables_widget import render_prompt_vars
 from usage_costs.cost_utils import record_cost_auto
 from usage_costs.models import ModelSku
+from requests.utils import CaseInsensitiveDict
 
 
 class VideoGenPage(BasePage):
-    title = "Text Video"
+    title = Workflow.VIDEO_GEN.label
     workflow = Workflow.VIDEO_GEN
     slug_versions = ["video"]
 
@@ -86,34 +88,53 @@ class VideoGenPage(BasePage):
                 response.output_videos[model.name] = fut.result()
             # print(f"{response.output_videos=}")
 
+    def render(self):
+        self.available_models = CaseInsensitiveDict(
+            {model.name: model for model in VideoModelSpec.objects.all()}
+        )
+        super().render()
+
     def get_raw_price(self, state: dict) -> float:
         return self.get_total_linked_usage_cost_in_credits()
 
-    def render(self):
-        self.available_models = {
-            model.name.lower(): model for model in VideoModelSpec.objects.all()
-        }
-        super().render()
+    def additional_notes(self) -> str | None:
+        ret = ""
+        selected_models = gui.session_state.get("selected_models", [])
+        for name in selected_models:
+            try:
+                model = self.available_models[name]
+            except KeyError:
+                continue
+            notes = model.pricing and model.pricing.notes
+            if not notes:
+                continue
+            ret += "\n" + notes
+        return ret
 
     def render_form_v2(self):
         render_video_gen_form(self.available_models)
 
     def render_output(self):
-        output_videos = gui.session_state.get("output_videos", {})
+        self.render_run_preview_output(gui.session_state, show_download_button=True)
+
+    def render_run_preview_output(
+        self, state: dict, show_download_button: bool = False
+    ):
+        output_videos = state.get("output_videos", {})
         if not output_videos:
             return
 
         for model_name, video_url in output_videos.items():
             try:
-                model = self.available_models[model_name.lower()]
+                model = self.available_models[model_name]
             except KeyError:
                 continue
             if not video_url:
                 continue
             gui.video(
                 video_url,
-                autoplay=False,
-                show_download_button=True,
+                autoplay=True,
+                show_download_button=show_download_button,
                 caption=model.label,
             )
 
@@ -154,13 +175,6 @@ class VideoGenPage(BasePage):
             """
         )
 
-    def additional_notes(self):
-        return """
-*4K availability varies by model. Longer durations and higher resolutions increase cost and render time.
-
-By running, you agree to Gooey.AI's terms & privacy policy. This workflow enforces provider safety filters. Do not upload personal images without permission.
-        """.strip()
-
 
 def generate_video(
     model: VideoModelSpec, inputs: dict, progress_q: Queue[tuple[str, str | None]]
@@ -188,28 +202,37 @@ def generate_video(
 
 
 def render_video_gen_form(available_models: dict[str, VideoModelSpec]):
+    # normalize the selected model names
+    gui.session_state["selected_models"] = [
+        model.name
+        for name in gui.session_state.get("selected_models", [])
+        if (model := available_models.get(name))
+    ]
     selected_models = gui.multiselect(
         label="###### Video Models",
         options=list(available_models.keys()),
         format_func=lambda x: available_models[x].label,
         key="selected_models",
+        allow_none=True,
     )
-    models = [available_models[name] for name in selected_models]
+    models = list(
+        filter(None, (available_models.get(name) for name in selected_models))
+    )
     if not models:
         return
 
-    common_names = set.intersection(
+    common_fields = set.intersection(
         *(set(model.schema["properties"]) for model in models)
     )
     schema = models[0].schema
     required_fields = set(schema.get("required", []))
-    ordering = schema.get("x-fal-order-properties") or list(common_names)
-    ordering.sort(key=lambda x: x not in required_fields)
+    ordered_fields = schema.get("x-fal-order-properties") or list(common_fields)
+    ordered_fields.sort(key=lambda x: x not in required_fields)
     old_inputs = gui.session_state.get("inputs", {})
     new_inputs = {}
 
-    for name in ordering:
-        if name not in common_names:
+    for name in ordered_fields:
+        if name not in common_fields:
             continue
 
         field = models[0].schema["properties"][name]
@@ -232,7 +255,7 @@ def render_field(
     label: str,
     value: typing.Any,
 ):
-    help_text = field.get("description")
+    help_text = dedent(field.get("description"))
 
     match field["type"]:
         case "array" if "lora" in name or "url" in name:
