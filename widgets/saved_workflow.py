@@ -12,26 +12,28 @@ from daras_ai.image_input import truncate_text_words
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.utils import get_relative_time
 from widgets.author import render_author_from_workspace, render_author_from_user
 from widgets.demo_button import get_demo_bots
 
 if typing.TYPE_CHECKING:
-    from daras_ai_v2.base import BasePage
+    from widgets.workflow_search import SearchFilters
 
 
 def render_saved_workflow_preview(
-    page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     published_run: PublishedRun,
     *,
-    workflow_pill: str | None = None,
+    show_workflow_pill: bool = False,
     show_workspace_author: bool = False,
     show_run_count: bool = False,
     hide_access_level: bool = False,
     hide_version_notes: bool = False,
     hide_last_editor: bool = False,
+    search_filters: typing.Optional["SearchFilters"] = None,
 ):
+    page_cls = Workflow(published_run.workflow).page_cls
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
     output_url = (
@@ -61,7 +63,11 @@ def render_saved_workflow_preview(
             with gui.div(className="d-flex align-items-center"):
                 with gui.link(to=published_run.get_app_url()):
                     gui.write(f"#### {truncate_text_words(tb.title_with_prefix(), 80)}")
-                render_title_pills(published_run, workflow_pill)
+                render_title_pills(
+                    published_run,
+                    show_workflow_pill=show_workflow_pill,
+                    search_filters=search_filters,
+                )
 
             with gui.div(className="row"):
                 with gui.div(
@@ -91,13 +97,29 @@ def render_saved_workflow_preview(
             render_workflow_media(output_url, published_run)
 
 
-def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
+def render_title_pills(
+    published_run: PublishedRun,
+    *,
+    show_workflow_pill: bool,
+    search_filters: typing.Optional["SearchFilters"],
+):
+    from routers.root import explore_page
+    from widgets.workflow_search import SearchFilters
+
+    search_filters = search_filters or SearchFilters()
+    workflow = Workflow(published_run.workflow)
     with gui.div(className="d-md-flex d-none align-items-center ms-2"):
-        if workflow_pill:
-            gui.pill(
-                workflow_pill,
-                unsafe_allow_html=True,
-                className="border border-dark ms-2",
+        if show_workflow_pill:
+            new_filters = search_filters.model_copy(
+                update={"workflow": workflow.short_slug}
+            )
+            url = get_app_route_url(
+                explore_page, query_params=new_filters.get_query_params()
+            )
+            render_pill_with_link(
+                f"{workflow.emoji} {workflow.short_title}",
+                link_to=url,
+                className="border border-dark",
             )
 
         for _, platform_id in get_demo_bots(published_run):
@@ -123,7 +145,29 @@ def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
                 gui.html(label)
 
         for tag in published_run.tags.all():
-            tag.render(className="ms-2")
+            new_filters = search_filters.model_copy(update={"search": tag.name})
+            link_to = get_app_route_url(
+                explore_page, query_params=new_filters.get_query_params()
+            )
+            render_pill_with_link(
+                tag.render(), link_to=link_to, className="border ms-2"
+            )
+
+
+def render_pill_with_link(
+    text: str,
+    link_to: str,
+    text_bg: typing.Literal["light", "dark", "primary", "secondary"] | None = "light",
+    unsafe_allow_html: bool = False,
+    **props,
+):
+    className = props.pop("className", "")
+    className += " badge rounded-pill"
+    if text_bg:
+        className += f" text-bg-{text_bg}"
+
+    with gui.div(className=className, **props), gui.link(to=link_to):
+        gui.html(text if unsafe_allow_html else html.escape(text))
 
 
 FOOTER_CSS = """
