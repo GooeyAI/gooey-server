@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from functools import cache
 
 from django.contrib import admin
 from django.db import models, transaction
@@ -436,9 +435,8 @@ class Tag(models.Model):
         return f"{self.icon} {self.name}" if self.icon else self.name
 
     @classmethod
-    @cache
     def get_options(cls) -> list["Tag"]:
-        return list(cls.objects.all())
+        return list(cls.objects.filter(featured_priority__gte=1))
 
     class Meta:
         constraints = [
