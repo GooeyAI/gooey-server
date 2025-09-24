@@ -3,7 +3,7 @@
 set -ex
 
 echo "==> Downloading fixture.json..."
-wget -N -nv https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/56a6de00-171b-11f0-a440-8e93953183bb/fixture.json
+wget -N -nv https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/237ffb72-9931-11f0-a655-02420a000109/fixture.json
 
 echo "==> Formatting with ruff..."
 poetry run ruff format --diff .
