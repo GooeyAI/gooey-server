@@ -1,6 +1,5 @@
 import typing
 
-from fastapi import Request
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db.models import (
@@ -11,6 +10,7 @@ from django.db.models import (
     QuerySet,
     Value,
 )
+from fastapi import Request
 from pydantic import BaseModel
 
 from app_users.models import AppUser
