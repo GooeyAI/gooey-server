@@ -255,7 +255,11 @@ def render_field(
     label: str,
     value: typing.Any,
 ):
-    help_text = dedent(field.get("description"))
+    description = field.get("description")
+    if description:
+        help_text = dedent(description)
+    else:
+        help_text = None
 
     match field["type"]:
         case "array" if "lora" in name or "url" in name:
