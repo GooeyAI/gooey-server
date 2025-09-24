@@ -9,7 +9,7 @@ import typing
 import uuid
 from copy import copy, deepcopy
 from enum import Enum
-from functools import cached_property, partial
+from functools import cached_property
 from itertools import pairwise
 from random import Random
 from textwrap import dedent
@@ -2184,7 +2184,6 @@ class BasePage:
 
         def _render(pr: PublishedRun):
             render_saved_workflow_preview(
-                self,
                 pr,
                 show_workspace_author=True,
                 hide_access_level=True,
@@ -2218,7 +2217,7 @@ class BasePage:
             return
 
         with gui.div(className="position-relative w-100"):
-            grid_layout(1, published_runs, partial(render_saved_workflow_preview, self))
+            grid_layout(1, published_runs, render_saved_workflow_preview)
 
         paginate_button(url=self.request.url, cursor=cursor)
 
