@@ -2245,9 +2245,12 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        qs = PublishedRun.objects.filter(
-            PublishedRun.approved_example_q(),
-            workflow=self.workflow,
+        qs = (
+            PublishedRun.objects.select_related(
+                "saved_run", "workspace", "last_edited_by"
+            )
+            .prefetch_related("tags", "versions")
+            .filter(PublishedRun.approved_example_q(), workflow=self.workflow)
         )
 
         example_runs, cursor = paginate_queryset(
@@ -2280,7 +2283,14 @@ class BasePage:
                 | Q(created_by=self.request.user)
                 | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
             )
-        qs = PublishedRun.objects.filter(Q(workflow=self.workflow) & pr_filter)
+
+        qs = (
+            PublishedRun.objects.select_related(
+                "saved_run", "workspace", "last_edited_by"
+            )
+            .prefetch_related("tags", "versions")
+            .filter(pr_filter, workflow=self.workflow)
+        )
 
         published_runs, cursor = paginate_queryset(
             qs=qs, ordering=["-updated_at"], cursor=self.request.query_params

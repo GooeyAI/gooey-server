@@ -295,9 +295,11 @@ def all_saved_runs_tab(request: Request):
             | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
         )
 
-    qs = PublishedRun.objects.select_related(
-        "workspace", "created_by", "saved_run"
-    ).filter(pr_filter)
+    qs = (
+        PublishedRun.objects.prefetch_related("tags", "versions")
+        .select_related("workspace", "last_edited_by", "saved_run")
+        .filter(pr_filter)
+    )
 
     prs, cursor = paginate_queryset(
         qs=qs, ordering=["-updated_at"], cursor=request.query_params
