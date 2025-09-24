@@ -372,7 +372,9 @@ def _render_selectbox(
 
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     qs = get_filtered_published_runs(user, search_filters)
-    qs = qs.select_related("workspace", "created_by", "saved_run")
+    qs = qs.prefetch_related("tags", "versions").select_related(
+        "workspace", "last_edited_by", "saved_run"
+    )
 
     def _render_run(pr: PublishedRun):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
