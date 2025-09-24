@@ -16,7 +16,7 @@ from django.utils.translation import ngettext
 from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
+from bots.models import PublishedRun, WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -78,6 +78,9 @@ class SearchFilters(BaseModel):
     @classmethod
     def to_lower(cls, v):
         return v.lower() if isinstance(v, str) else v
+
+    def get_query_params(self) -> dict[str, str]:
+        return self.model_dump(exclude_defaults=True)
 
 
 def render_search_filters(
@@ -191,8 +194,7 @@ def render_search_bar_with_redirect(
         search_filters.search = search_query
         raise gui.RedirectException(
             get_app_route_url(
-                explore_page,
-                query_params=search_filters.model_dump(exclude_defaults=True),
+                explore_page, query_params=search_filters.get_query_params()
             )
         )
 
@@ -391,21 +393,19 @@ def render_search_results(
     qs = qs.select_related("workspace", "created_by", "saved_run")
 
     def _render_run(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
         show_run_count = is_member or search_filters.sort == SortOptions.most_runs.name
 
         render_saved_workflow_preview(
-            workflow.page_cls,
             pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            show_workflow_pill=True,
             show_workspace_author=show_workspace_author,
             show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
             hide_access_level=True,
+            search_filters=search_filters,
         )
 
     grid_layout(1, qs, _render_run)

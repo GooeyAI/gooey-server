@@ -77,9 +77,7 @@ def render(request: Request, search_filters: SearchFilters | None):
             )
             if new_filters != search_filters:
                 # if the search bar value has changed, redirect to the new search page
-                raise gui.QueryParamsRedirectException(
-                    new_filters.model_dump(exclude_defaults=True)
-                )
+                raise gui.QueryParamsRedirectException(new_filters.get_query_params())
 
     if search_filters:
         with gui.div(className="my-4"):

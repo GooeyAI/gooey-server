@@ -12,7 +12,6 @@ from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_app_route_url
 from gooeysite.custom_create import get_or_create_lazy
 from workspaces.models import Workspace
 
@@ -433,29 +432,13 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
-    def render(self, **props) -> None:
-        import gooey_gui as gui
-
-        className = (
-            props.pop("className", "") + " badge rounded-pill border text-bg-light"
-        )
-        with gui.div(className=className, **props), gui.link(to=self.get_app_url()):
-            gui.html(f"{self.icon} {self.name}" if self.icon else self.name)
+    def render(self) -> str:
+        return f"{self.icon} {self.name}" if self.icon else self.name
 
     @classmethod
     @cache
     def get_options(cls) -> list["Tag"]:
         return list(cls.objects.all())
-
-    def get_app_url(self, query_params: dict | None = None) -> str:
-        from routers.root import explore_page
-
-        if not query_params:
-            query_params = {}
-        return get_app_route_url(
-            explore_page,
-            query_params=(query_params | {"search": self.name}),
-        )
 
     class Meta:
         constraints = [
