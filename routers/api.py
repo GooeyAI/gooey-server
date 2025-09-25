@@ -38,6 +38,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
+from recipes.BulkRunner import is_arr
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.models import Workspace
 from workspaces.widgets import set_current_workspace
@@ -313,18 +314,17 @@ def _parse_form_data(
             for uf in uf_list
         ]
         try:
-            is_str = (
-                request_model.model_json_schema()["properties"][key]["type"] == "string"
-            )
+            field_schema = request_model.model_json_schema()["properties"][key]
+            field_is_arr = is_arr(field_schema)
         except KeyError:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=dict(error=f'Inavlid file field "{key}"'),
             )
-        if is_str:
-            page_request_data[key] = urls[0]
-        else:
+        if field_is_arr:
             page_request_data.setdefault(key, []).extend(urls)
+        else:
+            page_request_data[key] = urls[0]
     # validate the request
     try:
         page_request = request_model.model_validate(page_request_data)
