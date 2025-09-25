@@ -30,7 +30,7 @@ from routers.twilio_api import (
     DEFAULT_INITIAL_TEXT,
 )
 from daras_ai_v2.language_model import LargeLanguageModels
-from number_cycling.models import ProvisionedNumber, BotExtensionUser, BotExtension
+from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
 
 app = CustomAPIRouter()
 
@@ -81,21 +81,21 @@ class TwilioVoiceWs(TwilioVoice):
         bi = None
 
         try:
-            ProvisionedNumber.objects.get(
+            SharedPhoneNumber.objects.get(
                 phone_number=bot_number, platform=Platform.TWILIO, is_active=True
             )
             try:
-                existing_user = BotExtensionUser.objects.get(
+                existing_user = SharedPhoneNumberBotUser.objects.get(
                     twilio_phone_number=user_number,
                     extension__bot_integration__twilio_phone_number=bot_number,
                 )
-            except BotExtensionUser.DoesNotExist:
+            except SharedPhoneNumberBotUser.DoesNotExist:
                 raise ExtensionGatheringVoice(call_sid, user_number)
 
             bot_extension = existing_user.extension
             bi = bot_extension.bot_integration
 
-        except ProvisionedNumber.DoesNotExist:
+        except SharedPhoneNumber.DoesNotExist:
             try:
                 # cases where user is calling the bot
                 bi = BotIntegration.objects.get(
@@ -175,14 +175,14 @@ def twilio_extension_input(
         return twiml_response(resp)
 
     try:
-        extension = BotExtension.objects.get(extension_number=int(digits))
-    except (BotExtension.DoesNotExist, ValueError):
+        extension = SharedPhoneNumberBotUser.objects.get(extension_number=int(digits))
+    except (SharedPhoneNumberBotUser.DoesNotExist, ValueError):
         resp = VoiceResponse()
         resp.say("Sorry, I couldn't find that extension on Gooey-AI.")
         resp.reject()
         return twiml_response(resp)
 
-    BotExtensionUser.objects.create(
+    SharedPhoneNumberBotUser.objects.create(
         twilio_phone_number=user_number,
         extension=extension,
     )
@@ -240,7 +240,7 @@ def create_twilio_voice_ws_bot(
     bi: BotIntegration,
     user_number: str,
     call_sid: str,
-    extension: BotExtension | None = None,
+    extension: SharedPhoneNumberBotUser | None = None,
     text: str | None = None,
     audio_url: str | None = None,
 ):

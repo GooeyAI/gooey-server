@@ -15,7 +15,7 @@ from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 from django.utils import timezone
 from django.db import transaction
-from number_cycling.models import ProvisionedNumber, BotExtensionUser
+from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
 from sentry_sdk import capture_exception
 
 DISCONNECT_EXTENSION_TEXT = "Extension disconnected"
@@ -36,9 +36,6 @@ class TwilioSMS(BotInterface):
 
     @classmethod
     def from_webhook_data(cls, data: dict):
-        self.request_overrides = dict(
-            variables=dict(platform_medium="SMS"),
-        )
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
@@ -48,20 +45,20 @@ class TwilioSMS(BotInterface):
         bot_id = data["To"][0]
 
         try:
-            ProvisionedNumber.objects.get(phone_number=bot_id, is_active=True)
+            SharedPhoneNumber.objects.get(phone_number=bot_id, is_active=True)
             is_provisioned = True
             try:
-                extension_user = BotExtensionUser.objects.get(
+                extension_user = SharedPhoneNumberBotUser.objects.get(
                     twilio_phone_number=user_id,
                     extension__bot_integration__twilio_phone_number=bot_id,
                 )
-            except BotExtensionUser.DoesNotExist:
+            except SharedPhoneNumberBotUser.DoesNotExist:
                 raise ExtensionGatheringSMS(INITIATE_EXTENSION_TEXT)
 
             bot_extension = extension_user.extension
             bi = bot_extension.bot_integration
 
-        except ProvisionedNumber.DoesNotExist:
+        except SharedPhoneNumber.DoesNotExist:
             bi = BotIntegration.objects.get(
                 twilio_account_sid=account_sid, twilio_phone_number=bot_id
             )
@@ -134,6 +131,9 @@ class TwilioSMS(BotInterface):
         input_type: str,
         user_msg_id: str,
     ):
+        self.request_overrides = dict(
+            variables=dict(platform_medium="SMS"),
+        )
         self.convo = convo
         self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
         self.user_id = convo.twilio_phone_number.as_e164

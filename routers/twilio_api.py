@@ -343,7 +343,7 @@ def twilio_sms(
         DISCONNECT_EXTENSION_TEXT,
         INITIATE_EXTENSION_TEXT,
     )
-    from number_cycling.utils import get_extension_number
+    from number_cycling.utils import parse_extension_number
     from number_cycling.models import BotExtension, BotExtensionUser
 
     logger.info(f"SMS data: {data}")
@@ -356,7 +356,7 @@ def twilio_sms(
             return twiml_response(resp)
 
         message_text = data["Body"][0]
-        bot_extension_number = get_extension_number(message_text)
+        bot_extension_number = parse_extension_number(message_text)
 
         if bot_extension_number:
             try:

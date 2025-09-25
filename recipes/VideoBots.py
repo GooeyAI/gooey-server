@@ -58,7 +58,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import UserError, UnavailableProvisionedNumber
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -1661,6 +1660,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         from routers.slack_api import slack_connect_url
         from routers.facebook_api import wa_connect_url
         from number_cycling.utils import create_bot_integration_with_extension
+        from number_cycling.models import SharedPhoneNumber
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
@@ -1729,9 +1729,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         redirect_url = connect_bot_to_published_run(
                             bi, pr, overwrite=True
                         )
-                    except UnavailableProvisionedNumber as e:
+                    except SharedPhoneNumber.DoesNotExist:
                         redirect_url = wa_connect_url(pr.id)
-
                 case Platform.SLACK:
                     redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
@@ -1744,11 +1743,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                             workspace=self.current_workspace,
                             platform=Platform.TWILIO,
                         )
-                    except UnavailableProvisionedNumber as e:
-                        gui.caption(
-                            f"{e}",
-                            className="text-center text-danger",
-                        )
+                    except SharedPhoneNumber.DoesNotExist as e:
+                        gui.caption(f"{e}", className="text-center text-danger")
                         return
 
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
@@ -1816,10 +1812,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         icon = Platform(bi.platform).get_icon()
         with gui.div(className="w-100 text-start"):
             test_link = bi.get_bot_test_link()
-            extension_number = bi.get_extension_number()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                if extension_number:
+                if bi.extension_number:
                     gui.write("###### Connected to Extension")
                 else:
                     gui.write("###### Connected to")
@@ -1852,12 +1847,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Test")
-
-                if extension_number:
-                    test_caption = f"Call or send a text message via {Platform(bi.platform).label} (with extension {extension_number})."
-                else:
-                    test_caption = f"Call or send a text message via {Platform(bi.platform).label}."
-
+                test_caption = (
+                    f"Call or send a text message via {Platform(bi.platform).label}."
+                )
+                if bi.extension_number:
+                    test_caption += f" (with extension {bi.extension_number})."
                 gui.caption(test_caption)
             with col2:
                 if not test_link:
@@ -1890,7 +1884,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         new_tab=True,
                     )
 
-            if bi.platform == Platform.WHATSAPP and extension_number:
+            if bi.platform == Platform.WHATSAPP and bi.extension_number:
                 is_enterprise = (
                     self.current_workspace.subscription
                     and PricingPlan.from_sub(self.current_workspace.subscription)
@@ -1901,15 +1895,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 with col1:
                     gui.write("###### Bring your own number")
                     gui.write(
-                        f"Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-whatsapp)",
+                        "Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-whatsapp)",
                     )
 
                 with col2:
-                    # get pr id from bi
-                    pr_id = bi.published_run.id
                     gui.anchor(
                         "Connect number",
-                        href=wa_connect_url(pr_id),
+                        href=wa_connect_url(self.current_pr.id),
                         style={
                             "backgroundColor": "#1877F2",
                             "color": "white",
@@ -1962,7 +1954,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         )
 
                 gui.write("---")
-            if bi.platform == Platform.TWILIO and extension_number:
+
+            if bi.platform == Platform.TWILIO and bi.extension_number:
                 col1, col2 = gui.columns(2, style={"alignItems": "center"})
                 is_enterprise = (
                     self.current_workspace.subscription
@@ -2023,7 +2016,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 if (
                     bi.platform == Platform.TWILIO
                     and bi.twilio_phone_number_sid
-                    and not extension_number
+                    and not bi.extension_number
                 ):
                     gui.anchor(
                         f"{icon} Open Twilio Console",
