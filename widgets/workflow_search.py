@@ -408,22 +408,24 @@ def get_filtered_published_runs(
     qs = PublishedRun.objects.all()
     qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
-    qs = build_sort_filter(qs, SortOptions.get(search_filters.sort))
+    qs = build_sort_filter(qs, search_filters)
     return qs[:25]
 
 
-def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
-    match sort:
+def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
+    match SortOptions.get(search_filters.sort):
         case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            return qs.order_by(
-                "-rank",
+            order_by = [
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
                 F("is_created_by").desc(nulls_last=True),
                 "-updated_at",
-            )
+            ]
+            if search_filters.search:
+                order_by.insert(0, "-rank")
+            return qs.order_by(*order_by)
         case SortOptions.last_updated:
             return qs.order_by("-updated_at")
         case SortOptions.created_at:
