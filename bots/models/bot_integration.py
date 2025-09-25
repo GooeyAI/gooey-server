@@ -365,7 +365,7 @@ class BotIntegration(models.Model):
     twilio_phone_number_sid = models.TextField(
         blank=True,
         default="",
-        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming",
+        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (only for display)",
     )
     twilio_account_sid = models.TextField(
         blank=True,
@@ -435,6 +435,21 @@ class BotIntegration(models.Model):
     )
     demo_notes = models.TextField(null=True, blank=True)
 
+    shared_phone_number = models.ForeignKey(
+        "number_cycling.SharedPhoneNumber",
+        on_delete=models.CASCADE,
+        related_name="bot_integrations",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    extension_number = models.IntegerField(
+        help_text="Extension number for shared phone number",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -442,12 +457,29 @@ class BotIntegration(models.Model):
 
     class Meta:
         ordering = ["-updated_at"]
+        get_latest_by = "updated_at"
         unique_together = [
             ("slack_channel_id", "slack_team_id"),
+            ("platform", "shared_phone_number", "extension_number"),
         ]
         indexes = [
+            models.Index(fields=["-updated_at"]),
             models.Index(fields=["workspace", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["twilio_phone_number"],
+                condition=models.Q(shared_phone_number__isnull=True),
+                name="unique_twilio_phone_number",
+                violation_error_message="A Bot Integration with this dedicated Twilio phone number already exists",
+            ),
+            models.UniqueConstraint(
+                fields=["wa_phone_number_id"],
+                condition=models.Q(shared_phone_number__isnull=True),
+                name="unique_wa_phone_number_id",
+                violation_error_message="A Bot Integration with this dedicated WhatsApp phone number already exists",
+            ),
         ]
 
     def __str__(self):
@@ -466,24 +498,6 @@ class BotIntegration(models.Model):
             return None
 
     def get_display_name(self):
-        if self.platform == Platform.TWILIO:
-            bot_extension_number = self.get_extension_number()
-            if bot_extension_number:
-                return f"{self.twilio_phone_number.as_international} ex {bot_extension_number}"
-            else:
-                return (
-                    self.twilio_phone_number
-                    and self.twilio_phone_number.as_international
-                )
-        elif self.platform == Platform.WHATSAPP:
-            bot_extension_number = self.get_extension_number()
-            if bot_extension_number:
-                return (
-                    f"{self.wa_phone_number.as_international} ex {bot_extension_number}"
-                )
-            else:
-                return self.wa_phone_number.as_international
-
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.wa_phone_number_id
@@ -499,7 +513,8 @@ class BotIntegration(models.Model):
                 self.platform == Platform.WEB
                 and f"Integration ID {self.api_integration_id()}"
             )
-        )
+            or ""
+        ) + ((self.extension_number and f" ex {self.extension_number}") or "")
 
     get_display_name.short_description = "Bot"
 
@@ -507,13 +522,10 @@ class BotIntegration(models.Model):
         from routers.root import chat_route
 
         if self.wa_phone_number:
-            bot_extension_number = self.get_extension_number()
-            if bot_extension_number:
-                wa_url = furl("https://wa.me/") / self.wa_phone_number.as_e164
-                wa_url.args["text"] = f"/extension {bot_extension_number}"
-                return wa_url.tostr()
-            else:
-                return (furl("https://wa.me/") / self.wa_phone_number.as_e164).tostr()
+            wa_url = furl("https://wa.me/") / self.wa_phone_number.as_e164
+            if self.extension_number:
+                wa_url.args["text"] = f"/extension {self.extension_number}"
+            return wa_url.tostr()
         elif self.slack_team_id and self.slack_channel_id:
             return (
                 furl("https://app.slack.com/client")
@@ -533,20 +545,11 @@ class BotIntegration(models.Model):
                 ),
             )
         elif self.twilio_phone_number:
-            bot_extension_number = self.get_extension_number()
             tel_url = furl("tel:") / self.twilio_phone_number.as_e164
-            if bot_extension_number:
-                return f"{tel_url.tostr()},{bot_extension_number}"
+            if self.extension_number:
+                return f"{tel_url.tostr()},{self.extension_number}"
             return tel_url.tostr()
         else:
-            return None
-
-    def get_extension_number(self) -> str | None:
-        from number_cycling.models import BotExtension
-
-        try:
-            return str(BotExtension.objects.get(bot_integration=self).extension_number)
-        except BotExtension.DoesNotExist:
             return None
 
     def api_integration_id(self) -> str:

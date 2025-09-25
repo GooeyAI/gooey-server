@@ -221,13 +221,14 @@ def render_graph_data(
         gui.write(f"##### {key}")
 
     if graph_data["data_selection"] == DataSelection.last.value:
-        latest_msg = (
-            Message.objects.filter(conversation__bot_integration=bi)
-            .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
-            .exclude(val__isnull=True)
-            .latest()
-        )
-        if not latest_msg:
+        try:
+            latest_msg = (
+                Message.objects.filter(conversation__bot_integration=bi)
+                .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
+                .exclude(val__isnull=True)
+                .latest()
+            )
+        except Message.DoesNotExist:
             gui.write("No analysis results found")
             return
         values = [[latest_msg.analysis_result.get(key), 1]]

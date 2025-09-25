@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import models
 import phonenumber_field.modelfields
 import random
-from daras_ai_v2.exceptions import UnavailableProvisionedNumber
+from bots.models import bot_integration
 from bots.models.bot_integration import (
     Platform,
     WhatsappPhoneNumberField,
@@ -11,96 +11,28 @@ from bots.models.bot_integration import (
 )
 
 
-class BotExtension(models.Model):
-    bot_integration = models.ForeignKey(
-        "bots.BotIntegration",
-        on_delete=models.CASCADE,
-        related_name="extensions",
-        help_text="The bot integration this extension belongs to",
+class SharedPhoneNumberQuerySet(models.QuerySet):
+    def any_active_number(self, platform: Platform) -> SharedPhoneNumber:
+        obj = self.filter(platform=platform.value, is_active=True).order_by("?").first()
+        if not obj:
+            raise SharedPhoneNumber.DoesNotExist(
+                f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
+            )
+        return obj
+
+
+class SharedPhoneNumber(models.Model):
+    platform = models.IntegerField(
+        choices=Platform.choices,
+        help_text="The platform this phone number is for (WhatsApp, Twilio, etc.)",
     )
-    extension_number = models.IntegerField(
-        unique=True,
-        help_text="Extension number for provisioned numbers",
-    )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        indexes = [
-            models.Index(
-                fields=["extension_number"], name="bots_botext_extensi_7ea998_idx"
-            ),
-        ]
-        unique_together = (("bot_integration", "extension_number"),)
-
-    def __str__(self) -> str:
-        return f"{self.extension_number} ({self.bot_integration})"
-
-
-class BotExtensionUser(models.Model):
-    extension = models.ForeignKey(
-        "number_cycling.BotExtension",
-        on_delete=models.CASCADE,
-        related_name="bot_extension_users",
-        help_text="The extension this user is associated with",
-    )
     wa_phone_number = WhatsappPhoneNumberField(
         blank=True,
-        null=True,
-        max_length=128,
-        help_text="WhatsApp phone number associated with this extension user",
+        default="",
+        help_text="Bot's WhatsApp phone number (only for display)",
         validators=[validate_phonenumber],
     )
-    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
-        blank=True,
-        null=True,
-        help_text="Twilio phone number associated with this extension user",
-        validators=[validate_phonenumber],
-        max_length=128,
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        indexes = [
-            models.Index(
-                fields=["wa_phone_number"], name="bots_botext_wa_phon_7efc3f_idx"
-            ),
-            models.Index(
-                fields=["twilio_phone_number"], name="bots_botext_twilio__e2d976_idx"
-            ),
-        ]
-        unique_together = (
-            ("extension", "twilio_phone_number"),
-            ("extension", "wa_phone_number"),
-        )
-        constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(wa_phone_number__isnull=False)
-                    | models.Q(twilio_phone_number__isnull=False)
-                ),
-                name="wa_phone_number_or_twilio_phone_number",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return (
-            f"{self.extension} - "
-            f"{(self.wa_phone_number and self.wa_phone_number.as_e164) or ''} "
-            f"{(self.twilio_phone_number and self.twilio_phone_number.as_e164) or ''}"
-        ).strip()
-
-
-class ProvisionedNumber(models.Model):
-    phone_number = models.CharField(
-        max_length=20,
-        unique=True,
-        help_text="The phone number (e.g., +15551234567)",
-    )
-
     wa_phone_number_id = models.CharField(
         max_length=256,
         blank=True,
@@ -110,10 +42,19 @@ class ProvisionedNumber(models.Model):
         help_text="Bot's WhatsApp phone number id (mandatory)",
     )
 
-    platform = models.IntegerField(
-        choices=Platform.choices,
-        help_text="The platform this phone number is for (WhatsApp, Twilio, etc.)",
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
+        blank=True,
+        null=True,
+        default=None,
+        unique=True,
+        help_text="Twilio phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
     )
+    twilio_phone_number_sid = models.TextField(
+        blank=True,
+        default="",
+        help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (only for display)",
+    )
+
     is_active = models.BooleanField(
         default=True, help_text="Whether this phone number is available for assignment"
     )
@@ -126,44 +67,75 @@ class ProvisionedNumber(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = SharedPhoneNumberQuerySet.as_manager()
+
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-updated_at"]
+        get_latest_by = "updated_at"
         indexes = [
-            models.Index(fields=["platform"], name="bots_provis_platfor_b162e3_idx"),
-            models.Index(fields=["is_active"], name="bots_provis_is_acti_aedbef_idx"),
-        ]
-        constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(platform=Platform.WHATSAPP)
-                    | models.Q(platform=Platform.TWILIO)
-                ),
-                name="platform_whatsapp_or_platform_twilio",
-            ),
-            models.CheckConstraint(
-                check=(
-                    ~models.Q(platform=Platform.WHATSAPP)
-                    | (
-                        models.Q(phone_number__isnull=False)
-                        & models.Q(wa_phone_number_id__isnull=False)
-                    )
-                ),
-                name="wa_phone_number_and_wa_phone_number_id",
-            ),
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["platform", "is_active"]),
         ]
 
     def __str__(self) -> str:
-        return f"{self.phone_number} ({Platform(self.platform).label})"
-
-    @classmethod
-    def get_available_phone_number(cls, platform: Platform) -> ProvisionedNumber:
-        available_numbers = list(
-            ProvisionedNumber.objects.filter(platform=platform.value, is_active=True)
+        return (
+            (self.wa_phone_number and self.wa_phone_number.as_international)
+            or self.wa_phone_number_id
+            or self.twilio_phone_number
+            or self.twilio_phone_number_sid
+            or self.notes
+            or ""
         )
 
-        if available_numbers:
-            return random.choice(available_numbers)
 
-        raise UnavailableProvisionedNumber(
-            f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
-        )
+class SharedPhoneNumberBotUser(models.Model):
+    shared_phone_number = models.ForeignKey(
+        "number_cycling.SharedPhoneNumber",
+        on_delete=models.CASCADE,
+        related_name="users",
+    )
+
+    wa_phone_number = WhatsappPhoneNumberField(
+        blank=True,
+        null=True,
+        help_text="The user's WhatsApp phone number",
+        validators=[validate_phonenumber],
+    )
+    twilio_phone_number = phonenumber_field.modelfields.PhoneNumberField(
+        blank=True,
+        null=True,
+        help_text="The user's Twilio phone number",
+    )
+
+    bot_integration = models.ForeignKey(
+        "bots.BotIntegration",
+        on_delete=models.CASCADE,
+        related_name="shared_phone_number_users",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        get_latest_by = "updated_at"
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+        ]
+        unique_together = [
+            ("wa_phone_number", "shared_phone_number"),
+            ("twilio_phone_number", "shared_phone_number"),
+        ]
+
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(wa_phone_number__isnull=False)
+                    ^ models.Q(twilio_phone_number__isnull=False)
+                ),
+                name="exactly_one_of_wa_or_twilio_phone_number",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.wa_phone_number or self.twilio_phone_number} <> {self.bot_integration}"
