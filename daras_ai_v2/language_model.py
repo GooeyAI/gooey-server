@@ -1068,9 +1068,7 @@ def remove_images_from_entry(entry: ConversationEntry) -> ConversationEntry | No
     if isinstance(contents, str):
         return entry
 
-    new_contents = [
-        part for part in contents if "image_url" not in part or not part["image_url"]
-    ]
+    new_contents = [part for part in contents if not part.get("image_url")]
     if new_contents:
         entry["content"] = new_contents
         return entry
