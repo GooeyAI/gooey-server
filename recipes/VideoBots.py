@@ -407,7 +407,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
     def document_understanding_step(self, request):
         ocr_texts = []
-        if request.document_model and request.input_images:
+        if request.input_images and (
+            request.document_model
+            or not LargeLanguageModels[request.selected_model].is_vision_model
+        ):
             yield "Running Azure Form Recognizer..."
             for url in request.input_images:
                 ocr_text = (
