@@ -26,7 +26,6 @@ from recipes.TextToSpeech import TextToSpeechPage
 from routers.custom_api_router import CustomAPIRouter
 from usage_costs.twilio_usage_cost import record_twilio_voice_call_cost
 
-
 DEFAULT_INITIAL_TEXT = "Welcome to {bot_name}! Please ask your question and press 0 if the end of your question isn't detected."
 DEFAULT_WAITING_AUDIO_URLS = [
     "http://com.twilio.sounds.music.s3.amazonaws.com/ClockworkWaltz.mp3",
@@ -337,70 +336,10 @@ def twilio_sms(
     background_tasks: BackgroundTasks, data: dict = fastapi_request_urlencoded_body
 ):
     """Handle incoming Twilio SMS."""
-    from daras_ai_v2.twilio_bot import (
-        TwilioSMS,
-        ExtensionGatheringSMS,
-        DISCONNECT_EXTENSION_TEXT,
-        INITIATE_EXTENSION_TEXT,
-    )
-    from number_cycling.utils import parse_extension_number
-    from number_cycling.models import BotExtension, BotExtensionUser
+    from daras_ai_v2.twilio_bot import TwilioSMS
+    from daras_ai_v2.bots import msg_handler
 
-    logger.info(f"SMS data: {data}")
-    try:
-        bot = TwilioSMS.from_webhook_data(data)
-    except ExtensionGatheringSMS as e:
-        if e.message == DISCONNECT_EXTENSION_TEXT:
-            resp = MessagingResponse()
-            resp.message(e.message)
-            return twiml_response(resp)
-
-        message_text = data["Body"][0]
-        bot_extension_number = parse_extension_number(message_text)
-
-        if bot_extension_number:
-            try:
-                bot_extension = BotExtension.objects.get(
-                    extension_number=bot_extension_number
-                )
-                bi = bot_extension.bot_integration
-                # override the message text from "/extension 12345" to "hi"
-                data["Body"][0] = "hi"
-
-                BotExtensionUser.objects.create(
-                    twilio_phone_number=data["From"][0],
-                    extension=bot_extension,
-                )
-
-            except (BotExtension.DoesNotExist, ValueError):
-                resp = MessagingResponse()
-                resp.message(
-                    "Sorry, I couldn't find that extension on Gooey.AI. Please enter another."
-                )
-                return twiml_response(resp)
-
-        else:
-            resp = MessagingResponse()
-            resp.message(INITIATE_EXTENSION_TEXT)
-            return twiml_response(resp)
-
-        convo = Conversation.objects.create(
-            bot_integration=bi,
-            twilio_phone_number=data["From"][0],
-            extension=bot_extension,
-        )
-
-        text, media_urls, input_type = TwilioSMS._extract_media_info(data)
-        user_msg_id = data["MessageSid"][0]
-
-        bot = TwilioSMS(
-            convo,
-            text=text,
-            media_urls=media_urls,
-            input_type=input_type,
-            user_msg_id=user_msg_id,
-        )
-
+    bot = TwilioSMS(data)
     background_tasks.add_task(msg_handler, bot)
 
     resp = MessagingResponse()
