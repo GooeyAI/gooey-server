@@ -11,15 +11,13 @@ from starlette.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import Connect, VoiceResponse
 from websockets import ConnectionClosed
 
-from bots.models import BotIntegration, Conversation
+from bots.models import BotIntegration
 from bots.models.convo_msg import ConvoBlockedStatus
-from bots.models.bot_integration import Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import msg_handler_raw
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_urlencoded_body,
     get_route_path,
-    get_api_route_url,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.twilio_bot import TwilioVoice
@@ -30,22 +28,10 @@ from routers.twilio_api import (
     DEFAULT_INITIAL_TEXT,
 )
 from daras_ai_v2.language_model import LargeLanguageModels
-from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
 
 app = CustomAPIRouter()
 
 T = typing.TypeVar("T")
-
-
-class ExtensionGatheringVoice(Exception):
-    """Exception raised when a user needs to provide an extension number."""
-
-    def __init__(self, call_sid: str, user_number: str):
-        self.call_sid = call_sid
-        self.user_number = user_number
-        super().__init__(
-            f"Extension gathering needed for {user_number} on call {call_sid}"
-        )
 
 
 class TwilioVoiceWs(TwilioVoice):
@@ -69,54 +55,6 @@ class TwilioVoiceWs(TwilioVoice):
                     LargeLanguageModels.gpt_4_o_audio.name
                 )
 
-    @classmethod
-    def from_webhook_data(cls, data: dict):
-        logger.debug(data)
-        account_sid = data["AccountSid"][0]
-        if account_sid == settings.TWILIO_ACCOUNT_SID:
-            account_sid = ""
-        call_sid = data["CallSid"][0]
-        user_number, bot_number = data["From"][0], data["To"][0]
-        bot_extension = None
-        bi = None
-
-        try:
-            SharedPhoneNumber.objects.get(
-                phone_number=bot_number, platform=Platform.TWILIO, is_active=True
-            )
-            try:
-                existing_user = SharedPhoneNumberBotUser.objects.get(
-                    twilio_phone_number=user_number,
-                    extension__bot_integration__twilio_phone_number=bot_number,
-                )
-            except SharedPhoneNumberBotUser.DoesNotExist:
-                raise ExtensionGatheringVoice(call_sid, user_number)
-
-            bot_extension = existing_user.extension
-            bi = bot_extension.bot_integration
-
-        except SharedPhoneNumber.DoesNotExist:
-            try:
-                # cases where user is calling the bot
-                bi = BotIntegration.objects.get(
-                    twilio_account_sid=account_sid, twilio_phone_number=bot_number
-                )
-            except BotIntegration.DoesNotExist:
-                #  cases where bot is calling the user
-                user_number, bot_number = bot_number, user_number
-                bi = BotIntegration.objects.get(
-                    twilio_account_sid=account_sid, twilio_phone_number=bot_number
-                )
-
-        return create_twilio_voice_ws_bot(
-            bi=bi,
-            user_number=user_number,
-            call_sid=call_sid,
-            extension=bot_extension,
-            text=data.get("SpeechResult", [None])[0],
-            audio_url=data.get("RecordingUrl", [None])[0],
-        )
-
     def _send_msg(self, *args, **kwargs):
         pass
 
@@ -127,18 +65,6 @@ def twilio_voice_ws(
 ):
     try:
         bot = TwilioVoiceWs.from_webhook_data(data)
-    except ExtensionGatheringVoice:
-        resp = VoiceResponse()
-        resp.say("Please dial an extension")
-        resp.gather(
-            action=get_api_route_url(twilio_extension_input),
-            method="POST",
-            numDigits=5,
-            timeout=10,
-        )
-        resp.say("No extension entered. Goodbye.")
-        resp.reject()
-        return twiml_response(resp)
     except BotIntegration.DoesNotExist as e:
         logger.debug(f"could not find bot integration for {data=} {e=}")
         resp = VoiceResponse()
@@ -157,62 +83,7 @@ def twilio_voice_ws(
         return twiml_response(resp)
 
     background_tasks.add_task(msg_handler_raw, bot)
-    return connect_to_stream(bot)
 
-
-@app.post("/__/twilio/voice/ws/extension/")
-def twilio_extension_input(
-    background_tasks: BackgroundTasks, data: dict = fastapi_request_urlencoded_body
-):
-    call_sid = data["CallSid"][0]
-    user_number = data["From"][0]
-    digits = data.get("Digits", [None])[0]
-
-    if not digits:
-        resp = VoiceResponse()
-        resp.say("No extension entered. Goodbye.")
-        resp.reject()
-        return twiml_response(resp)
-
-    try:
-        extension = SharedPhoneNumberBotUser.objects.get(extension_number=int(digits))
-    except (SharedPhoneNumberBotUser.DoesNotExist, ValueError):
-        resp = VoiceResponse()
-        resp.say("Sorry, I couldn't find that extension on Gooey-AI.")
-        resp.reject()
-        return twiml_response(resp)
-
-    SharedPhoneNumberBotUser.objects.create(
-        twilio_phone_number=user_number,
-        extension=extension,
-    )
-
-    bi = extension.bot_integration
-    bot = create_twilio_voice_ws_bot(
-        bi=bi,
-        user_number=user_number,
-        call_sid=call_sid,
-        extension=extension,
-        text=data.get("SpeechResult", [None])[0],
-        audio_url=data.get("RecordingUrl", [None])[0],
-    )
-
-    if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
-        resp = VoiceResponse()
-        resp.reject()
-        return twiml_response(resp)
-    try:
-        ensure_bot_rate_limits(bot.convo)
-    except RateLimitExceeded as e:
-        resp = VoiceResponse()
-        resp.say(e.detail["error"])
-        return twiml_response(resp)
-
-    background_tasks.add_task(msg_handler_raw, bot)
-    return connect_to_stream(bot)
-
-
-def connect_to_stream(bot: TwilioVoiceWs):
     resp = VoiceResponse()
 
     text = bot.bi.twilio_initial_text.strip()
@@ -234,56 +105,6 @@ def connect_to_stream(bot: TwilioVoiceWs):
     )
     resp.append(connect)
     return twiml_response(resp)
-
-
-def create_twilio_voice_ws_bot(
-    bi: BotIntegration,
-    user_number: str,
-    call_sid: str,
-    extension: SharedPhoneNumberBotUser | None = None,
-    text: str | None = None,
-    audio_url: str | None = None,
-):
-    if bi.twilio_use_missed_call:
-        convo = Conversation(
-            bot_integration=bi,
-            twilio_phone_number=user_number,
-            twilio_call_sid=call_sid,
-            extension=extension,
-        )
-    elif bi.twilio_fresh_conversation_per_call:
-        convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            twilio_phone_number=user_number,
-            twilio_call_sid=call_sid,
-            extension=extension,
-        )[0]
-    else:
-        convo = (
-            Conversation.objects.filter(
-                bot_integration=bi,
-                twilio_phone_number=user_number,
-                twilio_call_sid="",
-                extension=extension,
-            )
-            .order_by("created_at")
-            .last()
-        )
-
-        if not convo:
-            convo = Conversation.objects.create(
-                bot_integration=bi,
-                twilio_phone_number=user_number,
-                twilio_call_sid="",
-                extension=extension,
-            )
-
-    return TwilioVoiceWs(
-        convo,
-        text=text,
-        audio_url=audio_url,
-        call_sid=call_sid,
-    )
 
 
 @app.websocket("/__/twilio/voice/ws/stream/{call_sid}/")
