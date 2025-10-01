@@ -31,6 +31,22 @@ class SidebarRef:
 
 def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRef:
     """Create or get a sidebar reference with state management."""
+    import time
+
+    # Check if this is a fresh page load by comparing timestamps
+    last_load_time = session.get(f"{key}:last_load_time", 0)
+    current_time = time.time()
+
+    # If more than 1 second has passed since last load, consider it a fresh page load
+    if current_time - last_load_time > 0.5:
+        # Fresh page load - clear mobile state
+        mobile_key = key + ":mobile"
+        if mobile_key in session:
+            del session[mobile_key]
+
+    # Update the last load time
+    session[f"{key}:last_load_time"] = current_time
+
     ref = SidebarRef(
         key=key,
         session=session,
