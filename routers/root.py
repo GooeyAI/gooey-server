@@ -828,7 +828,7 @@ def page_wrapper(
                         )
                     else:
                         current_workspace = None
-                        anonymous_login_container(request, context)
+                        anonymous_login_container(request, context, hide_sign_in=True)
 
     # Main content pane
     with pane_container:
@@ -894,16 +894,18 @@ mobileSearchContainer.classList.remove(
 """
 
 
-def anonymous_login_container(request: Request, context: dict):
+def anonymous_login_container(
+    request: Request, context: dict, hide_sign_in: bool = False
+):
     next_url = str(furl(request.url).set(origin=None))
     login_url = str(furl("/login/", query_params=dict(next=next_url)))
 
-    with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
-        gui.html("Sign In")
-
     popover, content = gui.popover(interactive=True)
 
-    with popover, gui.div(className="d-flex align-items-center"):
+    with popover, gui.div(className="d-flex align-items-center overflow-hidden"):
+        if not hide_sign_in:
+            with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
+                gui.html("Sign In")
         gui.html(
             templates.get_template("google_one_tap_button.html").render(**context)
             + '<i class="ps-2 fa-regular fa-chevron-down d-xl-none"></i>'
