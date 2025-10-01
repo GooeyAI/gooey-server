@@ -16,7 +16,7 @@ from widgets.workflow_search import (
     render_search_filters,
     render_search_results,
 )
-from widgets.sidebar import sidebar_logo_header
+from widgets.sidebar import sidebar_mobile_header
 
 META_TITLE = "Explore AI Workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
@@ -53,7 +53,7 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
 
 
 def render(request: Request, search_filters: SearchFilters | None):
-    sidebar_logo_header(request.session)
+    sidebar_mobile_header(request.session)
     with gui.div(className="my-4"):
         # note: using css instead of `if not search_filters: ...` stops re-render
         # of the search bar. this preserves focus/blur between query-param redirects

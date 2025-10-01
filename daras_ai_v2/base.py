@@ -91,7 +91,7 @@ from workspaces.widgets import (
 )
 from routers.root import PREVIEW_ROUTE_WORKFLOWS
 
-from widgets.sidebar import render_default_sidebar, sidebar_logo_header
+from widgets.sidebar import render_default_sidebar, sidebar_mobile_header
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -195,7 +195,7 @@ class BasePage:
         self.request = request
 
     def render_sidebar(self, request, sidebar_ref):
-        render_default_sidebar(request.session)
+        render_default_sidebar(sidebar_ref, request)
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -394,7 +394,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        sidebar_logo_header(self.request.session)
+        sidebar_mobile_header(self.request.session)
         header_placeholder = gui.div(className="my-1 w-100")
         with (
             gui.styled(NAV_TABS_CSS),

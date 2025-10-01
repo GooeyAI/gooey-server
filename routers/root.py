@@ -809,7 +809,7 @@ def page_wrapper(
                 if container:
                     container.render_sidebar(request, sidebar_ref)
                 else:
-                    render_default_sidebar(request.session)
+                    render_default_sidebar(sidebar_ref, request)
 
             # Bottom section with workspace selector when sidebar is closed
             with (

@@ -27,7 +27,7 @@ from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
 from workspaces.widgets import get_current_workspace, SWITCH_WORKSPACE_KEY
-from widgets.sidebar import sidebar_logo_header
+from widgets.sidebar import sidebar_mobile_header
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -382,7 +382,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
         raise gui.RedirectException(str(redirect_url))
 
     with page_wrapper(request) as current_workspace:
-        sidebar_logo_header(request.session)
+        sidebar_mobile_header(request.session)
         with gui.nav_tabs():
             for tab in AccountTabs.get_tabs_for_user(request.user, current_workspace):
                 with gui.nav_item(tab.url_path, active=tab == current_tab):

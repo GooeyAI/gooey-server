@@ -41,7 +41,10 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
     return ref
 
 
-def sidebar_list_item(icon, title, is_sidebar_open, url=None, hover_icon=None):
+def sidebar_list_item(
+    icon, title, is_sidebar_open, url=None, hover_icon=None, current_url=None
+):
+    is_selected = current_url and url and current_url.startswith(url)
     with (
         gui.styled(
             """
@@ -64,6 +67,9 @@ def sidebar_list_item(icon, title, is_sidebar_open, url=None, hover_icon=None):
                     display: block;
                 }
             }
+            & .sidebar-list-item.selected {
+                background-color: #ddd;
+            }
             & .sidebar-list-item-title {
                 font-size: 0.875rem;
             }
@@ -74,6 +80,8 @@ def sidebar_list_item(icon, title, is_sidebar_open, url=None, hover_icon=None):
         link_classes = "d-block sidebar-list-item ms-2"
         if is_sidebar_open:
             link_classes += " d-flex align-items-baseline justify-content-between w-100"
+        if is_selected:
+            link_classes += " selected"
         with gui.tag(
             "a",
             href=url,
@@ -97,12 +105,12 @@ def sidebar_list_item(icon, title, is_sidebar_open, url=None, hover_icon=None):
                     gui.html(hover_icon, className="text-secondary")
 
 
-def sidebar_item_list(is_sidebar_open):
+def sidebar_item_list(is_sidebar_open, current_url=None):
     for i, (url, label, icon) in enumerate(settings.SIDEBAR_LINKS):
         if icon:
             with gui.div():
                 sidebar_list_item(
-                    icon, label, is_sidebar_open, url, icons.arrow_up_right
+                    icon, label, is_sidebar_open, url, icons.arrow_up_right, current_url
                 )
         else:
             with gui.div(
@@ -112,8 +120,10 @@ def sidebar_item_list(is_sidebar_open):
             gui.html(label)
 
 
-def render_default_sidebar(session: dict):
-    is_sidebar_open = use_sidebar("main-sidebar", session, default_open=True).is_open
+def render_default_sidebar(sidebar_ref: SidebarRef, request=None):
+    is_sidebar_open = sidebar_ref.is_open
+    current_url = request.url.path if request else None
+
     with gui.div(
         className=f"d-flex flex-column flex-grow-1 {'pe-3' if is_sidebar_open else ''} my-3 text-nowrap",
     ):
@@ -123,19 +133,21 @@ def render_default_sidebar(session: dict):
                 "Saved",
                 is_sidebar_open,
                 "/account/saved/",
+                current_url=current_url,
             )
             sidebar_list_item(
                 icons.search,
                 "Explore",
                 is_sidebar_open,
                 "/explore/",
+                current_url=current_url,
             )
 
         if is_sidebar_open:
-            sidebar_item_list(is_sidebar_open)
+            sidebar_item_list(is_sidebar_open, current_url)
 
 
-def sidebar_logo_header(session: dict):
+def sidebar_mobile_header(session: dict):
     with gui.div(
         className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2",
         style={"height": "54px"},
@@ -272,7 +284,4 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             style={"height": "100dvh"},
         )
         pane_content_placeholder = gui.div(className="d-flex flex-grow-1 mw-100")
-        # sidebar content
-        sidebar_content_placeholder
-        pane_content_placeholder
     return sidebar_content_placeholder, pane_content_placeholder
