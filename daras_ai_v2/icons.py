@@ -53,6 +53,8 @@ sort = '<i class="fa-solid fa-sort"></i>'
 info = "<i class='fa-regular fa-circle-info'></i>"
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
 library = '<i class="fa-solid fa-book"></i>'
+sidebar_flip = "<i class='fa-light fa-sidebar-flip'></i>"
+arrow_up_right = "<i class='fa-regular fa-arrow-up-right'></i>"
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'
