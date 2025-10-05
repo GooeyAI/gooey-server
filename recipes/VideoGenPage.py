@@ -28,6 +28,8 @@ class VideoGenPage(BasePage):
     workflow = Workflow.VIDEO_GEN
     slug_versions = ["video"]
 
+    price_deferred = True
+
     class RequestModel(BasePage.RequestModel):
         selected_models: list[str]
         inputs: dict[str, typing.Any]
