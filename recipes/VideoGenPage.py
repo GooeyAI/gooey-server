@@ -95,7 +95,7 @@ class VideoGenPage(BasePage):
         super().render()
 
     def get_raw_price(self, state: dict) -> float:
-        return self.get_total_linked_usage_cost_in_credits()
+        return self.get_total_linked_usage_cost_in_credits(default=1000)
 
     def additional_notes(self) -> str | None:
         ret = ""
