@@ -267,6 +267,7 @@ class BotIntegration(models.Model):
         default=None,
         null=True,
         help_text="Bot's WhatsApp phone number id (mandatory)",
+        db_index=True,
     )
 
     wa_business_access_token = models.TextField(
@@ -361,6 +362,7 @@ class BotIntegration(models.Model):
         null=True,
         default=None,
         help_text="Twilio phone number as found on twilio.com/console/phone-numbers/incoming (mandatory)",
+        db_index=True,
     )
     twilio_phone_number_sid = models.TextField(
         blank=True,

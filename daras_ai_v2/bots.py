@@ -178,9 +178,9 @@ class BotInterface:
                 ).latest()
             except BotIntegration.DoesNotExist as e:
                 # ideally, send an email to the admin here
-                raise UserError(
-                    f"phone number {self.bot_id} is not configured for {self.platform}"
-                ) from e
+                err_msg = f"phone number {self.bot_id} is not configured for {self.platform.label}"
+                self.send_msg(text=err_msg)
+                raise UserError(err_msg) from e
 
         input_text = self.get_input_text() or ""
         input_text = input_text.strip().lower()
