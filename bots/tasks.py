@@ -208,7 +208,13 @@ def send_broadcast_msg(
                 if medium == "Voice Call":
                     send_single_voice_call(convo, text, audio)
                 else:
-                    send_sms_message(convo, text, media_url=audio)
+                    send_sms_message(
+                        client=bi.get_twilio_client(),
+                        bot_number=bi.twilio_phone_number.as_e164,
+                        user_number=convo.twilio_phone_number.as_e164,
+                        text=text,
+                        media_url=audio,
+                    )
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"

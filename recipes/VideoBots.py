@@ -1870,9 +1870,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                    sms_url = furl("sms:") / bi.twilio_phone_number.as_e164
+                    if bi.extension_number:
+                        sms_url.args["body"] = f"{bi.extension_number}"
                     gui.anchor(
                         '<i class="fa-regular fa-sms"></i> Send SMS',
-                        str(furl("sms:") / bi.twilio_phone_number.as_e164),
+                        str(sms_url),
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
@@ -2170,9 +2173,9 @@ connect_choices = [
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
     ),
-    # ConnectChoice(
-    #     platform=Platform.TWILIO,
-    #     img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
-    #     label="Call or text your copilot with a free test number (or buy one).",
-    # ),
+    ConnectChoice(
+        platform=Platform.TWILIO,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
+        label="Call or text your copilot with a free test number (or buy one).",
+    ),
 ]
