@@ -6,6 +6,7 @@ import aifail
 import requests
 from loguru import logger
 from twilio.base.exceptions import TwilioRestException
+from twilio.rest import Client
 from twilio.twiml import TwiML
 from twilio.twiml.voice_response import VoiceResponse
 
@@ -23,20 +24,13 @@ class TwilioSMS(BotInterface):
             variables=dict(platform_medium="SMS"),
         )
 
-        account_sid = data["AccountSid"][0]
-        if account_sid == settings.TWILIO_ACCOUNT_SID:
-            account_sid = ""
-        bi = BotIntegration.objects.get(
-            twilio_account_sid=account_sid, twilio_phone_number=data["To"][0]
+        self.client = Client(
+            account_sid=settings.TWILIO_ACCOUNT_SID,
+            username=settings.TWILIO_API_KEY_SID,
+            password=settings.TWILIO_API_KEY_SECRET,
         )
-        self.convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            twilio_phone_number=data["From"][0],
-            twilio_call_sid="",
-        )[0]
-
-        self.bot_id = bi.twilio_phone_number.as_e164
-        self.user_id = self.convo.twilio_phone_number.as_e164
+        self.bot_id = data["To"][0]
+        self.user_id = data["From"][0]
 
         num_media = int(data.get("NumMedia", [0])[0])
         if num_media > 0:
@@ -57,6 +51,20 @@ class TwilioSMS(BotInterface):
             self.input_type = "text"
 
         self.user_msg_id = data["MessageSid"][0]
+
+        account_sid = data["AccountSid"][0]
+        if account_sid == settings.TWILIO_ACCOUNT_SID:
+            account_sid = ""
+        bi = self.lookup_bot_integration(
+            bot_lookup=dict(twilio_phone_number=self.bot_id),
+            user_lookup=dict(twilio_phone_number=self.user_id),
+        )
+        self.client = bi.get_twilio_client()
+        self.convo = Conversation.objects.get_or_create(
+            bot_integration=bi,
+            twilio_phone_number=self.user_id,
+            twilio_call_sid="",
+        )[0]
 
         super().__init__()
 
@@ -82,10 +90,13 @@ class TwilioSMS(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        assert not buttons, "Interactive mode is not implemented yet"
         media = audio or video or documents
+        if not (media or text):
+            return update_msg_id
         return send_sms_message(
-            self.convo,
+            client=self.client,
+            bot_number=self.bot_id,
+            user_number=self.user_id,
             text=text,
             media_url=media and media[0] or None,
         ).sid
@@ -95,20 +106,19 @@ class TwilioSMS(BotInterface):
 
 
 def send_sms_message(
-    convo: Conversation, text: str | None, media_url: str | None = None
+    client: Client,
+    text: str | None,
+    bot_number: str,
+    user_number: str,
+    media_url: str | None = None,
 ):
     """Send an SMS message to the given conversation."""
 
-    assert convo.twilio_phone_number, (
-        "This is not a Twilio conversation, it has no phone number."
-    )
-
-    client = convo.bot_integration.get_twilio_client()
     message = client.messages.create(
         body=text or "",
         media_url=media_url,
-        from_=convo.bot_integration.twilio_phone_number.as_e164,
-        to=convo.twilio_phone_number.as_e164,
+        from_=bot_number,
+        to=user_number,
     )
 
     return message

@@ -14,7 +14,7 @@ from twilio.twiml.voice_response import VoiceResponse, Gather
 from bots.models import Conversation, BotIntegration
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import normalised_lang_in_collection
-from daras_ai_v2.bots import msg_handler
+from daras_ai_v2.bots import BotIntegrationLookupFailed, msg_handler
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_urlencoded_body,
@@ -339,7 +339,10 @@ def twilio_sms(
     from daras_ai_v2.twilio_bot import TwilioSMS
     from daras_ai_v2.bots import msg_handler
 
-    bot = TwilioSMS(data)
+    try:
+        bot = TwilioSMS(data)
+    except BotIntegrationLookupFailed:
+        return Response(status_code=204)
     background_tasks.add_task(msg_handler, bot)
 
     resp = MessagingResponse()

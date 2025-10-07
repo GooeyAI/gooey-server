@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from django.db import models
 import phonenumber_field.modelfields
-import random
-from bots.models import bot_integration
 from bots.models.bot_integration import (
     Platform,
     WhatsappPhoneNumberField,
@@ -81,7 +79,7 @@ class SharedPhoneNumber(models.Model):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.wa_phone_number_id
-            or self.twilio_phone_number
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
             or self.twilio_phone_number_sid
             or self.notes
             or ""
@@ -138,4 +136,9 @@ class SharedPhoneNumberBotUser(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.wa_phone_number or self.twilio_phone_number} <> {self.bot_integration}"
+        phone_number = (
+            (self.wa_phone_number and self.wa_phone_number.as_international)
+            or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or "No phone number"
+        )
+        return f"{phone_number} <> {self.bot_integration}"
