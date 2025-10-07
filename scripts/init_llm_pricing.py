@@ -986,6 +986,15 @@ def run():
     # Claude
 
     llm_pricing_create(
+        model_id="claude-sonnet-4-5",
+        model_name=LargeLanguageModels.claude_4_5_sonnet.name,
+        unit_cost_input=3,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
+    )
+    llm_pricing_create(
         model_id="claude-4-sonnet-20250514",
         model_name=LargeLanguageModels.claude_4_sonnet.name,
         unit_cost_input=3,

@@ -782,6 +782,16 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_4_5_sonnet = LLMSpec(
+        label="Claude 4.5 Sonnet • Anthropic",
+        model_id="claude-sonnet-4-5",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=64_000,
+        is_vision_model=True,
+        supports_json=True,
+        is_thinking_model=True,
+    )
     claude_4_1_opus = LLMSpec(
         label="Claude 4.1 Opus • Anthropic",
         model_id="claude-opus-4-1",
@@ -802,6 +812,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_5_sonnet",
     )
     claude_4_opus = LLMSpec(
         label="Claude 4 Opus • Anthropic",
@@ -813,6 +825,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_1_opus",
     )
     claude_3_7_sonnet = LLMSpec(
         label="Claude 3.7 Sonnet • Anthropic",
@@ -823,6 +837,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_5_sonnet = LLMSpec(
         label="Claude 3.5 Sonnet • Anthropic",
@@ -834,7 +850,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_opus = LLMSpec(
         label="Claude 3 Opus • Anthropic",
@@ -846,7 +862,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_sonnet = LLMSpec(
         label="Claude 3 Sonnet • Anthropic",
@@ -858,7 +874,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_haiku = LLMSpec(
         label="Claude 3 Haiku • Anthropic",
@@ -870,7 +886,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
 
     afrollama_v1 = LLMSpec(
