@@ -8,6 +8,7 @@ from django.db.models import (
     F,
     FilteredRelation,
     Q,
+    OrderBy,
     QuerySet,
     Value,
 )
@@ -15,12 +16,12 @@ from fastapi import Request
 from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
+from bots.models import PublishedRun, Tag, WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
-from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.saved_workflow import render_pill_with_link, render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceRole
 
 if typing.TYPE_CHECKING:
@@ -77,6 +78,9 @@ class SearchFilters(BaseModel):
     @classmethod
     def to_lower(cls, v):
         return v.lower() if isinstance(v, str) else v
+
+    def get_query_params(self) -> dict[str, str]:
+        return self.model_dump(exclude_defaults=True)
 
 
 def render_search_filters(
@@ -183,8 +187,7 @@ def render_search_bar_with_redirect(
         search_filters.search = search_query
         raise gui.RedirectException(
             get_app_route_url(
-                explore_page,
-                query_params=search_filters.model_dump(exclude_defaults=True),
+                explore_page, query_params=search_filters.get_query_params()
             )
         )
 
@@ -268,6 +271,27 @@ def render_search_bar(
             search_query = ""
 
     return search_query
+
+
+def render_search_suggestions(search_filters: SearchFilters):
+    from routers.root import explore_page
+
+    with gui.div(
+        className="pt-2 pb-1 overflow-auto overflow-sm-visible d-flex flex-nowrap flex-sm-wrap"
+    ):
+        for tag in Tag.get_options():
+            url = get_app_route_url(
+                explore_page,
+                query_params=search_filters.model_copy(
+                    update={"search": tag.name}
+                ).get_query_params(),
+            )
+            render_pill_with_link(
+                tag.render(),
+                link_to=url,
+                text_bg=None,
+                className="me-2 my-1 bg-white border border-dark text-dark",
+            )
 
 
 def get_placeholder_by_search_filters(
@@ -379,24 +403,24 @@ def _render_selectbox(
 
 def render_search_results(user: AppUser | None, search_filters: SearchFilters):
     qs = get_filtered_published_runs(user, search_filters)
-    qs = qs.select_related("workspace", "created_by", "saved_run")
+    qs = qs.prefetch_related("tags", "versions").select_related(
+        "workspace", "last_edited_by", "saved_run"
+    )
 
     def _render_run(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
         show_run_count = is_member or search_filters.sort == SortOptions.most_runs.name
 
         render_saved_workflow_preview(
-            workflow.page_cls,
             pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
+            show_workflow_pill=True,
             show_workspace_author=show_workspace_author,
             show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            hide_visibility_pill=True,
+            hide_access_level=True,
+            search_filters=search_filters,
         )
 
     grid_layout(1, qs, _render_run)
@@ -416,24 +440,30 @@ def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
     match SortOptions.get(search_filters.sort):
         case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            order_by = [
+            fields = (
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
                 F("is_created_by").desc(nulls_last=True),
                 "-updated_at",
-            ]
-            if search_filters.search:
-                order_by.insert(0, "-rank")
-            return qs.order_by(*order_by)
-        case SortOptions.last_updated:
-            return qs.order_by("-updated_at")
-        case SortOptions.created_at:
-            return qs.order_by("-created_at")
-        case SortOptions.most_runs:
-            return qs.order_by(
-                "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
             )
+            if search_filters.search:
+                fields = ("-rank", *fields)
+        case SortOptions.last_updated:
+            fields = ("-updated_at",)
+        case SortOptions.created_at:
+            fields = ("-created_at",)
+        case SortOptions.most_runs:
+            fields = (
+                "-run_count",
+                F("is_created_by").desc(nulls_last=True),
+                "-updated_at",
+            )
+
+    return qs.order_by(*fields).distinct(
+        "id",
+        *(get_field_from_ordering(f) for f in fields),
+    )
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -502,6 +532,7 @@ def build_search_filter(
         vector = (
             SearchVector("title", weight="A")
             + SearchVector(
+                "tags__name",
                 "workspace__name",
                 "workspace__handle__name",
                 "created_by__display_name",
@@ -515,3 +546,13 @@ def build_search_filter(
         qs = qs.filter(search=query)
 
     return qs
+
+
+def get_field_from_ordering(value: str | OrderBy) -> str:
+    match value:
+        case OrderBy():
+            return value.expression.name
+        case str():
+            return value.lstrip("-")
+        case _:
+            raise ValueError(f"Invalid value: {value}")
