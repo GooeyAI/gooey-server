@@ -10,6 +10,8 @@ from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
 from workspaces.models import Workspace
 import secrets
 
+EXTENSION_NUMBER_LENGTH = 5
+
 
 def create_bot_integration_with_extension(
     name: str,
@@ -45,7 +47,7 @@ def create_bot_integration_with_extension(
 def parse_extension_number(message_text: str) -> int | None:
     if not message_text:
         return None
-    match = re.search(r"\b(\d{5})\b", message_text)
+    match = re.search(r"\b(\d{%d})\b" % EXTENSION_NUMBER_LENGTH, message_text)
     if match:
         try:
             return int(match.group(1))

@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-from decouple import config
+from collections import deque
 
 __import__("gooeysite.wsgi")
 
-from routers.api import create_new_run
-
-from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
-
-from daras_ai_v2.bots import BotInterface, build_system_vars
-
-
-from bots.models.convo_msg import Conversation, db_msgs_to_entries
-
+import asyncio
 import uuid
+from functools import wraps
 
+import aiohttp
 import requests
 from asgiref.sync import sync_to_async
-from livekit import agents
-from livekit.rtc.room import ConnectionState
+from decouple import config
+from livekit import agents, api, rtc
 from livekit.agents import (
     Agent,
     AgentSession,
@@ -34,8 +28,10 @@ from livekit.agents import (
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, NotGivenOr
 from livekit.agents.utils import AudioBuffer
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from livekit.rtc.room import ConnectionState
 
 from bots.models.bot_integration import BotIntegration, Platform
+from bots.models.convo_msg import Conversation, db_msgs_to_entries
 from daras_ai.image_input import (
     gcs_blob_for,
     gcs_bucket,
@@ -48,33 +44,137 @@ from daras_ai_v2.asr import (
     run_translate,
     should_translate_lang,
 )
+from daras_ai_v2.bots import BotIntegrationLookupFailed, BotInterface, build_system_vars
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import ConversationEntry, LargeLanguageModels, LLMApis
 from daras_ai_v2.language_model_openai_realtime import yield_from
+from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from functions.recipe_functions import WorkflowLLMTool
+from number_cycling.utils import EXTENSION_NUMBER_LENGTH
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import (
     DEFAULT_TRANSLATION_MODEL,
     VideoBotsPage,
     infer_asr_model_and_language,
 )
+from routers.api import create_new_run
+
+DTMF_TIMEOUT = 30
+MAX_TRIES = 5
 
 from daras_ai_v2.utils import clamp
 
 
 async def entrypoint(ctx: agents.JobContext):
-    from livekit.plugins import noise_cancellation
+    from livekit.plugins import openai
 
-    await ctx.connect()
-    # print(f"{ctx.room=}")
+    @ctx.room.on("participant_attributes_changed")
+    @asyncio_create_task
+    async def participant_attributes_changed(
+        changed_attributes: dict, participant: rtc.Participant
+    ):
+        if changed_attributes.get("sip.callStatus") == "hangup":
+            session.shutdown()
+            ctx.shutdown()
+            try:
+                await ctx.api.room.delete_room(
+                    api.DeleteRoomRequest(room=ctx.room.name)
+                )
+            except aiohttp.ServerDisconnectedError:
+                pass
+            await dtmf_queue.put(None)
+
+    # logger.info(f"{ctx=}")
+    await ctx.connect(rtc_config=rtc.RtcConfiguration())
+    # logger.info(f"{ctx.room=}")
     if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
         return
-    # print(f"{ctx.room.remote_participants=}")
     await ctx.wait_for_participant()
-    # print(f"{ctx.room.remote_participants=}")
+    # logger.info(f"{ctx.room.remote_participants=}")
+
     participant = list(ctx.room.remote_participants.values())[0]
-    page, request, agent, bi = await create_run(participant.attributes)
+    # logger.info(participant.attributes)
+    dtmf_queue = asyncio.Queue()
+
+    session = AgentSession(tts=openai.TTS())
+    await session.start(room=ctx.room, agent=Agent(instructions=""))
+
+    dtmf_digits = deque(maxlen=EXTENSION_NUMBER_LENGTH)
+
+    @ctx.room.on("sip_dtmf_received")
+    @asyncio_create_task
+    async def sip_dtmf_received(dtmf: rtc.SipDTMF):
+        # logger.info(f"{dtmf=}")
+        dtmf_digits.append(dtmf.digit)
+        await dtmf_queue.put(dtmf.digit)
+        session.interrupt()
+
+    # ctx.room.on("sip_dtmf_received", sip_dtmf_received)
+
+    for i in range(MAX_TRIES):
+        if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
+            return
+
+        # wait for the user to stop typing
+        if dtmf_digits or not dtmf_queue.empty():
+            while True:
+                try:
+                    await asyncio.wait_for(dtmf_queue.get(), timeout=2)
+                except asyncio.TimeoutError:
+                    break
+
+        try:
+            extension_number = "".join(dtmf_digits)
+            if extension_number.endswith("#"):
+                input_text = "/disconnect"
+            else:
+                input_text = "/extension " + extension_number.split("*")[-1]
+            page, request, agent, bi = await create_run(
+                data=participant.attributes, input_text=input_text
+            )
+        except BotIntegrationLookupFailed as e:
+            # logger.info(f"{e=}")
+            await session.say(text=e.message, allow_interruptions=(i == 0))
+            # wait for for the user to press a digit
+            try:
+                await asyncio.wait_for(dtmf_queue.get(), timeout=DTMF_TIMEOUT)
+            except asyncio.TimeoutError:
+                pass
+        except UserError as e:
+            # logger.info(f"{e=}")
+            session.say(text=e.message, allow_interruptions=False)
+            raise
+        else:
+            if i > 0:
+                session.say(text="Connecting you to the agent")
+            # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
+            await main(ctx, page, request, agent, bi)
+            # wait for user to press *
+            while await dtmf_queue.get() != "*":
+                pass
+
+    await session.say(
+        text="You have exceeded the maximum number of attempts. Please try again later."
+    )
+
+
+def asyncio_create_task(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        return asyncio.create_task(fn(*args, **kwargs))
+
+    return wrapper
+
+
+async def main(
+    ctx: agents.JobContext,
+    page: VideoBotsPage,
+    request: VideoBotsPage.RequestModel,
+    agent: Agent,
+    bi: BotIntegration,
+):
+    from livekit.plugins import noise_cancellation
 
     llm_model = LargeLanguageModels[request.selected_model]
     if llm_model.is_audio_model:
@@ -102,6 +202,8 @@ async def entrypoint(ctx: agents.JobContext):
 
     if bi.twilio_initial_text:
         await session.say(text=bi.twilio_initial_text)
+    else:
+        await session.generate_reply(user_input="Hello")
 
 
 async def create_audio_model_session(
@@ -217,8 +319,8 @@ async def create_stt_llm_tts_session(
 
 
 @sync_to_async
-def create_run(data):
-    bot = LivekitVoice.from_ctx(data)
+def create_run(data: dict, input_text: str):
+    bot = LivekitVoice(data, input_text)
 
     # get latest messages for context
     saved_msgs = bot.convo.last_n_msgs()
@@ -271,8 +373,7 @@ def entry_to_chat_item(entry: ConversationEntry) -> agents.ChatItem:
 class LivekitVoice(BotInterface):
     platform = Platform.TWILIO
 
-    @classmethod
-    def from_ctx(cls, data: dict):
+    def __init__(self, data: dict, input_text: str):
         # "sip.ruleID": "XXXX",
         # "sip.callID": "XXXX",
         # "sip.callIDFull": "XXXX",
@@ -284,60 +385,44 @@ class LivekitVoice(BotInterface):
         # "sip.twilio.accountSid": "XXXX",
         # "sip.trunkPhoneNumber": "+1XXXX",
         # "sip.phoneNumber": "+1XXXX"
+        self.bot_id = data["sip.trunkPhoneNumber"]
+        self.user_id = data["sip.phoneNumber"]
 
-        user_number = data["sip.phoneNumber"]
-        bot_number = data["sip.trunkPhoneNumber"]
+        self._input_text = input_text
+        self._pending_messages = []
+
         call_sid = data["sip.twilio.callSid"]
         account_sid = data["sip.twilio.accountSid"]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
         # print(f"{user_number=} {bot_number=} {call_sid=} {account_sid=}")
 
-        try:
-            # cases where user is calling the bot
-            bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
-            )
-            will_be_missed = bi.twilio_use_missed_call
-        except BotIntegration.DoesNotExist:
-            #  cases where bot is calling the user
-            user_number, bot_number = bot_number, user_number
-            bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
-            )
-            will_be_missed = False
-
-        if will_be_missed:
-            # for calls that we will reject and callback, the convo is not used so we don't want to create one
-            convo = Conversation(
+        bi = self.lookup_bot_integration(
+            bot_lookup=dict(twilio_phone_number=self.bot_id),
+            user_lookup=dict(twilio_phone_number=self.user_id),
+        )
+        if bi.twilio_fresh_conversation_per_call:
+            self.convo = Conversation.objects.get_or_create(
                 bot_integration=bi,
-                twilio_phone_number=user_number,
-                twilio_call_sid=call_sid,
-            )
-        elif bi.twilio_fresh_conversation_per_call:
-            convo = Conversation.objects.get_or_create(
-                bot_integration=bi,
-                twilio_phone_number=user_number,
+                twilio_phone_number=self.user_id,
                 twilio_call_sid=call_sid,
             )[0]
         else:
-            convo = Conversation.objects.get_or_create(
+            self.convo = Conversation.objects.get_or_create(
                 bot_integration=bi,
-                twilio_phone_number=user_number,
+                twilio_phone_number=self.user_id,
                 twilio_call_sid="",
             )[0]
 
-        return cls(convo, call_sid=call_sid)
-
-    def __init__(self, convo: Conversation, *, call_sid: str):
-        self.convo = convo
-
-        self.bot_id = convo.bot_integration.twilio_phone_number.as_e164
-        self.user_id = convo.twilio_phone_number.as_e164
-
-        self.call_sid = call_sid
-
         super().__init__()
+
+    def _send_msg(self, *, text: str | None = None, **kwargs) -> str | None:
+        # Queue messages to be sent later in async context
+        if text:
+            self._pending_messages.append(text)
+
+    def get_input_text(self) -> str | None:
+        return self._input_text
 
 
 def create_livekit_tool(tool: WorkflowLLMTool):

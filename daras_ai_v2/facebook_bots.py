@@ -14,7 +14,7 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.csv_lines import csv_decode_row
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
 WA_IMG_MAX_SIZE = 5 * 1024**2
@@ -35,14 +35,19 @@ class WhatsappBot(BotInterface):
         self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
         self.user_id = message["from"]  # this is a phone number
         self.input_type = message["type"]
-        self.access_token = ""
 
         user_phone_number = "+" + self.user_id
-        bi = self.lookup_bot_integration(
-            bot_lookup=dict(wa_phone_number_id=self.bot_id),
-            user_lookup=dict(wa_phone_number=user_phone_number),
-        )
-        self.access_token = bi.wa_business_access_token
+        try:
+            bi = self.lookup_bot_integration(
+                bot_lookup=dict(wa_phone_number_id=self.bot_id),
+                user_lookup=dict(wa_phone_number=user_phone_number),
+            )
+        except UserError as e:
+            self.access_token = ""
+            self.send_msg(text=e.message)
+            raise
+        else:
+            self.access_token = bi.wa_business_access_token
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi, wa_phone_number=user_phone_number
         )[0]
