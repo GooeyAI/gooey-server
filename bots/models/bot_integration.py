@@ -445,6 +445,9 @@ class BotIntegration(models.Model):
         blank=True,
         default=None,
     )
+
+    EXTENSION_NUMBER_LENGTH = 5
+
     extension_number = models.IntegerField(
         help_text="Extension number for shared phone number",
         null=True,

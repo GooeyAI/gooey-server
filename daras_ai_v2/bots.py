@@ -92,7 +92,7 @@ class ButtonPressed(BaseModel):
     )
 
 
-class BotIntegrationLookupFailed(Exception):
+class BotIntegrationLookupFailed(UserError):
     pass
 
 
@@ -178,9 +178,9 @@ class BotInterface:
                 ).latest()
             except BotIntegration.DoesNotExist as e:
                 # ideally, send an email to the admin here
-                err_msg = f"phone number {self.bot_id} is not configured for {self.platform.label}"
-                self.send_msg(text=err_msg)
-                raise UserError(err_msg) from e
+                raise UserError(
+                    f"phone number {self.bot_id} is not configured for {self.platform.label}"
+                ) from e
 
         input_text = self.get_input_text() or ""
         input_text = input_text.strip().lower()
@@ -190,8 +190,7 @@ class BotInterface:
                 shared_phone_number=shared_number,
                 **user_lookup,
             ).delete()
-            self.send_msg(text="Extension disconnected. Bye!")
-            raise BotIntegrationLookupFailed()
+            raise BotIntegrationLookupFailed("Extension disconnected. Bye!")
 
         extension_number = parse_extension_number(input_text)
         try:
@@ -202,10 +201,9 @@ class BotInterface:
         except SharedPhoneNumberBotUser.DoesNotExist:
             bi_user = None
             if not extension_number:
-                self.send_msg(
-                    text="Hi from Gooey.AI. Please enter a 5 digit extension number."
+                raise BotIntegrationLookupFailed(
+                    "Hi from Gooey.AI. Please enter a 5 digit extension number."
                 )
-                raise BotIntegrationLookupFailed()
 
         if (not bi_user) or (input_text.startswith("/ext") and extension_number):
             try:
@@ -215,10 +213,9 @@ class BotInterface:
                     extension_number=extension_number,
                 ).latest()
             except BotIntegration.DoesNotExist:
-                self.send_msg(
-                    text="Sorry, I couldn't find that extension on Gooey.AI. Please try with the correct extension number."
+                raise BotIntegrationLookupFailed(
+                    "Sorry, I couldn't find that extension on Gooey.AI. Please try with the correct extension number."
                 )
-                raise BotIntegrationLookupFailed()
 
             bi_user = SharedPhoneNumberBotUser.objects.update_or_create(
                 shared_phone_number=shared_number,

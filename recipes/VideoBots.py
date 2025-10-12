@@ -1852,7 +1852,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 )
                 if bi.extension_number:
                     test_caption += f" (with extension {bi.extension_number})."
-                gui.caption(test_caption)
+                gui.caption(
+                    test_caption,
+                    help="**SMS:** Send `/extension <extension number>` to connect to the agent. `/disconnect` to start fresh.\n\n"
+                    "**Voice Call:** ` * <extension number>` to change extension, `*#` to disconnect.",
+                )
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")

@@ -1445,14 +1445,14 @@ pyjwt = {version = ">=2.5.0", extras = ["crypto"]}
 
 [[package]]
 name = "flatbuffers"
-version = "25.2.10"
+version = "25.9.23"
 description = "The FlatBuffers serialization format for Python"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "flatbuffers-25.2.10-py2.py3-none-any.whl", hash = "sha256:ebba5f4d5ea615af3f7fd70fc310636fbb2bbd1f566ac0a23d98dd412de50051"},
-    {file = "flatbuffers-25.2.10.tar.gz", hash = "sha256:97e451377a41262f8d9bd4295cc836133415cc03d8cb966410a4af92eb00d26e"},
+    {file = "flatbuffers-25.9.23-py2.py3-none-any.whl", hash = "sha256:255538574d6cb6d0a79a17ec8bc0d30985913b87513a01cce8bcdb6b4c44d0e2"},
+    {file = "flatbuffers-25.9.23.tar.gz", hash = "sha256:676f9fa62750bb50cf531b42a0a2a118ad8f7f797a511eda12881c016f093b12"},
 ]
 
 [[package]]
@@ -1968,14 +1968,14 @@ testing = ["pytest"]
 
 [[package]]
 name = "google-genai"
-version = "1.37.0"
+version = "1.43.0"
 description = "GenAI Python SDK"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "google_genai-1.37.0-py3-none-any.whl", hash = "sha256:4571c11cc556b523262d326e326612ba665eedee0d6222c931a0a9365303fa10"},
-    {file = "google_genai-1.37.0.tar.gz", hash = "sha256:1e9328aa9c0bde5fe2afd71694f9e6eaf77b59b458525d7a4a073117578189f4"},
+    {file = "google_genai-1.43.0-py3-none-any.whl", hash = "sha256:be1d4b1acab268125d536fd81b73c38694a70cb08266759089154718924434fd"},
+    {file = "google_genai-1.43.0.tar.gz", hash = "sha256:84eb219d320759c5882bc2cdb4e2ac84544d00f5d12c7892c79fb03d71bfc9a4"},
 ]
 
 [package.dependencies]
@@ -2879,18 +2879,18 @@ marisa-trie = ">=0.7.7,<0.8.0"
 
 [[package]]
 name = "livekit"
-version = "1.0.13"
+version = "1.0.16"
 description = "Python Real-time SDK for LiveKit"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit-1.0.13-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:7174723d75544e6942e1c1a99fb297bfee538d0f7b9bd3f3cdebf06e42a72abc"},
-    {file = "livekit-1.0.13-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ef1f641bc622c0b15adf0e91dfc62740d20db51d09369d3a7f84e8314b0ce067"},
-    {file = "livekit-1.0.13-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:d40a8b9d5cc931736e82bb723e1ae27436e0b2d20b0217627341030400784dc2"},
-    {file = "livekit-1.0.13-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:d73bb327a1a711b09e0b39d574fb04af9b2f38381c6267330df8a713e44e1be3"},
-    {file = "livekit-1.0.13-py3-none-win_amd64.whl", hash = "sha256:bbb2d17203d74991aac23a5d0519e33984f8b0c0d53b2182c837086742d1b813"},
-    {file = "livekit-1.0.13.tar.gz", hash = "sha256:eb50b59b7320b1e960ea8f71b8e52fb832fb867e42806845659918dbe13e6a10"},
+    {file = "livekit-1.0.16-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:b10bd4ebdd20fc7c339547d73b0ba5ec16724530f5c1e8dd036e9dc2d09de296"},
+    {file = "livekit-1.0.16-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ab8230789c8709c46cd27ff1a56885302f0da03406619312352ca3efdedaa49a"},
+    {file = "livekit-1.0.16-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:c54d8990d75523ba555fa68a71820ff31c60f4b75da6e4c8551af96edae9c3ba"},
+    {file = "livekit-1.0.16-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:c5daef4ed4473678d38a895186e8588bfd70196001a1a74ef9b16246e42bfec1"},
+    {file = "livekit-1.0.16-py3-none-win_amd64.whl", hash = "sha256:3a8617394e793d9e6c27b340973286e3dafcf8bc9f1fd7b63478457c11cca6c1"},
+    {file = "livekit-1.0.16.tar.gz", hash = "sha256:f98ee942fb2389949bf8eac3648f05c95e8ae3e1f80dd88a3721899518cc8d3e"},
 ]
 
 [package.dependencies]
@@ -2901,14 +2901,14 @@ types-protobuf = ">=3"
 
 [[package]]
 name = "livekit-agents"
-version = "1.2.9"
+version = "1.2.14"
 description = "A powerful framework for building realtime voice AI agents"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "livekit_agents-1.2.9-py3-none-any.whl", hash = "sha256:78e90f03486c754bec8d1e7992a27c17e87b89d5e2798cd72eda58350ab93440"},
-    {file = "livekit_agents-1.2.9.tar.gz", hash = "sha256:f064f6a19526eacb09f19e92912db5df8d4e914e0d28c10601b030685c946d1e"},
+    {file = "livekit_agents-1.2.14-py3-none-any.whl", hash = "sha256:505e65db56a1acc1d8d4379712230d5ef72e856331a6cdeb3d8adb9203335608"},
+    {file = "livekit_agents-1.2.14.tar.gz", hash = "sha256:f21b8440c28175d77d4dae06318d649e8ac734b50c2dfc7aa84fe12f6247f184"},
 ]
 
 [package.dependencies]
@@ -2924,15 +2924,16 @@ eval-type-backport = "*"
 livekit = ">=1.0.12,<2"
 livekit-api = ">=1.0.5,<2"
 livekit-blingfire = ">=1.0,<2.0"
-livekit-plugins-anthropic = {version = ">=1.2.9", optional = true, markers = "extra == \"anthropic\""}
-livekit-plugins-google = {version = ">=1.2.9", optional = true, markers = "extra == \"google\""}
-livekit-plugins-groq = {version = ">=1.2.9", optional = true, markers = "extra == \"groq\""}
-livekit-plugins-openai = {version = ">=1.2.9", optional = true, markers = "extra == \"openai\""}
-livekit-plugins-silero = {version = ">=1.2.9", optional = true, markers = "extra == \"silero\""}
-livekit-plugins-turn-detector = {version = ">=1.2.9", optional = true, markers = "extra == \"turn-detector\""}
+livekit-plugins-anthropic = {version = ">=1.2.14", optional = true, markers = "extra == \"anthropic\""}
+livekit-plugins-google = {version = ">=1.2.14", optional = true, markers = "extra == \"google\""}
+livekit-plugins-groq = {version = ">=1.2.14", optional = true, markers = "extra == \"groq\""}
+livekit-plugins-openai = {version = ">=1.2.14", optional = true, markers = "extra == \"openai\""}
+livekit-plugins-silero = {version = ">=1.2.14", optional = true, markers = "extra == \"silero\""}
+livekit-plugins-turn-detector = {version = ">=1.2.14", optional = true, markers = "extra == \"turn-detector\""}
 livekit-protocol = ">=1.0,<2.0"
 nest-asyncio = ">=1.6.0"
 numpy = ">=1.26.0"
+openai = ">=1.99.2"
 opentelemetry-api = ">=1.34"
 opentelemetry-exporter-otlp = ">=1.34.1"
 opentelemetry-sdk = ">=1.34.1"
@@ -2948,48 +2949,51 @@ typing-extensions = ">=4.12"
 watchfiles = ">=1.0"
 
 [package.extras]
-anam = ["livekit-plugins-anam (>=1.2.9)"]
-anthropic = ["livekit-plugins-anthropic (>=1.2.9)"]
-assemblyai = ["livekit-plugins-assemblyai (>=1.2.9)"]
-aws = ["livekit-plugins-aws (>=1.2.9)"]
-azure = ["livekit-plugins-azure (>=1.2.9)"]
-baseten = ["livekit-plugins-baseten (>=1.2.9)"]
-bey = ["livekit-plugins-bey (>=1.2.9)"]
-bithuman = ["livekit-plugins-bithuman (>=1.2.9)"]
-cartesia = ["livekit-plugins-cartesia (>=1.2.9)"]
-clova = ["livekit-plugins-clova (>=1.2.9)"]
+anam = ["livekit-plugins-anam (>=1.2.14)"]
+anthropic = ["livekit-plugins-anthropic (>=1.2.14)"]
+assemblyai = ["livekit-plugins-assemblyai (>=1.2.14)"]
+aws = ["livekit-plugins-aws (>=1.2.14)"]
+azure = ["livekit-plugins-azure (>=1.2.14)"]
+baseten = ["livekit-plugins-baseten (>=1.2.14)"]
+bey = ["livekit-plugins-bey (>=1.2.14)"]
+bithuman = ["livekit-plugins-bithuman (>=1.2.14)"]
+cartesia = ["livekit-plugins-cartesia (>=1.2.14)"]
+clova = ["livekit-plugins-clova (>=1.2.14)"]
 codecs = ["av (>=12.0.0)", "numpy (>=1.26.0)"]
-deepgram = ["livekit-plugins-deepgram (>=1.2.9)"]
-elevenlabs = ["livekit-plugins-elevenlabs (>=1.2.9)"]
-fal = ["livekit-plugins-fal (>=1.2.9)"]
-gladia = ["livekit-plugins-gladia (>=1.2.9)"]
-google = ["livekit-plugins-google (>=1.2.9)"]
-groq = ["livekit-plugins-groq (>=1.2.9)"]
-hedra = ["livekit-plugins-hedra (>=1.2.9)"]
-hume = ["livekit-plugins-hume (>=1.2.9)"]
+deepgram = ["livekit-plugins-deepgram (>=1.2.14)"]
+elevenlabs = ["livekit-plugins-elevenlabs (>=1.2.14)"]
+fal = ["livekit-plugins-fal (>=1.2.14)"]
+fireworksai = ["livekit-plugins-fireworksai (>=1.2.14)"]
+gladia = ["livekit-plugins-gladia (>=1.2.14)"]
+google = ["livekit-plugins-google (>=1.2.14)"]
+groq = ["livekit-plugins-groq (>=1.2.14)"]
+hedra = ["livekit-plugins-hedra (>=1.2.14)"]
+hume = ["livekit-plugins-hume (>=1.2.14)"]
 images = ["pillow (>=10.3.0)"]
-inworld = ["livekit-plugins-inworld (>=1.2.9)"]
-langchain = ["livekit-plugins-langchain (>=1.2.9)"]
-lmnt = ["livekit-plugins-lmnt (>=1.2.9)"]
+inworld = ["livekit-plugins-inworld (>=1.2.14)"]
+langchain = ["livekit-plugins-langchain (>=1.2.14)"]
+lmnt = ["livekit-plugins-lmnt (>=1.2.14)"]
 mcp = ["mcp (>=1.10.0,<2) ; python_version >= \"3.10\""]
-mistralai = ["livekit-plugins-mistralai (>=1.2.9)"]
-neuphonic = ["livekit-plugins-neuphonic (>=1.2.9)"]
-nltk = ["livekit-plugins-nltk (>=1.2.9)"]
-openai = ["livekit-plugins-openai (>=1.2.9)"]
-playai = ["livekit-plugins-playai (>=1.2.9)"]
-resemble = ["livekit-plugins-resemble (>=1.2.9)"]
-rime = ["livekit-plugins-rime (>=1.2.9)"]
-sarvam = ["livekit-plugins-sarvam (>=1.2.9)"]
-silero = ["livekit-plugins-silero (>=1.2.9)"]
-simli = ["livekit-plugins-simli (>=1.2.9)"]
-smallestai = ["livekit-plugins-smallestai (>=1.2.9)"]
-speechify = ["livekit-plugins-speechify (>=1.2.9)"]
-speechmatics = ["livekit-plugins-speechmatics (>=1.2.9)"]
-spitch = ["livekit-plugins-spitch (>=1.2.9)"]
-tavus = ["livekit-plugins-tavus (>=1.2.9)"]
-turn-detector = ["livekit-plugins-turn-detector (>=1.2.9)"]
-ultravox = ["livekit-plugins-ultravox (>=1.2.9)"]
-upliftai = ["livekit-plugins-upliftai (>=1.2.9)"]
+minimax = ["livekit-plugins-minimax (>=1.2.14)"]
+mistralai = ["livekit-plugins-mistralai (>=1.2.14)"]
+neuphonic = ["livekit-plugins-neuphonic (>=1.2.14)"]
+nltk = ["livekit-plugins-nltk (>=1.2.14)"]
+openai = ["livekit-plugins-openai (>=1.2.14)"]
+playai = ["livekit-plugins-playai (>=1.2.14)"]
+resemble = ["livekit-plugins-resemble (>=1.2.14)"]
+rime = ["livekit-plugins-rime (>=1.2.14)"]
+sarvam = ["livekit-plugins-sarvam (>=1.2.14)"]
+silero = ["livekit-plugins-silero (>=1.2.14)"]
+simli = ["livekit-plugins-simli (>=1.2.14)"]
+smallestai = ["livekit-plugins-smallestai (>=1.2.14)"]
+soniox = ["livekit-plugins-soniox (>=1.2.14)"]
+speechify = ["livekit-plugins-speechify (>=1.2.14)"]
+speechmatics = ["livekit-plugins-speechmatics (>=1.2.14)"]
+spitch = ["livekit-plugins-spitch (>=1.2.14)"]
+tavus = ["livekit-plugins-tavus (>=1.2.14)"]
+turn-detector = ["livekit-plugins-turn-detector (>=1.2.14)"]
+ultravox = ["livekit-plugins-ultravox (>=1.2.14)"]
+upliftai = ["livekit-plugins-upliftai (>=1.2.14)"]
 
 [[package]]
 name = "livekit-api"
@@ -3047,31 +3051,31 @@ files = [
 
 [[package]]
 name = "livekit-plugins-anthropic"
-version = "1.2.9"
+version = "1.2.14"
 description = "Agent Framework plugin for services from Anthropic"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_anthropic-1.2.9-py3-none-any.whl", hash = "sha256:f33aaf467259fb981cd710c0d8b139f917b8ea0c12e2d6968c2200128fd5ffb6"},
-    {file = "livekit_plugins_anthropic-1.2.9.tar.gz", hash = "sha256:7f5368fff44abfba16cfa22c222cecda08cf5d78bfa6688d4a60a23b3b785aa5"},
+    {file = "livekit_plugins_anthropic-1.2.14-py3-none-any.whl", hash = "sha256:2ce1d8da36bd9e5702455dd80f6c213c19e575b8ef7b625cad68f782aee1c4a8"},
+    {file = "livekit_plugins_anthropic-1.2.14.tar.gz", hash = "sha256:54a02beb2d345398bdbd5f00ae14abee01dc680a90c096966202206aa97fb8f2"},
 ]
 
 [package.dependencies]
 anthropic = ">=0.41"
 httpx = "*"
-livekit-agents = ">=1.2.9"
+livekit-agents = ">=1.2.14"
 
 [[package]]
 name = "livekit-plugins-google"
-version = "1.2.9"
+version = "1.2.14"
 description = "Agent Framework plugin for services from Google Cloud"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_google-1.2.9-py3-none-any.whl", hash = "sha256:0badd3d00f0d85212366f5f512684148332b08617723fad5a9d616908e11f1c2"},
-    {file = "livekit_plugins_google-1.2.9.tar.gz", hash = "sha256:91076d8ae66c84724153dfbb8dbd8f59102beada3e0990305f151c414d723404"},
+    {file = "livekit_plugins_google-1.2.14-py3-none-any.whl", hash = "sha256:14e25d9320c1d3ad248dcfae1748091a1278ca190fde3e5ef513110249f8dd8a"},
+    {file = "livekit_plugins_google-1.2.14.tar.gz", hash = "sha256:257a9a1cfa5e58d1bcdd5b049bcdd1ef4ca5c3d496be87e36ecc4849b6eff4a8"},
 ]
 
 [package.dependencies]
@@ -3079,39 +3083,39 @@ google-auth = ">=2,<3"
 google-cloud-speech = ">=2,<3"
 google-cloud-texttospeech = ">=2.27,<3"
 google-genai = ">=v1.23.0"
-livekit-agents = ">=1.2.9"
+livekit-agents = ">=1.2.14"
 
 [[package]]
 name = "livekit-plugins-groq"
-version = "1.2.9"
+version = "1.2.14"
 description = "Groq inference plugin for LiveKit Agents"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_groq-1.2.9-py3-none-any.whl", hash = "sha256:7bcb832f74d7be3f69ee9c32f5c13bf01a276e3d774ca399de7c20859289fcc8"},
-    {file = "livekit_plugins_groq-1.2.9.tar.gz", hash = "sha256:5a5042c8495f303c57ce56fb6de5278dffa887e8674ba1f030f351e62db6484c"},
+    {file = "livekit_plugins_groq-1.2.14-py3-none-any.whl", hash = "sha256:cb77d52c42031d30adcbe031bfb131a06a0c8003dc725b3cec3ec5b2d9236f22"},
+    {file = "livekit_plugins_groq-1.2.14.tar.gz", hash = "sha256:fee851559f35d7bc92f1cb14461eb6f6ced88f4cb4da1d60f06c6d489539bc44"},
 ]
 
 [package.dependencies]
 aiohttp = "*"
 livekit = "*"
-livekit-agents = {version = ">=1.2.9", extras = ["codecs", "openai"]}
+livekit-agents = {version = ">=1.2.14", extras = ["codecs", "openai"]}
 
 [[package]]
 name = "livekit-plugins-mistralai"
-version = "1.2.9"
+version = "1.2.14"
 description = "LiveKit Agents Plugin for services from AWS"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_mistralai-1.2.9-py3-none-any.whl", hash = "sha256:b9d5a6a6366292f6b6bfe56a3b0edbd714d0591a5cdd0ab69ce4c1270ed09646"},
-    {file = "livekit_plugins_mistralai-1.2.9.tar.gz", hash = "sha256:1685546011e3de37a047b7f525ad2dc7a2f9ce31db7538964db224ed4b83824b"},
+    {file = "livekit_plugins_mistralai-1.2.14-py3-none-any.whl", hash = "sha256:df5127f7d736b81f0118e3042fd2a9958afa20a928ac7d4515483c4ba98612f8"},
+    {file = "livekit_plugins_mistralai-1.2.14.tar.gz", hash = "sha256:c4a48e6465c2bde38775f9df8fcbbdd91c16474bd48def00d45ef8cd82320fee"},
 ]
 
 [package.dependencies]
-livekit-agents = ">=1.2.9"
+livekit-agents = ">=1.2.14"
 livekit-plugins-openai = ">=1.2.5"
 mistralai = ">=1.9.3"
 
@@ -3135,18 +3139,18 @@ livekit = ">=0.21.3"
 
 [[package]]
 name = "livekit-plugins-openai"
-version = "1.2.9"
+version = "1.2.14"
 description = "Agent Framework plugin for services from OpenAI"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_openai-1.2.9-py3-none-any.whl", hash = "sha256:c0ff4d23d8c2822dbd98284efbe2ea0a5539ad3c72f2f4a7d02893d2ef5f145d"},
-    {file = "livekit_plugins_openai-1.2.9.tar.gz", hash = "sha256:5131bfe9e18596c08bf10c1780f8defdb55ecd623a1e6a7036b970f92923c289"},
+    {file = "livekit_plugins_openai-1.2.14-py3-none-any.whl", hash = "sha256:b80e2c7c1a932dbb968c665df4f1cab5e16b8b9bb0620e72f88936ea4ca7edfb"},
+    {file = "livekit_plugins_openai-1.2.14.tar.gz", hash = "sha256:70297df328878406abcd4eb680ad9ea770ae1a92be8bc590907f0ee364e65b00"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.2.9", extras = ["codecs", "images"]}
+livekit-agents = {version = ">=1.2.14", extras = ["codecs", "images"]}
 openai = {version = ">=1.107.2", extras = ["realtime"]}
 
 [package.extras]
@@ -3154,36 +3158,36 @@ vertex = ["google-auth (>=2.0.0)"]
 
 [[package]]
 name = "livekit-plugins-silero"
-version = "1.2.9"
+version = "1.2.14"
 description = "Agent Framework Plugin for Silero"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_silero-1.2.9-py3-none-any.whl", hash = "sha256:e6410c760e8eeb15a8b2f02dae43a97e73bfb1d0e2b819316c907f0da727a959"},
-    {file = "livekit_plugins_silero-1.2.9.tar.gz", hash = "sha256:2458516b43ac9965e0b2237382425b9f037f59f63b6668e8a18c2678adcad57e"},
+    {file = "livekit_plugins_silero-1.2.14-py3-none-any.whl", hash = "sha256:b4a7dd4b61d1120c2bff6816e1716826d15d563f3d6e1acbad9a831acb281d31"},
+    {file = "livekit_plugins_silero-1.2.14.tar.gz", hash = "sha256:72a6802927beabf594522327d310e8e01f403766b4f4051f9ecc100203c5b2dd"},
 ]
 
 [package.dependencies]
-livekit-agents = ">=1.2.9"
+livekit-agents = ">=1.2.14"
 numpy = ">=1.26"
 onnxruntime = ">=1.18"
 
 [[package]]
 name = "livekit-plugins-turn-detector"
-version = "1.2.9"
+version = "1.2.14"
 description = "End of utterance detection for LiveKit Agents"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_turn_detector-1.2.9-py3-none-any.whl", hash = "sha256:04a9795e75904630ce072a84133a5c6c36bf0cc5e6c556efcccfcb9936ad2780"},
-    {file = "livekit_plugins_turn_detector-1.2.9.tar.gz", hash = "sha256:464f4262a01e4e5c8ff152dcd4a9638b05e453dd5bfa7e2e97eea4a7699cbcac"},
+    {file = "livekit_plugins_turn_detector-1.2.14-py3-none-any.whl", hash = "sha256:5e4e819f65d2b14e3e0eb852a52623e4722bb247d60e841457f2b878c87ad5c8"},
+    {file = "livekit_plugins_turn_detector-1.2.14.tar.gz", hash = "sha256:d4284e28c93cf485ecad3e235e4eb99389014531a5d07a91a539486aae1d29c7"},
 ]
 
 [package.dependencies]
 jinja2 = "*"
-livekit-agents = ">=1.2.9"
+livekit-agents = ">=1.2.14"
 numpy = ">=1.26"
 onnxruntime = ">=1.18"
 transformers = ">=4.47.1"
@@ -4034,30 +4038,34 @@ signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
 
 [[package]]
 name = "onnxruntime"
-version = "1.22.1"
+version = "1.23.1"
 description = "ONNX Runtime is a runtime accelerator for Machine Learning models"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "onnxruntime-1.22.1-cp310-cp310-macosx_13_0_universal2.whl", hash = "sha256:80e7f51da1f5201c1379b8d6ef6170505cd800e40da216290f5e06be01aadf95"},
-    {file = "onnxruntime-1.22.1-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b89ddfdbbdaf7e3a59515dee657f6515601d55cb21a0f0f48c81aefc54ff1b73"},
-    {file = "onnxruntime-1.22.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bddc75868bcf6f9ed76858a632f65f7b1846bdcefc6d637b1e359c2c68609964"},
-    {file = "onnxruntime-1.22.1-cp310-cp310-win_amd64.whl", hash = "sha256:01e2f21b2793eb0c8642d2be3cee34cc7d96b85f45f6615e4e220424158877ce"},
-    {file = "onnxruntime-1.22.1-cp311-cp311-macosx_13_0_universal2.whl", hash = "sha256:f4581bccb786da68725d8eac7c63a8f31a89116b8761ff8b4989dc58b61d49a0"},
-    {file = "onnxruntime-1.22.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7ae7526cf10f93454beb0f751e78e5cb7619e3b92f9fc3bd51aa6f3b7a8977e5"},
-    {file = "onnxruntime-1.22.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f6effa1299ac549a05c784d50292e3378dbbf010346ded67400193b09ddc2f04"},
-    {file = "onnxruntime-1.22.1-cp311-cp311-win_amd64.whl", hash = "sha256:f28a42bb322b4ca6d255531bb334a2b3e21f172e37c1741bd5e66bc4b7b61f03"},
-    {file = "onnxruntime-1.22.1-cp312-cp312-macosx_13_0_universal2.whl", hash = "sha256:a938d11c0dc811badf78e435daa3899d9af38abee950d87f3ab7430eb5b3cf5a"},
-    {file = "onnxruntime-1.22.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:984cea2a02fcc5dfea44ade9aca9fe0f7a8a2cd6f77c258fc4388238618f3928"},
-    {file = "onnxruntime-1.22.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2d39a530aff1ec8d02e365f35e503193991417788641b184f5b1e8c9a6d5ce8d"},
-    {file = "onnxruntime-1.22.1-cp312-cp312-win_amd64.whl", hash = "sha256:6a64291d57ea966a245f749eb970f4fa05a64d26672e05a83fdb5db6b7d62f87"},
-    {file = "onnxruntime-1.22.1-cp313-cp313-macosx_13_0_universal2.whl", hash = "sha256:d29c7d87b6cbed8fecfd09dca471832384d12a69e1ab873e5effbb94adc3e966"},
-    {file = "onnxruntime-1.22.1-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:460487d83b7056ba98f1f7bac80287224c31d8149b15712b0d6f5078fcc33d0f"},
-    {file = "onnxruntime-1.22.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b0c37070268ba4e02a1a9d28560cd00cd1e94f0d4f275cbef283854f861a65fa"},
-    {file = "onnxruntime-1.22.1-cp313-cp313-win_amd64.whl", hash = "sha256:70980d729145a36a05f74b573435531f55ef9503bcda81fc6c3d6b9306199982"},
-    {file = "onnxruntime-1.22.1-cp313-cp313t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:33a7980bbc4b7f446bac26c3785652fe8730ed02617d765399e89ac7d44e0f7d"},
-    {file = "onnxruntime-1.22.1-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6e7e823624b015ea879d976cbef8bfaed2f7e2cc233d7506860a76dd37f8f381"},
+    {file = "onnxruntime-1.23.1-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:6b5257157d319abc87aa17294a9acf17119c6ecfdf9531017239b9022334f9b7"},
+    {file = "onnxruntime-1.23.1-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:0b99b96743322ed43c7825d339ad7b0fcb840b85b2e3047536ec1112afefdc41"},
+    {file = "onnxruntime-1.23.1-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:04e54ed9f972aadfe41abbf539cab714fe719aba011db6403e2f0098a282bf38"},
+    {file = "onnxruntime-1.23.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:740f8b32903a28d96eb70ad5d2ec586443768018b3e1211db986d6fa9b4d0ca1"},
+    {file = "onnxruntime-1.23.1-cp310-cp310-win_amd64.whl", hash = "sha256:cbb28e658dcb60643b56b6ba0b60b03b92004eb9a5e4460471009a5dc16c7d8e"},
+    {file = "onnxruntime-1.23.1-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:9ba6e52fb7bc2758a61d1e421d060cf71d5e4259f95ea8a6f72320ae4415f229"},
+    {file = "onnxruntime-1.23.1-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:7f130f4b0d31ba17c8789053a641958d0d341d96a1bff578d613fb52ded218c2"},
+    {file = "onnxruntime-1.23.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1b89fd116f20b70e1140a77286954a7715eb9347260ff2008ee7ec94994df039"},
+    {file = "onnxruntime-1.23.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:61139a29d536b71db6045c75462e593a53feecc19756dc222531971cd08e5efe"},
+    {file = "onnxruntime-1.23.1-cp311-cp311-win_amd64.whl", hash = "sha256:7973186e8eb66e32ea20cb238ae92b604091e4d1df632653ec830abf7584d0b3"},
+    {file = "onnxruntime-1.23.1-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:564d6add1688efdb0720cf2158b50314fc35b744ad2623155ee3b805c381d9ce"},
+    {file = "onnxruntime-1.23.1-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:3864c39307714eff1753149215ad86324a9372e3172a0275d5b16ffd296574bf"},
+    {file = "onnxruntime-1.23.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4e6b6b5ea80a96924f67fe1e5519f6c6f9cd716fdb5a4fd1ecb4f2b0971e8d00"},
+    {file = "onnxruntime-1.23.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:576502dad714ffe5f3b4e1918c5b3368766b222063c585e5fd88415c063e4c80"},
+    {file = "onnxruntime-1.23.1-cp312-cp312-win_amd64.whl", hash = "sha256:1b89b7c4d4c00a67debc2b0a1484d7f51b23fef85fbd80ac83ed2d17b2161bd6"},
+    {file = "onnxruntime-1.23.1-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:a5402841ff0a400739d2c0423f4f3e3a0ed62673af4323237bb5f5052fccf6cf"},
+    {file = "onnxruntime-1.23.1-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:7059296745fceafcac57badf0386e394185e20c27aa536ec705288c4cde19c8d"},
+    {file = "onnxruntime-1.23.1-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:dc8f92157234c3cfba23016576f73deb99aba165a6fc1f2fe4a37d0c524ad3ad"},
+    {file = "onnxruntime-1.23.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ce3ea70499aabc7c8b9407b3680b12473dba9322e3dfde0fe11ff8061c44a226"},
+    {file = "onnxruntime-1.23.1-cp313-cp313-win_amd64.whl", hash = "sha256:371202e1468d5159e78518236cb22f7bbd170e29b31ee77722070a20f8a733ce"},
+    {file = "onnxruntime-1.23.1-cp313-cp313t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:16217416cb88aadcd6a86f8e7c6c22ff951b65f9f695faef9c1ff94052ba1c36"},
+    {file = "onnxruntime-1.23.1-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:38eae2d803de3c08265a5b38211bcec315b19a7ca5867468029cca06fd217a6b"},
 ]
 
 [package.dependencies]
@@ -7780,4 +7788,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "5546e91b4ff13d8eca103bb855b4c2920292cccb5c496eec9b2fe5b93cb58d19"
+content-hash = "1919ed6cc0825e5939cbfd39a5566a66df92f3652bda6b9e9ad15e71468c8885"

@@ -13,6 +13,7 @@ from twilio.twiml.voice_response import VoiceResponse
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 
 
@@ -24,11 +25,6 @@ class TwilioSMS(BotInterface):
             variables=dict(platform_medium="SMS"),
         )
 
-        self.client = Client(
-            account_sid=settings.TWILIO_ACCOUNT_SID,
-            username=settings.TWILIO_API_KEY_SID,
-            password=settings.TWILIO_API_KEY_SECRET,
-        )
         self.bot_id = data["To"][0]
         self.user_id = data["From"][0]
 
@@ -52,13 +48,20 @@ class TwilioSMS(BotInterface):
 
         self.user_msg_id = data["MessageSid"][0]
 
-        account_sid = data["AccountSid"][0]
-        if account_sid == settings.TWILIO_ACCOUNT_SID:
-            account_sid = ""
-        bi = self.lookup_bot_integration(
-            bot_lookup=dict(twilio_phone_number=self.bot_id),
-            user_lookup=dict(twilio_phone_number=self.user_id),
-        )
+        try:
+            bi = self.lookup_bot_integration(
+                bot_lookup=dict(twilio_phone_number=self.bot_id),
+                user_lookup=dict(twilio_phone_number=self.user_id),
+            )
+        except UserError as e:
+            self.client = Client(
+                account_sid=settings.TWILIO_ACCOUNT_SID,
+                username=settings.TWILIO_API_KEY_SID,
+                password=settings.TWILIO_API_KEY_SECRET,
+            )
+            self.send_msg(text=e.message)
+            raise
+
         self.client = bi.get_twilio_client()
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,

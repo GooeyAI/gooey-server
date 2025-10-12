@@ -136,7 +136,7 @@ def get_or_create_credential_list(
     list_friendly_name: str,
 ):
     try:
-        clists = client.sip.credential_lists.create(friendly_name=list_friendly_name)
+        return client.sip.credential_lists.create(friendly_name=list_friendly_name)
     except TwilioException as exc:
         if exc.code == 21240:
             clists = client.sip.credential_lists.list()
