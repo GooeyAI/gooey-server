@@ -21,7 +21,7 @@ from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.grid_layout_widget import grid_layout
-from widgets.saved_workflow import render_pill_with_link, render_saved_workflow_preview
+from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceRole
 
 if typing.TYPE_CHECKING:
@@ -283,9 +283,7 @@ def render_search_bar(
 def render_search_suggestions(search_filters: SearchFilters):
     from routers.root import explore_page
 
-    with gui.div(
-        className="pt-2 pb-1 overflow-auto overflow-sm-visible d-flex flex-nowrap flex-sm-wrap"
-    ):
+    with gui.div(className="my-2"):
         for tag in Tag.get_options():
             url = get_app_route_url(
                 explore_page,
@@ -293,12 +291,8 @@ def render_search_suggestions(search_filters: SearchFilters):
                     update={"search": tag.name}
                 ).get_query_params(),
             )
-            render_pill_with_link(
-                tag.render(),
-                link_to=url,
-                text_bg=None,
-                className="me-2 my-1 bg-white border border-dark text-dark",
-            )
+            with gui.link(to=url, className="me-2 mb-1"):
+                gui.pill(tag.render())
 
 
 def get_placeholder_by_search_filters(
