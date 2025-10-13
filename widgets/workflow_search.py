@@ -3,12 +3,12 @@ import typing
 
 import gooey_gui as gui
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import (
     BooleanField,
     F,
     FilteredRelation,
     Q,
-    OrderBy,
     QuerySet,
     Value,
 )
@@ -462,10 +462,7 @@ def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
                 "-updated_at",
             )
 
-    return qs.order_by(*fields).distinct(
-        "id",
-        *(get_field_from_ordering(f) for f in fields),
-    )
+    return qs.order_by(*fields)
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -523,6 +520,9 @@ def build_search_filter(
             qs = qs.filter(workflow=workflow_page.workflow.value)
 
     if search_filters.search:
+        # add tag_names as a single aggregated field to remove duplicates
+        qs = qs.annotate(tag_names=ArrayAgg("tags__name", distinct=True))
+
         # build a raw tsquery like "foo:* & bar:*
         tokens = []
         for word in search_filters.search.strip().split():
@@ -532,9 +532,8 @@ def build_search_filter(
         query = SearchQuery(raw_query, search_type="raw")
 
         vector = (
-            SearchVector("title", weight="A")
+            SearchVector("title", "tag_names", weight="A")
             + SearchVector(
-                "tags__name",
                 "workspace__name",
                 "workspace__handle__name",
                 "created_by__display_name",
@@ -548,13 +547,3 @@ def build_search_filter(
         qs = qs.filter(search=query)
 
     return qs
-
-
-def get_field_from_ordering(value: str | OrderBy) -> str:
-    match value:
-        case OrderBy():
-            return value.expression.name
-        case str():
-            return value.lstrip("-")
-        case _:
-            raise ValueError(f"Invalid value: {value}")
