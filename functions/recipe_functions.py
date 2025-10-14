@@ -276,18 +276,22 @@ def generate_tool_properties(
         var_schema = fn_vars_schema.get(name, {})
         if var_schema and var_schema.get("role") == "system":
             continue
-        json_type = var_schema.get("type", get_json_type(value))
-        json_schema = {
-            "type": json_type,
-            "description": var_schema.get("description", ""),
-        }
-        if json_type == "array":
-            try:
-                items_type = get_json_type(value[0])
-            except IndexError:
-                items_type = "object"
-            json_schema["items"] = {"type": items_type}
+
+        json_schema = {"description": var_schema.get("description", "")}
+        json_schema |= get_nested_type(value, schema=var_schema)
+
         yield name, json_schema
+
+
+def get_nested_type(val, schema=None) -> dict[str, typing.Any]:
+    json_type = schema and schema.get("type") or get_json_type(val)
+    if json_type == "array":
+        try:
+            return {"type": "array", "items": get_nested_type(val[0])}
+        except IndexError:
+            return {"type": "array", "items": {"type": "object"}}
+    else:
+        return {"type": json_type}
 
 
 def get_json_type(val) -> "JsonTypes":
