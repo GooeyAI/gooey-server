@@ -87,6 +87,7 @@ class LargeLanguageModels(Enum):
         llm_api=LLMApis.openai,
         context_window=65_536,
         max_output_tokens=4_096,
+        supports_json=True,
     )
 
     # https://docs.sea-lion.ai/models/sea-lion-v4/gemma-sea-lion-v4-27b#usage
@@ -1062,13 +1063,16 @@ class ConversationEntry(typing_extensions.TypedDict, total=False):
     display_name: typing_extensions.NotRequired[str]
 
 
-def pop_entry_images(entry: ConversationEntry) -> list[str]:
+def remove_images_from_entry(entry: ConversationEntry) -> ConversationEntry | None:
     contents = entry.get("content") or ""
     if isinstance(contents, str):
-        return []
-    return list(
-        filter(None, (part.pop("image_url", {}).get("url") for part in contents)),
-    )
+        return entry
+
+    new_contents = [part for part in contents if not part.get("image_url")]
+    if new_contents:
+        entry["content"] = new_contents
+        return entry
+    return None
 
 
 def get_entry_images(entry: ConversationEntry) -> list[str]:
@@ -1138,8 +1142,9 @@ def run_language_model(
             model = LargeLanguageModels.gpt_4_o
         if not model.is_vision_model:
             # remove images from the messages
-            for entry in messages:
-                pop_entry_images(entry)
+            messages = list(
+                filter(None, (remove_images_from_entry(entry) for entry in messages))
+            )
         if (
             messages
             and response_format_type == "json_object"

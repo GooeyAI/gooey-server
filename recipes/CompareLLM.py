@@ -120,7 +120,7 @@ class CompareLLMPage(BasePage):
         col1, col2 = gui.columns(2)
         with col1:
             gui.write("**Prompt**")
-            gui.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
+            gui.write("```jinja2\n" + str(state.get("input_prompt") or "") + "\n```")
             variables = state.get("variables") or {}
             for key, value in variables.items():
                 gui.text_area(f"`{key}`", value=str(value), disabled=True)

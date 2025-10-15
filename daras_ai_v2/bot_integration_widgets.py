@@ -226,14 +226,23 @@ def twilio_specific_settings(bi: BotIntegration):
         value=bi.twilio_waiting_text,
         key=f"_bi_twilio_waiting_text_{bi.id}",
     )
+
     bi.twilio_use_missed_call = gui.checkbox(
         "📞 Use Missed Call",
         value=bi.twilio_use_missed_call,
         key=f"_bi_twilio_use_missed_call_{bi.id}",
+        disabled=bi.extension_number,
     )
+
+    if bi.extension_number:
+        gui.caption(
+            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for missed call support."
+        )
+
     gui.caption(
         "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
     )
+
     bi.twilio_fresh_conversation_per_call = gui.checkbox(
         "🔄 Fresh Conversation History for Each Call",
         value=bi.twilio_fresh_conversation_per_call,

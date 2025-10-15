@@ -13,9 +13,12 @@ from daras_ai_v2.bot_integration_connect import (
     connect_bot_to_published_run,
     load_published_run_from_state,
 )
-from daras_ai_v2.bots import msg_handler
+from daras_ai_v2.bots import BotIntegrationLookupFailed, msg_handler
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
+from daras_ai_v2.facebook_bots import (
+    WhatsappBot,
+    FacebookBot,
+)
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
 from routers.custom_api_router import CustomAPIRouter
@@ -217,7 +220,7 @@ def fb_webhook(
                 for message in value.get("messages", []):
                     try:
                         bot = WhatsappBot(message, value["metadata"])
-                    except ValueError:
+                    except BotIntegrationLookupFailed:
                         continue
                     background_tasks.add_task(msg_handler, bot)
             # handle fb/insta messages

@@ -1,32 +1,35 @@
 from __future__ import annotations
 
-from textwrap import dedent
+import json
 import typing
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+from textwrap import dedent
 
 import gooey_gui as gui
 from django.db.models import Q
 from pydantic import BaseModel
+from requests.utils import CaseInsensitiveDict
 
 from ai_models.models import VideoModelSpec
-from bots.models import Workflow, SavedRun, PublishedRun
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.functional import get_initializer
 from daras_ai_v2.pydantic_validation import HttpUrlStr
-from daras_ai_v2.safety_checker import safety_checker, SAFETY_CHECKER_MSG
+from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
 from daras_ai_v2.variables_widget import render_prompt_vars
 from usage_costs.cost_utils import record_cost_auto
 from usage_costs.models import ModelSku
-from requests.utils import CaseInsensitiveDict
 
 
 class VideoGenPage(BasePage):
     title = Workflow.VIDEO_GEN.label
     workflow = Workflow.VIDEO_GEN
     slug_versions = ["video"]
+
+    price_deferred = True
 
     class RequestModel(BasePage.RequestModel):
         selected_models: list[str]
@@ -95,7 +98,7 @@ class VideoGenPage(BasePage):
         super().render()
 
     def get_raw_price(self, state: dict) -> float:
-        return self.get_total_linked_usage_cost_in_credits()
+        return self.get_total_linked_usage_cost_in_credits(default=1000)
 
     def additional_notes(self) -> str | None:
         ret = ""
@@ -139,9 +142,9 @@ class VideoGenPage(BasePage):
             )
 
     def related_workflows(self) -> list:
-        from recipes.Lipsync import LipsyncPage
-        from recipes.DeforumSD import DeforumSDPage
         from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.Lipsync import LipsyncPage
         from recipes.VideoBots import VideoBotsPage
 
         return [
@@ -261,7 +264,7 @@ def render_field(
     else:
         help_text = None
 
-    match field["type"]:
+    match get_field_type(field):
         case "array" if "lora" in name or "url" in name:
             return gui.file_uploader(
                 label=label,
@@ -312,3 +315,31 @@ def render_field(
                 value=value,
                 help=help_text,
             )
+        case "object":
+            try:
+                json_str = json.dumps(value, indent=2)
+            except TypeError:
+                json_str = str(value)
+            json_str = gui.code_editor(
+                label="",
+                language="json",
+                value=json_str,
+                style=dict(maxHeight="300px"),
+            )
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                gui.error("Invalid JSON")
+            if not isinstance(value, dict):
+                gui.error("Value must be a JSON object")
+
+
+def get_field_type(field: dict) -> str:
+    try:
+        return field["type"]
+    except KeyError:
+        for props in field.get("anyOf", []):
+            inner_type = props.get("type")
+            if inner_type and inner_type != "null":
+                return inner_type
+        return "object"

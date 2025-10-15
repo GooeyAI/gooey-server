@@ -19,6 +19,7 @@ from bots.models import (
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import truncate_text_words
+from payments.plans import PricingPlan
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
@@ -57,7 +58,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -407,7 +407,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
     def document_understanding_step(self, request):
         ocr_texts = []
-        if request.document_model and request.input_images:
+        if request.input_images and (
+            request.document_model
+            or not LargeLanguageModels[request.selected_model].is_vision_model
+        ):
             yield "Running Azure Form Recognizer..."
             for url in request.input_images:
                 ocr_text = (
@@ -1656,8 +1659,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
 
     def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
-        from routers.facebook_api import fb_connect_url, wa_connect_url
+        from routers.facebook_api import fb_connect_url
         from routers.slack_api import slack_connect_url
+        from routers.facebook_api import wa_connect_url
+        from number_cycling.utils import create_bot_integration_with_extension
+        from number_cycling.models import SharedPhoneNumber
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
@@ -1716,11 +1722,36 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     )
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(pr.id)
+                    try:
+                        bi = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.WHATSAPP,
+                        )
+                        redirect_url = connect_bot_to_published_run(
+                            bi, pr, overwrite=True
+                        )
+                    except SharedPhoneNumber.DoesNotExist:
+                        redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:
                     redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(pr.id)
+                case Platform.TWILIO:
+                    try:
+                        bi = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.TWILIO,
+                        )
+                    except SharedPhoneNumber.DoesNotExist as e:
+                        gui.caption(f"{e}", className="text-center text-danger")
+                        return
+
+                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
+
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1743,6 +1774,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         self, integrations: list[BotIntegration], run_title: str
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+        from routers.facebook_api import wa_connect_url
 
         gui.markdown("#### Configure your Copilot")
         gui.newline()
@@ -1785,20 +1817,24 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             test_link = bi.get_bot_test_link()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Connected To")
+                if bi.extension_number:
+                    gui.write("###### Connected to Extension")
+                else:
+                    gui.write("###### Connected to")
+
                 gui.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
                 elif bi.platform == Platform.TWILIO:
                     copy_to_clipboard_button(
-                        f"{icons.link} Copy Phone Number",
-                        value=bi.twilio_phone_number.as_e164,
+                        f"{icons.copy_solid} Copy Phone Number",
+                        value=test_link.lstrip("tel:"),
                         type="secondary",
                     )
                 else:
                     copy_to_clipboard_button(
-                        f"{icons.link} Copy {Platform(bi.platform).label} Link",
+                        f"{icons.copy_solid} Copy {Platform(bi.platform).label} Link",
                         value=test_link,
                         type="secondary",
                     )
@@ -1814,7 +1850,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Test")
-                gui.caption(f"Send a test message via {Platform(bi.platform).label}.")
+                test_caption = (
+                    f"Call or send a text message via {Platform(bi.platform).label}."
+                )
+                if bi.extension_number:
+                    test_caption += f" (with extension {bi.extension_number})."
+                gui.caption(test_caption)
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
@@ -1846,6 +1887,115 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         new_tab=True,
                     )
 
+            if bi.platform == Platform.WHATSAPP and bi.extension_number:
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Bring your own number")
+                    gui.write(
+                        "Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-whatsapp)",
+                    )
+
+                with col2:
+                    gui.anchor(
+                        "Connect number",
+                        href=wa_connect_url(self.current_pr.id),
+                        style={
+                            "backgroundColor": "#1877F2",
+                            "color": "white",
+                            "width": "100%",
+                            "maxWidth": "225px",
+                        },
+                        type="secondary",
+                    )
+
+                gui.html("""
+                        <div class="d-flex align-items-center my-2">
+                            <hr class="flex-grow-1">
+                            <span class="px-3 text-muted">or</span>
+                            <hr class="flex-grow-1">
+                        </div>
+                        """)
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Buy a dedicated number")
+                    # Check if current workspace has enterprise subscription
+                    if is_enterprise:
+                        gui.write(
+                            f"As a premium customer, please contact us to setup a managed number"
+                        )
+                    else:
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+
+                gui.write("---")
+
+            if bi.platform == Platform.TWILIO and bi.extension_number:
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+                with col1:
+                    gui.write("###### Get a Dedicated Number")
+                    if is_enterprise:
+                        gui.write(
+                            "As a premium customer, please contact us to set up a managed number"
+                        )
+                    else:
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a dedicated number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Understand your Users")
@@ -1866,7 +2016,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     ),
                     new_tab=True,
                 )
-                if bi.platform == Platform.TWILIO and bi.twilio_phone_number_sid:
+                if (
+                    bi.platform == Platform.TWILIO
+                    and bi.twilio_phone_number_sid
+                    and not bi.extension_number
+                ):
                     gui.anchor(
                         f"{icon} Open Twilio Console",
                         str(
@@ -2007,7 +2161,7 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.WHATSAPP,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
-        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/account/billing/) for a number on us.",
+        label="Instantly connect WhatsApp via a test number, connect your own or buy a number on us. [Help Guide](https://gooey.ai/docs/)",
     ),
     ConnectChoice(
         platform=Platform.SLACK,
@@ -2019,4 +2173,9 @@ connect_choices = [
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
     ),
+    # ConnectChoice(
+    #     platform=Platform.TWILIO,
+    #     img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
+    #     label="Call or text your copilot with a free test number (or buy one).",
+    # ),
 ]

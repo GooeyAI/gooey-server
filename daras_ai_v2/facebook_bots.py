@@ -35,14 +35,18 @@ class WhatsappBot(BotInterface):
         self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
         self.user_id = message["from"]  # this is a phone number
         self.input_type = message["type"]
+        self.access_token = ""
 
-        bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
-
+        user_phone_number = "+" + self.user_id
+        bi = self.lookup_bot_integration(
+            bot_lookup=dict(wa_phone_number_id=self.bot_id),
+            user_lookup=dict(wa_phone_number=user_phone_number),
+        )
         self.access_token = bi.wa_business_access_token
         self.convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            wa_phone_number="+" + self.user_id,
+            bot_integration=bi, wa_phone_number=user_phone_number
         )[0]
+
         super().__init__()
 
     def get_input_text(self) -> str | None:

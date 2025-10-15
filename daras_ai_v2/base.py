@@ -168,6 +168,7 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
+    price_deferred: bool = False
 
     def __init__(
         self,
@@ -1627,9 +1628,18 @@ class BasePage:
     run_cost_line_clamp: int = 1
 
     def render_run_cost(self):
+        gui.caption(
+            self.get_run_cost_display(),
+            line_clamp=self.run_cost_line_clamp,
+            unsafe_allow_html=True,
+        )
+
+    def get_run_cost_display(self) -> str:
         url = self.get_credits_click_url()
         if self.current_sr.price and not self._has_request_changed():
             run_cost = self.current_sr.price
+        elif self.price_deferred:
+            return "Run cost = Calculating..."
         else:
             run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
@@ -1642,7 +1652,7 @@ class BasePage:
         if additional_notes:
             ret += f" \n{additional_notes}"
 
-        gui.caption(ret, line_clamp=self.run_cost_line_clamp, unsafe_allow_html=True)
+        return ret
 
     def _render_step_row(self):
         key = "details-expander"

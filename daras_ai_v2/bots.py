@@ -29,7 +29,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
@@ -38,6 +38,12 @@ from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
+from number_cycling.models import (
+    SharedPhoneNumber,
+    SharedPhoneNumberBotUser,
+)
+from number_cycling.utils import parse_extension_number
+
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -84,6 +90,10 @@ class ButtonPressed(BaseModel):
     button_title: str | None = Field(
         None, description="The title of the button that was pressed by the user"
     )
+
+
+class BotIntegrationLookupFailed(Exception):
+    pass
 
 
 class BotInterface:
@@ -150,6 +160,75 @@ class BotInterface:
 
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
+
+    def lookup_bot_integration(
+        self, *, bot_lookup: dict, user_lookup: dict
+    ) -> BotIntegration:
+        try:
+            shared_number = SharedPhoneNumber.objects.get(
+                **bot_lookup,
+                platform=self.platform,
+                is_active=True,
+            )
+        except SharedPhoneNumber.DoesNotExist:
+            try:
+                return BotIntegration.objects.filter(
+                    **bot_lookup,
+                    shared_phone_number__isnull=True,
+                ).latest()
+            except BotIntegration.DoesNotExist as e:
+                # ideally, send an email to the admin here
+                raise UserError(
+                    f"phone number {self.bot_id} is not configured for {self.platform}"
+                ) from e
+
+        input_text = self.get_input_text() or ""
+        input_text = input_text.strip().lower()
+
+        if input_text.startswith("/disconnect"):
+            SharedPhoneNumberBotUser.objects.filter(
+                shared_phone_number=shared_number,
+                **user_lookup,
+            ).delete()
+            self.send_msg(text="Extension disconnected. Bye!")
+            raise BotIntegrationLookupFailed()
+
+        extension_number = parse_extension_number(input_text)
+        try:
+            bi_user = SharedPhoneNumberBotUser.objects.filter(
+                shared_phone_number=shared_number,
+                **user_lookup,
+            ).latest()
+        except SharedPhoneNumberBotUser.DoesNotExist:
+            bi_user = None
+            if not extension_number:
+                self.send_msg(
+                    text="Hi from Gooey.AI. Please enter a 5 digit extension number."
+                )
+                raise BotIntegrationLookupFailed()
+
+        if (not bi_user) or (input_text.startswith("/ext") and extension_number):
+            try:
+                bi = BotIntegration.objects.filter(
+                    platform=self.platform,
+                    shared_phone_number=shared_number,
+                    extension_number=extension_number,
+                ).latest()
+            except BotIntegration.DoesNotExist:
+                self.send_msg(
+                    text="Sorry, I couldn't find that extension on Gooey.AI. Please try with the correct extension number."
+                )
+                raise BotIntegrationLookupFailed()
+
+            bi_user = SharedPhoneNumberBotUser.objects.update_or_create(
+                shared_phone_number=shared_number,
+                **user_lookup,
+                defaults=dict(bot_integration=bi),
+            )[0]
+            # replace the ext number with a prompt for the bot to start
+            self.get_input_text = lambda: "Hello"
+
+        return bi_user.bot_integration
 
     def send_msg(
         self,
