@@ -316,6 +316,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
+        supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
     gpt_4_o_mini_audio = LLMSpec(

@@ -60,6 +60,8 @@ from recipes.VideoBots import (
     infer_asr_model_and_language,
 )
 
+from daras_ai_v2.utils import clamp
+
 
 async def entrypoint(ctx: agents.JobContext):
     from livekit.plugins import noise_cancellation
@@ -115,8 +117,14 @@ async def create_audio_model_session(
     else:
         from livekit.plugins import openai
 
+        if llm_model.supports_temperature:
+            temperature = request.sampling_temperature
+            temperature = clamp(temperature, 0.6, 1.2)
+        else:
+            temperature = NOT_GIVEN
+
         llm = openai.realtime.RealtimeModel(
-            model=llm_model.model_id, temperature=request.sampling_temperature
+            model=llm_model.model_id, temperature=temperature
         )
         tts = openai.TTS()
         if request.openai_voice_name:
@@ -133,13 +141,18 @@ async def create_stt_llm_tts_session(
 ):
     from livekit.plugins import silero
 
+    if llm_model.supports_temperature:
+        temperature = request.sampling_temperature
+    else:
+        temperature = NOT_GIVEN
+
     match llm_model.llm_api:
         case _ if "gemini" in llm_model.model_id:
             from livekit.plugins import google
 
             llm = google.LLM(
                 model=llm_model.model_id.removeprefix("google/"),
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 vertexai=True,
             )
 
@@ -148,7 +161,7 @@ async def create_stt_llm_tts_session(
 
             llm = anthropic.LLM(
                 model=llm_model.model_id,
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 api_key=settings.ANTHROPIC_API_KEY,
             )
 
@@ -160,7 +173,7 @@ async def create_stt_llm_tts_session(
                 model_id = model_id[-1]
             llm = openai.LLM(
                 model=model_id,
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 api_key=settings.OPENAI_API_KEY,
             )
 
@@ -169,7 +182,7 @@ async def create_stt_llm_tts_session(
 
             llm = mistralai.LLM(
                 model=llm_model.model_id,
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 api_key=settings.MISTRAL_API_KEY,
             )
 
@@ -178,7 +191,7 @@ async def create_stt_llm_tts_session(
 
             llm = openai.LLM.with_fireworks(
                 model=llm_model.model_id,
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 api_key=settings.FIREWORKS_API_KEY,
             )
 
@@ -187,7 +200,7 @@ async def create_stt_llm_tts_session(
 
             llm = groq.LLM(
                 model=llm_model.model_id,
-                temperature=request.sampling_temperature,
+                temperature=temperature,
                 api_key=settings.GROQ_API_KEY,
             )
 
