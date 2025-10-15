@@ -1658,10 +1658,6 @@ def run_openai_chat(
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
-    if model == LargeLanguageModels.apertus_70b_instruct:
-        # Swiss AI Apertus model doesn't support tool calling
-        tools = None
-
     if avoid_repetition:
         kwargs["frequency_penalty"] = 0.1
         kwargs["presence_penalty"] = 0.25
