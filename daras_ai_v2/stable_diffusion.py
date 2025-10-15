@@ -66,6 +66,10 @@ class Text2ImgModels(Enum):
     deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
 
     @classmethod
+    def _available(cls):
+        return set(cls) - cls._deprecated()
+
+    @classmethod
     def _deprecated(cls):
         return {
             cls.jack_qiao,
