@@ -198,12 +198,12 @@ class BotInterface:
                 shared_phone_number=shared_number,
                 **user_lookup,
             ).latest()
-        except SharedPhoneNumberBotUser.DoesNotExist:
+        except SharedPhoneNumberBotUser.DoesNotExist as e:
             bi_user = None
             if not extension_number:
                 raise BotIntegrationLookupFailed(
                     "Hi from Gooey.AI. Please enter a 5 digit extension number."
-                )
+                ) from e
 
         if (not bi_user) or (input_text.startswith("/ext") and extension_number):
             try:
@@ -212,10 +212,10 @@ class BotInterface:
                     shared_phone_number=shared_number,
                     extension_number=extension_number,
                 ).latest()
-            except BotIntegration.DoesNotExist:
+            except BotIntegration.DoesNotExist as e:
                 raise BotIntegrationLookupFailed(
                     "Sorry, I couldn't find that extension on Gooey.AI. Please try with the correct extension number."
-                )
+                ) from e
 
             bi_user = SharedPhoneNumberBotUser.objects.update_or_create(
                 shared_phone_number=shared_number,

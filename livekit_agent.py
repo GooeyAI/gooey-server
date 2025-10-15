@@ -108,7 +108,7 @@ async def entrypoint(ctx: agents.JobContext):
         # logger.info(f"{dtmf=}")
         dtmf_digits.append(dtmf.digit)
         await dtmf_queue.put(dtmf.digit)
-        session.interrupt()
+        await session.interrupt()
 
     # ctx.room.on("sip_dtmf_received", sip_dtmf_received)
 
@@ -150,9 +150,13 @@ async def entrypoint(ctx: agents.JobContext):
                 session.say(text="Connecting you to the agent")
             # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
             await main(ctx, page, request, agent, bi)
-            # wait for user to press *
-            while await dtmf_queue.get() != "*":
-                pass
+
+            while True:
+                digit = await dtmf_queue.get()
+                if digit is None:  # hangup signal
+                    return
+                if digit == "*":  # change extension
+                    break
 
     await session.say(
         text="You have exceeded the maximum number of attempts. Please try again later."
@@ -389,7 +393,6 @@ class LivekitVoice(BotInterface):
         self.user_id = data["sip.phoneNumber"]
 
         self._input_text = input_text
-        self._pending_messages = []
 
         call_sid = data["sip.twilio.callSid"]
         account_sid = data["sip.twilio.accountSid"]
@@ -415,11 +418,6 @@ class LivekitVoice(BotInterface):
             )[0]
 
         super().__init__()
-
-    def _send_msg(self, *, text: str | None = None, **kwargs) -> str | None:
-        # Queue messages to be sent later in async context
-        if text:
-            self._pending_messages.append(text)
 
     def get_input_text(self) -> str | None:
         return self._input_text
