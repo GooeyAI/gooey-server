@@ -395,7 +395,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        sidebar_mobile_header(self.request.session)
+        sidebar_mobile_header(self.request)
         header_placeholder = gui.div(className="my-1 w-100")
         with (
             gui.styled(NAV_TABS_CSS),
