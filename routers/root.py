@@ -45,6 +45,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
+from widgets.page_header import render_page_header
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import global_workspace_selector, workspace_selector_link
 
@@ -689,7 +690,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request):
+    with page_wrapper_v2(request, workflow=page.workflow):
         page.render()
 
     return dict(
@@ -703,6 +704,32 @@ def get_og_url_path(request) -> str:
     return str(
         (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
     )
+
+
+@contextmanager
+def page_wrapper_v2(
+    request: Request,
+    className="",
+    search_filters: typing.Optional[SearchFilters] = None,
+    show_search_bar: bool = True,
+    workflow: typing.Optional[Workflow] = None,
+):
+    context = {"request": request, "block_incognito": True}
+
+    with gui.div(className="d-flex flex-column min-vh-100"):
+        gui.html(templates.get_template("gtag.html").render(**context))
+
+        current_workspace = render_page_header(
+            request, search_filters, show_search_bar, workflow
+        )
+
+        gui.html(copy_to_clipboard_scripts)
+
+        with gui.div(id="main-content", className="container-xxl " + className):
+            yield current_workspace
+
+        gui.html(templates.get_template("footer.html").render(**context))
+        gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 @contextmanager
