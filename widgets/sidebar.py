@@ -1,3 +1,4 @@
+from starlette.requests import Request
 import gooey_gui as gui
 from daras_ai_v2 import settings
 from textwrap import dedent
@@ -163,29 +164,39 @@ def render_default_sidebar(sidebar_ref: SidebarRef, request=None):
             sidebar_item_list(is_sidebar_open, current_url)
 
 
-def sidebar_mobile_header(session: dict):
+def sidebar_mobile_header(request: Request):
+    from routers.root import anonymous_login_container
+
     with gui.div(
         className="d-flex align-items-center justify-content-between d-md-none me-2 w-100 py-2",
         style={"height": "54px"},
     ):
-        sidebar_ref = use_sidebar("main-sidebar", session)
+        sidebar_ref = use_sidebar("main-sidebar", request.session)
         gui.tag(
             "img",
-            src=settings.GOOEY_LOGO_FACE,
-            width=settings.SIDEBAR_ICON_SIZE,
-            height=settings.SIDEBAR_ICON_SIZE,
+            src=settings.GOOEY_LOGO_RECT,
+            width="120px",
+            height="auto",
             className=" logo-face",
         )
-        open_mobile_sidebar = gui.button(
-            label=icons.sidebar_flip,
-            className="m-0",
-            unsafe_allow_html=True,
-            type="tertiary",
-            style={"padding": "6px 10px"},
-        )
-        if open_mobile_sidebar:
-            sidebar_ref.set_mobile_open(True)
-            raise gui.RerunException()
+        with gui.div(className="d-flex align-items-center gap-2"):
+            anonymous_login_container(
+                request,
+                context={
+                    "request": request,
+                    "block_incognito": True,
+                },
+            )
+            open_mobile_sidebar = gui.button(
+                label=icons.sidebar_flip,
+                className="m-0",
+                unsafe_allow_html=True,
+                type="tertiary",
+                style={"padding": "6px 10px"},
+            )
+            if open_mobile_sidebar:
+                sidebar_ref.set_mobile_open(True)
+                raise gui.RerunException()
 
 
 # Sidebar width variables
@@ -242,13 +253,19 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             @media (max-width: 767px) {{
                 & .gooey-sidebar-open {{
                     position: fixed;
+                    right: 0;
+                    left: auto;
                     min-width: {sidebar_mobile_width};
                     width: {sidebar_mobile_width};
                     max-width: {sidebar_mobile_width};
                     z-index: 2000;
+                    border-left: 1px solid #e0e0e0;
+                    border-right: none;
                 }}
                 & .gooey-sidebar-closed {{
                     position: fixed;
+                    right: 0;
+                    left: auto;
                     min-width: 0px;
                     width: 0px;
                     max-width: 0px;

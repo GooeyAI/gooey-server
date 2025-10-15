@@ -746,7 +746,7 @@ def page_wrapper(
                         src=settings.GOOEY_LOGO_FACE,
                         width=settings.SIDEBAR_ICON_SIZE,
                         height=settings.SIDEBAR_ICON_SIZE,
-                        className=" logo-face d-block",
+                        className=" logo-face d-none d-md-block",
                     )
                     open_sidebar_btn = gui.button(
                         label=icons.sidebar_flip,
@@ -844,36 +844,36 @@ def page_wrapper(
             gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
-# def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
-#     with gui.div(
-#         className="d-flex d-md-none flex-grow-1 justify-content-end",
-#     ):
-#         gui.button(
-#             icons.search,
-#             type="tertiary",
-#             unsafe_allow_html=True,
-#             className="m-0",
-#             onClick=JS_SHOW_MOBILE_SEARCH,
-#         )
+def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
+    with gui.div(
+        className="d-flex d-md-none flex-grow-1 justify-content-end",
+    ):
+        gui.button(
+            icons.search,
+            type="tertiary",
+            unsafe_allow_html=True,
+            className="m-0",
+            onClick=JS_SHOW_MOBILE_SEARCH,
+        )
 
-#     with (
-#         gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
-#         gui.div(
-#             className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
-#             style={"display": "none", "zIndex": "10"},
-#             id="mobile_search_container",
-#         ),
-#     ):
-#         render_search_bar_with_redirect(
-#             request=request,
-#             search_filters=search_filters or SearchFilters(),
-#         )
-#         gui.button(
-#             "Cancel",
-#             type="tertiary",
-#             className="d-md-none fs-6 m-0 ms-1 p-1",
-#             onClick=JS_HIDE_MOBILE_SEARCH,
-#         )
+    with (
+        gui.styled("@media (min-width: 768px) { & { position: static !important; } }"),
+        gui.div(
+            className="d-md-flex flex-grow-1 justify-content-center align-items-center bg-white top-0 left-0",
+            style={"display": "none", "zIndex": "10"},
+            id="mobile_search_container",
+        ),
+    ):
+        render_search_bar_with_redirect(
+            request=request,
+            search_filters=search_filters or SearchFilters(),
+        )
+        gui.button(
+            "Cancel",
+            type="tertiary",
+            className="d-md-none fs-6 m-0 ms-1 p-1",
+            onClick=JS_HIDE_MOBILE_SEARCH,
+        )
 
 
 JS_SHOW_MOBILE_SEARCH = """
@@ -904,7 +904,7 @@ def anonymous_login_container(
 
     with popover, gui.div(className="d-flex align-items-center overflow-hidden"):
         if not hide_sign_in:
-            with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
+            with gui.tag("a", href=login_url, className="pe-2"):
                 gui.html("Sign In")
         gui.html(
             templates.get_template("google_one_tap_button.html").render(**context)
