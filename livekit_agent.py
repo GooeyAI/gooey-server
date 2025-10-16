@@ -222,6 +222,7 @@ async def create_audio_model_session(
         tts = google.TTS()
     else:
         from livekit.plugins import openai
+        from openai.types.beta.realtime.session import TurnDetection
 
         if llm_model.supports_temperature:
             temperature = request.sampling_temperature
@@ -230,7 +231,14 @@ async def create_audio_model_session(
             temperature = NOT_GIVEN
 
         llm = openai.realtime.RealtimeModel(
-            model=llm_model.model_id, temperature=temperature
+            model=llm_model.model_id,
+            temperature=temperature,
+            turn_detection=TurnDetection(
+                type="semantic_vad",
+                eagerness="auto",
+                create_response=True,
+                interrupt_response=True,
+            ),
         )
         tts = openai.TTS()
         if request.openai_voice_name:
@@ -512,7 +520,7 @@ class GooeySTT(stt.STT):
 class GooeyTTS(tts.TTS):
     def __init__(self, page: VideoBotsPage, request: VideoBotsPage.RequestModel):
         tts_provider = TextToSpeechProviders.get(
-            request.tts_provider, default=TextToSpeechProviders.GOOGLE_TTS
+            request.tts_provider, default=TextToSpeechProviders.OPEN_AI
         )
         self.tts_sample_rate = tts_provider.sample_rate
         super().__init__(

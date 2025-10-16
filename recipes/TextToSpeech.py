@@ -147,7 +147,7 @@ class TextToSpeechPage(BasePage):
 
     def _get_tts_provider(self, state: dict):
         return TextToSpeechProviders.get(
-            state.get("tts_provider"), default=TextToSpeechProviders.GOOGLE_TTS
+            state.get("tts_provider"), default=TextToSpeechProviders.OPEN_AI
         )
 
     def get_cost_note(self):
