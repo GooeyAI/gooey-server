@@ -284,7 +284,7 @@ async def create_stt_llm_tts_session(
                 and llm_model.is_thinking_model
                 and not llm_model.name.startswith("o")
             ):
-                kwargs["reasoning_effort"] = request.reasoning_effort.name
+                kwargs["reasoning_effort"] = request.reasoning_effort
 
             llm = openai.LLM(
                 model=model_id,
