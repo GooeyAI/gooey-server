@@ -501,10 +501,10 @@ class GooeySTT(stt.STT):
 
 class GooeyTTS(tts.TTS):
     def __init__(self, page: VideoBotsPage, request: VideoBotsPage.RequestModel):
-        self.tts_provider = TextToSpeechProviders.get(
+        tts_provider = TextToSpeechProviders.get(
             request.tts_provider, default=TextToSpeechProviders.GOOGLE_TTS
         )
-        self.tts_sample_rate = self.tts_provider.sample_rate
+        self.tts_sample_rate = tts_provider.sample_rate
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),
             sample_rate=self.tts_sample_rate,

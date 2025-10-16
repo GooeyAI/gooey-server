@@ -2120,7 +2120,7 @@ def messages_as_prompt(query_msgs: list[dict]) -> str:
 
 
 def infer_asr_model_and_language(
-    user_language: str, default=AsrModels.whisper_large_v2
+    user_language: str, default=AsrModels.gpt_4_o_audio
 ) -> tuple[str, str]:
     asr_lang = None
     user_lang = user_language.lower()

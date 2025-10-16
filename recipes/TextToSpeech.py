@@ -146,9 +146,9 @@ class TextToSpeechPage(BasePage):
             return len(text) * 0.079
 
     def _get_tts_provider(self, state: dict):
-        tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
-        # TODO: validate tts_provider before lookup?
-        return TextToSpeechProviders[tts_provider]
+        return TextToSpeechProviders.get(
+            state.get("tts_provider"), default=TextToSpeechProviders.GOOGLE_TTS
+        )
 
     def get_cost_note(self):
         tts_provider = gui.session_state.get("tts_provider")
