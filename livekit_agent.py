@@ -81,7 +81,7 @@ async def entrypoint(ctx: agents.JobContext):
                 await ctx.api.room.delete_room(
                     api.DeleteRoomRequest(room=ctx.room.name)
                 )
-            except aiohttp.ServerDisconnectedError:
+            except (aiohttp.ServerDisconnectedError, api.TwirpError):
                 pass
             await dtmf_queue.put(None)
 
