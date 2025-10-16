@@ -277,10 +277,20 @@ async def create_stt_llm_tts_session(
             model_id = llm_model.model_id
             if isinstance(model_id, tuple):
                 model_id = model_id[-1]
+
+            kwargs = {}
+            if (
+                request.reasoning_effort
+                and llm_model.is_thinking_model
+                and not llm_model.name.startswith("o")
+            ):
+                kwargs["reasoning_effort"] = request.reasoning_effort.name
+
             llm = openai.LLM(
                 model=model_id,
                 temperature=temperature,
                 api_key=settings.OPENAI_API_KEY,
+                **kwargs,
             )
 
         case LLMApis.mistral:
