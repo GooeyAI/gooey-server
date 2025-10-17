@@ -47,6 +47,7 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import global_workspace_selector, workspace_selector_link
+from widgets.sidebar import render_default_sidebar, sidebar_layout, use_sidebar
 
 app = CustomAPIRouter()
 
@@ -250,7 +251,7 @@ def explore_page(
 ):
     from widgets import explore
 
-    with page_wrapper(request, search_filters=search_filters, show_search_bar=False):
+    with page_wrapper(request):
         explore.render(request, search_filters)
 
     return {
@@ -689,7 +690,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request):
+    with page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -709,75 +710,138 @@ def get_og_url_path(request) -> str:
 def page_wrapper(
     request: Request,
     className="",
-    search_filters: typing.Optional[SearchFilters] = None,
-    show_search_bar: bool = True,
+    page=None,
 ):
-    from routers.account import explore_in_current_workspace
+    context = {
+        "request": request,
+        "block_incognito": True,
+    }
 
-    context = {"request": request, "block_incognito": True}
+    sidebar_ref = use_sidebar("main-sidebar", request.session, default_open=True)
+    sidebar_container, pane_container = sidebar_layout(sidebar_ref)
 
-    with gui.div(className="d-flex flex-column min-vh-100"):
-        gui.html(templates.get_template("gtag.html").render(**context))
-
-        with (
-            gui.div(className="header"),
-            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
-            gui.div(className="container-xxl my-2"),
-            gui.div(
-                className="position-relative w-100 d-flex justify-content-between gap-2"
-            ),
-        ):
-            with (
-                gui.div(className="d-md-block"),
-                gui.tag("a", href="/"),
-            ):
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_IMG,
-                    width="300",
-                    height="142",
-                    className="img-fluid logo d-none d-sm-block",
-                )
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_RECT,
-                    width="145",
-                    height="40",
-                    className="img-fluid logo d-sm-none",
-                )
-
-            if show_search_bar:
-                _render_mobile_search_button(request, search_filters)
-
+    container = page if page else None
+    with sidebar_container:
+        with gui.styled("""
+            .gooey-sidebar-closed:hover {
+                & .hover-btn {
+                    display: block !important;
+                }
+                & .logo-face {
+                    display: none !important;
+                }
+            }
+        """):
             with gui.div(
-                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                className="flex-grow-1 position-relative",
+                id="sidebar-click-container",
             ):
-                for url, label in settings.HEADER_LINKS:
-                    render_header_link(
-                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+                with gui.div(
+                    className="d-flex px-md-2 px-3 py-2 align-items-center justify-content-between text-nowrap",
+                    style={"height": "54px"},
+                ):
+                    # sidebar header
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_FACE,
+                        width=settings.SIDEBAR_ICON_SIZE,
+                        height=settings.SIDEBAR_ICON_SIZE,
+                        className=" logo-face d-none d-md-block",
                     )
+                    open_sidebar_btn = gui.button(
+                        label=icons.sidebar_flip,
+                        className="m-0 d-none hover-btn gooey-btn",
+                        unsafe_allow_html=True,
+                        type="tertiary",
+                    )
+                    if open_sidebar_btn:
+                        sidebar_ref.set_open(True)
+                        raise gui.RerunException()
 
-                if request.user and not request.user.is_anonymous:
-                    render_header_link(
-                        url=get_route_path(explore_in_current_workspace),
-                        label="Saved",
-                        icon=icons.save,
-                    )
-
-                    current_workspace = global_workspace_selector(
-                        request.user, request.session
-                    )
-                else:
                     current_workspace = None
-                    anonymous_login_container(request, context)
+                    with (
+                        gui.styled(
+                            """
+                        & > button {
+                            max-width: 100%;
+                            overflow-x: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                            height: 100%;
+                            margin: auto;
+                        }
+                    """,
+                        ),
+                        gui.div(
+                            className="position-relative", style={"maxWidth": "50%"}
+                        ),
+                    ):
+                        if sidebar_ref.is_open:
+                            if request.user and not request.user.is_anonymous:
+                                current_workspace = global_workspace_selector(
+                                    request.user, request.session
+                                )
+                            else:
+                                current_workspace = None
+                                anonymous_login_container(request, context)
 
-        gui.html(copy_to_clipboard_scripts)
+                    close_mobile_sidebar = gui.button(
+                        label=icons.cancel,
+                        className="m-0 d-md-none gooey-btn",
+                        unsafe_allow_html=True,
+                        type="tertiary",
+                    )
+                    if close_mobile_sidebar:
+                        sidebar_ref.set_mobile_open(False)
+                        raise gui.RerunException()
 
-        with gui.div(id="main-content", className="container-xxl " + className):
-            yield current_workspace
+                    if sidebar_ref.is_open:
+                        close_sidebar = gui.button(
+                            label=icons.sidebar_flip,
+                            className="m-0 d-none d-md-block gooey-btn",
+                            unsafe_allow_html=True,
+                            type="tertiary",
+                        )
+                        if close_sidebar:
+                            sidebar_ref.set_open(False)
+                            raise gui.RerunException()
 
-        gui.html(templates.get_template("footer.html").render(**context))
-        gui.html(templates.get_template("login_scripts.html").render(**context))
+                if container:
+                    container.render_sidebar(request, sidebar_ref)
+                else:
+                    render_default_sidebar(sidebar_ref, request)
+
+            # Bottom section with workspace selector when sidebar is closed
+            with (
+                gui.styled(
+                    "& img { width: 32px !important; height: 32px !important; }"
+                ),
+                gui.div(
+                    className="p-3 position-absolute bottom-0 d-md-block d-none",
+                    style={"width": "100%", "zIndex": 1000},
+                ),
+            ):
+                if not sidebar_ref.is_open:
+                    if request.user and not request.user.is_anonymous:
+                        current_workspace = global_workspace_selector(
+                            request.user, request.session, hide_name=True
+                        )
+                    else:
+                        current_workspace = None
+                        anonymous_login_container(request, context, hide_sign_in=True)
+
+    # Main content pane
+    with pane_container:
+        with gui.div(className="d-flex flex-column min-vh-100 w-100 pt-md-2"):
+            gui.html(templates.get_template("gtag.html").render(**context))
+
+            gui.html(copy_to_clipboard_scripts)
+
+            with gui.div(id="main-content", className="px-3 " + className):
+                yield current_workspace
+
+            gui.html(templates.get_template("footer.html").render(**context))
+            gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
@@ -787,6 +851,7 @@ def _render_mobile_search_button(request: Request, search_filters: SearchFilters
         gui.button(
             icons.search,
             type="tertiary",
+            unsafe_allow_html=True,
             className="m-0",
             onClick=JS_SHOW_MOBILE_SEARCH,
         )
@@ -829,16 +894,18 @@ mobileSearchContainer.classList.remove(
 """
 
 
-def anonymous_login_container(request: Request, context: dict):
+def anonymous_login_container(
+    request: Request, context: dict, hide_sign_in: bool = False
+):
     next_url = str(furl(request.url).set(origin=None))
     login_url = str(furl("/login/", query_params=dict(next=next_url)))
 
-    with gui.tag("a", href=login_url, className="pe-2 d-none d-lg-block"):
-        gui.html("Sign In")
-
     popover, content = gui.popover(interactive=True)
 
-    with popover, gui.div(className="d-flex align-items-center"):
+    with popover, gui.div(className="d-flex align-items-center overflow-hidden"):
+        if not hide_sign_in:
+            with gui.tag("a", href=login_url, className="pe-2"):
+                gui.html("Sign In")
         gui.html(
             templates.get_template("google_one_tap_button.html").render(**context)
             + '<i class="ps-2 fa-regular fa-chevron-down d-xl-none"></i>'
