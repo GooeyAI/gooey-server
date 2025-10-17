@@ -10,7 +10,7 @@ from loguru import logger
 from requests.models import HTTPError
 from starlette.exceptions import HTTPException
 
-from bots.models import PublishedRun, WorkflowAccessLevel, Workflow
+from bots.models import PublishedRun, WorkflowAccessLevel
 from daras_ai_v2 import icons, paypal
 from daras_ai_v2.billing import billing_page
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
@@ -150,9 +150,7 @@ def explore_in_current_workspace(request: Request):
         workspace=get_filter_value_from_workspace(current_workspace)
     )
     raise gui.RedirectException(
-        get_app_route_url(
-            explore_page, query_params=search_filters.model_dump(exclude_defaults=True)
-        )
+        get_app_route_url(explore_page, query_params=search_filters.get_query_params())
     )
 
 
@@ -297,9 +295,11 @@ def all_saved_runs_tab(request: Request):
             | ~Q(public_access=WorkflowAccessLevel.VIEW_ONLY)
         )
 
-    qs = PublishedRun.objects.select_related(
-        "workspace", "created_by", "saved_run"
-    ).filter(pr_filter)
+    qs = (
+        PublishedRun.objects.prefetch_related("tags", "versions")
+        .select_related("workspace", "last_edited_by", "saved_run")
+        .filter(pr_filter)
+    )
 
     prs, cursor = paginate_queryset(
         qs=qs, ordering=["-updated_at"], cursor=request.query_params
@@ -351,12 +351,7 @@ def all_saved_runs_tab(request: Request):
         )
 
     def _render_run(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-        render_saved_workflow_preview(
-            workflow.page_cls,
-            pr,
-            workflow_pill=f"{workflow.emoji} {workflow.short_title}",
-        )
+        render_saved_workflow_preview(pr, show_workflow_pill=True)
 
     grid_layout(1, prs, _render_run)
 
