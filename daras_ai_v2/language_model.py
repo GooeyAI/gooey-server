@@ -243,6 +243,8 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
+        is_deprecated=True,
+        redirect_to="o3",
     )
 
     # https://platform.openai.com/docs/models#o1
@@ -257,7 +259,7 @@ class LargeLanguageModels(Enum):
         supports_json=False,
         supports_temperature=False,
         is_deprecated=True,
-        redirect_to="o1",
+        redirect_to="o3",
     )
 
     # https://platform.openai.com/docs/models#o1
@@ -272,6 +274,8 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=False,
         supports_temperature=False,
+        is_deprecated=True,
+        redirect_to="o3_mini",
     )
 
     # https://platform.openai.com/docs/models#gpt-4o
