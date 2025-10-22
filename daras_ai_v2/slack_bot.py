@@ -740,9 +740,7 @@ def update_msg_ack_selection_from_payload(payload: dict):
     original_blocks = (payload.get("message", {}) or {}).get("blocks", []) or []
     original_text = (payload.get("message", {}) or {}).get("text") or ""
 
-    bi = BotIntegration.objects.get(
-        slack_channel_id=channel_id, slack_team_id=team_id
-    )
+    bi = BotIntegration.objects.get(slack_channel_id=channel_id, slack_team_id=team_id)
     update_msg_acknowledge_selection(
         channel=channel_id,
         ts=message_ts,

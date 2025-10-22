@@ -268,6 +268,7 @@ class BotInterface:
                 update_msg_id=update_msg_id,
             )
             text = ""
+            update_msg_id = None
 
         if send_feedback_buttons:
             buttons = _feedback_buttons()
