@@ -227,8 +227,6 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
 
                 files = message.get("files", [])
                 if not files:
-                    message.get("message", {}).get("files", [])
-                if not files:
                     attachments = message.get("attachments", [])
                     files = [
                         file
