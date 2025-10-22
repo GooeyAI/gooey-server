@@ -685,3 +685,69 @@ class SlackAPIError(Exception):
     def __init__(self, error: str | dict):
         self.error = error
         super().__init__(error)
+
+
+def update_msg_acknowledge_selection(
+    *,
+    channel: str,
+    ts: str,
+    token: str,
+    original_blocks: list[dict] | None,
+    original_text: str | None,
+    selection_text: str | None,
+):
+    """
+    Remove any action (button) blocks from the message and append a small italic
+    context line acknowledging the user's selection. Preserves the rest of the blocks.
+    """
+    original_blocks = original_blocks or []
+    new_blocks = [b for b in original_blocks if b.get("type") != "actions"]
+    if selection_text:
+        new_blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {"type": "mrkdwn", "text": f"_You chose: {selection_text}_"},
+                ],
+            }
+        )
+    res = requests.post(
+        "https://slack.com/api/chat.update",
+        json={
+            "channel": channel,
+            "ts": ts,
+            "text": original_text or "",
+            "blocks": new_blocks,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    parse_slack_response(res)
+
+
+def update_msg_ack_selection_from_payload(payload: dict):
+    """
+    Convenience helper to process a Slack block_actions payload and update the
+    original message by removing buttons and appending an italic confirmation.
+    Performs BotIntegration lookup internally to get the token.
+    """
+    from bots.models import BotIntegration
+
+    channel_id = payload["channel"]["id"]
+    team_id = payload["team"]["id"]
+    message_ts = payload["container"]["message_ts"]
+    action = payload["actions"][0]
+    action_title = (action.get("text", {}) or {}).get("text") or ""
+    original_blocks = (payload.get("message", {}) or {}).get("blocks", []) or []
+    original_text = (payload.get("message", {}) or {}).get("text") or ""
+
+    bi = BotIntegration.objects.get(
+        slack_channel_id=channel_id, slack_team_id=team_id
+    )
+    update_msg_acknowledge_selection(
+        channel=channel_id,
+        ts=message_ts,
+        token=bi.slack_access_token,
+        original_blocks=original_blocks,
+        original_text=original_text,
+        selection_text=action_title,
+    )
