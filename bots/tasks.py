@@ -1,4 +1,5 @@
 import json
+import typing
 from datetime import timedelta
 from json import JSONDecodeError
 
@@ -18,7 +19,7 @@ from bots.models import (
 )
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
-from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
+from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from daras_ai_v2.slack_bot import (
     SlackBot,
     create_personal_channel,
@@ -30,6 +31,9 @@ from recipes.VideoBots import ReplyButton, messages_as_prompt
 from recipes.VideoBotsStats import (
     exec_export_fn,
 )
+
+if typing.TYPE_CHECKING:
+    from routers.broadcast_api import BotBroadcastFilters
 
 MAX_PROMPT_LEN = 100_000
 
@@ -142,6 +146,7 @@ def fill_req_vars_from_state(state: dict, req_vars: dict):
 
 def send_broadcast_msgs_chunked(
     *,
+    filters: "BotBroadcastFilters | None" = None,
     text: str,
     audio: str,
     video: str,
@@ -154,6 +159,7 @@ def send_broadcast_msgs_chunked(
     convo_ids = list(convo_qs.values_list("id", flat=True))
     for i in range(0, len(convo_ids), 100):
         send_broadcast_msg.delay(
+            filters=filters,
             text=text,
             audio=audio,
             video=video,
@@ -168,6 +174,7 @@ def send_broadcast_msgs_chunked(
 @shared_task
 def send_broadcast_msg(
     *,
+    filters: "BotBroadcastFilters | None" = None,
     text: str | None,
     audio: str = None,
     video: str = None,
@@ -180,6 +187,7 @@ def send_broadcast_msg(
     bi = BotIntegration.objects.get(id=bi_id)
     convos = Conversation.objects.filter(id__in=convo_ids)
     for convo in convos:
+        _msg_id = None
         match bi.platform:
             case Platform.WHATSAPP:
                 _msg_id = WhatsappBot.send_msg_to(
@@ -193,6 +201,15 @@ def send_broadcast_msg(
                     access_token=bi.wa_business_access_token,
                 )
             case Platform.SLACK:
+                if (
+                    filters
+                    and filters.slack_user_id__in
+                    and not convo.slack_channel_is_personal
+                ):
+                    continue
+                elif convo.slack_channel_is_personal:
+                    continue
+
                 _msg_id = SlackBot.send_msg_to(
                     text=text,
                     audio=audio and [audio],
@@ -206,20 +223,20 @@ def send_broadcast_msg(
                 )[0]
             case Platform.TWILIO:
                 if medium == "Voice Call":
-                    send_single_voice_call(convo, text, audio)
+                    _msg_id = send_single_voice_call(convo, text, audio).sid
                 else:
-                    send_sms_message(
+                    _msg_id = send_sms_message(
                         client=bi.get_twilio_client(),
                         bot_number=bi.twilio_phone_number.as_e164,
                         user_number=convo.twilio_phone_number.as_e164,
                         text=text,
                         media_url=audio,
-                    )
+                    ).sid
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"
                 )
-        # save_broadcast_message(convo, text, msg_id)
+        save_broadcast_message(convo, text, _msg_id)
 
 
 @shared_task
@@ -237,16 +254,34 @@ def exec_scheduled_runs():
         logger.info(f"ran scheduled function {fn_sr.get_app_url()}")
 
 
-## Disabled for now to prevent messing up the chat history
-# def save_broadcast_message(convo: Conversation, text: str, msg_id: str | None = None):
-#     message = Message(
-#         conversation=convo,
-#         role=CHATML_ROLE_ASSISTANT,
-#         content=text,
-#         display_content=text,
-#         saved_run=None,
-#     )
-#     if msg_id:
-#         message.platform_msg_id = msg_id
-#     message.save()
-#     return message
+def save_broadcast_message(convo: Conversation, text: str, msg_id: str | None = None):
+    if convo.bot_integration.platform not in [
+        Platform.SLACK,
+        Platform.WHATSAPP,
+        Platform.TWILIO,
+    ]:
+        return
+
+    user_msg = Message(
+        conversation=convo,
+        role=CHATML_ROLE_USER,
+        content="Loading Messages...",
+        display_content="",
+        saved_run=None,
+    )
+    assistant_msg = Message(
+        conversation=convo,
+        role=CHATML_ROLE_ASSISTANT,
+        content=text,
+        display_content=text,
+        saved_run=None,
+    )
+
+    if msg_id:
+        assistant_msg.platform_msg_id = msg_id
+
+    with transaction.atomic():
+        user_msg.save()
+        assistant_msg.save()
+
+    return assistant_msg
