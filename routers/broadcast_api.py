@@ -30,7 +30,7 @@ class BotBroadcastFilters(BaseModel):
     )
     slack_channel_is_personal: bool | None = Field(
         None,
-        description="Filter by whether the Slack channel is personal. By default, will broadcast to both public and personal slack channels.",
+        description="Filter by whether the Slack channel is personal. By default, will broadcast to public slack channels only.",
     )
 
 
@@ -114,6 +114,7 @@ def broadcast_api_json(
             ).distinct_by_user_id()
         total += convo_qs.count()
         send_broadcast_msgs_chunked(
+            filters=bot_request.filters,
             text=bot_request.text,
             audio=bot_request.audio,
             video=bot_request.video,

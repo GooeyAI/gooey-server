@@ -351,8 +351,16 @@ def broadcast_input(bi: BotIntegration):
         if not convos.exists():
             gui.error("No users have interacted with this bot yet.", icon="⚠️")
             return
+
+        convos_count = 0
+        if bi.platform == Platform.SLACK:
+            # Default broadcasts to Public Channels only
+            convos_count = convos.filter(slack_channel_is_personal=False).count()
+        else:
+            convos_count = convos.count()
+
         gui.write(
-            f"Are you sure? This will send a message to all {convos.count()} users that have ever interacted with this bot.\n"
+            f"Are you sure? This will send a message to all {convos_count} users that have ever interacted with this bot.\n"
         )
         gui.button("✅ Yes, Send", key=confirmed_send_btn)
 
