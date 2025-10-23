@@ -117,11 +117,12 @@ def broadcast_api_json(
                 filters.slack_user_id__in = [
                     user_id.strip("<@>") for user_id in filters.slack_user_id__in
                 ]
-            convo_qs = convo_qs.filter(**filters.model_dump(exclude_none=True))
+            convo_qs.filter(**filters.model_dump(exclude_none=True))
             if bi.platform == Platform.SLACK:
-                convo_qs = ensure_slack_personal_channels(
-                    bi, filters, convo_qs
-                ).distinct("slack_channel_id")
+                created = ensure_slack_personal_channels(bi, filters, convo_qs)
+                if created:
+                    convo_qs = convo_qs.all()  # get updated results
+                convo_qs = convo_qs.distinct("slack_channel_id")
             else:
                 convo_qs = convo_qs.distinct_by_user_id()
 
@@ -149,19 +150,18 @@ def ensure_slack_personal_channels(
     bi: BotIntegration,
     filters: BotBroadcastFilters,
     convo_qs: QuerySet[Conversation],
-) -> QuerySet[Conversation]:
+) -> bool:
     # note: explicit False check here because None means both public and personal channels
     if filters.slack_channel_is_personal is False or not filters.slack_user_id__in:
-        return convo_qs
+        return False
 
     missing_user_ids = set(filters.slack_user_id__in) - set(
         convo_qs.values_list("slack_user_id", flat=True)
     )
     if not missing_user_ids:
-        return convo_qs
+        return False
 
     for user_id in missing_user_ids:
         user = fetch_user_info(user_id, bi.slack_access_token)
         create_personal_channel(bi, user)
-
-    return convo_qs.filter(**filters.model_dump(exclude_none=True))
+    return True
