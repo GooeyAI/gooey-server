@@ -56,7 +56,10 @@ class ComposioLLMTool(BaseLLMTool):
         composio = Composio()
         try:
             return composio.tools.execute(
-                slug=self.tool.slug, user_id=user_id, arguments=kwargs
+                slug=self.tool.slug,
+                user_id=user_id,
+                arguments=kwargs,
+                dangerously_skip_version_check=True,
             )
         except composio_client.BadRequestError as e:
             is_auth_error = (
