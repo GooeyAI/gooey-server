@@ -117,7 +117,7 @@ def broadcast_api_json(
                 filters.slack_user_id__in = [
                     user_id.strip("<@>") for user_id in filters.slack_user_id__in
                 ]
-            convo_qs.filter(**filters.model_dump(exclude_none=True))
+            convo_qs = convo_qs.filter(**filters.model_dump(exclude_none=True))
             if bi.platform == Platform.SLACK:
                 created = ensure_slack_personal_channels(bi, filters, convo_qs)
                 if created:
