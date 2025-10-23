@@ -35,6 +35,7 @@ from daras_ai_v2.slack_bot import (
     SlackAPIError,
     fetch_user_info,
     parse_slack_response,
+    update_msg_ack_selection_from_payload,
 )
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.widgets import get_current_workspace
@@ -171,6 +172,11 @@ def slack_interaction(
         raise HTTPException(403, "Only accepts requests from Slack")
     if data["type"] != "block_actions":
         return
+    # Immediately update the original message to remove buttons and show selection
+    try:
+        update_msg_ack_selection_from_payload(data)
+    except Exception as e:
+        capture_exception(e)
     bot = SlackBot(
         message_ts=data["container"]["message_ts"],
         team_id=data["team"]["id"],
@@ -226,8 +232,6 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
                     return
 
                 files = message.get("files", [])
-                if not files:
-                    message.get("message", {}).get("files", [])
                 if not files:
                     attachments = message.get("attachments", [])
                     files = [
