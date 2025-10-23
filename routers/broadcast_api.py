@@ -91,17 +91,17 @@ def broadcast_api_json(
             bi_id_decoded = api_hashids.decode(bot_request.integration_id)[0]
             bi_qs = bi_qs.filter(id=bi_id_decoded)
         except IndexError:
-            return HTTPException(
+            raise HTTPException(
                 status_code=404,
                 detail="Could not find a bot in your account with the given integration_id.",
             )
     else:
-        return HTTPException(
+        raise HTTPException(
             status_code=400,
             detail="Must provide one of the following: example_id or run_id as query parameters, or integration_id in the request body.",
         )
     if not bi_qs.exists():
-        return HTTPException(
+        raise HTTPException(
             status_code=404,
             detail=f"Could not find a bot in your account with the given {example_id=} & {run_id=} & {bot_request.integration_id=}. "
             "Please use the same account that you used to create the bot.",
@@ -117,7 +117,7 @@ def broadcast_api_json(
                 filters.slack_user_id__in = [
                     user_id.strip("<@>") for user_id in filters.slack_user_id__in
                 ]
-            convo_qs = convo_qs.filter(**filters.model_dump(exclude_unset=True))
+            convo_qs = convo_qs.filter(**filters.model_dump(exclude_none=True))
             if bi.platform == Platform.SLACK:
                 convo_qs = ensure_slack_personal_channels(
                     bi, filters, convo_qs
@@ -128,7 +128,7 @@ def broadcast_api_json(
         if not convo_qs.exists():
             raise HTTPException(
                 status_code=404,
-                detail=f"No conversations found with the given filters: {filters.model_dump(exclude_unset=True)}",
+                detail=f"No conversations found with the given filters: {filters}",
             )
 
         total += convo_qs.count()
@@ -164,4 +164,4 @@ def ensure_slack_personal_channels(
         user = fetch_user_info(user_id, bi.slack_access_token)
         create_personal_channel(bi, user)
 
-    return convo_qs.filter(**filters.model_dump(exclude_unset=True))
+    return convo_qs.filter(**filters.model_dump(exclude_none=True))

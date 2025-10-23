@@ -24,7 +24,7 @@ def get_external_tools_from_state(state: dict) -> typing.Iterable[ComposioLLMToo
     tool_slugs = {
         tool_slug
         for function in functions
-        if (tool_slug := get_external_tool_slug_from_url(function["url"]))
+        if (tool_slug := get_external_tool_slug_from_url(function.get("url", "")))
     }
     for tool in Composio().tools.get_raw_composio_tools(tools=tool_slugs, limit=50):
         yield ComposioLLMTool(tool)
@@ -223,7 +223,7 @@ def get_toolkits():
 
 
 @gui.cache_in_session_state(key="__tools_cache__")
-def get_tools_for_toolkit(toolkit_slug: str) -> list[Tool]:
+def get_tools_for_toolkit(toolkit_slug: str) -> list[dict]:
     from composio import Composio
 
     return [

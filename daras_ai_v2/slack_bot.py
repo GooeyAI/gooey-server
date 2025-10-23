@@ -633,7 +633,7 @@ def create_file_block(
 
 
 def create_button_block(
-    buttons: list[ReplyButton], max_id_len: int = 256
+    buttons: list[ReplyButton], max_id_len: int = 250
 ) -> list[dict]:
     if not buttons:
         return []
