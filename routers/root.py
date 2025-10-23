@@ -10,7 +10,7 @@ from time import time
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
 from loguru import logger
@@ -258,6 +258,18 @@ def explore_page(
             url=get_og_url_path(request), search_filters=search_filters
         ),
     }
+
+
+@app.get("/tools/{toolkit_slug}/{tool_slug}")
+def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
+    from composio import Composio
+    import composio_client
+
+    try:
+        tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
+    except composio_client.NotFoundError:
+        raise HTTPException(status_code=404)
+    return JSONResponse(content=tool.to_dict())
 
 
 @gui.route(app, "/api/")

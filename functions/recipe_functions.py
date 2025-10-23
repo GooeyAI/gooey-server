@@ -7,6 +7,7 @@ import gooey_gui as gui
 from django.utils.text import slugify
 
 from app_users.models import AppUser
+from daras_ai_v2 import icons
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.settings import templates
@@ -76,8 +77,8 @@ class WorkflowLLMTool(BaseLLMTool):
     """External function tool that calls workflow URLs."""
 
     def __init__(self, function_url: str):
-        from daras_ai_v2.workflow_url_input import url_to_runs
         from bots.models import Workflow
+        from daras_ai_v2.workflow_url_input import url_to_runs
 
         self.function_url = function_url
 
@@ -264,9 +265,9 @@ def get_workflow_tools_from_state(
     if not functions:
         return
     for function in functions:
-        if function.get("trigger") != trigger.name:
+        if function.get("trigger") != trigger.name or "/tools/" in function["url"]:
             continue
-        yield WorkflowLLMTool(function.get("url"))
+        yield WorkflowLLMTool(function["url"])
 
 
 def generate_tool_properties(
@@ -314,12 +315,11 @@ def is_functions_enabled(key="functions") -> bool:
 
 def functions_input(current_user: AppUser, key="functions"):
     from daras_ai_v2.base import BasePage
+    from daras_ai_v2.workflow_url_input import del_button, workflow_url_input
     from recipes.BulkRunner import list_view_editor
+    from recipes.Functions import FunctionsPage
 
     def render_inputs(list_key: str, del_key: str, d: dict):
-        from daras_ai_v2.workflow_url_input import workflow_url_input
-        from recipes.Functions import FunctionsPage
-
         col1, col2 = gui.columns([3, 9], responsive=True)
         with col1:
             col1.node.props["className"] += " pt-1"
@@ -330,26 +330,39 @@ def functions_input(current_user: AppUser, key="functions"):
                 value=d.get("trigger"),
             )
         with col2:
-            workflow_url_input(
-                page_cls=FunctionsPage,
-                key=list_key + ":url",
-                internal_state=d,
-                del_key=del_key,
-                current_user=current_user,
-                include_root=False,
-            )
+            url = d.get("url") or ""
+            tool_slug = get_external_tool_slug_from_url(url)
+            if tool_slug:
+                with gui.div(className="d-flex align-items-center"):
+                    gui.write(
+                        f'<a href="{url}" target="_blank">{tool_slug}</a>',
+                        unsafe_allow_html=True,
+                    )
+                    del_button(del_key)
+            else:
+                workflow_url_input(
+                    page_cls=FunctionsPage,
+                    key=list_key + ":url",
+                    internal_state=d,
+                    del_key=del_key,
+                    current_user=current_user,
+                    include_root=False,
+                )
         col2.node.children[0].props["className"] += " col-12"
 
     def render_section():
+        from functions.composio_tools import render_inbuilt_tools_selector
+
         gui.session_state.setdefault(key, [{}])
-        with gui.div(className="d-flex align-items-center"):
+        with gui.div(className="d-flex align-items-center gap-3 mb-2"):
             gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
-        list_view_editor(
-            add_btn_label="Add Function",
-            add_btn_type="tertiary",
-            key=key,
-            render_inputs=render_inputs,
-        )
+            gui.session_state[f"--{key}:add"] = gui.button(
+                f"{icons.add} Add", type="tertiary", className="p-1 mb-2"
+            )
+            gui.div(className="flex-grow-1")
+            render_inbuilt_tools_selector()
+
+        list_view_editor(key=key, render_inputs=render_inputs)
 
     functions_enabled = switch_with_section(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
@@ -414,6 +427,7 @@ def _get_called_functions_items(
 
     if not is_functions_enabled():
         return
+
     qs = saved_run.called_functions.filter(trigger=trigger.db_value)
     for called_fn in qs:
         fn_sr = called_fn.function_run
@@ -441,3 +455,66 @@ def _get_called_functions_items(
             inputs=inputs,
             return_value=return_value,
         )
+
+    if trigger == FunctionTrigger.prompt:
+        yield from _get_external_tool_calls_items(saved_run)
+
+
+def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]:
+    final_prompt = saved_run.state.get("final_prompt")
+    if not final_prompt:
+        return []
+
+    external_tools = {
+        tool_slug
+        for fn in saved_run.state.get("functions", [])
+        if (tool_slug := get_external_tool_slug_from_url(fn["url"]))
+    }
+
+    items_by_id = {}
+    for entry in final_prompt:
+        if entry.get("role") == "tool":
+            tool_call_id = entry["tool_call_id"]
+            try:
+                item = items_by_id[tool_call_id]
+            except KeyError:
+                continue
+            return_value = entry["content"]
+            try:
+                return_value = json.loads(return_value)
+            except json.JSONDecodeError:
+                pass
+            item["return_value"] = return_value
+
+        for tool_call in entry.get("tool_calls", []):
+            tool_call_id = tool_call["id"]
+            tool_name = tool_call["function"]["name"]
+            if tool_name not in external_tools:
+                continue
+            inputs = tool_call["function"]["arguments"]
+            try:
+                inputs = json.loads(inputs)
+            except json.JSONDecodeError:
+                pass
+
+            items_by_id[tool_call_id] = dict(
+                id=tool_call_id,
+                title=tool_name,
+                url="",
+                inputs=inputs,
+                return_value=None,
+            )
+
+    return items_by_id.values()
+
+
+def get_external_tool_slug_from_url(url: str) -> str | None:
+    from daras_ai_v2.fastapi_tricks import resolve_url
+    from routers.root import tool_page
+
+    match = resolve_url(url)
+    if match and match.route.name == tool_page.__name__:
+        tool_slug = match.matched_params["tool_slug"]
+        return tool_slug
+
+    return None

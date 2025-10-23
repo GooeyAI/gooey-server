@@ -13,7 +13,9 @@ Context:
 {% for item in called_functions %}
 <details>
 <summary>🧩 Called <strong>{{ item.title }}</strong></summary>
+{% if item.url %}
 <p><a target="_blank" href="{{ item.url }}">View Run</a></p>
+{% endif %}
 
 {% if item.inputs %}
 <strong>Inputs</strong>

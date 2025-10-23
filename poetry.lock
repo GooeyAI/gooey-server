@@ -1013,6 +1013,48 @@ humanfriendly = ">=9.1"
 cron = ["capturer (>=2.4)"]
 
 [[package]]
+name = "composio"
+version = "0.9.0"
+description = "SDK for integrating Composio with your applications."
+optional = false
+python-versions = "<4,>=3.9"
+groups = ["main"]
+files = [
+    {file = "composio-0.9.0-py3-none-any.whl", hash = "sha256:488996ce08c8a43717dafa4113506343293b4352f310b15b3a5d330a74037b09"},
+    {file = "composio-0.9.0.tar.gz", hash = "sha256:b07ef5d96f66cc128d36bdf7d4f5216b7c56cd76abb5d11962cff867482e0855"},
+]
+
+[package.dependencies]
+composio-client = ">=1.10.0"
+openai = "*"
+pydantic = ">=2.6.4"
+pysher = ">=1.0.8"
+typing-extensions = ">=4.0.0"
+
+[[package]]
+name = "composio-client"
+version = "1.10.0"
+description = "The official Python library for the composio API"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "composio_client-1.10.0-py3-none-any.whl", hash = "sha256:60301b004d13d79366e82102d73dfa55daf27770f7f8afcc34d129ec43556a8a"},
+    {file = "composio_client-1.10.0.tar.gz", hash = "sha256:99778a550248ab3ff30b4d3bd18b8c2679ea4113d524a3d6261dd78ec925635f"},
+]
+
+[package.dependencies]
+anyio = ">=3.5.0,<5"
+distro = ">=1.7.0,<2"
+httpx = ">=0.23.0,<1"
+pydantic = ">=1.9.0,<3"
+sniffio = "*"
+typing-extensions = ">=4.10,<5"
+
+[package.extras]
+aiohttp = ["aiohttp", "httpx-aiohttp (>=0.1.8)"]
+
+[[package]]
 name = "cryptography"
 version = "41.0.5"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
@@ -5401,6 +5443,21 @@ files = [
 dev = ["build", "flake8", "mypy", "pytest", "twine"]
 
 [[package]]
+name = "pysher"
+version = "1.0.8"
+description = "Pusher websocket client for python, based on Erik Kulyk's PythonPusherClient"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "Pysher-1.0.8.tar.gz", hash = "sha256:7849c56032b208e49df67d7bd8d49029a69042ab0bb45b2ed59fa08f11ac5988"},
+]
+
+[package.dependencies]
+requests = ">=2.26.0"
+websocket-client = "!=0.49"
+
+[[package]]
 name = "pytest"
 version = "8.3.4"
 description = "pytest: simple powerful testing with Python"
@@ -7490,6 +7547,23 @@ files = [
 ]
 
 [[package]]
+name = "websocket-client"
+version = "1.9.0"
+description = "WebSocket client for Python with low level API options"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "websocket_client-1.9.0-py3-none-any.whl", hash = "sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef"},
+    {file = "websocket_client-1.9.0.tar.gz", hash = "sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98"},
+]
+
+[package.extras]
+docs = ["Sphinx (>=6.0)", "myst-parser (>=2.0.0)", "sphinx_rtd_theme (>=1.1.0)"]
+optional = ["python-socks", "wsaccel"]
+test = ["pytest", "websockets"]
+
+[[package]]
 name = "websockets"
 version = "15.0.1"
 description = "An implementation of the WebSocket Protocol (RFC 6455 & 7692)"
@@ -7788,4 +7862,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "1919ed6cc0825e5939cbfd39a5566a66df92f3652bda6b9e9ad15e71468c8885"
+content-hash = "7adc880088eed9f72495e348f370cc8c0ea23c609935cb783ed9b3dc1ca85baf"
