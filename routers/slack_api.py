@@ -170,14 +170,22 @@ def slack_interaction(
         raise HTTPException(403, "Only accepts requests from Slack")
     if data["type"] != "block_actions":
         return
+
+    context_msg_ts = data["container"]["message_ts"]
+    actions = data["actions"]
+    if actions:
+        message_ts = actions[0]["action_ts"]
+    else:
+        message_ts = context_msg_ts
     bot = SlackBot(
-        message_ts=data["actions"][0]["action_ts"],
+        message_ts=message_ts,
         team_id=data["team"]["id"],
         user_id=data["user"]["id"],
         channel_id=data["channel"]["id"],
-        actions=data["actions"],
-        context_msg_ts=data["container"]["message_ts"],
+        actions=actions,
+        context_msg_ts=context_msg_ts,
     )
+
     background_tasks.add_task(msg_handler, bot)
 
 
