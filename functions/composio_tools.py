@@ -134,6 +134,7 @@ def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
             functions.append({"trigger": "prompt", "url": url})
 
     if not dialog_ref.is_open:
+        gui.session_state.pop("__tools_cache__", None)
         for k in selected_keys:
             gui.session_state.pop(k, None)
         return
@@ -221,12 +222,16 @@ def get_toolkits():
     return Composio().toolkits.list(limit=1000).items
 
 
-@gui.cache_in_session_state
+@gui.cache_in_session_state(key="__tools_cache__")
 def get_tools_for_toolkit(toolkit_slug: str) -> list[Tool]:
     from composio import Composio
 
     return [
-        item.to_dict()
+        {
+            "name": item.name,
+            "slug": item.slug,
+            "description": item.description,
+        }
         for item in Composio().tools.get_raw_composio_tools(
             toolkits=[toolkit_slug], limit=9999
         )
