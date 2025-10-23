@@ -39,7 +39,6 @@ from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from widgets.base_header import render_breadcrumbs_with_author, render_header_title
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
@@ -58,6 +57,7 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
+from functions.composio_tools import get_external_tools_from_state
 from functions.inbuilt_tools import get_inbuilt_tools_from_state
 from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
 from functions.recipe_functions import (
@@ -73,9 +73,13 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from payments.plans import PricingPlan
-from routers.root import RecipeTabs
+from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
-from widgets.base_header import render_help_button
+from widgets.base_header import (
+    render_breadcrumbs_with_author,
+    render_header_title,
+    render_help_button,
+)
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
@@ -89,8 +93,6 @@ from workspaces.widgets import (
     render_create_workspace_alert,
     set_current_workspace,
 )
-from routers.root import PREVIEW_ROUTE_WORKFLOWS
-
 
 MAX_SEED = 4294967294
 gooey_rng = Random()
@@ -1416,22 +1418,35 @@ class BasePage:
         gui.session_state["is_flagged"] = is_flagged
 
     def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
-        return {
-            tool.name: tool.bind(
-                saved_run=self.current_sr,
-                workspace=self.current_workspace,
-                current_user=self.request.user,
-                request_model=self.RequestModel,
-                response_model=self.ResponseModel,
-                state=gui.session_state,
-                trigger=FunctionTrigger.prompt,
-            )
-            for tool in get_workflow_tools_from_state(
-                gui.session_state, FunctionTrigger.prompt
-            )
-        } | {
-            tool.name: tool for tool in get_inbuilt_tools_from_state(gui.session_state)
-        }
+        return (
+            {
+                tool.name: tool.bind(
+                    saved_run=self.current_sr,
+                    workspace=self.current_workspace,
+                    current_user=self.request.user,
+                    request_model=self.RequestModel,
+                    response_model=self.ResponseModel,
+                    state=gui.session_state,
+                    trigger=FunctionTrigger.prompt,
+                )
+                for tool in get_workflow_tools_from_state(
+                    gui.session_state, FunctionTrigger.prompt
+                )
+            }
+            | {
+                tool.name: tool
+                for tool in get_inbuilt_tools_from_state(gui.session_state)
+            }
+            | {
+                tool.name: tool.bind(
+                    workspace=self.current_workspace,
+                    redirect_url=self.current_app_url(
+                        query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
+                    ),
+                )
+                for tool in get_external_tools_from_state(gui.session_state)
+            }
+        )
 
     @cached_property
     def current_workspace(self) -> Workspace:

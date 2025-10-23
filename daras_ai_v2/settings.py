@@ -22,7 +22,6 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -532,3 +531,6 @@ LIVEKIT_SIP_URL = config("LIVEKIT_SIP_URL", "")
 LIVEKIT_SIP_TRUNK_NAME = config("LIVEKIT_SIP_TRUNK_NAME", "")
 LIVEKIT_SIP_TRUNK_USERNAME = config("LIVEKIT_SIP_TRUNK_USERNAME", "")
 LIVEKIT_SIP_TRUNK_PASSWORD = config("LIVEKIT_SIP_TRUNK_PASSWORD", "")
+
+COMPOSIO_API_KEY = config("COMPOSIO_API_KEY", "")
+os.environ["COMPOSIO_API_KEY"] = COMPOSIO_API_KEY
