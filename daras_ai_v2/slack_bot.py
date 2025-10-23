@@ -9,11 +9,11 @@ from requests import Response
 from sentry_sdk import capture_exception
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import truncate_text_words, upload_file_from_bytes
 from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
-from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE, ButtonPressed
+from daras_ai_v2.bots import BotInterface, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
 from daras_ai_v2.search_ref import SearchReference
@@ -27,6 +27,8 @@ $name is now connected to your Slack workspace in this channel!
 
 I'll respond to any text and audio messages in this channel while keeping track of a separate conversation history with each user. Add 👍 or 👎 to my responses to help me learn.
 """.strip()
+
+SLACK_MAX_SIZE = 500
 
 
 class SlackBot(BotInterface):
@@ -43,10 +45,12 @@ class SlackBot(BotInterface):
         channel_id: str,
         user_id: str,
         text: str = "",
-        files: list[dict] = None,
-        actions: list[dict] = None,
+        files: list[dict] | None = None,
+        actions: list[dict] | None = None,
+        context_msg_ts: str | None = None,
     ):
-        self.user_msg_id = self._msg_ts = message_ts
+        self.user_msg_id = message_ts
+        self._msg_ts = context_msg_ts or message_ts
         self._team_id = team_id
         self.bot_id = channel_id
         self.user_id = user_id
@@ -628,7 +632,9 @@ def create_file_block(
         }
 
 
-def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
+def create_button_block(
+    buttons: list[ReplyButton], max_id_len: int = 256
+) -> list[dict]:
     if not buttons:
         return []
     return [
@@ -639,7 +645,9 @@ def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
                     "type": "button",
                     "text": {"type": "plain_text", "text": button["title"]},
                     "value": button["id"],
-                    "action_id": "button_" + button["id"],
+                    "action_id": truncate_text_words(
+                        "button_" + button["id"], max_id_len
+                    ),
                 }
                 for button in buttons
             ],

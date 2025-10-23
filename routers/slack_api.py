@@ -144,7 +144,6 @@ def slack_connect_redirect(request: Request):
                 **config,
                 name=f"{slack_team_name} | #{slack_channel_name}",
                 platform=Platform.SLACK,
-                show_feedback_buttons=True,
             ),
         )
         if not created:
@@ -172,11 +171,12 @@ def slack_interaction(
     if data["type"] != "block_actions":
         return
     bot = SlackBot(
-        message_ts=data["container"]["message_ts"],
+        message_ts=data["actions"][0]["action_ts"],
         team_id=data["team"]["id"],
         user_id=data["user"]["id"],
         channel_id=data["channel"]["id"],
         actions=data["actions"],
+        context_msg_ts=data["container"]["message_ts"],
     )
     background_tasks.add_task(msg_handler, bot)
 

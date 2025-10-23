@@ -77,9 +77,6 @@ FEEDBACK_CONFIRMED_MSG = (
     "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
 
-SLACK_MAX_SIZE = 3000
-
-
 class ButtonPressed(BaseModel):
     button_id: str = Field(
         description="The ID of the button that was pressed by the user"
@@ -258,8 +255,8 @@ class BotInterface:
         if disable_feedback:
             send_feedback_buttons = False
 
-        if buttons and send_feedback_buttons:
-            self._send_msg(
+        if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
+            update_msg_id = self._send_msg(
                 text=text,
                 audio=audio,
                 video=video,
@@ -267,20 +264,22 @@ class BotInterface:
                 documents=documents,
                 update_msg_id=update_msg_id,
             )
-            text = ""
-            update_msg_id = None
-
-        if send_feedback_buttons:
-            buttons = _feedback_buttons()
-
-        return self._send_msg(
-            text=text,
-            audio=audio,
-            video=video,
-            buttons=buttons,
-            documents=documents,
-            update_msg_id=update_msg_id,
-        )
+            # send feedback buttons as a separate message
+            return self._send_msg(
+                buttons=_feedback_buttons(),
+                update_msg_id=update_msg_id,
+            )
+        else:
+            if send_feedback_buttons:
+                buttons += _feedback_buttons()
+            return self._send_msg(
+                text=text,
+                audio=audio,
+                video=video,
+                buttons=buttons,
+                documents=documents,
+                update_msg_id=update_msg_id,
+            )
 
     def _send_msg(
         self,
@@ -450,6 +449,7 @@ def msg_handler_raw(bot: BotInterface):
     if input_text.lower().strip("/ ") in RESET_KEYWORDS:
         # record the reset time so we don't send context
         bot.convo.reset_at = timezone.now()
+        bot.convo.save(update_fields=["reset_at"])
         # let the user know we've reset
         bot.send_msg(text=RESET_MSG)
     else:
