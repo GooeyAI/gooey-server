@@ -1,14 +1,16 @@
 import typing
 
-from django.db.models import Q
-from fastapi import Depends
-from fastapi import HTTPException
+from django.db.models import Q, QuerySet
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from api_keys.models import ApiKey
 from auth.token_authentication import api_auth_header
-from bots.models import BotIntegration
-from bots.tasks import send_broadcast_msgs_chunked
+from bots.models import BotIntegration, Conversation, Platform
+from bots.tasks import (
+    send_broadcast_msgs_chunked,
+)
+from daras_ai_v2.slack_bot import create_personal_channel, fetch_user_info
 from recipes.VideoBots import ReplyButton, VideoBotsPage
 from routers.custom_api_router import CustomAPIRouter
 
@@ -17,7 +19,7 @@ app = CustomAPIRouter()
 
 class BotBroadcastFilters(BaseModel):
     twilio_phone_number__in: list[str] | None = Field(
-        description="A list of Twilio phone numbers to broadcast to."
+        None, description="A list of Twilio phone numbers to broadcast to."
     )
     wa_phone_number__in: list[str] | None = Field(
         None, description="A list of WhatsApp phone numbers to broadcast to."
@@ -108,13 +110,29 @@ def broadcast_api_json(
     total = 0
     for bi in bi_qs:
         convo_qs = bi.conversations.all()
-        if bot_request.filters:
-            convo_qs = convo_qs.filter(
-                **bot_request.filters.model_dump(exclude_unset=True)
-            ).distinct_by_user_id()
+        filters = bot_request.filters
+        if filters:
+            if filters.slack_user_id__in:
+                # some input santization
+                filters.slack_user_id__in = [
+                    user_id.strip("<@>") for user_id in filters.slack_user_id__in
+                ]
+            convo_qs = convo_qs.filter(**filters.model_dump(exclude_unset=True))
+            if bi.platform == Platform.SLACK:
+                convo_qs = ensure_slack_personal_channels(
+                    bi, filters, convo_qs
+                ).distinct("slack_channel_id")
+            else:
+                convo_qs = convo_qs.distinct_by_user_id()
+
+        if not convo_qs.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"No conversations found with the given filters: {filters.model_dump(exclude_unset=True)}",
+            )
+
         total += convo_qs.count()
         send_broadcast_msgs_chunked(
-            filters=bot_request.filters,
             text=bot_request.text,
             audio=bot_request.audio,
             video=bot_request.video,
@@ -125,3 +143,25 @@ def broadcast_api_json(
         )
 
     return {"status": "success", "count": total}
+
+
+def ensure_slack_personal_channels(
+    bi: BotIntegration,
+    filters: BotBroadcastFilters,
+    convo_qs: QuerySet[Conversation],
+) -> QuerySet[Conversation]:
+    # note: explicit False check here because None means both public and personal channels
+    if filters.slack_channel_is_personal is False or not filters.slack_user_id__in:
+        return convo_qs
+
+    missing_user_ids = set(filters.slack_user_id__in) - set(
+        convo_qs.values_list("slack_user_id", flat=True)
+    )
+    if not missing_user_ids:
+        return convo_qs
+
+    for user_id in missing_user_ids:
+        user = fetch_user_info(user_id, bi.slack_access_token)
+        create_personal_channel(bi, user)
+
+    return convo_qs.filter(**filters.model_dump(exclude_unset=True))

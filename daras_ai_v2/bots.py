@@ -268,6 +268,7 @@ class BotInterface:
                 update_msg_id=update_msg_id,
             )
             text = ""
+            update_msg_id = None
 
         if send_feedback_buttons:
             buttons = _feedback_buttons()
@@ -608,15 +609,22 @@ def _process_and_send_msg(
         )
 
     # save msgs to db
-    _save_msgs(
-        bot=bot,
+    save_msg_pair_to_db(
+        convo=bot.convo,
         input_images=input_images,
         input_documents=input_documents,
-        input_text=input_text,
-        platform_msg_id=sent_msg_id or update_msg_id,
-        response=VideoBotsPage.ResponseModel.model_validate(state),
         saved_run=sr,
         received_time=recieved_time,
+        user_msg_id=bot.user_msg_id,
+        bot_msg_id=sent_msg_id or update_msg_id,
+        # user input
+        user_msg_display_content=state.get("input_prompt") or "",
+        # processed user input for bot
+        user_msg_content=state.get("raw_input_text") or "",
+        # raw bot output
+        bot_msg_content=state.get("raw_output_text") and state["raw_output_text"][0],
+        # bot output for human
+        bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
 
 
@@ -673,24 +681,32 @@ def build_system_vars(
     return variables, variables_schema
 
 
-def _save_msgs(
-    bot: BotInterface,
-    input_images: list[str] | None,
-    input_documents: list[str] | None,
-    input_text: str,
-    platform_msg_id: str | None,
-    response: VideoBotsPage.ResponseModel,
-    saved_run: SavedRun,
-    received_time: datetime,
+def save_msg_pair_to_db(
+    *,
+    convo: Conversation,
+    user_msg_id: str | None = None,
+    bot_msg_id: str | None = None,
+    input_images: list[str] | None = None,
+    input_documents: list[str] | None = None,
+    user_msg_content: str = "",
+    user_msg_display_content: str = "",
+    bot_msg_content: str = "",
+    bot_msg_display_content: str = "",
+    saved_run: SavedRun | None = None,
+    received_time: datetime | None = None,
 ):
+    if received_time:
+        response_time = timezone.now() - received_time
+    else:
+        response_time = None
     # create messages for future context
     user_msg = Message(
-        platform_msg_id=bot.user_msg_id,
-        conversation=bot.convo,
+        platform_msg_id=user_msg_id,
+        conversation=convo,
         role=CHATML_ROLE_USER,
-        content=response.raw_input_text,
-        display_content=input_text,
-        response_time=timezone.now() - received_time,
+        content=user_msg_content,
+        display_content=user_msg_display_content,
+        response_time=response_time,
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -699,21 +715,21 @@ def _save_msgs(
             MessageAttachment(message=user_msg, url=f_url, metadata=metadata)
         )
     assistant_msg = Message(
-        platform_msg_id=platform_msg_id,
-        conversation=bot.convo,
+        platform_msg_id=bot_msg_id,
+        conversation=convo,
         role=CHATML_ROLE_ASSISTANT,
-        content=response.raw_output_text and response.raw_output_text[0],
-        display_content=response.output_text and response.output_text[0],
+        content=bot_msg_content,
+        display_content=bot_msg_display_content,
         saved_run=saved_run,
-        response_time=timezone.now() - received_time,
+        response_time=response_time,
     )
     # save the messages & attachments
     # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code
     with transaction.atomic():
-        user_msg.save()
         for attachment in attachments:
             attachment.metadata.save()
             attachment.save()
+        user_msg.save()
         assistant_msg.save()
 
 

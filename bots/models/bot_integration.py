@@ -338,7 +338,7 @@ class BotIntegration(models.Model):
     )
     slack_read_receipt_msg = models.TextField(
         blank=True,
-        default="Results may take up to 1 minute, we appreciate your patience.",
+        default="",
         help_text="Bot's Slack read receipt message - if set, and platform is Slack, the bot will send this message to mark the user message as read and then delete it when it has a response ready",
     )
     slack_create_personal_channels = models.BooleanField(

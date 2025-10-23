@@ -333,7 +333,11 @@ def broadcast_input(bi: BotIntegration):
     if not gui.session_state.get(should_confirm_key):
         return
 
-    convos = bi.conversations.all()
+    convo_qs = bi.conversations.all()
+    if bi.platform == Platform.SLACK:
+        convo_qs = convo_qs.distinct("slack_channel_id")
+    else:
+        convo_qs = convo_qs.distinct_by_user_id()
     if gui.session_state.get(confirmed_send_btn):
         gui.success("Started sending broadcast!")
         gui.session_state.pop(confirmed_send_btn)
@@ -344,23 +348,15 @@ def broadcast_input(bi: BotIntegration):
             video=video,
             documents=documents,
             bi=bi,
-            convo_qs=convos,
+            convo_qs=convo_qs,
             medium=medium,
         )
     else:
-        if not convos.exists():
+        if not convo_qs.exists():
             gui.error("No users have interacted with this bot yet.", icon="⚠️")
             return
-
-        convos_count = 0
-        if bi.platform == Platform.SLACK:
-            # Default broadcasts to Public Channels only
-            convos_count = convos.filter(slack_channel_is_personal=False).count()
-        else:
-            convos_count = convos.count()
-
         gui.write(
-            f"Are you sure? This will send a message to all {convos_count} users that have ever interacted with this bot.\n"
+            f"Are you sure? This will send a message to all {convo_qs.count()} users that have ever interacted with this bot.\n"
         )
         gui.button("✅ Yes, Send", key=confirmed_send_btn)
 
