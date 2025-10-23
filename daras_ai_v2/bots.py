@@ -77,6 +77,7 @@ FEEDBACK_CONFIRMED_MSG = (
     "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
 
+
 class ButtonPressed(BaseModel):
     button_id: str = Field(
         description="The ID of the button that was pressed by the user"
@@ -726,10 +727,10 @@ def save_msg_pair_to_db(
     # save the messages & attachments
     # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code
     with transaction.atomic():
+        user_msg.save()
         for attachment in attachments:
             attachment.metadata.save()
             attachment.save()
-        user_msg.save()
         assistant_msg.save()
 
 
