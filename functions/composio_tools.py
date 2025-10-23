@@ -215,7 +215,7 @@ def render_toolkit_tools(toolkit: Toolkit):
 def get_toolkits():
     from composio import Composio
 
-    return Composio().toolkits.list(limit=9999).items
+    return Composio().toolkits.list(limit=1000).items
 
 
 @gui.cache_in_session_state
