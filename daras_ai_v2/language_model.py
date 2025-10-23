@@ -1666,6 +1666,10 @@ def run_openai_chat(
         # Swiss AI Apertus model doesn't support tool calling
         tools = None
 
+    if model == LargeLanguageModels.sea_lion_v4_gemma_3_27b_it:
+        # sea lion doesn't support tools
+        tools = None
+
     if avoid_repetition:
         kwargs["frequency_penalty"] = 0.1
         kwargs["presence_penalty"] = 0.25
