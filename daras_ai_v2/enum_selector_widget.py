@@ -16,6 +16,8 @@ def enum_multiselect(
     label: str = "",
     checkboxes=True,
     allow_none=True,
+    tooltip: dict[E, str] | None = None,
+    tooltip_placement: str = "top",
 ):
     try:
         deprecated = enum_cls._deprecated()
@@ -27,8 +29,14 @@ def enum_multiselect(
         if e in deprecated and e.name not in value:
             continue
         enums.append(e)
-    enum_names = [e.name for e in enums]
-    enum_labels = {e.name: _default_format_func(e) for e in enums}
+
+    enum_names = []
+    enum_labels = {}
+    enum_lookup = {}
+    for e in enums:
+        enum_names.append(e.name)
+        enum_labels[e.name] = _default_format_func(e)
+        enum_lookup[e.name] = e
 
     if checkboxes:
         if label:
@@ -41,7 +49,18 @@ def enum_multiselect(
             if inner_key not in gui.session_state:
                 gui.session_state[inner_key] = name in selected
 
-            gui.checkbox(enum_labels.get(name), key=inner_key)
+            enum_obj = enum_lookup[name]
+            tooltip_text = tooltip.get(enum_obj) if tooltip else None
+
+            if tooltip_text:
+                gui.checkbox(
+                    enum_labels.get(name),
+                    key=inner_key,
+                    help=tooltip_text,
+                    tooltip_placement=tooltip_placement,
+                )
+            else:
+                gui.checkbox(enum_labels.get(name), key=inner_key)
 
             if gui.session_state.get(inner_key):
                 ret_val.append(name)
