@@ -48,6 +48,8 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
     # Update the last load time
     session[f"{key}:last_load_time"] = current_time
 
+    # set the default open state in session here
+    session[key] = default_open
     ref = SidebarRef(
         key=key,
         session=session,
