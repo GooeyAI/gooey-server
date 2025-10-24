@@ -23,11 +23,9 @@ class VideoModelSpecAdmin(admin.ModelAdmin):
         "updated_at",
     ]
 
-    search_fields = [
-        "name",
-        "label",
-        "model_id",
-    ] + [f"pricing__{field}" for field in ModelPricingAdmin.search_fields]
+    search_fields = ["name", "label", "model_id", "category"] + [
+        f"pricing__{field}" for field in ModelPricingAdmin.search_fields
+    ]
     autocomplete_fields = ["pricing"]
 
     readonly_fields = [
@@ -43,6 +41,7 @@ class VideoModelSpecAdmin(admin.ModelAdmin):
                     "name",
                     "label",
                     "model_id",
+                    "category",
                     "schema",
                     "pricing",
                 ]

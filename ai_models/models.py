@@ -1,6 +1,11 @@
 from django.db import models
 
 
+class Category(models.IntegerChoices):
+    Video = (1, "Video")
+    Audio = (2, "Audio")
+
+
 class VideoModelSpec(models.Model):
     name = models.TextField(
         unique=True,
@@ -15,6 +20,12 @@ class VideoModelSpec(models.Model):
     schema = models.JSONField(
         help_text="The schema of the model parameters.",
         default=dict,
+    )
+
+    category = models.IntegerField(
+        choices=Category.choices,
+        help_text="Model category: generates Audio, Video, etc.",
+        null=True,
     )
 
     pricing = models.ForeignKey(
