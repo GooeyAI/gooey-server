@@ -50,6 +50,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
+from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import global_workspace_selector, workspace_selector_link
 
@@ -743,7 +744,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request):
+    with page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -762,6 +763,7 @@ def get_og_url_path(request) -> str:
 @contextmanager
 def page_wrapper(
     request: Request,
+    page: None = None,
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
     show_search_bar: bool = True,
@@ -770,68 +772,87 @@ def page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    with gui.div(className="d-flex flex-column min-vh-100"):
-        gui.html(templates.get_template("gtag.html").render(**context))
+    container = page if page else None
+    sidebar_ref = use_sidebar("builder-sidebar", request.session, default_open=False)
+    sidebar_content, pane_content = sidebar_layout(sidebar_ref)
 
-        with (
-            gui.div(className="header"),
-            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
-            gui.div(className="container-xxl my-2"),
-            gui.div(
-                className="position-relative w-100 d-flex justify-content-between gap-2"
-            ),
-        ):
+    is_builder_sidebar_open = sidebar_ref.is_open
+    with sidebar_content:
+        if container:
+            container.render_sidebar()
+
+    with pane_content:
+        with gui.div(className="d-flex flex-column min-vh-100 w-100"):
+            gui.html(templates.get_template("gtag.html").render(**context))
+
             with (
-                gui.div(className="d-md-block"),
-                gui.tag("a", href="/"),
+                gui.div(className="header"),
+                gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
+                gui.div(
+                    className="container-xxl my-2"
+                    if not is_builder_sidebar_open
+                    else "my-2 mx-2 w-100"
+                ),
+                gui.div(
+                    className="position-relative w-100 d-flex justify-content-between gap-2"
+                ),
             ):
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_IMG,
-                    width="300",
-                    height="142",
-                    className="img-fluid logo d-none d-sm-block",
-                )
-                gui.tag(
-                    "img",
-                    src=settings.GOOEY_LOGO_RECT,
-                    width="145",
-                    height="40",
-                    className="img-fluid logo d-sm-none",
-                )
+                with (
+                    gui.div(className="d-md-block"),
+                    gui.tag("a", href="/"),
+                ):
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_IMG,
+                        width="300",
+                        height="142",
+                        className="img-fluid logo d-none d-sm-block",
+                    )
+                    gui.tag(
+                        "img",
+                        src=settings.GOOEY_LOGO_RECT,
+                        width="145",
+                        height="40",
+                        className="img-fluid logo d-sm-none",
+                    )
 
-            if show_search_bar:
-                _render_mobile_search_button(request, search_filters)
+                if show_search_bar:
+                    _render_mobile_search_button(request, search_filters)
+
+                with gui.div(
+                    className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                ):
+                    for url, label in settings.HEADER_LINKS:
+                        render_header_link(
+                            url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+                        )
+
+                    if request.user and not request.user.is_anonymous:
+                        render_header_link(
+                            url=get_route_path(explore_in_current_workspace),
+                            label="Saved",
+                            icon=icons.save,
+                        )
+
+                        current_workspace = global_workspace_selector(
+                            request.user, request.session
+                        )
+                    else:
+                        current_workspace = None
+                        anonymous_login_container(request, context)
+
+            gui.html(copy_to_clipboard_scripts)
 
             with gui.div(
-                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                id="main-content",
+                className="container-xxl "
+                if not is_builder_sidebar_open
+                else "mx-2 w-100" + className,
             ):
-                for url, label in settings.HEADER_LINKS:
-                    render_header_link(
-                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
-                    )
+                yield current_workspace
 
-                if request.user and not request.user.is_anonymous:
-                    render_header_link(
-                        url=get_route_path(explore_in_current_workspace),
-                        label="Saved",
-                        icon=icons.save,
-                    )
-
-                    current_workspace = global_workspace_selector(
-                        request.user, request.session
-                    )
-                else:
-                    current_workspace = None
-                    anonymous_login_container(request, context)
-
-        gui.html(copy_to_clipboard_scripts)
-
-        with gui.div(id="main-content", className="container-xxl " + className):
-            yield current_workspace
-
-        gui.html(templates.get_template("footer.html").render(**context))
-        gui.html(templates.get_template("login_scripts.html").render(**context))
+            gui.html(templates.get_template("footer.html").render(**context))
+            gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
