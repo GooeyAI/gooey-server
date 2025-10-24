@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import json
 import typing
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
@@ -14,8 +13,6 @@ from furl import furl
 import gooey_gui as gui
 from django.db.models import Q
 from pydantic import BaseModel
-from requests.utils import CaseInsensitiveDict
-from requests.utils import CaseInsensitiveDict
 
 from ai_models.models import VideoModelSpec, Category
 from bots.models import Workflow
@@ -24,7 +21,6 @@ from daras_ai_v2.exceptions import UserError, ffmpeg, ffprobe_metadata
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.functional import get_initializer
 from daras_ai_v2.pydantic_validation import HttpUrlStr
-from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
 from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
 from daras_ai_v2.variables_widget import render_prompt_vars
 from usage_costs.cost_utils import record_cost_auto
@@ -131,18 +127,15 @@ class VideoGenPage(BasePage):
                 if self.request.user.disable_safety_checker:
                     continue
                 yield "Running safety checker..."
-                safety_checker(text=request.inputs[key])
+                safety_checker(text=request.audio_inputs[key])
 
             yield f"Generating audio with {request.selected_audio_model}..."
-            video_duration = ffprobe_metadata(video_url)["format"]["duration"]
 
-            payload = {}
-            payload["video_url"] = video_url
-            payload["duration"] = video_duration
-            payload = payload | request.audio_inputs
-
-            res = yield from generate_on_fal(request.selected_audio_model, payload)
             model = VideoModelSpec.objects.get(name=request.selected_audio_model)
+            raw_dur = ffprobe_metadata(video_url)["format"]["duration"]
+            payload = {"video_url": video_url, "duration": raw_dur}
+            payload = payload | request.audio_inputs
+            res = yield from generate_on_fal(model.model_id, payload)
 
             model_output_schemas = []
             try:
