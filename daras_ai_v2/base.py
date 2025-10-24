@@ -46,7 +46,7 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
-from daras_ai_v2.gooey_builder import render_gooey_builder
+from daras_ai_v2.gooey_builder import render_gooey_builder, render_gooey_builder_inline
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -78,6 +78,7 @@ from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
@@ -412,6 +413,33 @@ class BasePage:
         # rendered at the end to indicate unpublished changes
         with header_placeholder:
             self._render_header()
+
+    def render_sidebar(self):
+        sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
+        if sidebar_ref.is_open:
+            with gui.div(className="w-100 d-flex justify-content-end pt-2"):
+                close_button = gui.button(
+                    label="<i class='fa-regular fa-xmark'></i>",
+                    className="btn btn-secondary p-2",
+                )
+                if close_button:
+                    sidebar_ref.set_open(False)
+                    raise gui.RerunException()
+
+            with gui.div(className="w-100 h-100"):
+                self._render_gooey_builder()
+        else:
+            with gui.div(
+                className="w-100 position-absolute",
+                style={"bottom": "10px", "left": "10px"},
+            ):
+                gooey_builder_open_button = gui.button(
+                    label="<i class='fa-regular fa-message-smile'></i> Chat Assistant",
+                    className="btn btn-secondary rounded-pill",
+                )
+            if gooey_builder_open_button:
+                sidebar_ref.set_open(True)
+                raise gui.RerunException()
 
     def _render_header(self):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
@@ -1170,8 +1198,6 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                self._render_gooey_builder()
-
                 with gui.styled(INPUT_OUTPUT_COLS_CSS):
                     input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
@@ -1218,26 +1244,27 @@ class BasePage:
 
         if not self.is_current_user_admin():
             return
-        render_gooey_builder(
-            page_slug=self.slug_versions[-1],
-            builder_state=dict(
-                status=dict(
-                    error_msg=gui.session_state.get(StateKeys.error_msg),
-                    run_status=gui.session_state.get(StateKeys.run_status),
-                    run_time=gui.session_state.get(StateKeys.run_time),
-                ),
-                request=extract_model_fields(
-                    model=self.RequestModel, state=gui.session_state
-                ),
-                response=extract_model_fields(
-                    model=self.ResponseModel, state=gui.session_state
-                ),
-                metadata=dict(
-                    title=self.current_pr.title,
-                    description=self.current_pr.notes,
-                ),
-            ),
-        )
+        render_gooey_builder_inline(self.slug_versions[-1], gui.session_state)
+        # render_gooey_builder(
+        #     page_slug=self.slug_versions[-1],
+        #     builder_state=dict(
+        #         status=dict(
+        #             error_msg=gui.session_state.get(StateKeys.error_msg),
+        #             run_status=gui.session_state.get(StateKeys.run_status),
+        #             run_time=gui.session_state.get(StateKeys.run_time),
+        #         ),
+        #         request=extract_model_fields(
+        #             model=self.RequestModel, state=gui.session_state
+        #         ),
+        #         response=extract_model_fields(
+        #             model=self.ResponseModel, state=gui.session_state
+        #         ),
+        #         metadata=dict(
+        #             title=self.current_pr.title,
+        #             description=self.current_pr.notes,
+        #         ),
+        #     ),
+        # )
 
     def _render_version_history(self):
         versions = self.current_pr.versions.all()
