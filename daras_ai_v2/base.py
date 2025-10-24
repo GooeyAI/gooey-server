@@ -429,6 +429,9 @@ class BasePage:
             self._render_header()
 
     def render_sidebar(self):
+        if not self.is_current_user_admin():
+            return
+
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
         if sidebar_ref.is_open:
             with gui.div(className="w-100 d-flex justify-content-end pt-2"):
