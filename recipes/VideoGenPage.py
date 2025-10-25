@@ -409,6 +409,7 @@ def render_video_gen_form(available_models: dict[str, VideoModelSpec]):
         model_input_schemas = get_input_fields(models)
     except Exception as e:
         logger.error(f"Error getting input fields: {e}")
+        gui.error(f"Error getting input fields: {e}")
         return
 
     common_fields = set.intersection(
@@ -468,9 +469,12 @@ def render_audio_gen_form(available_audio_models: dict[str, VideoModelSpec]):
             )
         )
 
-        model_input_schemas = get_input_fields(models)
-
-        if not model_input_schemas:
+        model_input_schemas = []
+        try:
+            model_input_schemas = get_input_fields(models)
+        except Exception as e:
+            logger.error(f"Error getting input fields: {e}")
+            gui.error(f"Error getting input fields: {e}")
             return
 
         schema = model_input_schemas[0]
