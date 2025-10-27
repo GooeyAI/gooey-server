@@ -380,7 +380,7 @@ def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
         return
     for item in items:
         key = f"fn-call-details-{item['id']}"
-        with gui.expander(f"🧩 Called `{item['title']}`", key=key):
+        with gui.expander(f"🛠️ Called `{item['title']}`", key=key):
             if not gui.session_state.get(key):
                 continue
             gui.html(
@@ -402,18 +402,11 @@ def render_called_functions_as_html(
     *, saved_run: SavedRun, trigger: FunctionTrigger
 ) -> str:
     """Return HTML for functions called for a given run and trigger using a template."""
-    context_items = [
-        {
-            "title": item["title"],
-            "url": item["url"],
-            "inputs": item["inputs"],
-            "return_value": item["return_value"],
-        }
-        for item in _get_called_functions_items(saved_run=saved_run, trigger=trigger)
-    ]
+    context_items = list(
+        _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    )
     if not context_items:
         return ""
-
     context = {"called_functions": context_items}
     template = templates.get_template("functions/called_functions.html")
     return template.render(context)
@@ -454,6 +447,7 @@ def _get_called_functions_items(
             url=fn_sr.get_app_url(),
             inputs=inputs,
             return_value=return_value,
+            is_running=bool(fn_sr.run_status),
         )
 
     if trigger == FunctionTrigger.prompt:
@@ -485,6 +479,7 @@ def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]
             except json.JSONDecodeError:
                 pass
             item["return_value"] = return_value
+            item["is_running"] = False
 
         for tool_call in entry.get("tool_calls", []):
             tool_call_id = tool_call["id"]
@@ -503,6 +498,7 @@ def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]
                 url="",
                 inputs=inputs,
                 return_value=None,
+                is_running=True,
             )
 
     return items_by_id.values()

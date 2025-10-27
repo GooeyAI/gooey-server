@@ -1169,13 +1169,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # language=JavaScript
         gui.js(
             """
-            let elem = document.querySelector("#recipe-nav-tabs");
+            let elem = document.querySelector("#gooey-embed");
             if (!elem) return;
-            if (elem.scrollIntoViewIfNeeded) {
-                elem.scrollIntoViewIfNeeded(false);
-            } else {
-                elem.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
+            elem.scrollIntoView({ behavior: "smooth", block: "start" });
             """
         )
 
@@ -1276,12 +1272,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             # add last output
             run_status = self.get_run_state(gui.session_state)
-            if run_status == RecipeRunState.running:
-                event_type = "message_part"
-            elif run_status == RecipeRunState.failed:
-                event_type = "error"
-            else:
-                event_type = "final_response"
+            match run_status:
+                case RecipeRunState.starting:
+                    event_type = "conversation_start"
+                case RecipeRunState.running:
+                    event_type = "message_part"
+                case RecipeRunState.failed:
+                    event_type = "error"
+                case _:
+                    event_type = "final_response"
             raw_output_text = gui.session_state.get("raw_output_text") or []
             output_text = gui.session_state.get("output_text") or []
             output_video = gui.session_state.get("output_video") or []
@@ -1347,7 +1346,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         gui.html(
             # language=html
             f"""
-<div id="gooey-embed" className="border rounded py-1 mb-3 bg-white" style="height: 98vh"></div>
+<div id="gooey-embed" className="border rounded py-1 mb-3 bg-white" style="height: calc(100vh - 1rem)"></div>
 <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
             """
         )
@@ -1356,9 +1355,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """
 async function loadGooeyEmbed() {
     await window.waitUntilHydrated;
-    if (typeof GooeyEmbed === "undefined" ||
-        document.getElementById("gooey-embed")?.children.length)
+    let embedTarget = document.getElementById("gooey-embed");
+    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
         return;
+    }
     let controller = {
         messages,
         onSendMessage: (payload) => {
@@ -1500,7 +1500,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             except Exception:
                 pass
         if tools:
-            gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
+            gui.write(f"🛠️ `{FunctionTrigger.prompt.name} functions`")
             gui.json(
                 [tool.spec_function for tool in tools],
                 depth=3,

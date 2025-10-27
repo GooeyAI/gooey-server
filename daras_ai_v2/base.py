@@ -153,7 +153,7 @@ class BasePage:
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
             None,
-            title="🧩 Developer Tools and Functions",
+            title="🛠️ Developer Tools and Functions",
         )
         variables: dict[str, typing.Any] | None = Field(
             None,

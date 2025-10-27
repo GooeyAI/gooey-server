@@ -666,8 +666,11 @@ def build_system_vars(
             )
         case Platform.SLACK:
             variables["slack_user_name"] = convo.slack_user_name
+            variables["slack_user_id"] = convo.slack_user_id
             variables["slack_channel_name"] = convo.slack_channel_name
+            variables["slack_channel_id"] = convo.slack_channel_id
             variables["slack_team_name"] = bi.slack_team_name
+            variables["slack_team_id"] = bi.slack_team_id
         case Platform.WEB:
             variables["web_user_id"] = convo.web_user_id
         case Platform.TWILIO:

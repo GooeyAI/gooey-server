@@ -10,9 +10,33 @@ Context:
   ]
 #}
 
+<style>
+.gooey-spinner {
+    scroll-margin: 20px;
+    display: inline-block;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top: 2px solid #03dac5;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+</style>
+  
 {% for item in called_functions %}
 <details>
-<summary>🧩 Called <strong>{{ item.title }}</strong></summary>
+<summary><strong>
+{% if item.is_running %}<div class='gooey-spinner'></div>&nbsp;{% else %}🛠️{% endif %} 
+{{ item.title.replace("_", "<wbr>_") | safe }}
+</strong></summary>
 {% if item.url %}
 <p><a target="_blank" href="{{ item.url }}">View Run</a></p>
 {% endif %}
@@ -33,3 +57,5 @@ Context:
 
 </details>
 {% endfor %}
+
+<div style="height: 20px;"></div>
