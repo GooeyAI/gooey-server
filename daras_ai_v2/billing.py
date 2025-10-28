@@ -184,7 +184,7 @@ def render_all_plans(
                     )
 
     with plans_div:
-        grid_layout(len(all_plans), all_plans, _render_plan, separator=False)
+        grid_layout(3, all_plans, _render_plan, separator=False)
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(

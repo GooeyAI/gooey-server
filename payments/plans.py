@@ -100,7 +100,6 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         deprecated=True,
     )
-
     BUSINESS_2024 = PricingPlanData(
         db_value=5,
         key="business",
@@ -173,6 +172,18 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} free credits. 1000 for $10 thereafter.",
+    )
+
+    STANDARD = PricingPlanData(
+        db_value=8,
+        key="standard_2025",
+        title="Standard",
+        description="Individuals deploying the best of private & open source AI leveraging their own databases and tools",
+        pricing_caption="2,000 credits/month",
+        monthly_charge=25,
+        credits=2_000,
+        long_description="",
+        footer="",
     )
 
     BUSINESS = PricingPlanData(
