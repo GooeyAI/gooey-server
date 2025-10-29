@@ -1613,7 +1613,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 tab=RecipeTabs.integrations, example_id=pr.published_run_id
             )
             gui.caption(
-                f"Note: You seem to have unpublished changes. Integrations use the [last saved version]({last_saved_url}), not the currently visible edits.",
+                f"Note: You seem to have unpublished changes. Deployments use the [last saved version]({last_saved_url}), not the currently visible edits.",
                 className="text-center text-muted",
             )
 
@@ -1642,12 +1642,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         # this gets triggered on the /add route
         if gui.session_state.pop("--add-integration", None):
             self.render_integrations_add(
-                label="#### Add a New Integration to your Copilot",
+                label="#### Deploy to a New Channel",
                 run_title=run_title,
                 pr=pr,
             )
             with gui.center():
-                if gui.button("Return to Test & Configure"):
+                if gui.button("Return to Configure"):
                     cancel_url = self.current_app_url(RecipeTabs.integrations)
                     raise gui.RedirectException(cancel_url)
             return
@@ -2072,11 +2072,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Add Integration")
+                gui.write("###### Add Deployment")
                 gui.caption(f"Add another connection for {run_title}.")
             with col2:
                 gui.anchor(
-                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Integration',
+                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Deployment',
                     str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
                     unsafe_allow_html=True,
                 )

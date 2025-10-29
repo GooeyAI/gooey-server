@@ -47,7 +47,7 @@ from number_cycling.utils import parse_extension_number
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
-    "Please go to the Integrations Tab and connect this page."
+    "Please go to the Deploy Tab and connect this page."
 )
 RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
