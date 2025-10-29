@@ -917,8 +917,8 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations',
-        label="Integrations",
+        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',
+        label="Deploy",
         route=integrations_route,
     )
     saved = TabData(
