@@ -125,7 +125,7 @@ def render_current_plan(workspace: "Workspace"):
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
         with left:
-            gui.write(f"# ${monthly_charge} / month", className="no-margin")
+            gui.write(f"# {plan.get_pricing_title(tier_key)}", className="no-margin")
             if monthly_charge:
                 if provider:
                     provider_text = f" **via {provider.label}**"
@@ -151,18 +151,11 @@ def render_credit_balance(workspace: "Workspace"):
 def render_all_plans(
     workspace: "Workspace", user: "AppUser", session: dict
 ) -> PaymentProvider:
-    current_plan = (
-        PricingPlan.from_sub(workspace.subscription)
-        if workspace.subscription
-        else PricingPlan.STARTER
-    )
-    # Filter plans: exclude deprecated, and exclude STANDARD for non-personal workspaces
-    all_plans = [
-        plan
-        for plan in PricingPlan
-        if not plan.deprecated
-        and not (plan == PricingPlan.STANDARD and not workspace.is_personal)
-    ]
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+
+    all_plans = [plan for plan in PricingPlan if not plan.deprecated]
+    if not workspace.is_personal and current_plan != PricingPlan.STANDARD:
+        all_plans.remove(PricingPlan.STANDARD)
 
     gui.write("## All Plans")
     plans_div = gui.div(className="mb-1")
@@ -170,10 +163,7 @@ def render_all_plans(
     if workspace.subscription and workspace.subscription.payment_provider:
         selected_payment_provider = workspace.subscription.payment_provider
     else:
-        with gui.div():
-            selected_payment_provider = PaymentProvider[
-                payment_provider_radio() or PaymentProvider.STRIPE.name
-            ]
+        selected_payment_provider = PaymentProvider.STRIPE
 
     def _render_plan(plan: PricingPlan):
         if plan == current_plan:
@@ -185,13 +175,12 @@ def render_all_plans(
                 className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
             ):
                 selected_tier_key = _render_plan_details(
-                    plan, selected_payment_provider, workspace, current_plan
+                    plan, selected_payment_provider, workspace
                 )
                 with gui.div(className="mt-3 d-flex flex-column"):
                     _render_plan_action_button(
                         workspace=workspace,
                         plan=plan,
-                        current_plan=current_plan,
                         payment_provider=selected_payment_provider,
                         user=user,
                         session=session,
@@ -210,13 +199,11 @@ def render_all_plans(
 
 
 def _render_plan_details(
-    plan: PricingPlan,
-    payment_provider: PaymentProvider | None,
-    workspace: "Workspace",
-    current_plan: PricingPlan,
+    plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
 ) -> str | None:
     """Render plan details and return selected tier key if plan has tiers"""
     selected_tier_key = None
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
     with gui.div(className="flex-grow-1 d-flex flex-column"):
         with gui.div():
@@ -273,12 +260,12 @@ def _render_plan_action_button(
     workspace: "Workspace",
     user: "AppUser",
     plan: PricingPlan,
-    current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
     session: dict,
     selected_tier_key: str | None = None,
 ):
     is_user_in_team_workspace = len(user.cached_workspaces) > 1
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
     if (
         plan == current_plan
@@ -292,30 +279,20 @@ def _render_plan_action_button(
         )
 
     elif plan == current_plan:
-        # Check if this is Standard plan with a different tier selected
-        if plan == PricingPlan.STANDARD and selected_tier_key:
-            current_tier_key = (
-                workspace.subscription.plan_tier_key if workspace.subscription else None
+        current_tier_key = (
+            workspace.subscription.plan_tier_key if workspace.subscription else None
+        )
+
+        if plan.tiers and selected_tier_key and selected_tier_key != current_tier_key:
+            render_change_subscription_button(
+                workspace=workspace,
+                plan=plan,
+                selected_tier_key=selected_tier_key,
             )
-            if selected_tier_key != current_tier_key:
-                # Different tier selected, show upgrade/downgrade button
-                _render_tier_change_button(
-                    workspace=workspace,
-                    plan=plan,
-                    current_tier_key=current_tier_key,
-                    selected_tier_key=selected_tier_key,
-                )
-            else:
-                # Same tier, show "Your Plan"
-                gui.button(
-                    "Your Plan", className="w-100", disabled=True, type="tertiary"
-                )
         else:
-            # Not Standard plan or same tier
             gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
 
     elif current_plan == PricingPlan.ENTERPRISE:
-        # for even bottom-padding on the pricing card, we add a hidden button
         gui.button(
             "N/A",
             className="d-none d-lg-inline w-100 opacity-0",
@@ -338,39 +315,9 @@ def _render_plan_action_button(
     ):
         _render_switch_workspace_button(workspace=workspace, user=user, session=session)
 
-    elif plan == PricingPlan.STANDARD:
-        # Standard plan is only shown for personal workspaces (filtered in render_all_plans)
-        # Always show "Upgrade" button label for Standard plan
-        if workspace.subscription and workspace.subscription.is_paid():
-            # User has a paid plan, show upgrade/downgrade button
-            render_change_subscription_button(
-                workspace=workspace,
-                plan=plan,
-                current_plan=current_plan,
-                session=session,
-                user=user,
-                selected_tier_key=selected_tier_key,
-                button_label="Upgrade",
-            )
-        else:
-            # User is on free plan, show create subscription button
-            assert payment_provider is not None
-            _render_create_subscription_button(
-                workspace=workspace,
-                plan=plan,
-                payment_provider=payment_provider,
-                selected_tier_key=selected_tier_key,
-                button_label="Upgrade",
-            )
-
     elif workspace.subscription and workspace.subscription.is_paid():
         render_change_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            current_plan=current_plan,
-            session=session,
-            user=user,
-            selected_tier_key=selected_tier_key,
+            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
         )
 
     else:
@@ -417,117 +364,43 @@ def _render_switch_workspace_button(
             raise gui.RedirectException(get_route_path(members_route))
 
 
-def _render_tier_change_button(
-    *,
-    workspace: "Workspace",
-    plan: PricingPlan,
-    current_tier_key: str | None,
-    selected_tier_key: str,
-):
-    """Render upgrade/downgrade button for tier changes within the same plan"""
-    assert workspace.subscription, "Workspace must have a subscription for tier changes"
-
-    # Get pricing for both tiers
-    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
-    current_credits = plan.get_active_credits(current_tier_key)
-    selected_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
-    selected_credits = plan.get_active_credits(selected_tier_key)
-
-    # Determine if it's an upgrade or downgrade based on price
-    is_upgrade = selected_monthly_charge > current_monthly_charge
-
-    if is_upgrade:
-        label = "Upgrade"
-        modal_title = "#### Upgrade Tier"
-        confirm_label = "Upgrade"
-
-        ref = gui.use_confirm_dialog(key=f"tier-upgrade-{plan.key}-{selected_tier_key}")
-        gui.button_with_confirm_dialog(
-            ref=ref,
-            trigger_label=label,
-            trigger_type="primary",
-            modal_title=modal_title,
-            modal_content=f"""
-Are you sure you want to upgrade from **${current_monthly_charge}/month ({current_credits:,} credits)** to **${selected_monthly_charge}/month ({selected_credits:,} credits)**?
-
-Your payment method will be charged ${selected_monthly_charge:,} today and again every month until you cancel.
-
-**{selected_credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
-will be refreshed to {selected_credits:,} Credits.
-            """,
-            confirm_label=confirm_label,
-        )
-
-        if ref.pressed_confirm:
-            try:
-                change_subscription(
-                    workspace,
-                    plan,
-                    tier_key=selected_tier_key,
-                    billing_cycle_anchor="now",
-                    payment_behavior="error_if_incomplete",
-                )
-            except (stripe.CardError, stripe.InvalidRequestError) as e:
-                if isinstance(e, stripe.InvalidRequestError):
-                    sentry_sdk.capture_exception(e)
-                    logger.warning(e)
-                workspace.subscription.cancel()
-                stripe_subscription_create(workspace, plan, tier_key=selected_tier_key)
-    else:
-        label = "Downgrade"
-        modal_title = "#### Downgrade Tier"
-
-        ref = gui.use_confirm_dialog(
-            key=f"tier-downgrade-{plan.key}-{selected_tier_key}"
-        )
-        gui.button_with_confirm_dialog(
-            ref=ref,
-            trigger_label=label,
-            modal_title=modal_title,
-            modal_content=f"""
-Are you sure you want to downgrade from **${current_monthly_charge}/month ({current_credits:,} credits)** to **${selected_monthly_charge}/month ({selected_credits:,} credits)**?
-
-This will take effect from the next billing cycle.
-            """,
-            confirm_label="Downgrade",
-            confirm_className="border-danger bg-danger text-white",
-        )
-
-        if ref.pressed_confirm:
-            change_subscription(workspace, plan, tier_key=selected_tier_key)
-
-
 def render_change_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    current_plan: PricingPlan,
-    session: dict,
-    user: "AppUser",
     selected_tier_key: str | None = None,
-    button_label: str | None = None,
 ):
-    # subscription exists, show upgrade/downgrade button
-    if plan > current_plan:
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+    current_tier_key = workspace.subscription and workspace.subscription.plan_tier_key
+
+    if plan > current_plan or (
+        plan == current_plan
+        and plan.tiers
+        and (
+            plan.get_tier(selected_tier_key).monthly_charge
+            > plan.get_tier(current_tier_key).monthly_charge
+        )
+    ):
+        # subscription exists, show upgrade/downgrade button
         _render_upgrade_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            current_plan=current_plan,
-            selected_tier_key=selected_tier_key,
-            button_label=button_label,
+            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
         )
     else:
         if plan == PricingPlan.STARTER:
             label = "Downgrade to Public"
         else:
             label = "Downgrade"
+
+        current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+        new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+
         ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
         gui.button_with_confirm_dialog(
             ref=ref,
             trigger_label=label,
             modal_title="#### Downgrade Plan",
             modal_content=f"""
-Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
+Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(new_monthly_charge)}**?
 
 This will take effect from the next billing cycle.
                 """,
@@ -542,18 +415,15 @@ def _render_upgrade_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    current_plan: PricingPlan,
     selected_tier_key: str | None = None,
-    button_label: str | None = None,
 ):
-    label = button_label or "Upgrade & Go Private"
-    upgrade_dialog = gui.use_confirm_dialog(
-        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}"
-    )
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+    current_tier_key = workspace.subscription.plan_tier_key
 
-    # Get pricing based on tier
-    monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
-    credits = plan.get_active_credits(selected_tier_key)
+    label = "Upgrade & Go Private"
+    upgrade_dialog = gui.use_confirm_dialog(
+        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier_key or '0'}"
+    )
 
     # Standard plan is only for personal workspaces, skip workspace creation popup
     if workspace.is_personal and plan != PricingPlan.STANDARD:
@@ -567,18 +437,22 @@ def _render_upgrade_subscription_button(
     elif gui.session_state.pop("pressed_create_workspace", None):
         upgrade_dialog.set_open(True)
 
+    # Get pricing based on tier
+    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+    credits = plan.get_active_credits(selected_tier_key)
+
     gui.button_with_confirm_dialog(
         ref=upgrade_dialog,
         trigger_label=label,
         trigger_type="primary",
         modal_title="#### Upgrade Plan",
         modal_content=f"""
-Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ ${monthly_charge}/month**?
+Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ ${fmt_price(new_monthly_charge)}**?
 
-Your payment method will be charged ${monthly_charge:,} today and again every month until you cancel.
+Your payment method will be charged ${new_monthly_charge:,} today and again every month until you cancel.
 
-**{credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
-will be refreshed to {credits:,} Credits.
+**{credits:,} Credits** will be added to your account today and with subsequent payments, your account balance will be topped-up with {credits:,} Credits.
             """,
         confirm_label="Upgrade",
     )
@@ -610,9 +484,11 @@ def _render_create_subscription_button(
     plan: PricingPlan,
     payment_provider: PaymentProvider,
     selected_tier_key: str | None = None,
-    button_label: str | None = None,
 ):
-    label = button_label or "Go Private"
+    if plan == PricingPlan.STANDARD:
+        label = "Upgrade"
+    else:
+        label = "Go Private"
 
     # Standard plan is only for personal workspaces, skip workspace creation popup
     if workspace.is_personal and plan != PricingPlan.STANDARD:
@@ -638,9 +514,9 @@ def _render_create_subscription_button(
                 render_paypal_subscription_button(plan=plan)
 
 
-def fmt_price(plan: PricingPlan) -> str:
-    if plan.monthly_charge:
-        return f"${plan.monthly_charge:,}/month"
+def fmt_price(monthly_charge: int) -> str:
+    if monthly_charge:
+        return f"${monthly_charge:,}/month"
     else:
         return "Free"
 
