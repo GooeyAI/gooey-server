@@ -45,27 +45,26 @@ class PricingPlanData(typing.NamedTuple):
     pricing_title: str | None = None
     pricing_caption: str | None = None
     tiers: dict[str, PricingTier] | None = None  # For plans with multiple pricing tiers
-    full_width: bool = False
 
     def get_pricing_title(self, tier_key: str | None) -> str:
         if self.pricing_title is not None:
             return self.pricing_title
 
         monthly_charge = self.get_active_monthly_charge(tier_key)
-        return f"${monthly_charge} / month"
+        return f"${monthly_charge}/month"
 
     def get_pricing_caption(self, tier_key: str | None) -> str:
         if self.pricing_caption is not None:
             return self.pricing_caption
 
         credits = self.get_active_credits(tier_key)
-        return f"{credits:,} credits"
+        return f"{credits:,} credits/month"
 
     def get_tier(self, tier_key: str | None = None) -> PricingTier | None:
         """Get specific tier or None if no tiers or tier not found"""
-        if not self.tiers or not tier_key:
+        if not self.tiers:
             return None
-        return self.tiers.get(tier_key)
+        return self.tiers.get(tier_key or self.get_default_tier_key())
 
     def get_active_credits(self, tier_key: str | None = None) -> int:
         """Get credits for specific tier or default"""
@@ -79,11 +78,10 @@ class PricingPlanData(typing.NamedTuple):
             return tier.monthly_charge
         return self.monthly_charge
 
-    def get_default_tier_key(self) -> str | None:
-        """Get the default tier key (first tier if tiers exist)"""
+    def get_default_tier_key(self) -> str:
         if self.tiers:
             return next(iter(self.tiers.keys()))
-        return None
+        raise ValueError(f"No tiers available for plan {self.key}")
 
 
 class PricingPlan(PricingPlanData, Enum):
@@ -200,9 +198,11 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Non-commercial license</li>
               <li>Community Support in Discord</li>
               <br/>
+              <br/>
             </ul>
             """
         ),
+        pricing_title="$0",
         pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS} credits to start.",
     )
 
@@ -211,7 +211,6 @@ class PricingPlan(PricingPlanData, Enum):
         key="standard_2025",
         title="Standard",
         description="More credits for power users",
-        pricing_caption="Monthly credits",
         monthly_charge=25,
         credits=2_000,
         long_description=dedent(
@@ -301,6 +300,8 @@ class PricingPlan(PricingPlanData, Enum):
             <ul class="text-muted">
               <li>Full Commercial license</li>
               <li>Premium support via Email</li>
+              <br/>
+              <br/>
             </ul>
             """
         ),
@@ -367,8 +368,10 @@ class PricingPlan(PricingPlanData, Enum):
         return [(plan.db_value, plan.title) for plan in cls]
 
     @classmethod
-    def from_sub(cls, sub: "Subscription") -> PricingPlan:
-        return cls.from_db_value(sub.plan)
+    def from_sub(cls, sub: typing.Optional["Subscription"]) -> PricingPlan:
+        if sub:
+            return cls.from_db_value(sub.plan)
+        return cls.STARTER
 
     @classmethod
     def from_db_value(cls, db_value: int) -> PricingPlan:
