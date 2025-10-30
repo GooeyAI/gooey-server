@@ -36,6 +36,12 @@ class SubscriptionQuerySet(models.QuerySet):
 
 class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.db_choices())
+    plan_tier_key = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Tier key for plans with multiple pricing tiers (e.g., 'standard_25')",
+    )
     payment_provider = models.IntegerField(
         choices=PaymentProvider.choices, blank=True, null=True, default=None
     )
@@ -95,10 +101,13 @@ class Subscription(models.Model):
         **kwargs,
     ):
         if self.auto_recharge_enabled:
+            plan = PricingPlan.from_sub(self)
             if amount is None:
-                amount = PricingPlan.from_sub(self).credits
+                amount = plan.get_active_credits(self.plan_tier_key)
             if charged_amount is None:
-                charged_amount = PricingPlan.from_sub(self).monthly_charge * 100
+                charged_amount = (
+                    plan.get_active_monthly_charge(self.plan_tier_key) * 100
+                )
             self.ensure_default_auto_recharge_params(
                 amount=amount, charged_amount=charged_amount
             )
