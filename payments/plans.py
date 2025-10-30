@@ -45,18 +45,21 @@ class PricingPlanData(typing.NamedTuple):
     pricing_title: str | None = None
     pricing_caption: str | None = None
     tiers: dict[str, PricingTier] | None = None  # For plans with multiple pricing tiers
+    full_width: bool = False
 
-    def get_pricing_title(self) -> str:
+    def get_pricing_title(self, tier_key: str | None) -> str:
         if self.pricing_title is not None:
             return self.pricing_title
-        else:
-            return f"${self.monthly_charge} / month"
 
-    def get_pricing_caption(self) -> str:
+        monthly_charge = self.get_active_monthly_charge(tier_key)
+        return f"${monthly_charge} / month"
+
+    def get_pricing_caption(self, tier_key: str | None) -> str:
         if self.pricing_caption is not None:
             return self.pricing_caption
-        else:
-            return f"{self.credits:,} Credits / month"
+
+        credits = self.get_active_credits(tier_key)
+        return f"{credits:,} credits"
 
     def get_tier(self, tier_key: str | None = None) -> PricingTier | None:
         """Get specific tier or None if no tiers or tier not found"""
@@ -349,7 +352,8 @@ class PricingPlan(PricingPlanData, Enum):
 
     def __gt__(self, other: PricingPlan) -> bool:
         return not self == other and (
-            self == PricingPlan.ENTERPRISE or self.monthly_charge > other.monthly_charge
+            self == PricingPlan.ENTERPRISE
+            or self.get_active_monthly_charge() > other.get_active_monthly_charge()
         )
 
     def __le__(self, other: PricingPlan) -> bool:
