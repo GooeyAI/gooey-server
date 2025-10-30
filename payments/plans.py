@@ -20,6 +20,16 @@ if typing.TYPE_CHECKING:
     from payments.models import Subscription
 
 
+class PricingTier(typing.NamedTuple):
+    key: str
+    credits: int
+    monthly_charge: int
+
+    @property
+    def label(self) -> str:
+        return f"{self.credits:,} Credits for ${self.monthly_charge}/month"
+
+
 class PricingPlanData(typing.NamedTuple):
     db_value: int
     key: str
@@ -34,6 +44,7 @@ class PricingPlanData(typing.NamedTuple):
 
     pricing_title: str | None = None
     pricing_caption: str | None = None
+    tiers: dict[str, PricingTier] | None = None  # For plans with multiple pricing tiers
 
     def get_pricing_title(self) -> str:
         if self.pricing_title is not None:
@@ -46,6 +57,30 @@ class PricingPlanData(typing.NamedTuple):
             return self.pricing_caption
         else:
             return f"{self.credits:,} Credits / month"
+
+    def get_tier(self, tier_key: str | None = None) -> PricingTier | None:
+        """Get specific tier or None if no tiers or tier not found"""
+        if not self.tiers or not tier_key:
+            return None
+        return self.tiers.get(tier_key)
+
+    def get_active_credits(self, tier_key: str | None = None) -> int:
+        """Get credits for specific tier or default"""
+        if tier := self.get_tier(tier_key):
+            return tier.credits
+        return self.credits
+
+    def get_active_monthly_charge(self, tier_key: str | None = None) -> int:
+        """Get monthly charge for specific tier or default"""
+        if tier := self.get_tier(tier_key):
+            return tier.monthly_charge
+        return self.monthly_charge
+
+    def get_default_tier_key(self) -> str | None:
+        """Get the default tier key (first tier if tiers exist)"""
+        if self.tiers:
+            return next(iter(self.tiers.keys()))
+        return None
 
 
 class PricingPlan(PricingPlanData, Enum):
@@ -135,8 +170,8 @@ class PricingPlan(PricingPlanData, Enum):
     STARTER = PricingPlanData(
         db_value=3,
         key="starter",
-        title="Pay as you go",
-        description="Everyone at first, cash-strapped startups, open source developers.",
+        title="Free",
+        description="Kick our tires",
         credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
         monthly_charge=0,
         long_description=dedent(
@@ -144,20 +179,15 @@ class PricingPlan(PricingPlanData, Enum):
             #### Features
             <ul class="text-muted">
               <li>Public Workflows</li>
-              <li>One public workspace (up to 5 members)</li>
-              <li>Run all frontier models</li>
-              <li><a href="/explore">Explore, fork & run</a> any public workflow</li>
-              <li>Best in class RAG & agentic flows</li>
-              <li>Run any code via <a href="/functions/" target="_blank">functions</a></li>
-              <li>Test and deploy via <a href="/copilot/" target="_blank">Copilot</a> Web Widget</li>
-              <li><a href="/speech/" target="_blank">Speech Recognition</a> and translation for 1000+ languages</li>
+              <li>Run all frontier <a href="/compare-llm">LLMs</a></li>
+              <li><a href="/explore">Explore</a>, fork & run any public AI Workflow</li>
+              <li>Test and deploy via <a href="/copilot/">Agent Web Widget</a></li>
+              <li><a href="/speech/">Speech recognition</a> and translation for 1000+ languages</li>
+              <li>Broad selection of <a href="/text-to-speech/">Text to Speech voices</a> for <a href="/lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a></li>
+              <li>Access top image generation models</li>
+              <li>Deploy Workflows via the Web, WhatsApp, SMS/Voice, Slack or FB</li>
+              <li>Use-case specific, Workflow <a href="/bulk/">Evaluation</a> to optimize model and component selection.</li>
               <li>API access</li>
-              <li>Use-case specific, golden QnA based <a href="/bulk/">bulk evaluation</a></li>
-              <li>Basic usage and interaction history export and dashboards</li>
-              <li>
-                Broad selection of <a href="/tts/">Text to Speech voices</a> and custom 11Labs voices for
-                <a href="/Lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a>
-              </li>
             </ul>
             """
         ),
@@ -166,24 +196,73 @@ class PricingPlan(PricingPlanData, Enum):
             <ul class="text-muted">
               <li>Non-commercial license</li>
               <li>Community Support in Discord</li>
-              <li>Up to 5,000 runs of any Workflow</li>
               <br/>
             </ul>
             """
         ),
-        pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} free credits. 1000 for $10 thereafter.",
+        pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS} credits to start.",
     )
 
     STANDARD = PricingPlanData(
         db_value=8,
         key="standard_2025",
         title="Standard",
-        description="Individuals deploying the best of private & open source AI leveraging their own databases and tools",
-        pricing_caption="2,000 credits/month",
+        description="More credits for power users",
+        pricing_caption="Monthly credits",
         monthly_charge=25,
         credits=2_000,
-        long_description="",
-        footer="",
+        long_description=dedent(
+            """
+            #### Everything in Free +
+            <ul class="text-muted">
+              <li>Private Workflows</li>
+              <li>Access frontier video & animation models</li>
+              <li>Up to 44,000 Cr / month</li>
+              <li>Increased file upload limit</li>
+              <li>Higher rate limits</li>
+              <li>Execute any code via JS / Javascript <a href="/functions/">functions</a></li>
+              <li>SOC2 Type II + GDPR Compliance</li>
+            </ul>
+            """
+        ),
+        footer="""
+        <ul class="text-muted">
+          <li>Commerical licence for images, QR codes and videos</li>
+          <li>Premium Support via dedicated Discord Channel</li>
+        </ul>
+        """,
+        tiers={
+            "standard_25": PricingTier(
+                key="standard_25",
+                credits=2_000,
+                monthly_charge=25,
+            ),
+            "standard_50": PricingTier(
+                key="standard_50",
+                credits=4_200,
+                monthly_charge=50,
+            ),
+            "standard_100": PricingTier(
+                key="standard_100",
+                credits=9_000,
+                monthly_charge=100,
+            ),
+            "standard_200": PricingTier(
+                key="standard_200",
+                credits=20_000,
+                monthly_charge=200,
+            ),
+            "standard_300": PricingTier(
+                key="standard_300",
+                credits=32_000,
+                monthly_charge=300,
+            ),
+            "standard_400": PricingTier(
+                key="standard_400",
+                credits=44_000,
+                monthly_charge=400,
+            ),
+        },
     )
 
     BUSINESS = PricingPlanData(
@@ -196,24 +275,29 @@ class PricingPlan(PricingPlanData, Enum):
         credits=10_000,
         long_description=dedent(
             """
-            #### Everything in Free +
+            #### Everything in Standard +
             <ul class="text-muted">
-              <li>Private Workflows</li>
-              <li>1 Private Workspace (up to 5 members)</li>
-              <li>Collaborate on Workflows with version history</li>
-              <li>SOC2, GDPR compliance, Level 5 API support from OpenAI and others</li>
-              <li>API secrets for secure connections to external services</li>
-              <li>Higher submission rate and concurrency limits</li>
+
+              <li>Private Team Workspace</li>
+              <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
+              <li>API Secrets to securely access any system</li>
               <li>Bring your own WhatsApp number</li>
+              <li>Embed copilots in your own App</li>
+              <li>Impact and usage <a
+                    href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-10-15&end_date=2025-10-31&sort_by=Last+Sent"
+                >dashboards</a></li>
+              <li>Role Based Management</li>
+              <li>Centralized billing</li>
+              <li>Pooled Credits, Submission Rates and Concurrency</li>
+              <li>Version History on Workflows</li>
             </ul>
             """
         ),
         footer=dedent(
             """
             <ul class="text-muted">
-              <li>Commercial license</li>
-              <li>Premium support via dedicated Discord Channel</li>
-              <li>Up to 20,000 runs of any Workflow</li>
+              <li>Full Commercial license</li>
+              <li>Premium support via Email</li>
             </ul>
             """
         ),
@@ -290,13 +374,49 @@ class PricingPlan(PricingPlanData, Enum):
         raise ValueError(f"Invalid {cls.__name__} {db_value=}")
 
     @classmethod
-    def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
+    def get_by_stripe_product(
+        cls, product: stripe.Product
+    ) -> tuple[typing.Self, str | None] | None:
+        """
+        Get PricingPlan and tier_key from a Stripe Product.
+        Returns (plan, tier_key) tuple, where tier_key is None for plans without tiers.
+        Returns None if no matching plan is found.
+        """
         if product.name in REVERSE_STRIPE_PRODUCT_NAMES:
-            return cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
+            plan = cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
+            return (plan, None) if plan else None
 
+        # Get product price if available
+        product_price = None
+        if product.default_price:
+            product_price = product.default_price.unit_amount  # in cents
+
+        # Check all plans and their tiers by matching name and price
         for plan in cls:
-            if plan.supports_stripe() and plan.get_stripe_product_id() == product.id:
-                return plan
+            if not plan.supports_stripe():
+                continue
+
+            # Check if plan has tiers
+            if plan.tiers:
+                # Check each tier by matching product name
+                for tier_key, tier in plan.tiers.items():
+                    expected_name = f"{plan.title} - {tier.label}"
+                    expected_price = tier.monthly_charge * 100  # convert to cents
+
+                    if product.name == expected_name and (
+                        product_price is None or product_price == expected_price
+                    ):
+                        return (plan, tier_key)
+            else:
+                # No tiers, check default plan by name match
+                expected_price = plan.monthly_charge * 100  # convert to cents
+
+                if product.name == plan.title and (
+                    product_price is None or product_price == expected_price
+                ):
+                    return (plan, None)
+
+        return None
 
     @classmethod
     def get_by_paypal_plan_id(cls, plan_id: str) -> PricingPlan | None:
@@ -316,23 +436,27 @@ class PricingPlan(PricingPlanData, Enum):
     def supports_paypal(self) -> bool:
         return bool(self.monthly_charge)
 
-    def get_stripe_line_item(self) -> dict[str, Any]:
+    def get_stripe_line_item(self, tier_key: str | None = None) -> dict[str, Any]:
         if not self.supports_stripe():
             raise ValueError(f"Can't bill {self.title} via Stripe")
+
+        # Get pricing from tier or default
+        credits = self.get_active_credits(tier_key)
+        monthly_charge = self.get_active_monthly_charge(tier_key)
 
         if self.key in STRIPE_PRODUCT_NAMES:
             # via product_name
             return make_stripe_recurring_plan(
                 product_name=STRIPE_PRODUCT_NAMES[self.key],
-                credits=self.credits,
-                amount=self.monthly_charge,
+                credits=credits,
+                amount=monthly_charge,
             )
         else:
             # via product_id
             return make_stripe_recurring_plan(
-                product_id=self.get_stripe_product_id(),
-                credits=self.credits,
-                amount=self.monthly_charge,
+                product_id=self.get_stripe_product_id(tier_key),
+                credits=credits,
+                amount=monthly_charge,
             )
 
     def get_paypal_plan(self) -> dict[str, Any]:
@@ -345,20 +469,31 @@ class PricingPlan(PricingPlanData, Enum):
             amount=self.monthly_charge,
         )
 
-    def get_stripe_product_id(self) -> str:
+    def get_stripe_product_id(self, tier_key: str | None = None) -> str:
+        # Get pricing from tier or default
+        monthly_charge = self.get_active_monthly_charge(tier_key)
+
+        # Build product name - include tier info if applicable
+        if tier_key and self.tiers:
+            tier = self.get_tier(tier_key)
+            product_name = f"{self.title} - {tier.label}" if tier else self.title
+        else:
+            product_name = self.title
+
         for product in stripe.Product.list(expand=["data.default_price"]).data:
             if (
                 product.default_price
-                and product.default_price.unit_amount == self.monthly_charge * 100
+                and product.default_price.unit_amount == monthly_charge * 100
+                and product.name == product_name
             ):  # cents
                 return product.id
 
         product = stripe.Product.create(
-            name=self.title,
+            name=product_name,
             description=self.description,
             default_price_data={
                 "currency": "usd",
-                "unit_amount": self.monthly_charge * 100,
+                "unit_amount": monthly_charge * 100,
                 "recurring": {"interval": "month"},
             },
         )

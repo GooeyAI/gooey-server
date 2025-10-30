@@ -165,12 +165,16 @@ class StripeWebhookHandler:
             f"Stripe subscription {stripe_sub.id} is missing product"
         )
 
-        product = stripe.Product.retrieve(stripe_sub.plan.product)
-        plan = PricingPlan.get_by_stripe_product(product)
-        if not plan:
+        product = stripe.Product.retrieve(
+            stripe_sub.plan.product, expand=["default_price"]
+        )
+        result = PricingPlan.get_by_stripe_product(product)
+        if not result:
             raise Exception(
                 f"PricingPlan not found for product {stripe_sub.plan.product}"
             )
+
+        plan, tier_key_from_product = result
 
         if stripe_sub.status.lower() != "active":
             logger.info(
@@ -178,11 +182,17 @@ class StripeWebhookHandler:
             )
             return
 
+        # Use tier_key from product match (preferred), fall back to metadata
+        tier_key = tier_key_from_product
+        if tier_key is None and stripe_sub.metadata:
+            tier_key = stripe_sub.metadata.get("tier_key")
+
         set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             workspace=workspace,
             external_id=stripe_sub.id,
+            plan_tier_key=tier_key,
         )
 
     @classmethod
@@ -254,6 +264,7 @@ def set_workspace_subscription(
     amount: int | None = None,
     charged_amount: int | None = None,
     cancel_old: bool = True,
+    plan_tier_key: str | None = None,
 ) -> Subscription:
     with transaction.atomic():
         old_sub = workspace.subscription
@@ -264,6 +275,7 @@ def set_workspace_subscription(
             new_sub = Subscription()
 
         new_sub.plan = plan.db_value
+        new_sub.plan_tier_key = plan_tier_key
         new_sub.payment_provider = provider
         new_sub.external_id = external_id
         new_sub.full_clean(amount=amount, charged_amount=charged_amount)
