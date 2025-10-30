@@ -248,19 +248,14 @@ def _render_plan_details(
                     key=f"tier-select-{plan.key}",
                     value=default_tier_key,
                 )
-            # Update pricing display based on selected tier
-            tier = plan.get_tier(selected_tier_key)
-            title = f"${tier.monthly_charge} / month"
-            caption = f"{tier.credits:,} Credits / month"
         else:
-            title = plan.get_pricing_title()
-            caption = plan.get_pricing_caption()
+            selected_tier_key = None
 
         with pricing_div:
             with gui.tag("h3", className="my-0 d-inline me-2"):
-                gui.html(title)
+                gui.html(plan.get_pricing_title(selected_tier_key))
             with gui.tag("p", className="text-muted my-0"):
-                gui.html(caption)
+                gui.html(plan.get_pricing_caption(selected_tier_key))
 
         with gui.div(
             className="flex-grow-1 d-flex flex-column justify-content-between"
