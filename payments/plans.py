@@ -45,6 +45,7 @@ class PricingPlanData(typing.NamedTuple):
     pricing_title: str | None = None
     pricing_caption: str | None = None
     tiers: dict[str, PricingTier] | None = None  # For plans with multiple pricing tiers
+    full_width: bool = False
 
     def get_pricing_title(self, tier_key: str | None) -> str:
         if self.pricing_title is not None:
@@ -316,33 +317,34 @@ class PricingPlan(PricingPlanData, Enum):
         credits=999_999,
         pricing_title="Custom",
         pricing_caption="Typically $25,000 - $500,000 annually",
+        full_width=True,
         long_description=dedent(
             """
-            #### Everything in Business +
-            <ul class="text-muted">
-              <li>Unlimited Workspaces for private collaboration among teams and clients</li>
-              <li>Custom inference queues and rate limits</li>
-              <li>Strategic AI consulting</li>
-              <li>Accelerator and GoTo Market partnerships</li>
-              <li>Organizational onboarding with founders</li>
-              <li>White label Workspaces for client engagement</li>
-              <li>Custom Workflow evaluation and optimization</li>
-              <li>Custom model training, tuning, and hosting</li>
-              <li>Tailored usage and interaction analytics</li>
-              <li>SMS and TTS Telephony for Copilots</li>
-              <li>Use your own keys for OpenAI, Azure, and others</li>
-              <li>On-prem deployment</li>
-              <li>Custom workflows & feature development</li>
-            </ul>
-            """
-        ),
-        footer=dedent(
-            """
-            <ul class="text-muted">
-              <li>Commercial & reseller license</li>
-              <li>Support via Zoom, dedicated support channels, and SLA</li>
-              <li>Unlimited API calls</li>
-            </ul>
+            <div class="row row-cols-lg-2">
+                <div class="col">
+                  <ul class="text-muted">
+                    <li>Unlimited Workspaces for private collaboration among teams and clients</li>
+                    <li>Strategic AI consulting including:</li>
+                    <li>Rock-bottom, full-transparency, no mark-up token pricing</li>
+                    <li>Ongoing cost optimization + evals across all AI model providers</li>
+                    <li>Tailored onboarding and training</li>
+                    <li>Workflow performance evaluation</li>
+                    <li>Bespoke Workflows & features</li>
+                  </ul>
+                </div>
+                <div class="col">
+                  <ul class="text-muted">
+                    <li>Dedicated numbers for WhatsApp, Voice + SMS AI Agents</li>
+                    <li>Impact + ROI dashboards for your org based on industry best practices</li>
+                    <li>Export usage to your own BI platforms</li>
+                    <li>Integrations with your internal systems</li>
+                    <li>Host + Integrate your fine-tuned model in Gooey.AI infra</li>
+                    <li>Use your own keys for OpenAI, Azure, and others</li>
+                    <li>On-prem deployments</li>
+                    <li>Custom inference queues and rate limits</li>
+                  </ul>
+                </div>
+            </div>
             """
         ),
         contact_us_link=settings.CONTACT_URL,
