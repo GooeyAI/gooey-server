@@ -156,6 +156,8 @@ def render_all_plans(
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
     if not workspace.is_personal and current_plan != PricingPlan.STANDARD:
         all_plans.remove(PricingPlan.STANDARD)
+    grid_plans = [plan for plan in all_plans if not plan.full_width]
+    full_width_plans = [plan for plan in all_plans if plan.full_width]
 
     gui.write("## All Plans")
     plans_div = gui.div(className="mb-1")
@@ -165,30 +167,49 @@ def render_all_plans(
     else:
         selected_payment_provider = PaymentProvider.STRIPE
 
-    def _render_plan(plan: PricingPlan):
+    def _render_plan(plan: PricingPlan, full_width: bool = False):
         if plan == current_plan:
             extra_class = "border-dark"
         else:
             extra_class = "bg-light"
-        with gui.div(className="d-flex flex-column h-100"):
-            with gui.div(
-                className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
-            ):
-                selected_tier_key = _render_plan_details(
-                    plan, selected_payment_provider, workspace
-                )
-                with gui.div(className="mt-3 d-flex flex-column"):
-                    _render_plan_action_button(
-                        workspace=workspace,
-                        plan=plan,
-                        payment_provider=selected_payment_provider,
-                        user=user,
-                        session=session,
-                        selected_tier_key=selected_tier_key,
+        with (
+            gui.div(className="d-flex flex-column h-100"),
+            gui.div(
+                className=f"{rounded_border} flex-grow-1 d-flex flex-column mb-2 {extra_class}"
+            ),
+        ):
+            _render_plan_heading(plan)
+            flex_class = "flex-column" if not full_width else "row"
+            with gui.div(className=f"flex-grow-1 d-flex {flex_class}"):
+                if full_width:
+                    pricing_class, details_class = "col-lg-4", "col-lg-8"
+                else:
+                    pricing_class = "my-3"
+                    details_class = (
+                        "flex-grow-1 d-flex flex-column justify-content-between"
                     )
+                with gui.div(className=pricing_class):
+                    selected_tier_key = _render_plan_pricing(
+                        plan, selected_payment_provider, workspace
+                    )
+                with gui.div(className=details_class):
+                    _render_plan_details(plan)
+            with gui.div(className="mt-3 d-flex flex-column"):
+                _render_plan_action_button(
+                    workspace=workspace,
+                    plan=plan,
+                    payment_provider=selected_payment_provider,
+                    user=user,
+                    session=session,
+                    selected_tier_key=selected_tier_key,
+                )
 
     with plans_div:
-        grid_layout(3, all_plans, _render_plan, separator=False)
+        with gui.div(className="mb-1"):
+            grid_layout(len(grid_plans), grid_plans, _render_plan, separator=False)
+        for plan in full_width_plans:
+            with gui.div(className="mb-1"):
+                _render_plan(plan, full_width=True)
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
@@ -198,59 +219,64 @@ def render_all_plans(
     return selected_payment_provider
 
 
-def _render_plan_details(
-    plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
-) -> str | None:
+def _render_plan_full_width(plan: PricingPlan): ...
+
+
+def _render_plan_compact(plan: PricingPlan): ...
+
+
+def _render_plan_details(plan: PricingPlan):
     """Render plan details and return selected tier key if plan has tiers"""
-    selected_tier_key = None
+    with gui.div():
+        gui.write(plan.long_description, unsafe_allow_html=True)
+    with gui.div(className="mt-3"):
+        gui.write(plan.footer, unsafe_allow_html=True)
+
+
+def _render_plan_heading(plan: PricingPlan):
+    with gui.tag("h2", className="mb-1"):
+        gui.html(plan.title)
+    gui.caption(
+        plan.description,
+        unsafe_allow_html=True,
+        style={
+            "minHeight": "calc(var(--bs-body-line-height) * 2em)",
+            "display": "block",
+        },
+    )
+
+
+def _render_plan_pricing(
+    plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
+):
     current_plan = PricingPlan.from_sub(workspace.subscription)
+    pricing_div = gui.div()
 
-    with gui.div(className="flex-grow-1 d-flex flex-column"):
-        with gui.div():
-            with gui.tag("h2", className="mb-1"):
-                gui.html(plan.title)
-            gui.caption(
-                plan.description,
-                style={
-                    "minHeight": "calc(var(--bs-body-line-height) * 2em)",
-                    "display": "block",
-                },
+    if plan.tiers and payment_provider == PaymentProvider.STRIPE:
+        if plan == current_plan and workspace.subscription:
+            default_tier_key = (
+                workspace.subscription.plan_tier_key or plan.get_default_tier_key()
             )
-
-        pricing_div = gui.div(className="my-3")
-
-        if plan.tiers and payment_provider == PaymentProvider.STRIPE:
-            if plan == current_plan and workspace.subscription:
-                default_tier_key = (
-                    workspace.subscription.plan_tier_key or plan.get_default_tier_key()
-                )
-            else:
-                default_tier_key = plan.get_default_tier_key()
-
-            with gui.div(className="my-3"):
-                selected_tier_key = gui.selectbox(
-                    "",
-                    options=list(plan.tiers.keys()),
-                    format_func=lambda k: plan.tiers[k].label,
-                    key=f"tier-select-{plan.key}",
-                    value=default_tier_key,
-                )
         else:
-            selected_tier_key = None
+            default_tier_key = plan.get_default_tier_key()
 
-        with pricing_div:
-            with gui.tag("h3", className="my-0 d-inline me-2"):
-                gui.html(plan.get_pricing_title(selected_tier_key))
-            with gui.tag("p", className="text-muted my-0"):
-                gui.html(plan.get_pricing_caption(selected_tier_key))
+        with gui.div(className="my-3"):
+            selected_tier_key = gui.selectbox(
+                "",
+                options=list(plan.tiers.keys()),
+                format_func=lambda k: plan.tiers[k].label,
+                key=f"tier-select-{plan.key}",
+                value=default_tier_key,
+            )
+    else:
+        selected_tier_key = None
 
-        with gui.div(
-            className="flex-grow-1 d-flex flex-column justify-content-between"
-        ):
-            with gui.div():
-                gui.write(plan.long_description, unsafe_allow_html=True)
-            with gui.div(className="mt-3"):
-                gui.write(plan.footer, unsafe_allow_html=True)
+    with pricing_div:
+        with gui.tag("h3", className="my-0 d-inline me-2"):
+            gui.html(plan.get_pricing_title(selected_tier_key))
+        with gui.tag("p", className="text-muted my-0"):
+            gui.html(plan.get_pricing_caption(selected_tier_key))
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
     return selected_tier_key
 
