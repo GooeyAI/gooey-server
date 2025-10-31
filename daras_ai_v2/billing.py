@@ -393,30 +393,26 @@ def render_change_subscription_button(
         _render_upgrade_subscription_button(
             workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
         )
-    else:
-        if plan == PricingPlan.STARTER:
-            label = "Downgrade to Public"
-        else:
-            label = "Downgrade"
+        return
 
-        current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
-        new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
 
-        ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
-        gui.button_with_confirm_dialog(
-            ref=ref,
-            trigger_label=label,
-            modal_title="#### Downgrade Plan",
-            modal_content=f"""
+    ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
+    gui.button_with_confirm_dialog(
+        ref=ref,
+        trigger_label="Downgrade",
+        modal_title="#### Downgrade Plan",
+        modal_content=f"""
 Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(new_monthly_charge)}**?
 
 This will take effect from the next billing cycle.
-                """,
-            confirm_label="Downgrade",
-            confirm_className="border-danger bg-danger text-white",
-        )
-        if ref.pressed_confirm:
-            change_subscription(workspace, plan, tier_key=selected_tier_key)
+            """,
+        confirm_label="Downgrade",
+        confirm_className="border-danger bg-danger text-white",
+    )
+    if ref.pressed_confirm:
+        change_subscription(workspace, plan, tier_key=selected_tier_key)
 
 
 def _render_upgrade_subscription_button(
@@ -428,7 +424,7 @@ def _render_upgrade_subscription_button(
     current_plan = PricingPlan.from_sub(workspace.subscription)
     current_tier_key = workspace.subscription.plan_tier_key
 
-    label = "Upgrade & Go Private"
+    label = "Upgrade"
     upgrade_dialog = gui.use_confirm_dialog(
         key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier_key or '0'}"
     )
@@ -493,10 +489,7 @@ def _render_create_subscription_button(
     payment_provider: PaymentProvider,
     selected_tier_key: str | None = None,
 ):
-    if plan == PricingPlan.STANDARD:
-        label = "Upgrade"
-    else:
-        label = "Go Private"
+    label = "Upgrade"
 
     # Standard plan is only for personal workspaces, skip workspace creation popup
     if workspace.is_personal and plan != PricingPlan.STANDARD:
