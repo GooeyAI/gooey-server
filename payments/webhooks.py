@@ -5,7 +5,7 @@ from django.db import transaction
 from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
-from daras_ai_v2 import paypal
+from daras_ai_v2 import paypal, settings
 from workspaces.models import Workspace
 from .models import Subscription
 from .plans import PricingPlan
@@ -96,7 +96,9 @@ class StripeWebhookHandler:
         kwargs = {}
         if invoice.subscription and invoice.subscription_details:
             kwargs["plan"] = PricingPlan.get_by_key(
-                invoice.subscription_details.metadata.get("subscription_key")
+                invoice.subscription_details.metadata.get(
+                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
+                )
             ).db_value
             match invoice.billing_reason:
                 case "subscription_create":
@@ -165,16 +167,16 @@ class StripeWebhookHandler:
             f"Stripe subscription {stripe_sub.id} is missing product"
         )
 
-        product = stripe.Product.retrieve(
-            stripe_sub.plan.product, expand=["default_price"]
-        )
-        result = PricingPlan.get_by_stripe_product(product)
-        if not result:
-            raise Exception(
-                f"PricingPlan not found for product {stripe_sub.plan.product}"
+        try:
+            plan = PricingPlan.get_by_key(
+                stripe_sub.metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD]
             )
-
-        plan, tier_key_from_product = result
+        except KeyError:
+            product = stripe.Product.retrieve(
+                stripe_sub.plan.product, expand=["default_price"]
+            )
+            plan = PricingPlan.get_by_stripe_product(product)
+            assert plan is not None, f"Plan for product {product.id} not found"
 
         if stripe_sub.status.lower() != "active":
             logger.info(
@@ -182,11 +184,9 @@ class StripeWebhookHandler:
             )
             return
 
-        # Use tier_key from product match (preferred), fall back to metadata
-        tier_key = tier_key_from_product
-        if tier_key is None and stripe_sub.metadata:
-            tier_key = stripe_sub.metadata.get("tier_key")
-
+        tier_key = stripe_sub.metadata.get(
+            settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD
+        )
         set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
