@@ -198,8 +198,6 @@ class PricingPlan(PricingPlanData, Enum):
             <ul class="text-muted">
               <li>Non-commercial license</li>
               <li>Community support in Discord</li>
-              <br/>
-              <br/>
             </ul>
             """
         ),
@@ -301,8 +299,6 @@ class PricingPlan(PricingPlanData, Enum):
             <ul class="text-muted">
               <li>Full Commercial license</li>
               <li>Premium team support via Email</li>
-              <br/>
-              <br/>
             </ul>
             """
         ),
