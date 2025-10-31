@@ -230,7 +230,7 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         footer="""
         <ul class="text-muted">
-          <li>Commerical licence for images, QR codes and videos</li>
+          <li>Commercial licence for images, QR codes and videos</li>
           <li>Premium Support via dedicated Discord Channel</li>
         </ul>
         """,
@@ -383,22 +383,14 @@ class PricingPlan(PricingPlanData, Enum):
         raise ValueError(f"Invalid {cls.__name__} {db_value=}")
 
     @classmethod
-    def get_by_stripe_product(
-        cls, product: stripe.Product
-    ) -> tuple[typing.Self, str | None] | None:
-        """
-        Get PricingPlan and tier_key from a Stripe Product.
-        Returns (plan, tier_key) tuple, where tier_key is None for plans without tiers.
-        Returns None if no matching plan is found.
-        """
+    def get_by_stripe_product(cls, product: stripe.Product) -> PricingPlan | None:
         if product.name in REVERSE_STRIPE_PRODUCT_NAMES:
-            plan = cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
-            return (plan, None) if plan else None
+            return cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
 
-        # Get product price if available
-        product_price = None
         if product.default_price:
             product_price = product.default_price.unit_amount  # in cents
+        else:
+            product_price = None
 
         # Check all plans and their tiers by matching name and price
         for plan in cls:
@@ -415,7 +407,7 @@ class PricingPlan(PricingPlanData, Enum):
                     if product.name == expected_name and (
                         product_price is None or product_price == expected_price
                     ):
-                        return (plan, tier_key)
+                        return plan
             else:
                 # No tiers, check default plan by name match
                 expected_price = plan.monthly_charge * 100  # convert to cents
@@ -423,7 +415,7 @@ class PricingPlan(PricingPlanData, Enum):
                 if product.name == plan.title and (
                     product_price is None or product_price == expected_price
                 ):
-                    return (plan, None)
+                    return plan
 
         return None
 
@@ -434,10 +426,11 @@ class PricingPlan(PricingPlanData, Enum):
                 return plan
 
     @classmethod
-    def get_by_key(cls, key: str) -> PricingPlan | None:
+    def get_by_key(cls, key: str) -> PricingPlan:
         for plan in cls:
             if plan.key == key:
                 return plan
+        raise KeyError(f"Invalid {cls.__name__} key: {key}")
 
     def supports_stripe(self) -> bool:
         return bool(self.monthly_charge)
