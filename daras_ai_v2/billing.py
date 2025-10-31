@@ -219,12 +219,6 @@ def render_all_plans(
     return selected_payment_provider
 
 
-def _render_plan_full_width(plan: PricingPlan): ...
-
-
-def _render_plan_compact(plan: PricingPlan): ...
-
-
 def _render_plan_details(plan: PricingPlan):
     """Render plan details and return selected tier key if plan has tiers"""
     with gui.div():
@@ -582,7 +576,9 @@ def change_subscription(
                 settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
             }
             if tier_key:
-                metadata["tier_key"] = tier_key
+                metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = (
+                    tier_key
+                )
 
             stripe.Subscription.modify(
                 subscription.id,
@@ -839,7 +835,7 @@ def stripe_subscription_create(
     )
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
     if tier_key:
-        metadata["tier_key"] = tier_key
+        metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = tier_key
     line_items = [plan.get_stripe_line_item(tier_key)]
     if pm:
         sub = stripe.Subscription.create(
