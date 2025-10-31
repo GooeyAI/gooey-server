@@ -284,21 +284,9 @@ def _render_plan_action_button(
     session: dict,
     selected_tier_key: str | None = None,
 ):
-    is_user_in_team_workspace = len(user.cached_workspaces) > 1
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    if (
-        plan == current_plan
-        and current_plan == PricingPlan.STARTER
-        and not is_user_in_team_workspace
-    ):
-        gui.button(
-            "Create Public Workspace",
-            type="primary",
-            onClick=open_create_workspace_popup_js(),
-        )
-
-    elif plan == current_plan:
+    if plan == current_plan:
         current_tier_key = (
             workspace.subscription.plan_tier_key if workspace.subscription else None
         )
