@@ -1,3 +1,4 @@
+from functools import partial
 import typing
 
 import gooey_gui as gui
@@ -167,34 +168,68 @@ def render_all_plans(
     else:
         selected_payment_provider = PaymentProvider.STRIPE
 
-    def _render_plan(plan: PricingPlan, full_width: bool = False):
-        if plan == current_plan:
-            extra_class = "border-dark"
-        else:
-            extra_class = "bg-light"
-        with (
-            gui.div(className="d-flex flex-column h-100"),
-            gui.div(
-                className=f"{rounded_border} flex-grow-1 d-flex flex-column mb-2 {extra_class}"
-            ),
-        ):
-            _render_plan_heading(plan)
-            flex_class = "flex-column" if not full_width else "row"
-            with gui.div(className=f"flex-grow-1 d-flex {flex_class}"):
-                if full_width:
-                    pricing_class, details_class = "col-lg-4", "col-lg-8"
-                else:
-                    pricing_class = "my-3"
-                    details_class = (
-                        "flex-grow-1 d-flex flex-column justify-content-between"
-                    )
-                with gui.div(className=pricing_class):
+    with plans_div:
+        with gui.div(className="mb-1"):
+            partial_fn = partial(
+                _render_plan_compact,
+                workspace=workspace,
+                user=user,
+                session=session,
+                selected_payment_provider=selected_payment_provider,
+            )
+            grid_layout(len(grid_plans), grid_plans, partial_fn, separator=False)
+        for plan in full_width_plans:
+            with gui.div(className="mb-1"):
+                _render_plan_full_width(
+                    plan, workspace, user, session, selected_payment_provider
+                )
+
+    with gui.div(className="my-2 d-flex justify-content-center"):
+        gui.caption(
+            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**"
+        )
+
+    return selected_payment_provider
+
+
+def _render_plan_full_width(
+    plan: PricingPlan,
+    workspace: "Workspace",
+    user: "AppUser",
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+
+    if plan == current_plan:
+        extra_class = "border-dark"
+    else:
+        extra_class = "bg-light"
+    with (
+        gui.div(className="d-flex flex-column h-100"),
+        gui.div(className=f"{rounded_border} mb-2 {extra_class}"),
+    ):
+        _render_plan_heading(plan)
+        with gui.div(className="row-lg d-flex flex-grow-1"):
+            with gui.div(
+                className="col-lg-4 d-flex flex-column justify-content-between"
+            ):
+                with gui.div():
                     selected_tier_key = _render_plan_pricing(
                         plan, selected_payment_provider, workspace
                     )
-                with gui.div(className=details_class):
-                    _render_plan_details(plan)
-            with gui.div(className="mt-3 d-flex flex-column"):
+                with gui.div(className="d-none d-lg-flex flex-column"):
+                    _render_plan_action_button(
+                        workspace=workspace,
+                        plan=plan,
+                        payment_provider=selected_payment_provider,
+                        user=user,
+                        session=session,
+                        selected_tier_key=selected_tier_key,
+                    )
+            with gui.div(className="col-lg-8"):
+                _render_plan_details(plan)
+            with gui.div(className="d-flex d-lg-none flex-column my-3"):
                 _render_plan_action_button(
                     workspace=workspace,
                     plan=plan,
@@ -204,19 +239,44 @@ def render_all_plans(
                     selected_tier_key=selected_tier_key,
                 )
 
-    with plans_div:
-        with gui.div(className="mb-1"):
-            grid_layout(len(grid_plans), grid_plans, _render_plan, separator=False)
-        for plan in full_width_plans:
-            with gui.div(className="mb-1"):
-                _render_plan(plan, full_width=True)
 
-    with gui.div(className="my-2 d-flex justify-content-center"):
-        gui.caption(
-            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**"
-        )
+def _render_plan_compact(
+    plan: PricingPlan,
+    workspace: "Workspace",
+    user: "AppUser",
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    return selected_payment_provider
+    if plan == current_plan:
+        extra_class = "border-dark"
+    else:
+        extra_class = "bg-light"
+    with (
+        gui.div(className="d-flex flex-column h-100"),
+        gui.div(
+            className=f"{rounded_border} flex-grow-1 d-flex flex-column mb-2 {extra_class}"
+        ),
+    ):
+        _render_plan_heading(plan)
+        with gui.div(className="my-3"):
+            selected_tier_key = _render_plan_pricing(
+                plan, selected_payment_provider, workspace
+            )
+        with gui.div(
+            className="flex-grow-1 d-flex flex-column justify-content-between"
+        ):
+            _render_plan_details(plan)
+        with gui.div(className="mt-3 d-flex flex-column"):
+            _render_plan_action_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=selected_payment_provider,
+                user=user,
+                session=session,
+                selected_tier_key=selected_tier_key,
+            )
 
 
 def _render_plan_details(plan: PricingPlan):
