@@ -456,7 +456,7 @@ def _render_upgrade_subscription_button(
         trigger_type="primary",
         modal_title="#### Upgrade Plan",
         modal_content=f"""
-Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ ${fmt_price(new_monthly_charge)}**?
+Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(new_monthly_charge)}**?
 
 Your payment method will be charged ${new_monthly_charge:,} today and again every month until you cancel.
 
