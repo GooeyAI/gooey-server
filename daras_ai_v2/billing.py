@@ -159,7 +159,7 @@ def render_all_plans(
     grid_plans = [plan for plan in all_plans if not plan.full_width]
     full_width_plans = [plan for plan in all_plans if plan.full_width]
 
-    gui.write("## All Plans")
+    gui.write("## Plans")
     plans_div = gui.div(className="mb-1")
 
     if workspace.subscription and workspace.subscription.payment_provider:

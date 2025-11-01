@@ -189,7 +189,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Access top image generation models</li>
               <li>Deploy Workflows via the Web, WhatsApp, SMS/Voice, Slack or FB</li>
               <li>Use-case specific, Workflow <a href="/bulk/">Evaluation</a> to optimize model and component selection.</li>
-              <li>API access</li>
+              <li><a href="https://docs.gooey.ai/api-reference/getting-started">API access</a></li>
             </ul>
             """
         ),
@@ -197,7 +197,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
             <ul class="text-muted">
               <li>Non-commercial license</li>
-              <li>Community Support in Discord</li>
+              <li>Community support in Discord</li>
               <br/>
               <br/>
             </ul>
@@ -223,15 +223,15 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Up to 44,000 Cr / month</li>
               <li>Increased file upload limit</li>
               <li>Higher rate limits</li>
-              <li>Execute any code via JS / Javascript <a href="/functions/">functions</a></li>
+              <li>Execute any code via JS / Python <a href="/functions/">functions</a></li>
               <li>SOC2 Type II + GDPR Compliance</li>
             </ul>
             """
         ),
         footer="""
         <ul class="text-muted">
-          <li>Commercial licence for images, QR codes and videos</li>
-          <li>Premium Support via dedicated Discord Channel</li>
+          <li>Commercial license for images & videos</li>
+          <li>Premium support via Discord</li>
         </ul>
         """,
         tiers={
@@ -300,7 +300,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
             <ul class="text-muted">
               <li>Full Commercial license</li>
-              <li>Premium support via Email</li>
+              <li>Premium team support via Email</li>
               <br/>
               <br/>
             </ul>
@@ -338,7 +338,7 @@ class PricingPlan(PricingPlanData, Enum):
                     <li>Impact + ROI dashboards for your org based on industry best practices</li>
                     <li>Export usage to your own BI platforms</li>
                     <li>Integrations with your internal systems</li>
-                    <li>Host + Integrate your fine-tuned model in Gooey.AI infra</li>
+                    <li>Host & integrate your fine-tuned model on Gooey.AI infrastructure</li>
                     <li>Use your own keys for OpenAI, Azure, and others</li>
                     <li>On-prem deployments</li>
                     <li>Custom inference queues and rate limits</li>
