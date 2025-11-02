@@ -316,7 +316,7 @@ class PricingPlan(PricingPlanData, Enum):
         full_width=True,
         long_description=dedent(
             """
-            <div class="row row-cols-lg-2">
+            <div class="row row-cols-1 row-cols-md-2">
                 <div class="col">
                   <ul class="text-muted">
                     <li>Unlimited Workspaces for private collaboration among teams and clients</li>

@@ -110,14 +110,14 @@ def render_current_plan(workspace: "Workspace"):
                 )
             ):
                 gui.html("Next invoice on ")
-                gui.pill(
-                    "...",
-                    text_bg="dark",
-                    **render_local_date_attrs(
-                        next_invoice_ts,
-                        date_options={"day": "numeric", "month": "long"},
-                    ),
-                )
+                with gui.tag("span", className="badge rounded-pill text-bg-dark"):
+                    gui.html(
+                        "...",
+                        **render_local_date_attrs(
+                            next_invoice_ts,
+                            date_options={"day": "numeric", "month": "long"},
+                        ),
+                    )
 
         if plan is PricingPlan.ENTERPRISE:
             # charge details are not relevant for Enterprise customers
@@ -210,11 +210,11 @@ def _render_plan_full_width(
         gui.div(className=f"{rounded_border} mb-2 {extra_class}"),
     ):
         _render_plan_heading(plan)
-        with gui.div(className="row-lg d-flex flex-grow-1"):
+        with gui.div(className="row-lg d-flex flex-column flex-lg-row flex-grow-1"):
             with gui.div(
                 className="col-lg-4 d-flex flex-column justify-content-between"
             ):
-                with gui.div():
+                with gui.div(className="mb-3"):
                     selected_tier_key = _render_plan_pricing(
                         plan, selected_payment_provider, workspace
                     )
@@ -229,15 +229,15 @@ def _render_plan_full_width(
                     )
             with gui.div(className="col-lg-8"):
                 _render_plan_details(plan)
-            with gui.div(className="d-flex d-lg-none flex-column my-3"):
-                _render_plan_action_button(
-                    workspace=workspace,
-                    plan=plan,
-                    payment_provider=selected_payment_provider,
-                    user=user,
-                    session=session,
-                    selected_tier_key=selected_tier_key,
-                )
+        with gui.div(className="d-flex d-lg-none flex-column my-3"):
+            _render_plan_action_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=selected_payment_provider,
+                user=user,
+                session=session,
+                selected_tier_key=selected_tier_key,
+            )
 
 
 def _render_plan_compact(
