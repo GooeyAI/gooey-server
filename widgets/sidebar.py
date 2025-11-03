@@ -23,7 +23,7 @@ class SidebarRef:
 
     def set_mobile_open(self, value: bool):
         self.is_mobile_open = self.session[self.mobile_key] = value
-        self.set_open(value)
+        # self.set_open(value)
 
     @property
     def mobile_key(self):
@@ -204,13 +204,15 @@ def sidebar_mobile_header(request: Request):
 # Sidebar width variables
 sidebar_open_width = "340px"
 sidebar_closed_width = "0px"
-sidebar_mobile_width = "80vw"
+sidebar_mobile_width = "100vw"
 
 
 def sidebar_layout(sidebar_ref: SidebarRef):
     is_mobile_open = sidebar_ref.is_mobile_open
     sidebar_funtion_classes = (
-        "gooey-sidebar-open" if sidebar_ref.is_open else "gooey-sidebar-closed"
+        "gooey-sidebar-open"
+        if sidebar_ref.is_open or sidebar_ref.is_mobile_open
+        else "gooey-sidebar-closed"
     )
 
     side_bar_styles = dedent(
@@ -227,7 +229,6 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             }}
 
             & .gooey-sidebar {{
-                transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 background-color: #f9f9f9;
                 position: sticky;
                 top: 0;
@@ -255,8 +256,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             @media (max-width: 767px) {{
                 & .gooey-sidebar-open {{
                     position: fixed;
-                    right: 0;
-                    left: auto;
+                    left: 0;
                     min-width: {sidebar_mobile_width};
                     width: {sidebar_mobile_width};
                     max-width: {sidebar_mobile_width};
@@ -265,13 +265,13 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                     border-right: none;
                 }}
                 & .gooey-sidebar-closed {{
-                    position: fixed;
+                    position: sticky;
                     right: 0;
                     left: auto;
                     min-width: 0px;
                     width: 0px;
                     max-width: 0px;
-                    overflow: hidden;
+                    overflow: visible;
                 }}
             }}
         """
