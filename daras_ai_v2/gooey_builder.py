@@ -43,8 +43,12 @@ async function onload() {
     GooeyEmbed.setGooeyBuilderVariables = (value) => {
         config.payload.variables = value;
     };
+    
     GooeyEmbed.setGooeyBuilderVariables(variables);
     
+    config.onClose = function() {
+        document.getElementById("onClose").click();
+    };
     GooeyEmbed.mount(config);
 }
 
