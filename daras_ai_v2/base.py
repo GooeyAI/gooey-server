@@ -433,6 +433,13 @@ class BasePage:
             return
 
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
+        if self.tab != RecipeTabs.run:
+            if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
+                sidebar_ref.set_open(False)
+                sidebar_ref.set_mobile_open(False)
+                raise gui.RerunException()
+            return
+
         if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
             gui.tag(
                 "button",
