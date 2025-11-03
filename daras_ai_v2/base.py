@@ -434,14 +434,18 @@ class BasePage:
 
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
         if sidebar_ref.is_open:
-            with gui.div(className="w-100 d-flex justify-content-end pt-2"):
-                close_button = gui.button(
-                    label="<i class='fa-regular fa-xmark'></i>",
-                    className="btn btn-secondary p-2",
-                )
-                if close_button:
-                    sidebar_ref.set_open(False)
-                    raise gui.RerunException()
+            gui.tag(
+                "button",
+                type="submit",
+                name="onCloseGooeyBuilder",
+                value="yes",
+                hidden=True,
+                id="onClose",
+            )  # hidden button to trigger the onClose event passed in the config
+
+            if gui.session_state.pop("onCloseGooeyBuilder", None):
+                sidebar_ref.set_open(False)
+                raise gui.RerunException()
 
             with gui.div(className="w-100 h-100"):
                 self._render_gooey_builder()
