@@ -236,6 +236,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 bottom: 0;
                 z-index: 999;
                 border-right: 1px solid #e0e0e0;
+                height: 100dvh;
             }}
 
             & .gooey-sidebar-open {{
@@ -253,16 +254,19 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                 cursor: e-resize;
             }}
 
-            @media (max-width: 767px) {{
+            @media (max-width: 990px) {{
                 & .gooey-sidebar-open {{
                     position: fixed;
                     left: 0;
+                    bottom: 0;
                     min-width: {sidebar_mobile_width};
                     width: {sidebar_mobile_width};
                     max-width: {sidebar_mobile_width};
                     z-index: 2000;
                     border-left: 1px solid #e0e0e0;
                     border-right: none;
+                    height: calc(100dvh - 4px); /* 4px for the progress bar */
+                    margin-top: auto;
                 }}
                 & .gooey-sidebar-closed {{
                     position: sticky;
@@ -316,7 +320,6 @@ def sidebar_layout(sidebar_ref: SidebarRef):
 
         sidebar_content_placeholder = gui.div(
             className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_funtion_classes}",
-            style={"height": "100dvh"},
         )
         pane_content_placeholder = gui.div(className="d-flex flex-grow-1 mw-100")
     return sidebar_content_placeholder, pane_content_placeholder

@@ -460,35 +460,21 @@ class BasePage:
             with gui.styled("& .gooey-builder-open-button:hover { scale: 1.2; }"):
                 with gui.div(
                     className="w-100 position-absolute",
-                    style={"bottom": "10px", "left": "10px", "z-index": "1000"},
+                    style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
                 ):
                     gooey_builder_open_button = gui.button(
-                        label="<img src='https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg' style='width: 48px; height: 48px; border-radius: 50%;' />",
-                        className="btn btn-secondary border-0 d-none d-lg-block p-0 gooey-builder-open-button",
+                        label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 56px; height: 56px; border-radius: 50%;' />",
+                        className="btn btn-secondary border-0 d-none d-md-block p-0 gooey-builder-open-button",
                         style={
-                            "width": "48px",
-                            "height": "48px",
+                            "width": "56px",
+                            "height": "56px",
                             "borderRadius": "50%",
                             "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
                         },
                     )
-                    gooey_builder_mobile_open_button = gui.button(
-                        label="<img src='https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg' style='width: 48px; height: 48px; border-radius: 50%;' />",
-                        className="border-0 btn btn-secondary rounded-pill d-lg-none gooey-builder-open-button p-0",
-                        style={
-                            "width": "48px",
-                            "height": "48px",
-                            "borderRadius": "50%",
-                            "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
-                        },
-                    )
-            if gooey_builder_mobile_open_button:
-                sidebar_ref.set_mobile_open(True)
-                raise gui.RerunException()
-
-            if gooey_builder_open_button:
-                sidebar_ref.set_open(True)
-                raise gui.RerunException()
+                    if gooey_builder_open_button:
+                        sidebar_ref.set_open(True)
+                        raise gui.RerunException()
 
     def _render_header(self):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
