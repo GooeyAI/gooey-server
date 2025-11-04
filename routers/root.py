@@ -816,30 +816,48 @@ def page_wrapper(
                         className="img-fluid logo d-sm-none",
                     )
 
-                if show_search_bar:
-                    _render_mobile_search_button(request, search_filters)
-
                 with gui.div(
-                    className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                    className="d-flex justify-content-end flex-grow-1 align-items-center"
                 ):
-                    for url, label in settings.HEADER_LINKS:
-                        render_header_link(
-                            url=url, label=label, icon=settings.HEADER_ICONS.get(url)
-                        )
+                    gooey_builder_mobile_open_button = gui.button(
+                        label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 36px; height: 36px; border-radius: 50%;' />",
+                        className="border-0 m-0 btn btn-secondary rounded-pill d-md-none gooey-builder-open-button p-0",
+                        style={
+                            "width": "36px",
+                            "height": "36px",
+                            "borderRadius": "50%",
+                        },
+                    )
+                    if gooey_builder_mobile_open_button:
+                        sidebar_ref.set_mobile_open(True)
+                        raise gui.RerunException()
 
-                    if request.user and not request.user.is_anonymous:
-                        render_header_link(
-                            url=get_route_path(explore_in_current_workspace),
-                            label="Saved",
-                            icon=icons.save,
-                        )
+                    if show_search_bar:
+                        _render_mobile_search_button(request, search_filters)
 
-                        current_workspace = global_workspace_selector(
-                            request.user, request.session
-                        )
-                    else:
-                        current_workspace = None
-                        anonymous_login_container(request, context)
+                    with gui.div(
+                        className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                    ):
+                        for url, label in settings.HEADER_LINKS:
+                            render_header_link(
+                                url=url,
+                                label=label,
+                                icon=settings.HEADER_ICONS.get(url),
+                            )
+
+                        if request.user and not request.user.is_anonymous:
+                            render_header_link(
+                                url=get_route_path(explore_in_current_workspace),
+                                label="Saved",
+                                icon=icons.save,
+                            )
+
+                            current_workspace = global_workspace_selector(
+                                request.user, request.session
+                            )
+                        else:
+                            current_workspace = None
+                            anonymous_login_container(request, context)
 
             gui.html(copy_to_clipboard_scripts)
 
@@ -857,7 +875,7 @@ def page_wrapper(
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
     with gui.div(
-        className="d-flex d-md-none flex-grow-1 justify-content-end",
+        className="d-flex d-md-none justify-content-end",
     ):
         gui.button(
             icons.search,
