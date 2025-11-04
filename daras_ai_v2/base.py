@@ -1299,7 +1299,26 @@ class BasePage:
 
         if not enable_bot_builder:
             return
-        render_gooey_builder_inline(self.slug_versions[-1], gui.session_state)
+        render_gooey_builder_inline(
+            page_slug=self.slug_versions[-1],
+            builder_state=dict(
+                status=dict(
+                    error_msg=gui.session_state.get(StateKeys.error_msg),
+                    run_status=gui.session_state.get(StateKeys.run_status),
+                    run_time=gui.session_state.get(StateKeys.run_time),
+                ),
+                request=extract_model_fields(
+                    model=self.RequestModel, state=gui.session_state
+                ),
+                response=extract_model_fields(
+                    model=self.ResponseModel, state=gui.session_state
+                ),
+                metadata=dict(
+                    title=self.current_pr.title,
+                    description=self.current_pr.notes,
+                ),
+            ),
+        )
 
         # render_gooey_builder(
         #     page_slug=self.slug_versions[-1],
