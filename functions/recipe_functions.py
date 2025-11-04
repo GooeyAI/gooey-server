@@ -11,7 +11,7 @@ from daras_ai_v2 import icons
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.settings import templates
-from functions.models import CalledFunction, FunctionTrigger
+from functions.models import CalledFunction, FunctionScopes, FunctionTrigger
 from widgets.switch_with_section import switch_with_section
 
 if typing.TYPE_CHECKING:
@@ -69,7 +69,10 @@ class BaseLLMTool:
             ret = dict(error=repr(e))
         return json.dumps(ret)
 
-    def call(self, **kwargs) -> typing.Any:
+    def __call__(self, *args, **kwargs) -> typing.Any:
+        return self.call(*args, **kwargs)
+
+    def call(self, *args, **kwargs) -> typing.Any:
         raise NotImplementedError
 
 
@@ -319,36 +322,60 @@ def functions_input(current_user: AppUser, key="functions"):
     from recipes.BulkRunner import list_view_editor
     from recipes.Functions import FunctionsPage
 
-    def render_inputs(list_key: str, del_key: str, d: dict):
-        col1, col2 = gui.columns([3, 9], responsive=True)
-        with col1:
-            col1.node.props["className"] += " pt-1"
-            d["trigger"] = enum_selector(
-                enum_cls=FunctionTrigger,
-                use_selectbox=True,
-                key=list_key + ":trigger",
-                value=d.get("trigger"),
-            )
-        with col2:
-            url = d.get("url") or ""
-            tool_slug = get_external_tool_slug_from_url(url)
-            if tool_slug:
+    def render_inputs(list_key: str, del_key: str, fn: dict):
+        col1, col2 = gui.columns([4, 9], responsive=True)
+        url = fn.get("url") or ""
+        tool_slug = get_external_tool_slug_from_url(url)
+        if tool_slug:
+            fn["slug"] = tool_slug
+            with col1, gui.styled("& i { padding-left: 4px; width: 28px; }"):
+                fn["scope"] = enum_selector(
+                    label="",
+                    enum_cls=FunctionScopes,
+                    format_func=FunctionScopes.format_func,
+                    key=list_key + ":scope",
+                    value=fn.get("scope"),
+                    use_selectbox=True,
+                    allow_none=True,
+                )
+            with col2:
                 with gui.div(className="d-flex align-items-center"):
-                    gui.write(
-                        f'<a href="{url}" target="_blank">{tool_slug}</a>',
-                        unsafe_allow_html=True,
-                    )
+                    logo = fn.get("logo")
+                    if logo:
+                        gui.image(
+                            logo,
+                            style=dict(width="14px", height="14px", marginRight="8px"),
+                        )
+                    with gui.div(className="flex-grow-1"):
+                        gui.write(
+                            fn.get("label") or tool_slug,
+                            unsafe_allow_html=True,
+                            help=(
+                                "Embed statically in the prompt with Jinja Template:\n `{{ %s(...) }}`"
+                                % tool_slug
+                            ),
+                        )
+                    gui.url_button(url)
                     del_button(del_key)
-            else:
+        else:
+            with col1:
+                col1.node.props["className"] += " pt-1"
+                fn["trigger"] = enum_selector(
+                    enum_cls=FunctionTrigger,
+                    use_selectbox=True,
+                    key=list_key + ":trigger",
+                    value=fn.get("trigger"),
+                )
+            with col2:
                 workflow_url_input(
                     page_cls=FunctionsPage,
                     key=list_key + ":url",
-                    internal_state=d,
+                    internal_state=fn,
                     del_key=del_key,
                     current_user=current_user,
                     include_root=False,
                 )
-        col2.node.children[0].props["className"] += " col-12"
+            col2.node.children[0].props["className"] += " col-12"
 
     def render_section():
         from functions.composio_tools import render_inbuilt_tools_selector

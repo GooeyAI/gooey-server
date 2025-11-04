@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "managed_secrets",
     "ai_models",
     "number_cycling",
+    "memory",
 ]
 
 MIDDLEWARE = [
