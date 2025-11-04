@@ -1,6 +1,7 @@
 billing = '<i class="fa-regular fa-square-dollar"></i>'
 save = '<i class="fa-regular fa-floppy-disk"></i>'
 profile = '<i class="fa-regular fa-address-card"></i>'
+person = '<i class="fa-regular fa-person"></i>'
 api = '<i class="fa-regular fa-rocket"></i>'
 run = '<i class="fa-regular fa-person-running"></i>'
 example = '<i class="fa-regular fa-gift"></i>'

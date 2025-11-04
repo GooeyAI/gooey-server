@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import html
 import inspect
+import itertools
 import json
 import math
 import traceback
@@ -57,11 +58,20 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
-from functions.composio_tools import get_external_tools_from_state
-from functions.inbuilt_tools import get_inbuilt_tools_from_state
-from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
+from functions.composio_tools import ComposioLLMTool
+from functions.inbuilt_tools import (
+    INBUILT_INTEGRATION_TOOLS,
+    get_inbuilt_tools_from_state,
+)
+from functions.models import (
+    FunctionScopes,
+    FunctionTrigger,
+    RecipeFunction,
+    VariableSchema,
+)
 from functions.recipe_functions import (
     BaseLLMTool,
+    WorkflowLLMTool,
     call_recipe_functions,
     functions_input,
     get_workflow_tools_from_state,
@@ -1418,9 +1428,20 @@ class BasePage:
         gui.session_state["is_flagged"] = is_flagged
 
     def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
-        return (
-            {
-                tool.name: tool.bind(
+        return {
+            tool.name: self.bind_tool(tool)
+            for tool in itertools.chain(
+                get_workflow_tools_from_state(
+                    gui.session_state, FunctionTrigger.prompt
+                ),
+                get_inbuilt_tools_from_state(gui.session_state),
+            )
+        }
+
+    def bind_tool(self, tool: BaseLLMTool) -> BaseLLMTool:
+        match tool:
+            case WorkflowLLMTool():
+                return tool.bind(
                     saved_run=self.current_sr,
                     workspace=self.current_workspace,
                     current_user=self.request.user,
@@ -1429,24 +1450,29 @@ class BasePage:
                     state=gui.session_state,
                     trigger=FunctionTrigger.prompt,
                 )
-                for tool in get_workflow_tools_from_state(
-                    gui.session_state, FunctionTrigger.prompt
-                )
-            }
-            | {
-                tool.name: tool
-                for tool in get_inbuilt_tools_from_state(gui.session_state)
-            }
-            | {
-                tool.name: tool.bind(
-                    workspace=self.current_workspace,
+            case ComposioLLMTool():
+                return tool.bind(
+                    user_id=FunctionScopes.get_user_id_for_scope(
+                        tool.scope,
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        published_run=self.current_pr,
+                    ),
                     redirect_url=self.current_app_url(
                         query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
                     ),
                 )
-                for tool in get_external_tools_from_state(gui.session_state)
-            }
-        )
+            case _ if tool.name in INBUILT_INTEGRATION_TOOLS:
+                return tool.bind(
+                    user_id=FunctionScopes.get_user_id_for_scope(
+                        tool.scope,
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        published_run=self.current_pr,
+                    ),
+                )
+            case _:
+                return tool
 
     @cached_property
     def current_workspace(self) -> Workspace:
@@ -1824,10 +1850,17 @@ class BasePage:
     def render_variables(self):
         if not self.functions_in_settings:
             functions_input(self.request.user)
+
+        function_slugs = [
+            slug
+            for fn in gui.session_state.get("functions", [])
+            if (slug := fn.get("slug"))
+        ]
+
         variables_input(
             template_keys=self.template_keys,
             allow_add=is_functions_enabled(),
-            exclude=self.fields_to_save(),
+            exclude=self.fields_to_save() + function_slugs,
         )
 
     @classmethod

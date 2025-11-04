@@ -8,31 +8,16 @@ import gooey_gui as gui
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.redis_cache import redis_cache_decorator
-from functions.recipe_functions import BaseLLMTool, get_external_tool_slug_from_url
-from workspaces.models import Workspace
+from functions.recipe_functions import BaseLLMTool
 
 if typing.TYPE_CHECKING:
-    from composio.types import Tool, Toolkit
-
-
-def get_external_tools_from_state(state: dict) -> typing.Iterable[ComposioLLMTool]:
-    from composio import Composio
-
-    functions = state.get("functions")
-    if not functions:
-        return
-    tool_slugs = {
-        tool_slug
-        for function in functions
-        if (tool_slug := get_external_tool_slug_from_url(function.get("url", "")))
-    }
-    for tool in Composio().tools.get_raw_composio_tools(tools=tool_slugs, limit=50):
-        yield ComposioLLMTool(tool)
+    from composio.types import Tool
 
 
 class ComposioLLMTool(BaseLLMTool):
-    def __init__(self, tool: Tool):
+    def __init__(self, tool: Tool, scope: str | None):
         self.tool = tool
+        self.scope = scope
         super().__init__(
             name=tool.slug,
             label=tool.name,
@@ -41,23 +26,22 @@ class ComposioLLMTool(BaseLLMTool):
             required=tool.input_parameters.get("required"),
         )
 
-    def bind(self, workspace: Workspace, redirect_url: str):
-        self.workspace = workspace
+    def bind(self, user_id: str, redirect_url: str):
+        self.user_id = user_id
         self.redirect_url = redirect_url
         return self
 
     def call(self, **kwargs) -> dict:
-        from composio import Composio
         import composio_client
+        from composio import Composio
 
-        user_id = f"gooey-workspace-{self.workspace.id}"
         requires_auth = not self.tool.no_auth
 
         composio = Composio()
         try:
             return composio.tools.execute(
                 slug=self.tool.slug,
-                user_id=user_id,
+                user_id=self.user_id,
                 arguments=kwargs,
                 dangerously_skip_version_check=True,
             )
@@ -83,13 +67,13 @@ class ComposioLLMTool(BaseLLMTool):
                 )
 
             connected_accounts = composio.connected_accounts.list(
-                user_ids=[user_id],
+                user_ids=[self.user_id],
                 auth_config_ids=[auth_config.id],
                 statuses=["ACTIVE"],
             )
             if not connected_accounts.items:
                 connection_request = composio.connected_accounts.link(
-                    user_id=user_id,
+                    user_id=self.user_id,
                     auth_config_id=auth_config.id,
                     callback_url=self.redirect_url,
                 )
@@ -98,68 +82,52 @@ class ComposioLLMTool(BaseLLMTool):
                 )
 
         return composio.tools.execute(
-            slug=self.tool.slug, user_id=user_id, arguments=kwargs
+            slug=self.tool.slug, user_id=self.user_id, arguments=kwargs
         )
 
 
 def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
-    from daras_ai_v2.fastapi_tricks import get_app_route_url
-    from routers.root import tool_page
-
-    dialog_ref = gui.use_confirm_dialog(key)
+    dialog_ref = gui.use_alert_dialog(key)
 
     if gui.button(
-        label='<i class="fa-solid fa-octagon-plus"></i> Add External',
+        label='<i class="fa-solid fa-octagon-plus"></i> Add Integrations',
         key="select_tools",
         type="tertiary",
         className="p-1 mb-2",
     ):
         dialog_ref.set_open(True)
 
-    selected_keys = [
-        k for k, v in gui.session_state.items() if v and k.startswith("inbuilt_tool:")
-    ]
-
-    if dialog_ref.pressed_confirm:
-        functions = gui.session_state.setdefault("functions", [])
-        existing_urls = {f["url"] for f in functions}
-        for k in selected_keys:
-            toolkit_slug, tool_slug = k.removeprefix("inbuilt_tool:").split("/")
-            url = get_app_route_url(
-                tool_page,
-                path_params=dict(toolkit_slug=toolkit_slug, tool_slug=tool_slug),
-            )
-            if url in existing_urls:
-                continue
-            functions.append({"trigger": "prompt", "url": url})
-
     if not dialog_ref.is_open:
         gui.session_state.pop("__tools_cache__", None)
-        for k in selected_keys:
-            gui.session_state.pop(k, None)
+        for k in list(gui.session_state.keys()):
+            if k.startswith("inbuilt_tool:"):
+                gui.session_state.pop(k, None)
         return
 
-    confirm_label = "Add"
-    if selected_keys:
-        confirm_label += f" {len(selected_keys)} Tools"
+    function_urls = {
+        function.get("url", "") for function in gui.session_state.get("functions", [])
+    }
 
-    with gui.confirm_dialog(
+    with gui.alert_dialog(
         ref=dialog_ref,
-        modal_title="#### 🧰 Add External Tools",
+        modal_title="#### 🧰 Add Integrations",
         large=True,
-        confirm_label=confirm_label,
     ):
-        render_tool_search_dialog()
+        render_tool_search_dialog(function_urls)
+        with gui.div(
+            className="d-flex justify-content-end mt-2 container-margin-reset"
+        ):
+            gui.write(f"{len(function_urls)} integrations selected")
 
 
-def render_tool_search_dialog():
+def render_tool_search_dialog(function_urls: set[str]):
     if not settings.COMPOSIO_API_KEY:
         gui.error(
             "Please set the COMPOSIO_API_KEY environment variable to use this feature."
         )
         return
 
-    query = gui.text_input(label="", placeholder="Search for a tool...")
+    query = gui.text_input(label="", placeholder="Search integrations...")
 
     with (
         gui.styled("& .gui-expander-header { padding: 0.5rem; }"),
@@ -168,36 +136,39 @@ def render_tool_search_dialog():
             style={"maxHeight": "50vh"},
         ),
     ):
-        toolkits = get_toolkits()
+        toolkits = [
+            dict(
+                name="Gooey.AI Memory",
+                slug="GOOEY_AI_MEMORY",
+                logo="https://gooey.ai/favicon.ico",
+                description="Securely store key user data such as their consent, location or other other info you want your AI agent to remember across sessions and conversations.",
+                search_terms="gooey.ai gooeyai storage data user consent location remember conversation session",
+            )
+        ] + list_toolkits()
 
         query_words = query.lower().split()
         if query_words:
             toolkits = [
                 toolkit
                 for toolkit in toolkits
-                if all(
-                    word in toolkit.name.lower()
-                    or word in toolkit.meta.description.lower()
-                    or any(
-                        word in category.name.lower()
-                        for category in toolkit.meta.categories
-                    )
-                    for word in query_words
-                )
+                if all(word in toolkit["search_terms"] for word in query_words)
             ]
 
         for toolkit in toolkits[:50]:
-            render_toolkit_tools(toolkit)
+            render_toolkit_tools(toolkit, function_urls)
 
 
-def render_toolkit_tools(toolkit: Toolkit):
-    expander_key = f"inbuilt_toolkit:{toolkit.slug}"
+def render_toolkit_tools(toolkit: dict, function_urls: set[str]):
+    from daras_ai_v2.fastapi_tricks import get_app_route_url
+    from routers.root import tool_page
+
+    expander_key = f"inbuilt_toolkit:{toolkit['slug']}"
     with (
         gui.expander(
             label=(
-                f"<img src='{toolkit.meta.logo}' width='16' height='16' class='me-1 mb-1' /> "
-                f"**{toolkit.name}**<br>"
-                f"<span class='text-muted small'>{toolkit.meta.description}</span>"
+                f"<img src='{toolkit['logo']}' width='16' height='16' class='me-1 mb-1' /> "
+                f"**{toolkit['name']}**<br>"
+                f"<span class='text-muted small'>{toolkit['description']}</span>"
             ),
             key=expander_key,
         ),
@@ -205,34 +176,92 @@ def render_toolkit_tools(toolkit: Toolkit):
         if not gui.session_state.get(expander_key):
             return
 
-        tools = get_tools_for_toolkit(toolkit.slug)
-        for tool in tools:
+        toolkit_slug = toolkit["slug"]
+        if toolkit_slug == "GOOEY_AI_MEMORY":
+            tools = {
+                "GOOEY_MEMORY_READ_VALUE": dict(
+                    name="Read Value",
+                    slug="GOOEY_MEMORY_READ_VALUE",
+                    description="Read the value of a key from the Gooey.AI store.",
+                ),
+                "GOOEY_MEMORY_WRITE_VALUE": dict(
+                    name="Write Value",
+                    slug="GOOEY_MEMORY_WRITE_VALUE",
+                    description="Write a value to the Gooey.AI store.",
+                ),
+                "GOOEY_MEMORY_DELETE_VALUE": dict(
+                    name="Delete Value",
+                    slug="GOOEY_MEMORY_DELETE_VALUE",
+                    description="Delete a value from the Gooey.AI store.",
+                ),
+            }
+        else:
+            tools = get_tools_for_toolkit(toolkit_slug)
+        for tool in tools.values():
             with gui.div(className="d-flex gap-2"):
-                gui.checkbox(
+                url = get_app_route_url(
+                    tool_page,
+                    path_params=dict(toolkit_slug=toolkit_slug, tool_slug=tool["slug"]),
+                )
+                functions = gui.session_state.setdefault("functions", [])
+                if gui.checkbox(
                     label=tool["name"],
                     help=dedent(tool["description"]),
-                    key=f"inbuilt_tool:{toolkit.slug}/{tool['slug']}",
-                )
+                    key=f"inbuilt_tool:{toolkit['slug']}/{tool['slug']}",
+                    value=url in function_urls,
+                ):
+                    if url not in function_urls:
+                        functions.append(
+                            {
+                                "trigger": "prompt",
+                                "url": url,
+                                "label": tool["name"],
+                                "logo": toolkit["logo"],
+                            }
+                        )
+                        function_urls.add(url)
+                else:
+                    if url in function_urls:
+                        function_urls.remove(url)
+                        for i in range(len(functions)):
+                            if functions[i]["url"] == url:
+                                functions.pop(i)
+                                break
 
 
 @redis_cache_decorator(ex=60 * 60 * 24)  # 1 day
-def get_toolkits():
-    from composio import Composio
-
-    return Composio().toolkits.list(limit=1000).items
-
-
-@gui.cache_in_session_state(key="__tools_cache__")
-def get_tools_for_toolkit(toolkit_slug: str) -> list[dict]:
+def list_toolkits():
     from composio import Composio
 
     return [
-        {
-            "name": item.name,
-            "slug": item.slug,
-            "description": item.description,
-        }
+        dict(
+            name=item.name,
+            slug=item.slug,
+            logo=item.meta.logo,
+            description=item.meta.description,
+            search_terms=" ".join(
+                [
+                    item.name,
+                    item.meta.description,
+                    *[category.name for category in item.meta.categories],
+                ]
+            ).lower(),
+        )
+        for item in Composio().toolkits.list(limit=1000).items
+    ]
+
+
+@gui.cache_in_session_state(key="__tools_cache__")
+def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict]:
+    from composio import Composio
+
+    return {
+        item.slug: dict(
+            name=item.name,
+            slug=item.slug,
+            description=item.description,
+        )
         for item in Composio().tools.get_raw_composio_tools(
             toolkits=[toolkit_slug], limit=9999
         )
-    ]
+    }
