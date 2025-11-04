@@ -819,18 +819,19 @@ def page_wrapper(
                 with gui.div(
                     className="d-flex justify-content-end flex-grow-1 align-items-center"
                 ):
-                    gooey_builder_mobile_open_button = gui.button(
-                        label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 36px; height: 36px; border-radius: 50%;' />",
-                        className="border-0 m-0 btn btn-secondary rounded-pill d-md-none gooey-builder-open-button p-0",
-                        style={
-                            "width": "36px",
-                            "height": "36px",
-                            "borderRadius": "50%",
-                        },
-                    )
-                    if gooey_builder_mobile_open_button:
-                        sidebar_ref.set_mobile_open(True)
-                        raise gui.RerunException()
+                    if request.user and request.user.is_admin:
+                        gooey_builder_mobile_open_button = gui.button(
+                            label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 36px; height: 36px; border-radius: 50%;' />",
+                            className="border-0 m-0 btn btn-secondary rounded-pill d-md-none gooey-builder-open-button p-0",
+                            style={
+                                "width": "36px",
+                                "height": "36px",
+                                "borderRadius": "50%",
+                            },
+                        )
+                        if gooey_builder_mobile_open_button:
+                            sidebar_ref.set_mobile_open(True)
+                            raise gui.RerunException()
 
                     if show_search_bar:
                         _render_mobile_search_button(request, search_filters)
