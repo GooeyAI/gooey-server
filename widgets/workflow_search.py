@@ -220,7 +220,7 @@ def render_search_bar(
             }}
             &::before {{
                 content: "\f002";              /* FontAwesome glyph */
-                font-family: "Font Awesome 6 Pro";
+                font-family: "Font Awesome 7 Pro";
                 position: absolute;
                 top: 14px;
                 left: 18px;
