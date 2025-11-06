@@ -1832,7 +1832,11 @@ class BasePage:
                 with gui.div(className="bg-white mt-2"), gui.expander("⚙️ Settings"):
                     self.render_settings()
                     if self.functions_in_settings:
-                        functions_input(self.request.user)
+                        functions_input(
+                            workspace=self.request.user and self.current_workspace,
+                            user=self.request.user,
+                            published_run=self.current_pr,
+                        )
 
             with placeholder:
                 self.render_variables()
@@ -1849,7 +1853,11 @@ class BasePage:
 
     def render_variables(self):
         if not self.functions_in_settings:
-            functions_input(self.request.user)
+            functions_input(
+                workspace=self.request.user and self.current_workspace,
+                user=self.request.user,
+                published_run=self.current_pr,
+            )
 
         function_slugs = [
             slug

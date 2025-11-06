@@ -32,22 +32,38 @@ class ScopeParts(GooeyEnum):
 
 
 class FunctionScope(typing.NamedTuple):
+    icon: str
     label: str
     parts: tuple[ScopeParts] = []
 
 
 class FunctionScopes(FunctionScope, GooeyEnum):
+    workspace = FunctionScope(
+        icon=icons.company,
+        label="Workspace Members",
+        parts=(ScopeParts.workspace,),
+    )
+
     workspace_member = FunctionScope(
-        label=f"{icons.profile} My Runs & Deployments",
+        icon=icons.profile,
+        label="My Runs & Deployments",
         parts=(ScopeParts.workspace, ScopeParts.member),
     )
 
+    deployment_user = FunctionScope(
+        icon=f'<img align="left" width="24" height="24" src="{icons.integrations_img}">',
+        label="&nbsp; User of any Deployment",
+        parts=(ScopeParts.workspace, ScopeParts.deployment, ScopeParts.platform_user),
+    )
+
     saved_workflow = FunctionScope(
-        label=f"{icons.save} Saved Workflow",
+        icon=icons.save,
+        label="Saved Workflow",
         parts=(ScopeParts.workspace, ScopeParts.saved_workflow),
     )
     saved_workflow_user = FunctionScope(
-        label='<i class="fa-regular fa-person-rays"></i> User of Saved Workflow',
+        icon='<i class="fa-regular fa-user-message"></i>',
+        label="User of Saved Workflow",
         parts=(
             ScopeParts.workspace,
             ScopeParts.saved_workflow,
@@ -55,16 +71,9 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         ),
     )
 
-    deployment = FunctionScope(
-        label=f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Deployed App',
-        parts=(ScopeParts.workspace, ScopeParts.deployment),
-    )
-    deployment_user = FunctionScope(
-        label='<i class="fa-solid fa-chalkboard-user"></i> User of Deployed App',
-        parts=(ScopeParts.workspace, ScopeParts.deployment, ScopeParts.platform_user),
-    )
     conversation = FunctionScope(
-        label=f"{icons.chat} Chat Conversation",
+        icon='<i class="fa-regular fa-message"></i>',
+        label="Chat Conversation",
         parts=(
             ScopeParts.workspace,
             ScopeParts.deployment,
@@ -74,12 +83,69 @@ class FunctionScopes(FunctionScope, GooeyEnum):
     )
 
     @classmethod
-    def format_func(cls, name: str | None) -> str:
+    def format_label(
+        cls,
+        name: str | None,
+        workspace: Workspace | None,
+        user: AppUser | None,
+        published_run: PublishedRun | None,
+    ) -> str:
         scope = cls.get(name)
-        if scope:
-            return scope.label
-        else:
-            return '<span class="text-muted"><i class="fa-solid fa-shield-quartered"></i> Select Scope</span>'
+        if not scope:
+            return "Select Scope"
+        match scope:
+            case cls.workspace if workspace and not workspace.is_personal:
+                return f"{workspace.display_html()} Members"
+
+            case cls.workspace_member if user:
+                label = f"Only I ({user.full_name()})"
+                photo = user.get_photo()
+                if photo:
+                    label = f'<img align="left" src="{photo}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;"> &nbsp; {label}'
+                return label
+
+            case cls.deployment_user if workspace:
+                icon = (
+                    '<div style="position: relative; display: inline-block; margin-left: -4px; margin-right: 10px;">'
+                    f"{scope.icon}"
+                    '<span class="fa-stack" style="position: absolute; bottom: -12px; left: 8px;">'
+                    '<i class="fa-solid fa-circle fa-xl" style="color: rgba(200, 200, 200, 0.6);"></i>'
+                    '<i class="fa-solid fa-user-message fa-xs fa-stack-1x" color="darkslategrey"></i>'
+                    "</span>"
+                    "</div>"
+                )
+                if workspace.is_personal:
+                    return f"{icon} User of any Deployment by Me ({workspace.display_name()})"
+                else:
+                    return (
+                        f"{icon} User of any Deployment on {workspace.display_name()}"
+                    )
+
+            case cls.saved_workflow | cls.saved_workflow_user if published_run:
+                from recipes.VideoBots import VideoBotsPage
+
+                if published_run.photo_url:
+                    photo_url = published_run.photo_url
+                else:
+                    photo_url = VideoBotsPage.get_root_pr().photo_url
+                icon = f'<img align="left" src="{photo_url}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">'
+
+                if scope == cls.saved_workflow_user:
+                    icon = (
+                        '<div style="position: relative; display: inline-block; margin-left: -4px; margin-right: 10px;">'
+                        f"{icon}"
+                        '<span class="fa-stack" style="position: absolute; bottom: -12px; left: 8px;">'
+                        '<i class="fa-solid fa-circle fa-xl" style="color: rgba(200, 200, 200, 0.6);"></i>'
+                        '<i class="fa-solid fa-user-message fa-xs fa-stack-1x" color="darkslategrey"></i>'
+                        "</span>"
+                        "</div>"
+                    )
+                    return f"{icon} User of {published_run.title}"
+                else:
+                    return f"{icon} &nbsp; {published_run.title}"
+
+            case _:
+                return f"{scope.icon} {scope.label}"
 
     @classmethod
     def get_user_id_for_scope(

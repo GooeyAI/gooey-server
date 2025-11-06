@@ -15,7 +15,7 @@ from functions.models import CalledFunction, FunctionScopes, FunctionTrigger
 from widgets.switch_with_section import switch_with_section
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun
+    from bots.models import PublishedRun, SavedRun
     from daras_ai_v2.base import BasePage, JsonTypes
     from workspaces.models import Workspace
 
@@ -316,7 +316,12 @@ def is_functions_enabled(key="functions") -> bool:
     return bool(gui.session_state.get(f"--enable-{key}"))
 
 
-def functions_input(current_user: AppUser, key="functions"):
+def functions_input(
+    workspace: Workspace | None,
+    user: AppUser | None,
+    published_run: PublishedRun | None,
+    key="functions",
+):
     from daras_ai_v2.base import BasePage
     from daras_ai_v2.workflow_url_input import del_button, workflow_url_input
     from recipes.BulkRunner import list_view_editor
@@ -328,15 +333,19 @@ def functions_input(current_user: AppUser, key="functions"):
         tool_slug = get_external_tool_slug_from_url(url)
         if tool_slug:
             fn["slug"] = tool_slug
-            with col1, gui.styled("& i { padding-left: 4px; width: 28px; }"):
+            with col1, gui.styled("& i { width: 28px; }"):
                 fn["scope"] = enum_selector(
                     label="",
                     enum_cls=FunctionScopes,
-                    format_func=FunctionScopes.format_func,
+                    format_func=lambda name: FunctionScopes.format_label(
+                        name,
+                        workspace=workspace,
+                        user=user,
+                        published_run=published_run,
+                    ),
                     key=list_key + ":scope",
                     value=fn.get("scope"),
                     use_selectbox=True,
-                    allow_none=True,
                 )
             with col2:
                 with gui.div(className="d-flex align-items-center"):
@@ -372,7 +381,7 @@ def functions_input(current_user: AppUser, key="functions"):
                     key=list_key + ":url",
                     internal_state=fn,
                     del_key=del_key,
-                    current_user=current_user,
+                    current_user=user,
                     include_root=False,
                 )
             col2.node.children[0].props["className"] += " col-12"
