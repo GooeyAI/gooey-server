@@ -24,7 +24,7 @@ from widgets.demo_button import render_demo_button_settings
 from workspaces.models import Workspace
 
 
-def integrations_welcome_screen(title: str):
+def deployments_welcome_screen(title: str):
     with gui.center():
         gui.markdown(f"#### {title}")
 
@@ -50,7 +50,7 @@ def integrations_welcome_screen(title: str):
         )
         gui.caption("Make changes, Submit & Save your perfect workflow")
     with col2:
-        gui.image(icons.integrations_img, alt="Integrations", style={"height": "5rem"})
+        gui.image(icons.deployments_img, alt="Deployments", style={"height": "5rem"})
         gui.markdown("2. Connect to Slack, Whatsapp or your App")
         gui.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
     with col3:
@@ -365,8 +365,8 @@ def get_web_widget_embed_code(bi: BotIntegration, *, config: dict = None) -> str
     lib_src = get_app_route_url(
         chat_lib_route,
         path_params=dict(
-            integration_id=bi.api_integration_id(),
-            integration_name=slugify(bi.name) or "untitled",
+            deployment_id=bi.api_deployment_id(),
+            deployment_name=slugify(bi.name) or "untitled",
         ),
     ).rstrip("/")
     if config is None:
@@ -546,7 +546,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 config=bi.get_web_widget_config(hostname) | dict(mode="inline"),
             )
         else:
-            bot_api_example_generator(bi.api_integration_id())
+            bot_api_example_generator(bi.api_deployment_id())
 
 
 def integration_details_generator(bi: BotIntegration, user: AppUser | None):

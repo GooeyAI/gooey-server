@@ -14,7 +14,7 @@ from bots.models import (
 )
 from daras_ai_v2.fastapi_tricks import get_route_path
 from routers import facebook_api
-from routers.root import RecipeTabs, integrations_stats_route
+from routers.root import RecipeTabs, deployments_stats_route
 from routers.slack_api import slack_connect_redirect, slack_connect_redirect_shortcuts
 from routers.static_pages import webflow_upload
 from server import app
@@ -70,10 +70,10 @@ def test_integration_stats_route(db_fixtures, force_authentication, threadpool_s
                     content="test-message-2",
                 )
         url_path = get_route_path(
-            integrations_stats_route,
+            deployments_stats_route,
             path_params=dict(
                 page_slug="test-slug",
-                integration_id=bi.api_integration_id(),
+                deployment_id=bi.api_deployment_id(),
             ),
         )
         threadpool_subtest(

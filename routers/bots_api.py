@@ -7,8 +7,10 @@ from typing import Any
 import hashids
 from fastapi import HTTPException
 from furl import furl
-from pydantic import BaseModel, Field
-from starlette.responses import StreamingResponse, Response
+from pydantic import BaseModel, Field, AliasChoices, model_validator
+from pydantic_core import PydanticCustomError
+from starlette.responses import StreamingResponse, Response, RedirectResponse
+from starlette.status import HTTP_308_PERMANENT_REDIRECT
 
 from bots.models import Platform, Conversation, BotIntegration, Message, SavedRun
 from celeryapp.tasks import err_msg_for_exc
@@ -24,6 +26,7 @@ from routers.api import (
     build_async_api_response,
 )
 from routers.custom_api_router import CustomAPIRouter
+from loguru import logger
 
 app = CustomAPIRouter()
 
@@ -32,8 +35,11 @@ MSG_ID_PREFIX = "web-"
 
 
 class CreateStreamRequestBase(BaseModel):
-    integration_id: str = Field(
-        description="Your Integration ID as shown in the Copilot Deploy tab"
+    # integration_id is deprecated, but we keep it for backward compatibility
+
+    deployment_id: str = Field(
+        description="Your Deployment ID as shown in the Copilot Deploy tab",
+        validation_alias=AliasChoices("deployment_id", "integration_id"),
     )
 
     conversation_id: str | None = Field(
@@ -88,12 +94,12 @@ class CreateStreamResponse(BaseModel):
 
 
 @app.post(
-    "/v3/integrations/stream",
+    "/v3/deployments/stream",
     response_model=CreateStreamResponse,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
-    tags=["Copilot Integrations"],
-    name="Copilot Integrations Create Stream",
+    tags=["Copilot Deployments"],
+    name="Copilot Deployments Create Stream",
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
@@ -109,6 +115,27 @@ def stream_create(request: CreateStreamRequest, response: Response):
     response.headers["Location"] = stream_url
     response.headers["Access-Control-Expose-Headers"] = "Location"
     return CreateStreamResponse(stream_url=stream_url)
+
+
+@app.post(
+    "/v3/integrations/stream",
+    response_model=CreateStreamResponse,
+    responses={
+        402: {},
+        308: {"description": "Permanent redirect to /v3/deployments/stream"},
+    },
+    operation_id=VideoBotsPage.slug_versions[0] + "__stream_create_redirect",
+    tags=["Copilot Deployments"],
+    name="Copilot Deployments Create Stream (deprecated - redirects)",
+    deprecated=True,
+    include_in_schema=True,
+)
+def stream_create_integrations(request: CreateStreamRequest, response: Response):
+    """Backward compatibility endpoint. Redirects to /v3/deployments/stream"""
+    redirect_url = str(
+        furl(settings.API_BASE_URL) / app.url_path_for(stream_create.__name__)
+    )
+    return RedirectResponse(url=redirect_url, status_code=HTTP_308_PERMANENT_REDIRECT)
 
 
 class ConversationStart(BaseModel):
@@ -180,12 +207,12 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
 
 
 @app.get(
-    "/v3/integrations/stream/{request_id}",
+    "/v3/deployments/stream/{request_id}",
     response_model=StreamEvent,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream",
-    tags=["Copilot Integrations"],
-    name="Copilot integrations Stream Response",
+    tags=["Copilot Deployments"],
+    name="Copilot Deployments Stream Response",
 )
 def stream_response(request_id: str):
     r = get_redis_cache().getdel(f"gooey/stream-init/v1/{request_id}")
@@ -201,6 +228,30 @@ def stream_response(request_id: str):
     return StreamingResponse(
         iterqueue(api.queue, thread), media_type="text/event-stream"
     )
+
+
+@app.get(
+    "/v3/integrations/stream/{request_id}",
+    response_model=StreamEvent,
+    responses={
+        402: {},
+        301: {
+            "description": "Permanent redirect to /v3/deployments/stream/{request_id}"
+        },
+    },
+    operation_id=VideoBotsPage.slug_versions[0] + "__stream_redirect",
+    tags=["Copilot Deployments"],
+    name="Copilot Deployments Stream Response (deprecated - redirects)",
+    deprecated=True,
+    include_in_schema=True,
+)
+def stream_response_integrations(request_id: str):
+    """Backward compatibility endpoint. Redirects to /v3/deployments/stream/{request_id}"""
+    redirect_url = str(
+        furl(settings.API_BASE_URL)
+        / app.url_path_for(stream_response.__name__, request_id=request_id)
+    )
+    return RedirectResponse(url=redirect_url, status_code=301)
 
 
 def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
@@ -233,12 +284,12 @@ class ApiInterface(BotInterface):
         self.request = request
         self.request_overrides = request.model_dump(exclude_unset=True)
         try:
-            self.bot_id = api_hashids.decode(request.integration_id)[0]
+            self.bot_id = api_hashids.decode(request.deployment_id)[0]
             assert BotIntegration.objects.filter(id=self.bot_id).exists()
         except (IndexError, AssertionError):
             raise HTTPException(
                 status_code=404,
-                detail=f"Bot Integration with id={request.integration_id} not found",
+                detail=f"Bot Deployment with id={request.deployment_id} not found",
             )
 
         if request.conversation_id:
@@ -255,7 +306,7 @@ class ApiInterface(BotInterface):
                 if self.convo.bot_integration_id != self.bot_id:
                     raise HTTPException(
                         status_code=400,
-                        detail="Bot Integration mismatch. The provided integration ID does not match the integration ID associated with this conversation.",
+                        detail="Bot deployment mismatch. The provided deployment ID (integration_id is deprecated) does not match the deployment associated with this conversation.",
                     )
                 if request.user_id and request.user_id != self.convo.web_user_id:
                     raise HTTPException(

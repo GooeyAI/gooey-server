@@ -431,34 +431,34 @@ def save_route(
 
 @gui.route(
     app,
-    "/{page_slug}/integrations/add/",
-    "/{page_slug}/{run_slug}/integrations/add/",
-    "/{page_slug}/{run_slug}-{example_id}/integrations/add/",
+    "/{page_slug}/deployments/add/",
+    "/{page_slug}/{run_slug}/deployments/add/",
+    "/{page_slug}/{run_slug}-{example_id}/deployments/add/",
 )
-def add_integrations_route(
+def add_deployments_route(
     request: Request,
     page_slug: str,
     run_slug: str = None,
     example_id: str = None,
 ):
-    gui.session_state["--add-integration"] = True
-    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
+    gui.session_state["--add-deployment"] = True
+    return render_recipe_page(request, page_slug, RecipeTabs.deployments, example_id)
 
 
 @gui.route(
     app,
-    "/{page_slug}/integrations/{integration_id}/stats/",
-    "/{page_slug}/{run_slug}/integrations/{integration_id}/stats/",
-    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/",
+    "/{page_slug}/deployments/{deployment_id}/stats/",
+    "/{page_slug}/{run_slug}/deployments/{deployment_id}/stats/",
+    "/{page_slug}/{run_slug}-{example_id}/deployments/{deployment_id}/stats/",
     ###
-    "/{page_slug}/integrations/{integration_id}/analysis/",
-    "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
-    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/deployments/{deployment_id}/analysis/",
+    "/{page_slug}/{run_slug}/deployments/{deployment_id}/analysis/",
+    "/{page_slug}/{run_slug}-{example_id}/deployments/{deployment_id}/analysis/",
 )
-def integrations_stats_route(
+def deployments_stats_route(
     request: Request,
     page_slug: str,
-    integration_id: str,
+    deployment_id: str,
     run_slug: str = None,
     example_id: str = None,
     graphs: str = None,
@@ -466,7 +466,7 @@ def integrations_stats_route(
     from routers.bots_api import api_hashids
 
     try:
-        gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
+        gui.session_state.setdefault("bi_id", api_hashids.decode(deployment_id)[0])
     except IndexError:
         raise HTTPException(status_code=404)
 
@@ -476,34 +476,73 @@ def integrations_stats_route(
         except json.JSONDecodeError:
             pass
 
-    return render_recipe_page(request, "stats", RecipeTabs.integrations, example_id)
+    return render_recipe_page(request, "stats", RecipeTabs.deployments, example_id)
 
 
 @gui.route(
     app,
+    "/{page_slug}/deployments/",
+    "/{page_slug}/{run_slug}/deployments/",
+    "/{page_slug}/{run_slug}-{example_id}/deployments/",
+    ###
+    "/{page_slug}/deployments/{deployment_id}/",
+    "/{page_slug}/{run_slug}/deployments/{deployment_id}/",
+    "/{page_slug}/{run_slug}-{example_id}/deployments/{deployment_id}/",
+)
+def deployments_route(
+    request: Request,
+    page_slug: str,
+    run_slug: str = None,
+    example_id: str = None,
+    deployment_id: str = None,
+):
+    from routers.bots_api import api_hashids
+
+    if deployment_id:
+        try:
+            gui.session_state.setdefault("bi_id", api_hashids.decode(deployment_id)[0])
+        except IndexError:
+            raise HTTPException(status_code=404)
+    return render_recipe_page(request, page_slug, RecipeTabs.deployments, example_id)
+
+
+@gui.route(
+    app,
+    ### backward compatibility - redirect to deployments
+    # Redirect /integrations/add/ paths to /deployments/add/
+    "/{page_slug}/integrations/add/",
+    "/{page_slug}/{run_slug}/integrations/add/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/add/",
+    # Redirect /integrations/{id}/stats/ paths to /deployments/{id}/stats/
+    "/{page_slug}/integrations/{integration_id}/stats/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/stats/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/stats/",
+    # Redirect /integrations/{id}/analysis/ paths to /deployments/{id}/analysis/
+    "/{page_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}/integrations/{integration_id}/analysis/",
+    "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/analysis/",
+    # Redirect /integrations/ paths to /deployments/
     "/{page_slug}/integrations/",
     "/{page_slug}/{run_slug}/integrations/",
     "/{page_slug}/{run_slug}-{example_id}/integrations/",
-    ###
+    # Redirect /integrations/{id}/ paths to /deployments/{id}/
     "/{page_slug}/integrations/{integration_id}/",
     "/{page_slug}/{run_slug}/integrations/{integration_id}/",
     "/{page_slug}/{run_slug}-{example_id}/integrations/{integration_id}/",
 )
-def integrations_route(
+def integrations_redirect(
     request: Request,
     page_slug: str,
     run_slug: str = None,
     example_id: str = None,
     integration_id: str = None,
 ):
-    from routers.bots_api import api_hashids
-
-    if integration_id:
-        try:
-            gui.session_state.setdefault("bi_id", api_hashids.decode(integration_id)[0])
-        except IndexError:
-            raise HTTPException(status_code=404)
-    return render_recipe_page(request, page_slug, RecipeTabs.integrations, example_id)
+    """Redirect old /integrations/ paths to /deployments/"""
+    new_url = furl(request.url)
+    new_url.path.segments = [
+        "deployments" if seg == "integrations" else seg for seg in new_url.path.segments
+    ]
+    return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
 
 
 @gui.route(
@@ -526,15 +565,15 @@ def chat_explore_route(request: Request):
     )
 
 
-@app.get("/chat/{integration_name}-{integration_id}/")
+@app.get("/chat/{deployment_name}-{deployment_id}/")
 def chat_route(
-    request: Request, integration_id: str = None, integration_name: str = None
+    request: Request, deployment_id: str = None, deployment_name: str = None
 ):
     from daras_ai_v2.bot_integration_widgets import get_web_widget_embed_code
     from routers.bots_api import api_hashids
 
     try:
-        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+        bi = BotIntegration.objects.get(id=api_hashids.decode(deployment_id)[0])
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
 
@@ -554,12 +593,12 @@ def chat_route(
     )
 
 
-@app.get("/chat/{integration_name}-{integration_id}/lib.js")
-def chat_lib_route(request: Request, integration_id: str, integration_name: str = None):
+@app.get("/chat/{deployment_name}-{deployment_id}/lib.js")
+def chat_lib_route(request: Request, deployment_id: str, deployment_name: str = None):
     from routers.bots_api import api_hashids
 
     try:
-        bi = BotIntegration.objects.get(id=api_hashids.decode(integration_id)[0])
+        bi = BotIntegration.objects.get(id=api_hashids.decode(deployment_id)[0])
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
 
@@ -916,10 +955,10 @@ class RecipeTabs(TabData, Enum):
         label="History",
         route=history_route,
     )
-    integrations = TabData(
-        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',
+    deployments = TabData(
+        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.deployments_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',
         label="Deploy",
-        route=integrations_route,
+        route=deployments_route,
     )
     saved = TabData(
         title=f"{icons.save} Saved",

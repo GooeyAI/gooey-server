@@ -44,7 +44,7 @@ class TwilioVoiceWs(TwilioVoice):
         audio_url = furl(settings.WS_PROXY_API_BASE_URL) / get_route_path(
             twilio_ws_proxy, path_params=dict(call_sid=self.call_sid)
         )
-        audio_url.add(query_params={"bi_id": self.bi.api_integration_id()})
+        audio_url.add(query_params={"bi_id": self.bi.api_deployment_id()})
         self._audio_url = str(audio_url)
         # force gpt-4o-audio for non-audio models
         if self.saved_run and self.saved_run.state:

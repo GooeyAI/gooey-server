@@ -330,7 +330,7 @@ If you encounter any issues, write to us at support@gooey.ai and make sure to in
         )
 
 
-def bot_api_example_generator(integration_id: str):
+def bot_api_example_generator(deployment_id: str):
     from routers import bots_api
     from recipes.VideoBots import VideoBotsPage
 
@@ -342,8 +342,8 @@ let response = await fetch("%(api_url)s", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    // your integration's ID as shown in the Gooey.AI Deploy tab
-    "integration_id": "%(integration_id)s",
+    // your deployment's ID as shown in the Gooey.AI Deploy tab
+    "deployment_id": "%(deployment_id)s",
     // the input text for the bot
     "input_prompt": "Hello, world!",
   }),
@@ -382,12 +382,12 @@ evtSource.onerror = (event) => {
             furl(settings.API_BASE_URL)
             / bots_api.app.url_path_for(bots_api.stream_create.__name__)
         ),
-        integration_id=integration_id,
+        deployment_id=deployment_id,
     )
 
     gui.write(
         f"""
-Your Integration ID: `{integration_id}`
+Your Deployment ID: `{deployment_id}`
 
 
 Use the following code snippet to stream messages from the bot.   
