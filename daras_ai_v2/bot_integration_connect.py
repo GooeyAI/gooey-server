@@ -28,9 +28,9 @@ def connect_bot_to_published_run(
             send_confirmation_msg(bi)
 
     return VideoBotsPage.app_url(
-        tab=RecipeTabs.integrations,
+        tab=RecipeTabs.deployments,
         example_id=published_run.published_run_id,
-        path_params=dict(integration_id=bi.api_integration_id()),
+        path_params=dict(deployment_id=bi.api_deployment_id()),
     )
 
 

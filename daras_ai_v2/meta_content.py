@@ -109,7 +109,7 @@ def meta_title_for_page(
     match tab:
         case RecipeTabs.examples:
             ret = f"{tab.label}: {metadata.meta_title}"
-        case RecipeTabs.run_as_api | RecipeTabs.integrations:
+        case RecipeTabs.run_as_api | RecipeTabs.deployments:
             page_title = meta_title_for_page(
                 page=page, metadata=metadata, sr=sr, pr=pr, tab=RecipeTabs.run
             )
@@ -194,7 +194,7 @@ def canonical_url_for_page(
     from routers.root import RecipeTabs
 
     kwargs = {}
-    if page.tab in {RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations}:
+    if page.tab in {RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.deployments}:
         if pr and pr.saved_run == sr and pr.is_root():
             pass
         elif pr and pr.saved_run == sr:
@@ -232,7 +232,7 @@ def robots_tag_for_page(
                 no_follow, no_index = False, False
             case RecipeTabs.run_as_api:
                 no_follow, no_index = False, True
-            case RecipeTabs.integrations:
+            case RecipeTabs.deployments:
                 no_follow, no_index = True, True
             case RecipeTabs.history:
                 no_follow, no_index = True, True

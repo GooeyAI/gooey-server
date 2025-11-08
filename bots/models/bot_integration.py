@@ -516,7 +516,7 @@ class BotIntegration(models.Model):
             or self.name
             or (
                 self.platform == Platform.WEB
-                and f"Integration ID {self.api_integration_id()}"
+                and f"Deployment ID {self.api_deployment_id()}"
             )
             or ""
         ) + ((self.extension_number and f" ex {self.extension_number}") or "")
@@ -545,8 +545,8 @@ class BotIntegration(models.Model):
             return get_app_route_url(
                 chat_route,
                 path_params=dict(
-                    integration_id=self.api_integration_id(),
-                    integration_name=slugify(self.name) or "untitled",
+                    deployment_id=self.api_deployment_id(),
+                    deployment_name=slugify(self.name) or "untitled",
                 ),
             )
         elif self.twilio_phone_number:
@@ -557,7 +557,7 @@ class BotIntegration(models.Model):
         else:
             return None
 
-    def api_integration_id(self) -> str:
+    def api_deployment_id(self) -> str:
         from routers.bots_api import api_hashids
 
         return api_hashids.encode(self.id)
@@ -567,7 +567,7 @@ class BotIntegration(models.Model):
     ) -> dict:
         config = self.web_config_extras | dict(
             target=target,
-            integration_id=self.api_integration_id(),
+            deployment_id=self.api_deployment_id(),
             branding=self.get_web_widget_branding(),
         )
 

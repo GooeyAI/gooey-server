@@ -637,11 +637,16 @@ def build_system_vars(
     bi = convo.bot_integration
     if bi.platform == Platform.WEB:
         user_msg_id = user_msg_id.removeprefix(MSG_ID_PREFIX)
+    deployment_id = bi.api_deployment_id()
+    deployment_name = bi.name
     variables = dict(
         platform=Platform(bi.platform).name,
-        integration_id=bi.api_integration_id(),
-        integration_name=bi.name,
-        conversation_id=convo.api_integration_id(),
+        deployment_id=deployment_id,
+        deployment_name=deployment_name,
+        # deprecated aliases - still passed for backward compatibility but not shown in UI
+        integration_id=deployment_id,
+        integration_name=deployment_name,
+        conversation_id=convo.api_deployment_id(),
         user_message_id=user_msg_id,
     )
 
@@ -682,6 +687,9 @@ def build_system_vars(
             )
 
     variables_schema = {var: {"role": "system"} for var in variables}
+    # mark deprecated variables so they're excluded from UI
+    variables_schema["integration_id"] = {"role": "system", "deprecated": True}
+    variables_schema["integration_name"] = {"role": "system", "deprecated": True}
     return variables, variables_schema
 
 

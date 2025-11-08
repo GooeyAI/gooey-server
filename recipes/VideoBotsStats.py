@@ -113,11 +113,11 @@ class VideoBotsStatsPage(BasePage):
                 str(
                     furl(
                         VideoBotsPage.app_url(
-                            tab=RecipeTabs.integrations,
+                            tab=RecipeTabs.deployments,
                             example_id=(
                                 bi.published_run and bi.published_run.published_run_id
                             ),
-                            path_params=dict(integration_id=bi.api_integration_id()),
+                            path_params=dict(deployment_id=bi.api_deployment_id()),
                         )
                     )
                     / "stats/"
@@ -328,14 +328,12 @@ class VideoBotsStatsPage(BasePage):
                         gui.breadcrumb_item(
                             "Deploy",
                             link_to=VideoBotsPage.app_url(
-                                tab=RecipeTabs.integrations,
+                                tab=RecipeTabs.deployments,
                                 example_id=(
                                     bi.published_run
                                     and bi.published_run.published_run_id
                                 ),
-                                path_params=dict(
-                                    integration_id=bi.api_integration_id()
-                                ),
+                                path_params=dict(deployment_id=bi.api_deployment_id()),
                             ),
                         )
 
@@ -725,13 +723,19 @@ def get_export_fn_vars(
     bi: BotIntegration, fn_sr: SavedRun, messages_export_url: str
 ) -> tuple[dict[str, typing.Any], dict[str, VariableSchema]]:
     # system variables
+    deployment_id = bi.api_deployment_id()
+    deployment_name = bi.name
     variables = dict(
         messages_export_url=messages_export_url,
         saved_copilot_url=(bi.published_run and bi.published_run.get_app_url()),
         platform=Platform(bi.platform).name,
-        integration_id=bi.api_integration_id(),
-        integration_name=bi.name,
+        deployment_id=deployment_id,
+        deployment_name=deployment_name,
+        # deprecated aliases - still passed for backward compatibility but not shown in UI
+        integration_id=deployment_id,
+        integration_name=deployment_name,
     )
+
     match bi.platform:
         case Platform.FACEBOOK:
             variables["bot_fb_page_name"] = bi.fb_page_name
@@ -749,8 +753,11 @@ def get_export_fn_vars(
             )
     variables_schema = {var: {"role": "system"} for var in variables}
 
+    # mark deprecated variables so they're excluded from UI
+    variables_schema["integration_id"] = {"role": "system", "deprecated": True}
+    variables_schema["integration_name"] = {"role": "system", "deprecated": True}
+
     # existing user defined variables
     variables = (fn_sr.state.get("variables") or {}) | variables
     variables_schema = (fn_sr.state.get("variables_schema") or {}) | variables_schema
-
     return variables, variables_schema

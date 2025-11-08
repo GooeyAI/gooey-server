@@ -212,6 +212,12 @@ def render_list_item(
                 "Add a value and tap Run to test a sample value.",
                 className="text-muted small",
             )
+        if schema.get("deprecated"):
+            gui.write(
+                "Deprecated",
+                help="This variable is deprecated and will be removed in a future version. ",
+                className="text-muted small",
+            )
 
         gui.div(className="flex-grow-1")
         gui.button(

@@ -56,7 +56,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
     )
 
     deployment = FunctionScope(
-        label=f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Deployed App',
+        label=f'<img align="left" width="24" height="24" src="{icons.deployments_img}"> &nbsp; Deployed App',
         parts=(ScopeParts.workspace, ScopeParts.deployment),
     )
     deployment_user = FunctionScope(
@@ -157,6 +157,7 @@ class VariableSchema(TypedDict):
     type: NotRequired[JsonTypes]
     role: NotRequired[typing.Literal["user", "system"]]
     description: NotRequired[str]
+    deprecated: NotRequired[bool]
 
 
 class CalledFunctionResponse(BaseModel):

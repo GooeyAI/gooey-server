@@ -40,7 +40,7 @@ from gooeysite.custom_filters import (
 )
 from gooeysite.custom_widgets import JSONEditorWidget
 from recipes.VideoBots import VideoBotsPage
-from routers.root import integrations_stats_route
+from routers.root import deployments_stats_route
 
 fb_fields = [
     "fb_page_id",
@@ -344,16 +344,16 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         if not bi.id:
             raise bi.DoesNotExist
 
-        integration_id = bi.api_integration_id()
+        deployment_id = bi.api_deployment_id()
         return open_in_new_tab(
             url=get_app_route_url(
-                integrations_stats_route,
+                deployments_stats_route,
                 path_params=dict(
                     page_slug=VideoBotsPage.slug_versions[-1],
-                    integration_id=integration_id,
+                    deployment_id=deployment_id,
                 ),
             ),
-            label=integration_id,
+            label=deployment_id,
         )
 
 

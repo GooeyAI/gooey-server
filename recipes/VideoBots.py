@@ -44,7 +44,7 @@ from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
     general_integration_settings,
-    integrations_welcome_screen,
+    deployments_welcome_screen,
     web_widget_config,
 )
 from daras_ai_v2.csv_lines import csv_decode_row
@@ -1400,7 +1400,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 }
             """,
             config=dict(
-                integration_id="magic",
+                deployment_id="magic",
                 target="#gooey-embed",
                 mode="inline",
                 enableAudioMessage=True,
@@ -1598,23 +1598,23 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
     def get_tabs(self):
         tabs = super().get_tabs()
         tabs.insert(1, RecipeTabs.preview)
-        tabs.extend([RecipeTabs.integrations])
+        tabs.extend([RecipeTabs.deployments])
         return tabs
 
     def render_selected_tab(self):
         super().render_selected_tab()
 
-        if self.tab == RecipeTabs.integrations:
-            self.render_integrations_tab()
+        if self.tab == RecipeTabs.deployments:
+            self.render_deployments_tab()
 
-    def render_integrations_tab(self):
+    def render_deployments_tab(self):
         from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 
         gui.newline()
 
         # not signed in case
         if not self.request.user or self.request.user.is_anonymous:
-            integrations_welcome_screen(title="Connect your Copilot")
+            deployments_welcome_screen(title="Connect your Copilot")
             gui.newline()
             with gui.center():
                 gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
@@ -1625,7 +1625,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         # make user the user knows that they are on a saved run not the published run
         if pr and pr.saved_run_id != sr.id:
             last_saved_url = self.app_url(
-                tab=RecipeTabs.integrations, example_id=pr.published_run_id
+                tab=RecipeTabs.deployments, example_id=pr.published_run_id
             )
             gui.caption(
                 f"Note: You seem to have unpublished changes. Deployments use the [last saved version]({last_saved_url}), not the currently visible edits.",
@@ -1647,7 +1647,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
         # no connected integrations on this run
         if not (integrations_qs and integrations_qs.exists()):
-            self.render_integrations_add(
+            self.render_deployments_add(
                 label="#### Connect your Copilot",
                 run_title=run_title,
                 pr=pr,
@@ -1655,25 +1655,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             return
 
         # this gets triggered on the /add route
-        if gui.session_state.pop("--add-integration", None):
-            self.render_integrations_add(
+        if gui.session_state.pop("--add-deployment", None):
+            self.render_deployments_add(
                 label="#### Deploy to a New Channel",
                 run_title=run_title,
                 pr=pr,
             )
             with gui.center():
                 if gui.button("Return to Configure"):
-                    cancel_url = self.current_app_url(RecipeTabs.integrations)
+                    cancel_url = self.current_app_url(RecipeTabs.deployments)
                     raise gui.RedirectException(cancel_url)
             return
 
         with gui.center():
             # signed in, can edit, and has connected botintegrations on this run
-            self.render_integrations_settings(
-                integrations=list(integrations_qs), run_title=run_title
+            self.render_deployments_settings(
+                deployments=list(integrations_qs), run_title=run_title
             )
 
-    def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
+    def render_deployments_add(self, label: str, run_title: str, pr: PublishedRun):
         from routers.facebook_api import fb_connect_url
         from routers.slack_api import slack_connect_url
         from routers.facebook_api import wa_connect_url
@@ -1785,8 +1785,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             className="text-center",
         )
 
-    def render_integrations_settings(
-        self, integrations: list[BotIntegration], run_title: str
+    def render_deployments_settings(
+        self, deployments: list[BotIntegration], run_title: str
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
         from routers.facebook_api import wa_connect_url
@@ -1794,29 +1794,29 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         gui.markdown("#### Configure your Copilot")
         gui.newline()
 
-        if len(integrations) > 1:
+        if len(deployments) > 1:
             with gui.div(
                 style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}
             ):
-                integrations_map = {i.id: i for i in integrations}
+                deployments_map = {i.id: i for i in deployments}
                 bi_id = gui.selectbox(
                     label="",
-                    options=integrations_map.keys(),
-                    format_func=lambda bi_id: f"{Platform(integrations_map[bi_id].platform).get_icon()} &nbsp; {integrations_map[bi_id].name}",
+                    options=deployments_map.keys(),
+                    format_func=lambda bi_id: f"{Platform(deployments_map[bi_id].platform).get_icon()} &nbsp; {deployments_map[bi_id].name}",
                     key="bi_id",
                 )
-                bi = integrations_map[bi_id]
+                bi = deployments_map[bi_id]
                 old_bi_id = gui.session_state.get("old_bi_id", bi_id)
                 if bi_id != old_bi_id:
                     raise gui.RedirectException(
                         self.current_app_url(
-                            RecipeTabs.integrations,
-                            path_params=dict(integration_id=bi.api_integration_id()),
+                            RecipeTabs.deployments,
+                            path_params=dict(deployment_id=bi.api_deployment_id()),
                         )
                     )
                 gui.session_state["old_bi_id"] = bi_id
         else:
-            bi = integrations[0]
+            bi = deployments[0]
 
         if bi.platform == Platform.WEB:
             web_widget_config(
@@ -2028,10 +2028,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     str(
                         furl(
                             self.current_app_url(
-                                RecipeTabs.integrations,
-                                path_params=dict(
-                                    integration_id=bi.api_integration_id()
-                                ),
+                                RecipeTabs.deployments,
+                                path_params=dict(deployment_id=bi.api_deployment_id()),
                             )
                         )
                         / "stats/"
@@ -2091,8 +2089,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 gui.caption(f"Add another connection for {run_title}.")
             with col2:
                 gui.anchor(
-                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Deployment',
-                    str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
+                    f'<img align="left" width="24" height="24" src="{icons.deployments_img}"> &nbsp; Add Deployment',
+                    str(furl(self.current_app_url(RecipeTabs.deployments)) / "add/"),
                     unsafe_allow_html=True,
                 )
 
