@@ -265,12 +265,7 @@ def render_public_runs_list(request: Request, workspace: Workspace):
         return
 
     def _render(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-        render_saved_workflow_preview(
-            workflow.page_cls,
-            pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-        )
+        render_saved_workflow_preview(pr, show_workflow_pill=True)
 
     grid_layout(1, prs, _render)
 
