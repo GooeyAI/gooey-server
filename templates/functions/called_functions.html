@@ -29,11 +29,14 @@ Context:
         transform: rotate(360deg);
     }
 }
+.tool-name {
+    font-size: 14px;
+}
 </style>
   
 {% for item in called_functions %}
 <details>
-<summary><strong>
+<summary><strong class="tool-name">
 {% if item.is_running %}<div class='gooey-spinner'></div>&nbsp;{% else %}🛠️{% endif %} 
 {{ item.title.replace("_", "<wbr>_") | safe }}
 </strong></summary>
