@@ -428,6 +428,11 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 key=f"_bi_website_url_{bi.id}",
                 value=bi.website_url,
             )
+        bi.input_placeholder = gui.text_input(
+            "###### Message box placeholder",
+            key=f"_bi_input_placeholder_{bi.id}",
+            value=bi.input_placeholder,
+        )
 
         gui.write("###### Conversation Starters")
         bi.conversation_starters = list(
