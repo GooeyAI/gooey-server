@@ -1662,12 +1662,11 @@ def run_openai_chat(
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
-    if model == LargeLanguageModels.apertus_70b_instruct:
+    if model in [
+        LargeLanguageModels.apertus_70b_instruct,
+        LargeLanguageModels.sea_lion_v4_gemma_3_27b_it,
+    ]:
         # Swiss AI Apertus model doesn't support tool calling
-        tools = None
-
-    if model == LargeLanguageModels.sea_lion_v4_gemma_3_27b_it:
-        # sea lion doesn't support tools
         tools = None
 
     if avoid_repetition:
