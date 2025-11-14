@@ -60,6 +60,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -1950,7 +1951,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     # Check if current workspace has enterprise subscription
                     if is_enterprise:
                         gui.write(
-                            f"As a premium customer, please contact us to setup a managed number"
+                            "As a premium customer, please contact us to setup a managed number"
                         )
                     else:
                         gui.write(
