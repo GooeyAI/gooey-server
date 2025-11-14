@@ -128,10 +128,8 @@ def load_pipe(language: str):
     volumes={"/cache": model_cache},
     enable_memory_snapshot=True,
 )
-def run_mms_tts(language: str, text: str) -> bytes:
-    import io
+def run_mms_tts(language: str, text: str, upload_url: str) -> bytes:
     import torch
-    import scipy
 
     pipe = load_pipe(language)
 
@@ -139,9 +137,26 @@ def run_mms_tts(language: str, text: str) -> bytes:
     with torch.no_grad():
         output = pipe(text)
 
-    b = io.BytesIO()
-    scipy.io.wavfile.write(b, rate=output["sampling_rate"], data=output["audio"][0])
-    return b.getvalue()
+    upload_audio(output["audio"][0], upload_url, rate=output["sampling_rate"])
+
+
+def upload_audio(audio, url: str, rate: int = 16_000):
+    import scipy
+    import io
+
+    # The resulting audio output can be saved as a .wav file:
+    f = io.BytesIO()
+    scipy.io.wavfile.write(f, rate=rate, data=audio)
+    audio_bytes = f.getvalue()
+    # upload to given url
+    upload_audio_from_bytes(audio_bytes, url)
+
+
+def upload_audio_from_bytes(audio: bytes, url: str):
+    import requests
+
+    r = requests.put(url, headers={"Content-Type": "audio/wav"}, data=audio)
+    r.raise_for_status()
 
 
 if __name__ == "__main__":
