@@ -1132,6 +1132,16 @@ def run():
     )
 
     llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-v3p1",
+        model_name=LargeLanguageModels.deepseek_v3p1.name,
+        unit_cost_input=0.56,
+        unit_cost_output=1.68,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
         model_id="accounts/fireworks/models/mistral-small-24b-instruct-2501",
         model_name=LargeLanguageModels.mistral_small_24b_instruct.name,
         unit_cost_input=0.90,
