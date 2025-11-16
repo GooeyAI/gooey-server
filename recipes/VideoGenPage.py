@@ -278,13 +278,15 @@ def render_field(
                 value=value,
                 help=help_text,
             )
-        case "string" if field.get("enum"):
-            return gui.selectbox(
+        case ("string" | "integer" | "number") as _type if field.get("enum"):
+            v = gui.selectbox(
                 label=label,
                 value=value,
                 help=help_text,
                 options=field["enum"],
             )
+            pytype = {"string": str, "integer": int, "number": float}[_type]
+            return pytype(v)
         case "string":
             return gui.text_area(
                 label=label,
