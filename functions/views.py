@@ -52,8 +52,8 @@ def get_integration_authorizations_for_workspace(workspace: "Workspace"):
 
 
 def manage_integration_authorizations(workspace: Workspace, current_user: AppUser):
-    gui.write("""
-        Integrations require stored authorizations to securely connect your Gooey.AI workflows to other platforms (e.g. Google & M365 Workspaces, Notion, Slack, etc). The scope defines how broadly the authorization may be used across your Workspace, Deployments and Users. Learn more.
+    gui.caption("""
+        Integrations use saved authorizations to securely connect your Gooey.AI workflows with other platforms (Google/M365, Notion, Slack, and more). The Authorized for scope defines how broadly the authorization may be used across your Workspace, Deployments and Users. [Learn more](https://gooey.ai/IntegrationAuthorizationHelp).
     """)
 
     account_scopes = list(
@@ -111,7 +111,9 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
                                     className="container-margin-reset",
                                 )
                         else:
-                            gui.html("All Workflows")
+                            gui.html(
+                                f'All {workspace.html_icon()} <h6 class="d-inline">{workspace.display_name(current_user=current_user)}</h6> Workflows'
+                            )
                     with gui.tag("td"):
                         gui.html(toolkit_name)
                     with gui.tag("td"):
