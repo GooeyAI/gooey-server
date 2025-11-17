@@ -73,22 +73,34 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
                 gui.html("Authorized for")
 
         with gui.tag("tbody"):
+            pr_ids, user_ids = set(), set()
+            for _, _, scope_parts in account_scopes:
+                if pr_id := scope_parts.get(ScopeParts.saved_workflow):
+                    pr_ids.add(pr_id)
+                if user_id := scope_parts.get(ScopeParts.member):
+                    user_ids.add(user_id)
+            published_runs = (
+                pr_ids
+                and {
+                    pr.published_run_id: pr
+                    for pr in PublishedRun.objects.filter(published_run_id__in=pr_ids)
+                }
+                or {}
+            )
+            users = (
+                user_ids
+                and {user.id: user for user in AppUser.objects.filter(id__in=user_ids)}
+                or {}
+            )
+
             for account, scope, scope_parts in account_scopes:
                 toolkit_name = get_toolkit_name_by_slug(account["toolkit"]["slug"])
                 published_run_id = scope_parts.get(ScopeParts.saved_workflow)
                 published_run = (
-                    published_run_id
-                    and PublishedRun.objects.filter(
-                        published_run_id=published_run_id
-                    ).first()
-                    or None
+                    published_run_id and published_runs.get(published_run_id) or None
                 )
-                app_user_id = scope_parts.get(ScopeParts.member)
-                app_user = (
-                    app_user_id
-                    and AppUser.objects.filter(id=app_user_id).first()
-                    or None
-                )
+                user_id = scope_parts.get(ScopeParts.member)
+                user = user_id and users.get(int(user_id)) or None
 
                 with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
@@ -107,7 +119,7 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
                             FunctionScopes.format_label(
                                 name=scope.name,
                                 workspace=workspace,
-                                user=app_user,
+                                user=user,
                                 published_run=published_run,
                                 current_user=current_user,
                             )
