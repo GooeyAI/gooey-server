@@ -65,11 +65,11 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
 
     with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
                 gui.html("Workflow")
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
                 gui.html("Integration")
-            with gui.tag("th", scope="col"):
+            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
                 gui.html("Authorized for")
 
         with gui.tag("tbody"):
