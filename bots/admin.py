@@ -175,6 +175,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "slack_channel_hook_url",
         "slack_access_token",
         "twilio_phone_number",
+        "extension_number",
     ]
     list_display = [
         "name",
@@ -200,6 +201,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "workspace",
         "created_by",
         "demo_qr_code_run",
+        "shared_phone_number",
     ]
 
     formfield_overrides = {
@@ -262,6 +264,15 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "demo_qr_code_image",
                     "demo_qr_code_run",
                     "demo_notes",
+                ]
+            },
+        ),
+        (
+            "Number Cycling",
+            {
+                "fields": [
+                    "shared_phone_number",
+                    "extension_number",
                 ]
             },
         ),
@@ -431,6 +442,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "updated_at",
         "run_status",
         "error_msg",
+        "platform",
     ]
     list_filter = [
         "workflow",
@@ -440,6 +452,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         ("error_msg", admin.EmptyFieldListFilter),
         "created_at",
         "retention_policy",
+        "platform",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version", "workspace"]

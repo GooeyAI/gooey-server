@@ -10,7 +10,7 @@ from time import time
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
 from loguru import logger
@@ -173,7 +173,7 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
 
 @app.get("/logout/")
 async def logout(request: Request):
-    request.session.pop(FIREBASE_SESSION_COOKIE, None)
+    request.session.clear()
     return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
 
 
@@ -258,6 +258,18 @@ def explore_page(
             url=get_og_url_path(request), search_filters=search_filters
         ),
     }
+
+
+@app.get("/tools/{toolkit_slug}/{tool_slug}")
+def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
+    from composio import Composio
+    import composio_client
+
+    try:
+        tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
+    except composio_client.NotFoundError:
+        raise HTTPException(status_code=404)
+    return JSONResponse(content=tool.to_dict())
 
 
 @gui.route(app, "/api/")
@@ -585,6 +597,18 @@ let script = document.createElement("script");
 
 @gui.route(
     app,
+    "/{page_slug}/preview/",
+    "/{page_slug}/{run_slug}/preview/",
+    "/{page_slug}/{run_slug}-{example_id}/preview/",
+)
+def preview_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    return render_recipe_page(request, page_slug, RecipeTabs.preview, example_id)
+
+
+@gui.route(
+    app,
     "/{path:path}",
     "/{page_slug}/",
     "/{page_slug}/{run_slug}/",
@@ -740,13 +764,6 @@ def page_wrapper(
             with gui.div(
                 className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
             ):
-                if not show_search_bar:
-                    render_header_link(
-                        url=get_route_path(explore_page),
-                        label="Explore",
-                        icon=icons.search,
-                    )
-
                 for url, label in settings.HEADER_LINKS:
                     render_header_link(
                         url=url, label=label, icon=settings.HEADER_ICONS.get(url)
@@ -782,7 +799,6 @@ def _render_mobile_search_button(request: Request, search_filters: SearchFilters
         gui.button(
             icons.search,
             type="tertiary",
-            unsafe_allow_html=True,
             className="m-0",
             onClick=JS_SHOW_MOBILE_SEARCH,
         )
@@ -851,11 +867,6 @@ def anonymous_login_container(request: Request, context: dict):
 
         gui.html('<hr class="my-1"/>')
 
-        workspace_selector_link(
-            url=get_route_path(explore_page),
-            label="Explore",
-            icon=icons.search,
-        )
         for url, label in settings.HEADER_LINKS:
             workspace_selector_link(
                 url=url, label=label, icon=settings.HEADER_ICONS.get(url)
@@ -876,9 +887,17 @@ class TabData(typing.NamedTuple):
     route: typing.Callable
 
 
+PREVIEW_ROUTE_WORKFLOWS = [Workflow.VIDEO_BOTS]
+
+
 class RecipeTabs(TabData, Enum):
+    preview = TabData(
+        title=f"<span class='mobile-only-recipe-tab'>{icons.preview} Preview</span>",
+        label="",
+        route=preview_route,
+    )
     run = TabData(
-        title=f"{icons.run} <span class='d-none d-lg-inline'>Run</span>",
+        title=f"{icons.run} Run",
         label="",
         route=recipe_or_handle_or_static,
     )
@@ -898,8 +917,8 @@ class RecipeTabs(TabData, Enum):
         route=history_route,
     )
     integrations = TabData(
-        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> <span class="d-none d-lg-inline">Integrations</span>',
-        label="Integrations",
+        title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',
+        label="Deploy",
         route=integrations_route,
     )
     saved = TabData(

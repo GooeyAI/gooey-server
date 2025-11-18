@@ -2,14 +2,15 @@
 
 set -ex
 
-if [ "$RUN_JUPYTER" ]; then
-  pip install jupyterlab
-  jupyter lab --allow-root --ip 0.0.0.0 --port 8000
+if [ "$RUN_LIVEKIT" ]; then
+  python livekit_agent.py download-files
+  SENTRY_ENVIRONMENT="livekit" exec python livekit_agent.py start
 elif [ "$RUN_DJANGO" ]; then
   ./manage.py runscript setup_vespa_db
   ./manage.py migrate
   ./manage.py collectstatic
   ./manage.py runscript init_llm_pricing
+  ./manage.py runscript init_ivr_pricing
   ./manage.py runscript init_image_generation_pricing
   SENTRY_ENVIRONMENT="django" exec gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads "${MAX_THREADS:-1}" --access-logfile -
 elif [ "$RUN_STREAMLIT" ]; then

@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from json import JSONDecodeError
+import random
 
 from celery import shared_task
 from django.db import transaction
@@ -16,6 +17,7 @@ from bots.models import (
     Message,
     Platform,
 )
+from daras_ai_v2.bots import save_msg_pair_to_db
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -180,9 +182,10 @@ def send_broadcast_msg(
     bi = BotIntegration.objects.get(id=bi_id)
     convos = Conversation.objects.filter(id__in=convo_ids)
     for convo in convos:
+        platform_msg_id = None
         match bi.platform:
             case Platform.WHATSAPP:
-                _msg_id = WhatsappBot.send_msg_to(
+                platform_msg_id = WhatsappBot.send_msg_to(
                     text=text,
                     audio=audio and [audio],
                     video=video and [video],
@@ -193,7 +196,7 @@ def send_broadcast_msg(
                     access_token=bi.wa_business_access_token,
                 )
             case Platform.SLACK:
-                _msg_id = SlackBot.send_msg_to(
+                platform_msg_id = SlackBot.send_msg_to(
                     text=text,
                     audio=audio and [audio],
                     video=video and [video],
@@ -206,14 +209,35 @@ def send_broadcast_msg(
                 )[0]
             case Platform.TWILIO:
                 if medium == "Voice Call":
-                    send_single_voice_call(convo, text, audio)
+                    platform_msg_id = send_single_voice_call(convo, text, audio).sid
                 else:
-                    send_sms_message(convo, text, media_url=audio)
+                    platform_msg_id = send_sms_message(
+                        client=bi.get_twilio_client(),
+                        bot_number=bi.twilio_phone_number.as_e164,
+                        user_number=convo.twilio_phone_number.as_e164,
+                        text=text,
+                        media_url=audio,
+                    ).sid
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"
                 )
-        # save_broadcast_message(convo, text, msg_id)
+        save_msg_pair_to_db(
+            bot_msg_id=platform_msg_id,
+            convo=convo,
+            user_msg_content=random.choice(
+                [
+                    "Hey, what's up?",
+                    "Hello there!",
+                    "Do you have any updates for me?",
+                    "Anything new?",
+                    "Whats new?",
+                    "Update me",
+                    "Load Messages",
+                ]
+            ),
+            bot_msg_content=text,
+        )
 
 
 @shared_task
@@ -229,18 +253,3 @@ def exec_scheduled_runs():
         sched.save(update_fields=["last_run_at"])
 
         logger.info(f"ran scheduled function {fn_sr.get_app_url()}")
-
-
-## Disabled for now to prevent messing up the chat history
-# def save_broadcast_message(convo: Conversation, text: str, msg_id: str | None = None):
-#     message = Message(
-#         conversation=convo,
-#         role=CHATML_ROLE_ASSISTANT,
-#         content=text,
-#         display_content=text,
-#         saved_run=None,
-#     )
-#     if msg_id:
-#         message.platform_msg_id = msg_id
-#     message.save()
-#     return message

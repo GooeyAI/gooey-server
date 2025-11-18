@@ -48,6 +48,13 @@ RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only
 # install playwright
 RUN poetry run playwright install-deps && poetry run playwright install chromium
 
+# Conditionally install mediapipe if RUN_LIVEKIT is not set
+ARG RUN_LIVEKIT=${RUN_LIVEKIT}
+ENV RUN_LIVEKIT=${RUN_LIVEKIT}
+RUN if [ -z "$RUN_LIVEKIT" ]; then \
+        poetry run pip install --no-cache-dir mediapipe; \
+    fi
+
 # copy the code into the container
 COPY . .
 
@@ -63,6 +70,7 @@ EXPOSE 8501
 HEALTHCHECK CMD \
     wget 127.0.0.1:8000 \
     || wget 127.0.0.1:8501 \
+    || wget 127.0.0.1:8081 \
     || bash -c 'poetry run celery -A celeryapp inspect ping -d celery@$HOSTNAME' \
     || exit 1
 

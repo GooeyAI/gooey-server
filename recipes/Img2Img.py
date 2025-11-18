@@ -223,6 +223,8 @@ class Img2ImgPage(BasePage):
                 unit_price = 10
             case Img2ImgModels.gpt_image_1.name:
                 unit_price = 45
+            case Img2ImgModels.nano_banana.name:
+                unit_price = 8
             case _:
                 unit_price = 5
 

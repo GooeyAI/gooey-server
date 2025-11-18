@@ -106,6 +106,7 @@ class CompareLLMPage(BasePage):
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
                 response_format_type=request.response_format_type,
+                reasoning_effort=request.reasoning_effort,
                 stream=True,
             )
             for i, entries in enumerate(ret):
@@ -119,7 +120,7 @@ class CompareLLMPage(BasePage):
         col1, col2 = gui.columns(2)
         with col1:
             gui.write("**Prompt**")
-            gui.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
+            gui.write("```jinja2\n" + str(state.get("input_prompt") or "") + "\n```")
             variables = state.get("variables") or {}
             for key, value in variables.items():
                 gui.text_area(f"`{key}`", value=str(value), disabled=True)

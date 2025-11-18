@@ -28,7 +28,7 @@ def render_author_as_breadcrumb(
             render_author_from_workspace(workspace, current_workspace=current_workspace)
 
         # don't render the user's name for examples and personal workspaces
-        if is_example or workspace.is_personal:
+        if is_example or not workspace or workspace.is_personal:
             return
 
         gui.html(icons.chevron_right)

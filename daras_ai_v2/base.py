@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import html
 import inspect
+import itertools
 import json
 import math
 import traceback
@@ -57,10 +58,20 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
-from functions.inbuilt_tools import get_inbuilt_tools_from_state
-from functions.models import FunctionTrigger, RecipeFunction, VariableSchema
+from functions.composio_tools import ComposioLLMTool
+from functions.inbuilt_tools import (
+    INBUILT_INTEGRATION_TOOLS,
+    get_inbuilt_tools_from_state,
+)
+from functions.models import (
+    FunctionScopes,
+    FunctionTrigger,
+    RecipeFunction,
+    VariableSchema,
+)
 from functions.recipe_functions import (
     BaseLLMTool,
+    WorkflowLLMTool,
     call_recipe_functions,
     functions_input,
     get_workflow_tools_from_state,
@@ -72,7 +83,7 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from payments.plans import PricingPlan
-from routers.root import RecipeTabs
+from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.base_header import (
     render_breadcrumbs_with_author,
@@ -152,7 +163,7 @@ class BasePage:
     class RequestModel(BaseModel):
         functions: list[RecipeFunction] | None = Field(
             None,
-            title="🧩 Developer Tools and Functions",
+            title="🛠️ Developer Tools and Functions",
         )
         variables: dict[str, typing.Any] | None = Field(
             None,
@@ -168,6 +179,7 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
+    price_deferred: bool = False
 
     def __init__(
         self,
@@ -393,29 +405,17 @@ class BasePage:
 
         header_placeholder = gui.div(className="my-3 w-100")
         with (
-            gui.styled(
-                """
-                @media (max-width: 768px) { 
-                    & button {
-                        font-size: 0.9rem; 
-                        padding: 0.3rem !important 
-                    }
-                }
-                & .nav-item {
-                    font-size: smaller;
-                    font-weight: bold;
-                }
-                & button {
-                    padding: 0.4rem !important;
-                }
-                """
-            ),
-            gui.div(className="position-relative"),
+            gui.styled(NAV_TABS_CSS),
+            gui.div(className="position-relative", id="recipe-nav-tabs"),
             gui.nav_tabs(),
         ):
             for tab in self.get_tabs():
                 url = self.current_app_url(tab)
-                with gui.nav_item(url, active=tab == self.tab):
+                if tab == RecipeTabs.run and self.tab == RecipeTabs.preview:
+                    force_active_lg = gui.tag("span", className="active-lg")
+                else:
+                    force_active_lg = gui.dummy()
+                with force_active_lg, gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
                 self._render_saved_generated_timestamp()
@@ -430,12 +430,11 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
-        is_root_example = is_example and pr.is_root()
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
 
-        if self.tab != RecipeTabs.run:
+        if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
             # Examples, API, Saved, etc
             if self.tab == RecipeTabs.saved or self.tab == RecipeTabs.history:
                 with gui.div(className="mb-2"):
@@ -487,7 +486,6 @@ class BasePage:
                         self.render_header_extra()
                         render_breadcrumbs_with_author(
                             tbreadcrumbs,
-                            is_root_example=is_root_example,
                             user=self.current_sr_user,
                             pr=self.current_pr,
                             sr=self.current_sr,
@@ -538,7 +536,7 @@ class BasePage:
 
     def _render_saved_generated_timestamp(self):
         sr, pr = self.current_sr_pr
-        if not (pr and self.tab == RecipeTabs.run):
+        if not (pr and (self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview)):
             return
         if pr.saved_run_id == sr.id or pr.is_root():
             dt = pr.updated_at
@@ -612,7 +610,7 @@ class BasePage:
         ):
             publish_dialog_ref = gui.use_alert_dialog(key="publish-modal")
 
-            if self.tab == RecipeTabs.run:
+            if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
                 if self.current_pr.is_root():
                     render_help_button(self.workflow)
                 if self.is_logged_in():
@@ -728,17 +726,20 @@ class BasePage:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="secondary",
+                        key="save_published_run_as_new",
                         className="mb-0 py-2 px-4",
                     )
                     pressed_save = gui.button(
                         f"{icons.save} Save",
                         type="primary",
+                        key="save_published_run",
                         className="mb-0 ms-2 py-2 px-4",
                     )
                 else:
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="primary",
+                        key="save_published_run",
                         className="mb-0 py-2 px-4",
                     )
                     pressed_save = False
@@ -1176,38 +1177,15 @@ class BasePage:
 
     def render_selected_tab(self):
         match self.tab:
-            case RecipeTabs.run:
+            case RecipeTabs.run | RecipeTabs.preview:
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                     return
 
-                if self.is_current_user_admin():
-                    render_gooey_builder(
-                        page_slug=self.slug_versions[-1],
-                        saved_state={
-                            k: v
-                            for k, v in gui.session_state.items()
-                            if k in self.fields_to_save()
-                        },
-                        builder_state=dict(
-                            status=dict(
-                                error_msg=gui.session_state.get(StateKeys.error_msg),
-                                run_status=gui.session_state.get(StateKeys.run_status),
-                                run_time=gui.session_state.get(StateKeys.run_time),
-                            ),
-                            request=extract_model_fields(
-                                model=self.RequestModel, state=gui.session_state
-                            ),
-                            response=extract_model_fields(
-                                model=self.ResponseModel, state=gui.session_state
-                            ),
-                        ),
-                    )
+                self._render_gooey_builder()
 
-                with gui.styled(OUTPUT_TABS_CSS):
-                    output_col, input_col = gui.tabs(
-                        [f"{icons.preview} Preview", f"{icons.edit} Edit"]
-                    )
+                with gui.styled(INPUT_OUTPUT_COLS_CSS):
+                    input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
                         submitted = self._render_input_col()
                     with output_col:
@@ -1232,6 +1210,46 @@ class BasePage:
 
             case RecipeTabs.saved:
                 self._saved_tab()
+
+    def _render_gooey_builder(self):
+        update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
+        if update_gui_state:
+            new_state = (
+                {
+                    k: v
+                    for k, v in gui.session_state.items()
+                    if k in self.fields_to_save()
+                }
+                | {
+                    "--has-request-changed": True,
+                }
+                | update_gui_state
+            )
+            gui.session_state.clear()
+            gui.session_state.update(new_state)
+
+        if not self.is_current_user_admin():
+            return
+        render_gooey_builder(
+            page_slug=self.slug_versions[-1],
+            builder_state=dict(
+                status=dict(
+                    error_msg=gui.session_state.get(StateKeys.error_msg),
+                    run_status=gui.session_state.get(StateKeys.run_status),
+                    run_time=gui.session_state.get(StateKeys.run_time),
+                ),
+                request=extract_model_fields(
+                    model=self.RequestModel, state=gui.session_state
+                ),
+                response=extract_model_fields(
+                    model=self.ResponseModel, state=gui.session_state
+                ),
+                metadata=dict(
+                    title=self.current_pr.title,
+                    description=self.current_pr.notes,
+                ),
+            ),
+        )
 
     def _render_version_history(self):
         versions = self.current_pr.versions.all()
@@ -1411,21 +1429,50 @@ class BasePage:
 
     def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
         return {
-            tool.name: tool.bind(
-                saved_run=self.current_sr,
-                workspace=self.current_workspace,
-                current_user=self.request.user,
-                request_model=self.RequestModel,
-                response_model=self.ResponseModel,
-                state=gui.session_state,
-                trigger=FunctionTrigger.prompt,
+            tool.name: self.bind_tool(tool)
+            for tool in itertools.chain(
+                get_workflow_tools_from_state(
+                    gui.session_state, FunctionTrigger.prompt
+                ),
+                get_inbuilt_tools_from_state(gui.session_state),
             )
-            for tool in get_workflow_tools_from_state(
-                gui.session_state, FunctionTrigger.prompt
-            )
-        } | {
-            tool.name: tool for tool in get_inbuilt_tools_from_state(gui.session_state)
         }
+
+    def bind_tool(self, tool: BaseLLMTool) -> BaseLLMTool:
+        match tool:
+            case WorkflowLLMTool():
+                return tool.bind(
+                    saved_run=self.current_sr,
+                    workspace=self.current_workspace,
+                    current_user=self.request.user,
+                    request_model=self.RequestModel,
+                    response_model=self.ResponseModel,
+                    state=gui.session_state,
+                    trigger=FunctionTrigger.prompt,
+                )
+            case ComposioLLMTool():
+                return tool.bind(
+                    user_id=FunctionScopes.get_user_id_for_scope(
+                        tool.scope,
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        published_run=self.current_pr,
+                    ),
+                    redirect_url=self.current_app_url(
+                        query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
+                    ),
+                )
+            case _ if tool.name in INBUILT_INTEGRATION_TOOLS:
+                return tool.bind(
+                    user_id=FunctionScopes.get_user_id_for_scope(
+                        tool.scope,
+                        workspace=self.current_workspace,
+                        user=self.request.user,
+                        published_run=self.current_pr,
+                    ),
+                )
+            case _:
+                return tool
 
     @cached_property
     def current_workspace(self) -> Workspace:
@@ -1600,7 +1647,6 @@ class BasePage:
                     f"{icons.run} Run",
                     key=key,
                     type="primary",
-                    unsafe_allow_html=True,
                     className="my-0 py-2",
                     # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
@@ -1618,9 +1664,18 @@ class BasePage:
     run_cost_line_clamp: int = 1
 
     def render_run_cost(self):
+        gui.caption(
+            self.get_run_cost_display(),
+            line_clamp=self.run_cost_line_clamp,
+            unsafe_allow_html=True,
+        )
+
+    def get_run_cost_display(self) -> str:
         url = self.get_credits_click_url()
         if self.current_sr.price and not self._has_request_changed():
             run_cost = self.current_sr.price
+        elif self.price_deferred:
+            return "Run cost = Calculating..."
         else:
             run_cost = self.get_price_roundoff(gui.session_state)
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
@@ -1633,7 +1688,7 @@ class BasePage:
         if additional_notes:
             ret += f" \n{additional_notes}"
 
-        gui.caption(ret, line_clamp=self.run_cost_line_clamp, unsafe_allow_html=True)
+        return ret
 
     def _render_step_row(self):
         key = "details-expander"
@@ -1765,36 +1820,55 @@ class BasePage:
     show_settings = True
 
     def _render_input_col(self):
-        self.render_form_v2()
-        placeholder = gui.div()
+        if self.tab == RecipeTabs.preview:
+            hide_on_mobile = "d-none d-lg-block"
+        else:
+            hide_on_mobile = ""
+        with gui.div(className=hide_on_mobile):
+            self.render_form_v2()
+            placeholder = gui.div()
 
-        if self.show_settings:
-            with gui.div(className="bg-white"):
-                with gui.expander("⚙️ Settings"):
+            if self.show_settings:
+                with gui.div(className="bg-white mt-2"), gui.expander("⚙️ Settings"):
                     self.render_settings()
                     if self.functions_in_settings:
-                        functions_input(self.request.user)
+                        functions_input(
+                            workspace=self.request.user and self.current_workspace,
+                            user=self.request.user,
+                            published_run=self.current_pr,
+                        )
 
-        with placeholder:
-            self.render_variables()
+            with placeholder:
+                self.render_variables()
 
-        submitted = self.render_submit_button()
-        with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
-            terms_caption = self.get_terms_caption()
-            gui.caption(f"_{terms_caption}_")
+            submitted = self.render_submit_button()
+            with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
+                terms_caption = self.get_terms_caption()
+                gui.caption(f"_{terms_caption}_")
 
-        return submitted
+            return submitted
 
     def get_terms_caption(self):
         return "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
 
     def render_variables(self):
         if not self.functions_in_settings:
-            functions_input(self.request.user)
+            functions_input(
+                workspace=self.request.user and self.current_workspace,
+                user=self.request.user,
+                published_run=self.current_pr,
+            )
+
+        function_slugs = [
+            slug
+            for fn in gui.session_state.get("functions", [])
+            if (slug := fn.get("slug"))
+        ]
+
         variables_input(
             template_keys=self.template_keys,
             allow_add=is_functions_enabled(),
-            exclude=self.fields_to_save(),
+            exclude=self.fields_to_save() + function_slugs,
         )
 
     @classmethod
@@ -1835,7 +1909,13 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
-        with gui.div(style=dict(position="sticky", top="0.5rem")):
+        if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            hide_on_mobile = "d-none d-lg-block pb-2"
+        else:
+            hide_on_mobile = ""
+        with gui.div(
+            style=dict(position="sticky", top="0.5rem"), className=hide_on_mobile
+        ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
                 self._render_failed_output()
@@ -1847,9 +1927,8 @@ class BasePage:
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
                 self.click_preview_tab()
                 self._render_running_output()
-            else:
-                if not is_deleted:
-                    self._render_after_output()
+            elif not is_deleted:
+                self._render_after_output()
 
     def _render_failed_output(self):
         err_msg = gui.session_state.get(StateKeys.error_msg)
@@ -1908,7 +1987,11 @@ class BasePage:
         sr = self.on_submit(unsaved_state=unsaved_state)
         if not sr:
             return
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
+        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            tab = RecipeTabs.preview
+        else:
+            tab = None
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -2558,36 +2641,76 @@ class TitleValidationError(Exception):
     pass
 
 
-OUTPUT_TABS_CSS = """
-& [data-reach-tab-list] {  
-    text-align: center; margin-top: 0 
+INPUT_OUTPUT_COLS_CSS = """
+& {
+    margin: -1rem 0 1rem 0;
+    padding-top: 1rem;
 }
+
+/* reset col padding in mobile */
+& > div {
+    padding: 0; 
+}
+
 @media (min-width: 768px) {
-    & [data-reach-tab-list] {
-        display: none;
-    }
-    & [data-reach-tab-panels] {
-        display: flex;
-        flex-direction: row-reverse;
-        width: 100%;
+    & {
         background-color: #f9f9f9;
-        padding: 10px;
-        margin-top: -1rem;
     }
-    & [data-reach-tab-panels] > div:nth-child(2) {
-        flex: 0 1 auto;
-        width: 60%;
-        max-width: 100%;
-        padding-right: 0.75rem;
+    /* set col padding in mobile */
+    & > div {
+        padding-left: calc(var(--bs-gutter-x) * .5);
+        padding-right: calc(var(--bs-gutter-x) * .5);
     }
-    & [data-reach-tab-panels] > div:nth-child(1) {
-        flex: 0 0 auto;
-        width: 40%;
-        max-width: 100%;
-        padding-left: 0.75rem;
+}
+"""
+
+NAV_TABS_CSS = """
+@media (max-width: 768px) { 
+    & button {
+        font-size: 0.9rem; 
+        padding: 0.3rem !important 
     }
-    & [data-reach-tab-panel][hidden] {
-        display: block !important;
+}
+& .nav-item {
+    font-size: smaller;
+    font-weight: bold;
+}
+& button {
+    padding: 0.4rem !important;
+}
+
+& a:has(span.mobile-only-recipe-tab) {
+    display: block !important;
+}
+
+& li.nav-item:first-of-type button {
+    margin-left: 0 !important;
+}
+
+& ul.nav-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap !important;
+    display: flex;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.5rem;
+}
+
+@media (min-width: 992px) {
+    & a:has(span.mobile-only-recipe-tab) {
+        display: none !important;
+    }
+
+    /* RUN as active tab in lg view for preview route */
+    & span.active-lg button {
+        color: #000;
+        border-bottom: 2px solid black;
+    }
+
+    & ul.nav-tabs {
+        gap: 0;
     }
 }
 """

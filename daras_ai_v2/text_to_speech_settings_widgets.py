@@ -20,6 +20,21 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 
+class TTSProvider(typing.NamedTuple):
+    value: str
+    sample_rate: int
+
+
+class TextToSpeechProviders(TTSProvider, GooeyEnum):
+    GOOGLE_TTS = TTSProvider(value="Google Text-to-Speech", sample_rate=24000)
+    ELEVEN_LABS = TTSProvider(value="Eleven Labs", sample_rate=44100)
+    UBERDUCK = TTSProvider(value="Uberduck.ai", sample_rate=22050)
+    BARK = TTSProvider(value="Bark (suno-ai)", sample_rate=24000)
+    AZURE_TTS = TTSProvider(value="Azure Text-to-Speech", sample_rate=16000)
+    OPEN_AI = TTSProvider(value="OpenAI", sample_rate=24000)
+    GHANA_NLP = TTSProvider(value="GhanaNLP Text-To-Speech", sample_rate=16000)
+
+
 UBERDUCK_VOICES = {
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
     "Angus": "7d29a280-8a3e-4c4b-9df4-cbe77e8f4a63",
@@ -64,16 +79,6 @@ class OpenAI_TTS_Voices(OpenAI_Voice, GooeyEnum):
 
 class GHANA_NLP_TTS_LANGUAGES(GooeyEnum):
     tw = "Twi"
-
-
-class TextToSpeechProviders(Enum):
-    GOOGLE_TTS = "Google Text-to-Speech"
-    ELEVEN_LABS = "Eleven Labs"
-    UBERDUCK = "Uberduck.ai"
-    BARK = "Bark (suno-ai)"
-    AZURE_TTS = "Azure Text-to-Speech"
-    OPEN_AI = "OpenAI"
-    GHANA_NLP = "GhanaNLP Text-To-Speech"
 
 
 # This exists only for backwards compatiblity

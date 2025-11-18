@@ -2,9 +2,9 @@ import json
 import math
 import typing
 from itertools import zip_longest
-import typing_extensions
 
 import gooey_gui as gui
+import typing_extensions
 from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
@@ -19,6 +19,9 @@ from bots.models import (
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import truncate_text_words
+from daras_ai_v2.exceptions import UserError
+from functions.recipe_functions import BaseLLMTool
+from payments.plans import PricingPlan
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
@@ -57,7 +60,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -110,15 +112,21 @@ from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
-    render_called_functions,
+    render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
 from url_shortener.models import ShortenedURL
+from usage_costs.twilio_usage_cost import (
+    get_non_ivr_price_credits,
+    get_ivr_price_credits_and_seconds,
+)
+from widgets.switch_with_section import switch_with_section
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
+from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
 GRAYCOLOR = "#00000073"
 DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
@@ -313,6 +321,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             deprecated=True,
         )
 
+        bulk_runs: list[str] | None = Field(
+            None,
+            title="Bulk Evaluation",
+            description="Add a [bulk](https://gooey.ai/bulk-runner) workflow with your golden evaluation data to rate workflows on cost, speed and latency.",
+        )
+
     class RequestModel(
         LipsyncSettings, TextToSpeechSettings, LanguageModelSettings, RequestModelBase
     ):
@@ -340,752 +354,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         reply_buttons: list[ReplyButton] | None = None
 
         finish_reason: list[str] | None = None
-
-    def related_workflows(self):
-        from recipes.CompareText2Img import CompareText2ImgPage
-        from recipes.DeforumSD import DeforumSDPage
-        from recipes.DocSearch import DocSearchPage
-        from recipes.LipsyncTTS import LipsyncTTSPage
-
-        return [
-            LipsyncTTSPage,
-            DocSearchPage,
-            DeforumSDPage,
-            CompareText2ImgPage,
-        ]
-
-    @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
-        import langcodes
-
-        if pr and pr.title and not pr.is_root():
-            return pr.title
-
-        try:
-            lang = langcodes.Language.get(
-                sr.state.get("user_language") or sr.state.get("asr_language") or ""
-            ).display_name()
-        except (KeyError, langcodes.LanguageTagError):
-            lang = None
-
-        return " ".join(filter(None, [lang, cls.get_recipe_title()]))
-
-    @classmethod
-    def get_prompt_title(cls, state: dict) -> str | None:
-        # don't show the input prompt in the run titles, instead show get_run_title()
-        return None
-
-    def render_description(self):
-        gui.write(
-            """
-Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
-
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot's face and  voice settings.
-
-We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
-
-How It Works:
-1. Appends the user's question to the bottom of your dialog script.
-2. Sends the appended script to OpenAI's GPT3 asking it to respond to the question in the style of your character
-3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
-4. Lip syncs the face video clip to the voice clip
-5. Shows the resulting video to the user
-
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
-        """
-        )
-
-    def render_form_v2(self):
-        gui.code_editor(
-            label=(
-                '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
-                + field_title(self.RequestModel, "bot_script")
-            ),
-            key="bot_script",
-            language="jinja",
-            style=dict(maxHeight="50vh"),
-            help=field_desc(self.RequestModel, "bot_script"),
-        )
-        render_prompt_library()
-
-        language_model = language_model_selector(
-            label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
-        )
-
-        if not LargeLanguageModels[language_model].is_audio_model:
-            bulk_documents_uploader(
-                label=(
-                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
-                    + field_title(self.RequestModel, "documents")
-                ),
-                accept=["audio/*", "application/*", "video/*", "text/*"],
-                help=field_desc(self.RequestModel, "documents"),
-            )
-
-        gui.markdown("#### 💪 Capabilities")
-
-        if gui.switch(
-            "##### 🦻 Speech Recognition & Translation",
-            value=bool(
-                gui.session_state.get("user_language")
-                or gui.session_state.get("asr_model")
-            ),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                gui.caption(field_desc(self.RequestModel, "user_language"))
-
-                # drop down to filter models based on the selected language
-                selected_filter_language = language_filter_selector(
-                    options=asr_languages_without_dialects()
-                )
-
-                col1, col2 = gui.columns(2, responsive=False)
-                with col1:
-                    asr_model = asr_model_selector(
-                        key="asr_model",
-                        language_filter=selected_filter_language,
-                        label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                        format_func=lambda x: (
-                            AsrModels[x].value if x else "Auto Select"
-                        ),
-                    )
-                with col2:
-                    if asr_model:
-                        asr_language = asr_language_selector(
-                            asr_model,
-                            language_filter=selected_filter_language,
-                            label=f"###### {field_title(self.RequestModel, 'asr_language')}",
-                            key="asr_language",
-                        )
-                    else:
-                        asr_language = None
-
-                if asr_model.supports_input_prompt():
-                    gui.text_area(
-                        f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
-                        key="asr_prompt",
-                        value="Transcribe the recording as accurately as possible.",
-                        height=300,
-                    )
-
-                gui.newline()
-                if gui.checkbox(
-                    "🔠 **Translate to & from English**",
-                    value=bool(gui.session_state.get("translation_model")),
-                ):
-                    gui.caption(
-                        "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
-                    )
-
-                    if asr_model and asr_model.supports_speech_translation():
-                        with gui.div(className="text-muted"):
-                            if gui.checkbox(
-                                label=field_desc(self.RequestModel, "asr_task").format(
-                                    asr_model=asr_model.value,
-                                    asr_language=asr_language or "Detected Language",
-                                ),
-                                value=gui.session_state.get("asr_task") == "translate",
-                            ):
-                                gui.session_state["asr_task"] = "translate"
-                            else:
-                                gui.session_state.pop("asr_task", None)
-                    else:
-                        gui.session_state.pop("asr_task", None)
-
-                    col1, col2 = gui.columns(2)
-                    with col1:
-                        translation_model = translation_model_selector(
-                            allow_none=False,
-                            language_filter=selected_filter_language,
-                        )
-                    with col2:
-                        translation_language_selector(
-                            model=translation_model,
-                            language_filter=selected_filter_language,
-                            label=f"###### {field_title(self.RequestModel, 'user_language')}",
-                            key="user_language",
-                        )
-                else:
-                    gui.session_state["asr_task"] = None
-                    gui.session_state["translation_model"] = None
-                    gui.session_state["user_language"] = None
-
-                gui.newline()
-        else:
-            gui.session_state["asr_model"] = None
-            gui.session_state["asr_language"] = None
-            gui.session_state["asr_prompt"] = None
-
-            gui.session_state["asr_task"] = None
-            gui.session_state["translation_model"] = None
-            gui.session_state["user_language"] = None
-
-        if gui.switch(
-            "##### 🗣️ Text to Speech & Lipsync",
-            value=bool(gui.session_state.get("tts_provider")),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                text_to_speech_provider_selector(self)
-
-            gui.newline()
-
-            enable_video = gui.switch(
-                "##### 🫦 Add Lipsync Video",
-                value=bool(gui.session_state.get("input_face")),
-            )
-        else:
-            gui.session_state["tts_provider"] = None
-            enable_video = False
-        if enable_video:
-            with gui.div(className="pt-2 ps-1"):
-                gui.file_uploader(
-                    """
-                    ###### 👩‍🦰 Input Face
-                    Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
-                    """,
-                    key="input_face",
-                )
-                enum_selector(
-                    LipsyncModel,
-                    label="###### Lipsync Model",
-                    key="lipsync_model",
-                    use_selectbox=True,
-                )
-            gui.newline()
-        else:
-            gui.session_state["input_face"] = None
-            gui.session_state.pop("lipsync_model", None)
-
-        if gui.switch(
-            "##### 🩻 Photo & Document Intelligence",
-            value=bool(gui.session_state.get("document_model")),
-        ):
-            with gui.div(className="pt-2 ps-1"):
-                if settings.AZURE_FORM_RECOGNIZER_KEY:
-                    doc_model_descriptions = azure_form_recognizer_models()
-                else:
-                    doc_model_descriptions = {}
-                gui.selectbox(
-                    f"{field_desc(self.RequestModel, 'document_model')}",
-                    key="document_model",
-                    options=doc_model_descriptions,
-                    format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
-                )
-            gui.newline()
-        else:
-            gui.session_state["document_model"] = None
-
-    def validate_form_v2(self):
-        input_glossary = gui.session_state.get("input_glossary_document", "")
-        output_glossary = gui.session_state.get("output_glossary_document", "")
-        if input_glossary:
-            validate_glossary_document(input_glossary)
-        if output_glossary:
-            validate_glossary_document(output_glossary)
-
-    def render_usage_guide(self):
-        youtube_video("-j2su1r8pEg")
-
-    def render_settings(self):
-        tts_provider = gui.session_state.get("tts_provider")
-        if tts_provider:
-            text_to_speech_settings(self, tts_provider)
-            gui.write("---")
-
-        lipsync_model = gui.session_state.get("lipsync_model")
-        if lipsync_model:
-            lipsync_settings(lipsync_model)
-            gui.write("---")
-
-        translation_model = gui.session_state.get(
-            "translation_model", DEFAULT_TRANSLATION_MODEL
-        )
-        if (
-            gui.session_state.get("user_language")
-            and TranslationModels[translation_model].supports_glossary
-        ):
-            gui.markdown("##### 🔠 Translation Settings")
-            enable_glossary = gui.checkbox(
-                "📖 Add Glossary",
-                value=bool(
-                    gui.session_state.get("input_glossary_document")
-                    or gui.session_state.get("output_glossary_document")
-                ),
-                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!",
-            )
-            if enable_glossary:
-                gui.caption(
-                    """
-                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
-                    """
-                )
-                gui.file_uploader(
-                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-                    key="input_glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
-                )
-                gui.file_uploader(
-                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-                    key="output_glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
-                )
-            else:
-                gui.session_state["input_glossary_document"] = None
-                gui.session_state["output_glossary_document"] = None
-            gui.write("---")
-
-        documents = gui.session_state.get("documents")
-        if documents:
-            gui.write("#### 📄 Knowledge Base")
-            gui.text_area(
-                "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
-                help=field_desc(self.RequestModel, "task_instructions"),
-                key="task_instructions",
-                height=300,
-            )
-
-            citation_style_selector()
-            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
-            cache_knowledge_widget(self)
-            doc_extract_selector(self.request.user)
-
-            gui.write("---")
-
-        gui.markdown(
-            """
-            #### Advanced Settings
-            In general, you should not need to adjust these.
-            """
-        )
-
-        if documents:
-            query_instructions_widget()
-            keyword_instructions_widget()
-            gui.write("---")
-            doc_search_advanced_settings()
-            gui.write("---")
-
-        gui.write("##### 🔠 Language Model Settings")
-        language_model_settings(gui.session_state.get("selected_model"))
-
-    def run_as_api_tab(self):
-        elevenlabs_load_state(self)
-        super().run_as_api_tab()
-
-    @classmethod
-    def get_example_preferred_fields(cls, state: dict) -> list[str]:
-        return ["input_prompt", "messages"]
-
-    def render_run_preview_output(self, state: dict):
-        input_prompt = state.get("input_prompt")
-        if input_prompt:
-            gui.write(
-                "**Prompt**\n```properties\n"
-                + truncate_text_words(input_prompt, maxlen=200)
-                + "\n```"
-            )
-
-        gui.write("**Response**")
-
-        output_video = state.get("output_video")
-        if output_video:
-            gui.video(output_video[0], autoplay=True)
-
-        output_text = state.get("output_text")
-        if output_text:
-            gui.write(output_text[0], line_clamp=5)
-
-    scroll_into_view = False
-
-    def _render_running_output(self):
-        ## The embedded web widget includes a running output, so just scroll it into view
-
-        # language=JavaScript
-        gui.js(
-            """
-            let elem = document.querySelector("#gooey-embed");
-            if (!elem) return;
-            if (elem.scrollIntoViewIfNeeded) {
-                elem.scrollIntoViewIfNeeded(false);
-            } else {
-                elem.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-            """
-        )
-
-    def render_output(self):
-        from daras_ai_v2.bots import parse_bot_html
-
-        gui.tag(
-            "button",
-            type="submit",
-            name="onSendMessage",
-            hidden=True,
-            id="onSendMessage",
-        )
-        input_payload = gui.session_state.pop("onSendMessage", None)
-        if input_payload:
-            try:
-                input_data = json.loads(input_payload)
-            except (json.JSONDecodeError, TypeError):
-                pass
-            else:
-                self.on_send(
-                    input_data.get("input_prompt"),
-                    input_data.get("input_images"),
-                    input_data.get("input_audio"),
-                    input_data.get("input_documents"),
-                    input_data.get("button_pressed"),
-                    input_data.get("input_location"),
-                )
-
-        gui.tag(
-            "button",
-            type="submit",
-            name="onNewConversation",
-            value="yes",
-            hidden=True,
-            id="onNewConversation",
-        )
-        if gui.session_state.pop("onNewConversation", None):
-            gui.session_state["messages"] = []
-            gui.session_state["input_prompt"] = ""
-            gui.session_state["input_images"] = None
-            gui.session_state["input_audio"] = None
-            gui.session_state["input_documents"] = None
-            gui.session_state["raw_input_text"] = ""
-            self.clear_outputs()
-            gui.session_state["final_keyword_query"] = ""
-            gui.session_state["final_search_query"] = ""
-            gui.rerun()
-
-        messages = []  # chat widget internal mishmash format
-        input_audio = gui.session_state.get("input_audio") or ""
-        input_images = gui.session_state.get("input_images") or []
-        input_documents = gui.session_state.get("input_documents") or []
-
-        if is_realtime_audio_url(input_audio):
-            entries = gui.session_state.get("final_prompt", []).copy()
-            input_audio = ""  # dont render ws audio url in chat widget
-        else:
-            entries = gui.session_state.get("messages", []).copy()
-
-        for entry in entries:
-            role = entry.get("role")
-            if role == CHATML_ROLE_USER:
-                messages.append(
-                    dict(
-                        role=role,
-                        input_prompt=get_entry_text(entry),
-                        input_images=get_entry_images(entry) or [],
-                    )
-                )
-            elif role == CHATML_ROLE_ASSISTANT:
-                messages.append(
-                    dict(
-                        role=role,
-                        type="final_response",
-                        status="completed",
-                        output_text=[parse_bot_html(get_entry_text(entry))[1]],
-                    )
-                )
-
-        # add last input to history if present
-        show_raw_msgs = False
-        if show_raw_msgs:
-            input_prompt = gui.session_state.get("raw_input_text") or ""
-        else:
-            input_prompt = gui.session_state.get("input_prompt") or ""
-
-        if input_prompt or input_images or input_audio or input_documents:
-            messages.append(
-                dict(
-                    role=CHATML_ROLE_USER,
-                    input_prompt=input_prompt,
-                    input_images=input_images,
-                    input_audio=input_audio,
-                    input_documents=input_documents,
-                ),
-            )
-
-            # add last output
-            run_status = self.get_run_state(gui.session_state)
-            if run_status == RecipeRunState.running:
-                event_type = "message_part"
-            elif run_status == RecipeRunState.failed:
-                event_type = "error"
-            else:
-                event_type = "final_response"
-            raw_output_text = gui.session_state.get("raw_output_text") or []
-            output_text = gui.session_state.get("output_text") or []
-            output_video = gui.session_state.get("output_video") or []
-            output_audio = gui.session_state.get("output_audio") or []
-            text = output_text and output_text[0] or ""
-            if text:
-                buttons, text, disable_feedback = parse_bot_html(text)
-            else:
-                buttons = []
-            messages.append(
-                dict(
-                    role=CHATML_ROLE_ASSISTANT,
-                    type=event_type,
-                    status=run_status,
-                    detail=gui.session_state.get(StateKeys.run_status) or "",
-                    raw_output_text=raw_output_text,
-                    output_text=[text],
-                    text=text,
-                    output_video=output_video,
-                    output_audio=output_audio,
-                    references=gui.session_state.get("references") or [],
-                    buttons=buttons,
-                )
-            )
-
-        # fill branding with bot integration data if available
-        bot_integration = (
-            BotIntegration.objects.filter(
-                published_run=self.current_pr,
-                platform=Platform.WEB,
-            )
-            .order_by("-updated_at")
-            .first()
-        )
-        if bot_integration:
-            bot_branding = bot_integration.get_web_widget_branding()
-            if self.current_pr.photo_url:
-                bot_branding["photoUrl"] = self.current_pr.photo_url
-        else:
-            bot_branding = dict(
-                name=self.current_pr.title,
-                photoUrl=self.current_pr.photo_url,
-                title=self.current_pr.title,
-            )
-        bot_branding["showPoweredByGooey"] = False
-        gui.html(
-            # language=html
-            f"""
-<div id="gooey-embed" className="border rounded py-1 mb-3 bg-white" style="height: 98vh"></div>
-<script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
-            """
-        )
-        gui.js(
-            # language=javascript
-            """
-async function loadGooeyEmbed() {
-    await window.waitUntilHydrated;
-    if (typeof GooeyEmbed === "undefined" ||
-        document.getElementById("gooey-embed")?.children.length)
-        return;
-    let controller = {
-        messages,
-        onSendMessage: (payload) => {
-            let btn = document.getElementById("onSendMessage");
-            if (!btn) return;
-            btn.value = JSON.stringify(payload);
-            btn.click();
-        },
-        onNewConversation() {
-          document.getElementById("onNewConversation").click();
-        },
-    };
-    GooeyEmbed.controller = controller;
-    GooeyEmbed.mount(config, controller);
-}
-
-const script = document.getElementById("gooey-embed-script");
-if (script) script.onload = loadGooeyEmbed;
-loadGooeyEmbed();
-window.addEventListener("hydrated", loadGooeyEmbed);
-
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
-    GooeyEmbed.controller.setMessages?.(messages);
-}
-            """,
-            config=dict(
-                integration_id="magic",
-                target="#gooey-embed",
-                mode="inline",
-                enableAudioMessage=True,
-                enablePhotoUpload=True,
-                enableConversations=False,
-                branding=bot_branding,
-                fillParent=True,
-                secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
-            ),
-            messages=messages,
-        )
-
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
-        render_called_functions(
-            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
-        )
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
-
-    def _render_regenerate_button(self):
-        pass
-
-    def on_send(
-        self,
-        new_input_prompt: str | None,
-        new_input_images: list[str] | None,
-        new_input_audio: str | None,
-        new_input_documents: list[str] | None,
-        button_pressed: list[str] | None,
-        input_location: dict[str, float] | None,
-    ):
-        if button_pressed:
-            # encoded by parse_html
-            target, title = None, None
-            parts = csv_decode_row(button_pressed.get("button_id", ""))
-            if len(parts) >= 3:
-                target = parts[1]
-                title = parts[-1]
-            value = title or button_pressed.get("button_title", "")
-            if target and target != "input_prompt":
-                gui.session_state[target] = value
-            else:
-                new_input_prompt = value
-
-        if input_location:
-            from daras_ai_v2.bots import handle_location_msg
-
-            new_input_prompt = handle_location_msg(input_location)
-
-        prev_input = gui.session_state.get("raw_input_text") or ""
-        prev_output = (gui.session_state.get("raw_output_text") or [""])[0]
-        prev_input_images = gui.session_state.get("input_images")
-        prev_input_audio = gui.session_state.get("input_audio")
-        prev_input_documents = gui.session_state.get("input_documents")
-
-        if (
-            prev_input or prev_input_images or prev_input_audio or prev_input_documents
-        ) and prev_output:
-            # append previous input to the history
-            gui.session_state["messages"] = gui.session_state.get("messages", []) + [
-                format_chat_entry(
-                    role=CHATML_ROLE_USER,
-                    content_text=prev_input,
-                    input_images=prev_input_images,
-                    input_audio=prev_input_audio,
-                    input_documents=prev_input_documents,
-                ),
-                format_chat_entry(
-                    role=CHATML_ROLE_ASSISTANT,
-                    content_text=prev_output,
-                ),
-            ]
-
-        # add new input to the state
-        gui.session_state["input_prompt"] = new_input_prompt
-        gui.session_state["input_audio"] = new_input_audio or None
-        gui.session_state["input_images"] = new_input_images or None
-        gui.session_state["input_documents"] = new_input_documents or None
-
-        self.submit_and_redirect()
-
-    def render_steps(self):
-        if gui.session_state.get("tts_provider"):
-            gui.video(gui.session_state.get("input_face"), caption="Input Face")
-
-        final_search_query = gui.session_state.get("final_search_query")
-        if final_search_query:
-            gui.text_area(
-                "###### `final_search_query`", value=final_search_query, disabled=True
-            )
-
-        final_keyword_query = gui.session_state.get("final_keyword_query")
-        if final_keyword_query:
-            if isinstance(final_keyword_query, list):
-                gui.write("###### `final_keyword_query`")
-                gui.json(final_keyword_query)
-            else:
-                gui.text_area(
-                    "###### `final_keyword_query`",
-                    value=str(final_keyword_query),
-                    disabled=True,
-                )
-
-        references = gui.session_state.get("references", [])
-        if references:
-            gui.write("###### `references`")
-            gui.json(references, collapseStringsAfterLength=False)
-
-        tools = list(
-            get_inbuilt_tools_from_state(gui.session_state),
-        )
-        if gui.session_state.get("functions"):
-            try:
-                tools += list(
-                    get_workflow_tools_from_state(
-                        gui.session_state, FunctionTrigger.prompt
-                    ),
-                )
-            except Exception:
-                pass
-        if tools:
-            gui.write(f"🧩 `{FunctionTrigger.prompt.name} functions`")
-            gui.json(
-                [tool.spec_function for tool in tools],
-                depth=3,
-                collapseStringsAfterLength=False,
-            )
-
-        final_prompt = gui.session_state.get("final_prompt")
-        if final_prompt:
-            if isinstance(final_prompt, str):
-                text_output("###### `final_prompt`", value=final_prompt, height=300)
-            else:
-                gui.write(
-                    '###### <i class="fa-sharp fa-light fa-rectangle-terminal"></i> `final_prompt`',
-                    unsafe_allow_html=True,
-                )
-                gui.json(final_prompt, depth=5)
-
-        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
-            for idx, text in enumerate(gui.session_state.get(k) or []):
-                gui.text_area(
-                    f"###### 📜 `{k}[{idx}]`",
-                    value=text,
-                    disabled=True,
-                )
-
-        for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
-            gui.write(f"###### 🔉 `output_audio[{idx}]`")
-            gui.audio(audio_url)
-
-    def get_raw_price(self, state: dict):
-        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
-
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            output_text_list = state.get(
-                "raw_tts_text", state.get("raw_output_text", [])
-            )
-            tts_state = {"text_prompt": "".join(output_text_list)}
-            total += TextToSpeechPage().get_raw_price(tts_state)
-
-        if state.get("input_face"):
-            total += 1
-
-        return total
-
-    def additional_notes(self):
-        try:
-            model = LargeLanguageModels[gui.session_state["selected_model"]].value
-        except KeyError:
-            model = "LLM"
-        notes = f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
-
-        if (
-            gui.session_state.get("tts_provider")
-            == TextToSpeechProviders.ELEVEN_LABS.name
-        ):
-            notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
-
-        if gui.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
-
-        return notes
 
     def run_v2(
         self,
@@ -1124,8 +392,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             request=request, user_input=user_input, ocr_texts=ocr_texts
         )
 
+        tools_by_name = self.get_current_llm_tools()
+
         yield from self.build_final_prompt(
-            request=request, response=response, user_input=user_input, model=llm_model
+            request=request,
+            response=response,
+            user_input=user_input,
+            model=llm_model,
+            tools_by_name=tools_by_name,
         )
 
         yield from self.llm_loop(
@@ -1133,6 +407,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             response=response,
             model=llm_model,
             asr_msg=asr_msg,
+            tools_by_name=tools_by_name,
         )
 
         yield from self.tts_step(model=llm_model, request=request, response=response)
@@ -1141,7 +416,10 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
     def document_understanding_step(self, request):
         ocr_texts = []
-        if request.document_model and request.input_images:
+        if request.input_images and (
+            request.document_model
+            or not LargeLanguageModels[request.selected_model].is_vision_model
+        ):
             yield "Running Azure Form Recognizer..."
             for url in request.input_images:
                 ocr_text = (
@@ -1220,14 +498,19 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 target_language="en",
             )
         for text in ocr_texts:
-            user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
         return user_input
 
-    def build_final_prompt(self, request, response, user_input, model):
+    def build_final_prompt(self, request, response, user_input, model, tools_by_name):
         # construct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
-            bot_script = render_prompt_vars(bot_script, gui.session_state)
+            variables = gui.session_state.get("variables", {})
+            for tool_name in tools_by_name:
+                variables.pop(tool_name, None)
+            bot_script = render_prompt_vars(
+                bot_script, gui.session_state | tools_by_name
+            )
             # insert to top
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
         else:
@@ -1353,6 +636,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         model: LargeLanguageModels,
         asr_msg: str | None = None,
         prev_output_text: list[str] | None = None,
+        tools_by_name: dict[str, BaseLLMTool] | None = None,
     ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.value}..."
 
@@ -1362,7 +646,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
 
-        tools_by_name = self.get_current_llm_tools()
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
             messages=response.final_prompt,
@@ -1371,6 +654,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             temperature=request.sampling_temperature,
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
+            reasoning_effort=request.reasoning_effort,
             tools=list(tools_by_name.values()),
             stream=True,
             audio_url=request.input_audio,
@@ -1462,6 +746,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             response=response,
             model=model,
             prev_output_text=output_text,
+            tools_by_name=tools_by_name,
         )
 
     def output_translation_step(self, request, response, output_text):
@@ -1516,12 +801,803 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 yield from LipsyncPage(request=self.request).run(lip_state)
                 response.output_video.append(lip_state["output_video"])
 
+    def related_workflows(self):
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.DocSearch import DocSearchPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+
+        return [
+            LipsyncTTSPage,
+            DocSearchPage,
+            DeforumSDPage,
+            CompareText2ImgPage,
+        ]
+
+    @classmethod
+    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
+        import langcodes
+
+        if pr and pr.title and not pr.is_root():
+            return pr.title
+
+        try:
+            lang = langcodes.Language.get(
+                sr.state.get("user_language") or sr.state.get("asr_language") or ""
+            ).display_name()
+        except (KeyError, langcodes.LanguageTagError):
+            lang = None
+
+        return " ".join(filter(None, [lang, cls.get_recipe_title()]))
+
+    @classmethod
+    def get_prompt_title(cls, state: dict) -> str | None:
+        # don't show the input prompt in the run titles, instead show get_run_title()
+        return None
+
+    def render_description(self):
+        gui.write(
+            """
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
+
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot's face and  voice settings.
+
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
+
+How It Works:
+1. Appends the user's question to the bottom of your dialog script.
+2. Sends the appended script to OpenAI's GPT3 asking it to respond to the question in the style of your character
+3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
+4. Lip syncs the face video clip to the voice clip
+5. Shows the resulting video to the user
+
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
+        """
+        )
+
+    def render_form_v2(self):
+        gui.code_editor(
+            label=(
+                '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
+                + field_title(self.RequestModel, "bot_script")
+            ),
+            key="bot_script",
+            language="jinja",
+            style=dict(maxHeight="50vh"),
+            help=field_desc(self.RequestModel, "bot_script"),
+        )
+        render_prompt_library()
+
+        language_model = language_model_selector(
+            label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
+        )
+
+        if not LargeLanguageModels[language_model].is_audio_model:
+            bulk_documents_uploader(
+                label=(
+                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
+                    + field_title(self.RequestModel, "documents")
+                ),
+                accept=["audio/*", "application/*", "video/*", "text/*"],
+                help=field_desc(self.RequestModel, "documents"),
+            )
+
+        gui.markdown("#### 💪 Capabilities")
+
+        speech_recognition_enabled = switch_with_section(
+            label="##### 🦻 Speech Recognition & Translation",
+            key="_speech_recognition_enabled",
+            control_keys=["user_language", "asr_model"],
+            render_section=self.speech_recognition_settings,
+        )
+        if not speech_recognition_enabled:
+            gui.session_state["asr_model"] = None
+            gui.session_state["asr_language"] = None
+            gui.session_state["asr_prompt"] = None
+
+            gui.session_state["asr_task"] = None
+            gui.session_state["translation_model"] = None
+            gui.session_state["user_language"] = None
+
+        text_to_speech_enabled = switch_with_section(
+            label="##### 🗣️ Text to Speech & Lipsync",
+            key="_text_to_speech_enabled",
+            control_keys=["tts_provider"],
+            render_section=self.text_to_speech_settings,
+        )
+        if not text_to_speech_enabled:
+            gui.session_state["tts_provider"] = None
+
+        document_intelligence_enabled = switch_with_section(
+            label="##### 🩻 Photo & Document Intelligence",
+            key="_document_intelligence_enabled",
+            control_keys=["document_model"],
+            render_section=self.document_intelligence_settings,
+        )
+        if not document_intelligence_enabled:
+            gui.session_state["document_model"] = None
+
+        switch_with_section(
+            label="##### 📊 Analytics & Evaluation",
+            control_keys=["bulk_runs"],
+            render_section=lambda: render_workflow_bulk_runs_list(
+                user=self.request.user,
+                workspace=self.current_workspace,
+                sr=self.current_sr,
+                pr=self.current_pr,
+            ),
+        )
+
+    def speech_recognition_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            gui.caption(field_desc(self.RequestModel, "user_language"))
+
+            # drop down to filter models based on the selected language
+            selected_filter_language = language_filter_selector(
+                options=asr_languages_without_dialects()
+            )
+
+            col1, col2 = gui.columns(2, responsive=False)
+            with col1:
+                asr_model = asr_model_selector(
+                    key="asr_model",
+                    language_filter=selected_filter_language,
+                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
+                    format_func=lambda x: (AsrModels[x].value if x else "Auto Select"),
+                )
+            with col2:
+                if asr_model:
+                    asr_language = asr_language_selector(
+                        asr_model,
+                        language_filter=selected_filter_language,
+                        label=f"###### {field_title(self.RequestModel, 'asr_language')}",
+                        key="asr_language",
+                    )
+                else:
+                    asr_language = None
+
+            if asr_model and asr_model.supports_input_prompt():
+                gui.text_area(
+                    f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
+                    key="asr_prompt",
+                    value="Transcribe the recording as accurately as possible.",
+                    height=300,
+                )
+
+            gui.newline()
+            if gui.checkbox(
+                "🔠 **Translate to & from English**",
+                value=bool(gui.session_state.get("translation_model")),
+            ):
+                gui.caption(
+                    "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
+                )
+
+                if asr_model and asr_model.supports_speech_translation():
+                    with gui.div(className="text-muted"):
+                        if gui.checkbox(
+                            label=field_desc(self.RequestModel, "asr_task").format(
+                                asr_model=asr_model.value,
+                                asr_language=asr_language or "Detected Language",
+                            ),
+                            value=gui.session_state.get("asr_task") == "translate",
+                        ):
+                            gui.session_state["asr_task"] = "translate"
+                        else:
+                            gui.session_state.pop("asr_task", None)
+                else:
+                    gui.session_state.pop("asr_task", None)
+
+                col1, col2 = gui.columns(2)
+                with col1:
+                    translation_model = translation_model_selector(
+                        allow_none=False,
+                        language_filter=selected_filter_language,
+                    )
+                with col2:
+                    translation_language_selector(
+                        model=translation_model,
+                        language_filter=selected_filter_language,
+                        label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                        key="user_language",
+                    )
+            else:
+                gui.session_state["asr_task"] = None
+                gui.session_state["translation_model"] = None
+                gui.session_state["user_language"] = None
+            gui.div(className="pb-1")
+
+    def text_to_speech_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            text_to_speech_provider_selector(self)
+
+        gui.newline()
+
+        if gui.checkbox(
+            label="**🫦 Add Lipsync Video**",
+            value=bool(gui.session_state.get("input_face")),
+        ):
+            self.lipsync_settings()
+        else:
+            gui.session_state["input_face"] = None
+            gui.session_state.pop("lipsync_model", None)
+
+        gui.div(className="pb-1")
+
+    def lipsync_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            gui.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
+                """,
+                key="input_face",
+            )
+            enum_selector(
+                LipsyncModel,
+                label="###### Lipsync Model",
+                key="lipsync_model",
+                use_selectbox=True,
+            )
+            gui.newline()
+
+    def document_intelligence_settings(self):
+        with gui.div(className="pt-2 ps-1"):
+            if settings.AZURE_FORM_RECOGNIZER_KEY:
+                doc_model_descriptions = azure_form_recognizer_models()
+            else:
+                doc_model_descriptions = {}
+            gui.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=doc_model_descriptions,
+                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
+            )
+            gui.newline()
+
+    def validate_form_v2(self):
+        input_glossary = gui.session_state.get("input_glossary_document", "")
+        output_glossary = gui.session_state.get("output_glossary_document", "")
+        if input_glossary:
+            validate_glossary_document(input_glossary)
+        if output_glossary:
+            validate_glossary_document(output_glossary)
+
+    def render_usage_guide(self):
+        youtube_video("-j2su1r8pEg")
+
+    def render_settings(self):
+        tts_provider = gui.session_state.get("tts_provider")
+        if tts_provider:
+            text_to_speech_settings(self, tts_provider)
+            gui.write("---")
+
+        lipsync_model = gui.session_state.get("lipsync_model")
+        if lipsync_model and gui.session_state.get("input_face"):
+            lipsync_settings(lipsync_model)
+            gui.write("---")
+
+        translation_model = gui.session_state.get(
+            "translation_model", DEFAULT_TRANSLATION_MODEL
+        )
+        if (
+            gui.session_state.get("user_language")
+            and TranslationModels[translation_model].supports_glossary
+        ):
+            gui.markdown("##### 🔠 Translation Settings")
+            enable_glossary = gui.checkbox(
+                "📖 Add Glossary",
+                value=bool(
+                    gui.session_state.get("input_glossary_document")
+                    or gui.session_state.get("output_glossary_document")
+                ),
+                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!",
+            )
+            if enable_glossary:
+                gui.caption(
+                    """
+                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+                    """
+                )
+                gui.file_uploader(
+                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                    key="input_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
+                )
+                gui.file_uploader(
+                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                    key="output_glossary_document",
+                    accept=SUPPORTED_SPREADSHEET_TYPES,
+                )
+            else:
+                gui.session_state["input_glossary_document"] = None
+                gui.session_state["output_glossary_document"] = None
+            gui.write("---")
+
+        documents = gui.session_state.get("documents")
+        if documents:
+            gui.write("#### 📄 Knowledge Base")
+            gui.text_area(
+                "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
+                help=field_desc(self.RequestModel, "task_instructions"),
+                key="task_instructions",
+                height=300,
+            )
+
+            citation_style_selector()
+            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
+            cache_knowledge_widget(self)
+            doc_extract_selector(self.request.user)
+
+            gui.write("---")
+
+        gui.markdown(
+            """
+            #### Advanced Settings
+            In general, you should not need to adjust these.
+            """
+        )
+
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            gui.write("---")
+            doc_search_advanced_settings()
+            gui.write("---")
+
+        gui.write("##### 🔠 Language Model Settings")
+        language_model_settings(gui.session_state.get("selected_model"))
+
+    def run_as_api_tab(self):
+        elevenlabs_load_state(self)
+        super().run_as_api_tab()
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "messages"]
+
+    def render_run_preview_output(self, state: dict):
+        input_prompt = state.get("input_prompt")
+        if input_prompt:
+            gui.write(
+                "**Prompt**\n```properties\n"
+                + truncate_text_words(input_prompt, maxlen=200)
+                + "\n```"
+            )
+
+        gui.write("**Response**")
+
+        output_video = state.get("output_video")
+        if output_video:
+            gui.video(output_video[0], autoplay=True)
+
+        output_text = state.get("output_text")
+        if output_text:
+            gui.write(output_text[0], line_clamp=5)
+
+    scroll_into_view = False
+
+    def _render_running_output(self):
+        ## The embedded web widget includes a running output, so just scroll it into view to tabs which just above the widget
+
+        # language=JavaScript
+        gui.js(
+            """
+            let elem = document.querySelector("#gooey-embed");
+            if (!elem) return;
+            elem.scrollIntoView({ behavior: "smooth", block: "start" });
+            """
+        )
+
+    def render_output(self):
+        from daras_ai_v2.bots import parse_bot_html
+
+        gui.tag(
+            "button",
+            type="submit",
+            name="onSendMessage",
+            hidden=True,
+            id="onSendMessage",
+        )
+        input_payload = gui.session_state.pop("onSendMessage", None)
+        if input_payload:
+            try:
+                input_data = json.loads(input_payload)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            else:
+                self.on_send(
+                    input_data.get("input_prompt"),
+                    input_data.get("input_images"),
+                    input_data.get("input_audio"),
+                    input_data.get("input_documents"),
+                    input_data.get("button_pressed"),
+                    input_data.get("input_location"),
+                )
+
+        gui.tag(
+            "button",
+            type="submit",
+            name="onNewConversation",
+            value="yes",
+            hidden=True,
+            id="onNewConversation",
+        )
+        if gui.session_state.pop("onNewConversation", None):
+            gui.session_state["messages"] = []
+            gui.session_state["input_prompt"] = ""
+            gui.session_state["input_images"] = None
+            gui.session_state["input_audio"] = None
+            gui.session_state["input_documents"] = None
+            gui.session_state["raw_input_text"] = ""
+            self.clear_outputs()
+            gui.session_state["final_keyword_query"] = ""
+            gui.session_state["final_search_query"] = ""
+            gui.rerun()
+
+        messages = []  # chat widget internal mishmash format
+        input_audio = gui.session_state.get("input_audio") or ""
+        input_images = gui.session_state.get("input_images") or []
+        input_documents = gui.session_state.get("input_documents") or []
+
+        if is_realtime_audio_url(input_audio):
+            entries = gui.session_state.get("final_prompt", []).copy()
+            input_audio = ""  # dont render ws audio url in chat widget
+        else:
+            entries = gui.session_state.get("messages", []).copy()
+
+        for entry in entries:
+            role = entry.get("role")
+            if role == CHATML_ROLE_USER:
+                messages.append(
+                    dict(
+                        role=role,
+                        input_prompt=get_entry_text(entry),
+                        input_images=get_entry_images(entry) or [],
+                    )
+                )
+            elif role == CHATML_ROLE_ASSISTANT:
+                messages.append(
+                    dict(
+                        role=role,
+                        type="final_response",
+                        status="completed",
+                        output_text=[parse_bot_html(get_entry_text(entry))[1]],
+                    )
+                )
+
+        # add last input to history if present
+        show_raw_msgs = False
+        if show_raw_msgs:
+            input_prompt = gui.session_state.get("raw_input_text") or ""
+        else:
+            input_prompt = gui.session_state.get("input_prompt") or ""
+
+        if input_prompt or input_images or input_audio or input_documents:
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_USER,
+                    input_prompt=input_prompt,
+                    input_images=input_images,
+                    input_audio=input_audio,
+                    input_documents=input_documents,
+                ),
+            )
+
+            # add last output
+            run_status = self.get_run_state(gui.session_state)
+            match run_status:
+                case RecipeRunState.starting:
+                    event_type = "conversation_start"
+                case RecipeRunState.running:
+                    event_type = "message_part"
+                case RecipeRunState.failed:
+                    event_type = "error"
+                case _:
+                    event_type = "final_response"
+            raw_output_text = gui.session_state.get("raw_output_text") or []
+            output_text = gui.session_state.get("output_text") or []
+            output_video = gui.session_state.get("output_video") or []
+            output_audio = gui.session_state.get("output_audio") or []
+            text = output_text and output_text[0] or ""
+            if text:
+                buttons, text, disable_feedback = parse_bot_html(text)
+            else:
+                buttons = []
+            text = "\n\n".join(
+                filter(
+                    None,
+                    [
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                        ),
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+                        ),
+                        text,
+                        render_called_functions_as_html(
+                            saved_run=self.current_sr, trigger=FunctionTrigger.post
+                        ),
+                    ],
+                )
+            )
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_ASSISTANT,
+                    type=event_type,
+                    status=run_status,
+                    detail=gui.session_state.get(StateKeys.run_status) or "",
+                    raw_output_text=raw_output_text,
+                    output_text=[text],
+                    text=text,
+                    output_video=output_video,
+                    output_audio=output_audio,
+                    references=gui.session_state.get("references") or [],
+                    buttons=buttons,
+                )
+            )
+
+        # fill branding with bot integration data if available
+        bot_integration = (
+            BotIntegration.objects.filter(
+                published_run=self.current_pr,
+                platform=Platform.WEB,
+            )
+            .order_by("-updated_at")
+            .first()
+        )
+        if bot_integration:
+            bot_branding = bot_integration.get_web_widget_branding()
+            if self.current_pr.photo_url:
+                bot_branding["photoUrl"] = self.current_pr.photo_url
+        else:
+            bot_branding = dict(
+                name=self.current_pr.title,
+                photoUrl=self.current_pr.photo_url,
+                title=self.current_pr.title,
+            )
+        bot_branding["showPoweredByGooey"] = False
+        gui.html(
+            # language=html
+            f"""
+<div id="gooey-embed" className="border rounded py-1 mb-3 bg-white" style="height: calc(100vh - 1rem)"></div>
+<script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
+            """
+        )
+        gui.js(
+            # language=javascript
+            """
+async function loadGooeyEmbed() {
+    await window.waitUntilHydrated;
+    let embedTarget = document.getElementById("gooey-embed");
+    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
+        return;
+    }
+    let controller = {
+        messages,
+        onSendMessage: (payload) => {
+            let btn = document.getElementById("onSendMessage");
+            if (!btn) return;
+            btn.value = JSON.stringify(payload);
+            btn.click();
+        },
+        onNewConversation() {
+          document.getElementById("onNewConversation").click();
+        },
+    };
+    GooeyEmbed.controller = controller;
+    GooeyEmbed.mount(config, controller);
+}
+
+const script = document.getElementById("gooey-embed-script");
+if (script) script.onload = loadGooeyEmbed;
+loadGooeyEmbed();
+window.addEventListener("hydrated", loadGooeyEmbed);
+
+if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
+    GooeyEmbed.controller.setMessages?.(messages);
+}
+            """,
+            config=dict(
+                integration_id="magic",
+                target="#gooey-embed",
+                mode="inline",
+                enableAudioMessage=True,
+                enablePhotoUpload=True,
+                enableConversations=False,
+                branding=bot_branding,
+                fillParent=True,
+                secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
+            ),
+            messages=messages,
+        )
+
+    def _render_regenerate_button(self):
+        pass
+
+    def on_send(
+        self,
+        new_input_prompt: str | None,
+        new_input_images: list[str] | None,
+        new_input_audio: str | None,
+        new_input_documents: list[str] | None,
+        button_pressed: list[str] | None,
+        input_location: dict[str, float] | None,
+    ):
+        if button_pressed:
+            # encoded by parse_html
+            target, title = None, None
+            parts = csv_decode_row(button_pressed.get("button_id", ""))
+            if len(parts) >= 3:
+                target = parts[1]
+                title = parts[-1]
+            value = title or button_pressed.get("button_title", "")
+            if target and target != "input_prompt":
+                gui.session_state[target] = value
+            else:
+                new_input_prompt = value
+
+        if input_location:
+            from daras_ai_v2.bots import handle_location_msg
+
+            new_input_prompt = handle_location_msg(input_location)
+
+        prev_input = gui.session_state.get("raw_input_text") or ""
+        prev_output = (gui.session_state.get("raw_output_text") or [""])[0]
+        prev_input_images = gui.session_state.get("input_images")
+        prev_input_audio = gui.session_state.get("input_audio")
+        prev_input_documents = gui.session_state.get("input_documents")
+
+        if (
+            prev_input or prev_input_images or prev_input_audio or prev_input_documents
+        ) and prev_output:
+            # append previous input to the history
+            gui.session_state["messages"] = gui.session_state.get("messages", []) + [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER,
+                    content_text=prev_input,
+                    input_images=prev_input_images,
+                    input_audio=prev_input_audio,
+                    input_documents=prev_input_documents,
+                ),
+                format_chat_entry(
+                    role=CHATML_ROLE_ASSISTANT,
+                    content_text=prev_output,
+                ),
+            ]
+
+        # add new input to the state
+        gui.session_state["input_prompt"] = new_input_prompt
+        gui.session_state["input_audio"] = new_input_audio or None
+        gui.session_state["input_images"] = new_input_images or None
+        gui.session_state["input_documents"] = new_input_documents or None
+
+        self.submit_and_redirect()
+
+    def render_steps(self):
+        if gui.session_state.get("tts_provider"):
+            gui.video(gui.session_state.get("input_face"), caption="Input Face")
+
+        final_search_query = gui.session_state.get("final_search_query")
+        if final_search_query:
+            gui.text_area(
+                "###### `final_search_query`", value=final_search_query, disabled=True
+            )
+
+        final_keyword_query = gui.session_state.get("final_keyword_query")
+        if final_keyword_query:
+            if isinstance(final_keyword_query, list):
+                gui.write("###### `final_keyword_query`")
+                gui.json(final_keyword_query)
+            else:
+                gui.text_area(
+                    "###### `final_keyword_query`",
+                    value=str(final_keyword_query),
+                    disabled=True,
+                )
+
+        references = gui.session_state.get("references", [])
+        if references:
+            gui.write("###### `references`")
+            gui.json(references, collapseStringsAfterLength=False)
+
+        tools = list(
+            get_inbuilt_tools_from_state(gui.session_state),
+        )
+        if gui.session_state.get("functions"):
+            try:
+                tools += list(
+                    get_workflow_tools_from_state(
+                        gui.session_state, FunctionTrigger.prompt
+                    ),
+                )
+            except Exception:
+                pass
+        if tools:
+            gui.write(f"🛠️ `{FunctionTrigger.prompt.name} functions`")
+            gui.json(
+                [tool.spec_function for tool in tools],
+                depth=3,
+                collapseStringsAfterLength=False,
+            )
+
+        final_prompt = gui.session_state.get("final_prompt")
+        if final_prompt:
+            if isinstance(final_prompt, str):
+                text_output("###### `final_prompt`", value=final_prompt, height=300)
+            else:
+                gui.write(
+                    '###### <i class="fa-sharp fa-light fa-rectangle-terminal"></i> `final_prompt`',
+                    unsafe_allow_html=True,
+                )
+                gui.json(final_prompt, depth=5)
+
+        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
+            for idx, text in enumerate(gui.session_state.get(k) or []):
+                gui.text_area(
+                    f"###### 📜 `{k}[{idx}]`",
+                    value=text,
+                    disabled=True,
+                )
+
+        for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
+            gui.write(f"###### 🔉 `output_audio[{idx}]`")
+            gui.audio(audio_url)
+
+    def get_raw_price(self, state: dict):
+        total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
+
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            output_text_list = state.get(
+                "raw_tts_text", state.get("raw_output_text", [])
+            )
+            tts_state = {"text_prompt": "".join(output_text_list)}
+            total += TextToSpeechPage().get_raw_price(tts_state)
+
+        if is_realtime_audio_url(state.get("input_audio")):
+            total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
+
+        if state.get("input_face"):
+            total += 1
+
+        return total
+
+    def additional_notes(self):
+        try:
+            model = LargeLanguageModels[gui.session_state["selected_model"]].value
+        except KeyError:
+            model = "LLM"
+
+        llm_cost = get_non_ivr_price_credits(self.current_sr)
+        notes = (
+            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+        )
+
+        if (
+            gui.session_state.get("tts_provider")
+            == TextToSpeechProviders.ELEVEN_LABS.name
+        ):
+            notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+
+        if is_realtime_audio_url(gui.session_state.get("input_audio")):
+            credits, duration_sec = get_ivr_price_credits_and_seconds(self.current_sr)
+            if credits:
+                duration_min = math.ceil(int(duration_sec) / 60)
+                notes += f" + {credits} ({duration_min}min call)"
+
+        if gui.session_state.get("input_face"):
+            notes += " + 1 (lipsync)"
+
+        return notes
+
     def render_header_extra(self):
-        if self.tab == RecipeTabs.run:
+        if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
 
     def get_tabs(self):
         tabs = super().get_tabs()
+        tabs.insert(1, RecipeTabs.preview)
         tabs.extend([RecipeTabs.integrations])
         return tabs
 
@@ -1552,7 +1628,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 tab=RecipeTabs.integrations, example_id=pr.published_run_id
             )
             gui.caption(
-                f"Note: You seem to have unpublished changes. Integrations use the [last saved version]({last_saved_url}), not the currently visible edits.",
+                f"Note: You seem to have unpublished changes. Deployments use the [last saved version]({last_saved_url}), not the currently visible edits.",
                 className="text-center text-muted",
             )
 
@@ -1581,12 +1657,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         # this gets triggered on the /add route
         if gui.session_state.pop("--add-integration", None):
             self.render_integrations_add(
-                label="#### Add a New Integration to your Copilot",
+                label="#### Deploy to a New Channel",
                 run_title=run_title,
                 pr=pr,
             )
             with gui.center():
-                if gui.button("Return to Test & Configure"):
+                if gui.button("Return to Configure"):
                     cancel_url = self.current_app_url(RecipeTabs.integrations)
                     raise gui.RedirectException(cancel_url)
             return
@@ -1598,8 +1674,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             )
 
     def render_integrations_add(self, label: str, run_title: str, pr: PublishedRun):
-        from routers.facebook_api import fb_connect_url, wa_connect_url
+        from routers.facebook_api import fb_connect_url
         from routers.slack_api import slack_connect_url
+        from routers.facebook_api import wa_connect_url
+        from number_cycling.utils import create_bot_integration_with_extension
+        from number_cycling.models import SharedPhoneNumber
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
@@ -1658,11 +1737,36 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     )
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
                 case Platform.WHATSAPP:
-                    redirect_url = wa_connect_url(pr.id)
+                    try:
+                        bi = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.WHATSAPP,
+                        )
+                        redirect_url = connect_bot_to_published_run(
+                            bi, pr, overwrite=True
+                        )
+                    except SharedPhoneNumber.DoesNotExist:
+                        redirect_url = wa_connect_url(pr.id)
                 case Platform.SLACK:
                     redirect_url = slack_connect_url(pr.id)
                 case Platform.FACEBOOK:
                     redirect_url = fb_connect_url(pr.id)
+                case Platform.TWILIO:
+                    try:
+                        bi = create_bot_integration_with_extension(
+                            name=run_title,
+                            created_by=self.request.user,
+                            workspace=self.current_workspace,
+                            platform=Platform.TWILIO,
+                        )
+                    except SharedPhoneNumber.DoesNotExist as e:
+                        gui.caption(f"{e}", className="text-center text-danger")
+                        return
+
+                    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
+
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
@@ -1685,6 +1789,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         self, integrations: list[BotIntegration], run_title: str
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+        from routers.facebook_api import wa_connect_url
 
         gui.markdown("#### Configure your Copilot")
         gui.newline()
@@ -1727,20 +1832,24 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             test_link = bi.get_bot_test_link()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Connected To")
+                if bi.extension_number:
+                    gui.write("###### Connected to Extension")
+                else:
+                    gui.write("###### Connected to")
+
                 gui.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
                 elif bi.platform == Platform.TWILIO:
                     copy_to_clipboard_button(
-                        f"{icons.link} Copy Phone Number",
-                        value=bi.twilio_phone_number.as_e164,
+                        f"{icons.copy_solid} Copy Phone Number",
+                        value=test_link.lstrip("tel:"),
                         type="secondary",
                     )
                 else:
                     copy_to_clipboard_button(
-                        f"{icons.link} Copy {Platform(bi.platform).label} Link",
+                        f"{icons.copy_solid} Copy {Platform(bi.platform).label} Link",
                         value=test_link,
                         type="secondary",
                     )
@@ -1756,7 +1865,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Test")
-                gui.caption(f"Send a test message via {Platform(bi.platform).label}.")
+                test_caption = (
+                    f"Call or send a text message via {Platform(bi.platform).label}."
+                )
+                if bi.extension_number:
+                    test_caption += f" (with extension {bi.extension_number})."
+                gui.caption(
+                    test_caption,
+                    help="**SMS:** Send `/extension <extension number>` to connect to the agent. `/disconnect` to start fresh.\n\n"
+                    "**Voice Call:** ` * <extension number>` to change extension, `*#` to disconnect.",
+                )
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
@@ -1774,9 +1892,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
+                    sms_url = furl("sms:") / bi.twilio_phone_number.as_e164
+                    if bi.extension_number:
+                        sms_url.args["body"] = f"{bi.extension_number}"
                     gui.anchor(
                         '<i class="fa-regular fa-sms"></i> Send SMS',
-                        str(furl("sms:") / bi.twilio_phone_number.as_e164),
+                        str(sms_url),
                         unsafe_allow_html=True,
                         new_tab=True,
                     )
@@ -1788,6 +1909,115 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         new_tab=True,
                     )
 
+            if bi.platform == Platform.WHATSAPP and bi.extension_number:
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Bring your own number")
+                    gui.write(
+                        "Connect your mobile # (that's not already on WhatsApp) with your Facebook Business Profile. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-whatsapp)",
+                    )
+
+                with col2:
+                    gui.anchor(
+                        "Connect number",
+                        href=wa_connect_url(self.current_pr.id),
+                        style={
+                            "backgroundColor": "#1877F2",
+                            "color": "white",
+                            "width": "100%",
+                            "maxWidth": "225px",
+                        },
+                        type="secondary",
+                    )
+
+                gui.html("""
+                        <div class="d-flex align-items-center my-2">
+                            <hr class="flex-grow-1">
+                            <span class="px-3 text-muted">or</span>
+                            <hr class="flex-grow-1">
+                        </div>
+                        """)
+
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Buy a dedicated number")
+                    # Check if current workspace has enterprise subscription
+                    if is_enterprise:
+                        gui.write(
+                            f"As a premium customer, please contact us to setup a managed number"
+                        )
+                    else:
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+
+                gui.write("---")
+
+            if bi.platform == Platform.TWILIO and bi.extension_number:
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                is_enterprise = (
+                    self.current_workspace.subscription
+                    and PricingPlan.from_sub(self.current_workspace.subscription)
+                    == PricingPlan.ENTERPRISE
+                )
+                with col1:
+                    gui.write("###### Get a Dedicated Number")
+                    if is_enterprise:
+                        gui.write(
+                            "As a premium customer, please contact us to set up a managed number"
+                        )
+                    else:
+                        gui.write(
+                            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for a dedicated number managed by Gooey.AI"
+                        )
+                with col2:
+                    if is_enterprise:
+                        gui.anchor(
+                            "Contact",
+                            href=settings.CONTACT_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
+                    else:
+                        gui.anchor(
+                            "Upgrade",
+                            href=settings.PRICING_DETAILS_URL,
+                            style={
+                                "width": "100%",
+                                "maxWidth": "225px",
+                            },
+                            type="primary",
+                        )
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Understand your Users")
@@ -1808,7 +2038,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     ),
                     new_tab=True,
                 )
-                if bi.platform == Platform.TWILIO and bi.twilio_phone_number_sid:
+                if (
+                    bi.platform == Platform.TWILIO
+                    and bi.twilio_phone_number_sid
+                    and not bi.extension_number
+                ):
                     gui.anchor(
                         f"{icon} Open Twilio Console",
                         str(
@@ -1853,11 +2087,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Add Integration")
+                gui.write("###### Add Deployment")
                 gui.caption(f"Add another connection for {run_title}.")
             with col2:
                 gui.anchor(
-                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Integration',
+                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Deployment',
                     str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
                     unsafe_allow_html=True,
                 )
@@ -1901,7 +2135,7 @@ def messages_as_prompt(query_msgs: list[dict]) -> str:
 
 
 def infer_asr_model_and_language(
-    user_language: str, default=AsrModels.whisper_large_v2
+    user_language: str, default=AsrModels.gpt_4_o_audio
 ) -> tuple[str, str]:
     asr_lang = None
     user_lang = user_language.lower()
@@ -1949,7 +2183,7 @@ connect_choices = [
     ConnectChoice(
         platform=Platform.WHATSAPP,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/thumbs/Digital_Inline_Green_400x400.png",
-        label="[Read our guide](https://docs.gooey.ai/guides/how-to-deploy-an-ai-copilot/deploy-on-whatsapp) to connect your own mobile # (that's not already on WhatsApp) or [upgrade](https://gooey.ai/account/billing/) for a number on us.",
+        label="Instantly connect WhatsApp via a test number, connect your own or buy a number on us. [Help Guide](https://gooey.ai/docs/)",
     ),
     ConnectChoice(
         platform=Platform.SLACK,
@@ -1960,5 +2194,10 @@ connect_choices = [
         platform=Platform.FACEBOOK,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
+    ),
+    ConnectChoice(
+        platform=Platform.TWILIO,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
+        label="Call or text your copilot with a free test number (or buy one).",
     ),
 ]

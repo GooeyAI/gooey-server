@@ -1,0 +1,61 @@
+{# Renders a list of called functions with inputs and return values.
+Context:
+- called_functions: [
+    {
+      title: str,
+      url: str,
+      inputs: object,
+      return_value: object|None,
+    }
+  ]
+#}
+
+<style>
+.gooey-spinner {
+    scroll-margin: 20px;
+    display: inline-block;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top: 2px solid #03dac5;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+</style>
+  
+{% for item in called_functions %}
+<details>
+<summary><strong>
+{% if item.is_running %}<div class='gooey-spinner'></div>&nbsp;{% else %}🛠️{% endif %} 
+{{ item.title.replace("_", "<wbr>_") | safe }}
+</strong></summary>
+{% if item.url %}
+<p><a target="_blank" href="{{ item.url }}">View Run</a></p>
+{% endif %}
+
+{% if item.inputs %}
+<strong>Inputs</strong>
+```json
+{{ item.inputs | tojson(indent=2) }}
+```
+{% endif %}
+
+{% if item.return_value is not none %}
+<strong>Return value</strong>
+```json
+{{ item.return_value | tojson(indent=2) }}
+```
+{% endif %}
+
+</details>
+{% endfor %}
+
+<div style="height: 20px;"></div>

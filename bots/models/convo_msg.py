@@ -37,43 +37,12 @@ class ConversationQuerySet(models.QuerySet):
         """Get unique conversations"""
         return self.distinct(*Conversation.user_id_fields)
 
-    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> pd.DataFrame:
-        import pandas as pd
-
-        qs = self.select_related("bot_integration").prefetch_related("messages")
-        rows = []
-        for convo in qs[:1000]:
-            convo: Conversation
-            row = {
-                "USER": convo.get_display_name(),
-                "BOT INTEGRATION": str(convo.bot_integration),
-                "CREATED AT": convo.created_at.astimezone(tz).replace(tzinfo=None),
-                "MESSAGES": convo.messages.count(),
-            }
-            try:
-                row |= {
-                    "LAST MESSAGE": convo.messages.latest()
-                    .created_at.astimezone(tz)
-                    .replace(tzinfo=None),
-                    "DELTA HOURS": round(
-                        convo.last_active_delta().total_seconds() / 3600
-                    ),
-                    "D1": convo.d1(),
-                    "D7": convo.d7(),
-                    "D30": convo.d30(),
-                }
-            except Message.DoesNotExist:
-                pass
-            rows.append(row)
-        df = pd.DataFrame.from_records(rows)
-        return df
-
-    def to_df_format(
+    def to_df(
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=1000
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all()
+        qs = self.all().select_related("bot_integration")
         rows = []
         for convo in qs[:row_limit]:
             convo: Conversation
@@ -104,10 +73,13 @@ class ConversationQuerySet(models.QuerySet):
                 row |= {
                     "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
-                    "A7": last_time
-                    > datetime.datetime.now() - datetime.timedelta(days=7),
-                    "A30": last_time
-                    > datetime.datetime.now() - datetime.timedelta(days=30),
+                    "A7": (
+                        last_time > datetime.datetime.now() - datetime.timedelta(days=7)
+                    ),
+                    "A30": (
+                        last_time
+                        > datetime.datetime.now() - datetime.timedelta(days=30)
+                    ),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
                     "R7": last_time - first_time < datetime.timedelta(days=7),
                     "R30": last_time - first_time < datetime.timedelta(days=30),
@@ -118,8 +90,12 @@ class ConversationQuerySet(models.QuerySet):
             except Message.DoesNotExist:
                 pass
             row |= {
-                "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
-                "Bot": str(convo.bot_integration),
+                "Created At": (
+                    convo.created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                    .strftime(settings.SHORT_DATETIME_FORMAT)
+                ),
+                "Integration Name": convo.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -139,7 +115,7 @@ class ConversationQuerySet(models.QuerySet):
                 "R30",
                 "Delta Hours",
                 "Created At",
-                "Bot",
+                "Integration Name",
             ],
         )
         return df
@@ -396,11 +372,13 @@ class MessageQuerySet(models.QuerySet):
                 "Analysis Result": row.get("analysis_result"),
                 "Feedback": row.get("feedback"),
                 "Run Time": row.get("run_time_sec"),
+                "Credits Used": row.get("credits_used", 0),
                 "Run URL": row.get("run_url"),
                 "Input Images": ", ".join(row.get("input_images") or []),
                 "Input Audio": row.get("input_audio"),
                 "User Message ID": row.get("user_message_id"),
                 "Conversation ID": row.get("conversation_id"),
+                "Integration Name": row.get("integration_name"),
             }
             for row in self.to_json(tz=tz, row_limit=row_limit)
             if row.get("sent")
@@ -416,7 +394,7 @@ class MessageQuerySet(models.QuerySet):
         conversations = defaultdict(list)
 
         qs = self.order_by("-created_at").prefetch_related(
-            "feedbacks", "conversation", "saved_run"
+            "feedbacks", "conversation", "saved_run", "conversation__bot_integration"
         )
         for message in qs[:row_limit]:
             message: Message
@@ -436,6 +414,7 @@ class MessageQuerySet(models.QuerySet):
                 if saved_run:
                     row["run_time_sec"] = int(saved_run.run_time.total_seconds())
                     row["run_url"] = saved_run.get_app_url()
+                    row["credits_used"] = saved_run.price or 0
                     input_images = saved_run.state.get("input_images")
                     if input_images:
                         row["input_images"] = input_images
@@ -456,6 +435,7 @@ class MessageQuerySet(models.QuerySet):
                             and message.platform_msg_id.removeprefix(MSG_ID_PREFIX)
                         ),
                         "conversation_id": message.conversation.api_integration_id(),
+                        "integration_name": message.conversation.bot_integration.name,
                     }
                 )
 
@@ -618,44 +598,14 @@ class MessageAttachment(models.Model):
 
 
 class FeedbackQuerySet(models.QuerySet):
-    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> pd.DataFrame:
-        import pandas as pd
-
-        qs = self.all().prefetch_related("message", "message__conversation")
-        rows = []
-        for feedback in qs[:10000]:
-            feedback: Feedback
-            row = {
-                "USER": feedback.message.conversation.get_display_name(),
-                "BOT": str(feedback.message.conversation.bot_integration),
-                "USER MESSAGE CREATED AT": feedback.message.get_previous_by_created_at()
-                .created_at.astimezone(tz)
-                .replace(tzinfo=None),
-                "USER MESSAGE (ENGLISH)": feedback.message.get_previous_by_created_at().content,
-                "USER MESSAGE (ORIGINAL)": feedback.message.get_previous_by_created_at().display_content,
-                "BOT MESSAGE CREATED AT": feedback.message.created_at.astimezone(
-                    tz
-                ).replace(tzinfo=None),
-                "BOT MESSAGE (ENGLISH)": feedback.message.content,
-                "BOT MESSAGE (ORIGINAL)": feedback.message.display_content,
-                "FEEDBACK RATING": feedback.rating,
-                "FEEDBACK (ORIGINAL)": feedback.text,
-                "FEEDBACK (ENGLISH)": feedback.text_english,
-                "FEEDBACK CREATED AT": feedback.created_at.astimezone(tz).replace(
-                    tzinfo=None
-                ),
-                "QUESTION_ANSWERED": feedback.message.question_answered,
-            }
-            rows.append(row)
-        df = pd.DataFrame.from_records(rows)
-        return df
-
-    def to_df_format(
+    def to_df(
         self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().prefetch_related("message", "message__conversation")
+        qs = self.all().prefetch_related(
+            "message", "message__conversation", "message__conversation__bot_integration"
+        )
         rows = []
         for feedback in qs[:row_limit]:
             feedback: Feedback
@@ -673,6 +623,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)": feedback.text_english,
                 "Feedback (Local)": feedback.text,
                 "Run URL": feedback.message.saved_run.get_app_url(),
+                "Integration Name": feedback.message.conversation.bot_integration.name,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -688,6 +639,7 @@ class FeedbackQuerySet(models.QuerySet):
                 "Feedback (EN)",
                 "Feedback (Local)",
                 "Run URL",
+                "Integration Name",
             ],
         )
         return df

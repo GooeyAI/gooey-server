@@ -38,6 +38,8 @@ class TwilioVoiceWs(TwilioVoice):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.user_msg_id = self.call_sid
+
         self.input_type = "audio"
         audio_url = furl(settings.WS_PROXY_API_BASE_URL) / get_route_path(
             twilio_ws_proxy, path_params=dict(call_sid=self.call_sid)

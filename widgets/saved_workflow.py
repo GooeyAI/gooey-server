@@ -92,10 +92,7 @@ def render_saved_workflow_preview(
 
 
 def render_title_pills(published_run: PublishedRun, workflow_pill: str | None):
-    with gui.div(
-        className="d-md-flex d-none align-items-center ms-2",
-        style={"font-size": "0.9rem"},
-    ):
+    with gui.div(className="d-md-flex d-none align-items-center ms-2"):
         if workflow_pill:
             gui.pill(
                 workflow_pill,

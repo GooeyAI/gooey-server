@@ -5,6 +5,79 @@ category = ModelCategory.LLM
 
 
 def run():
+    # SEA-LION
+    llm_pricing_create(
+        model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",
+        model_name=LargeLanguageModels.sea_lion_v4_gemma_3_27b_it.name,
+        unit_cost_input=0.09,
+        unit_cost_output=0.16,
+        unit_quantity=10**6,
+        provider=ModelProvider.sea_lion,
+        pricing_url="https://openrouter.ai/google/gemma-3-27b-it",
+        notes="Pricing same as Gemma 3",
+    )
+
+    # Swiss AI Apertus
+    llm_pricing_create(
+        model_id="swiss-ai/apertus-70b-instruct",
+        model_name=LargeLanguageModels.apertus_70b_instruct.name,
+        unit_cost_input=0.25,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.publicai,
+        pricing_url="https://platform.publicai.co/api/~endpoints",
+        notes="Pricing same as GPT-5 Mini",
+    )
+
+    # gpt-realtime
+    llm_pricing_create(
+        model_id="gpt-realtime-2025-08-28",
+        model_name=LargeLanguageModels.gpt_realtime.name,
+        unit_cost_input=4,
+        unit_cost_output=16,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-realtime",
+    )
+
+    # gpt-5
+    llm_pricing_create(
+        model_id="gpt-5-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5.name,
+        unit_cost_input=1.25,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-mini-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5_mini.name,
+        unit_cost_input=0.25,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-mini",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-nano-2025-08-07",
+        model_name=LargeLanguageModels.gpt_5_nano.name,
+        unit_cost_input=0.05,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-nano",
+    )
+    llm_pricing_create(
+        model_id="gpt-5-chat-latest",
+        model_name=LargeLanguageModels.gpt_5_chat.name,
+        unit_cost_input=1.25,
+        unit_cost_output=10,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5-chat",
+    )
+
     # gpt-4.1
     llm_pricing_create(
         model_id="gpt-4.1-2025-04-14",
@@ -586,6 +659,15 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="google/gemini-2.5-flash-lite",
+        model_name=LargeLanguageModels.gemini_2_5_flash_lite.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.4,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite",
+    )
+    llm_pricing_create(
         model_id="google/gemini-2.5-pro",
         model_name=LargeLanguageModels.gemini_2_5_pro.name,
         unit_cost_input=1.25,
@@ -910,7 +992,16 @@ def run():
         unit_cost_output=15,
         unit_quantity=10**6,
         provider=ModelProvider.anthropic,
-        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
+    )
+    llm_pricing_create(
+        model_id="claude-opus-4-1",
+        model_name=LargeLanguageModels.claude_4_1_opus.name,
+        unit_cost_input=15,
+        unit_cost_output=75,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
     )
     llm_pricing_create(
         model_id="claude-4-opus-20250514",
@@ -919,7 +1010,7 @@ def run():
         unit_cost_output=75,
         unit_quantity=10**6,
         provider=ModelProvider.anthropic,
-        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+        pricing_url="https://docs.anthropic.com/en/docs/about-claude/pricing",
     )
     llm_pricing_create(
         model_id="claude-3-7-sonnet-20250219",

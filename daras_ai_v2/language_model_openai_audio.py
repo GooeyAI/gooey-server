@@ -15,6 +15,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_bytes_to_wav
 from daras_ai_v2.exceptions import raise_for_status, ffmpeg
 from daras_ai_v2.language_model_openai_realtime import RealtimeSession
+from daras_ai_v2.utils import clamp
 from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json, send_recv_json
 
@@ -37,6 +38,8 @@ def run_openai_audio(
     step_chunk_size: int = 300,
 ):
     openai_ws, created = get_or_create_ws(model)
+
+    temperature = clamp(temperature, 0.6, 1.2)
 
     twilio_ws = None
     audio_data = None
@@ -68,7 +71,7 @@ def run_openai_audio(
         )
         if twilio_ws:
             for entry in RealtimeSession(
-                twilio_ws, openai_ws, tools, messages, audio_url
+                twilio_ws, openai_ws, tools, messages, audio_url, model
             ).stream():
                 yield [entry]
         else:

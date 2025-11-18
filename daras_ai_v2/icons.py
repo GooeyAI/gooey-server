@@ -1,6 +1,7 @@
 billing = '<i class="fa-regular fa-square-dollar"></i>'
 save = '<i class="fa-regular fa-floppy-disk"></i>'
 profile = '<i class="fa-regular fa-address-card"></i>'
+person = '<i class="fa-regular fa-person"></i>'
 api = '<i class="fa-regular fa-rocket"></i>'
 run = '<i class="fa-regular fa-person-running"></i>'
 example = '<i class="fa-regular fa-gift"></i>'
@@ -72,6 +73,6 @@ card_icons = {
     "diners": '<i class="fa-brands fa-cc-diners-club"></i>',
 }
 
-integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
+integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bfced380-bb60-11f0-80c3-02420a0001e9/d1487c30-12b0-4cc2-bd07-6f22a6f3806b.png"
 
 help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'

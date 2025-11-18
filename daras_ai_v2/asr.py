@@ -243,6 +243,12 @@ MMS_SUPPORTED = {
     'zpt', 'zpu', 'zpz', 'ztq', 'zty', 'zul', 'zyb', 'zyp', 'zza'
 }  # fmt: skip
 
+SUNBIRD_SUPPORTED_LANGUAGES = {
+    "ach": "<|su|>", "eng": "<|en|>", "kin": "<|as|>", "lgg": "<|jw|>", "lug": "<|ba|>", "myx": "<|mg|>",
+    "nyn": "<|ha|>", "swa": "<|sw|>", "teo": "<|ln|>", "ttj": "<|tt|>", "xog": "<|haw|>"
+}  # fmt: skip
+
+
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
 GHANA_NLP_SUPPORTED = {'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani',
                        'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru'}  # fmt: skip
@@ -277,6 +283,10 @@ class AsrModels(Enum):
 
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
     lelapa = "Vulavula (Lelapa AI)"
+    whisper_sunbird_large_v3 = "Sunbird Ugandan Whisper v3 (Sunbird AI)"
+    whisper_akera_large_v3 = "Akera Whisper v3 (akera)"
+    whisper_swahili_medium_v3 = "Jacaranda Health Swahili Whisper v3 (Jacaranda Health)"
+    mbaza_ctc_large = "Mbaza Conformer LG (MbazaNLP)"
 
     seamless_m4t = "Seamless M4T [Deprecated] (Facebook Research)"
     whisper_chichewa_large_v3 = (
@@ -328,6 +338,7 @@ class AsrModels(Enum):
 
 
 asr_model_ids = {
+    AsrModels.whisper_akera_large_v3: "akera/whisper-large-v3-kik-full_v2",
     AsrModels.gpt_4_o_audio: "gpt-4o-transcribe",
     AsrModels.gpt_4_o_mini_audio: "gpt-4o-mini-transcribe",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
@@ -342,6 +353,9 @@ asr_model_ids = {
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.lelapa: "lelapa-vulavula",
     AsrModels.elevenlabs: "elevenlabs-scribe-v1",
+    AsrModels.whisper_sunbird_large_v3: "Sunbird/asr-whisper-large-v3-salt",
+    AsrModels.whisper_swahili_medium_v3: "Jacaranda-Health/ASR-STT",
+    AsrModels.mbaza_ctc_large: "mbazaNLP/stt_rw_sw_lg_conformer_ctc_large",
 }
 
 forced_asr_languages = {
@@ -351,6 +365,7 @@ forced_asr_languages = {
     AsrModels.vakyansh_bhojpuri: "bho",
     AsrModels.nemo_english: "en",
     AsrModels.nemo_hindi: "hi",
+    AsrModels.whisper_akera_large_v3: "kik",
 }
 
 asr_supported_languages = {
@@ -373,6 +388,10 @@ asr_supported_languages = {
     AsrModels.mms_1b_all: MMS_SUPPORTED,
     AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
     AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
+    AsrModels.whisper_sunbird_large_v3: SUNBIRD_SUPPORTED_LANGUAGES,
+    AsrModels.whisper_swahili_medium_v3: {"sw", "en"},
+    AsrModels.whisper_akera_large_v3: {"kik"},
+    AsrModels.mbaza_ctc_large: {"sw", "rw", "lg"},
 }
 
 
@@ -577,7 +596,7 @@ def google_translate_target_languages() -> dict[str, str]:
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
     """
-    from google.cloud import translate
+    from google.cloud import translate_v3 as translate
 
     _, project = get_google_auth_session()
     parent = f"projects/{project}/locations/global"
@@ -598,7 +617,7 @@ def google_translate_source_languages() -> dict[str, str]:
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
     """
-    from google.cloud import translate
+    from google.cloud import translate_v3 as translate
 
     _, project = get_google_auth_session()
     parent = f"projects/{project}/locations/global"
@@ -1204,7 +1223,7 @@ def run_asr(
             for result in batch.transcript.results  # SpeechRecognitionResult
             if result.alternatives
         )
-    elif "nemo" in selected_model.name:
+    elif selected_model == AsrModels.mbaza_ctc_large:
         data = call_celery_task(
             "nemo_asr",
             pipeline=dict(
@@ -1272,13 +1291,19 @@ def run_asr(
         )
     # call one of the self-hosted models
     else:
-        kwargs = {}
+        kwargs = {"task": "translate" if speech_translation_target else "transcribe"}
         if "vakyansh" in selected_model.name:
             # fixes https://github.com/huggingface/transformers/issues/15275#issuecomment-1624879632
             kwargs["decoder_kwargs"] = dict(skip_special_tokens=True)
             kwargs["chunk_length_s"] = 60
             kwargs["stride_length_s"] = (6, 0)
             kwargs["batch_size"] = 32
+        elif selected_model == AsrModels.whisper_akera_large_v3:
+            # don't pass language or task
+            kwargs.pop("task", None)
+            kwargs["max_length"] = 448
+        elif selected_model == AsrModels.whisper_sunbird_large_v3 and language:
+            kwargs["language"] = SUNBIRD_SUPPORTED_LANGUAGES[language.strip()]
         elif "whisper" in selected_model.name:
             forced_lang = forced_asr_languages.get(selected_model)
             if forced_lang:
@@ -1294,7 +1319,6 @@ def run_asr(
             ),
             inputs=dict(
                 audio=audio_url,
-                task="translate" if speech_translation_target else "transcribe",
                 return_timestamps=output_format != AsrOutputFormat.text,
                 **kwargs,
             ),

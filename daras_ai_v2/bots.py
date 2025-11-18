@@ -1,14 +1,16 @@
 import mimetypes
 import random
+import traceback
 import typing
 from datetime import datetime
 
 import gooey_gui as gui
 import requests
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -27,7 +29,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
@@ -36,10 +38,16 @@ from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
+from number_cycling.models import (
+    SharedPhoneNumber,
+    SharedPhoneNumberBotUser,
+)
+from number_cycling.utils import parse_extension_number
+
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
-    "Please go to the Integrations Tab and connect this page."
+    "Please go to the Deploy Tab and connect this page."
 )
 RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
@@ -69,8 +77,6 @@ FEEDBACK_CONFIRMED_MSG = (
     "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
 
-SLACK_MAX_SIZE = 3000
-
 
 class ButtonPressed(BaseModel):
     button_id: str = Field(
@@ -82,6 +88,10 @@ class ButtonPressed(BaseModel):
     button_title: str | None = Field(
         None, description="The title of the button that was pressed by the user"
     )
+
+
+class BotIntegrationLookupFailed(UserError):
+    pass
 
 
 class BotInterface:
@@ -149,6 +159,72 @@ class BotInterface:
         self.show_feedback_buttons = self.bi.show_feedback_buttons
         self.streaming_enabled = self.bi.streaming_enabled
 
+    def lookup_bot_integration(
+        self, *, bot_lookup: dict, user_lookup: dict
+    ) -> BotIntegration:
+        try:
+            shared_number = SharedPhoneNumber.objects.get(
+                **bot_lookup,
+                platform=self.platform,
+                is_active=True,
+            )
+        except SharedPhoneNumber.DoesNotExist:
+            try:
+                return BotIntegration.objects.filter(
+                    **bot_lookup,
+                    shared_phone_number__isnull=True,
+                ).latest()
+            except BotIntegration.DoesNotExist as e:
+                # ideally, send an email to the admin here
+                raise UserError(
+                    f"phone number {self.bot_id} is not configured for {self.platform.label}"
+                ) from e
+
+        input_text = self.get_input_text() or ""
+        input_text = input_text.strip().lower()
+
+        if input_text.startswith("/disconnect"):
+            SharedPhoneNumberBotUser.objects.filter(
+                shared_phone_number=shared_number,
+                **user_lookup,
+            ).delete()
+            raise BotIntegrationLookupFailed("Extension disconnected. Bye!")
+
+        extension_number = parse_extension_number(input_text)
+        try:
+            bi_user = SharedPhoneNumberBotUser.objects.filter(
+                shared_phone_number=shared_number,
+                **user_lookup,
+            ).latest()
+        except SharedPhoneNumberBotUser.DoesNotExist as e:
+            bi_user = None
+            if not extension_number:
+                raise BotIntegrationLookupFailed(
+                    "Hi from Gooey.AI. Please enter a 5 digit extension number."
+                ) from e
+
+        if (not bi_user) or (input_text.startswith("/ext") and extension_number):
+            try:
+                bi = BotIntegration.objects.filter(
+                    platform=self.platform,
+                    shared_phone_number=shared_number,
+                    extension_number=extension_number,
+                ).latest()
+            except BotIntegration.DoesNotExist as e:
+                raise BotIntegrationLookupFailed(
+                    "Sorry, I couldn't find that extension on Gooey.AI. Please try with the correct extension number."
+                ) from e
+
+            bi_user = SharedPhoneNumberBotUser.objects.update_or_create(
+                shared_phone_number=shared_number,
+                **user_lookup,
+                defaults=dict(bot_integration=bi),
+            )[0]
+            # replace the ext number with a prompt for the bot to start
+            self.get_input_text = lambda: "Hello"
+
+        return bi_user.bot_integration
+
     def send_msg(
         self,
         *,
@@ -180,8 +256,8 @@ class BotInterface:
         if disable_feedback:
             send_feedback_buttons = False
 
-        if buttons and send_feedback_buttons:
-            self._send_msg(
+        if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
+            update_msg_id = self._send_msg(
                 text=text,
                 audio=audio,
                 video=video,
@@ -189,19 +265,22 @@ class BotInterface:
                 documents=documents,
                 update_msg_id=update_msg_id,
             )
-            text = ""
-
-        if send_feedback_buttons:
-            buttons = _feedback_buttons()
-
-        return self._send_msg(
-            text=text,
-            audio=audio,
-            video=video,
-            buttons=buttons,
-            documents=documents,
-            update_msg_id=update_msg_id,
-        )
+            # send feedback buttons as a separate message
+            return self._send_msg(
+                buttons=_feedback_buttons(),
+                update_msg_id=update_msg_id,
+            )
+        else:
+            if send_feedback_buttons:
+                buttons += _feedback_buttons()
+            return self._send_msg(
+                text=text,
+                audio=audio,
+                video=video,
+                buttons=buttons,
+                documents=documents,
+                update_msg_id=update_msg_id,
+            )
 
     def _send_msg(
         self,
@@ -371,6 +450,7 @@ def msg_handler_raw(bot: BotInterface):
     if input_text.lower().strip("/ ") in RESET_KEYWORDS:
         # record the reset time so we don't send context
         bot.convo.reset_at = timezone.now()
+        bot.convo.save(update_fields=["reset_at"])
         # let the user know we've reset
         bot.send_msg(text=RESET_MSG)
     else:
@@ -433,6 +513,15 @@ def _process_and_send_msg(
         request_body=body,
     )
     bot.on_run_created(sr)
+
+    try:
+        sr.platform = bot.platform
+        sr.user_message_id = bot.user_msg_id
+        sr.save(update_fields=["platform", "user_message_id"])
+    except IntegrityError as e:
+        # Likely duplicate (platform, user_message_id). Log and proceed.
+        traceback.print_exc()
+        capture_exception(e)
 
     send_feedback_buttons = bot.show_feedback_buttons
 
@@ -521,15 +610,22 @@ def _process_and_send_msg(
         )
 
     # save msgs to db
-    _save_msgs(
-        bot=bot,
+    save_msg_pair_to_db(
+        convo=bot.convo,
         input_images=input_images,
         input_documents=input_documents,
-        input_text=input_text,
-        platform_msg_id=sent_msg_id or update_msg_id,
-        response=VideoBotsPage.ResponseModel.model_validate(state),
         saved_run=sr,
         received_time=recieved_time,
+        user_msg_id=bot.user_msg_id,
+        bot_msg_id=sent_msg_id or update_msg_id,
+        # user input
+        user_msg_display_content=state.get("input_prompt") or "",
+        # processed user input for bot
+        user_msg_content=state.get("raw_input_text") or "",
+        # raw bot output
+        bot_msg_content=state.get("raw_output_text") and state["raw_output_text"][0],
+        # bot output for human
+        bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
 
 
@@ -570,8 +666,11 @@ def build_system_vars(
             )
         case Platform.SLACK:
             variables["slack_user_name"] = convo.slack_user_name
+            variables["slack_user_id"] = convo.slack_user_id
             variables["slack_channel_name"] = convo.slack_channel_name
+            variables["slack_channel_id"] = convo.slack_channel_id
             variables["slack_team_name"] = bi.slack_team_name
+            variables["slack_team_id"] = bi.slack_team_id
         case Platform.WEB:
             variables["web_user_id"] = convo.web_user_id
         case Platform.TWILIO:
@@ -586,24 +685,32 @@ def build_system_vars(
     return variables, variables_schema
 
 
-def _save_msgs(
-    bot: BotInterface,
-    input_images: list[str] | None,
-    input_documents: list[str] | None,
-    input_text: str,
-    platform_msg_id: str | None,
-    response: VideoBotsPage.ResponseModel,
-    saved_run: SavedRun,
-    received_time: datetime,
+def save_msg_pair_to_db(
+    *,
+    convo: Conversation,
+    user_msg_id: str | None = None,
+    bot_msg_id: str | None = None,
+    input_images: list[str] | None = None,
+    input_documents: list[str] | None = None,
+    user_msg_content: str = "",
+    user_msg_display_content: str = "",
+    bot_msg_content: str = "",
+    bot_msg_display_content: str = "",
+    saved_run: SavedRun | None = None,
+    received_time: datetime | None = None,
 ):
+    if received_time:
+        response_time = timezone.now() - received_time
+    else:
+        response_time = None
     # create messages for future context
     user_msg = Message(
-        platform_msg_id=bot.user_msg_id,
-        conversation=bot.convo,
+        platform_msg_id=user_msg_id,
+        conversation=convo,
         role=CHATML_ROLE_USER,
-        content=response.raw_input_text,
-        display_content=input_text,
-        response_time=timezone.now() - received_time,
+        content=user_msg_content,
+        display_content=user_msg_display_content,
+        response_time=response_time,
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -612,13 +719,13 @@ def _save_msgs(
             MessageAttachment(message=user_msg, url=f_url, metadata=metadata)
         )
     assistant_msg = Message(
-        platform_msg_id=platform_msg_id,
-        conversation=bot.convo,
+        platform_msg_id=bot_msg_id,
+        conversation=convo,
         role=CHATML_ROLE_ASSISTANT,
-        content=response.raw_output_text and response.raw_output_text[0],
-        display_content=response.output_text and response.output_text[0],
+        content=bot_msg_content,
+        display_content=bot_msg_display_content,
         saved_run=saved_run,
-        response_time=timezone.now() - received_time,
+        response_time=response_time,
     )
     # save the messages & attachments
     # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code

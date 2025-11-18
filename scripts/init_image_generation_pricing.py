@@ -29,6 +29,31 @@ def run():
         notes="Token-based pricing: $5/1M text input tokens, $10/1M image input tokens, $40/1M output tokens",
     )
 
+    # Nano Banana (Google) - Per-image pricing 8 credits per image
+    image_generation_pricing_create(
+        model_id="fal-ai/nano-banana",
+        model_name=Text2ImgModels.nano_banana.name,
+        unit_cost_text_input=None,
+        unit_cost_image_input=None,
+        unit_cost_output=0.08,
+        unit_quantity=1,
+        provider=ModelProvider.fal_ai,
+        pricing_url="https://fal.ai/models/fal-ai/nano-banana",
+        notes="Per-image pricing: $0.08 per generated image (8 credits per image)",
+    )
+
+    image_generation_pricing_create(
+        model_id="fal-ai/nano-banana/edit",
+        model_name=Img2ImgModels.nano_banana.name,
+        unit_cost_text_input=None,
+        unit_cost_image_input=None,
+        unit_cost_output=0.08,
+        unit_quantity=1,
+        provider=ModelProvider.fal_ai,
+        pricing_url="https://fal.ai/models/fal-ai/nano-banana/edit",
+        notes="Per-image pricing: $0.08 per generated image (8 credits per image)",
+    )
+
 
 def image_generation_pricing_create(
     model_id: str,

@@ -34,9 +34,7 @@ from workspaces.models import Workspace
 
 
 class TextToSpeechSettings(BaseModel):
-    tts_provider: (
-        typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
-    ) = None
+    tts_provider: TextToSpeechProviders.api_choices | None = None
 
     uberduck_voice_name: str | None = None
     uberduck_speaking_rate: float | None = None
@@ -75,18 +73,6 @@ class TextToSpeechPage(BasePage):
         "text2speech",
         "compare-text-to-speech-engines",
     ]
-
-    sane_defaults = {
-        "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,
-        "google_voice_name": "en-IN-Wavenet-A",
-        "google_pitch": 0.0,
-        "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "Aiden Botha",
-        "uberduck_speaking_rate": 1.0,
-        "elevenlabs_model": "eleven_multilingual_v2",
-        "elevenlabs_stability": 0.5,
-        "elevenlabs_similarity_boost": 0.75,
-    }
 
     class RequestModelBase(BasePage.RequestModel):
         text_prompt: str
@@ -160,9 +146,9 @@ class TextToSpeechPage(BasePage):
             return len(text) * 0.079
 
     def _get_tts_provider(self, state: dict):
-        tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
-        # TODO: validate tts_provider before lookup?
-        return TextToSpeechProviders[tts_provider]
+        return TextToSpeechProviders.get(
+            state.get("tts_provider"), default=TextToSpeechProviders.OPEN_AI
+        )
 
     def get_cost_note(self):
         tts_provider = gui.session_state.get("tts_provider")

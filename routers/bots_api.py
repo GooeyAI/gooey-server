@@ -33,7 +33,7 @@ MSG_ID_PREFIX = "web-"
 
 class CreateStreamRequestBase(BaseModel):
     integration_id: str = Field(
-        description="Your Integration ID as shown in the Copilot Integrations tab"
+        description="Your Integration ID as shown in the Copilot Deploy tab"
     )
 
     conversation_id: str | None = Field(

@@ -1,4 +1,3 @@
-import datetime
 import typing
 import uuid
 
@@ -8,7 +7,9 @@ from pydantic import BaseModel, Field
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.text_format import format_timedelta
 from daras_ai_v2 import icons
+from daras_ai_v2 import breadcrumbs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -248,21 +249,32 @@ To understand what each field represents, check out our [API docs](https://api.g
             _backup = gui.session_state
             for url in eval_runs:
                 try:
-                    page_cls, sr, _ = url_to_runs(url)
+                    page_cls, sr, pr = url_to_runs(url)
                 except SavedRun.DoesNotExist:
                     continue
                 gui.set_session_state(sr.state)
+                title = breadcrumbs.get_title_breadcrumbs(
+                    page_cls=page_cls, sr=sr, pr=pr
+                ).title_with_prefix()
+                gui.html(
+                    '<i class="fa fa-external-link"></i>'
+                    f' <a href="{url}" target="_blank">{title}</a>'
+                )
                 try:
                     page_cls().render_output()
                 except Exception as e:
                     gui.error(repr(e))
-                gui.write(url)
                 gui.write("---")
             gui.set_session_state(_backup)
         else:
             files = gui.session_state.get("output_documents", [])
             for file in files:
-                gui.write(file)
+                gui.html(
+                    '<span class="float-end">'
+                    '<i class="fa fa-file-csv"></i>'
+                    f' <a href="{file}" target="_blank">Download</a>'
+                    "</span><br>"
+                )
                 gui.data_table(file)
 
     def run_v2(
@@ -310,13 +322,10 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     sr.wait_for_celery_result(result)
 
-                    run_time = datetime.timedelta(
-                        seconds=int(sr.run_time.total_seconds())
-                    )
                     state = sr.to_dict()
                     state["run_url"] = sr.get_app_url()
                     state["price"] = sr.price
-                    state["run_time"] = str(run_time)
+                    state["run_time"] = round(sr.run_time.total_seconds(), 2)
                     state["error_msg"] = sr.error_msg
 
                     for field, col in request.output_columns.items():

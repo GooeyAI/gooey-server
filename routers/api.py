@@ -38,6 +38,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from functions.models import CalledFunctionResponse
+from recipes.BulkRunner import is_arr
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.models import Workspace
 from workspaces.widgets import set_current_workspace
@@ -313,18 +314,17 @@ def _parse_form_data(
             for uf in uf_list
         ]
         try:
-            is_str = (
-                request_model.model_json_schema()["properties"][key]["type"] == "string"
-            )
+            field_schema = request_model.model_json_schema()["properties"][key]
+            field_is_arr = is_arr(field_schema)
         except KeyError:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=dict(error=f'Inavlid file field "{key}"'),
             )
-        if is_str:
-            page_request_data[key] = urls[0]
-        else:
+        if field_is_arr:
             page_request_data.setdefault(key, []).extend(urls)
+        else:
+            page_request_data[key] = urls[0]
     # validate the request
     try:
         page_request = request_model.model_validate(page_request_data)
@@ -343,7 +343,34 @@ def submit_api_call(
     request_body: dict,
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
+    **defaults,
 ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+    page, sr = create_new_run(
+        page_cls=page_cls,
+        query_params=query_params,
+        retention_policy=retention_policy,
+        current_user=current_user,
+        workspace=workspace,
+        request_body=request_body,
+        enable_rate_limits=enable_rate_limits,
+        **defaults,
+    )
+    # submit the task
+    result = page.call_runner_task(sr, deduct_credits=deduct_credits)
+    return result, sr
+
+
+def create_new_run(
+    *,
+    page_cls: typing.Type[BasePage],
+    query_params: dict,
+    retention_policy: RetentionPolicy = None,
+    current_user: AppUser,
+    workspace: Workspace,
+    request_body: dict,
+    enable_rate_limits: bool = False,
+    **defaults,
+) -> tuple["BasePage", "SavedRun"]:
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
     page = page_cls(user=current_user, query_params=query_params)
@@ -351,8 +378,13 @@ def submit_api_call(
 
     # get saved state from db
     state = page.current_sr_to_session_state()
-    # load request data
+    # extract variables
+    variables = request_body.pop("variables", None)
+    # merge request data
     state.update(request_body)
+    # merge variables
+    if variables:
+        state.setdefault("variables", {}).update(variables)
 
     # set streamlit session state
     gui.set_session_state(state)
@@ -363,12 +395,12 @@ def submit_api_call(
             enable_rate_limits=enable_rate_limits,
             is_api_call=True,
             retention_policy=retention_policy or RetentionPolicy.keep,
+            **defaults,
         )
     except ValidationError as e:
         raise RequestValidationError(e.errors(), body=gui.session_state) from e
-    # submit the task
-    result = page.call_runner_task(sr, deduct_credits=deduct_credits)
-    return result, sr
+
+    return page, sr
 
 
 def build_async_api_response(sr: "SavedRun") -> dict:

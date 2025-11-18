@@ -22,16 +22,14 @@ from daras_ai_v2.workflow_url_input import del_button
 from gooeysite.custom_filters import JSONBExtractPath, related_json_field_summary
 from recipes.BulkRunner import list_view_editor
 
+from widgets.plotly_theme import (
+    apply_consistent_styling,
+    defaultPlotlyConfig,
+    COLOR_PALETTE,
+)
+
 if typing.TYPE_CHECKING:
     import plotly.graph_objects as go
-
-
-# Modern color palette with 27 distinct colors
-COLOR_PALETTE = [
-    "#FF6B6B", "#45B7D1", "#96CEB4", "#FFEEAD", "#D4A5A5", "#9B59B6", "#3498DB", "#E74C3C", "#2ECC71", "#F1C40F",
-    "#E67E22", "#1ABC9C", "#9B59B6", "#34495E", "#E74C3C", "#3498DB", "#2ECC71", "#F1C40F", "#E67E22", "#1ABC9C",
-    "#9B59B6", "#34495E", "#E74C3C", "#3498DB", "#2ECC71", "#F1C40F",
-]  # fmt: skip
 
 
 def render_analysis_section(
@@ -223,13 +221,14 @@ def render_graph_data(
         gui.write(f"##### {key}")
 
     if graph_data["data_selection"] == DataSelection.last.value:
-        latest_msg = (
-            Message.objects.filter(conversation__bot_integration=bi)
-            .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
-            .exclude(val__isnull=True)
-            .latest()
-        )
-        if not latest_msg:
+        try:
+            latest_msg = (
+                Message.objects.filter(conversation__bot_integration=bi)
+                .annotate(val=JSONBExtractPath("analysis_result", key.split("__")))
+                .exclude(val__isnull=True)
+                .latest()
+            )
+        except Message.DoesNotExist:
             gui.write("No analysis results found")
             return
         values = [[latest_msg.analysis_result.get(key), 1]]
@@ -294,7 +293,7 @@ def render_bar_chart(values: list[list[typing.Any]]):
         margin=dict(l=0, r=0, t=0, b=70),
         xaxis=dict(tickangle=-35),
     )
-    gui.plotly_chart(fig, config={"displayModeBar": False, "displaylogo": False})
+    gui.plotly_chart(fig, config=defaultPlotlyConfig)
 
 
 def render_pie_chart(values: list[list[typing.Any]]):
@@ -360,23 +359,7 @@ def make_figure(*data: typing.Any) -> "go.Figure":
     import plotly.graph_objects as go
 
     fig = go.Figure(data=data)
-    fig.update_layout(
-        template="plotly_white",
-        font=dict(size=12, family="basiercircle,sans-serif"),
-        polar=dict(
-            radialaxis=dict(angle=90, tickangle=90),
-            angularaxis=dict(rotation=25),
-        ),
-        dragmode="pan",
-        autosize=True,
-        hovermode="x unified",
-    )
-    fig.update_xaxes(
-        spikemode="across",
-        spikedash="solid",
-        spikecolor="rgba(126, 87, 194, 0.25)",  # soft purple, semi-transparent
-        spikethickness=1,
-    )
+    fig = apply_consistent_styling(fig)
     return fig
 
 

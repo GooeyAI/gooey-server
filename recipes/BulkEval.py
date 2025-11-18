@@ -286,9 +286,13 @@ Here's what you uploaded:
         aggregations = gui.session_state.get("aggregations", [])
 
         for file, results in zip_longest(files, aggregations):
-            gui.write(file)
+            gui.html(
+                '<span class="float-end">'
+                '<i class="fa fa-file-csv"></i>'
+                f' <a href="{file}" target="_blank">Download</a>'
+                "</span><br>"
+            )
             gui.data_table(file)
-
             if not results:
                 continue
 
@@ -406,6 +410,7 @@ def iterate(
             yield "Uploading Results..."
 
         result = fut.result()
+        input_cols = set(result.current_rec.keys())
 
         for metric_name, metric_value in result.llm_output.items():
             col = f"{result.ep['name']} - {metric_name}"
@@ -426,6 +431,8 @@ def iterate(
             else:
                 cols = out_df.select_dtypes(include=["float", "int"]).columns
             for col in cols:
+                if col in input_cols:
+                    continue
                 col_values = out_df[col].dropna()
                 agg_value = col_values.agg(agg["function"])
                 aggs.append(

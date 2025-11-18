@@ -10,7 +10,9 @@ client = TestClient(app)
 
 
 def test_send_msg_streaming(db_fixtures, force_authentication, mock_celery_tasks):
-    bi = BotIntegration.objects.filter(platform=Platform.WEB).first()
+    bi = BotIntegration.objects.filter(
+        published_run__saved_run__state__output_text__isnull=False,
+    ).first()
     r = client.post(
         "/v3/integrations/stream/",
         json={

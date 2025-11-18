@@ -55,6 +55,8 @@ class Text2ImgModels(Enum):
     dall_e_3 = "DALL·E 3 (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
+    nano_banana = "Nano Banana (Google)"
+
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
     analog_diffusion = "Analog Diffusion [Deprecated] (wavymulder)"
@@ -62,6 +64,10 @@ class Text2ImgModels(Enum):
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
     deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
+
+    @classmethod
+    def _available(cls):
+        return set(cls) - cls._deprecated()
 
     @classmethod
     def _deprecated(cls):
@@ -89,6 +95,10 @@ openai_model_ids = {
     Text2ImgModels.gpt_image_1: "gpt-image-1",
 }
 
+gemini_model_ids = {
+    Text2ImgModels.nano_banana: "fal-ai/nano-banana",
+}
+
 
 class Img2ImgModels(Enum):
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
@@ -101,6 +111,7 @@ class Img2ImgModels(Enum):
     dall_e = "Dall-E (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
+    nano_banana = "Nano Banana (Google)"
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
@@ -131,6 +142,7 @@ img2img_model_ids = {
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Img2ImgModels.dall_e: "dall-e-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
+    Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
 }
 
 
@@ -308,6 +320,7 @@ def text2img(
         Text2ImgModels.dall_e_3,
         Text2ImgModels.flux_1_dev,
         Text2ImgModels.gpt_image_1,
+        Text2ImgModels.nano_banana,
     }:
         _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -382,6 +395,24 @@ def text2img(
                     response_format="b64_json",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
+        case Text2ImgModels.nano_banana:
+            from usage_costs.cost_utils import record_cost_auto
+            from usage_costs.models import ModelSku
+
+            payload = dict(prompt=prompt, output_format="png", num_images=num_outputs)
+
+            output_images = yield from generate_fal_images(
+                model_id=gemini_model_ids[model],
+                payload=payload,
+            )
+
+            record_cost_auto(
+                model=gemini_model_ids[model],
+                sku=ModelSku.output_image_tokens,
+                quantity=num_outputs,
+            )
+
+            return output_images
         case _:
             prompt = add_prompt_prefix(prompt, model.name)
             return call_sd_multi(
@@ -462,8 +493,18 @@ def img2img(
     seed: int = 42,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
 ) -> typing.Generator[str, None, list[str]]:
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
+
+    if not prompt and selected_model in (
+        Img2ImgModels.flux_pro_kontext.name,
+        Img2ImgModels.gpt_image_1.name,
+        Img2ImgModels.nano_banana.name,
+    ):
+        raise UserError("Text prompt is required for this model")
 
     match selected_model:
         case Img2ImgModels.flux_pro_kontext.name:
@@ -483,9 +524,6 @@ def img2img(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
             )
-
-            from usage_costs.cost_utils import record_cost_auto
-            from usage_costs.models import ModelSku
 
             record_cost_auto(
                 model=img2img_model_ids[Img2ImgModels[selected_model]],
@@ -533,6 +571,25 @@ def img2img(
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
                 for part in response.data
             ]
+        case Img2ImgModels.nano_banana.name:
+            payload = dict(
+                prompt=prompt,
+                image_urls=[init_image],
+                num_images=num_outputs,
+                output_format="png",
+            )
+            output_images = yield from generate_fal_images(
+                model_id=img2img_model_ids[Img2ImgModels[selected_model]],
+                payload=payload,
+            )
+
+            record_cost_auto(
+                model=img2img_model_ids[Img2ImgModels[selected_model]],
+                sku=ModelSku.output_image_tokens,
+                quantity=num_outputs,
+            )
+
+            return output_images
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(

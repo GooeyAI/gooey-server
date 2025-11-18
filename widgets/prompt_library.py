@@ -4,7 +4,11 @@ import gooey_gui as gui
 
 from daras_ai_v2 import icons
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
-from functions.inbuilt_tools import FeedbackCollectionLLMTool, CallTransferLLMTool
+from functions.inbuilt_tools import (
+    FeedbackCollectionLLMTool,
+    CallTransferLLMTool,
+    VectorSearchLLMTool,
+)
 
 
 class Prompt(typing.NamedTuple):
@@ -66,6 +70,10 @@ Use the geocoding response to lookup details on google instead of location coord
     Prompt(
         title="Feedback Collection Tool",
         snippet=FeedbackCollectionLLMTool.system_prompt,
+    ),
+    Prompt(
+        title="Knowledge Base Search Tool",
+        snippet=VectorSearchLLMTool.system_prompt,
     ),
     Prompt(
         title="Current Date",

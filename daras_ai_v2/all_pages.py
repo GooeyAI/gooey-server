@@ -33,6 +33,7 @@ from recipes.SmartGPT import SmartGPTPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
+from recipes.VideoGenPage import VideoGenPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr_page import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
@@ -63,6 +64,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         FunctionsPage,
     ],
     "Videos, Lipsync, & Speech": [
+        VideoGenPage,
         LipsyncPage,
         LipsyncTTSPage,
         TextToSpeechPage,

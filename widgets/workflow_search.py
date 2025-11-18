@@ -1,8 +1,8 @@
+import re
 import typing
 
-from fastapi import Request
 import gooey_gui as gui
-from django.contrib.postgres.search import SearchQuery, SearchVector
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.db.models import (
     BooleanField,
     F,
@@ -11,7 +11,8 @@ from django.db.models import (
     QuerySet,
     Value,
 )
-from pydantic import BaseModel
+from django.utils.translation import ngettext
+from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Workflow, WorkflowAccessLevel
@@ -22,9 +23,11 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceRole
 
+if typing.TYPE_CHECKING:
+    from fastapi import Request
+
 
 class SortOption(typing.NamedTuple):
-    value: str
     label: str
     icon: str
 
@@ -33,30 +36,32 @@ _icon_width = "1.3em"
 
 
 class SortOptions(SortOption, GooeyEnum):
-    FEATURED = SortOption(
-        value="featured",
+    featured = SortOption(
         label="Featured",
         icon=f'<i class="fa-solid fa-star" style="width: {_icon_width};"></i>',
     )
-    UPDATED_AT = SortOption(
-        value="last_updated",
+    last_updated = SortOption(
         label="Last Updated",
         icon=f'<i class="fa-solid fa-clock" style="width: {_icon_width};"></i>',
     )
-    CREATED_AT = SortOption(
-        value="created_at",
+    created_at = SortOption(
         label="Created At",
         icon=f'<i class="fa-solid fa-calendar" style="width: {_icon_width};"></i>',
     )
-    MOST_RUNS = SortOption(
-        value="most_runs",
+    most_runs = SortOption(
         label="Most Runs",
         icon=f'<i class="fa-solid fa-chart-line" style="width: {_icon_width};"></i>',
     )
 
     @classmethod
-    def get(cls, key=None, default=None):
-        return super().get(key, default=cls.FEATURED)
+    def get(cls, key=None):
+        return super().get(key, default=cls.featured)
+
+    def html_icon_label(self) -> str:
+        return f'{self.icon}<span class="hide-on-small-screens"> {self.label}</span>'
+
+
+SEARCH_TOKEN_ALLOWED_CHARS = re.compile(r"[\w]+")
 
 
 class SearchFilters(BaseModel):
@@ -68,9 +73,16 @@ class SearchFilters(BaseModel):
     def __bool__(self):
         return bool(self.search or self.workspace or self.workflow or self.sort)
 
+    @field_validator("sort", "workflow", mode="before")
+    @classmethod
+    def to_lower(cls, v):
+        return v.lower() if isinstance(v, str) else v
+
 
 def render_search_filters(
-    current_user: AppUser | None = None, search_filters: SearchFilters | None = None
+    current_user: AppUser | None = None,
+    search_filters: SearchFilters | None = None,
+    result_count: int | None = None,
 ):
     if not search_filters:
         search_filters = SearchFilters()
@@ -115,12 +127,11 @@ def render_search_filters(
             with gui.div(
                 className=f"{col_class} d-flex gap-2 justify-content-end align-items-center",
             ):
-                sort_options: dict[str, str] = {
-                    (opt.value if opt != SortOptions.get() else ""): (
-                        f'{opt.icon}<span class="hide-on-small-screens"> {opt.label}</span>'
+                if result_count is not None:
+                    gui.caption(
+                        f"{result_count} {ngettext('result', 'results', result_count)}",
+                        className="text-muted d-none d-md-block",
                     )
-                    for opt in SortOptions
-                }
                 with (
                     gui.styled(
                         """
@@ -138,6 +149,12 @@ def render_search_filters(
                     ),
                     gui.div(),
                 ):
+                    sort_options = {
+                        opt.name if opt != SortOptions.get() else None: (
+                            opt.html_icon_label()
+                        )
+                        for opt in SortOptions
+                    }
                     search_filters.sort = (
                         gui.selectbox(
                             label="",
@@ -154,11 +171,11 @@ def render_search_filters(
 
 
 def render_search_bar_with_redirect(
-    request: Request,
+    request: "Request",
     search_filters: SearchFilters,
     key: str = "global_search_query",
     id: str = "global_search_bar",
-    max_width: str = "500px",
+    max_width: str = "450px",
 ):
     from routers.root import explore_page
 
@@ -210,7 +227,7 @@ def render_search_bar(
             }}
             &::before {{
                 content: "\f002";              /* FontAwesome glyph */
-                font-family: "Font Awesome 6 Pro";
+                font-family: "Font Awesome 7 Pro";
                 position: absolute;
                 top: 14px;
                 left: 18px;
@@ -236,7 +253,7 @@ def render_search_bar(
             key=key,
             id=id,
             value=search_filters.search,
-            autocomplete="off",
+            autoComplete="off",
             **props,
         )
 
@@ -367,8 +384,9 @@ def _render_selectbox(
     )
 
 
-def render_search_results(user: AppUser | None, search_filters: SearchFilters):
-    qs = get_filtered_published_runs(user, search_filters)
+def render_search_results(
+    qs: QuerySet[PublishedRun], user: AppUser | None, search_filters: SearchFilters
+):
     qs = qs.select_related("workspace", "created_by", "saved_run")
 
     def _render_run(pr: PublishedRun):
@@ -377,7 +395,7 @@ def render_search_results(user: AppUser | None, search_filters: SearchFilters):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
         hide_last_editor = bool(pr.workspace_id and not is_member)
-        show_run_count = is_member or search_filters.sort == SortOptions.MOST_RUNS.value
+        show_run_count = is_member or search_filters.sort == SortOptions.most_runs.name
 
         render_saved_workflow_preview(
             workflow.page_cls,
@@ -398,26 +416,29 @@ def get_filtered_published_runs(
     qs = PublishedRun.objects.all()
     qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
-    qs = build_sort_filter(qs, SortOptions.get(search_filters.sort))
+    qs = build_sort_filter(qs, search_filters)
     return qs[:25]
 
 
-def build_sort_filter(qs: QuerySet, sort: SortOptions) -> QuerySet:
-    match sort:
-        case SortOptions.FEATURED:
+def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
+    match SortOptions.get(search_filters.sort):
+        case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            return qs.order_by(
+            order_by = [
                 "-is_approved_example",
                 "-example_priority",
                 "-is_root_workflow",
                 F("is_created_by").desc(nulls_last=True),
                 "-updated_at",
-            )
-        case SortOptions.UPDATED_AT:
+            ]
+            if search_filters.search:
+                order_by.insert(0, "-rank")
+            return qs.order_by(*order_by)
+        case SortOptions.last_updated:
             return qs.order_by("-updated_at")
-        case SortOptions.CREATED_AT:
+        case SortOptions.created_at:
             return qs.order_by("-created_at")
-        case SortOptions.MOST_RUNS:
+        case SortOptions.most_runs:
             return qs.order_by(
                 "-run_count", F("is_created_by").desc(nulls_last=True), "-updated_at"
             )
@@ -480,32 +501,25 @@ def build_search_filter(
     if search_filters.search:
         # build a raw tsquery like "foo:* & bar:*
         tokens = []
-        for token in search_filters.search.strip().split():
-            # Only allow tokens that are alphanumeric
-            token = "".join(c for c in token if c.isalnum())
-            if not token:
-                continue
-            tokens.append(token + ":*")
+        for word in search_filters.search.strip().split():
+            for token in re.findall(SEARCH_TOKEN_ALLOWED_CHARS, word):
+                tokens.append(token + ":*")
         raw_query = " & ".join(tokens)
-        search = SearchQuery(raw_query, search_type="raw")
+        query = SearchQuery(raw_query, search_type="raw")
 
-        # search by workflow title
-        workflow_search = PublishedRun.objects.filter(
-            published_run_id="", title__search=search
-        ).values("workflow")
-
-        # search by workflow metadata
-        qs = qs.annotate(
-            search=SearchVector(
-                "title",
-                "notes",
-                "created_by__display_name",
-                "workspace__handle__name",
+        vector = (
+            SearchVector("title", weight="A")
+            + SearchVector(
                 "workspace__name",
-            ),
+                "workspace__handle__name",
+                "created_by__display_name",
+                weight="B",
+            )
+            + SearchVector("notes", weight="C")
         )
+        qs = qs.annotate(search=vector, rank=SearchRank(vector, query))
 
         # filter on the search vector
-        qs = qs.filter(Q(search=search) | Q(workflow__in=workflow_search))
+        qs = qs.filter(search=query)
 
     return qs

@@ -342,6 +342,7 @@ def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str
         stop=[STOP_SEQ],
         avoid_repetition=request.avoid_repetition,
         response_format_type=request.response_format_type,
+        reasoning_effort=request.reasoning_effort,
     )
 
 

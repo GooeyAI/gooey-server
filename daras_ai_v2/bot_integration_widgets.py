@@ -226,14 +226,23 @@ def twilio_specific_settings(bi: BotIntegration):
         value=bi.twilio_waiting_text,
         key=f"_bi_twilio_waiting_text_{bi.id}",
     )
+
     bi.twilio_use_missed_call = gui.checkbox(
         "📞 Use Missed Call",
         value=bi.twilio_use_missed_call,
         key=f"_bi_twilio_use_missed_call_{bi.id}",
+        disabled=bi.extension_number,
     )
+
+    if bi.extension_number:
+        gui.caption(
+            f"[Upgrade]({settings.PRICING_DETAILS_URL}) for missed call support."
+        )
+
     gui.caption(
         "When enabled, immediately hangs up incoming calls and calls back the user so they don't incur charges (depending on their carrier/plan)."
     )
+
     bi.twilio_fresh_conversation_per_call = gui.checkbox(
         "🔄 Fresh Conversation History for Each Call",
         value=bi.twilio_fresh_conversation_per_call,
@@ -324,7 +333,11 @@ def broadcast_input(bi: BotIntegration):
     if not gui.session_state.get(should_confirm_key):
         return
 
-    convos = bi.conversations.all()
+    convo_qs = bi.conversations.all()
+    if bi.platform == Platform.SLACK:
+        convo_qs = convo_qs.distinct("slack_channel_id")
+    else:
+        convo_qs = convo_qs.distinct_by_user_id()
     if gui.session_state.get(confirmed_send_btn):
         gui.success("Started sending broadcast!")
         gui.session_state.pop(confirmed_send_btn)
@@ -335,15 +348,15 @@ def broadcast_input(bi: BotIntegration):
             video=video,
             documents=documents,
             bi=bi,
-            convo_qs=convos,
+            convo_qs=convo_qs,
             medium=medium,
         )
     else:
-        if not convos.exists():
+        if not convo_qs.exists():
             gui.error("No users have interacted with this bot yet.", icon="⚠️")
             return
         gui.write(
-            f"Are you sure? This will send a message to all {convos.count()} users that have ever interacted with this bot.\n"
+            f"Are you sure? This will send a message to all {convo_qs.count()} users that have ever interacted with this bot.\n"
         )
         gui.button("✅ Yes, Send", key=confirmed_send_btn)
 

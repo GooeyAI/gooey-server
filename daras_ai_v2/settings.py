@@ -22,7 +22,6 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -47,6 +46,8 @@ SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", cast=bool, default=not D
 
 # CSP settings
 CSP_DEFAULT_SRC = ("*",)
+CSP_STYLE_SRC = ("*", "'unsafe-inline'")
+CSP_SCRIPT_SRC = ("*", "'unsafe-inline'")
 
 # Application definition
 
@@ -76,6 +77,9 @@ INSTALLED_APPS = [
     "workspaces",
     "api_keys",
     "managed_secrets",
+    "ai_models",
+    "number_cycling",
+    "memory",
 ]
 
 MIDDLEWARE = [
@@ -281,7 +285,6 @@ os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
 
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
-TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 FAL_API_KEY = config("FAL_API_KEY", default="")
 
 APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
@@ -300,6 +303,7 @@ BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
 
 HEADER_LINKS = [
+    (EXPLORE_URL, "Explore"),
     (DOCS_URL, "Docs"),
     ("/api/", "API"),
     (BLOG_URL, "Blog"),
@@ -511,9 +515,23 @@ SCRAPING_PROXY_CERT_URL = config("SCRAPING_PROXY_CERT_URL", "")
 
 FIREWORKS_API_KEY = config("FIREWORKS_API_KEY", "")
 MISTRAL_API_KEY = config("MISTRAL_API_KEY", "")
+SEA_LION_API_KEY = config("SEA_LION_API_KEY", "")
+PUBLICAI_API_KEY = config("PUBLICAI_API_KEY", "")
 
 MODAL_TOKEN_ID = config("MODAL_TOKEN_ID", "")
 MODAL_TOKEN_SECRET = config("MODAL_TOKEN_SECRET", "")
 if MODAL_TOKEN_ID and MODAL_TOKEN_SECRET:
     os.environ["MODAL_TOKEN_ID"] = MODAL_TOKEN_ID
     os.environ["MODAL_TOKEN_SECRET"] = MODAL_TOKEN_SECRET
+
+os.environ["LIVEKIT_API_KEY"] = config("LIVEKIT_API_KEY", "")
+os.environ["LIVEKIT_API_SECRET"] = config("LIVEKIT_API_SECRET", "")
+os.environ["LIVEKIT_URL"] = config("LIVEKIT_URL", "")
+
+LIVEKIT_SIP_URL = config("LIVEKIT_SIP_URL", "")
+LIVEKIT_SIP_TRUNK_NAME = config("LIVEKIT_SIP_TRUNK_NAME", "")
+LIVEKIT_SIP_TRUNK_USERNAME = config("LIVEKIT_SIP_TRUNK_USERNAME", "")
+LIVEKIT_SIP_TRUNK_PASSWORD = config("LIVEKIT_SIP_TRUNK_PASSWORD", "")
+
+COMPOSIO_API_KEY = config("COMPOSIO_API_KEY", "")
+os.environ["COMPOSIO_API_KEY"] = COMPOSIO_API_KEY

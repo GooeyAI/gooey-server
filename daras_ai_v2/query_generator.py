@@ -34,4 +34,5 @@ def generate_final_search_query(
         temperature=request.sampling_temperature,
         avoid_repetition=request.avoid_repetition,
         response_format_type=response_format_type,
+        reasoning_effort=request.reasoning_effort,
     )[0]
