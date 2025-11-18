@@ -9,7 +9,7 @@ from .composio_tools import get_toolkit_name_by_slug
 from .models import FunctionScopes, ScopeParts
 from app_users.models import AppUser
 from bots.models import PublishedRun
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 
 
 if typing.TYPE_CHECKING:
@@ -52,6 +52,8 @@ def get_integration_authorizations_for_workspace(workspace: "Workspace"):
 
 
 def manage_integration_authorizations(workspace: Workspace, current_user: AppUser):
+    from composio import Composio
+
     gui.caption("""
         Integrations use saved authorizations to securely connect your Gooey.AI workflows with other platforms (Google/M365, Notion, Slack, and more). The Authorized for scope defines how broadly the authorization may be used across your Workspace, Deployments and Users. [Learn more](https://gooey.ai/IntegrationAuthorizationHelp).
     """)
@@ -63,14 +65,19 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
         gui.write("No integrations authorized yet.")
         return
 
-    with gui.div(className="table-responsive"), gui.tag("table", className="table"):
+    with (
+        gui.div(className="table-responsive"),
+        gui.tag("table", className="table table-striped"),
+    ):
         with gui.tag("thead"), gui.tag("tr"):
-            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
+            with gui.tag("th", scope="col"):
                 gui.html("Workflow")
-            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
+            with gui.tag("th", scope="col"):
                 gui.html("Integration")
-            with gui.tag("th", scope="col"), gui.tag("h6", className="d-inline"):
+            with gui.tag("th", scope="col"):
                 gui.html("Authorized for")
+            with gui.tag("th", scope="col"):
+                pass  # Actions column
 
         with gui.tag("tbody"):
             pr_ids, user_ids = set(), set()
@@ -126,3 +133,21 @@ def manage_integration_authorizations(workspace: Workspace, current_user: AppUse
                                 current_user=current_user,
                             )
                         )
+                    with gui.tag("td"):
+                        delete_dialog = gui.use_confirm_dialog(
+                            key=f"delete-integration-auth-{account['id']}"
+                        )
+                        gui.button_with_confirm_dialog(
+                            ref=delete_dialog,
+                            trigger_label=icons.delete,
+                            trigger_type="tertiary",
+                            trigger_className="text-danger p-0 m-0",
+                            modal_title="#### Delete Authorization",
+                            modal_content="Are you sure you want to delete this authorization?\n\n"
+                            "Workflows using this authorization will stop working.",
+                            confirm_label="Delete",
+                            confirm_className="border-danger bg-danger text-white",
+                        )
+                        if delete_dialog.pressed_confirm:
+                            Composio().connected_accounts.delete(account["id"])
+                            gui.rerun()
