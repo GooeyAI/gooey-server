@@ -433,7 +433,7 @@ class BasePage:
             return
 
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
-        if self.tab != RecipeTabs.run:
+        if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
             if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
                 sidebar_ref.set_open(False)
                 sidebar_ref.set_mobile_open(False)
