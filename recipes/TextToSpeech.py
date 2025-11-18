@@ -1,11 +1,9 @@
 import datetime
 import json
 import time
-import typing
 
 import gooey_gui as gui
 import requests
-import modal
 from pydantic import BaseModel, Field
 
 from bots.models import Workflow
@@ -165,6 +163,8 @@ class TextToSpeechPage(BasePage):
             return ""
 
     def run(self, state: dict):
+        import modal
+
         text = state["text_prompt"].strip()
 
         # Parse markdown to plain text
