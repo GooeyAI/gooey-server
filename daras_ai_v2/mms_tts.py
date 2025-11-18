@@ -128,7 +128,7 @@ def load_pipe(language: str):
     volumes={"/cache": model_cache},
     enable_memory_snapshot=True,
 )
-def run_mms_tts(language: str, text: str, upload_url: str) -> bytes:
+def run_mms_tts(language: str, text: str, upload_url: str):
     import torch
 
     pipe = load_pipe(language)
