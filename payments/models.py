@@ -45,7 +45,7 @@ class Subscription(models.Model):
         null=True,
         blank=True,
     )
-    auto_recharge_enabled = models.BooleanField(default=False)
+    auto_recharge_enabled = models.BooleanField(default=True)
     auto_recharge_topup_amount = models.IntegerField(
         default=settings.ADDON_AMOUNT_CHOICES[0]
     )

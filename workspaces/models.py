@@ -220,32 +220,6 @@ class Workspace(SafeDeleteModel):
             plan = PricingPlan.from_sub(self.subscription)
             return plan in (PricingPlan.ENTERPRISE, PricingPlan.BUSINESS)
 
-    def allow_credit_topups(self) -> bool:
-        """
-        Check if workspace is allowed to purchase credit topups.
-
-        Returns True if:
-        - Workspace has an Enterprise subscription, OR
-        - Workspace has purchased topups before (ADDON or AUTO_RECHARGE transactions)
-
-        Returns False otherwise (including workspaces with no subscription)
-        """
-        from app_users.models import AppUserTransaction, TransactionReason
-
-        # Enterprise workspaces always allowed
-        if self.subscription_id:
-            plan = PricingPlan.from_sub(self.subscription)
-            if plan == PricingPlan.ENTERPRISE:
-                return True
-
-        # Check if workspace has topup history
-        has_topup_history = AppUserTransaction.objects.filter(
-            workspace=self,
-            reason__in=[TransactionReason.ADDON, TransactionReason.AUTO_RECHARGE],
-        ).exists()
-
-        return has_topup_history
-
     @transaction.atomic()
     def create_with_owner(self):
         # free credits for first team created by a user
