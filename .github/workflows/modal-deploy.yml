@@ -5,7 +5,7 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'daras_ai_v2/mms_tts.py'
       - '.github/workflows/modal-deploy.yml'
