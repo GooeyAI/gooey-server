@@ -648,6 +648,20 @@ class LargeLanguageModels(Enum):
         redirect_to="gemma_2_9b_it",
     )
 
+    # https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro
+    gemini_3_pro = LLMSpec(
+        label="Gemini 3 Pro • Google",
+        model_id="google/gemini-3-pro-preview",
+        llm_api=LLMApis.openai,
+        context_window=1_048_576,
+        max_output_tokens=65_535,
+        price=1,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
+
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     gemini_2_5_pro = LLMSpec(
         label="Gemini 2.5 Pro (Google)",
@@ -1636,14 +1650,29 @@ def run_openai_chat(
         if reasoning_effort:
             re = ReasoningEffort.from_api(reasoning_effort)
             if "gemini" in model.name:
-                thinking_budget = re.thinking_budget
-                kwargs["extra_body"] = {
-                    "google": {
-                        "thinking_config": {
-                            "thinking_budget": thinking_budget,
-                        },
+                if model in [
+                    LargeLanguageModels.gemini_2_5_pro,
+                    LargeLanguageModels.gemini_2_5_flash,
+                    LargeLanguageModels.gemini_2_5_flash_lite,
+                    LargeLanguageModels.gemini_2_flash_lite,
+                    LargeLanguageModels.gemini_2_flash,
+                ]:
+                    thinking_budget = re.thinking_budget
+                    kwargs["extra_body"] = {
+                        "google": {
+                            "thinking_config": {
+                                "thinking_budget": thinking_budget,
+                            },
+                        }
                     }
-                }
+                else:
+                    kwargs["extra_body"] = {
+                        "google": {
+                            "thinking_config": {
+                                "thinking_level": re.name,
+                            },
+                        }
+                    }
             elif "claude" in model.name:
                 # claude requires thinking blocks from previous turns for tool calls, which we don't have
                 if not any(entry.get("role") == "tool" for entry in messages):
@@ -1951,7 +1980,7 @@ def get_openai_client(model: str):
         client = openai.OpenAI(
             api_key=get_google_auth_token(),
             max_retries=0,
-            base_url=f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
+            base_url=f"https://aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
         )
     elif model.startswith("aisingapore/"):
         client = openai.OpenAI(
