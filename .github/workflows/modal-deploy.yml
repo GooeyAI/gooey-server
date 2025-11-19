@@ -1,0 +1,51 @@
+name: Modal Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'daras_ai_v2/mms_tts.py'
+      - '.github/workflows/modal-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'Python file to deploy (e.g., daras_ai_v2/mms_tts.py)'
+        required: true
+        default: 'daras_ai_v2/mms_tts.py'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ["3.10.12"]
+        poetry-version: ["1.8.3"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python, Poetry and Dependencies
+        uses: packetcoders/action-setup-cache-python-poetry@main
+        with:
+          python-version: ${{matrix.python-version}}
+          poetry-version: ${{matrix.poetry-version}}
+          install-args: --only main
+
+      - name: Set up Modal
+        run: |
+          poetry run pip install modal
+
+      - name: Authenticate with Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          poetry run modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
+
+      - name: Deploy to Modal
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          FILE="${{ github.event.inputs.file || 'daras_ai_v2/mms_tts.py' }}"
+          poetry run modal deploy $FILE
