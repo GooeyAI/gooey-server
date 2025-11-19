@@ -101,6 +101,18 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    # https://platform.openai.com/docs/models/gpt-5.1
+    gpt_5_1 = LLMSpec(
+        label="GPT-5.1 • openai",
+        model_id="gpt-5.1-2025-11-13",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+    )
     # https://platform.openai.com/docs/models/gpt-5
     gpt_5 = LLMSpec(
         label="GPT-5 • openai",
