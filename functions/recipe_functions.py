@@ -342,6 +342,7 @@ def functions_input(
                         workspace=workspace,
                         user=user,
                         published_run=published_run,
+                        current_user=user,
                     ),
                     key=list_key + ":scope",
                     value=fn.get("scope"),
