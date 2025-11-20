@@ -1,3 +1,4 @@
+from functools import partial
 import typing
 
 import gooey_gui as gui
@@ -80,6 +81,12 @@ def render_payments_setup():
 
 def render_current_plan(workspace: "Workspace"):
     plan = PricingPlan.from_sub(workspace.subscription)
+    tier_key = workspace.subscription.plan_tier_key
+
+    # Get tier-aware pricing
+    monthly_charge = plan.get_active_monthly_charge(tier_key)
+    credits = plan.get_active_credits(tier_key)
+
     if workspace.subscription.payment_provider:
         provider = PaymentProvider(workspace.subscription.payment_provider)
     else:
@@ -103,14 +110,14 @@ def render_current_plan(workspace: "Workspace"):
                 )
             ):
                 gui.html("Next invoice on ")
-                gui.pill(
-                    "...",
-                    text_bg="dark",
-                    **render_local_date_attrs(
-                        next_invoice_ts,
-                        date_options={"day": "numeric", "month": "long"},
-                    ),
-                )
+                with gui.tag("span", className="badge rounded-pill text-bg-dark"):
+                    gui.html(
+                        "...",
+                        **render_local_date_attrs(
+                            next_invoice_ts,
+                            date_options={"day": "numeric", "month": "long"},
+                        ),
+                    )
 
         if plan is PricingPlan.ENTERPRISE:
             # charge details are not relevant for Enterprise customers
@@ -119,8 +126,8 @@ def render_current_plan(workspace: "Workspace"):
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
         with left:
-            gui.write(f"# {plan.get_pricing_title()}", className="no-margin")
-            if plan.monthly_charge:
+            gui.write(f"# {plan.get_pricing_title(tier_key)}", className="no-margin")
+            if monthly_charge:
                 if provider:
                     provider_text = f" **via {provider.label}**"
                 else:
@@ -128,10 +135,10 @@ def render_current_plan(workspace: "Workspace"):
                 gui.caption("per month" + provider_text)
 
         with right, gui.div(className="text-end"):
-            gui.write(f"# {plan.credits:,} credits", className="no-margin")
-            if plan.monthly_charge:
+            gui.write(f"# {credits:,} credits", className="no-margin")
+            if monthly_charge:
                 gui.write(
-                    f"**${plan.monthly_charge:,}** monthly renewal for {plan.credits:,} credits"
+                    f"**${monthly_charge:,}** monthly renewal for {credits:,} credits"
                 )
 
 
@@ -145,46 +152,37 @@ def render_credit_balance(workspace: "Workspace"):
 def render_all_plans(
     workspace: "Workspace", user: "AppUser", session: dict
 ) -> PaymentProvider:
-    current_plan = (
-        PricingPlan.from_sub(workspace.subscription)
-        if workspace.subscription
-        else PricingPlan.STARTER
-    )
-    all_plans = [plan for plan in PricingPlan if not plan.deprecated]
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    gui.write("## All Plans")
+    all_plans = [plan for plan in PricingPlan if not plan.deprecated]
+    if not workspace.is_personal and current_plan != PricingPlan.STANDARD:
+        all_plans.remove(PricingPlan.STANDARD)
+    grid_plans = [plan for plan in all_plans if not plan.full_width]
+    full_width_plans = [plan for plan in all_plans if plan.full_width]
+
+    gui.write("## Plans")
     plans_div = gui.div(className="mb-1")
 
     if workspace.subscription and workspace.subscription.payment_provider:
         selected_payment_provider = workspace.subscription.payment_provider
     else:
-        with gui.div():
-            selected_payment_provider = PaymentProvider[
-                payment_provider_radio() or PaymentProvider.STRIPE.name
-            ]
-
-    def _render_plan(plan: PricingPlan):
-        if plan == current_plan:
-            extra_class = "border-dark"
-        else:
-            extra_class = "bg-light"
-        with gui.div(className="d-flex flex-column h-100"):
-            with gui.div(
-                className=f"{rounded_border} flex-grow-1 d-flex flex-column p-3 mb-2 {extra_class}"
-            ):
-                _render_plan_details(plan)
-                with gui.div(className="mt-3 d-flex flex-column"):
-                    _render_plan_action_button(
-                        workspace=workspace,
-                        plan=plan,
-                        current_plan=current_plan,
-                        payment_provider=selected_payment_provider,
-                        user=user,
-                        session=session,
-                    )
+        selected_payment_provider = PaymentProvider.STRIPE
 
     with plans_div:
-        grid_layout(len(all_plans), all_plans, _render_plan, separator=False)
+        with gui.div(className="mb-1"):
+            partial_fn = partial(
+                _render_plan_compact,
+                workspace=workspace,
+                user=user,
+                session=session,
+                selected_payment_provider=selected_payment_provider,
+            )
+            grid_layout(len(grid_plans), grid_plans, partial_fn, separator=False)
+        for plan in full_width_plans:
+            with gui.div(className="mb-1"):
+                _render_plan_full_width(
+                    plan, workspace, user, session, selected_payment_provider
+                )
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
@@ -194,32 +192,147 @@ def render_all_plans(
     return selected_payment_provider
 
 
-def _render_plan_details(plan: PricingPlan):
-    with gui.div(className="flex-grow-1 d-flex flex-column"):
-        with gui.div():
-            with gui.tag("h2", className="mb-1"):
-                gui.html(plan.title)
-            gui.caption(
-                plan.description,
-                style={
-                    "minHeight": "calc(var(--bs-body-line-height) * 2em)",
-                    "display": "block",
-                },
+def _render_plan_full_width(
+    plan: PricingPlan,
+    workspace: "Workspace",
+    user: "AppUser",
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+
+    if plan == current_plan:
+        extra_class = "border-dark"
+    else:
+        extra_class = "bg-light"
+    with (
+        gui.div(className="d-flex flex-column h-100"),
+        gui.div(className=f"{rounded_border} mb-2 {extra_class}"),
+    ):
+        _render_plan_heading(plan)
+        with gui.div(className="row-lg d-flex flex-column flex-lg-row flex-grow-1"):
+            with gui.div(
+                className="col-lg-4 d-flex flex-column justify-content-between"
+            ):
+                with gui.div(className="mb-3"):
+                    selected_tier_key = _render_plan_pricing(
+                        plan, selected_payment_provider, workspace
+                    )
+                with gui.div(className="d-none d-lg-flex flex-column"):
+                    _render_plan_action_button(
+                        workspace=workspace,
+                        plan=plan,
+                        payment_provider=selected_payment_provider,
+                        user=user,
+                        session=session,
+                        selected_tier_key=selected_tier_key,
+                    )
+            with gui.div(className="col-lg-8"):
+                _render_plan_details(plan)
+        with gui.div(className="d-flex d-lg-none flex-column my-3"):
+            _render_plan_action_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=selected_payment_provider,
+                user=user,
+                session=session,
+                selected_tier_key=selected_tier_key,
             )
 
-        with gui.div(className="my-3"):
-            with gui.tag("h3", className="my-0 d-inline me-2"):
-                gui.html(plan.get_pricing_title())
-            with gui.tag("p", className="text-muted my-0"):
-                gui.html(plan.get_pricing_caption())
 
+def _render_plan_compact(
+    plan: PricingPlan,
+    workspace: "Workspace",
+    user: "AppUser",
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+
+    if plan == current_plan:
+        extra_class = "border-dark"
+    else:
+        extra_class = "bg-light"
+    with (
+        gui.div(className="d-flex flex-column h-100"),
+        gui.div(
+            className=f"{rounded_border} flex-grow-1 d-flex flex-column mb-2 {extra_class}"
+        ),
+    ):
+        _render_plan_heading(plan)
+        with gui.div(className="my-3"):
+            selected_tier_key = _render_plan_pricing(
+                plan, selected_payment_provider, workspace
+            )
         with gui.div(
             className="flex-grow-1 d-flex flex-column justify-content-between"
         ):
-            with gui.div():
-                gui.write(plan.long_description, unsafe_allow_html=True)
-            with gui.div(className="mt-3"):
-                gui.write(plan.footer, unsafe_allow_html=True)
+            _render_plan_details(plan)
+        with gui.div(className="mt-3 d-flex flex-column"):
+            _render_plan_action_button(
+                workspace=workspace,
+                plan=plan,
+                payment_provider=selected_payment_provider,
+                user=user,
+                session=session,
+                selected_tier_key=selected_tier_key,
+            )
+
+
+def _render_plan_details(plan: PricingPlan):
+    """Render plan details and return selected tier key if plan has tiers"""
+    with gui.div():
+        gui.write(plan.long_description, unsafe_allow_html=True)
+    with gui.div(className="mt-3"):
+        gui.write(plan.footer, unsafe_allow_html=True)
+
+
+def _render_plan_heading(plan: PricingPlan):
+    with gui.tag("h2", className="mb-1"):
+        gui.html(plan.title)
+    gui.caption(
+        plan.description,
+        unsafe_allow_html=True,
+        style={
+            "minHeight": "calc(var(--bs-body-line-height) * 2em)",
+            "display": "block",
+        },
+    )
+
+
+def _render_plan_pricing(
+    plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
+):
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+    pricing_div = gui.div()
+
+    if plan.tiers and payment_provider == PaymentProvider.STRIPE:
+        if plan == current_plan and workspace.subscription:
+            default_tier_key = (
+                workspace.subscription.plan_tier_key or plan.get_default_tier_key()
+            )
+        else:
+            default_tier_key = plan.get_default_tier_key()
+
+        with gui.div(className="my-3"):
+            selected_tier_key = gui.selectbox(
+                "",
+                options=list(plan.tiers.keys()),
+                format_func=lambda k: plan.tiers[k].label,
+                key=f"tier-select-{plan.key}",
+                value=default_tier_key,
+            )
+    else:
+        selected_tier_key = None
+
+    with pricing_div:
+        with gui.tag("h3", className="my-0 d-inline me-2"):
+            gui.html(plan.get_pricing_title(selected_tier_key))
+        with gui.tag("p", className="text-muted my-0"):
+            gui.html(plan.get_pricing_caption(selected_tier_key))
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+
+    return selected_tier_key
 
 
 def _render_plan_action_button(
@@ -227,28 +340,27 @@ def _render_plan_action_button(
     workspace: "Workspace",
     user: "AppUser",
     plan: PricingPlan,
-    current_plan: PricingPlan,
     payment_provider: PaymentProvider | None,
     session: dict,
+    selected_tier_key: str | None = None,
 ):
-    is_user_in_team_workspace = len(user.cached_workspaces) > 1
+    current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    if (
-        plan == current_plan
-        and current_plan == PricingPlan.STARTER
-        and not is_user_in_team_workspace
-    ):
-        gui.button(
-            "Create Public Workspace",
-            type="primary",
-            onClick=open_create_workspace_popup_js(),
+    if plan == current_plan:
+        current_tier_key = (
+            workspace.subscription.plan_tier_key if workspace.subscription else None
         )
 
-    elif plan == current_plan:
-        gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
+        if plan.tiers and selected_tier_key and selected_tier_key != current_tier_key:
+            render_change_subscription_button(
+                workspace=workspace,
+                plan=plan,
+                selected_tier_key=selected_tier_key,
+            )
+        else:
+            gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
 
     elif current_plan == PricingPlan.ENTERPRISE:
-        # for even bottom-padding on the pricing card, we add a hidden button
         gui.button(
             "N/A",
             className="d-none d-lg-inline w-100 opacity-0",
@@ -273,11 +385,7 @@ def _render_plan_action_button(
 
     elif workspace.subscription and workspace.subscription.is_paid():
         render_change_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            current_plan=current_plan,
-            session=session,
-            user=user,
+            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
         )
 
     else:
@@ -286,6 +394,7 @@ def _render_plan_action_button(
             workspace=workspace,
             plan=plan,
             payment_provider=payment_provider,
+            selected_tier_key=selected_tier_key,
         )
 
 
@@ -327,48 +436,61 @@ def render_change_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    current_plan: PricingPlan,
-    session: dict,
-    user: "AppUser",
+    selected_tier_key: str | None = None,
 ):
-    # subscription exists, show upgrade/downgrade button
-    if plan > current_plan:
-        _render_upgrade_subscription_button(
-            workspace=workspace,
-            plan=plan,
-            current_plan=current_plan,
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+    current_tier_key = workspace.subscription and workspace.subscription.plan_tier_key
+
+    if plan > current_plan or (
+        plan == current_plan
+        and plan.tiers
+        and (
+            plan.get_tier(selected_tier_key).monthly_charge
+            > plan.get_tier(current_tier_key).monthly_charge
         )
-    else:
-        if plan == PricingPlan.STARTER:
-            label = "Downgrade to Public"
-        else:
-            label = "Downgrade"
-        ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
-        gui.button_with_confirm_dialog(
-            ref=ref,
-            trigger_label=label,
-            modal_title="#### Downgrade Plan",
-            modal_content=f"""
-Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
+    ):
+        # subscription exists, show upgrade/downgrade button
+        _render_upgrade_subscription_button(
+            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
+        )
+        return
+
+    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+
+    ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
+    gui.button_with_confirm_dialog(
+        ref=ref,
+        trigger_label="Downgrade",
+        modal_title="#### Downgrade Plan",
+        modal_content=f"""
+Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(new_monthly_charge)}**?
 
 This will take effect from the next billing cycle.
-                """,
-            confirm_label="Downgrade",
-            confirm_className="border-danger bg-danger text-white",
-        )
-        if ref.pressed_confirm:
-            change_subscription(workspace, plan)
+            """,
+        confirm_label="Downgrade",
+        confirm_className="border-danger bg-danger text-white",
+    )
+    if ref.pressed_confirm:
+        change_subscription(workspace, plan, tier_key=selected_tier_key)
 
 
 def _render_upgrade_subscription_button(
-    *, workspace: "Workspace", plan: PricingPlan, current_plan: PricingPlan
+    *,
+    workspace: "Workspace",
+    plan: PricingPlan,
+    selected_tier_key: str | None = None,
 ):
-    label = "Upgrade & Go Private"
+    current_plan = PricingPlan.from_sub(workspace.subscription)
+    current_tier_key = workspace.subscription.plan_tier_key
+
+    label = "Upgrade"
     upgrade_dialog = gui.use_confirm_dialog(
-        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}"
+        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier_key or '0'}"
     )
 
-    if workspace.is_personal:
+    # Standard plan is only for personal workspaces, skip workspace creation popup
+    if workspace.is_personal and plan != PricingPlan.STANDARD:
         if gui.button(
             label,
             type="primary",
@@ -379,18 +501,22 @@ def _render_upgrade_subscription_button(
     elif gui.session_state.pop("pressed_create_workspace", None):
         upgrade_dialog.set_open(True)
 
+    # Get pricing based on tier
+    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+    credits = plan.get_active_credits(selected_tier_key)
+
     gui.button_with_confirm_dialog(
         ref=upgrade_dialog,
         trigger_label=label,
         trigger_type="primary",
         modal_title="#### Upgrade Plan",
         modal_content=f"""
-Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_plan)}** to **{plan.title} @ {fmt_price(plan)}**?
+Are you sure you want to upgrade from **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(new_monthly_charge)}**?
 
-Your payment method will be charged ${plan.monthly_charge:,} today and again every month until you cancel.
+Your payment method will be charged ${new_monthly_charge:,} today and again every month until you cancel.
 
-**{plan.credits:,} Credits** will be added to your account today and with subsequent payments, your account balance
-will be refreshed to {plan.credits:,} Credits.
+**{credits:,} Credits** will be added to your account today and with subsequent payments, your account balance will be topped-up with {credits:,} Credits.
             """,
         confirm_label="Upgrade",
     )
@@ -400,6 +526,7 @@ will be refreshed to {plan.credits:,} Credits.
             change_subscription(
                 workspace,
                 plan,
+                tier_key=selected_tier_key,
                 # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
                 billing_cycle_anchor="now",
                 payment_behavior="error_if_incomplete",
@@ -412,7 +539,7 @@ will be refreshed to {plan.credits:,} Credits.
             # only handle error if it's related to mandates
             # cancel current subscription & redirect user to new subscription page
             workspace.subscription.cancel()
-            stripe_subscription_create(workspace, plan)
+            stripe_subscription_create(workspace, plan, tier_key=selected_tier_key)
 
 
 def _render_create_subscription_button(
@@ -420,9 +547,12 @@ def _render_create_subscription_button(
     workspace: "Workspace",
     plan: PricingPlan,
     payment_provider: PaymentProvider,
+    selected_tier_key: str | None = None,
 ):
-    label = "Go Private"
-    if workspace.is_personal:
+    label = "Upgrade"
+
+    # Standard plan is only for personal workspaces, skip workspace creation popup
+    if workspace.is_personal and plan != PricingPlan.STANDARD:
         if gui.button(
             label,
             type="primary",
@@ -438,25 +568,33 @@ def _render_create_subscription_button(
                     workspace=workspace,
                     plan=plan,
                     pressed=pressed,
+                    tier_key=selected_tier_key,
                 )
             case PaymentProvider.PAYPAL:
+                # PayPal doesn't support tiers, use default
                 render_paypal_subscription_button(plan=plan)
 
 
-def fmt_price(plan: PricingPlan) -> str:
-    if plan.monthly_charge:
-        return f"${plan.monthly_charge:,}/month"
+def fmt_price(monthly_charge: int) -> str:
+    if monthly_charge:
+        return f"${monthly_charge:,}/month"
     else:
         return "Free"
 
 
-def change_subscription(workspace: "Workspace", new_plan: PricingPlan, **kwargs):
+def change_subscription(
+    workspace: "Workspace", new_plan: PricingPlan, tier_key: str | None = None, **kwargs
+):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
     current_plan = PricingPlan.from_sub(workspace.subscription)
+    current_tier_key = (
+        workspace.subscription.plan_tier_key if workspace.subscription else None
+    )
 
-    if new_plan == current_plan:
+    # Check if plan and tier are both unchanged
+    if new_plan == current_plan and tier_key == current_tier_key:
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
@@ -473,15 +611,23 @@ def change_subscription(workspace: "Workspace", new_plan: PricingPlan, **kwargs)
             subscription = stripe.Subscription.retrieve(
                 workspace.subscription.external_id
             )
+
+            # Build metadata with tier info
+            metadata = {
+                settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
+            }
+            if tier_key:
+                metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = (
+                    tier_key
+                )
+
             stripe.Subscription.modify(
                 subscription.id,
                 items=[
                     {"id": subscription["items"].data[0], "deleted": True},
-                    new_plan.get_stripe_line_item(),
+                    new_plan.get_stripe_line_item(tier_key),
                 ],
-                metadata={
-                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
-                },
+                metadata=metadata,
                 **kwargs,
                 proration_behavior="none",
             )
@@ -521,6 +667,10 @@ def payment_provider_radio(**props) -> str | None:
 def render_addon_section(
     workspace: "Workspace", selected_payment_provider: PaymentProvider
 ):
+    # Check if workspace is allowed to purchase topups - hide entire section if not
+    if not workspace.allow_credit_topups():
+        return
+
     if workspace.subscription:
         gui.write("# Purchase More Credits")
     else:
@@ -662,10 +812,15 @@ def render_stripe_subscription_button(
     workspace: "Workspace",
     plan: PricingPlan,
     pressed: bool = False,
+    tier_key: str | None = None,
 ):
     if not plan.supports_stripe():
         gui.write("Stripe subscription not available")
         return
+
+    # Get pricing based on tier
+    monthly_charge = plan.get_active_monthly_charge(tier_key)
+    credits = plan.get_active_credits(tier_key)
 
     ref = gui.use_confirm_dialog(key=f"--change-sub-confirm-dialog-{plan.key}")
 
@@ -676,7 +831,9 @@ def render_stripe_subscription_button(
         ):
             ref.set_open(True)
         else:
-            stripe_subscription_create(workspace=workspace, plan=plan)
+            stripe_subscription_create(
+                workspace=workspace, plan=plan, tier_key=tier_key
+            )
 
     if ref.is_open:
         gui.confirm_dialog(
@@ -684,19 +841,21 @@ def render_stripe_subscription_button(
             modal_title="#### Upgrade Plan",
             confirm_label="Buy",
             modal_content=f"""
-Are you sure you want to subscribe to **{plan.title} ({fmt_price(plan)})**?
+Are you sure you want to subscribe to **{plan.title} (${monthly_charge}/month)**?
 
 This will charge you the full amount today, and every month thereafter.
 
-**{plan.credits:,} credits** will be added to your account.
+**{credits:,} credits** will be added to your account.
             """,
         )
 
     if ref.pressed_confirm:
-        stripe_subscription_create(workspace=workspace, plan=plan)
+        stripe_subscription_create(workspace=workspace, plan=plan, tier_key=tier_key)
 
 
-def stripe_subscription_create(workspace: "Workspace", plan: PricingPlan):
+def stripe_subscription_create(
+    workspace: "Workspace", plan: PricingPlan, tier_key: str | None = None
+):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -720,7 +879,9 @@ def stripe_subscription_create(workspace: "Workspace", plan: PricingPlan):
         and workspace.subscription.stripe_get_default_payment_method()
     )
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
-    line_items = [plan.get_stripe_line_item()]
+    if tier_key:
+        metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = tier_key
+    line_items = [plan.get_stripe_line_item(tier_key)]
     if pm:
         sub = stripe.Subscription.create(
             customer=pm.customer,
@@ -914,7 +1075,12 @@ def render_auto_recharge_section(workspace: "Workspace"):
     assert workspace.subscription
     subscription = workspace.subscription
 
+    # Check if workspace is allowed to use auto-recharge - hide entire section if not
+    if not workspace.allow_credit_topups():
+        return
+
     gui.write("## Auto Recharge & Limits")
+
     with gui.div(className="h4"):
         auto_recharge_enabled = gui.checkbox(
             "Enable auto recharge",

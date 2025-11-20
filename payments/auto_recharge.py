@@ -30,7 +30,8 @@ class AutoRechargeCooldownException(AutoRechargeException):
 
 def should_attempt_auto_recharge(workspace: Workspace) -> bool:
     return bool(
-        workspace.subscription
+        workspace.allow_credit_topups()
+        and workspace.subscription
         and workspace.subscription.auto_recharge_enabled
         and workspace.subscription.payment_provider
         and workspace.balance < workspace.subscription.auto_recharge_balance_threshold
