@@ -77,6 +77,7 @@ class LLMSpec(typing.NamedTuple):
     is_deprecated: bool = False
     # redirect to a different LLM when deprecated
     redirect_to: str = "gpt_4_o_mini"
+    version: float = -1
 
 
 class LargeLanguageModels(Enum):
@@ -112,6 +113,7 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
+        version=5.1,
     )
     # https://platform.openai.com/docs/models/gpt-5
     gpt_5 = LLMSpec(
@@ -124,6 +126,7 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
+        version=5,
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
     gpt_5_mini = LLMSpec(
@@ -660,6 +663,7 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
+        version=3,
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -1059,6 +1063,7 @@ class LargeLanguageModels(Enum):
         self.supports_temperature = spec.supports_temperature
         self.is_audio_model = spec.is_audio_model
         self.redirect_to = spec.redirect_to
+        self.version = spec.version
 
     @property
     def value(self):
@@ -1087,6 +1092,10 @@ class ReasoningEffort(_ReasoningEffort, GooeyEnum):
     low = _ReasoningEffort(name="low", label="Low", thinking_budget=4096)
     medium = _ReasoningEffort(name="medium", label="Medium", thinking_budget=8192)
     high = _ReasoningEffort(name="high", label="High", thinking_budget=24576)
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.minimal}
 
 
 def calc_gpt_tokens(
@@ -1665,30 +1674,17 @@ def run_openai_chat(
             reasoning_effort = None
         if reasoning_effort:
             re = ReasoningEffort.from_api(reasoning_effort)
-            if "gemini" in model.name:
-                if model in [
-                    LargeLanguageModels.gemini_2_5_pro,
-                    LargeLanguageModels.gemini_2_5_flash,
-                    LargeLanguageModels.gemini_2_5_flash_lite,
-                    LargeLanguageModels.gemini_2_flash_lite,
-                    LargeLanguageModels.gemini_2_flash,
-                ]:
-                    thinking_budget = re.thinking_budget
-                    kwargs["extra_body"] = {
-                        "google": {
-                            "thinking_config": {
-                                "thinking_budget": thinking_budget,
-                            },
-                        }
+            if re == ReasoningEffort.minimal:  # deprecated
+                re = ReasoningEffort.low
+            if "gemini" in model.name and model.version < 3:
+                thinking_budget = re.thinking_budget
+                kwargs["extra_body"] = {
+                    "google": {
+                        "thinking_config": {
+                            "thinking_budget": thinking_budget,
+                        },
                     }
-                else:
-                    kwargs["extra_body"] = {
-                        "google": {
-                            "thinking_config": {
-                                "thinking_level": re.name,
-                            },
-                        }
-                    }
+                }
             elif "claude" in model.name:
                 # claude requires thinking blocks from previous turns for tool calls, which we don't have
                 if not any(entry.get("role") == "tool" for entry in messages):
