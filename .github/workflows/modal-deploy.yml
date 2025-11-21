@@ -8,6 +8,7 @@ on:
       - master
     paths:
       - 'daras_ai_v2/mms_tts.py'
+      - 'daras_ai_v2/meta_omnilingual_asr.py'
       - '.github/workflows/modal-deploy.yml'
   workflow_dispatch:
     inputs:
@@ -45,9 +46,41 @@ jobs:
         run: |
           poetry run modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
 
+      - name: Detect changed files
+        id: changed-files
+        if: github.event_name == 'push'
+        run: |
+          echo "Detecting changed Modal files..."
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '^daras_ai_v2/(mms_tts|meta_omnilingual_asr)\.py$' || true)
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No Modal deployment files changed"
+            echo "files=" >> $GITHUB_OUTPUT
+          else
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+            # Convert to space-separated list
+            FILES_LIST=$(echo "$CHANGED_FILES" | tr '\n' ' ')
+            echo "files=$FILES_LIST" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to Modal
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          FILE="${{ github.event.inputs.file || 'daras_ai_v2/mms_tts.py' }}"
-          poetry run modal deploy $FILE
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Manual trigger - deploy specified file
+            FILE="${{ github.event.inputs.file }}"
+            echo "Deploying manually specified file: $FILE"
+            poetry run modal deploy $FILE
+          else
+            # Push trigger - deploy changed files
+            FILES="${{ steps.changed-files.outputs.files }}"
+            if [ -z "$FILES" ]; then
+              echo "No Modal deployment files to deploy"
+              exit 0
+            fi
+            for FILE in $FILES; do
+              echo "Deploying: $FILE"
+              poetry run modal deploy $FILE
+            done
+          fi
