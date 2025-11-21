@@ -458,6 +458,18 @@ class LargeLanguageModels(Enum):
         context_window=128_000,
         max_output_tokens=8192,
         supports_json=True,
+        is_deprecated=True,
+        redirect_to="deepseek_v3p1",
+    )
+
+    deepseek_v3p1 = LLMSpec(
+        label="DeepSeek V3.1 • DeepSeek",
+        model_id="accounts/fireworks/models/deepseek-v3p1",
+        llm_api=LLMApis.fireworks,
+        context_window=163_800,
+        max_output_tokens=20_500,
+        supports_json=True,
+        is_thinking_model=True,
     )
 
     # https://console.groq.com/docs/models
