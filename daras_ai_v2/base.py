@@ -722,7 +722,11 @@ class BasePage:
                 pr=pr,
             )
             with gui.div(className="mt-4 mt-lg-0 text-end"):
-                if user_can_edit and pr.workspace_id == selected_workspace.id:
+                if (
+                    user_can_edit
+                    and pr.workspace_id == selected_workspace.id
+                    and not pr.is_root()
+                ):
                     pressed_save_as_new = gui.button(
                         f"{icons.fork} Save as New",
                         type="secondary",
@@ -787,7 +791,7 @@ class BasePage:
         self._render_admin_options(sr, pr)
 
         # add friction for saving root workflows
-        if pr.is_root() and self.is_current_user_admin():
+        if pr.is_root():
             ref = gui.use_confirm_dialog("confirm-save-root")
             if pressed_save:
                 ref.set_open(True)
