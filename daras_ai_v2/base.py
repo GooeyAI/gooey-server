@@ -624,7 +624,7 @@ class BasePage:
                     current_app_url=self.current_app_url(self.tab),
                     session=self.request.session,
                 )
-                self._render_save_button(publish_dialog_ref)
+                self._render_save_button(publish_dialog_ref, pr=self.current_pr)
             elif self.tab != RecipeTabs.examples:
                 copy_to_clipboard_button(
                     label=f"{icons.link} Copy Link",
@@ -636,12 +636,18 @@ class BasePage:
             if publish_dialog_ref.is_open:
                 self._render_publish_dialog(ref=publish_dialog_ref)
 
-    def _render_save_button(self, publish_dialog_ref: gui.AlertDialogRef):
+    def _render_save_button(
+        self, publish_dialog_ref: gui.AlertDialogRef, pr: PublishedRun
+    ):
         with gui.div(className="d-flex justify-content-end"):
-            if self.request.user and WorkflowAccessLevel.can_user_edit_published_run(
-                workspace=self.current_workspace,
-                user=self.request.user,
-                pr=self.current_pr,
+            if (
+                self.request.user
+                and WorkflowAccessLevel.can_user_edit_published_run(
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    pr=self.current_pr,
+                )
+                and not (pr.is_root() and not self.is_current_user_admin())
             ):
                 icon, label = icons.save, "Update"
             elif self._has_request_changed():
@@ -732,7 +738,7 @@ class BasePage:
                     pressed_save = gui.button(
                         f"{icons.save} Save",
                         type="primary",
-                        key="save_published_run",
+                        key="save_published_run_root",
                         className="mb-0 ms-2 py-2 px-4",
                     )
                 else:
