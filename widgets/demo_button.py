@@ -165,7 +165,9 @@ def render_demo_button_settings(
     with col1:
         gui.write("###### Demo Notes")
         bi.demo_notes = gui.text_area(
-            "", placeholder="Add demo instructions as text or markdown"
+            "",
+            placeholder="Add demo instructions as text or markdown",
+            value=bi.demo_notes,
         )
 
     with col2:
