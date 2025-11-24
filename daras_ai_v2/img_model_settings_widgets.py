@@ -36,19 +36,19 @@ def img_model_settings(
     else:
         selected_model = gui.session_state.get("selected_model")
 
-    negative_prompt_setting(selected_model)
+    negative_prompt_setting(selected_models=[selected_model])
 
-    num_outputs_setting(selected_model)
+    num_outputs_setting(selected_model, model_enum=models_enum)
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
     if models_enum is Text2ImgModels:
-        sd_2_upscaling_setting()
+        sd_2_upscaling_setting(selected_models=[selected_model])
 
     col1, col2 = gui.columns(2)
 
     with col1:
-        guidance_scale_setting(selected_model)
+        guidance_scale_setting(selected_models=[selected_model])
 
     with col2:
         if models_enum is Img2ImgModels and not gui.session_state.get(
@@ -61,7 +61,7 @@ def img_model_settings(
     if show_scheduler:
         col1, col2 = gui.columns(2)
         with col1:
-            scheduler_setting(selected_model)
+            scheduler_setting(selected_models=[selected_model])
 
     return selected_model
 
@@ -82,6 +82,7 @@ def model_selector(
         Img2ImgModels.jack_qiao.name,
         Img2ImgModels.sd_2.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_pro.name,
     ]
     col1, col2 = gui.columns(2)
     with col1:
@@ -186,7 +187,7 @@ def controlnet_weight_setting(
     )
 
 
-def num_outputs_setting(selected_models: str | list[str] = None):
+def num_outputs_setting(selected_models: str | list[str] = None, model_enum=None):
     col1, col2 = gui.columns(2, gap="medium")
     with col1:
         gui.slider(
@@ -205,10 +206,10 @@ def num_outputs_setting(selected_models: str | list[str] = None):
             """
         )
     with col2:
-        quality_setting(selected_models)
+        quality_setting(selected_models, model_enum=model_enum)
 
 
-def quality_setting(selected_models=None):
+def quality_setting(selected_models=None, model_enum=None):
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
 
@@ -240,6 +241,68 @@ def quality_setting(selected_models=None):
             """##### GPT Image 1 Quality""",
             options=["low", "medium", "high"],
             key="gpt_image_1_quality",
+        )
+
+    if any(
+        selected_model in [Text2ImgModels.nano_banana_pro.name]
+        for selected_model in selected_models
+    ):
+        aspect_ratio_options = [
+            "21:9",
+            "16:9",
+            "3:2",
+            "4:3",
+            "5:4",
+            "1:1",
+            "4:5",
+            "3:4",
+            "2:3",
+            "9:16",
+        ]
+        default_ratio_value = "1:1"
+        if model_enum is Img2ImgModels:
+            aspect_ratio_options = ["auto"] + aspect_ratio_options
+            default_ratio_value = "auto"
+
+        gui.selectbox(
+            """##### Nano Banana Pro Resolution""",
+            value="1K",
+            options=["1K", "2K", "4K"],
+            key="nano_banana_pro_resolution",
+        )
+        gui.selectbox(
+            """##### Nano Banana Pro Aspect Ratio""",
+            value=default_ratio_value,
+            options=aspect_ratio_options,
+            key="nano_banana_pro_aspect_ratio",
+        )
+
+    if any(
+        selected_model in [Text2ImgModels.nano_banana.name]
+        for selected_model in selected_models
+    ):
+        aspect_ratio_options = [
+            "21:9",
+            "16:9",
+            "3:2",
+            "4:3",
+            "5:4",
+            "1:1",
+            "4:5",
+            "3:4",
+            "2:3",
+            "9:16",
+        ]
+        default_ratio_value = "1:1"
+        if model_enum is Img2ImgModels:
+            default_ratio_value = "auto"
+            aspect_ratio_options = ["auto"] + aspect_ratio_options
+
+        gui.selectbox(
+            """##### Nano Banana Aspect Ratio""",
+            value=default_ratio_value,
+            options=aspect_ratio_options,
+            key="nano_banana_aspect_ratio",
         )
 
     if any(
@@ -303,7 +366,19 @@ LANDSCAPE = "Landscape"
 PORTRAIT = "Portrait"
 
 
-def output_resolution_setting():
+def output_resolution_setting(selected_models: list[str] | None = None):
+    if selected_models and any(
+        selected_model
+        in [
+            Text2ImgModels.dall_e.name,
+            Text2ImgModels.gpt_image_1.name,
+            Text2ImgModels.nano_banana.name,
+            Text2ImgModels.nano_banana_pro.name,
+        ]
+        for selected_model in selected_models
+    ):
+        return
+
     col1, col2, col3 = gui.columns(3)
 
     if "__pixels" not in gui.session_state:
@@ -341,6 +416,8 @@ def output_resolution_setting():
     if selected_models and selected_models <= {Text2ImgModels.flux_1_dev.name}:
         pixel_options = [1024]
     elif selected_models and selected_models <= {Text2ImgModels.nano_banana.name}:
+        pixel_options = [1024]
+    elif selected_models and selected_models <= {Text2ImgModels.nano_banana_pro.name}:
         pixel_options = [1024]
     elif selected_models and selected_models <= {Text2ImgModels.dall_e.name}:
         pixel_options = [256, 512, 1024]
@@ -389,18 +466,28 @@ def output_resolution_setting():
     gui.session_state["output_height"] = res[1]
 
 
-def sd_2_upscaling_setting():
+def sd_2_upscaling_setting(selected_models: list[str] | None = None):
+    if selected_models and not any(
+        selected_model in [Text2ImgModels.sd_2.name]
+        for selected_model in selected_models
+    ):
+        return
     gui.checkbox("**4x Upscaling**", key="sd_2_upscaling")
     gui.caption("Note: Currently, only square images can be upscaled")
 
 
-def scheduler_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.jack_qiao,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def scheduler_setting(selected_models: list[str] | None = None):
+    if selected_models and any(
+        selected_model
+        in [
+            Text2ImgModels.dall_e.name,
+            Text2ImgModels.gpt_image_1.name,
+            Text2ImgModels.jack_qiao,
+            Text2ImgModels.nano_banana.name,
+            Text2ImgModels.nano_banana_pro.name,
+        ]
+        for selected_model in selected_models
+    ):
         return
     enum_selector(
         Schedulers,
@@ -416,17 +503,22 @@ def scheduler_setting(selected_model: str | None = None):
     )
 
 
-def guidance_scale_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.jack_qiao,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def guidance_scale_setting(selected_models: list[str] | None = None):
+    if selected_models and any(
+        selected_model
+        in [
+            Text2ImgModels.dall_e.name,
+            Text2ImgModels.gpt_image_1.name,
+            Text2ImgModels.jack_qiao,
+            Text2ImgModels.nano_banana.name,
+            Text2ImgModels.nano_banana_pro.name,
+        ]
+        for selected_model in selected_models
+    ):
         return
 
     # Flux Pro Kontext requires guidance_scale >= 1.0
-    if selected_model == Img2ImgModels.flux_pro_kontext.name:
+    if selected_models and Img2ImgModels.flux_pro_kontext.name in selected_models:
         min_value = 1.0
     else:
         min_value = 0.0
@@ -471,6 +563,7 @@ def prompt_strength_setting(selected_model: str = None):
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.instruct_pix2pix.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_pro.name,
     ]:
         return
 
@@ -491,12 +584,17 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
-def negative_prompt_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def negative_prompt_setting(selected_models: list[str] | None = None):
+    if selected_models and any(
+        selected_model
+        in [
+            Text2ImgModels.dall_e.name,
+            Text2ImgModels.gpt_image_1.name,
+            Text2ImgModels.nano_banana.name,
+            Text2ImgModels.nano_banana_pro.name,
+        ]
+        for selected_model in selected_models
+    ):
         return
 
     gui.text_area(
@@ -513,3 +611,25 @@ def negative_prompt_setting(selected_model: str | None = None):
         Image generation engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
         """
     )
+
+
+def edit_instruction_setting(selected_models: list[str] | None = None):
+    if selected_models and not any(
+        selected_model in [Img2ImgModels.instruct_pix2pix.name]
+        for selected_model in selected_models
+    ):
+        return
+    gui.caption(
+        """
+            You can also enable ‘Edit Instructions’ to use InstructPix2Pix that allows you to change your generated image output with a follow-up written instruction.
+            """
+    )
+    if gui.checkbox("📝 Edit Instructions"):
+        gui.text_area(
+            """
+            Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
+            """,
+            key="__edit_instruction",
+            placeholder="Give it sunglasses and a mustache",
+        )
+    gui.session_state["edit_instruction"] = gui.session_state.get("__edit_instruction")

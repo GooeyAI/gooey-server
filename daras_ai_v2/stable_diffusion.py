@@ -24,6 +24,11 @@ from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 SD_IMG_MAX_SIZE = (768, 768)
 
 
+NanoBananaAspectRatioOptions = typing.Literal[
+    "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"
+]
+
+
 class InpaintingModels(Enum):
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     runway_ml = "Stable Diffusion v1.5 (RunwayML)"
@@ -56,6 +61,7 @@ class Text2ImgModels(Enum):
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     nano_banana = "Nano Banana (Google)"
+    nano_banana_pro = "Nano Banana Pro (Google)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
@@ -97,6 +103,7 @@ openai_model_ids = {
 
 gemini_model_ids = {
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
+    Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
 }
 
 
@@ -112,6 +119,7 @@ class Img2ImgModels(Enum):
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     nano_banana = "Nano Banana (Google)"
+    nano_banana_pro = "Nano Banana Pro (Google)"
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
@@ -143,6 +151,7 @@ img2img_model_ids = {
     Img2ImgModels.dall_e: "dall-e-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
     Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
+    Img2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro/edit",
 }
 
 
@@ -314,6 +323,9 @@ def text2img(
     dall_e_3_quality: str | None = None,
     dall_e_3_style: str | None = None,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
+    nano_banana_pro_resolution: typing.Literal["1K", "2K", "4K"] | None = None,
+    nano_banana_aspect_ratio: NanoBananaAspectRatioOptions | None = None,
+    nano_banana_pro_aspect_ratio: NanoBananaAspectRatioOptions | None = None,
     loras: list[LoraWeight] | None = None,
 ):
     if model not in {
@@ -321,6 +333,7 @@ def text2img(
         Text2ImgModels.flux_1_dev,
         Text2ImgModels.gpt_image_1,
         Text2ImgModels.nano_banana,
+        Text2ImgModels.nano_banana_pro,
     }:
         _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -395,11 +408,25 @@ def text2img(
                     response_format="b64_json",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.nano_banana:
+        case Text2ImgModels.nano_banana | Text2ImgModels.nano_banana_pro:
             from usage_costs.cost_utils import record_cost_auto
             from usage_costs.models import ModelSku
 
-            payload = dict(prompt=prompt, output_format="png", num_images=num_outputs)
+            effective_cost_quantity = num_outputs
+
+            payload = dict(
+                prompt=prompt,
+                output_format="png",
+                num_images=num_outputs,
+            )
+            if model == Text2ImgModels.nano_banana_pro:
+                payload["resolution"] = nano_banana_pro_resolution
+                payload["aspect_ratio"] = nano_banana_pro_aspect_ratio
+                if nano_banana_pro_resolution == "4K":
+                    effective_cost_quantity = 2 * num_outputs
+                # NOTE: 4K outputs will be charged at double the standard rate
+            else:
+                payload["aspect_ratio"] = nano_banana_aspect_ratio
 
             output_images = yield from generate_fal_images(
                 model_id=gemini_model_ids[model],
@@ -409,10 +436,11 @@ def text2img(
             record_cost_auto(
                 model=gemini_model_ids[model],
                 sku=ModelSku.output_image_tokens,
-                quantity=num_outputs,
+                quantity=effective_cost_quantity,
             )
 
             return output_images
+
         case _:
             prompt = add_prompt_prefix(prompt, model.name)
             return call_sd_multi(
@@ -492,6 +520,13 @@ def img2img(
     guidance_scale: float,
     seed: int = 42,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
+    nano_banana_pro_resolution: typing.Literal["1K", "2K", "4K"] | None = None,
+    nano_banana_aspect_ratio: (typing.Literal["auto"] | NanoBananaAspectRatioOptions)
+    | None = None,
+    nano_banana_pro_aspect_ratio: (
+        typing.Literal["auto"] | NanoBananaAspectRatioOptions
+    )
+    | None = None,
 ) -> typing.Generator[str, None, list[str]]:
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
@@ -503,6 +538,7 @@ def img2img(
         Img2ImgModels.flux_pro_kontext.name,
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_pro.name,
     ):
         raise UserError("Text prompt is required for this model")
 
@@ -571,13 +607,24 @@ def img2img(
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
                 for part in response.data
             ]
-        case Img2ImgModels.nano_banana.name:
+        case Img2ImgModels.nano_banana.name | Img2ImgModels.nano_banana_pro.name:
+            effective_cost_quantity = num_outputs
             payload = dict(
                 prompt=prompt,
                 image_urls=[init_image],
                 num_images=num_outputs,
                 output_format="png",
             )
+
+            if selected_model == Img2ImgModels.nano_banana_pro.name:
+                payload["resolution"] = nano_banana_pro_resolution
+                payload["aspect_ratio"] = nano_banana_pro_aspect_ratio
+                if nano_banana_pro_resolution == "4K":
+                    effective_cost_quantity = 2 * num_outputs
+                    # NOTE: 4K outputs will be charged at double the standard rate
+            else:
+                payload["aspect_ratio"] = nano_banana_aspect_ratio
+
             output_images = yield from generate_fal_images(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
@@ -586,7 +633,7 @@ def img2img(
             record_cost_auto(
                 model=img2img_model_ids[Img2ImgModels[selected_model]],
                 sku=ModelSku.output_image_tokens,
-                quantity=num_outputs,
+                quantity=effective_cost_quantity,
             )
 
             return output_images
