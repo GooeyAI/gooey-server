@@ -369,7 +369,7 @@ def _render_plan_action_button(
             gui.html("Let's Talk")
 
     elif (
-        plan == PricingPlan.BUSINESS
+        plan == PricingPlan.BUSINESS_2025
         and workspace.is_personal
         and any(
             w.subscription_id and w.subscription.plan == plan.db_value
@@ -480,7 +480,6 @@ def _render_upgrade_subscription_button(
     current_plan = PricingPlan.from_sub(workspace.subscription)
     current_tier = workspace.subscription.get_tier()
 
-    label = "Upgrade"
     upgrade_dialog = gui.use_confirm_dialog(
         key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier}"
     )
@@ -488,7 +487,7 @@ def _render_upgrade_subscription_button(
     # Standard plan is only for personal workspaces, skip workspace creation popup
     if workspace.is_personal and plan != PricingPlan.STANDARD:
         if gui.button(
-            label,
+            "Create Team",
             type="primary",
             onClick=open_create_workspace_popup_js(selected_plan=plan),
         ):
@@ -504,7 +503,7 @@ def _render_upgrade_subscription_button(
 
     gui.button_with_confirm_dialog(
         ref=upgrade_dialog,
-        trigger_label=label,
+        trigger_label="Upgrade",
         trigger_type="primary",
         modal_title="#### Upgrade Plan",
         modal_content=f"""

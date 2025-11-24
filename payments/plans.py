@@ -160,6 +160,44 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         deprecated=True,
     )
+    BUSINESS_2025 = PricingPlanData(
+        db_value=7,
+        key="business_2025",
+        title="Business",
+        description="Small to mid-sized organizations, DIY teams with awesome AI ambition.",
+        pricing_caption="One Private Workspace + 10,000 credits/month",
+        monthly_charge=399,
+        credits=10_000,
+        long_description=dedent(
+            """
+            #### Everything in Free +
+            <ul class="text-muted">
+
+              <li>Private Team Workspace</li>
+              <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
+              <li>API Secrets to securely access any system</li>
+              <li>Bring your own WhatsApp number</li>
+              <li>Embed copilots in your own App</li>
+              <li>Impact and usage <a
+                    href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-10-15&end_date=2025-10-31&sort_by=Last+Sent"
+                >dashboards</a></li>
+              <li>Role Based Management</li>
+              <li>Centralized billing</li>
+              <li>Pooled Credits, Submission Rates and Concurrency</li>
+              <li>Version History on Workflows</li>
+            </ul>
+            """
+        ),
+        footer=dedent(
+            """
+            <ul class="text-muted">
+              <li>Full Commercial license</li>
+              <li>Premium team support via Email</li>
+            </ul>
+            """
+        ),
+        deprecated=True,
+    )
 
     # -- active
     STARTER = PricingPlanData(
@@ -235,27 +273,24 @@ class PricingPlan(PricingPlanData, Enum):
         ],
     )
 
-    BUSINESS = PricingPlanData(
-        db_value=7,
-        key="business_2025",
-        title="Business",
-        description="Small to mid-sized organizations, DIY teams with awesome AI ambition.",
-        pricing_caption="One Private Workspace + 10,000 credits/month",
-        monthly_charge=399,
-        credits=10_000,
+    TEAM = PricingPlanData(
+        db_value=9,
+        key="team_2025",
+        title="Team",
+        description="AI Teams that collaborate together can change the world.",
+        pricing_caption="Monthly credits per member",
+        monthly_charge=40,
+        credits=2_500,
         long_description=dedent(
             """
-            #### Everything in Free +
+            #### All Standard Features +
             <ul class="text-muted">
-
               <li>Private Team Workspace</li>
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
               <li>API Secrets to securely access any system</li>
               <li>Bring your own WhatsApp number</li>
               <li>Embed copilots in your own App</li>
-              <li>Impact and usage <a
-                    href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-10-15&end_date=2025-10-31&sort_by=Last+Sent"
-                >dashboards</a></li>
+              <li>Impact and usage <a href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-11-09&end_date=2025-11-25&sort_by=Last+Sent">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>
               <li>Pooled Credits, Submission Rates and Concurrency</li>
@@ -266,8 +301,8 @@ class PricingPlan(PricingPlanData, Enum):
         footer=dedent(
             """
             <ul class="text-muted">
-              <li>Full Commercial license</li>
-              <li>Premium team support via Email</li>
+              <li>Commerical license</li>
+              <li>Premium Support via Email</li>
             </ul>
             """
         ),
