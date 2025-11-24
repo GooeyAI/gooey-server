@@ -455,7 +455,7 @@ def render_change_subscription_button(
         )
         return
 
-    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
+    current_monthly_charge = current_plan.get_active_monthly_charge(current_tier_key)
     new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
 
     ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
