@@ -222,7 +222,7 @@ class Workspace(SafeDeleteModel):
             return False
         else:
             plan = PricingPlan.from_sub(self.subscription)
-            return plan in (PricingPlan.ENTERPRISE, PricingPlan.BUSINESS)
+            return plan in (PricingPlan.ENTERPRISE, PricingPlan.BUSINESS_2025)
 
     @transaction.atomic()
     def create_with_owner(self):
