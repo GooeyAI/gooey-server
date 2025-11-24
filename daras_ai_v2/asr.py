@@ -1286,7 +1286,7 @@ def run_asr(
         return r.json()["transcription_text"]
     elif selected_model == AsrModels.meta_omnilingual_asr_llm_7b:
         import modal
-        from daras_ai_v2.meta_omnilingual_asr import app as modal_app
+        from modal_functions.meta_omnilingual_asr import app as modal_app
 
         # Ensure language is in the correct format (e.g., "eng_Latn")
         if language and language not in OMNILINGUAL_ASR_SUPPORTED:

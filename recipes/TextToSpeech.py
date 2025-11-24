@@ -399,7 +399,7 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = audio_url
 
             case TextToSpeechProviders.MMS_TTS:
-                from daras_ai_v2.mms_tts import (
+                from modal_functions.mms_tts import (
                     MMS_TTS_SUPPORTED_LANGUAGES,
                     app as modal_app,
                 )
