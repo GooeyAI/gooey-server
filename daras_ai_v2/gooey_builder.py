@@ -14,6 +14,7 @@ def render_gooey_builder_inline(page_slug: str, builder_state: dict):
     )
 
     config["mode"] = "inline"
+    config["showRunLink"] = True
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
