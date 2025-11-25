@@ -787,7 +787,7 @@ class BasePage:
         self._render_admin_options(sr, pr)
 
         # add friction for saving root workflows
-        if pr.is_root() and self.is_current_user_admin():
+        if pr.is_root():
             ref = gui.use_confirm_dialog("confirm-save-root")
             if pressed_save:
                 ref.set_open(True)

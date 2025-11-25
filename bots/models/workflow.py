@@ -183,6 +183,7 @@ class WorkflowAccessLevel(models.IntegerChoices):
                 or pr.created_by_id == user.id
                 or pr.workspace.get_admins().filter(id=user.id).exists()
             )
+            and not pr.is_root()
         )
 
 
