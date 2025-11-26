@@ -170,11 +170,13 @@ class CompareText2ImgPage(BasePage):
         )
 
         selected_models = gui.session_state.get("selected_models", [])
+
         edit_instruction_setting(selected_models=selected_models)
         negative_prompt_setting(selected_models=selected_models)
         output_resolution_setting(selected_models=selected_models)
         num_outputs_setting(selected_models=selected_models, model_enum=Text2ImgModels)
         sd_2_upscaling_setting(selected_models=selected_models)
+
         col1, col2 = gui.columns(2)
         with col1:
             guidance_scale_setting(selected_models=selected_models)

@@ -1,3 +1,4 @@
+from functools import wraps
 import gooey_gui as gui
 
 from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
@@ -11,6 +12,40 @@ from daras_ai_v2.stable_diffusion import (
     gemini_model_ids,
     openai_model_ids,
 )
+
+
+def model_filter(*models, exclude=True):
+    """
+    Decorator to conditionally render based on selected models.
+
+    Args:
+        *models: Model names to check against
+        exclude: If True, skip function if any selected model is in the list (default).
+                 If False, skip function unless at least one selected model is in the list.
+    """
+
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(selected_models=None, *args, **kwargs):
+            if selected_models:
+                model_list = (
+                    selected_models
+                    if isinstance(selected_models, list)
+                    else [selected_models]
+                )
+                if exclude:
+                    # Skip if any selected model is in the excluded list
+                    if any(m in models for m in model_list):
+                        return
+                else:
+                    # Skip unless at least one selected model is in the included list
+                    if not any(m in models for m in model_list):
+                        return
+            return fn(selected_models, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def img_model_settings(
@@ -187,7 +222,9 @@ def controlnet_weight_setting(
     )
 
 
-def num_outputs_setting(selected_models: str | list[str] = None, model_enum=None):
+def num_outputs_setting(
+    selected_models: str | list[str] | None = None, model_enum=None
+):
     col1, col2 = gui.columns(2, gap="medium")
     with col1:
         gui.slider(
@@ -209,15 +246,10 @@ def num_outputs_setting(selected_models: str | list[str] = None, model_enum=None
         quality_setting(selected_models, model_enum=model_enum)
 
 
+@model_filter(InpaintingModels.dall_e.name, exclude=True)
 def quality_setting(selected_models=None, model_enum=None):
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
-
-    if any(
-        selected_model in [InpaintingModels.dall_e.name]
-        for selected_model in selected_models
-    ):
-        return
 
     if any(
         selected_model in [Text2ImgModels.dall_e_3.name]
@@ -247,22 +279,9 @@ def quality_setting(selected_models=None, model_enum=None):
         selected_model in [Text2ImgModels.nano_banana_pro.name]
         for selected_model in selected_models
     ):
-        aspect_ratio_options = [
-            "21:9",
-            "16:9",
-            "3:2",
-            "4:3",
-            "5:4",
-            "1:1",
-            "4:5",
-            "3:4",
-            "2:3",
-            "9:16",
-        ]
-        default_ratio_value = "1:1"
-        if model_enum is Img2ImgModels:
-            aspect_ratio_options = ["auto"] + aspect_ratio_options
-            default_ratio_value = "auto"
+        aspect_ratio_options, default_ratio_value = _get_nano_banana_aspect_ratio(
+            model_enum
+        )
 
         gui.selectbox(
             """##### Nano Banana Pro Resolution""",
@@ -281,22 +300,9 @@ def quality_setting(selected_models=None, model_enum=None):
         selected_model in [Text2ImgModels.nano_banana.name]
         for selected_model in selected_models
     ):
-        aspect_ratio_options = [
-            "21:9",
-            "16:9",
-            "3:2",
-            "4:3",
-            "5:4",
-            "1:1",
-            "4:5",
-            "3:4",
-            "2:3",
-            "9:16",
-        ]
-        default_ratio_value = "1:1"
-        if model_enum is Img2ImgModels:
-            default_ratio_value = "auto"
-            aspect_ratio_options = ["auto"] + aspect_ratio_options
+        aspect_ratio_options, default_ratio_value = _get_nano_banana_aspect_ratio(
+            model_enum
+        )
 
         gui.selectbox(
             """##### Nano Banana Aspect Ratio""",
@@ -329,6 +335,28 @@ def quality_setting(selected_models=None, model_enum=None):
             An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
             """
         )
+
+
+def _get_nano_banana_aspect_ratio(model_enum):
+    aspect_ratio_options = [
+        "21:9",
+        "16:9",
+        "3:2",
+        "4:3",
+        "5:4",
+        "1:1",
+        "4:5",
+        "3:4",
+        "2:3",
+        "9:16",
+    ]
+    default_ratio_value = "1:1"
+
+    if model_enum is Img2ImgModels:
+        aspect_ratio_options = ["auto", *aspect_ratio_options]
+        default_ratio_value = "auto"
+
+    return aspect_ratio_options, default_ratio_value
 
 
 RESOLUTIONS: dict[int, dict[str, str]] = {
@@ -366,19 +394,12 @@ LANDSCAPE = "Landscape"
 PORTRAIT = "Portrait"
 
 
+@model_filter(
+    Text2ImgModels.nano_banana.name,
+    Text2ImgModels.nano_banana_pro.name,
+    exclude=True,
+)
 def output_resolution_setting(selected_models: list[str] | None = None):
-    if selected_models and any(
-        selected_model
-        in [
-            Text2ImgModels.dall_e.name,
-            Text2ImgModels.gpt_image_1.name,
-            Text2ImgModels.nano_banana.name,
-            Text2ImgModels.nano_banana_pro.name,
-        ]
-        for selected_model in selected_models
-    ):
-        return
-
     col1, col2, col3 = gui.columns(3)
 
     if "__pixels" not in gui.session_state:
@@ -415,19 +436,15 @@ def output_resolution_setting(selected_models: list[str] | None = None):
     allowed_shapes = None
     if selected_models and selected_models <= {Text2ImgModels.flux_1_dev.name}:
         pixel_options = [1024]
-    elif selected_models and selected_models <= {Text2ImgModels.nano_banana.name}:
-        pixel_options = [1024]
-    elif selected_models and selected_models <= {Text2ImgModels.nano_banana_pro.name}:
-        pixel_options = [1024]
     elif selected_models and selected_models <= {Text2ImgModels.dall_e.name}:
         pixel_options = [256, 512, 1024]
         allowed_shapes = ["square"]
     elif selected_models and selected_models <= {Text2ImgModels.dall_e_3.name}:
         pixel_options = [1024]
-        allowed_shapes = ["square", "wide"]
+        allowed_shapes = ["square", "wide", "camera"]
     elif selected_models and selected_models <= {Text2ImgModels.gpt_image_1.name}:
         pixel_options = [1024]
-        allowed_shapes = ["square", "camera"]
+        allowed_shapes = ["square", "wide", "camera"]
     else:
         pixel_options = [512, 768]
 
@@ -466,29 +483,22 @@ def output_resolution_setting(selected_models: list[str] | None = None):
     gui.session_state["output_height"] = res[1]
 
 
+@model_filter(Text2ImgModels.sd_2.name, exclude=False)
 def sd_2_upscaling_setting(selected_models: list[str] | None = None):
-    if selected_models and not any(
-        selected_model in [Text2ImgModels.sd_2.name]
-        for selected_model in selected_models
-    ):
-        return
     gui.checkbox("**4x Upscaling**", key="sd_2_upscaling")
     gui.caption("Note: Currently, only square images can be upscaled")
 
 
+@model_filter(
+    Text2ImgModels.dall_e.name,
+    Text2ImgModels.dall_e_3.name,
+    Text2ImgModels.gpt_image_1.name,
+    Text2ImgModels.jack_qiao.name,
+    Text2ImgModels.nano_banana.name,
+    Text2ImgModels.nano_banana_pro.name,
+    exclude=True,
+)
 def scheduler_setting(selected_models: list[str] | None = None):
-    if selected_models and any(
-        selected_model
-        in [
-            Text2ImgModels.dall_e.name,
-            Text2ImgModels.gpt_image_1.name,
-            Text2ImgModels.jack_qiao,
-            Text2ImgModels.nano_banana.name,
-            Text2ImgModels.nano_banana_pro.name,
-        ]
-        for selected_model in selected_models
-    ):
-        return
     enum_selector(
         Schedulers,
         label="""
@@ -503,20 +513,16 @@ def scheduler_setting(selected_models: list[str] | None = None):
     )
 
 
+@model_filter(
+    Text2ImgModels.dall_e.name,
+    Text2ImgModels.dall_e_3.name,
+    Text2ImgModels.gpt_image_1.name,
+    Text2ImgModels.nano_banana.name,
+    Text2ImgModels.nano_banana_pro.name,
+    Text2ImgModels.jack_qiao.name,
+    exclude=True,
+)
 def guidance_scale_setting(selected_models: list[str] | None = None):
-    if selected_models and any(
-        selected_model
-        in [
-            Text2ImgModels.dall_e.name,
-            Text2ImgModels.gpt_image_1.name,
-            Text2ImgModels.jack_qiao,
-            Text2ImgModels.nano_banana.name,
-            Text2ImgModels.nano_banana_pro.name,
-        ]
-        for selected_model in selected_models
-    ):
-        return
-
     # Flux Pro Kontext requires guidance_scale >= 1.0
     if selected_models and Img2ImgModels.flux_pro_kontext.name in selected_models:
         min_value = 1.0
@@ -557,16 +563,15 @@ usually at the expense of lower image quality
     )
 
 
-def prompt_strength_setting(selected_model: str = None):
-    if selected_model in [
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.gpt_image_1.name,
-        Img2ImgModels.instruct_pix2pix.name,
-        Img2ImgModels.nano_banana.name,
-        Img2ImgModels.nano_banana_pro.name,
-    ]:
-        return
-
+@model_filter(
+    Img2ImgModels.dall_e.name,
+    Img2ImgModels.gpt_image_1.name,
+    Img2ImgModels.instruct_pix2pix.name,
+    Img2ImgModels.nano_banana.name,
+    Img2ImgModels.nano_banana_pro.name,
+    exclude=True,
+)
+def prompt_strength_setting(selected_models: str | list[str] | None = None):
     gui.slider(
         label="""
         ##### Extent of Modification 
@@ -584,19 +589,15 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
+@model_filter(
+    Text2ImgModels.dall_e.name,
+    Text2ImgModels.dall_e_3.name,
+    Text2ImgModels.gpt_image_1.name,
+    Text2ImgModels.nano_banana.name,
+    Text2ImgModels.nano_banana_pro.name,
+    exclude=True,
+)
 def negative_prompt_setting(selected_models: list[str] | None = None):
-    if selected_models and any(
-        selected_model
-        in [
-            Text2ImgModels.dall_e.name,
-            Text2ImgModels.gpt_image_1.name,
-            Text2ImgModels.nano_banana.name,
-            Text2ImgModels.nano_banana_pro.name,
-        ]
-        for selected_model in selected_models
-    ):
-        return
-
     gui.text_area(
         """
         ##### 🧽 Negative Prompt
@@ -613,12 +614,8 @@ def negative_prompt_setting(selected_models: list[str] | None = None):
     )
 
 
+@model_filter(Img2ImgModels.instruct_pix2pix.name, exclude=False)
 def edit_instruction_setting(selected_models: list[str] | None = None):
-    if selected_models and not any(
-        selected_model in [Img2ImgModels.instruct_pix2pix.name]
-        for selected_model in selected_models
-    ):
-        return
     gui.caption(
         """
             You can also enable ‘Edit Instructions’ to use InstructPix2Pix that allows you to change your generated image output with a follow-up written instruction.
