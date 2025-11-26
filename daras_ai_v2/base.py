@@ -536,9 +536,17 @@ class BasePage:
 
     def _render_saved_generated_timestamp(self):
         sr, pr = self.current_sr_pr
-        if not (pr and (self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview)):
+        if not (
+            self.tab in {RecipeTabs.run, RecipeTabs.preview}
+            and (
+                self.get_run_state(gui.session_state)
+                in {RecipeRunState.completed, RecipeRunState.failed}
+            )
+        ):
+            # only render for completed/failed runs and on run/preview tab
             return
-        if pr.saved_run_id == sr.id or pr.is_root():
+
+        if pr.saved_run_id == sr.id:
             dt = pr.updated_at
         else:
             dt = sr.updated_at
