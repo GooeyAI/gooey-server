@@ -302,7 +302,6 @@ def _render_plan_heading(plan: PricingPlan):
 def _render_plan_pricing(
     plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
 ) -> PricingTier | None:
-    current_plan = PricingPlan.from_sub(workspace.subscription)
     pricing_div = gui.div()
 
     if plan.tiers and payment_provider == PaymentProvider.STRIPE:
@@ -499,7 +498,7 @@ def _render_upgrade_subscription_button(
         upgrade_dialog.set_open(True)
 
     # Get pricing based on tier
-    current_monthly_charge = plan.get_active_monthly_charge(current_tier)
+    current_monthly_charge = current_plan.get_active_monthly_charge(current_tier)
     new_monthly_charge = plan.get_active_monthly_charge(selected_tier)
     credits = plan.get_active_credits(selected_tier)
 
