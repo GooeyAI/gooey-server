@@ -21,7 +21,6 @@ if typing.TYPE_CHECKING:
 
 
 class PricingTier(typing.NamedTuple):
-    key: str
     credits: int
     monthly_charge: int
 
@@ -44,44 +43,38 @@ class PricingPlanData(typing.NamedTuple):
 
     pricing_title: str | None = None
     pricing_caption: str | None = None
-    tiers: dict[str, PricingTier] | None = None  # For plans with multiple pricing tiers
+    tiers: list[PricingTier] | None = None  # For plans with multiple pricing tiers
     full_width: bool = False
 
-    def get_pricing_title(self, tier_key: str | None) -> str:
+    def get_pricing_title(self, tier: PricingTier | None = None) -> str:
         if self.pricing_title is not None:
             return self.pricing_title
 
-        monthly_charge = self.get_active_monthly_charge(tier_key)
+        monthly_charge = self.get_active_monthly_charge(tier)
         return f"${monthly_charge}/month"
 
-    def get_pricing_caption(self, tier_key: str | None) -> str:
+    def get_pricing_caption(self, tier: PricingTier | None = None) -> str:
         if self.pricing_caption is not None:
             return self.pricing_caption
 
-        credits = self.get_active_credits(tier_key)
+        credits = self.get_active_credits(tier)
         return f"{credits:,} credits/month"
 
-    def get_tier(self, tier_key: str | None = None) -> PricingTier | None:
-        """Get specific tier or None if no tiers or tier not found"""
-        if not self.tiers:
-            return None
-        return self.tiers.get(tier_key or self.get_default_tier_key())
-
-    def get_active_credits(self, tier_key: str | None = None) -> int:
+    def get_active_credits(self, tier: PricingTier | None = None) -> int:
         """Get credits for specific tier or default"""
-        if tier := self.get_tier(tier_key):
+        if tier is not None:
             return tier.credits
         return self.credits
 
-    def get_active_monthly_charge(self, tier_key: str | None = None) -> int:
+    def get_active_monthly_charge(self, tier: PricingTier | None = None) -> int:
         """Get monthly charge for specific tier or default"""
-        if tier := self.get_tier(tier_key):
+        if tier is not None:
             return tier.monthly_charge
         return self.monthly_charge
 
-    def get_default_tier_key(self) -> str:
+    def get_default_tier(self) -> PricingTier:
         if self.tiers:
-            return next(iter(self.tiers.keys()))
+            return self.tiers[0]
         raise ValueError(f"No tiers available for plan {self.key}")
 
 
@@ -174,7 +167,7 @@ class PricingPlan(PricingPlanData, Enum):
         key="starter",
         title="Free",
         description="Kick our tires",
-        credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
+        credits=0,
         monthly_charge=0,
         long_description=dedent(
             """
@@ -232,38 +225,14 @@ class PricingPlan(PricingPlanData, Enum):
           <li>Premium support via Discord</li>
         </ul>
         """,
-        tiers={
-            "standard_25": PricingTier(
-                key="standard_25",
-                credits=2_000,
-                monthly_charge=25,
-            ),
-            "standard_50": PricingTier(
-                key="standard_50",
-                credits=4_200,
-                monthly_charge=50,
-            ),
-            "standard_100": PricingTier(
-                key="standard_100",
-                credits=9_000,
-                monthly_charge=100,
-            ),
-            "standard_200": PricingTier(
-                key="standard_200",
-                credits=20_000,
-                monthly_charge=200,
-            ),
-            "standard_300": PricingTier(
-                key="standard_300",
-                credits=32_000,
-                monthly_charge=300,
-            ),
-            "standard_400": PricingTier(
-                key="standard_400",
-                credits=44_000,
-                monthly_charge=400,
-            ),
-        },
+        tiers=[
+            PricingTier(credits=2_000, monthly_charge=25),
+            PricingTier(credits=4_200, monthly_charge=50),
+            PricingTier(credits=9_000, monthly_charge=100),
+            PricingTier(credits=20_000, monthly_charge=200),
+            PricingTier(credits=32_000, monthly_charge=300),
+            PricingTier(credits=44_000, monthly_charge=400),
+        ],
     )
 
     BUSINESS = PricingPlanData(
@@ -396,7 +365,7 @@ class PricingPlan(PricingPlanData, Enum):
             # Check if plan has tiers
             if plan.tiers:
                 # Check each tier by matching product name
-                for tier_key, tier in plan.tiers.items():
+                for tier in plan.tiers:
                     expected_name = f"{plan.title} - {tier.label}"
                     expected_price = tier.monthly_charge * 100  # convert to cents
 
@@ -434,13 +403,13 @@ class PricingPlan(PricingPlanData, Enum):
     def supports_paypal(self) -> bool:
         return bool(self.monthly_charge)
 
-    def get_stripe_line_item(self, tier_key: str | None = None) -> dict[str, Any]:
+    def get_stripe_line_item(self, tier: PricingTier | None = None) -> dict[str, Any]:
         if not self.supports_stripe():
             raise ValueError(f"Can't bill {self.title} via Stripe")
 
         # Get pricing from tier or default
-        credits = self.get_active_credits(tier_key)
-        monthly_charge = self.get_active_monthly_charge(tier_key)
+        credits = self.get_active_credits(tier)
+        monthly_charge = self.get_active_monthly_charge(tier)
 
         if self.key in STRIPE_PRODUCT_NAMES:
             # via product_name
@@ -452,7 +421,7 @@ class PricingPlan(PricingPlanData, Enum):
         else:
             # via product_id
             return make_stripe_recurring_plan(
-                product_id=self.get_stripe_product_id(tier_key),
+                product_id=self.get_stripe_product_id(tier),
                 credits=credits,
                 amount=monthly_charge,
             )
@@ -467,14 +436,13 @@ class PricingPlan(PricingPlanData, Enum):
             amount=self.monthly_charge,
         )
 
-    def get_stripe_product_id(self, tier_key: str | None = None) -> str:
+    def get_stripe_product_id(self, tier: PricingTier | None = None) -> str:
         # Get pricing from tier or default
-        monthly_charge = self.get_active_monthly_charge(tier_key)
+        monthly_charge = self.get_active_monthly_charge(tier)
 
         # Build product name - include tier info if applicable
-        if tier_key and self.tiers:
-            tier = self.get_tier(tier_key)
-            product_name = f"{self.title} - {tier.label}" if tier else self.title
+        if tier is not None:
+            product_name = f"{self.title} - {tier.label}"
         else:
             product_name = self.title
 
