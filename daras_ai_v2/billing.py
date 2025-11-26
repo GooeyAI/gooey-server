@@ -15,7 +15,7 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.models import PaymentMethodSummary
-from payments.plans import PricingPlan
+from payments.plans import PricingPlan, PricingTier
 from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
 from scripts.migrate_existing_subscriptions import available_subscriptions
 from widgets.author import render_author_from_workspace
@@ -81,11 +81,10 @@ def render_payments_setup():
 
 def render_current_plan(workspace: "Workspace"):
     plan = PricingPlan.from_sub(workspace.subscription)
-    tier_key = workspace.subscription.plan_tier_key
-
     # Get tier-aware pricing
-    monthly_charge = plan.get_active_monthly_charge(tier_key)
-    credits = plan.get_active_credits(tier_key)
+    tier = workspace.subscription.get_tier()
+    monthly_charge = plan.get_active_monthly_charge(tier)
+    credits = plan.get_active_credits(tier)
 
     if workspace.subscription.payment_provider:
         provider = PaymentProvider(workspace.subscription.payment_provider)
@@ -126,7 +125,7 @@ def render_current_plan(workspace: "Workspace"):
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
         with left:
-            gui.write(f"# {plan.get_pricing_title(tier_key)}", className="no-margin")
+            gui.write(f"# {plan.get_pricing_title(tier)}", className="no-margin")
             if monthly_charge:
                 if provider:
                     provider_text = f" **via {provider.label}**"
@@ -215,7 +214,7 @@ def _render_plan_full_width(
                 className="col-lg-4 d-flex flex-column justify-content-between"
             ):
                 with gui.div(className="mb-3"):
-                    selected_tier_key = _render_plan_pricing(
+                    selected_tier = _render_plan_pricing(
                         plan, selected_payment_provider, workspace
                     )
                 with gui.div(className="d-none d-lg-flex flex-column"):
@@ -225,7 +224,7 @@ def _render_plan_full_width(
                         payment_provider=selected_payment_provider,
                         user=user,
                         session=session,
-                        selected_tier_key=selected_tier_key,
+                        selected_tier=selected_tier,
                     )
             with gui.div(className="col-lg-8"):
                 _render_plan_details(plan)
@@ -236,7 +235,7 @@ def _render_plan_full_width(
                 payment_provider=selected_payment_provider,
                 user=user,
                 session=session,
-                selected_tier_key=selected_tier_key,
+                selected_tier=selected_tier,
             )
 
 
@@ -261,7 +260,7 @@ def _render_plan_compact(
     ):
         _render_plan_heading(plan)
         with gui.div(className="my-3"):
-            selected_tier_key = _render_plan_pricing(
+            selected_tier = _render_plan_pricing(
                 plan, selected_payment_provider, workspace
             )
         with gui.div(
@@ -275,7 +274,7 @@ def _render_plan_compact(
                 payment_provider=selected_payment_provider,
                 user=user,
                 session=session,
-                selected_tier_key=selected_tier_key,
+                selected_tier=selected_tier,
             )
 
 
@@ -302,37 +301,34 @@ def _render_plan_heading(plan: PricingPlan):
 
 def _render_plan_pricing(
     plan: PricingPlan, payment_provider: PaymentProvider | None, workspace: "Workspace"
-):
+) -> PricingTier | None:
     current_plan = PricingPlan.from_sub(workspace.subscription)
     pricing_div = gui.div()
 
     if plan.tiers and payment_provider == PaymentProvider.STRIPE:
-        if plan == current_plan and workspace.subscription:
-            default_tier_key = (
-                workspace.subscription.plan_tier_key or plan.get_default_tier_key()
-            )
-        else:
-            default_tier_key = plan.get_default_tier_key()
-
         with gui.div(className="my-3"):
-            selected_tier_key = gui.selectbox(
-                "",
-                options=list(plan.tiers.keys()),
-                format_func=lambda k: plan.tiers[k].label,
+            choices = {tier.monthly_charge: tier for tier in plan.tiers}
+            monthly_charge = gui.selectbox(
+                label="",
+                options=choices.keys(),
+                format_func=lambda k: choices[k].label,
                 key=f"tier-select-{plan.key}",
-                value=default_tier_key,
+                value=(
+                    workspace.subscription
+                    and round(workspace.subscription.charged_amount / 100)
+                ),
             )
+            selected_tier = choices.get(monthly_charge)
     else:
-        selected_tier_key = None
+        selected_tier = None
 
     with pricing_div:
         with gui.tag("h3", className="my-0 d-inline me-2"):
-            gui.html(plan.get_pricing_title(selected_tier_key))
+            gui.html(plan.get_pricing_title(selected_tier))
         with gui.tag("p", className="text-muted my-0"):
-            gui.html(plan.get_pricing_caption(selected_tier_key))
-    current_plan = PricingPlan.from_sub(workspace.subscription)
+            gui.html(plan.get_pricing_caption(selected_tier))
 
-    return selected_tier_key
+    return selected_tier
 
 
 def _render_plan_action_button(
@@ -342,20 +338,21 @@ def _render_plan_action_button(
     plan: PricingPlan,
     payment_provider: PaymentProvider | None,
     session: dict,
-    selected_tier_key: str | None = None,
+    selected_tier: PricingTier | None = None,
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
     if plan == current_plan:
-        current_tier_key = (
-            workspace.subscription.plan_tier_key if workspace.subscription else None
-        )
-
-        if plan.tiers and selected_tier_key and selected_tier_key != current_tier_key:
+        if (
+            plan.tiers
+            and selected_tier
+            and workspace.subscription
+            and selected_tier != workspace.subscription.get_tier()
+        ):
             render_change_subscription_button(
                 workspace=workspace,
                 plan=plan,
-                selected_tier_key=selected_tier_key,
+                selected_tier=selected_tier,
             )
         else:
             gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
@@ -385,7 +382,7 @@ def _render_plan_action_button(
 
     elif workspace.subscription and workspace.subscription.is_paid():
         render_change_subscription_button(
-            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
+            workspace=workspace, plan=plan, selected_tier=selected_tier
         )
 
     else:
@@ -394,7 +391,7 @@ def _render_plan_action_button(
             workspace=workspace,
             plan=plan,
             payment_provider=payment_provider,
-            selected_tier_key=selected_tier_key,
+            selected_tier=selected_tier,
         )
 
 
@@ -436,27 +433,27 @@ def render_change_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    selected_tier_key: str | None = None,
+    selected_tier: PricingTier | None = None,
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
-    current_tier_key = workspace.subscription and workspace.subscription.plan_tier_key
+    current_tier = workspace.subscription and workspace.subscription.get_tier()
 
     if plan > current_plan or (
         plan == current_plan
         and plan.tiers
-        and (
-            plan.get_tier(selected_tier_key).monthly_charge
-            > plan.get_tier(current_tier_key).monthly_charge
-        )
+        and current_tier
+        and selected_tier.monthly_charge > current_tier.monthly_charge
     ):
         # subscription exists, show upgrade/downgrade button
         _render_upgrade_subscription_button(
-            workspace=workspace, plan=plan, selected_tier_key=selected_tier_key
+            workspace=workspace,
+            plan=plan,
+            selected_tier=selected_tier,
         )
         return
 
-    current_monthly_charge = current_plan.get_active_monthly_charge(current_tier_key)
-    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
+    current_monthly_charge = current_plan.get_active_monthly_charge(current_tier)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier)
 
     ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
     gui.button_with_confirm_dialog(
@@ -472,21 +469,21 @@ This will take effect from the next billing cycle.
         confirm_className="border-danger bg-danger text-white",
     )
     if ref.pressed_confirm:
-        change_subscription(workspace, plan, tier_key=selected_tier_key)
+        change_subscription(workspace, new_plan=plan, new_tier=selected_tier)
 
 
 def _render_upgrade_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
-    selected_tier_key: str | None = None,
+    selected_tier: PricingTier | None = None,
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
-    current_tier_key = workspace.subscription.plan_tier_key
+    current_tier = workspace.subscription.get_tier()
 
     label = "Upgrade"
     upgrade_dialog = gui.use_confirm_dialog(
-        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier_key or '0'}"
+        key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_tier}"
     )
 
     # Standard plan is only for personal workspaces, skip workspace creation popup
@@ -502,9 +499,9 @@ def _render_upgrade_subscription_button(
         upgrade_dialog.set_open(True)
 
     # Get pricing based on tier
-    current_monthly_charge = plan.get_active_monthly_charge(current_tier_key)
-    new_monthly_charge = plan.get_active_monthly_charge(selected_tier_key)
-    credits = plan.get_active_credits(selected_tier_key)
+    current_monthly_charge = plan.get_active_monthly_charge(current_tier)
+    new_monthly_charge = plan.get_active_monthly_charge(selected_tier)
+    credits = plan.get_active_credits(selected_tier)
 
     gui.button_with_confirm_dialog(
         ref=upgrade_dialog,
@@ -525,8 +522,8 @@ Your payment method will be charged ${new_monthly_charge:,} today and again ever
         try:
             change_subscription(
                 workspace,
-                plan,
-                tier_key=selected_tier_key,
+                new_plan=plan,
+                new_tier=selected_tier,
                 # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
                 billing_cycle_anchor="now",
                 payment_behavior="error_if_incomplete",
@@ -539,7 +536,7 @@ Your payment method will be charged ${new_monthly_charge:,} today and again ever
             # only handle error if it's related to mandates
             # cancel current subscription & redirect user to new subscription page
             workspace.subscription.cancel()
-            stripe_subscription_create(workspace, plan, tier_key=selected_tier_key)
+            stripe_subscription_create(workspace, plan, tier=selected_tier)
 
 
 def _render_create_subscription_button(
@@ -547,7 +544,7 @@ def _render_create_subscription_button(
     workspace: "Workspace",
     plan: PricingPlan,
     payment_provider: PaymentProvider,
-    selected_tier_key: str | None = None,
+    selected_tier: PricingTier | None = None,
 ):
     label = "Upgrade"
 
@@ -568,7 +565,7 @@ def _render_create_subscription_button(
                     workspace=workspace,
                     plan=plan,
                     pressed=pressed,
-                    tier_key=selected_tier_key,
+                    tier=selected_tier,
                 )
             case PaymentProvider.PAYPAL:
                 # PayPal doesn't support tiers, use default
@@ -583,18 +580,22 @@ def fmt_price(monthly_charge: int) -> str:
 
 
 def change_subscription(
-    workspace: "Workspace", new_plan: PricingPlan, tier_key: str | None = None, **kwargs
+    workspace: "Workspace",
+    new_plan: PricingPlan,
+    new_tier: PricingTier | None = None,
+    **kwargs,
 ):
     from routers.account import account_route
     from routers.account import payment_processing_route
 
     current_plan = PricingPlan.from_sub(workspace.subscription)
-    current_tier_key = (
-        workspace.subscription.plan_tier_key if workspace.subscription else None
-    )
 
     # Check if plan and tier are both unchanged
-    if new_plan == current_plan and tier_key == current_tier_key:
+    if (
+        new_plan == current_plan
+        and workspace.subscription
+        and new_tier == workspace.subscription.get_tier()
+    ):
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
     if new_plan == PricingPlan.STARTER:
@@ -616,16 +617,12 @@ def change_subscription(
             metadata = {
                 settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
             }
-            if tier_key:
-                metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = (
-                    tier_key
-                )
 
             stripe.Subscription.modify(
                 subscription.id,
                 items=[
                     {"id": subscription["items"].data[0], "deleted": True},
-                    new_plan.get_stripe_line_item(tier_key),
+                    new_plan.get_stripe_line_item(new_tier),
                 ],
                 metadata=metadata,
                 **kwargs,
@@ -807,16 +804,16 @@ def render_stripe_subscription_button(
     *,
     workspace: "Workspace",
     plan: PricingPlan,
+    tier: PricingTier | None = None,
     pressed: bool = False,
-    tier_key: str | None = None,
 ):
     if not plan.supports_stripe():
         gui.write("Stripe subscription not available")
         return
 
     # Get pricing based on tier
-    monthly_charge = plan.get_active_monthly_charge(tier_key)
-    credits = plan.get_active_credits(tier_key)
+    monthly_charge = plan.get_active_monthly_charge(tier)
+    credits = plan.get_active_credits(tier)
 
     ref = gui.use_confirm_dialog(key=f"--change-sub-confirm-dialog-{plan.key}")
 
@@ -827,9 +824,7 @@ def render_stripe_subscription_button(
         ):
             ref.set_open(True)
         else:
-            stripe_subscription_create(
-                workspace=workspace, plan=plan, tier_key=tier_key
-            )
+            stripe_subscription_create(workspace=workspace, plan=plan, tier=tier)
 
     if ref.is_open:
         gui.confirm_dialog(
@@ -846,11 +841,13 @@ This will charge you the full amount today, and every month thereafter.
         )
 
     if ref.pressed_confirm:
-        stripe_subscription_create(workspace=workspace, plan=plan, tier_key=tier_key)
+        stripe_subscription_create(workspace=workspace, plan=plan, tier=tier)
 
 
 def stripe_subscription_create(
-    workspace: "Workspace", plan: PricingPlan, tier_key: str | None = None
+    workspace: "Workspace",
+    plan: PricingPlan,
+    tier: PricingTier | None = None,
 ):
     from routers.account import account_route
     from routers.account import payment_processing_route
@@ -875,9 +872,7 @@ def stripe_subscription_create(
         and workspace.subscription.stripe_get_default_payment_method()
     )
     metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: plan.key}
-    if tier_key:
-        metadata[settings.STRIPE_USER_SUBSCRIPTION_TIER_METADATA_FIELD] = tier_key
-    line_items = [plan.get_stripe_line_item(tier_key)]
+    line_items = [plan.get_stripe_line_item(tier)]
     if pm:
         sub = stripe.Subscription.create(
             customer=pm.customer,
