@@ -418,7 +418,7 @@ class BasePage:
                 with force_active_lg, gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
-                self._render_saved_generated_timestamp()
+            self._render_saved_generated_timestamp()
         with gui.nav_tab_content():
             self.render_selected_tab()
         # rendered at the end to indicate unpublished changes
