@@ -1,6 +1,7 @@
 from copy import copy
 from decimal import Decimal
 
+import sentry_sdk
 import stripe
 from django.db import transaction
 from loguru import logger
@@ -96,11 +97,14 @@ class StripeWebhookHandler:
 
         kwargs = {}
         if invoice.subscription and invoice.subscription_details:
-            kwargs["plan"] = PricingPlan.get_by_key(
-                invoice.subscription_details.metadata.get(
-                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
-                )
-            ).db_value
+            try:
+                kwargs["plan"] = PricingPlan.get_by_key(
+                    invoice.subscription_details.metadata.get(
+                        settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
+                    )
+                ).db_value
+            except KeyError as e:
+                sentry_sdk.capture_exception(e)
             match invoice.billing_reason:
                 case "subscription_create":
                     reason = TransactionReason.SUBSCRIPTION_CREATE
