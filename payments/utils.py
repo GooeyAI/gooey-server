@@ -17,7 +17,7 @@ def make_stripe_recurring_plan(
     cents_per_month = amount * 100
     price_data = {
         "currency": "usd",
-        "unit_amount_decimal": round(cents_per_month / credits, 4),
+        "unit_amount_decimal": round(cents_per_month / credits, 12),
         "recurring": {"interval": "month"},
     }
     if product_id:
