@@ -1299,40 +1299,43 @@ class BasePage:
             uid=version.saved_run.uid,
             query_params=dict(version_id=version.version_id),
         )
-        with gui.link(to=url, className="d-block text-decoration-none my-3"):
-            if version.title:
-                gui.markdown(version.title)
-
-            with gui.div(
-                className="d-flex justify-content-between align-items-middle fw-bold"
+        with gui.styled("&.pr-version:hover { background-color: #f0f0f0 }"):
+            with gui.link(
+                to=url,
+                className="d-block text-decoration-none my-3 pr-version p-2 rounded-2",
             ):
-                if version.changed_by:
-                    with gui.tag("h6"):
-                        render_author_from_user(
-                            version.changed_by, responsive=False, show_as_link=False
+                with gui.div(
+                    className="d-flex justify-content-between align-items-middle fw-bold container-margin-reset"
+                ):
+                    if version.changed_by:
+                        with gui.tag("h6", className="mb-0"):
+                            render_author_from_user(
+                                version.changed_by, responsive=False, show_as_link=False
+                            )
+                    else:
+                        gui.write(
+                            "###### Deleted User", className="container-margin-reset"
                         )
-                else:
-                    gui.write("###### Deleted User", className="container-margin-reset")
-                with gui.tag("h6", className="mb-0"):
-                    gui.html(
-                        "Loading...",
-                        **render_local_dt_attrs(
-                            version.created_at,
-                            date_options={"month": "short", "day": "numeric"},
-                        ),
-                    )
-            with gui.div(className="container-margin-reset"):
-                is_first_version = not older_version
-                if is_first_version:
-                    with gui.tag("span", className="badge bg-secondary px-3"):
-                        gui.write("FIRST VERSION")
-                elif version.change_notes:
-                    gui.caption(
-                        f"{icons.notes} {html.escape(version.change_notes)}",
-                        unsafe_allow_html=True,
-                    )
-                elif older_version and older_version.title != version.title:
-                    gui.caption(f"Renamed to: {version.title}")
+                    with gui.tag("h6", className="mb-0"):
+                        gui.html(
+                            "Loading...",
+                            **render_local_dt_attrs(
+                                version.created_at,
+                                date_options={"month": "short", "day": "numeric"},
+                            ),
+                        )
+                with gui.div(className="container-margin-reset"):
+                    is_first_version = not older_version
+                    if is_first_version:
+                        with gui.tag("span", className="badge bg-secondary px-3"):
+                            gui.write("FIRST VERSION")
+                    elif version.change_notes:
+                        gui.caption(
+                            f"{icons.notes} {html.escape(version.change_notes)}",
+                            unsafe_allow_html=True,
+                        )
+                    elif older_version and older_version.title != version.title:
+                        gui.caption(f"Renamed to: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
