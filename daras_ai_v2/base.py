@@ -237,6 +237,7 @@ class BasePage:
         example_id: str | None = None,
         run_id: str | None = None,
         uid: str | None = None,
+        version_id: str | None = None,
         query_params: dict[str, str] | None = None,
         path_params: dict | None = None,
     ) -> str:
@@ -430,6 +431,16 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
+        version_id = self.request.query_params.get("version_id", None)
+        pr_version = None
+        if version_id:
+            pr_version = pr.versions.get(version_id=version_id)
+
+            if pr_version and self.current_pr:
+                self.current_pr.title = pr_version.title
+                self.current_pr.notes = pr_version.notes
+                self.current_pr.photo_url = pr_version.photo_url
+
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
@@ -494,7 +505,7 @@ class BasePage:
                             ),
                         )
 
-        if self.tab == RecipeTabs.run and is_example:
+        if self.tab == RecipeTabs.run and is_example or pr_version:
             with gui.div(className="container-margin-reset"):
                 if self.current_pr and self.current_pr.notes:
                     gui.write(self.current_pr.notes, line_clamp=3)
@@ -1276,8 +1287,12 @@ class BasePage:
             example_id=version.published_run.published_run_id,
             run_id=version.saved_run.run_id,
             uid=version.saved_run.uid,
+            query_params=dict(version_id=version.version_id),
         )
         with gui.link(to=url, className="d-block text-decoration-none my-3"):
+            if version.title:
+                gui.markdown(version.title)
+
             with gui.div(
                 className="d-flex justify-content-between align-items-middle fw-bold"
             ):
