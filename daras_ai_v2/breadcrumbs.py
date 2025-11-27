@@ -60,10 +60,6 @@ def get_title_breadcrumbs(
     is_run = not is_root and not is_example
     is_api_call = sr.is_api_call and tab == RecipeTabs.run
 
-    print("is_root>>>", is_root)
-    print("is_example>>>", is_example)
-    print("is_run>>>", is_run)
-    print("is_api_call>>>", is_api_call)
     metadata = page_cls.workflow.get_or_create_metadata()
     root_title = TitleUrl(
         f"{metadata.emoji} {metadata.short_title}", page_cls.app_url()
@@ -114,16 +110,10 @@ def get_title_breadcrumbs(
                     url=pr and pr.get_app_url(),
                 )
             else:
-                if pr_version:
-                    h1_title = TitleUrl(
-                        title=pr_version.title,
-                        url=pr_version.saved_run.get_app_url(),
-                    )
-                else:
-                    h1_title = TitleUrl(
-                        title=prompt_title or page_cls.get_run_title(sr, pr),
-                        url=root_title.url,
-                    )
+                h1_title = TitleUrl(
+                    title=prompt_title or page_cls.get_run_title(sr, pr),
+                    url=root_title.url,
+                )
 
             return TitleBreadCrumbs(
                 root_title=root_title, h1_prefix=prefix, h1_title=h1_title

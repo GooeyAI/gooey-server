@@ -952,11 +952,13 @@ class BasePage:
         notes: str,
         photo_url: str,
     ):
+        version_id = self.request.query_params.get("version_id", None)
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
             or published_run.photo_url != photo_url
+            or version_id
         )
 
     def _has_request_changed(self) -> bool:
