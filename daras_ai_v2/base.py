@@ -487,7 +487,11 @@ class BasePage:
                                 className="d-flex align-items-end flex-column-reverse gap-2",
                                 style={"whiteSpace": "nowrap"},
                             ):
-                                if request_changed or (can_save and not is_example):
+                                if (
+                                    request_changed
+                                    or (can_save and not is_example)
+                                    or self.is_published_run_version()
+                                ):
                                     self._render_unpublished_changes_indicator()
                                 self.render_social_buttons()
 
@@ -875,7 +879,10 @@ class BasePage:
                 notes=published_run_description.strip(),
                 photo_url=photo_url,
             )
-            if not self._has_published_run_changed(published_run=pr, **updates):
+            if (
+                not self._has_published_run_changed(published_run=pr, **updates)
+                and self.is_published_run_version
+            ):
                 gui.error("No changes to publish", icon="⚠️")
                 return
             pr.add_version(
@@ -943,6 +950,9 @@ class BasePage:
         elif title.strip() == "":
             raise TitleValidationError("Title cannot be empty.")
 
+    def is_published_run_version(self) -> bool:
+        return self.request.query_params.get("version_id", None) is not None
+
     def _has_published_run_changed(
         self,
         *,
@@ -952,13 +962,11 @@ class BasePage:
         notes: str,
         photo_url: str,
     ):
-        version_id = self.request.query_params.get("version_id", None)
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.saved_run != saved_run
             or published_run.photo_url != photo_url
-            or version_id
         )
 
     def _has_request_changed(self) -> bool:
