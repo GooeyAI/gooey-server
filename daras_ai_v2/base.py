@@ -417,7 +417,7 @@ class BasePage:
             self._render_header()
 
     def render_sidebar(self):
-        if not self.is_current_user_admin():
+        if not self.current_workspace.bot_builder:
             return
 
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)

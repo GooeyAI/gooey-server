@@ -39,6 +39,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         except KeyError:
             pass
         set_current_workspace(session, int(switch_workspace_id))
+        raise gui.RerunException()
 
     try:
         current = [
