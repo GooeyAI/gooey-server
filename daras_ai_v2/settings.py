@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "managed_secrets",
     "ai_models",
     "number_cycling",
+    "memory",
 ]
 
 MIDDLEWARE = [
@@ -523,6 +524,8 @@ MODAL_TOKEN_SECRET = config("MODAL_TOKEN_SECRET", "")
 if MODAL_TOKEN_ID and MODAL_TOKEN_SECRET:
     os.environ["MODAL_TOKEN_ID"] = MODAL_TOKEN_ID
     os.environ["MODAL_TOKEN_SECRET"] = MODAL_TOKEN_SECRET
+
+HF_TOKEN = config("HF_TOKEN", "")
 
 os.environ["LIVEKIT_API_KEY"] = config("LIVEKIT_API_KEY", "")
 os.environ["LIVEKIT_API_SECRET"] = config("LIVEKIT_API_SECRET", "")

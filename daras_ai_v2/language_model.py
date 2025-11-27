@@ -77,6 +77,7 @@ class LLMSpec(typing.NamedTuple):
     is_deprecated: bool = False
     # redirect to a different LLM when deprecated
     redirect_to: str = "gpt_4_o_mini"
+    version: float = -1
 
 
 class LargeLanguageModels(Enum):
@@ -101,6 +102,19 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    # https://platform.openai.com/docs/models/gpt-5.1
+    gpt_5_1 = LLMSpec(
+        label="GPT-5.1 • openai",
+        model_id="gpt-5.1-2025-11-13",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+        version=5.1,
+    )
     # https://platform.openai.com/docs/models/gpt-5
     gpt_5 = LLMSpec(
         label="GPT-5 • openai",
@@ -112,6 +126,7 @@ class LargeLanguageModels(Enum):
         is_thinking_model=True,
         supports_json=True,
         supports_temperature=False,
+        version=5,
     )
     # https://platform.openai.com/docs/models/gpt-5-mini
     gpt_5_mini = LLMSpec(
@@ -636,6 +651,21 @@ class LargeLanguageModels(Enum):
         redirect_to="gemma_2_9b_it",
     )
 
+    # https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro
+    gemini_3_pro = LLMSpec(
+        label="Gemini 3 Pro • Google",
+        model_id="google/gemini-3-pro-preview",
+        llm_api=LLMApis.openai,
+        context_window=1_048_576,
+        max_output_tokens=65_535,
+        price=1,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+        version=3,
+    )
+
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     gemini_2_5_pro = LLMSpec(
         label="Gemini 2.5 Pro (Google)",
@@ -782,6 +812,16 @@ class LargeLanguageModels(Enum):
     )
 
     # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_4_5_sonnet = LLMSpec(
+        label="Claude 4.5 Sonnet • Anthropic",
+        model_id="claude-sonnet-4-5",
+        llm_api=LLMApis.openai,
+        context_window=200_000,
+        max_output_tokens=64_000,
+        is_vision_model=True,
+        supports_json=True,
+        is_thinking_model=True,
+    )
     claude_4_1_opus = LLMSpec(
         label="Claude 4.1 Opus • Anthropic",
         model_id="claude-opus-4-1",
@@ -802,6 +842,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_5_sonnet",
     )
     claude_4_opus = LLMSpec(
         label="Claude 4 Opus • Anthropic",
@@ -813,6 +855,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_1_opus",
     )
     claude_3_7_sonnet = LLMSpec(
         label="Claude 3.7 Sonnet • Anthropic",
@@ -823,6 +867,8 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_5_sonnet = LLMSpec(
         label="Claude 3.5 Sonnet • Anthropic",
@@ -834,7 +880,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_opus = LLMSpec(
         label="Claude 3 Opus • Anthropic",
@@ -846,7 +892,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_sonnet = LLMSpec(
         label="Claude 3 Sonnet • Anthropic",
@@ -858,7 +904,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
     claude_3_haiku = LLMSpec(
         label="Claude 3 Haiku • Anthropic",
@@ -870,7 +916,7 @@ class LargeLanguageModels(Enum):
         is_vision_model=True,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="claude_3_7_sonnet",
+        redirect_to="claude_4_5_sonnet",
     )
 
     afrollama_v1 = LLMSpec(
@@ -1017,6 +1063,7 @@ class LargeLanguageModels(Enum):
         self.supports_temperature = spec.supports_temperature
         self.is_audio_model = spec.is_audio_model
         self.redirect_to = spec.redirect_to
+        self.version = spec.version
 
     @property
     def value(self):
@@ -1045,6 +1092,10 @@ class ReasoningEffort(_ReasoningEffort, GooeyEnum):
     low = _ReasoningEffort(name="low", label="Low", thinking_budget=4096)
     medium = _ReasoningEffort(name="medium", label="Medium", thinking_budget=8192)
     high = _ReasoningEffort(name="high", label="High", thinking_budget=24576)
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.minimal}
 
 
 def calc_gpt_tokens(
@@ -1611,7 +1662,8 @@ def run_openai_chat(
     reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
-    from openai._types import NOT_GIVEN
+    from openai import NOT_GIVEN
+    from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
     kwargs = {}
 
@@ -1622,7 +1674,9 @@ def run_openai_chat(
             reasoning_effort = None
         if reasoning_effort:
             re = ReasoningEffort.from_api(reasoning_effort)
-            if "gemini" in model.name:
+            if re == ReasoningEffort.minimal:  # deprecated
+                re = ReasoningEffort.low
+            if "gemini" in model.name and model.version < 3:
                 thinking_budget = re.thinking_budget
                 kwargs["extra_body"] = {
                     "google": {
@@ -1662,7 +1716,10 @@ def run_openai_chat(
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
-    if model == LargeLanguageModels.apertus_70b_instruct:
+    if model in [
+        LargeLanguageModels.apertus_70b_instruct,
+        LargeLanguageModels.sea_lion_v4_gemma_3_27b_it,
+    ]:
         # Swiss AI Apertus model doesn't support tool calling
         tools = None
 
@@ -1682,21 +1739,24 @@ def run_openai_chat(
     model_ids = model.model_id
     if isinstance(model_ids, str):
         model_ids = [model_ids]
-    completion, used_model = try_all(
-        *[
-            _get_chat_completions_create(
-                model=model_id,
-                messages=messages,
-                stop=stop or NOT_GIVEN,
-                n=num_outputs,
-                stream=stream,
-                **kwargs,
-            )
-            for model_id in model_ids
-        ],
-    )
-    if stream:
-        return _stream_openai_chunked(completion.__stream__(), used_model, messages)
+
+    with capture_openai_content_policy_violation():
+        completion, used_model = try_all(
+            *[
+                _get_chat_completions_create(
+                    model=model_id,
+                    messages=messages,
+                    stop=stop or NOT_GIVEN,
+                    n=num_outputs,
+                    stream=stream,
+                    **kwargs,
+                )
+                for model_id in model_ids
+            ],
+        )
+        if stream:
+            return _stream_openai_chunked(completion.__stream__(), used_model, messages)
+
     if not completion or not completion.choices:
         return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
     else:
@@ -1932,7 +1992,7 @@ def get_openai_client(model: str):
         client = openai.OpenAI(
             api_key=get_google_auth_token(),
             max_retries=0,
-            base_url=f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
+            base_url=f"https://aiplatform.googleapis.com/v1/projects/{settings.GCP_PROJECT}/locations/{settings.GCP_REGION}/endpoints/openapi",
         )
     elif model.startswith("aisingapore/"):
         client = openai.OpenAI(

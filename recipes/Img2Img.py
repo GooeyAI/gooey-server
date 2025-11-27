@@ -18,6 +18,7 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
     controlnet,
     ControlNetModels,
+    NanoBananaAspectRatioOptions,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
 
@@ -68,6 +69,10 @@ class Img2ImgPage(BasePage):
         # sd_2_upscaling: bool | None
         gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None
 
+        nano_banana_pro_resolution: typing.Literal["1K", "2K", "4K"] | None = None
+        nano_banana_pro_aspect_ratio: NanoBananaAspectRatioOptions | None = None
+        nano_banana_aspect_ratio: NanoBananaAspectRatioOptions | None = None
+
         seed: int | None = None
 
         image_guidance_scale: float | None = None
@@ -99,6 +104,7 @@ class Img2ImgPage(BasePage):
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
+            accept=["image/*"],
         )
 
         gui.text_area(
@@ -212,6 +218,10 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                gpt_image_1_quality=request.gpt_image_1_quality,
+                nano_banana_pro_resolution=request.nano_banana_pro_resolution,
+                nano_banana_aspect_ratio=request.nano_banana_aspect_ratio,
+                nano_banana_pro_aspect_ratio=request.nano_banana_pro_aspect_ratio,
             )
 
     def get_raw_price(self, state: dict) -> int:
@@ -225,6 +235,12 @@ class Img2ImgPage(BasePage):
                 unit_price = 45
             case Img2ImgModels.nano_banana.name:
                 unit_price = 8
+            case Img2ImgModels.nano_banana_pro.name:
+                match state.get("nano_banana_pro_resolution"):
+                    case "4K":
+                        unit_price = 40
+                    case _:
+                        unit_price = 20
             case _:
                 unit_price = 5
 

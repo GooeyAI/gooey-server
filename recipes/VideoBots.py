@@ -19,6 +19,8 @@ from bots.models import (
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import truncate_text_words
+from daras_ai_v2.exceptions import UserError
+from functions.recipe_functions import BaseLLMTool
 from payments.plans import PricingPlan
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
@@ -391,8 +393,14 @@ Translation Glossary for LLM Language (English) -> User Langauge
             request=request, user_input=user_input, ocr_texts=ocr_texts
         )
 
+        tools_by_name = self.get_current_llm_tools()
+
         yield from self.build_final_prompt(
-            request=request, response=response, user_input=user_input, model=llm_model
+            request=request,
+            response=response,
+            user_input=user_input,
+            model=llm_model,
+            tools_by_name=tools_by_name,
         )
 
         yield from self.llm_loop(
@@ -400,6 +408,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             response=response,
             model=llm_model,
             asr_msg=asr_msg,
+            tools_by_name=tools_by_name,
         )
 
         yield from self.tts_step(model=llm_model, request=request, response=response)
@@ -493,11 +502,16 @@ Translation Glossary for LLM Language (English) -> User Langauge
             user_input = f"Extracted Text: {text!r}\n\n{user_input}"
         return user_input
 
-    def build_final_prompt(self, request, response, user_input, model):
+    def build_final_prompt(self, request, response, user_input, model, tools_by_name):
         # construct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
-            bot_script = render_prompt_vars(bot_script, gui.session_state)
+            variables = gui.session_state.get("variables", {})
+            for tool_name in tools_by_name:
+                variables.pop(tool_name, None)
+            bot_script = render_prompt_vars(
+                bot_script, gui.session_state | tools_by_name
+            )
             # insert to top
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
         else:
@@ -623,6 +637,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         model: LargeLanguageModels,
         asr_msg: str | None = None,
         prev_output_text: list[str] | None = None,
+        tools_by_name: dict[str, BaseLLMTool] | None = None,
     ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.value}..."
 
@@ -632,7 +647,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
 
-        tools_by_name = self.get_current_llm_tools()
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=request.selected_model,
             messages=response.final_prompt,
@@ -733,6 +747,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             response=response,
             model=model,
             prev_output_text=output_text,
+            tools_by_name=tools_by_name,
         )
 
     def output_translation_step(self, request, response, output_text):
@@ -1614,7 +1629,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 tab=RecipeTabs.integrations, example_id=pr.published_run_id
             )
             gui.caption(
-                f"Note: You seem to have unpublished changes. Integrations use the [last saved version]({last_saved_url}), not the currently visible edits.",
+                f"Note: You seem to have unpublished changes. Deployments use the [last saved version]({last_saved_url}), not the currently visible edits.",
                 className="text-center text-muted",
             )
 
@@ -1643,12 +1658,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         # this gets triggered on the /add route
         if gui.session_state.pop("--add-integration", None):
             self.render_integrations_add(
-                label="#### Add a New Integration to your Copilot",
+                label="#### Deploy to a New Channel",
                 run_title=run_title,
                 pr=pr,
             )
             with gui.center():
-                if gui.button("Return to Test & Configure"):
+                if gui.button("Return to Configure"):
                     cancel_url = self.current_app_url(RecipeTabs.integrations)
                     raise gui.RedirectException(cancel_url)
             return
@@ -2073,11 +2088,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
-                gui.write("###### Add Integration")
+                gui.write("###### Add Deployment")
                 gui.caption(f"Add another connection for {run_title}.")
             with col2:
                 gui.anchor(
-                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Integration',
+                    f'<img align="left" width="24" height="24" src="{icons.integrations_img}"> &nbsp; Add Deployment',
                     str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
                     unsafe_allow_html=True,
                 )

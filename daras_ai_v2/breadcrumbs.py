@@ -96,7 +96,7 @@ def get_title_breadcrumbs(
             )
         case _ if is_run:
             if tab and tab.label:
-                prefix = tab.label
+                prefix = "Deployments" if tab == RecipeTabs.integrations else tab.label
             elif is_api_call:
                 prefix = "API Run"
             else:

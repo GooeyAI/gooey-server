@@ -1,6 +1,8 @@
+import json
 import typing
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from loguru import logger
 from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
@@ -8,10 +10,19 @@ from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
-from functions.recipe_functions import BaseLLMTool, generate_tool_properties
+from functions.composio_tools import ComposioLLMTool
+from functions.models import FunctionScopes
+from functions.recipe_functions import (
+    BaseLLMTool,
+    generate_tool_properties,
+    get_external_tool_slug_from_url,
+)
+from memory.models import MemoryEntry
 
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
+    from composio import Composio
+
     from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 
     audio_url = state.get("input_audio")
@@ -37,6 +48,29 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
             platform_msg_id=collect_feedback.get("last_bot_message_id"),
             conversation_id=variables.get("conversation_id"),
         )
+
+    functions = state.get("functions")
+    if not functions:
+        return
+
+    composio_tools = {}
+    for function in functions:
+        url = function.get("url")
+        if not url:
+            continue
+        tool_slug = get_external_tool_slug_from_url(url)
+        if not tool_slug:
+            continue
+        scope = FunctionScopes.get(function.get("scope"))
+        try:
+            tool_cls = INBUILT_INTEGRATION_TOOLS[tool_slug]
+            yield tool_cls(scope)
+        except KeyError:
+            composio_tools[tool_slug] = scope
+    for tool_spec in Composio().tools.get_raw_composio_tools(
+        tools=composio_tools, limit=50
+    ):
+        yield ComposioLLMTool(tool_spec, composio_tools[tool_spec.slug])
 
 
 class VectorSearchLLMTool(BaseLLMTool):
@@ -76,8 +110,8 @@ You should build well-written queries, including keywords as well as the context
         )
 
     def call(self, queries: list[str]) -> dict[str, list[str]]:
-        from daras_ai_v2.vector_search import get_top_k_references, DocSearchRequest
         from daras_ai_v2.language_model_openai_realtime import yield_from
+        from daras_ai_v2.vector_search import DocSearchRequest, get_top_k_references
 
         return {
             query: yield_from(
@@ -93,7 +127,7 @@ You should build well-written queries, including keywords as well as the context
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
     def __init__(self, state, page_slug):
-        from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+        from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
         self.state = state or {}
         try:
@@ -186,8 +220,8 @@ You can transfer the user's call to another phone number using this tool. Some e
         return self
 
     def call(self, phone_number: str) -> dict:
-        from routers.bots_api import api_hashids
         from daras_ai_v2.fastapi_tricks import get_api_route_url
+        from routers.bots_api import api_hashids
         from routers.twilio_api import twilio_voice_call_status
 
         try:
@@ -313,3 +347,108 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
         feedback.save()
 
         return {"success": True}
+
+
+class GooeyMemoryLLMToolRead(BaseLLMTool):
+    name = "GOOEY_MEMORY_READ_VALUE"
+
+    def __init__(self, scope: FunctionScopes | None):
+        self.scope = scope
+        super().__init__(
+            name=self.name,
+            label="Read Value from Gooey.AI Memory",
+            description="Read the value of a key from the Gooey.AI store.",
+            properties={
+                "key": {
+                    "type": "string",
+                    "description": "The key to read from the Gooey.AI store.",
+                },
+            },
+            required=["key"],
+        )
+
+    def bind(self, user_id: str):
+        self.user_id = user_id
+        return self
+
+    def call(self, key: str) -> dict:
+        try:
+            value = MemoryEntry.objects.get(user_id=self.user_id, key=key).value
+        except MemoryEntry.DoesNotExist:
+            return {"success": False, "error": f"Key not found: {key}"}
+        return {"success": True, "key": key, "value": value}
+
+
+class GooeyMemoryLLMToolWrite(BaseLLMTool):
+    name = "GOOEY_MEMORY_WRITE_VALUE"
+
+    def __init__(self, scope: FunctionScopes):
+        self.scope = scope
+        super().__init__(
+            name=self.name,
+            label="Write Value to Gooey.AI Memory",
+            description="Write a value to the Gooey.AI store.",
+            properties={
+                "key": {
+                    "type": "string",
+                    "description": "The key to write to the Gooey.AI store.",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "The value to write to the Gooey.AI store.",
+                },
+            },
+            required=["key", "value"],
+        )
+
+    def bind(self, user_id: str):
+        self.user_id = user_id
+        return self
+
+    def call(self, key: str, value) -> dict:
+        from celeryapp.tasks import get_running_saved_run
+
+        saved_run = get_running_saved_run()
+        MemoryEntry.objects.update_or_create(
+            user_id=self.user_id,
+            key=key,
+            defaults=dict(value=value, saved_run=saved_run, updated_at=timezone.now()),
+        )
+        return {"success": True}
+
+
+class GooeyMemoryLLMToolDelete(BaseLLMTool):
+    name = "GOOEY_MEMORY_DELETE_VALUE"
+
+    def __init__(self, scope: FunctionScopes):
+        self.scope = scope
+        super().__init__(
+            name=self.name,
+            label="Delete Value from Gooey.AI Memory",
+            description="Delete a value from the Gooey.AI store.",
+            properties={
+                "key": {
+                    "type": "string",
+                    "description": "The key to delete from the Gooey.AI store.",
+                },
+            },
+            required=["key"],
+        )
+
+    def bind(self, user_id: str):
+        self.user_id = user_id
+        return self
+
+    def call(self, key: str) -> dict:
+        MemoryEntry.objects.filter(user_id=self.user_id, key=key).delete()
+        return {"success": True}
+
+
+INBUILT_INTEGRATION_TOOLS = {
+    tool.name: tool
+    for tool in [
+        GooeyMemoryLLMToolRead,
+        GooeyMemoryLLMToolWrite,
+        GooeyMemoryLLMToolDelete,
+    ]
+}

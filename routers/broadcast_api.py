@@ -44,7 +44,7 @@ class BotBroadcastRequestModel(BaseModel):
         None, description="Video URL to send to all users"
     )
     integration_id: str | None = Field(
-        description="The Bot's Integration ID as shown in the Copilot Integrations tab or as variables in a function call."
+        description="The Bot's Integration ID as shown in the Copilot Deploy tab or as variables in a function call."
     )
     buttons: list[ReplyButton] | None = Field(
         None, description="Buttons to send to all users"

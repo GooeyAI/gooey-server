@@ -342,7 +342,7 @@ let response = await fetch("%(api_url)s", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    // your integration's ID as shown in the Gooey.AI Integrations tab
+    // your integration's ID as shown in the Gooey.AI Deploy tab
     "integration_id": "%(integration_id)s",
     // the input text for the bot
     "input_prompt": "Hello, world!",

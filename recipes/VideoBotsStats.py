@@ -85,7 +85,7 @@ class VideoBotsStatsPage(BasePage):
         self.setup_sentry()
 
         if not self.request.user or self.request.user.is_anonymous:
-            gui.write("**Please Login to view stats for your bot integrations**")
+            gui.write("**Please Login to view stats for your bot Deployments**")
             return
         if self.is_current_user_admin():
             bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
@@ -97,7 +97,7 @@ class VideoBotsStatsPage(BasePage):
 
         if not bi_qs.exists():
             gui.write(
-                "**Please connect a bot to a platform to view stats for your bot integrations or login to an account with connected bot integrations**"
+                "**Please connect a bot to a platform to view stats for your bot deployments or login to an account with connected bot deployments**"
             )
             return
 
@@ -326,7 +326,7 @@ class VideoBotsStatsPage(BasePage):
                                 className="text-muted",
                             )
                         gui.breadcrumb_item(
-                            "Integrations",
+                            "Deploy",
                             link_to=VideoBotsPage.app_url(
                                 tab=RecipeTabs.integrations,
                                 example_id=(

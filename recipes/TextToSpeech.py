@@ -1,13 +1,13 @@
+import datetime
 import json
 import time
-import typing
 
 import gooey_gui as gui
 import requests
 from pydantic import BaseModel, Field
 
 from bots.models import Workflow
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, gcs_blob_for
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
@@ -61,6 +61,8 @@ class TextToSpeechSettings(BaseModel):
     openai_voice_name: OpenAI_TTS_Voices.api_choices | None = None
     openai_tts_model: OpenAI_TTS_Models.api_choices | None = None
     ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None = None
+
+    mms_tts_language: str = "eng"
 
 
 class TextToSpeechPage(BasePage):
@@ -161,6 +163,8 @@ class TextToSpeechPage(BasePage):
             return ""
 
     def run(self, state: dict):
+        import modal
+
         text = state["text_prompt"].strip()
 
         # Parse markdown to plain text
@@ -393,6 +397,32 @@ class TextToSpeechPage(BasePage):
                 raise_for_status(response)
                 audio_url = upload_file_from_bytes("ghana_gen.wav", response.content)
                 state["audio_url"] = audio_url
+
+            case TextToSpeechProviders.MMS_TTS:
+                from daras_ai_v2.mms_tts import (
+                    MMS_TTS_SUPPORTED_LANGUAGES,
+                    app as modal_app,
+                )
+
+                language = state.get("mms_tts_language", "eng")
+                if language not in MMS_TTS_SUPPORTED_LANGUAGES:
+                    raise UserError(f"Unsupported language: {language}")
+
+                blob = gcs_blob_for("mms_tts_gen.wav")
+                upload_url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(hours=12),
+                    method="PUT",
+                    content_type="audio/wav",
+                )
+
+                run_mms_tts = modal.Function.lookup(modal_app.name, "run_mms_tts")
+                with modal.enable_output():
+                    run_mms_tts.remote(
+                        language=language, text=text, upload_url=upload_url
+                    )
+
+                state["audio_url"] = blob.public_url
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))
