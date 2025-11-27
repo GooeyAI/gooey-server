@@ -744,7 +744,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request, page=page):
+    with page_wrapper(request, page=page, is_recipe_page=True):
         page.render()
 
     return dict(
@@ -767,6 +767,7 @@ def page_wrapper(
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
     show_search_bar: bool = True,
+    is_recipe_page: bool = False,
 ):
     from routers.account import explore_in_current_workspace
 
@@ -777,6 +778,11 @@ def page_wrapper(
     sidebar_content, pane_content = sidebar_layout(sidebar_ref)
 
     is_builder_sidebar_open = sidebar_ref.is_open
+    if not is_recipe_page and (is_builder_sidebar_open):
+        sidebar_ref.set_open(False)
+        sidebar_ref.set_mobile_open(False)
+        raise gui.RerunException()
+
     with sidebar_content:
         if container:
             container.render_sidebar()
