@@ -673,6 +673,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
+        is_audio_model=True,
         supports_json=True,
         supports_temperature=False,
         version=3,
@@ -688,6 +689,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
+        is_audio_model=True,
         supports_json=True,
     )
     gemini_2_5_flash = LLMSpec(
@@ -699,6 +701,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
+        is_audio_model=True,
         supports_json=True,
     )
     gemini_2_5_flash_lite = LLMSpec(
@@ -709,6 +712,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=65_536,
         price=1,
         is_vision_model=True,
+        is_audio_model=True,
         supports_json=True,
     )
     gemini_2_5_pro_preview = LLMSpec(
@@ -745,6 +749,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         price=20,
         is_vision_model=True,
+        is_audio_model=True,
         supports_json=True,
     )
     gemini_2_flash = LLMSpec(
@@ -755,6 +760,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         price=20,
         is_vision_model=True,
+        is_audio_model=True,
         supports_json=True,
     )
     gemini_1_5_flash = LLMSpec(
@@ -2490,28 +2496,41 @@ def entry_to_prompt_str(entry: ConversationEntry) -> str:
 
 def format_chat_entry(
     *,
-    role: str,
+    role: typing.Literal["system", "user", "assistant", "tool"],
     content_text: str,
     input_images: typing.Optional[list[str]] = None,
     input_audio: typing.Optional[str] = None,
     input_documents: typing.Optional[list[str]] = None,
 ) -> ConversationEntry:
-    parts = []
+    text_parts = []
     if input_images:
-        parts.append(f"Image URLs: {', '.join(input_images)}")
-    # if input_audio:
-    #     parts.append(f"Audio URL: {input_audio}")
+        text_parts.append(f"Image URLs: {', '.join(input_images)}")
+    if input_audio:
+        text_parts.append(f"Audio URL: {input_audio}")
     if input_documents:
-        parts.append(f"Document URLs: {', '.join(input_documents)}")
-    parts.append(content_text)
+        text_parts.append(f"Document URLs: {', '.join(input_documents)}")
+    text_parts.append(content_text)
+    text_with_urls = "\n\n".join(filter(None, text_parts))
 
-    content = "\n\n".join(filter(None, parts))
+    if not input_images and not input_audio:
+        return {"role": role, "content": text_with_urls}
+
+    content = []
     if input_images:
-        content = [
-            {"type": "image_url", "image_url": {"url": url}} for url in input_images
-        ] + [
-            {"type": "text", "text": content},
-        ]
+        content.extend(
+            [{"type": "image_url", "image_url": {"url": url}} for url in input_images]
+        )
+    if input_audio:
+        r = requests.get(input_audio)
+        r.raise_for_status()
+        audio_data = base64.b64encode(r.content).decode()
+        content.append(
+            {
+                "type": "input_audio",
+                "input_audio": {"data": audio_data, "format": "wav"},
+            }
+        )
+    content.append({"type": "text", "text": text_with_urls})
     return {"role": role, "content": content}
 
 

@@ -453,27 +453,31 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return ocr_texts
 
     def asr_step(self, model, request, response, user_input):
-        if request.input_audio and not model.is_audio_model:
-            if not request.asr_model:
-                request.asr_model, request.asr_language = infer_asr_model_and_language(
-                    request.user_language or ""
-                )
-            selected_model = AsrModels[request.asr_model]
-            yield f"Transcribing using {selected_model.value}..."
-            asr_output = run_asr(
-                audio_url=request.input_audio,
-                selected_model=request.asr_model,
-                language=request.asr_language,
-                speech_translation_target=(
-                    "en" if request.asr_task == "translate" else None
-                ),
-                input_prompt=request.asr_prompt,
+        if not request.input_audio:
+            return None, user_input
+        if model.is_audio_model and not request.asr_model:
+            # unless an ASR model is explicitly specified,
+            # have the audio-enabled LLM accept the audio directly
+            return None, user_input
+
+        if not request.asr_model:
+            request.asr_model, request.asr_language = infer_asr_model_and_language(
+                request.user_language or ""
             )
-            asr_msg = f'🎧: "{asr_output}"'
-            response.output_text = [asr_msg] * request.num_outputs
-            user_input = f"{asr_output}\n\n{user_input}".strip()
-        else:
-            asr_msg = None
+        selected_model = AsrModels[request.asr_model]
+        yield f"Transcribing using {selected_model.value}..."
+        asr_output = run_asr(
+            audio_url=request.input_audio,
+            selected_model=request.asr_model,
+            language=request.asr_language,
+            speech_translation_target=(
+                "en" if request.asr_task == "translate" else None
+            ),
+            input_prompt=request.asr_prompt,
+        )
+        asr_msg = f'🎧: "{asr_output}"'
+        response.output_text = [asr_msg] * request.num_outputs
+        user_input = f"{asr_output}\n\n{user_input}".strip()
         return asr_msg, user_input
 
     def input_translation_step(self, request, user_input, ocr_texts):
@@ -657,7 +661,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             reasoning_effort=request.reasoning_effort,
             tools=list(tools_by_name.values()),
             stream=True,
-            audio_url=request.input_audio,
+            audio_url=request.input_audio if request.asr_model else None,
             audio_session_extra=audio_session_extra,
         )
 
@@ -1950,7 +1954,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     # Check if current workspace has enterprise subscription
                     if is_enterprise:
                         gui.write(
-                            f"As a premium customer, please contact us to setup a managed number"
+                            "As a premium customer, please contact us to setup a managed number"
                         )
                     else:
                         gui.write(
