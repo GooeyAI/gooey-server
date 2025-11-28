@@ -267,8 +267,8 @@ def set_workspace_subscription(
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
-    amount: int | None = None,
-    charged_amount: int | None = None,
+    amount: int = 0,
+    charged_amount: int = 0,
     cancel_old: bool = True,
 ) -> Subscription:
     with transaction.atomic():
@@ -280,8 +280,8 @@ def set_workspace_subscription(
             new_sub = Subscription()
 
         new_sub.plan = plan.db_value
-        new_sub.amount = amount or plan.credits
-        new_sub.charged_amount = charged_amount or (plan.monthly_charge * 100)
+        new_sub.amount = amount
+        new_sub.charged_amount = charged_amount
         new_sub.payment_provider = provider
         new_sub.external_id = external_id
         new_sub.full_clean()
