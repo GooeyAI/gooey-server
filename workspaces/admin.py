@@ -89,6 +89,8 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "handle",
         "created_by",
         "is_personal",
+        "bot_builder",
+        "restricted_function_scope",
         ("is_paying", "stripe_customer_id"),
         ("total_payments", "total_charged", "total_usage_cost"),
         ("balance", "subscription"),
