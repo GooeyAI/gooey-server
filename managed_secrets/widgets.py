@@ -14,7 +14,7 @@ if typing.TYPE_CHECKING:
 
 
 def manage_secrets_table(workspace: "Workspace", user: "AppUser"):
-    gui.write(
+    gui.caption(
         "Secrets are protected environment variables that allow you to share Gooey Workflows with private keys that are hidden from viewers of the workflow."
     )
 

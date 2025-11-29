@@ -13,7 +13,7 @@ if typing.TYPE_CHECKING:
 
 
 def manage_api_keys(workspace: "Workspace", user: AppUser):
-    gui.write(
+    gui.caption(
         f"""
 {workspace.display_name(current_user=user)} API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
