@@ -28,7 +28,7 @@ image = (
         "omnilingual-asr",
         "requests~=2.31",
     )
-    .env({"FAIRSEQ2_CACHE_DIR": cache_dir})
+    .env({"FAIRSEQ2_CACHE_DIR": cache_dir, "HF_XET_HIGH_PERFORMANCE": "1"})
 )
 
 
@@ -37,58 +37,54 @@ def load_pipeline(model_card: str):
     from omnilingual_asr.models.inference.pipeline import ASRInferencePipeline
 
     print(f"Loading model: {model_card}")
-    pipeline = ASRInferencePipeline(model_card=model_card)
+    pipeline = ASRInferencePipeline(model_card=model_card, device="cuda")
     print("Model loaded successfully")
 
     return pipeline
 
 
-@app.function(
+@app.cls(
     image=image,
-    gpu="a100",
-    timeout=30 * 60,
+    gpu="a10g",
     volumes={cache_dir: model_cache},
+    timeout=30 * 60,
+    scaledown_window=90,
     enable_memory_snapshot=True,
+    experimental_options={"enable_gpu_snapshot": True},
 )
-def run_omnilingual_asr(audio_url: str, language: str | None = None) -> str:
-    """
-    Run Omnilingual ASR inference on a WAV audio file.
+class Omnilingual:
+    @modal.enter(snap=True)
+    def load(self):
+        self.model = load_pipeline("omniASR_LLM_7B")
 
-    Args:
-        audio_url: URL to download the WAV audio file from (must be 16kHz, mono, pcm_s16le format)
-        language: Language code in format {language_code}_{script} (e.g., "eng_Latn" for English)
+    @modal.method()
+    def run(self, audio_url: str, language: str | None = None) -> str:
+        """Run transcription on the given audio file."""
+        import os
 
-    Returns:
-        Transcription text
-    """
-    import os
+        # Download audio file
+        print(f"Downloading audio from: {audio_url}")
+        audio_path = download_audio(audio_url)
 
-    # Download audio file
-    print(f"Downloading audio from: {audio_url}")
-    audio_path = download_audio(audio_url)
+        try:
+            # Run transcription
+            if language:
+                print(f"Transcribing audio in language: {language}")
+            else:
+                print("Transcribing audio with language auto-detection")
+            transcriptions = self.model.transcribe(
+                [audio_path], lang=[language], batch_size=1
+            )
 
-    try:
-        # Load pipeline
-        pipeline = load_pipeline("omniASR_LLM_7B")
+            transcription = transcriptions[0]
+            print(f"Transcription: {transcription}")
 
-        # Run transcription
-        if language:
-            print(f"Transcribing audio in language: {language}")
-        else:
-            print("Transcribing audio with language auto-detection")
-        transcriptions = pipeline.transcribe(
-            [audio_path], lang=[language], batch_size=1
-        )
+            return transcription
 
-        transcription = transcriptions[0]
-        print(f"Transcription: {transcription}")
-
-        return transcription
-
-    finally:
-        # Clean up temporary file
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
+        finally:
+            # Clean up temporary file
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
 
 
 def download_audio(url: str) -> str:
