@@ -26,6 +26,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # for diff-ing commits
 
       - name: Setup Python, Poetry and Dependencies
         uses: packetcoders/action-setup-cache-python-poetry@main
