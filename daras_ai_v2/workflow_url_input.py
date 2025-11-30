@@ -77,7 +77,7 @@ def edit_done_button(key: str):
 
 def edit_button(key: str):
     gui.button(
-        '<i class="fa-regular fa-pencil text-warning"></i>',
+        '<i class="fa-regular fa-pencil text-black"></i>',
         key=key + ":edit-mode",
         type="tertiary",
     )
@@ -85,7 +85,7 @@ def edit_button(key: str):
 
 def del_button(key: str):
     gui.button(
-        '<i class="fa-regular fa-trash text-danger"></i>',
+        '<i class="fa-regular fa-trash text-black"></i>',
         key=key,
         type="tertiary",
     )
