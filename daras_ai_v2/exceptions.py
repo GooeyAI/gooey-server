@@ -143,20 +143,6 @@ def ffprobe(filename: str) -> dict:
     return json.loads(text)
 
 
-def ffprobe_metadata(filename: str) -> dict:
-    text = call_cmd(
-        "ffprobe",
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
-        filename,
-        err_msg=FFMPEG_ERR_MSG,
-    )
-    return json.loads(text)
-
-
 def call_cmd(
     *args, err_msg: str = "", ok_returncodes: typing.Iterable[int] = ()
 ) -> str:
