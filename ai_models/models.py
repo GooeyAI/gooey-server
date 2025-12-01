@@ -1,12 +1,18 @@
 from django.db import models
 
 
-class Category(models.IntegerChoices):
-    Video = (1, "Video")
-    Audio = (2, "Audio")
+class AIModelSpec(models.Model):
+    class Categories(models.IntegerChoices):
+        video = (1, "🎥 Video")
+        audio = (2, "🎵 Audio")
 
+    category = models.IntegerField(
+        choices=Categories.choices,
+        help_text="Model category: generates Audio, Video, etc.",
+        null=True,
+        default=Categories.video,
+    )
 
-class VideoModelSpec(models.Model):
     name = models.TextField(
         unique=True,
         help_text="The name of the model to be used in user-facing API calls. WARNING: Don't edit this field after it's been used in a workflow.",
@@ -22,16 +28,10 @@ class VideoModelSpec(models.Model):
         default=dict,
     )
 
-    category = models.IntegerField(
-        choices=Category.choices,
-        help_text="Model category: generates Audio, Video, etc.",
-        null=True,
-    )
-
     pricing = models.ForeignKey(
         "usage_costs.ModelPricing",
         on_delete=models.SET_NULL,
-        related_name="video_model_specs",
+        related_name="ai_model_specs",
         null=True,
         blank=True,
         default=None,
@@ -42,6 +42,9 @@ class VideoModelSpec(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "AI Model Spec"
 
     def __str__(self):
         return f"{self.label} ({self.model_id})"

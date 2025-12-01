@@ -1,17 +1,18 @@
 from django.contrib import admin
 from django.db import models
 
-from ai_models.models import VideoModelSpec
+from ai_models.models import AIModelSpec
 from gooeysite.custom_widgets import JSONEditorWidget
 from usage_costs.admin import ModelPricingAdmin
 
 
-@admin.register(VideoModelSpec)
-class VideoModelSpecAdmin(admin.ModelAdmin):
+@admin.register(AIModelSpec)
+class AIModelSpecAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "label",
         "model_id",
+        "category",
         "created_at",
         "updated_at",
     ]
@@ -19,6 +20,7 @@ class VideoModelSpecAdmin(admin.ModelAdmin):
     list_filter = [
         "pricing__category",
         "pricing__provider",
+        "category",
         "created_at",
         "updated_at",
     ]
@@ -38,10 +40,10 @@ class VideoModelSpecAdmin(admin.ModelAdmin):
             "Model Information",
             {
                 "fields": [
+                    "category",
                     "name",
                     "label",
                     "model_id",
-                    "category",
                     "schema",
                     "pricing",
                 ]
