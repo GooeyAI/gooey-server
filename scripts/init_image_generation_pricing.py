@@ -54,6 +54,30 @@ def run():
         notes="Per-image pricing: $0.08 per generated image (8 credits per image)",
     )
 
+    image_generation_pricing_create(
+        model_id="fal-ai/nano-banana-pro",
+        model_name=Text2ImgModels.nano_banana_pro.name,
+        unit_cost_text_input=None,
+        unit_cost_image_input=None,
+        unit_cost_output=0.20,
+        unit_quantity=1,
+        provider=ModelProvider.fal_ai,
+        pricing_url="https://fal.ai/models/fal-ai/nano-banana-pro",
+        notes="Per-image pricing: $0.20 per generated image (20 credits per image) , 4K outputs will be charged at double the standard rate",
+    )
+
+    image_generation_pricing_create(
+        model_id="fal-ai/nano-banana-pro/edit",
+        model_name=Img2ImgModels.nano_banana_pro.name,
+        unit_cost_text_input=None,
+        unit_cost_image_input=None,
+        unit_cost_output=0.20,
+        unit_quantity=1,
+        provider=ModelProvider.fal_ai,
+        pricing_url="https://fal.ai/models/fal-ai/nano-banana-pro/edit",
+        notes="Per-image pricing: $0.20 per generated image (20 credits per image) , 4K outputs will be charged at double the standard rate",
+    )
+
 
 def image_generation_pricing_create(
     model_id: str,
