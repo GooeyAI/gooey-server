@@ -56,6 +56,7 @@ class Text2ImgModels(Enum):
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     nano_banana = "Nano Banana (Google)"
+    nano_banana_pro = "Nano Banana Pro (Google)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
@@ -97,6 +98,7 @@ openai_model_ids = {
 
 gemini_model_ids = {
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
+    Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
 }
 
 
@@ -112,6 +114,8 @@ class Img2ImgModels(Enum):
     gpt_image_1 = "GPT Image 1 (OpenAI)"
 
     nano_banana = "Nano Banana (Google)"
+    nano_banana_pro = "Nano Banana Pro (Google)"
+
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
@@ -143,6 +147,7 @@ img2img_model_ids = {
     Img2ImgModels.dall_e: "dall-e-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
     Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
+    Img2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro/edit",
 }
 
 
@@ -321,6 +326,7 @@ def text2img(
         Text2ImgModels.flux_1_dev,
         Text2ImgModels.gpt_image_1,
         Text2ImgModels.nano_banana,
+        Text2ImgModels.nano_banana_pro,
     }:
         _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -395,7 +401,7 @@ def text2img(
                     response_format="b64_json",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.nano_banana:
+        case Text2ImgModels.nano_banana | Text2ImgModels.nano_banana_pro:
             from usage_costs.cost_utils import record_cost_auto
             from usage_costs.models import ModelSku
 
@@ -503,6 +509,7 @@ def img2img(
         Img2ImgModels.flux_pro_kontext.name,
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_pro.name,
     ):
         raise UserError("Text prompt is required for this model")
 
@@ -571,7 +578,7 @@ def img2img(
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
                 for part in response.data
             ]
-        case Img2ImgModels.nano_banana.name:
+        case Img2ImgModels.nano_banana.name | Img2ImgModels.nano_banana_pro.name:
             payload = dict(
                 prompt=prompt,
                 image_urls=[init_image],
