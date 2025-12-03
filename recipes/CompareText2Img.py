@@ -10,6 +10,7 @@ from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
+    edit_instruction_setting,
     guidance_scale_setting,
     num_outputs_setting,
     output_resolution_setting,
@@ -27,6 +28,7 @@ from daras_ai_v2.stable_diffusion import (
     sd_upscale,
     Schedulers,
     LoraWeight,
+    NanoBananaAspectRatioOptions,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
 
@@ -62,6 +64,9 @@ class CompareText2ImgPage(BasePage):
         dall_e_3_quality: str | None = None
         dall_e_3_style: str | None = None
         gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None
+        nano_banana_pro_resolution: typing.Literal["1K", "2K", "4K"] | None = None
+        nano_banana_aspect_ratio: NanoBananaAspectRatioOptions | None = None
+        nano_banana_pro_aspect_ratio: NanoBananaAspectRatioOptions | None = None
 
         guidance_scale: float | None = None
         seed: int | None = None
@@ -121,6 +126,7 @@ class CompareText2ImgPage(BasePage):
 
             Dalle-3: 15 Cr
             Nano banana: 8 Cr
+            Nano banana pro: 20 Cr or 40 Cr (4K)
             GPT-image: 3, 10 or 40 Cr
             """
         )
@@ -162,30 +168,19 @@ class CompareText2ImgPage(BasePage):
             Customize the image output for your text prompt with these Settings. 
             """
         )
-        gui.caption(
-            """
-            You can also enable ‘Edit Instructions’ to use InstructPix2Pix that allows you to change your generated image output with a follow-up written instruction.
-            """
-        )
-        if gui.checkbox("📝 Edit Instructions"):
-            gui.text_area(
-                """
-                Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
-                """,
-                key="__edit_instruction",
-                placeholder="Give it sunglasses and a mustache",
-            )
-        gui.session_state["edit_instruction"] = gui.session_state.get(
-            "__edit_instruction"
-        )
-        negative_prompt_setting()
-        output_resolution_setting()
-        num_outputs_setting(gui.session_state.get("selected_models", []))
-        sd_2_upscaling_setting()
+
+        selected_models = gui.session_state.get("selected_models", [])
+
+        edit_instruction_setting(selected_models=selected_models)
+        negative_prompt_setting(selected_models=selected_models)
+        output_resolution_setting(selected_models=selected_models)
+        num_outputs_setting(selected_models=selected_models, model_enum=Text2ImgModels)
+        sd_2_upscaling_setting(selected_models=selected_models)
+
         col1, col2 = gui.columns(2)
         with col1:
-            guidance_scale_setting()
-            scheduler_setting()
+            guidance_scale_setting(selected_models=selected_models)
+            scheduler_setting(selected_models=selected_models)
         with col2:
             if gui.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()
@@ -218,6 +213,9 @@ class CompareText2ImgPage(BasePage):
                 dall_e_3_quality=request.dall_e_3_quality,
                 dall_e_3_style=request.dall_e_3_style,
                 gpt_image_1_quality=request.gpt_image_1_quality,
+                nano_banana_pro_resolution=request.nano_banana_pro_resolution,
+                nano_banana_aspect_ratio=request.nano_banana_aspect_ratio,
+                nano_banana_pro_aspect_ratio=request.nano_banana_pro_aspect_ratio,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,
