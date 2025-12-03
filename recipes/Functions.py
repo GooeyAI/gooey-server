@@ -10,6 +10,7 @@ import gooey_gui as gui
 import requests
 from pydantic import BaseModel, Field
 
+from auth.token_authentication import generate_ephemeral_api_key
 from bots.models import Workflow
 from bots.models.saved_run import SavedRun
 from celeryapp.tasks import update_gcs_content_types
@@ -123,7 +124,15 @@ class FunctionsPage(BasePage):
             yield "Decrypting secrets..."
             env = dict(map_parallel(self._load_secret, request.secrets))
         else:
-            env = None
+            env = {}
+
+        if "GOOEY_API_KEY" not in env:
+            ephemeral_key = generate_ephemeral_api_key(
+                user_id=self.request.user.id,
+                workspace_id=self.current_workspace.id,
+                run_id=self.current_sr.run_id,
+            )
+            env["GOOEY_API_KEY"] = ephemeral_key
 
         yield "Running your code..."
 
