@@ -4,11 +4,23 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.openapi.models import HTTPBase as HTTPBaseModel, SecuritySchemeType
 from fastapi.security.base import SecurityBase
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from api_keys.models import ApiKey
+from app_users.models import AppUser
 from auth.auth_backend import authlocal
+from bots.models.saved_run import SavedRun
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
+from daras_ai_v2.settings import SECRET_KEY
+from workspaces.models import Workspace
+
+
+EPHEMERAL_KEY_PREFIX = "ek_"
+
+TOKEN_EXPIRATION = 60 * 60 * 3
+
+DISABLED_ACCOUNT_ERROR_MESSAGE = """Your Gooey.AI account has been disabled for violating our Terms of Service.\n\nContact us at support@gooey.ai if you think this is a mistake."""
 
 
 class AuthenticationError(HTTPException):
@@ -26,6 +38,9 @@ class AuthorizationError(HTTPException):
 
 
 def authenticate_credentials(token: str) -> ApiKey:
+    if token.startswith(EPHEMERAL_KEY_PREFIX):
+        return verify_ephemeral_api_key(token)
+
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
 
@@ -37,11 +52,7 @@ def authenticate_credentials(token: str) -> ApiKey:
         raise AuthorizationError("Invalid API Key.")
 
     if api_key.workspace.created_by.is_disabled:
-        msg = (
-            "Your Gooey.AI account has been disabled for violating our Terms of Service. "
-            "Contact us at support@gooey.ai if you think this is a mistake."
-        )
-        raise AuthenticationError(msg)
+        raise AuthenticationError(DISABLED_ACCOUNT_ERROR_MESSAGE)
 
     return api_key
 
@@ -98,3 +109,72 @@ api_auth_header = APIAuth(
     description=f"{auth_scheme} $GOOEY_API_KEY",
     openapi_extra={"x-fern-bearer": {"name": "apiKey", "env": "GOOEY_API_KEY"}},
 )
+
+
+_signer = URLSafeTimedSerializer(SECRET_KEY, salt="gooey-ephemeral-api-key")
+
+
+def generate_ephemeral_api_key(user_id: int, workspace_id: str, run_id: str) -> str:
+    payload = {
+        "user_id": user_id,
+        "workspace_id": workspace_id,
+        "run_id": run_id,
+    }
+    signed_token = _signer.dumps(payload, salt="gooey-ephemeral-api-key")
+    token = EPHEMERAL_KEY_PREFIX + signed_token
+
+    return token
+
+
+def verify_ephemeral_api_key(token: str) -> ApiKey:
+    signed_token = token.removeprefix(EPHEMERAL_KEY_PREFIX)
+    try:
+        payload = _signer.loads(
+            signed_token, salt="gooey-ephemeral-api-key", max_age=TOKEN_EXPIRATION
+        )
+    except SignatureExpired:
+        raise AuthenticationError("API Key has expired.")
+    except BadSignature:
+        raise AuthenticationError("Invalid API Key.")
+
+    workspace_id = payload.get("workspace_id")
+    user_id = payload.get("user_id")
+    run_id = payload.get("run_id")
+
+    if not (workspace_id and user_id and run_id):
+        raise AuthenticationError("Invalid API Key.")
+
+    try:
+        workspace = Workspace.objects.get(id=workspace_id)
+        user = AppUser.objects.get(id=user_id)
+    except (Workspace.DoesNotExist, AppUser.DoesNotExist):
+        raise AuthenticationError("Invalid API Key.")
+
+    if user.is_disabled or workspace.created_by.is_disabled:
+        raise AuthorizationError(DISABLED_ACCOUNT_ERROR_MESSAGE)
+
+    _verify_run_state(run_id, user, workspace)
+
+    return ApiKey(
+        created_by=user,
+        workspace=workspace,
+    )
+
+
+def _verify_run_state(run_id: str, user: AppUser, workspace: Workspace) -> None:
+    from daras_ai_v2.base import BasePage, RecipeRunState
+
+    try:
+        saved_run = SavedRun.objects.get(
+            run_id=run_id, uid=user.uid, workspace=workspace
+        )
+    except SavedRun.DoesNotExist:
+        raise AuthenticationError("Invalid API Key. Run not found.")
+
+    state = saved_run.to_dict()
+    run_state = BasePage.get_run_state(state)
+
+    if run_state != RecipeRunState.running:
+        raise AuthenticationError("Invalid API Key. Run is not active.")
+
+    return
