@@ -416,7 +416,7 @@ class TextToSpeechPage(BasePage):
                     content_type="audio/wav",
                 )
 
-                run_mms_tts = modal.Function.lookup(modal_app.name, "run_mms_tts")
+                run_mms_tts = modal.Function.from_name(modal_app.name, "run_mms_tts")
                 with modal.enable_output():
                     run_mms_tts.remote(
                         language=language, text=text, upload_url=upload_url
