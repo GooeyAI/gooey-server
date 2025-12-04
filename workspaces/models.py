@@ -155,6 +155,10 @@ class Workspace(SafeDeleteModel):
     banner_url = CustomURLField(null=True, blank=True)
     description = models.TextField(blank=True, default="")
 
+    # features
+    enable_bot_builder = models.BooleanField(default=False)
+    restrict_function_scope = models.BooleanField(default=False)
+
     # billing
     balance = models.IntegerField("bal", default=0)
     is_paying = models.BooleanField("paid", default=False)
