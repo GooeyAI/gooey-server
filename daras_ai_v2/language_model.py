@@ -73,6 +73,7 @@ class LLMSpec(typing.NamedTuple):
     is_thinking_model: bool = False
     supports_json: bool = False
     supports_temperature: bool = True
+    supports_input_audio: bool = False
     is_audio_model: bool = False
     is_deprecated: bool = False
     # redirect to a different LLM when deprecated
@@ -325,6 +326,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
+        supports_input_audio=True,
     )
     # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
     gpt_realtime = LLMSpec(
@@ -335,6 +337,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
+        supports_input_audio=True,
         supports_temperature=False,
     )
     # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
@@ -346,6 +349,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=4_096,
         price=10,
         is_audio_model=True,
+        supports_input_audio=True,
     )
 
     chatgpt_4_o = LLMSpec(
@@ -673,7 +677,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
         supports_temperature=False,
         version=3,
@@ -689,7 +693,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
     )
     gemini_2_5_flash = LLMSpec(
@@ -701,7 +705,7 @@ class LargeLanguageModels(Enum):
         price=1,
         is_vision_model=True,
         is_thinking_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
     )
     gemini_2_5_flash_lite = LLMSpec(
@@ -712,7 +716,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=65_536,
         price=1,
         is_vision_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
     )
     gemini_2_5_pro_preview = LLMSpec(
@@ -749,7 +753,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         price=20,
         is_vision_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
     )
     gemini_2_flash = LLMSpec(
@@ -760,7 +764,7 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         price=20,
         is_vision_model=True,
-        is_audio_model=True,
+        supports_input_audio=True,
         supports_json=True,
     )
     gemini_1_5_flash = LLMSpec(
@@ -1079,6 +1083,7 @@ class LargeLanguageModels(Enum):
         self.is_thinking_model = spec.is_thinking_model
         self.supports_json = spec.supports_json
         self.supports_temperature = spec.supports_temperature
+        self.supports_input_audio = spec.supports_input_audio
         self.is_audio_model = spec.is_audio_model
         self.redirect_to = spec.redirect_to
         self.version = spec.version
@@ -2505,8 +2510,8 @@ def format_chat_entry(
     text_parts = []
     if input_images:
         text_parts.append(f"Image URLs: {', '.join(input_images)}")
-    if input_audio:
-        text_parts.append(f"Audio URL: {input_audio}")
+    # if input_audio:
+    #     text_parts.append(f"Audio URL: {input_audio}")
     if input_documents:
         text_parts.append(f"Document URLs: {', '.join(input_documents)}")
     text_parts.append(content_text)
