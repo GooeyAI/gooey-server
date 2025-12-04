@@ -54,7 +54,7 @@ class VideoGenPage(BasePage):
         if not request.selected_models:
             raise UserError("Please select at least one model")
 
-        self.run_safety_checker(request)
+        yield from self.run_safety_checker(request)
 
         q = Q()
         for model_name in request.selected_models:
@@ -96,7 +96,9 @@ class VideoGenPage(BasePage):
             for fut in fs:
                 fut.result()
 
-    def run_safety_checker(self, request: VideoGenPage.RequestModel):
+    def run_safety_checker(
+        self, request: VideoGenPage.RequestModel
+    ) -> typing.Iterator[str | None]:
         if self.request.user.disable_safety_checker:
             return
         for inputs in [request.inputs, request.audio_inputs]:
@@ -289,7 +291,7 @@ def generate_audio(
     res_audio = get_url_from_result(res.get("audio"))
 
     if res_video:
-        return video_url
+        return res_video
     elif res_audio:
         audio_url = get_url_from_result(res_audio)
         filename = f"{audio_model.label}_merged.mp4"
