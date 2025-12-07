@@ -19,6 +19,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
+from functions.views import manage_integration_authorizations
 from managed_secrets.widgets import manage_secrets_table
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
@@ -252,7 +253,9 @@ class AccountTabs(TabData, Enum):
     profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
     members = TabData(title=f"{icons.company} Members", route=members_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
-    api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
+    api_keys = TabData(
+        title=f"{icons.keys} Keys & Authorizations", route=api_keys_route
+    )
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
 
     @property
@@ -371,6 +374,9 @@ def api_keys_tab(request: Request):
 
     gui.write("## 🛡 Secrets")
     manage_secrets_table(workspace, request.user)
+
+    gui.write("## 🤝 Integration Authorizations")
+    manage_integration_authorizations(workspace, request.user)
 
 
 @contextmanager
