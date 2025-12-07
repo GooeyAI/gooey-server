@@ -102,6 +102,13 @@ gemini_model_ids = {
 }
 
 
+model_pricing_tooltips = {
+    Text2ImgModels.dall_e_3: "15 Cr",
+    Text2ImgModels.gpt_image_1: "3, 10 or 40 Cr",
+    Text2ImgModels.nano_banana: "8 Cr",
+}
+
+
 class Img2ImgModels(Enum):
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
 

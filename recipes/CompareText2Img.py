@@ -101,6 +101,8 @@ class CompareText2ImgPage(BasePage):
         ]
 
     def render_form_v2(self):
+        from daras_ai_v2.stable_diffusion import model_pricing_tooltips
+
         gui.text_area(
             """
             #### 👩‍💻 Prompt
@@ -118,10 +120,6 @@ class CompareText2ImgPage(BasePage):
         gui.caption(
             """
             Each selected model costs 2 credits ($.02) / image except where noted.
-
-            Dalle-3: 15 Cr
-            Nano banana: 8 Cr
-            GPT-image: 3, 10 or 40 Cr
             """
         )
 
@@ -131,9 +129,12 @@ class CompareText2ImgPage(BasePage):
         [Check out our prompt guide](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit#slide=id.g210b1678eba_0_26).
         """
         )
+
         selected_models = enum_multiselect(
             Text2ImgModels,
             key="selected_models",
+            tooltip=model_pricing_tooltips,
+            tooltip_placement="right",
         )
         if selected_models and set(selected_models) <= {Text2ImgModels.flux_1_dev.name}:
             loras_input()
