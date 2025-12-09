@@ -474,6 +474,7 @@ def db_msgs_to_entries(msgs: list["Message"]) -> list["ConversationEntry"]:
         )
     return entries
 
+
 class Message(models.Model):
     conversation = models.ForeignKey(
         "Conversation", on_delete=models.CASCADE, related_name="messages"
@@ -594,6 +595,7 @@ class MessageAttachment(models.Model):
         if self.metadata_id:
             return f"{self.metadata.name} ({self.url})"
         return self.url
+
 
 def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
     from daras_ai_v2.bots import parse_bot_html

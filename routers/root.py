@@ -583,7 +583,11 @@ def chat_route(
             "bi": bi,
             "embed_code": get_web_widget_embed_code(
                 bi,
-                config=dict(mode="fullscreen", conversationData=conversationData),
+                config=dict(
+                    mode="fullscreen",
+                    enableShareConversation=True,
+                    conversationData=conversationData,
+                ),
             ),
             "meta": raw_build_meta_tags(
                 url=get_og_url_path(request),
