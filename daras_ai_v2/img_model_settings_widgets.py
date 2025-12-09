@@ -82,6 +82,7 @@ def model_selector(
         Img2ImgModels.jack_qiao.name,
         Img2ImgModels.sd_2.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_pro.name,
     ]
     col1, col2 = gui.columns(2)
     with col1:

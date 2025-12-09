@@ -1292,11 +1292,9 @@ def run_asr(
         if language and language not in OMNILINGUAL_ASR_SUPPORTED:
             raise UserError(f"Unsupported language: {language}")
 
-        run_omnilingual_asr = modal.Function.lookup(
-            modal_app.name, "run_omnilingual_asr"
-        )
+        Omnilingual = modal.Cls.from_name(modal_app.name, "Omnilingual")
         with modal.enable_output():
-            transcription = run_omnilingual_asr.remote(
+            transcription = Omnilingual().run.remote(
                 audio_url=audio_url, language=language
             )
         return transcription

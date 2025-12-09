@@ -1,5 +1,4 @@
 import typing
-from enum import Enum
 
 import gooey_gui as gui
 import requests
@@ -221,7 +220,7 @@ def mms_tts_selector():
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def mms_tts_language_options():
     import langcodes
-    from daras_ai_v2.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
+    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
 
     result = {}
     for lang in MMS_TTS_SUPPORTED_LANGUAGES:

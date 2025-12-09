@@ -2,7 +2,7 @@
 To deploy changes to remote functions, run this file directly as a script:
 
 ```bash
-poetry run python daras_ai_v2/mms_tts.py
+poetry run python modal_functions/mms_tts.py
 ```
 """
 

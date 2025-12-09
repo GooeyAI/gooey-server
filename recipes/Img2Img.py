@@ -225,6 +225,12 @@ class Img2ImgPage(BasePage):
                 unit_price = 45
             case Img2ImgModels.nano_banana.name:
                 unit_price = 8
+            case Img2ImgModels.nano_banana_pro.name:
+                match state.get("nano_banana_pro_resolution"):
+                    case "4K":
+                        unit_price = 40
+                    case _:
+                        unit_price = 20
             case _:
                 unit_price = 5
 

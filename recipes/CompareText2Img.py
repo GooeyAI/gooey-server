@@ -297,6 +297,12 @@ class CompareText2ImgPage(BasePage):
                             total += 40
                 case Text2ImgModels.nano_banana.name:
                     total += 8
+                case Text2ImgModels.nano_banana_pro.name:
+                    match state.get("nano_banana_pro_resolution"):
+                        case "4K":
+                            total += 40
+                        case _:
+                            total += 20
                 case _:
                     total += 2
         num_outputs = state.get("num_outputs") or 0

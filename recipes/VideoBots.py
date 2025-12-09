@@ -400,6 +400,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
             user_input=user_input,
             model=llm_model,
             tools_by_name=tools_by_name,
+            # use LLM audio input capability if not using a dedicated ASR model
+            include_input_audio=(not asr_msg),
         )
 
         yield from self.llm_loop(
@@ -453,27 +455,30 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return ocr_texts
 
     def asr_step(self, model, request, response, user_input):
-        if request.input_audio and not model.is_audio_model:
-            if not request.asr_model:
-                request.asr_model, request.asr_language = infer_asr_model_and_language(
-                    request.user_language or ""
-                )
-            selected_model = AsrModels[request.asr_model]
-            yield f"Transcribing using {selected_model.value}..."
-            asr_output = run_asr(
-                audio_url=request.input_audio,
-                selected_model=request.asr_model,
-                language=request.asr_language,
-                speech_translation_target=(
-                    "en" if request.asr_task == "translate" else None
-                ),
-                input_prompt=request.asr_prompt,
+        if not request.input_audio or (
+            model.supports_input_audio and not request.asr_model
+        ):
+            # unless an ASR model is explicitly specified,
+            # have the audio-enabled LLM accept the audio directly
+            return None, user_input
+        if not request.asr_model:
+            request.asr_model, request.asr_language = infer_asr_model_and_language(
+                request.user_language or ""
             )
-            asr_msg = f'🎧: "{asr_output}"'
-            response.output_text = [asr_msg] * request.num_outputs
-            user_input = f"{asr_output}\n\n{user_input}".strip()
-        else:
-            asr_msg = None
+        selected_model = AsrModels[request.asr_model]
+        yield f"Transcribing using {selected_model.value}..."
+        asr_output = run_asr(
+            audio_url=request.input_audio,
+            selected_model=request.asr_model,
+            language=request.asr_language,
+            speech_translation_target=(
+                "en" if request.asr_task == "translate" else None
+            ),
+            input_prompt=request.asr_prompt,
+        )
+        asr_msg = f'🎧: "{asr_output}"'
+        response.output_text = [asr_msg] * request.num_outputs
+        user_input = f"{asr_output}\n\n{user_input}".strip()
         return asr_msg, user_input
 
     def input_translation_step(self, request, user_input, ocr_texts):
@@ -501,7 +506,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             user_input = f"Extracted Text: {text!r}\n\n{user_input}"
         return user_input
 
-    def build_final_prompt(self, request, response, user_input, model, tools_by_name):
+    def build_final_prompt(
+        self, request, response, user_input, model, tools_by_name, include_input_audio
+    ):
         # construct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
@@ -523,7 +530,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             role=CHATML_ROLE_USER,
             content_text=user_input,
             input_images=request.input_images,
-            input_audio=request.input_audio,
+            input_audio=include_input_audio and request.input_audio,
             input_documents=request.input_documents,
         )
         # truncate the history to fit the model's max tokens
@@ -1458,7 +1465,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     role=CHATML_ROLE_USER,
                     content_text=prev_input,
                     input_images=prev_input_images,
-                    input_audio=prev_input_audio,
+                    # input_audio=prev_input_audio,
                     input_documents=prev_input_documents,
                 ),
                 format_chat_entry(
@@ -1950,7 +1957,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                     # Check if current workspace has enterprise subscription
                     if is_enterprise:
                         gui.write(
-                            f"As a premium customer, please contact us to setup a managed number"
+                            "As a premium customer, please contact us to setup a managed number"
                         )
                     else:
                         gui.write(

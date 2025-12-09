@@ -9,7 +9,7 @@ import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.utils.text import Truncator
 
 from bots.custom_fields import CustomURLField
@@ -474,7 +474,6 @@ def db_msgs_to_entries(msgs: list["Message"]) -> list["ConversationEntry"]:
         )
     return entries
 
-
 class Message(models.Model):
     conversation = models.ForeignKey(
         "Conversation", on_delete=models.CASCADE, related_name="messages"
@@ -595,6 +594,95 @@ class MessageAttachment(models.Model):
         if self.metadata_id:
             return f"{self.metadata.name} ({self.url})"
         return self.url
+
+def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
+    from daras_ai_v2.bots import parse_bot_html
+    from routers.bots_api import MSG_ID_PREFIX
+
+    api_messages = [None] * len(msgs)
+    for i, msg in enumerate(msgs):
+        msg: Message
+        if msg.role == CHATML_ROLE_USER:
+            input_images = (
+                list(
+                    MessageAttachment.objects.filter(
+                        message=msg, metadata__mime_type__startswith="image/"
+                    ).values_list("url", flat=True)
+                )
+                or []
+            )
+
+            input_audio = (
+                list(
+                    MessageAttachment.objects.filter(
+                        message=msg, metadata__mime_type__startswith="audio/"
+                    ).values_list("url", flat=True)
+                )
+                or ""
+            )
+
+            # any document type other than audio/image
+            input_documents = (
+                list(
+                    MessageAttachment.objects.filter(message=msg)
+                    .exclude(
+                        Q(metadata__mime_type__startswith="image/")
+                        | Q(metadata__mime_type__startswith="audio/")
+                    )
+                    .values_list("url", flat=True)
+                )
+                or []
+            )
+            api_messages[i] = {
+                "role": msg.role,
+                "input_prompt": msg.display_content,
+                "input_images": input_images,
+                "input_audio": input_audio,
+                "input_documents": input_documents,
+                "created_at": msg.created_at.isoformat(),
+            }
+        elif msg.role == CHATML_ROLE_ASSISTANT:
+            output_images = (
+                list(
+                    MessageAttachment.objects.filter(
+                        message=msg, metadata__mime_type__startswith="image/"
+                    ).values_list("url", flat=True)
+                )
+                or []
+            )
+            output_audio = (
+                list(
+                    MessageAttachment.objects.filter(
+                        message=msg, metadata__mime_type__startswith="audio/"
+                    ).values_list("url", flat=True)
+                )
+                or []
+            )
+            output_documents = (
+                list(
+                    MessageAttachment.objects.filter(
+                        message=msg, metadata__mime_type__startswith="application/pdf"
+                    ).values_list("url", flat=True)
+                )
+                or []
+            )
+            buttons, text, _ = parse_bot_html(msg.display_content)
+            api_messages[i] = {
+                "role": msg.role,
+                "created_at": msg.created_at.isoformat(),
+                "status": "completed",
+                "type": "final_response",
+                "raw_output_text": [msg.content],
+                "output_text": [text],
+                "buttons": buttons,
+                "output_images": output_images,
+                "output_audio": output_audio,
+                "output_documents": output_documents,
+                "web_url": msg.saved_run.get_app_url(),
+                "user_message_id": msg.platform_msg_id,
+                "bot_message_id": msg.platform_msg_id.strip(MSG_ID_PREFIX),
+            }
+    return api_messages
 
 
 class FeedbackQuerySet(models.QuerySet):
