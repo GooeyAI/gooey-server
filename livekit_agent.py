@@ -112,6 +112,12 @@ async def entrypoint(ctx: agents.JobContext):
 
     # ctx.room.on("sip_dtmf_received", sip_dtmf_received)
 
+    # add initial wait for identifying extension codes
+    try:
+        await asyncio.wait_for(dtmf_queue.get(), timeout=5)
+    except asyncio.TimeoutError:
+        pass
+
     for i in range(MAX_TRIES):
         if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
             return
