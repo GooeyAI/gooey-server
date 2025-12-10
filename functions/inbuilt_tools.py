@@ -1,4 +1,3 @@
-import json
 import typing
 
 from django.core.exceptions import ValidationError
@@ -18,6 +17,9 @@ from functions.recipe_functions import (
     get_external_tool_slug_from_url,
 )
 from memory.models import MemoryEntry
+
+if typing.TYPE_CHECKING:
+    from bots.models import SavedRun
 
 
 def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
@@ -367,8 +369,9 @@ class GooeyMemoryLLMToolRead(BaseLLMTool):
             required=["key"],
         )
 
-    def bind(self, user_id: str):
+    def bind(self, user_id: str, saved_run: "SavedRun"):
         self.user_id = user_id
+        self.saved_run = saved_run
         return self
 
     def call(self, key: str) -> dict:
@@ -401,18 +404,18 @@ class GooeyMemoryLLMToolWrite(BaseLLMTool):
             required=["key", "value"],
         )
 
-    def bind(self, user_id: str):
+    def bind(self, user_id: str, saved_run: "SavedRun"):
         self.user_id = user_id
+        self.saved_run = saved_run
         return self
 
     def call(self, key: str, value) -> dict:
-        from celeryapp.tasks import get_running_saved_run
-
-        saved_run = get_running_saved_run()
         MemoryEntry.objects.update_or_create(
             user_id=self.user_id,
             key=key,
-            defaults=dict(value=value, saved_run=saved_run, updated_at=timezone.now()),
+            defaults=dict(
+                value=value, saved_run=self.saved_run, updated_at=timezone.now()
+            ),
         )
         return {"success": True}
 
@@ -435,8 +438,9 @@ class GooeyMemoryLLMToolDelete(BaseLLMTool):
             required=["key"],
         )
 
-    def bind(self, user_id: str):
+    def bind(self, user_id: str, saved_run: "SavedRun"):
         self.user_id = user_id
+        self.saved_run = saved_run
         return self
 
     def call(self, key: str) -> dict:

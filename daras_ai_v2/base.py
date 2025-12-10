@@ -1478,6 +1478,7 @@ class BasePage:
                         user=self.request.user,
                         published_run=self.current_pr,
                     ),
+                    saved_run=self.current_sr,
                 )
             case _:
                 return tool
