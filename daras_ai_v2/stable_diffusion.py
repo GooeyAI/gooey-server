@@ -9,13 +9,13 @@ from django.db import models
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
-    upload_file_from_bytes,
     bytes_to_cv2_img,
-    resize_img_pad,
-    resize_img_fit,
     get_downscale_factor,
+    resize_img_fit,
+    resize_img_pad,
+    upload_file_from_bytes,
 )
-from daras_ai_v2.exceptions import raise_for_status, UserError
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.gpu_server import b64_img_decode, call_sd_multi
@@ -43,20 +43,20 @@ inpaint_model_ids = {
 
 
 class Text2ImgModels(Enum):
+    nano_banana_pro = "Nano Banana Pro (Google)"
+    nano_banana = "Nano Banana (Google)"
+
     flux_1_dev = "FLUX.1 [dev]"
+
+    gpt_image_1 = "GPT Image 1 (OpenAI)"
+    dall_e_3 = "DALL·E 3 (OpenAI)"
+    dall_e = "DALL·E 2 (OpenAI)"
 
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     dream_shaper = "DreamShaper (Lykon)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-
-    dall_e = "DALL·E 2 (OpenAI)"
-    dall_e_3 = "DALL·E 3 (OpenAI)"
-    gpt_image_1 = "GPT Image 1 (OpenAI)"
-
-    nano_banana = "Nano Banana (Google)"
-    nano_banana_pro = "Nano Banana Pro (Google)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
@@ -84,26 +84,28 @@ class Text2ImgModels(Enum):
 
 
 text2img_model_ids = {
+    Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
+    Text2ImgModels.nano_banana: "fal-ai/nano-banana",
+    Text2ImgModels.gpt_image_1: "gpt-image-1",
+    Text2ImgModels.dall_e_3: "dall-e-3",
+    Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.flux_1_dev: "fal-ai/flux-general",
     Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
     Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
 }
-openai_model_ids = {
-    Text2ImgModels.dall_e: "dall-e-2",
-    Text2ImgModels.dall_e_3: "dall-e-3",
-    Text2ImgModels.gpt_image_1: "gpt-image-1",
-}
-
-gemini_model_ids = {
-    Text2ImgModels.nano_banana: "fal-ai/nano-banana",
-    Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
-}
 
 
 class Img2ImgModels(Enum):
+    nano_banana_pro = "Nano Banana Pro (Google)"
+    nano_banana = "Nano Banana (Google)"
+
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
+
+    gpt_image_1 = "GPT Image 1 (OpenAI)"
+
+    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
     dream_shaper = "DreamShaper (Lykon)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
@@ -111,12 +113,6 @@ class Img2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
 
     dall_e = "Dall-E (OpenAI)"
-    gpt_image_1 = "GPT Image 1 (OpenAI)"
-
-    nano_banana = "Nano Banana (Google)"
-    nano_banana_pro = "Nano Banana Pro (Google)"
-
-    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
     openjourney_2 = "Open Journey v2 beta [Deprecated] (PromptHero)"
     openjourney = "Open Journey [Deprecated] (PromptHero)"
@@ -358,7 +354,7 @@ def text2img(
             width, height = _get_gpt_image_1_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=openai_model_ids[model],
+                    model=text2img_model_ids[model],
                     prompt=prompt,
                     size=f"{width}x{height}",
                     quality=gpt_image_1_quality,
@@ -366,7 +362,7 @@ def text2img(
 
             # Record usage costs using the API response usage data
             record_openai_image_generation_usage(
-                model=openai_model_ids[model],
+                model=text2img_model_ids[model],
                 usage=response.usage,
             )
 
@@ -378,7 +374,7 @@ def text2img(
             width, height = _get_dall_e_3_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=openai_model_ids[model],
+                    model=text2img_model_ids[model],
                     n=1,  # num_outputs, not supported yet
                     prompt=prompt,
                     response_format="b64_json",
@@ -394,7 +390,7 @@ def text2img(
             client = OpenAI()
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
-                    model=openai_model_ids[model],
+                    model=text2img_model_ids[model],
                     n=num_outputs,
                     prompt=prompt,
                     size=f"{edge}x{edge}",
@@ -405,15 +401,17 @@ def text2img(
             from usage_costs.cost_utils import record_cost_auto
             from usage_costs.models import ModelSku
 
-            payload = dict(prompt=prompt, output_format="png", num_images=num_outputs)
+            payload = dict(
+                prompt=prompt, output_format="png", num_images=num_outputs
+            ) | resolve_nano_banana_resolution(width, height)
 
             output_images = yield from generate_fal_images(
-                model_id=gemini_model_ids[model],
+                model_id=text2img_model_ids[model],
                 payload=payload,
             )
 
             record_cost_auto(
-                model=gemini_model_ids[model],
+                model=text2img_model_ids[model],
                 sku=ModelSku.output_image_tokens,
                 quantity=num_outputs,
             )
@@ -444,6 +442,30 @@ def text2img(
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def resolve_nano_banana_resolution(width: int, height: int) -> dict:
+    from daras_ai_v2.img_model_settings_widgets import (
+        RESOLUTIONS,
+        NANO_BANANA_RESOLUTIONS,
+    )
+
+    if width < height:
+        res = f"{height} x {width}"
+        portrait = True
+    else:
+        res = f"{width} x {height}"
+        portrait = False
+    for pixels in NANO_BANANA_RESOLUTIONS:
+        try:
+            aspect_ratio = RESOLUTIONS[pixels][res]
+        except KeyError:
+            continue
+        if portrait:
+            aspect_ratio = ":".join(aspect_ratio.split(":")[::-1])
+        return {"resolution": pixels, "aspect_ratio": aspect_ratio}
+
+    return {}
 
 
 def generate_fal_images(

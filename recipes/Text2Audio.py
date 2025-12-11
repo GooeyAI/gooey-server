@@ -88,9 +88,10 @@ class Text2AudioPage(BasePage):
             max_value=20,
             step=1,
         )
-        negative_prompt_setting()
-        num_outputs_setting()
-        guidance_scale_setting()
+        selected_models = set(gui.session_state.get("selected_models", []))
+        negative_prompt_setting(selected_models)
+        num_outputs_setting(selected_models)
+        guidance_scale_setting(selected_models)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Text2AudioPage.RequestModel = self.RequestModel.model_validate(state)
