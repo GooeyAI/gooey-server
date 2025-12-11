@@ -597,80 +597,43 @@ class MessageAttachment(models.Model):
         return self.url
 
 
-def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
+def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
     from daras_ai_v2.bots import parse_bot_html
     from routers.bots_api import MSG_ID_PREFIX
 
-    api_messages = [None] * len(msgs)
-    for i, msg in enumerate(msgs):
+    for msg in msgs:
         msg: Message
+        images = list(
+            msg.attachments.filter(
+                metadata__mime_type__startswith="image/"
+            ).values_list("url", flat=True)
+        )
+        audios = list(
+            msg.attachments.filter(
+                metadata__mime_type__startswith="audio/"
+            ).values_list("url", flat=True)
+        )
+        audio = audios and audios[0]
         if msg.role == CHATML_ROLE_USER:
-            input_images = (
-                list(
-                    MessageAttachment.objects.filter(
-                        message=msg, metadata__mime_type__startswith="image/"
-                    ).values_list("url", flat=True)
-                )
-                or []
-            )
-
-            input_audio = (
-                list(
-                    MessageAttachment.objects.filter(
-                        message=msg, metadata__mime_type__startswith="audio/"
-                    ).values_list("url", flat=True)
-                )
-                or ""
-            )
-
             # any document type other than audio/image
-            input_documents = (
-                list(
-                    MessageAttachment.objects.filter(message=msg)
-                    .exclude(
-                        Q(metadata__mime_type__startswith="image/")
-                        | Q(metadata__mime_type__startswith="audio/")
-                    )
-                    .values_list("url", flat=True)
-                )
-                or []
+            documents = list(
+                msg.attachments.exclude(
+                    Q(metadata__mime_type__startswith="image/")
+                    | Q(metadata__mime_type__startswith="audio/")
+                ).values_list("url", flat=True)
             )
-            api_messages[i] = {
+            yield {
                 "role": msg.role,
                 "input_prompt": msg.display_content,
-                "input_images": input_images,
-                "input_audio": input_audio,
-                "input_documents": input_documents,
+                "input_images": images,
+                "input_audio": audio,
+                "input_documents": documents,
                 "created_at": msg.created_at.isoformat(),
             }
         elif msg.role == CHATML_ROLE_ASSISTANT:
-            output_images = (
-                list(
-                    MessageAttachment.objects.filter(
-                        message=msg, metadata__mime_type__startswith="image/"
-                    ).values_list("url", flat=True)
-                )
-                or []
-            )
-            output_audio = (
-                list(
-                    MessageAttachment.objects.filter(
-                        message=msg, metadata__mime_type__startswith="audio/"
-                    ).values_list("url", flat=True)
-                )
-                or []
-            )
-            output_documents = (
-                list(
-                    MessageAttachment.objects.filter(
-                        message=msg, metadata__mime_type__startswith="application/pdf"
-                    ).values_list("url", flat=True)
-                )
-                or []
-            )
             references = msg.saved_run.state.get("references")
             buttons, text, _ = parse_bot_html(msg.display_content)
-            api_messages[i] = {
+            yield {
                 "role": msg.role,
                 "created_at": msg.created_at.isoformat(),
                 "status": "completed",
@@ -678,15 +641,13 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
                 "raw_output_text": [msg.content],
                 "output_text": [text],
                 "buttons": buttons,
-                "output_images": output_images,
-                "output_audio": output_audio,
-                "output_documents": output_documents,
+                "output_images": images,
+                "output_audio": audio,
                 "web_url": msg.saved_run.get_app_url(),
                 "user_message_id": msg.platform_msg_id,
                 "bot_message_id": msg.platform_msg_id.strip(MSG_ID_PREFIX),
                 "references": references,
             }
-    return api_messages
 
 
 class FeedbackQuerySet(models.QuerySet):
