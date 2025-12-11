@@ -10,6 +10,7 @@ from time import time
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
+from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import JSONResponse, RedirectResponse
 from firebase_admin import auth, exceptions
 from furl import furl
@@ -98,6 +99,15 @@ def get_sitemap():
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse("static/favicon.ico")
+
+
+@app.get("/docs", include_in_schema=False)
+async def redoc_html():
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title="GOOEY.AI - ReDoc",
+        redoc_js_url="https://unpkg.com/redoc@2/bundles/redoc.standalone.js",
+    )
 
 
 @app.get("/login/")
