@@ -410,6 +410,8 @@ def text2img(
                 payload=payload,
             )
 
+            if payload.get("resolution") == "4K":
+                num_outputs *= 2  # 2x price for 4K
             record_cost_auto(
                 model=text2img_model_ids[model],
                 sku=ModelSku.output_image_tokens,
