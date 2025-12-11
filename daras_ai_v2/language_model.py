@@ -821,6 +821,14 @@ class LargeLanguageModels(Enum):
         is_deprecated=True,
         redirect_to="gemini_2_flash",
     )
+    gemini_live = LLMSpec(
+        label="Gemini Live (Voice Only) • Google",
+        model_id="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        llm_api=LLMApis.gemini,
+        context_window=32_000,
+        max_output_tokens=64_000,
+        is_audio_model=True,
+    )
     palm2_text = LLMSpec(
         label="PaLM 2 Text • Google",
         model_id="text-bison",
@@ -1202,6 +1210,11 @@ def run_language_model(
     )
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
+
+    if model == LargeLanguageModels.gemini_live:
+        raise UserError(
+            "Gemini Live is not supported for text generation. Please use this from a Voice Deployment instead."
+        )
 
     if model.is_deprecated:
         if not model.redirect_to:
