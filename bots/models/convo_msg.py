@@ -668,6 +668,7 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
                 )
                 or []
             )
+            references = msg.saved_run.state.get("references")
             buttons, text, _ = parse_bot_html(msg.display_content)
             api_messages[i] = {
                 "role": msg.role,
@@ -683,6 +684,7 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> list[dict]:
                 "web_url": msg.saved_run.get_app_url(),
                 "user_message_id": msg.platform_msg_id,
                 "bot_message_id": msg.platform_msg_id.strip(MSG_ID_PREFIX),
+                "references": references,
             }
     return api_messages
 
