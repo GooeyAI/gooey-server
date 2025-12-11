@@ -1,16 +1,30 @@
 import gooey_gui as gui
 
-from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_multiselect, enum_selector
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
-    InpaintingModels,
-    Img2ImgModels,
     ControlNetModels,
+    Img2ImgModels,
     Schedulers,
+    Text2ImgModels,
     controlnet_model_explanations,
-    gemini_model_ids,
-    openai_model_ids,
 )
+
+# openai / google models that generally dont support controlnet, guidance scale, inference steps etc.
+PROPRIETARY_MODELS = {
+    Text2ImgModels.nano_banana_pro.name,
+    Text2ImgModels.nano_banana.name,
+    Text2ImgModels.gpt_image_1.name,
+    Text2ImgModels.dall_e_3.name,
+    Text2ImgModels.dall_e.name,
+}
+
+# self hosted diffusion models that have full support for controlnet, guidance scale, inference steps etc.
+SELF_HOSTED_SD_MODELS = {
+    Text2ImgModels.dream_shaper.name,
+    Text2ImgModels.dreamlike_2.name,
+    Text2ImgModels.sd_2.name,
+    Text2ImgModels.sd_1_5.name,
+}
 
 
 def img_model_settings(
@@ -35,12 +49,16 @@ def img_model_settings(
         )
     else:
         selected_model = gui.session_state.get("selected_model")
+    if selected_model:
+        selected_models = {selected_model}
+    else:
+        selected_models = set()
 
-    negative_prompt_setting(selected_model)
+    negative_prompt_setting(selected_models)
 
-    num_outputs_setting(selected_model)
+    num_outputs_setting(selected_models)
     if models_enum is not Img2ImgModels:
-        output_resolution_setting()
+        output_resolution_setting(selected_models)
 
     if models_enum is Text2ImgModels:
         sd_2_upscaling_setting()
@@ -48,20 +66,20 @@ def img_model_settings(
     col1, col2 = gui.columns(2)
 
     with col1:
-        guidance_scale_setting(selected_model)
+        guidance_scale_setting(selected_models)
 
     with col2:
         if models_enum is Img2ImgModels and not gui.session_state.get(
             "selected_controlnet_model"
         ):
-            prompt_strength_setting(selected_model)
-        if selected_model == Img2ImgModels.instruct_pix2pix.name:
+            prompt_strength_setting(selected_models)
+        if Img2ImgModels.instruct_pix2pix.name in selected_models:
             instruct_pix2pix_settings()
 
     if show_scheduler:
         col1, col2 = gui.columns(2)
         with col1:
-            scheduler_setting(selected_model)
+            scheduler_setting(selected_models)
 
     return selected_model
 
@@ -74,26 +92,16 @@ def model_selector(
     low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
     high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
-    controlnet_unsupported_models = [
-        Img2ImgModels.flux_pro_kontext.name,
-        Img2ImgModels.instruct_pix2pix.name,
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.gpt_image_1.name,
-        Img2ImgModels.jack_qiao.name,
-        Img2ImgModels.sd_2.name,
-        Img2ImgModels.nano_banana.name,
-        Img2ImgModels.nano_banana_pro.name,
-    ]
+    choices = models_enum
+    if require_controlnet:
+        choices = [model for model in choices if model.name in SELF_HOSTED_SD_MODELS]
     col1, col2 = gui.columns(2)
     with col1:
         selected_model = enum_selector(
-            models_enum,
-            label="""
-            #### 🤖 Choose your preferred AI Model
-            """,
+            choices,
+            label="#### 🤖 Choose your preferred AI Model",
             key="selected_model",
             use_selectbox=True,
-            exclude=controlnet_unsupported_models if require_controlnet else [],
         )
         gui.caption(
             """
@@ -101,13 +109,7 @@ def model_selector(
             Please use our default settings for optimal results if you're a beginner.   
             """
         )
-        if (
-            models_enum is Img2ImgModels
-            and gui.session_state.get("selected_model") in controlnet_unsupported_models
-        ):
-            if "selected_controlnet_model" in gui.session_state:
-                gui.session_state["selected_controlnet_model"] = None
-        elif models_enum is Img2ImgModels:
+        if models_enum is Img2ImgModels and selected_model in SELF_HOSTED_SD_MODELS:
             enum_multiselect(
                 ControlNetModels,
                 label=controlnet_explanation,
@@ -121,6 +123,8 @@ def model_selector(
                     low_explanation=low_explanation,
                     high_explanation=high_explanation,
                 )
+        elif "selected_controlnet_model" in gui.session_state:
+            gui.session_state["selected_controlnet_model"] = None
     return selected_model
 
 
@@ -187,7 +191,7 @@ def controlnet_weight_setting(
     )
 
 
-def num_outputs_setting(selected_models: str | list[str] = None):
+def num_outputs_setting(selected_models: set[str]):
     col1, col2 = gui.columns(2, gap="medium")
     with col1:
         gui.slider(
@@ -209,20 +213,8 @@ def num_outputs_setting(selected_models: str | list[str] = None):
         quality_setting(selected_models)
 
 
-def quality_setting(selected_models=None):
-    if not isinstance(selected_models, list):
-        selected_models = [selected_models]
-
-    if any(
-        selected_model in [InpaintingModels.dall_e.name]
-        for selected_model in selected_models
-    ):
-        return
-
-    if any(
-        selected_model in [Text2ImgModels.dall_e_3.name]
-        for selected_model in selected_models
-    ):
+def quality_setting(selected_models: set[str]):
+    if Text2ImgModels.dall_e_3.name in selected_models:
         gui.selectbox(
             """##### Dalle 3 Quality""",
             options=["standard", "hd"],
@@ -233,25 +225,17 @@ def quality_setting(selected_models=None):
             options=["natural", "vivid"],
             key="dall_e_3_style",
         )
-    if any(
-        selected_model in [Text2ImgModels.gpt_image_1.name]
-        for selected_model in selected_models
-    ):
+
+    if Text2ImgModels.gpt_image_1.name in selected_models:
         gui.selectbox(
             """##### GPT Image 1 Quality""",
             options=["low", "medium", "high"],
             key="gpt_image_1_quality",
         )
 
-    if any(
-        (
-            selected_model
-            and selected_model
-            not in map(lambda m: m.name, openai_model_ids | gemini_model_ids)
-        )
-        for selected_model in selected_models
+    if selected_models & (
+        SELF_HOSTED_SD_MODELS | {Img2ImgModels.instruct_pix2pix.name}
     ):
-        # not applicable for openai and gemini models
         gui.slider(
             label="""
             ##### Quality
@@ -269,44 +253,65 @@ def quality_setting(selected_models=None):
         )
 
 
-RESOLUTIONS: dict[int, dict[str, str]] = {
-    256: {
-        "256, 256": "square",
+RESOLUTIONS: dict[str, dict[str, str]] = {
+    "256p": {
+        "256 x 256": "square",
     },
-    512: {
-        "512, 512": "square",
-        "576, 448": "A4",
-        "640, 384": "laptop",
-        "768, 320": "smartphone",
-        "960, 256": "cinema",
-        "1024, 256": "panorama",
+    "512p": {
+        "512 x 512": "square",
+        "576 x 448": "A4",
+        "640 x 384": "laptop",
+        "768 x 320": "smartphone",
+        "960 x 256": "cinema",
+        "1024 x 256": "panorama",
     },
-    768: {
-        "768, 768": "square",
-        "896, 640": "A4",
-        "1024, 576": "laptop",
-        "1024, 512": "smartphone",
-        "1152, 512": "cinema",
-        "1536, 384": "panorama",
+    "768p": {
+        "768 x 768": "square",
+        "896 x 640": "A4",
+        "1024 x 576": "laptop",
+        "1024 x 512": "smartphone",
+        "1152 x 512": "cinema",
+        "1536 x 384": "panorama",
     },
-    1024: {
-        "1024, 1024": "square",
-        "1024, 768": "A4",
-        "1280, 768": "laptop",
-        "1536, 512": "smartphone",
-        "1792, 512": "cinema",
-        "2048, 512": "panorama",
-        "1792, 1024": "wide",
-        "1536, 1024": "camera",
+    "1024p": {
+        "1024 x 1024": "square",
+        "1024 x 768": "A4",
+        "1280 x 768": "laptop",
+        "1536 x 512": "smartphone",
+        "1792 x 512": "cinema",
+        "2048 x 512": "panorama",
+        "1792 x 1024": "wide",
+        "1536 x 1024": "camera",
+    },
+    "1K": {
+        "1920 x 1080": "16:9",
+        "1620 x 1080": "3:2",
+        "1440 x 1080": "4:3",
+        "1350 x 1080": "5:4",
+        "1080 x 1080": "1:1",
+    },
+    "2K": {
+        "2560 x 1440": "16:9",
+        "2160 x 1440": "3:2",
+        "1920 x 1440": "4:3",
+        "1800 x 1440": "5:4",
+        "1440 x 1440": "1:1",
+    },
+    "4K": {
+        "3840 x 2160": "16:9",
+        "3240 x 2160": "3:2",
+        "2880 x 2160": "4:3",
+        "2700 x 2160": "5:4",
+        "2160 x 2160": "1:1",
     },
 }
 LANDSCAPE = "Landscape"
 PORTRAIT = "Portrait"
 
+NANO_BANANA_RESOLUTIONS = ["1K", "2K", "4K"]
 
-def output_resolution_setting():
-    col1, col2, col3 = gui.columns(3)
 
+def output_resolution_setting(selected_models: set[str]):
     if "__pixels" not in gui.session_state:
         saved = (
             gui.session_state.get("output_width"),
@@ -321,60 +326,51 @@ def output_resolution_setting():
             orientation = LANDSCAPE
         for pixels, spec in RESOLUTIONS.items():
             for res in spec.keys():
-                if res != f"{int(saved[0])}, {int(saved[1])}":
+                if res != f"{int(saved[0])} x {int(saved[1])}":
                     continue
                 gui.session_state["__pixels"] = pixels
                 gui.session_state["__res"] = res
                 gui.session_state["__orientation"] = orientation
                 break
 
-    selected_models = (
-        gui.session_state.get(
-            "selected_model", gui.session_state.get("selected_models")
-        )
-        or []
-    )
-    if not isinstance(selected_models, list):
-        selected_models = [selected_models]
-    selected_models = set(selected_models)
-
     allowed_shapes = None
-    if selected_models and selected_models <= {Text2ImgModels.flux_1_dev.name}:
-        pixel_options = [1024]
-    elif selected_models and selected_models <= {Text2ImgModels.nano_banana.name}:
-        pixel_options = [1024]
-    elif selected_models and selected_models <= {Text2ImgModels.dall_e.name}:
-        pixel_options = [256, 512, 1024]
+    if not selected_models:
+        pixel_options = ["1K"]
+    elif selected_models <= {
+        Text2ImgModels.nano_banana.name,
+        Text2ImgModels.nano_banana_pro.name,
+    }:
+        pixel_options = NANO_BANANA_RESOLUTIONS
+    elif selected_models <= {Text2ImgModels.flux_1_dev.name}:
+        pixel_options = ["1024p"]
+    elif selected_models <= {Text2ImgModels.dall_e.name}:
+        pixel_options = ["256p", "512p", "1024p"]
         allowed_shapes = ["square"]
-    elif selected_models and selected_models <= {Text2ImgModels.dall_e_3.name}:
-        pixel_options = [1024]
+    elif selected_models <= {Text2ImgModels.dall_e_3.name}:
+        pixel_options = ["1024p"]
         allowed_shapes = ["square", "wide"]
-    elif selected_models and selected_models <= {Text2ImgModels.gpt_image_1.name}:
-        pixel_options = [1024]
+    elif selected_models <= {Text2ImgModels.gpt_image_1.name}:
+        pixel_options = ["1024p"]
         allowed_shapes = ["square", "camera"]
     else:
-        pixel_options = [512, 768]
+        pixel_options = ["512p", "768p"]
 
+    col1, col2, col3 = gui.columns(3)
     with col1:
-        pixels = gui.selectbox(
-            "##### Size",
-            key="__pixels",
-            format_func=lambda x: f"{x}p",
-            options=pixel_options,
-        )
+        pixels = gui.selectbox("##### Size", key="__pixels", options=pixel_options)
     with col2:
         res_options = [
             res
-            for res, shape in RESOLUTIONS[pixels or pixel_options[0]].items()
+            for res, shape in RESOLUTIONS[pixels].items()
             if not allowed_shapes or shape in allowed_shapes
         ]
         res = gui.selectbox(
             "##### Resolution",
             key="__res",
-            format_func=lambda r: f"{r.split(', ')[0]} x {r.split(', ')[1]} ({RESOLUTIONS[pixels][r]})",
+            format_func=lambda r: f"{r} ({RESOLUTIONS[pixels][r]})",
             options=res_options,
         )
-        res = tuple(map(int, res.split(", ")))
+        res = tuple(map(int, res.split("x")))
 
     if res[0] != res[1]:
         with col3:
@@ -395,13 +391,8 @@ def sd_2_upscaling_setting():
     gui.caption("Note: Currently, only square images can be upscaled")
 
 
-def scheduler_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.jack_qiao,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def scheduler_setting(selected_models: set[str]):
+    if not selected_models & SELF_HOSTED_SD_MODELS:
         return
     enum_selector(
         Schedulers,
@@ -417,21 +408,14 @@ def scheduler_setting(selected_model: str | None = None):
     )
 
 
-def guidance_scale_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.jack_qiao,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def guidance_scale_setting(selected_models: set[str]):
+    if selected_models & PROPRIETARY_MODELS:
         return
-
     # Flux Pro Kontext requires guidance_scale >= 1.0
-    if selected_model == Img2ImgModels.flux_pro_kontext.name:
+    if Img2ImgModels.flux_pro_kontext.name in selected_models:
         min_value = 1.0
     else:
         min_value = 0.0
-
     gui.slider(
         label="""
         ##### 🎨️ Artistic Pressure
@@ -466,13 +450,8 @@ usually at the expense of lower image quality
     )
 
 
-def prompt_strength_setting(selected_model: str = None):
-    if selected_model in [
-        Img2ImgModels.dall_e.name,
-        Img2ImgModels.gpt_image_1.name,
-        Img2ImgModels.instruct_pix2pix.name,
-        Img2ImgModels.nano_banana.name,
-    ]:
+def prompt_strength_setting(selected_models: set[str]):
+    if not selected_models & SELF_HOSTED_SD_MODELS:
         return
 
     gui.slider(
@@ -492,12 +471,10 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
-def negative_prompt_setting(selected_model: str | None = None):
-    if selected_model in [
-        Text2ImgModels.dall_e.name,
-        Text2ImgModels.gpt_image_1.name,
-        Text2ImgModels.nano_banana.name,
-    ]:
+def negative_prompt_setting(selected_models: set[str]):
+    if not selected_models & (
+        SELF_HOSTED_SD_MODELS | {Img2ImgModels.instruct_pix2pix.name}
+    ):
         return
 
     gui.text_area(

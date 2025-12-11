@@ -178,14 +178,15 @@ class CompareText2ImgPage(BasePage):
         gui.session_state["edit_instruction"] = gui.session_state.get(
             "__edit_instruction"
         )
-        negative_prompt_setting()
-        output_resolution_setting()
-        num_outputs_setting(gui.session_state.get("selected_models", []))
+        selected_models = set(gui.session_state.get("selected_models", []))
+        negative_prompt_setting(selected_models)
+        output_resolution_setting(selected_models)
+        num_outputs_setting(selected_models)
         sd_2_upscaling_setting()
         col1, col2 = gui.columns(2)
         with col1:
-            guidance_scale_setting()
-            scheduler_setting()
+            guidance_scale_setting(selected_models)
+            scheduler_setting(selected_models)
         with col2:
             if gui.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()
