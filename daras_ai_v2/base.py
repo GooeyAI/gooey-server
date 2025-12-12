@@ -1236,7 +1236,12 @@ class BasePage:
             gui.session_state.clear()
             gui.session_state.update(new_state)
 
-        if not self.is_current_user_admin():
+        if not self.request.user or (
+            self.request.user.is_anonymous
+            or (
+                self.current_workspace and not self.current_workspace.enable_bot_builder
+            )
+        ):
             return
         render_gooey_builder(
             page_slug=self.slug_versions[-1],

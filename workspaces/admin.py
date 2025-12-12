@@ -93,6 +93,10 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         ("total_payments", "total_charged", "total_usage_cost"),
         ("balance", "subscription"),
         (
+            "enable_bot_builder",
+            "restrict_function_scope",
+        ),
+        (
             "view_saved_runs",
             "view_published_runs",
             "view_api_keys",
