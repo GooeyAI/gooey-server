@@ -120,8 +120,9 @@ class CompareText2ImgPage(BasePage):
             Each selected model costs 2 credits ($.02) / image except where noted.
 
             Dalle-3: 15 Cr
-            Nano banana: 8 Cr
-            GPT-image: 3, 10 or 40 Cr
+            Nano Banana: 8 Cr
+            Nano Banana Pro: 20 or 40 Cr
+            GPT-Image 1: 3, 10 or 40 Cr
             """
         )
 
