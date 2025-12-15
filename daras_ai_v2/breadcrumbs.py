@@ -56,7 +56,7 @@ def get_title_breadcrumbs(
     from routers.root import RecipeTabs
 
     is_root = pr and pr.saved_run == sr and pr.is_root()
-    is_example = not is_root and pr and pr.saved_run == sr
+    is_example = not is_root and pr and pr.saved_run == sr or sr.parent_version
     is_run = not is_root and not is_example
     is_api_call = sr.is_api_call and tab == RecipeTabs.run
 
@@ -103,6 +103,7 @@ def get_title_breadcrumbs(
                 prefix = "Run"
 
             prompt_title = page_cls.get_prompt_title(sr)
+
             if pr and not pr.is_root():
                 h1_title = TitleUrl(
                     title=prompt_title or pr.title or f"Fork: {pr.published_run_id}",

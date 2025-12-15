@@ -237,6 +237,7 @@ class BasePage:
         example_id: str | None = None,
         run_id: str | None = None,
         uid: str | None = None,
+        version_id: str | None = None,
         query_params: dict[str, str] | None = None,
         path_params: dict | None = None,
     ) -> str:
@@ -430,6 +431,16 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
+        version_id = self.request.query_params.get("version_id", None)
+        pr_version = None
+        if version_id:
+            pr_version = pr.versions.get(version_id=version_id)
+
+            if pr_version and self.current_pr:
+                self.current_pr.title = pr_version.title
+                self.current_pr.notes = pr_version.notes
+                self.current_pr.photo_url = pr_version.photo_url
+
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         can_save = self.can_user_save_run(sr, pr)
         request_changed = self._has_request_changed()
@@ -476,7 +487,11 @@ class BasePage:
                                 className="d-flex align-items-end flex-column-reverse gap-2",
                                 style={"whiteSpace": "nowrap"},
                             ):
-                                if request_changed or (can_save and not is_example):
+                                if (
+                                    request_changed
+                                    or (can_save and not is_example)
+                                    or self.is_published_run_version()
+                                ):
                                     self._render_unpublished_changes_indicator()
                                 self.render_social_buttons()
 
@@ -494,7 +509,7 @@ class BasePage:
                             ),
                         )
 
-        if self.tab == RecipeTabs.run and is_example:
+        if self.tab == RecipeTabs.run and is_example or pr_version:
             with gui.div(className="container-margin-reset"):
                 if self.current_pr and self.current_pr.notes:
                     gui.write(self.current_pr.notes, line_clamp=3)
@@ -864,7 +879,10 @@ class BasePage:
                 notes=published_run_description.strip(),
                 photo_url=photo_url,
             )
-            if not self._has_published_run_changed(published_run=pr, **updates):
+            if (
+                not self._has_published_run_changed(published_run=pr, **updates)
+                and self.is_published_run_version
+            ):
                 gui.error("No changes to publish", icon="⚠️")
                 return
             pr.add_version(
@@ -931,6 +949,9 @@ class BasePage:
             )
         elif title.strip() == "":
             raise TitleValidationError("Title cannot be empty.")
+
+    def is_published_run_version(self) -> bool:
+        return self.request.query_params.get("version_id", None) is not None
 
     def _has_published_run_changed(
         self,
@@ -1281,38 +1302,45 @@ class BasePage:
             example_id=version.published_run.published_run_id,
             run_id=version.saved_run.run_id,
             uid=version.saved_run.uid,
+            query_params=dict(version_id=version.version_id),
         )
-        with gui.link(to=url, className="d-block text-decoration-none my-3"):
-            with gui.div(
-                className="d-flex justify-content-between align-items-middle fw-bold"
+        with gui.styled("&.pr-version:hover { background-color: #f0f0f0 }"):
+            with gui.link(
+                to=url,
+                className="d-block text-decoration-none my-3 pr-version p-2 rounded-2",
             ):
-                if version.changed_by:
-                    with gui.tag("h6"):
-                        render_author_from_user(
-                            version.changed_by, responsive=False, show_as_link=False
+                with gui.div(
+                    className="d-flex justify-content-between align-items-middle fw-bold container-margin-reset"
+                ):
+                    if version.changed_by:
+                        with gui.tag("h6", className="mb-0"):
+                            render_author_from_user(
+                                version.changed_by, responsive=False, show_as_link=False
+                            )
+                    else:
+                        gui.write(
+                            "###### Deleted User", className="container-margin-reset"
                         )
-                else:
-                    gui.write("###### Deleted User", className="container-margin-reset")
-                with gui.tag("h6", className="mb-0"):
-                    gui.html(
-                        "Loading...",
-                        **render_local_dt_attrs(
-                            version.created_at,
-                            date_options={"month": "short", "day": "numeric"},
-                        ),
-                    )
-            with gui.div(className="container-margin-reset"):
-                is_first_version = not older_version
-                if is_first_version:
-                    with gui.tag("span", className="badge bg-secondary px-3"):
-                        gui.write("FIRST VERSION")
-                elif version.change_notes:
-                    gui.caption(
-                        f"{icons.notes} {html.escape(version.change_notes)}",
-                        unsafe_allow_html=True,
-                    )
-                elif older_version and older_version.title != version.title:
-                    gui.caption(f"Renamed to: {version.title}")
+                    with gui.tag("h6", className="mb-0"):
+                        gui.html(
+                            "Loading...",
+                            **render_local_dt_attrs(
+                                version.created_at,
+                                date_options={"month": "short", "day": "numeric"},
+                            ),
+                        )
+                with gui.div(className="container-margin-reset"):
+                    is_first_version = not older_version
+                    if is_first_version:
+                        with gui.tag("span", className="badge bg-secondary px-3"):
+                            gui.write("FIRST VERSION")
+                    elif version.change_notes:
+                        gui.caption(
+                            f"{icons.notes} {html.escape(version.change_notes)}",
+                            unsafe_allow_html=True,
+                        )
+                    elif older_version and older_version.title != version.title:
+                        gui.caption(f"Renamed to: {version.title}")
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
