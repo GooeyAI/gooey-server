@@ -1241,8 +1241,10 @@ class BasePage:
             or (
                 self.current_workspace and not self.current_workspace.enable_bot_builder
             )
+            and not self.request.user.is_admin()
         ):
             return
+
         render_gooey_builder(
             page_slug=self.slug_versions[-1],
             builder_state=dict(
