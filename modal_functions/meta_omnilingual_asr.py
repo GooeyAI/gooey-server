@@ -48,7 +48,8 @@ def load_pipeline(model_card: str):
     gpu="a10g",
     volumes={cache_dir: model_cache},
     timeout=30 * 60,
-    scaledown_window=90,
+    scaledown_window=60 * 60,  # 1 hour
+    max_containers=2,
     enable_memory_snapshot=True,
     experimental_options={"enable_gpu_snapshot": True},
 )

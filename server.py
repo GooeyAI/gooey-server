@@ -56,10 +56,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs", lifespan=lifespan)
+app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 app.include_router(bots_api.app)
 app.include_router(api.app)
 app.include_router(broadcast_api.app)

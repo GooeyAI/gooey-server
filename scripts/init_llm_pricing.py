@@ -670,6 +670,16 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        model_name=LargeLanguageModels.gemini_live.name,
+        unit_cost_input=0.5,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-native-audio",
+    )
+
+    llm_pricing_create(
         model_id="google/gemini-3-pro-preview",
         model_name=LargeLanguageModels.gemini_3_pro.name,
         unit_cost_input=2,

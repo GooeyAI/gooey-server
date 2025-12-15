@@ -146,13 +146,13 @@ def render_demo_button_settings(
     ):
         enabled = bi.public_visibility > WorkflowAccessLevel.VIEW_ONLY
         new_value = gui.switch(
-            f"###### Show {Platform(bi.platform).label} Button",
+            f"###### Show {Platform(bi.platform).get_title()} Button",
             value=enabled,
         )
 
         workspace_url = bi.workspace.handle_id and bi.workspace.handle.get_app_url()
 
-        gui.caption(f"""Add a {Platform(bi.platform).label} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
+        gui.caption(f"""Add a {Platform(bi.platform).get_title()} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
                       Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace.""")
 
         if new_value != enabled:

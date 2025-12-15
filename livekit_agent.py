@@ -217,7 +217,10 @@ async def create_audio_model_session(
         from livekit.plugins import google
 
         llm = google.beta.realtime.RealtimeModel(
-            model=llm_model.model_id, temperature=request.sampling_temperature
+            model=llm_model.model_id,
+            temperature=request.sampling_temperature,
+            vertexai=True,
+            project=settings.GCP_PROJECT,
         )
         tts = google.TTS()
     else:

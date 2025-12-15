@@ -120,8 +120,9 @@ class CompareText2ImgPage(BasePage):
             Each selected model costs 2 credits ($.02) / image except where noted.
 
             Dalle-3: 15 Cr
-            Nano banana: 8 Cr
-            GPT-image: 3, 10 or 40 Cr
+            Nano Banana: 8 Cr
+            Nano Banana Pro: 20 or 40 Cr
+            GPT-Image 1: 3, 10 or 40 Cr
             """
         )
 
@@ -178,14 +179,15 @@ class CompareText2ImgPage(BasePage):
         gui.session_state["edit_instruction"] = gui.session_state.get(
             "__edit_instruction"
         )
-        negative_prompt_setting()
-        output_resolution_setting()
-        num_outputs_setting(gui.session_state.get("selected_models", []))
+        selected_models = set(gui.session_state.get("selected_models", []))
+        negative_prompt_setting(selected_models)
+        output_resolution_setting(selected_models)
+        num_outputs_setting(selected_models)
         sd_2_upscaling_setting()
         col1, col2 = gui.columns(2)
         with col1:
-            guidance_scale_setting()
-            scheduler_setting()
+            guidance_scale_setting(selected_models)
+            scheduler_setting(selected_models)
         with col2:
             if gui.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()
@@ -298,7 +300,7 @@ class CompareText2ImgPage(BasePage):
                 case Text2ImgModels.nano_banana.name:
                     total += 8
                 case Text2ImgModels.nano_banana_pro.name:
-                    match state.get("nano_banana_pro_resolution"):
+                    match state.get("__pixels"):
                         case "4K":
                             total += 40
                         case _:

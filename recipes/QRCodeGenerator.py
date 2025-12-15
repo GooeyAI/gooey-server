@@ -305,7 +305,7 @@ Here is the final output:
         )
         gui.write("---")
 
-        output_resolution_setting()
+        output_resolution_setting({gui.session_state.get("selected_model")})
 
         gui.write(
             """
