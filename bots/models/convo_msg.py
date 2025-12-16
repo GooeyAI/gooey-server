@@ -624,7 +624,7 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
             )
             yield {
                 "role": msg.role,
-                "input_prompt": msg.display_content,
+                "input_prompt": msg.display_content or msg.content,
                 "input_images": images,
                 "input_audio": audio,
                 "input_documents": documents,
