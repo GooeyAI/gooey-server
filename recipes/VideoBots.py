@@ -1562,6 +1562,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
 
+        if state.get("selected_model") == LargeLanguageModels.agrillm_qwen3_30b.name:
+            total += 100
+
         if is_realtime_audio_url(state.get("input_audio")):
             total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
 
@@ -1577,6 +1580,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             model = "LLM"
 
         llm_cost = get_non_ivr_price_credits(self.current_sr)
+        if model == LargeLanguageModels.agrillm_qwen3_30b.value:
+            llm_cost += 100
+
         notes = (
             f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
         )
