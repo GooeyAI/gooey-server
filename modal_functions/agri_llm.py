@@ -41,13 +41,14 @@ vllm_image = (
     image=vllm_image,
     gpu=f"H100:{N_GPU}",
     scaledown_window=5 * MINUTES,
-    timeout=5 * MINUTES,
+    timeout=3 * MINUTES,
     volumes={
         hf_cache_dir: model_cache,
         vllm_cache_dir: vllm_cache,
     },
     enable_memory_snapshot=True,
     experimental_options={"enable_gpu_snapshot": True},
+    max_containers=1,
 )
 @modal.concurrent(max_inputs=32)
 @modal.web_server(port=VLLM_PORT, startup_timeout=10 * MINUTES)
@@ -64,6 +65,9 @@ def serve():
         "--served-model-name",
         MODEL_NAME,
         "llm",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "hermes",
         "--host",
         "0.0.0.0",
         "--port",
