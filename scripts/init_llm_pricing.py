@@ -5,6 +5,17 @@ category = ModelCategory.LLM
 
 
 def run():
+    # agriLLM
+    llm_pricing_create(
+        model_id="AI71ai/agrillm-Qwen3-30B-A3B",
+        model_name=LargeLanguageModels.agrillm_qwen3_30b.name,
+        unit_cost_input=10.0,
+        unit_cost_output=95.0,
+        unit_quantity=10**6,
+        provider=ModelProvider.modal,
+        pricing_url="https://www.modal.com/pricing",
+    )
+
     # SEA-LION
     llm_pricing_create(
         model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",

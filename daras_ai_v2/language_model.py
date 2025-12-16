@@ -13,6 +13,7 @@ import requests
 import typing_extensions
 from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
+from furl import furl
 from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -2062,7 +2063,7 @@ def get_openai_client(model: str):
         client = openai.OpenAI(
             api_key=settings.MODAL_VLLM_API_KEY,
             max_retries=0,
-            base_url=f"{modal_fn.get_web_url()}/v1",
+            base_url=str(furl(modal_fn.get_web_url()) / "v1"),
         )
     else:
         client = openai.OpenAI(
