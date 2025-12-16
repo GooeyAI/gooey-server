@@ -1851,6 +1851,8 @@ def _stream_openai_chunked(
                         tc = tc_delta.model_dump()
                         entry.setdefault("tool_calls", []).append(tc)
                     else:
+                        if tc["function"]["arguments"] is None:
+                            tc["function"]["arguments"] = ""
                         tc["function"]["arguments"] += tc_delta.function.arguments
 
             # append the delta to the current chunk
