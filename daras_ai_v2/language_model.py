@@ -82,6 +82,15 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    agrillm_qwen3_30b = LLMSpec(
+        label="AgriLLM Qwen-3 30B • ai71",
+        model_id="AI71ai/agrillm-Qwen3-30B-A3B",
+        llm_api=LLMApis.openai,
+        context_window=32_768,
+        max_output_tokens=4_096,
+        supports_json=True,
+    )
+
     # https://platform.publicai.co/api/~endpoints
     apertus_70b_instruct = LLMSpec(
         label="Apertus 70B Instruct • SwissAI via PublicAI",
@@ -2042,6 +2051,16 @@ def get_openai_client(model: str):
             max_retries=0,
             base_url="https://api.publicai.co/v1",
             default_headers={"User-Agent": "gooey/openai-sdk"},
+        )
+    elif model.startswith("AI71ai/"):
+        import modal
+        from modal_functions.agri_llm import app
+
+        modal_fn = modal.Function.from_name(app.name, "serve")
+        client = openai.OpenAI(
+            api_key=settings.MODAL_VLLM_API_KEY,
+            max_retries=0,
+            base_url=f"{modal_fn.get_web_url()}/v1",
         )
     else:
         client = openai.OpenAI(
