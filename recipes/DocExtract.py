@@ -15,8 +15,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
     AsrModels,
     TranslationModels,
-    audio_url_to_wav,
-    download_youtube_to_wav_url,
+    audio_url_to_wav_url,
     run_asr,
     run_translate,
 )
@@ -466,18 +465,8 @@ def process_source(
     )
     if not content_url:
         yield "Downloading"
-        if is_yt:
-            content_url, _ = download_youtube_to_wav_url(webpage_url)
-        elif is_video:
-            f = furl(webpage_url)
-            if is_gdrive_url(f):
-                f_bytes, _ = gdrive_download(
-                    f, doc_meta.mime_type, doc_meta.export_links
-                )
-                webpage_url = upload_file_from_bytes(
-                    doc_meta.name, f_bytes, content_type=doc_meta.mime_type
-                )
-            content_url, _ = audio_url_to_wav(webpage_url)
+        if is_yt or is_video:
+            content_url, _ = audio_url_to_wav_url(webpage_url)
         elif is_pdf:
             content_url = entry.get("content_url") or webpage_url
         else:

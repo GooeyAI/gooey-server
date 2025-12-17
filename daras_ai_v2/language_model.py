@@ -22,7 +22,7 @@ from openai.types.chat import (
 )
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
-from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
@@ -2539,9 +2539,8 @@ def format_chat_entry(
             [{"type": "image_url", "image_url": {"url": url}} for url in input_images]
         )
     if input_audio:
-        r = requests.get(input_audio)
-        r.raise_for_status()
-        audio_data = base64.b64encode(r.content).decode()
+        wavdata, _ = audio_url_to_wav(input_audio)
+        audio_data = base64.b64encode(wavdata).decode()
         content.append(
             {
                 "type": "input_audio",
