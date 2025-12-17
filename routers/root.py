@@ -556,7 +556,7 @@ def chat_route(
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
 
-    if conversation_id:
+    if conversation_id and bi.web_config_extras.get("enableShareConversation", False):
         try:
             conversation: Conversation = Conversation.objects.get(
                 id=api_hashids.decode(conversation_id)[0],
