@@ -1062,28 +1062,13 @@ def run_asr(
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
-    from daras_ai_v2.vector_search import is_yt_dlp_able_url
     import langcodes
 
     selected_model = AsrModels[selected_model]
     if selected_model in AsrModels._deprecated():
         raise UserError(f"Model {selected_model} is deprecated.")
     output_format = AsrOutputFormat[output_format]
-    if is_yt_dlp_able_url(audio_url):
-        audio_url, size = download_youtube_to_wav_url(audio_url)
-    elif is_gdrive_url(furl(audio_url)):
-        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
-        anybytes, _ = gdrive_download(
-            furl(audio_url), meta.get("mimeType", "audio/wav")
-        )
-        wavbytes, size = audio_bytes_to_wav(anybytes)
-        audio_url = upload_file_from_bytes(
-            filename=meta.get("name", "gdrive_audio") + ".wav",
-            data=wavbytes,
-            content_type="audio/wav",
-        )
-    else:
-        audio_url, size = audio_url_to_wav(audio_url)
+    audio_url, size = audio_url_to_wav_url(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
 
     if selected_model == AsrModels.azure:
@@ -1442,7 +1427,44 @@ def download_youtube_to_wav(youtube_url: str) -> bytes:
     return wavdata
 
 
-def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
+def audio_url_to_wav(audio_url: str) -> tuple[bytes, int]:
+    from daras_ai_v2.vector_search import is_yt_dlp_able_url
+
+    if is_yt_dlp_able_url(audio_url):
+        wavdata = download_youtube_to_wav(audio_url)
+        return wavdata, len(wavdata)
+
+    if is_gdrive_url(furl(audio_url)):
+        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        anybytes, _ = gdrive_download(
+            furl(audio_url), meta.get("mimeType", "audio/wav")
+        )
+        return audio_bytes_to_wav(anybytes)
+
+    r = requests.get(audio_url)
+    raise_for_status(r, is_user_url=True)
+    return audio_bytes_to_wav(r.content)
+
+
+def audio_url_to_wav_url(audio_url: str) -> tuple[str, int]:
+    from daras_ai_v2.vector_search import is_yt_dlp_able_url
+
+    if is_gdrive_url(furl(audio_url)):
+        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        anybytes, _ = gdrive_download(
+            furl(audio_url), meta.get("mimeType", "audio/wav")
+        )
+        wavbytes, size = audio_bytes_to_wav(anybytes)
+        audio_url = upload_file_from_bytes(
+            filename=meta.get("name", "gdrive_audio") + ".wav",
+            data=wavbytes,
+            content_type="audio/wav",
+        )
+        return audio_url, size
+
+    if is_yt_dlp_able_url(audio_url):
+        return download_youtube_to_wav_url(audio_url)
+
     r = requests.get(audio_url)
     raise_for_status(r, is_user_url=True)
     audio_bytes = r.content
