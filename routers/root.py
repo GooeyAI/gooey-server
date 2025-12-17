@@ -583,7 +583,6 @@ def chat_route(
                 bi,
                 config=dict(
                     mode="fullscreen",
-                    enableShareConversation=True,
                     conversationData=conversation_data,
                 ),
             ),
