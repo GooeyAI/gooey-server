@@ -451,6 +451,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 enableAudioMessage=True,
                 enableConversations=True,
                 enableSourcePreview=True,
+                enableShareConversation=False,
                 branding=(
                     dict(showPoweredByGooey=True)
                     | bi.web_config_extras.get("branding", {})
@@ -469,6 +470,9 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             )
             config["enableConversations"] = gui.checkbox(
                 'Show "New Chat"', value=config["enableConversations"]
+            )
+            config["enableShareConversation"] = gui.checkbox(
+                "Enable Conversation Sharing", value=config["enableShareConversation"]
             )
         with scol2:
             config["enableAudioMessage"] = gui.checkbox(
