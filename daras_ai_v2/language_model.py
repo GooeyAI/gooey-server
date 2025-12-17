@@ -113,6 +113,19 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    # https://platform.openai.com/docs/models/gpt-5.2
+    gpt_5_2 = LLMSpec(
+        label="GPT-5.2 • openai",
+        model_id="gpt-5.2-2025-12-11",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+        version=5.2,
+    )
     # https://platform.openai.com/docs/models/gpt-5.1
     gpt_5_1 = LLMSpec(
         label="GPT-5.1 • openai",
@@ -473,12 +486,24 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="deepseek_v3p1",
+        redirect_to="deepseek_v3p2",
     )
 
     deepseek_v3p1 = LLMSpec(
         label="DeepSeek V3.1 • DeepSeek",
         model_id="accounts/fireworks/models/deepseek-v3p1",
+        llm_api=LLMApis.fireworks,
+        context_window=163_800,
+        max_output_tokens=20_500,
+        supports_json=True,
+        is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="deepseek_v3p2",
+    )
+
+    deepseek_v3p2 = LLMSpec(
+        label="DeepSeek V3.2 • DeepSeek",
+        model_id="accounts/fireworks/models/deepseek-v3p2",
         llm_api=LLMApis.fireworks,
         context_window=163_800,
         max_output_tokens=20_500,

@@ -51,6 +51,17 @@ def run():
         pricing_url="https://platform.openai.com/docs/models/gpt-realtime",
     )
 
+    # gpt-5.2
+    llm_pricing_create(
+        model_id="gpt-5.2-2025-12-11",
+        model_name=LargeLanguageModels.gpt_5_2.name,
+        unit_cost_input=1.75,
+        unit_cost_output=14,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5.2",
+    )
+
     # gpt-5.1
     llm_pricing_create(
         model_id="gpt-5.1-2025-11-13",
@@ -1184,6 +1195,16 @@ def run():
     llm_pricing_create(
         model_id="accounts/fireworks/models/deepseek-v3p1",
         model_name=LargeLanguageModels.deepseek_v3p1.name,
+        unit_cost_input=0.56,
+        unit_cost_output=1.68,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-v3p2",
+        model_name=LargeLanguageModels.deepseek_v3p2.name,
         unit_cost_input=0.56,
         unit_cost_output=1.68,
         unit_quantity=10**6,
