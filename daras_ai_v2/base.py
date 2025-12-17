@@ -28,6 +28,7 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
 from app_users.models import AppUser, AppUserTransaction
+from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
 from bots.models import (
     PublishedRun,
     PublishedRunVersion,
@@ -1160,10 +1161,7 @@ class BasePage:
 
     def _user_disabled_check(self):
         if self.current_sr_user and self.current_sr_user.is_disabled:
-            msg = (
-                "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
-                "Contact us at support@gooey.ai if you think this is a mistake."
-            )
+            msg = DISABLED_ACCOUNT_ERROR_MESSAGE
             gui.error(msg, icon="😵")
             gui.stop()
 

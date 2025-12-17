@@ -17,10 +17,14 @@ from workspaces.models import Workspace
 
 
 EPHEMERAL_KEY_PREFIX = "ek_"
+EMERPHAL_KEY_SALT = "gooey-ephemeral-api-key"
 
-TOKEN_EXPIRATION = 60 * 60 * 3
+TOKEN_EXPIRATION = 60 * 60 * 3  # 3 hours
 
-DISABLED_ACCOUNT_ERROR_MESSAGE = """Your Gooey.AI account has been disabled for violating our Terms of Service.\n\nContact us at support@gooey.ai if you think this is a mistake."""
+DISABLED_ACCOUNT_ERROR_MESSAGE = (
+    "This Gooey.AI account has been disabled for violating our [Terms of Service](https://gooey.ai/terms). "
+    "Contact us at support@gooey.ai if you think this is a mistake."
+)
 
 
 class AuthenticationError(HTTPException):
@@ -111,7 +115,7 @@ api_auth_header = APIAuth(
 )
 
 
-_signer = URLSafeTimedSerializer(SECRET_KEY, salt="gooey-ephemeral-api-key")
+_signer = URLSafeTimedSerializer(SECRET_KEY, salt=EMERPHAL_KEY_SALT)
 
 
 def generate_ephemeral_api_key(user_id: int, workspace_id: str, run_id: str) -> str:
@@ -120,7 +124,7 @@ def generate_ephemeral_api_key(user_id: int, workspace_id: str, run_id: str) -> 
         "workspace_id": workspace_id,
         "run_id": run_id,
     }
-    signed_token = _signer.dumps(payload, salt="gooey-ephemeral-api-key")
+    signed_token = _signer.dumps(payload, salt=EMERPHAL_KEY_SALT)
     token = EPHEMERAL_KEY_PREFIX + signed_token
 
     return token
@@ -130,7 +134,7 @@ def verify_ephemeral_api_key(token: str) -> ApiKey:
     signed_token = token.removeprefix(EPHEMERAL_KEY_PREFIX)
     try:
         payload = _signer.loads(
-            signed_token, salt="gooey-ephemeral-api-key", max_age=TOKEN_EXPIRATION
+            signed_token, salt=EMERPHAL_KEY_SALT, max_age=TOKEN_EXPIRATION
         )
     except SignatureExpired:
         raise AuthenticationError("API Key has expired.")
@@ -153,21 +157,16 @@ def verify_ephemeral_api_key(token: str) -> ApiKey:
     if user.is_disabled or workspace.created_by.is_disabled:
         raise AuthorizationError(DISABLED_ACCOUNT_ERROR_MESSAGE)
 
-    _verify_run_state(run_id, user, workspace)
+    _verify_run_state(run_id, user)
 
-    return ApiKey(
-        created_by=user,
-        workspace=workspace,
-    )
+    return ApiKey(created_by=user, workspace=workspace)
 
 
-def _verify_run_state(run_id: str, user: AppUser, workspace: Workspace) -> None:
+def _verify_run_state(run_id: str, user: AppUser) -> None:
     from daras_ai_v2.base import BasePage, RecipeRunState
 
     try:
-        saved_run = SavedRun.objects.get(
-            run_id=run_id, uid=user.uid, workspace=workspace
-        )
+        saved_run = SavedRun.objects.get(run_id=run_id, uid=user.uid)
     except SavedRun.DoesNotExist:
         raise AuthenticationError("Invalid API Key. Run not found.")
 
@@ -176,5 +175,3 @@ def _verify_run_state(run_id: str, user: AppUser, workspace: Workspace) -> None:
 
     if run_state != RecipeRunState.running:
         raise AuthenticationError("Invalid API Key. Run is not active.")
-
-    return
