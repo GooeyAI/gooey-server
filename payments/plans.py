@@ -245,7 +245,7 @@ class PricingPlan(PricingPlanData, Enum):
         credits=10_000,
         long_description=dedent(
             """
-            #### Everything in Standard +
+            #### Everything in Free +
             <ul class="text-muted">
 
               <li>Private Team Workspace</li>
