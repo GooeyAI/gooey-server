@@ -1,8 +1,5 @@
-from starlette.requests import Request
 import gooey_gui as gui
-from daras_ai_v2 import settings
 from textwrap import dedent
-from daras_ai_v2 import icons
 
 
 class SidebarRef:
@@ -34,6 +31,7 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
     """Create or get a sidebar reference with state management."""
     import time
 
+    ## HUGE HACK HERE
     # Check if this is a fresh page load by comparing timestamps
     last_load_time = session.get(f"{key}:last_load_time", 0)
     current_time = time.time()
@@ -120,10 +118,10 @@ def sidebar_layout(sidebar_ref: SidebarRef):
                     min-width: {sidebar_mobile_width};
                     width: {sidebar_mobile_width};
                     max-width: {sidebar_mobile_width};
-                    z-index: 2000;
+                    z-index: 100;
                     border-left: 1px solid #e0e0e0;
                     border-right: none;
-                    height: calc(100dvh - 4px); /* 4px for the progress bar */
+                    height: calc(100dvh); /* 4px for the progress bar */
                     margin-top: auto;
                 }}
                 & .gooey-sidebar-closed {{
@@ -158,15 +156,6 @@ def sidebar_layout(sidebar_ref: SidebarRef):
             style={"height": "100dvh"},
         ),
     ):
-        open_sidebar_btn = gui.button(
-            label="",
-            className="d-none",
-            id="sidebar-hidden-btn",
-        )
-        if open_sidebar_btn:
-            sidebar_ref.set_open(True)
-            raise gui.RerunException()
-
         sidebar_content_placeholder = gui.div(
             className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_funtion_classes}",
         )
