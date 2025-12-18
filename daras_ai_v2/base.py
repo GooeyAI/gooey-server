@@ -48,7 +48,7 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
-from daras_ai_v2.gooey_builder import render_gooey_builder, render_gooey_builder_inline
+from daras_ai_v2.gooey_builder import render_gooey_builder_inline
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -429,11 +429,20 @@ class BasePage:
             self._render_header()
 
     def render_sidebar(self):
-        if not self.is_current_user_admin():
+        enable_bot_builder = (
+            self.request.user
+            and not self.request.user.is_anonymous
+            and (
+                self.request.user.is_admin()
+                or self.current_workspace.enable_bot_builder
+            )
+        )
+        if not enable_bot_builder:
             return
 
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
         if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
+            # close the sidebar for other tabs
             if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
                 sidebar_ref.set_open(False)
                 sidebar_ref.set_mobile_open(False)
@@ -441,6 +450,7 @@ class BasePage:
             return
 
         if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
+            # hidden button to trigger the onClose event passed in the widget config
             gui.tag(
                 "button",
                 type="submit",
@@ -448,7 +458,7 @@ class BasePage:
                 value="yes",
                 hidden=True,
                 id="onClose",
-            )  # hidden button to trigger the onClose event passed in the config
+            )
 
             if gui.session_state.pop("onCloseGooeyBuilder", None):
                 sidebar_ref.set_open(False)
@@ -1299,6 +1309,7 @@ class BasePage:
 
         if not enable_bot_builder:
             return
+
         render_gooey_builder_inline(
             page_slug=self.slug_versions[-1],
             builder_state=dict(
