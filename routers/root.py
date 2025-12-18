@@ -54,6 +54,9 @@ from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import global_workspace_selector, workspace_selector_link
 
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+
 app = CustomAPIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
@@ -763,7 +766,7 @@ def get_og_url_path(request) -> str:
 @contextmanager
 def page_wrapper(
     request: Request,
-    page: None = None,
+    page: typing.Optional["BasePage"] = None,
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
     show_search_bar: bool = True,
@@ -778,7 +781,7 @@ def page_wrapper(
     sidebar_content, pane_content = sidebar_layout(sidebar_ref)
 
     is_builder_sidebar_open = sidebar_ref.is_open
-    if not is_recipe_page and (is_builder_sidebar_open):
+    if not is_recipe_page and is_builder_sidebar_open:
         sidebar_ref.set_open(False)
         sidebar_ref.set_mobile_open(False)
         raise gui.RerunException()
