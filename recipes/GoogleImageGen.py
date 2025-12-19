@@ -27,6 +27,7 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     SD_IMG_MAX_SIZE,
     instruct_pix2pix,
+    validate_multi_image_models,
 )
 
 
@@ -128,6 +129,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         if not state["selected_model"]:
             state["output_images"] = image_urls
             return  # Break out of the generator
+        validate_multi_image_models(Img2ImgModels[request.selected_model], image_urls)
 
         selected_image_bytes = None
         for selected_image_url in image_urls:
@@ -166,7 +168,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             state["output_images"] = yield from img2img(
                 prompt=request.text_prompt,
                 negative_prompt=request.negative_prompt,
-                init_image=selected_image_url,
+                init_images=selected_image_url,
                 init_image_bytes=selected_image_bytes,
                 selected_model=request.selected_model,
                 num_inference_steps=request.quality,

@@ -18,6 +18,7 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
     controlnet,
     ControlNetModels,
+    validate_multi_image_models,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
 
@@ -42,7 +43,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: HttpUrlStr
+        input_image: HttpUrlStr | list[HttpUrlStr] | None = None
         text_prompt: str | None = None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
@@ -99,6 +100,8 @@ class Img2ImgPage(BasePage):
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
+            accept_multiple_files=True,
+            accept=["image/*"],
         )
 
         gui.text_area(
@@ -160,12 +163,24 @@ class Img2ImgPage(BasePage):
         if request.negative_prompt:
             request.negative_prompt = render_prompt_vars(request.negative_prompt, state)
 
-        init_image = request.input_image
-        init_image_bytes = requests.get(init_image).content
+        init_images = request.input_image
+        if isinstance(init_images, str):
+            init_images = [init_images]
 
+        validate_multi_image_models(Img2ImgModels[request.selected_model], init_images)
+
+        init_images_bytes = []
+        for img_url in init_images:
+            init_images_bytes.append(requests.get(img_url).content)
+
+        # Safety checker
         if not self.request.user.disable_safety_checker:
             yield "Running safety checker..."
-            safety_checker(text=request.text_prompt, image=request.input_image)
+            if request.text_prompt:
+                safety_checker(text=request.text_prompt)
+
+            for img_url in init_images:
+                safety_checker(image=img_url)
 
         yield "Generating Image..."
 
@@ -184,16 +199,18 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
-                images=[init_image],
+                images=init_images,
                 image_guidance_scale=request.image_guidance_scale,
             )
         elif request.selected_controlnet_model:
+            init_images = init_images * len(request.selected_controlnet_model)
+
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
                 selected_controlnet_model=request.selected_controlnet_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
-                init_images=init_image,
+                init_images=init_images,
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
@@ -205,13 +222,14 @@ class Img2ImgPage(BasePage):
                 selected_model=request.selected_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
-                init_image=init_image,
-                init_image_bytes=init_image_bytes,
+                init_images=init_images,
+                init_image_bytes=init_images_bytes,
                 num_inference_steps=request.quality,
                 prompt_strength=request.prompt_strength,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                gpt_image_1_quality=request.gpt_image_1_quality,
             )
 
     def get_raw_price(self, state: dict) -> int:
