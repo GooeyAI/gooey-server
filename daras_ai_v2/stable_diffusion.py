@@ -133,6 +133,10 @@ class Img2ImgModels(Enum):
             cls.dall_e,
         }
 
+    @classmethod
+    def _multi_image_models(cls):
+        return {cls.nano_banana, cls.nano_banana_pro, cls.gpt_image_1}
+
 
 img2img_model_ids = {
     Img2ImgModels.flux_pro_kontext: "fal-ai/flux-pro/kontext",
@@ -514,8 +518,8 @@ def img2img(
     selected_model: str,
     prompt: str,
     num_outputs: int,
-    init_image: str,
-    init_image_bytes: bytes = None,
+    init_images: str | list[str],
+    init_image_bytes: bytes | list[bytes] = None,
     num_inference_steps: int,
     prompt_strength: float = None,
     negative_prompt: str = None,
@@ -525,6 +529,11 @@ def img2img(
 ) -> typing.Generator[str, None, list[str]]:
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
+
+    if isinstance(init_images, str):
+        init_images = [init_images]
+    if isinstance(init_image_bytes, bytes):
+        init_image_bytes = [init_image_bytes]
 
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
@@ -544,7 +553,7 @@ def img2img(
                 guidance_scale = 1.0
             payload = dict(
                 prompt=prompt,
-                image_url=init_image,
+                image_url=init_images[0],
                 num_inference_steps=min(num_inference_steps, 50),
                 seed=seed,
                 guidance_scale=guidance_scale,
@@ -566,26 +575,29 @@ def img2img(
         case Img2ImgModels.gpt_image_1.name:
             from openai import NOT_GIVEN, OpenAI
 
-            init_height, init_width, _ = bytes_to_cv2_img(init_image_bytes).shape
-            _resolution_check(init_width, init_height)
+            payload_input_images = []
+            for idx, image_bytes in enumerate(init_image_bytes):
+                init_height, init_width, _ = bytes_to_cv2_img(image_bytes).shape
+                _resolution_check(init_width, init_height)
 
-            if selected_model == Img2ImgModels.dall_e.name:
-                edge = _get_dall_e_img_size(init_width, init_height)
-                width, height = edge, edge
-                response_format = "b64_json"
-            else:
-                width, height = _get_gpt_image_1_img_size(init_width, init_height)
-                response_format = NOT_GIVEN
+                if selected_model == Img2ImgModels.dall_e.name:
+                    edge = _get_dall_e_img_size(init_width, init_height)
+                    width, height = edge, edge
+                    response_format = "b64_json"
+                else:
+                    width, height = _get_gpt_image_1_img_size(init_width, init_height)
+                    response_format = NOT_GIVEN
 
-            image = resize_img_pad(init_image_bytes, (width, height))
-            image = rgb_img_to_rgba(image)
+                image = resize_img_pad(image_bytes, (width, height))
+                image = rgb_img_to_rgba(image)
+                payload_input_images.append((f"image_{idx}.png", image))
 
             client = OpenAI()
             with capture_openai_content_policy_violation():
                 response = client.images.edit(
                     model=img2img_model_ids[Img2ImgModels[selected_model]],
                     prompt=prompt,
-                    image=("image.png", image),
+                    image=payload_input_images,
                     n=num_outputs,
                     size=f"{width}x{height}",
                     response_format=response_format,
@@ -605,10 +617,11 @@ def img2img(
         case Img2ImgModels.nano_banana.name | Img2ImgModels.nano_banana_pro.name:
             payload = dict(
                 prompt=prompt,
-                image_urls=[init_image],
+                image_urls=init_images,
                 num_images=num_outputs,
                 output_format="png",
             )
+
             output_images = yield from generate_fal_images(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
@@ -637,7 +650,7 @@ def img2img(
                     "num_images_per_prompt": num_outputs,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
-                    "image": [init_image],
+                    "image": init_images,
                     "strength": prompt_strength,
                 },
             )
@@ -870,3 +883,19 @@ def record_openai_image_generation_usage(
             sku=ModelSku.output_image_tokens,
             quantity=output_image_tokens,
         )
+
+
+def validate_multi_image_models(selected_model: Img2ImgModels, init_images: list[str]):
+    if (
+        len(init_images) > 1
+        and selected_model not in Img2ImgModels._multi_image_models()
+    ):
+        supported_models = "\n".join(
+            f"  - {model.value}" for model in Img2ImgModels._multi_image_models()
+        )
+        raise UserError(
+            f"**{selected_model.value}** does not support multiple images. Please select one of the following models that supports multiple images:\n{supported_models}\n\nOr upload a single image."
+        )
+
+    if len(init_images) > 20:
+        raise UserError("Maximum number of images is 20. Please upload fewer images.")

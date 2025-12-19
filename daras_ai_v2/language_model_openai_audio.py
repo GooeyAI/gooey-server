@@ -5,15 +5,14 @@ import tempfile
 import threading
 import typing
 
-import requests
 from furl import furl
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect, ClientConnection
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import audio_bytes_to_wav
-from daras_ai_v2.exceptions import raise_for_status, ffmpeg
+from daras_ai_v2.asr import audio_url_to_wav
+from daras_ai_v2.exceptions import ffmpeg
 from daras_ai_v2.language_model_openai_realtime import RealtimeSession
 from daras_ai_v2.utils import clamp
 from functions.recipe_functions import BaseLLMTool
@@ -53,9 +52,7 @@ def run_openai_audio(
         }
     elif audio_url and created:
         # only send audio if we are creating a new session
-        response = requests.get(audio_url)
-        raise_for_status(response, is_user_url=True)
-        wav_bytes = audio_bytes_to_wav(response.content)[0] or response.content
+        wav_bytes, _ = audio_url_to_wav(audio_url)
         audio_data = base64.b64encode(wav_bytes).decode()
 
     has_tool_calls = False

@@ -129,7 +129,13 @@ class CompareLLMPage(BasePage):
 
     def get_raw_price(self, state: dict) -> float:
         grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
-        return sum(map(math.ceil, grouped_costs.values())) + self.PROFIT_CREDITS
+        price = sum(map(math.ceil, grouped_costs.values()))
+        if LargeLanguageModels.agrillm_qwen3_30b.name in state.get(
+            "selected_models", []
+        ):
+            price += 100
+
+        return price + self.PROFIT_CREDITS
 
     def additional_notes(self) -> str | None:
         grouped_costs = self.get_grouped_linked_usage_cost_in_credits()

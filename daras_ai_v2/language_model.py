@@ -13,6 +13,7 @@ import requests
 import typing_extensions
 from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
+from furl import furl
 from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -22,7 +23,7 @@ from openai.types.chat import (
 )
 
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
-from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task
@@ -82,6 +83,15 @@ class LLMSpec(typing.NamedTuple):
 
 
 class LargeLanguageModels(Enum):
+    agrillm_qwen3_30b = LLMSpec(
+        label="AgriLLM Qwen-3 30B • ai71",
+        model_id="AI71ai/agrillm-Qwen3-30B-A3B",
+        llm_api=LLMApis.openai,
+        context_window=32_768,
+        max_output_tokens=4_096,
+        supports_json=True,
+    )
+
     # https://platform.publicai.co/api/~endpoints
     apertus_70b_instruct = LLMSpec(
         label="Apertus 70B Instruct • SwissAI via PublicAI",
@@ -103,6 +113,19 @@ class LargeLanguageModels(Enum):
         supports_json=True,
     )
 
+    # https://platform.openai.com/docs/models/gpt-5.2
+    gpt_5_2 = LLMSpec(
+        label="GPT-5.2 • openai",
+        model_id="gpt-5.2-2025-12-11",
+        llm_api=LLMApis.openai,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        is_vision_model=True,
+        is_thinking_model=True,
+        supports_json=True,
+        supports_temperature=False,
+        version=5.2,
+    )
     # https://platform.openai.com/docs/models/gpt-5.1
     gpt_5_1 = LLMSpec(
         label="GPT-5.1 • openai",
@@ -463,12 +486,24 @@ class LargeLanguageModels(Enum):
         max_output_tokens=8192,
         supports_json=True,
         is_deprecated=True,
-        redirect_to="deepseek_v3p1",
+        redirect_to="deepseek_v3p2",
     )
 
     deepseek_v3p1 = LLMSpec(
         label="DeepSeek V3.1 • DeepSeek",
         model_id="accounts/fireworks/models/deepseek-v3p1",
+        llm_api=LLMApis.fireworks,
+        context_window=163_800,
+        max_output_tokens=20_500,
+        supports_json=True,
+        is_thinking_model=True,
+        is_deprecated=True,
+        redirect_to="deepseek_v3p2",
+    )
+
+    deepseek_v3p2 = LLMSpec(
+        label="DeepSeek V3.2 • DeepSeek",
+        model_id="accounts/fireworks/models/deepseek-v3p2",
         llm_api=LLMApis.fireworks,
         context_window=163_800,
         max_output_tokens=20_500,
@@ -820,6 +855,14 @@ class LargeLanguageModels(Enum):
         price=10,
         is_deprecated=True,
         redirect_to="gemini_2_flash",
+    )
+    gemini_live = LLMSpec(
+        label="Gemini Live (Voice Only) • Google",
+        model_id="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        llm_api=LLMApis.gemini,
+        context_window=32_000,
+        max_output_tokens=64_000,
+        is_audio_model=True,
     )
     palm2_text = LLMSpec(
         label="PaLM 2 Text • Google",
@@ -1202,6 +1245,11 @@ def run_language_model(
     )
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
+
+    if model == LargeLanguageModels.gemini_live:
+        raise UserError(
+            "Gemini Live is not supported for text generation. Please use this from a Voice Deployment instead."
+        )
 
     if model.is_deprecated:
         if not model.redirect_to:
@@ -1842,6 +1890,8 @@ def _stream_openai_chunked(
                         tc = tc_delta.model_dump()
                         entry.setdefault("tool_calls", []).append(tc)
                     else:
+                        if tc["function"]["arguments"] is None:
+                            tc["function"]["arguments"] = ""
                         tc["function"]["arguments"] += tc_delta.function.arguments
 
             # append the delta to the current chunk
@@ -2029,6 +2079,16 @@ def get_openai_client(model: str):
             max_retries=0,
             base_url="https://api.publicai.co/v1",
             default_headers={"User-Agent": "gooey/openai-sdk"},
+        )
+    elif model.startswith("AI71ai/"):
+        import modal
+        from modal_functions.agri_llm import app
+
+        modal_fn = modal.Function.from_name(app.name, "serve")
+        client = openai.OpenAI(
+            api_key=settings.MODAL_VLLM_API_KEY,
+            max_retries=0,
+            base_url=str(furl(modal_fn.get_web_url()) / "v1"),
         )
     else:
         client = openai.OpenAI(
@@ -2526,9 +2586,8 @@ def format_chat_entry(
             [{"type": "image_url", "image_url": {"url": url}} for url in input_images]
         )
     if input_audio:
-        r = requests.get(input_audio)
-        r.raise_for_status()
-        audio_data = base64.b64encode(r.content).decode()
+        wavdata, _ = audio_url_to_wav(input_audio)
+        audio_data = base64.b64encode(wavdata).decode()
         content.append(
             {
                 "type": "input_audio",

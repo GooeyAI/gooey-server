@@ -5,6 +5,17 @@ category = ModelCategory.LLM
 
 
 def run():
+    # agriLLM
+    llm_pricing_create(
+        model_id="AI71ai/agrillm-Qwen3-30B-A3B",
+        model_name=LargeLanguageModels.agrillm_qwen3_30b.name,
+        unit_cost_input=10.0,
+        unit_cost_output=95.0,
+        unit_quantity=10**6,
+        provider=ModelProvider.modal,
+        pricing_url="https://www.modal.com/pricing",
+    )
+
     # SEA-LION
     llm_pricing_create(
         model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",
@@ -38,6 +49,17 @@ def run():
         unit_quantity=10**6,
         provider=ModelProvider.openai,
         pricing_url="https://platform.openai.com/docs/models/gpt-realtime",
+    )
+
+    # gpt-5.2
+    llm_pricing_create(
+        model_id="gpt-5.2-2025-12-11",
+        model_name=LargeLanguageModels.gpt_5_2.name,
+        unit_cost_input=1.75,
+        unit_cost_output=14,
+        unit_quantity=10**6,
+        provider=ModelProvider.openai,
+        pricing_url="https://platform.openai.com/docs/models/gpt-5.2",
     )
 
     # gpt-5.1
@@ -670,6 +692,16 @@ def run():
     # Gemini
 
     llm_pricing_create(
+        model_id="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        model_name=LargeLanguageModels.gemini_live.name,
+        unit_cost_input=0.5,
+        unit_cost_output=2,
+        unit_quantity=10**6,
+        provider=ModelProvider.google,
+        pricing_url="https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-native-audio",
+    )
+
+    llm_pricing_create(
         model_id="google/gemini-3-pro-preview",
         model_name=LargeLanguageModels.gemini_3_pro.name,
         unit_cost_input=2,
@@ -1163,6 +1195,16 @@ def run():
     llm_pricing_create(
         model_id="accounts/fireworks/models/deepseek-v3p1",
         model_name=LargeLanguageModels.deepseek_v3p1.name,
+        unit_cost_input=0.56,
+        unit_cost_output=1.68,
+        unit_quantity=10**6,
+        provider=ModelProvider.fireworks,
+        pricing_url="https://fireworks.ai/pricing",
+    )
+
+    llm_pricing_create(
+        model_id="accounts/fireworks/models/deepseek-v3p2",
+        model_name=LargeLanguageModels.deepseek_v3p2.name,
         unit_cost_input=0.56,
         unit_cost_output=1.68,
         unit_quantity=10**6,
