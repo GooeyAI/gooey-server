@@ -57,6 +57,7 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
 
     return ref
 
+
 # Sidebar width variables
 sidebar_open_width = "340px"
 sidebar_closed_width = "0px"
