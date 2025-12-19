@@ -40,8 +40,8 @@ vllm_image = (
 @app.function(
     image=vllm_image,
     gpu=f"H100:{N_GPU}",
-    scaledown_window=5 * MINUTES,
-    timeout=3 * MINUTES,
+    scaledown_window=15 * MINUTES,
+    timeout=15 * MINUTES,
     volumes={
         hf_cache_dir: model_cache,
         vllm_cache_dir: vllm_cache,
