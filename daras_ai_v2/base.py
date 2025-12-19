@@ -1002,7 +1002,10 @@ class BasePage:
             className="mb-3 d-flex justify-content-around align-items-center gap-3"
         ):
             is_latest_version = self.current_pr.saved_run == self.current_sr
-            label = "Duplicate" if is_latest_version else "Save as New"
+            if is_latest_version:
+                label = "Duplicate"
+            else:
+                label = "Save as New"
             save_as_new_button = gui.button(f"{icons.fork} {label}", className="w-100")
 
             if (
