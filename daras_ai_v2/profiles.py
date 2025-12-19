@@ -252,8 +252,11 @@ def _render_member_photos(workspace: Workspace):
 
 
 def render_public_runs_list(request: Request, workspace: Workspace):
-    qs = PublishedRun.objects.filter(workspace=workspace).exclude(
-        public_access=WorkflowAccessLevel.VIEW_ONLY
+    qs = (
+        PublishedRun.objects.select_related("workspace", "saved_run", "last_edited_by")
+        .prefetch_related("tags")
+        .filter(workspace=workspace)
+        .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
     )
 
     prs, cursor = paginate_queryset(
