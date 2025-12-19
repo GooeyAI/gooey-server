@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import HttpUrlStr
@@ -169,10 +169,6 @@ class Img2ImgPage(BasePage):
 
         validate_multi_image_models(Img2ImgModels[request.selected_model], init_images)
 
-        init_images_bytes = []
-        for img_url in init_images:
-            init_images_bytes.append(requests.get(img_url).content)
-
         # Safety checker
         if not self.request.user.disable_safety_checker:
             yield "Running safety checker..."
@@ -203,7 +199,7 @@ class Img2ImgPage(BasePage):
                 image_guidance_scale=request.image_guidance_scale,
             )
         elif request.selected_controlnet_model:
-            init_images = init_images * len(request.selected_controlnet_model)
+            init_images *= len(request.selected_controlnet_model)
 
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
@@ -218,6 +214,11 @@ class Img2ImgPage(BasePage):
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
+            init_images_bytes = []
+            for img_url in init_images:
+                r = requests.get(img_url)
+                raise_for_status(r, is_user_url=True)
+                init_images_bytes.append(r.content)
             state["output_images"] = yield from img2img(
                 selected_model=request.selected_model,
                 prompt=request.text_prompt,
