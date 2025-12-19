@@ -203,6 +203,8 @@ class Img2ImgPage(BasePage):
                 image_guidance_scale=request.image_guidance_scale,
             )
         elif request.selected_controlnet_model:
+            init_images = init_images * len(request.selected_controlnet_model)
+
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
                 selected_controlnet_model=request.selected_controlnet_model,
