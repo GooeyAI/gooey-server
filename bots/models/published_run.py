@@ -407,19 +407,21 @@ class PublishedRunVersion(models.Model):
         return f"{self.published_run} - {self.version_id}"
 
 
-class TagCategory(models.TextChoices):
-    app = "App"
-    industry = "Industry"
-    medium = "Medium"
-    language = "Language"
-    region = "Region"
-    other = "Other"
+class TagCategory(models.IntegerChoices):
+    app = (1, "App")
+    industry = (2, "Industry")
+    medium = (3, "Medium")
+    language = (4, "Language")
+    region = (5, "Region")
+    other = (6, "Other")
 
 
 class Tag(models.Model):
     name = models.CharField(max_length=64)
     icon = models.TextField(blank=True, default="")
-    category = models.TextField(choices=TagCategory.choices, default=TagCategory.other)
+    category = models.IntegerField(
+        choices=TagCategory.choices, default=TagCategory.other
+    )
     featured_priority = models.IntegerField(
         default=1,
         help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
