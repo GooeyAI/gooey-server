@@ -48,7 +48,7 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
-from daras_ai_v2.gooey_builder import render_gooey_builder
+from daras_ai_v2.gooey_builder import render_gooey_builder_inline
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -94,6 +94,7 @@ from widgets.base_header import (
 )
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
@@ -426,6 +427,9 @@ class BasePage:
         # rendered at the end to indicate unpublished changes
         with header_placeholder:
             self._render_header()
+
+    def render_sidebar(self):
+        self._render_gooey_builder()
 
     def _render_header(self):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
@@ -1195,8 +1199,6 @@ class BasePage:
                     self.render_deleted_output()
                     return
 
-                self._render_gooey_builder()
-
                 with gui.styled(INPUT_OUTPUT_COLS_CSS):
                     input_col, output_col = gui.columns([3, 2], gap="medium")
                     with input_col:
@@ -1225,22 +1227,6 @@ class BasePage:
                 self._saved_tab()
 
     def _render_gooey_builder(self):
-        update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
-        if update_gui_state:
-            new_state = (
-                {
-                    k: v
-                    for k, v in gui.session_state.items()
-                    if k in self.fields_to_save()
-                }
-                | {
-                    "--has-request-changed": True,
-                }
-                | update_gui_state
-            )
-            gui.session_state.clear()
-            gui.session_state.update(new_state)
-
         enable_bot_builder = (
             self.request.user
             and not self.request.user.is_anonymous
@@ -1249,30 +1235,93 @@ class BasePage:
                 or self.current_workspace.enable_bot_builder
             )
         )
-
         if not enable_bot_builder:
             return
 
-        render_gooey_builder(
-            page_slug=self.slug_versions[-1],
-            builder_state=dict(
-                status=dict(
-                    error_msg=gui.session_state.get(StateKeys.error_msg),
-                    run_status=gui.session_state.get(StateKeys.run_status),
-                    run_time=gui.session_state.get(StateKeys.run_time),
-                ),
-                request=extract_model_fields(
-                    model=self.RequestModel, state=gui.session_state
-                ),
-                response=extract_model_fields(
-                    model=self.ResponseModel, state=gui.session_state
-                ),
-                metadata=dict(
-                    title=self.current_pr.title,
-                    description=self.current_pr.notes,
-                ),
-            ),
-        )
+        sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
+        if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
+            # close the sidebar for other tabs
+            if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
+                sidebar_ref.set_open(False)
+                sidebar_ref.set_mobile_open(False)
+                raise gui.RerunException()
+            return
+
+        if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
+            # open the sidebar for the builder
+            # hidden button to trigger the onClose event passed in the widget config
+            gui.tag(
+                "button",
+                type="submit",
+                name="onCloseGooeyBuilder",
+                value="yes",
+                hidden=True,
+                id="onClose",
+            )
+
+            if gui.session_state.pop("onCloseGooeyBuilder", None):
+                sidebar_ref.set_open(False)
+                raise gui.RerunException()
+
+            with gui.div(className="w-100 h-100"):
+                update_gui_state: dict | None = gui.session_state.pop(
+                    "update_gui_state", None
+                )
+                if update_gui_state:
+                    new_state = (
+                        {
+                            k: v
+                            for k, v in gui.session_state.items()
+                            if k in self.fields_to_save()
+                        }
+                        | {
+                            "--has-request-changed": True,
+                        }
+                        | update_gui_state
+                    )
+                    gui.session_state.clear()
+                    gui.session_state.update(new_state)
+
+                render_gooey_builder_inline(
+                    page_slug=self.slug_versions[-1],
+                    builder_state=dict(
+                        status=dict(
+                            error_msg=gui.session_state.get(StateKeys.error_msg),
+                            run_status=gui.session_state.get(StateKeys.run_status),
+                            run_time=gui.session_state.get(StateKeys.run_time),
+                        ),
+                        request=extract_model_fields(
+                            model=self.RequestModel, state=gui.session_state
+                        ),
+                        response=extract_model_fields(
+                            model=self.ResponseModel, state=gui.session_state
+                        ),
+                        metadata=dict(
+                            title=self.current_pr.title,
+                            description=self.current_pr.notes,
+                        ),
+                    ),
+                )
+        else:
+            # render the Floating Builder button
+            with gui.styled("& .gooey-builder-open-button:hover { scale: 1.2; }"):
+                with gui.div(
+                    className="w-100 position-absolute",
+                    style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
+                ):
+                    gooey_builder_open_button = gui.button(
+                        label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 56px; height: 56px; border-radius: 50%;' />",
+                        className="btn btn-secondary border-0 d-none d-md-block p-0 gooey-builder-open-button",
+                        style={
+                            "width": "56px",
+                            "height": "56px",
+                            "borderRadius": "50%",
+                            "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
+                        },
+                    )
+                    if gooey_builder_open_button:
+                        sidebar_ref.set_open(True)
+                        raise gui.RerunException()
 
     def _render_version_history(self):
         versions = self.current_pr.versions.all()

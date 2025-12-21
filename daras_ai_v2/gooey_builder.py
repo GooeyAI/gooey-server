@@ -4,7 +4,7 @@ from bots.models import BotIntegration
 from daras_ai_v2 import settings
 
 
-def render_gooey_builder(page_slug: str, builder_state: dict):
+def render_gooey_builder_inline(page_slug: str, builder_state: dict):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
 
@@ -13,6 +13,8 @@ def render_gooey_builder(page_slug: str, builder_state: dict):
         hostname="gooey.ai", target="#gooey-builder-embed"
     )
 
+    config["mode"] = "inline"
+    config["showRunLink"] = True
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
@@ -25,7 +27,7 @@ def render_gooey_builder(page_slug: str, builder_state: dict):
     gui.html(
         # language=html
         f"""
-<div id="gooey-builder-embed"></div>
+<div id="gooey-builder-embed" style="height: 100%"></div>
 <script id="gooey-builder-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
         """
     )
@@ -42,8 +44,12 @@ async function onload() {
     GooeyEmbed.setGooeyBuilderVariables = (value) => {
         config.payload.variables = value;
     };
+    
     GooeyEmbed.setGooeyBuilderVariables(variables);
     
+    config.onClose = function() {
+        document.getElementById("onClose").click();
+    };
     GooeyEmbed.mount(config);
 }
 
