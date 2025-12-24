@@ -9,6 +9,7 @@ from html_sanitizer import Sanitizer
 from loguru import logger
 from pydantic import BaseModel
 
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
@@ -16,7 +17,6 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
-    LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -69,7 +69,6 @@ class SEOSummaryPage(BasePage):
         serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
         enable_html=False,
-        selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
         max_tokens=1024,
         num_outputs=1,
@@ -92,9 +91,7 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None = None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
         max_search_urls: int | None = None
 
@@ -275,7 +272,7 @@ SearchSEO > Page Parsing > GPT3
 
         yield from _gen_final_prompt(request, state)
 
-        yield f"Generating content using {LargeLanguageModels[request.selected_model].value}..."
+        yield f"Generating content using {AIModelSpec.objects.get(name=request.selected_model).label}..."
 
         output_content = _run_lm(request, state["final_prompt"])
 
@@ -366,7 +363,7 @@ def _gen_final_prompt(
     )
 
     max_allowed_tokens = (
-        LargeLanguageModels[request.selected_model].context_window
+        AIModelSpec.objects.get(name=request.selected_model).llm_context_window
         - request.max_tokens
         - calc_gpt_tokens(end_input_prompt)
     )

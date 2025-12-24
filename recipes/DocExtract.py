@@ -34,7 +34,6 @@ from daras_ai_v2.functional import (
 )
 from daras_ai_v2.gdrive_downloader import gdrive_download, is_gdrive_url
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
@@ -107,9 +106,7 @@ class DocExtractPage(BasePage):
 
         task_instructions: str | None = None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
     class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass

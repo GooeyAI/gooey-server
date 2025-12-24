@@ -10,16 +10,13 @@ from furl import furl
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection
 
+from ai_models.models import AIModelSpec
 from functions.inbuilt_tools import CallTransferLLMTool
 from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json
 
 # Disable websocket logging
 logging.getLogger("websockets").setLevel(logging.WARNING)
-
-
-if typing.TYPE_CHECKING:
-    from daras_ai_v2.language_model import LargeLanguageModels
 
 
 # adapted from: https://github.com/openai/openai-realtime-twilio-demo/blob/main/websocket-server/src/sessionManager.ts
@@ -31,7 +28,7 @@ class RealtimeSession:
         tools: list[BaseLLMTool] | None = None,
         messages: list[dict] | None = None,
         audio_url: str | None = None,
-        model: LargeLanguageModels | None = None,
+        model: AIModelSpec | None = None,
     ):
         self.twilio_ws = twilio_ws
         self.openai_ws = openai_ws

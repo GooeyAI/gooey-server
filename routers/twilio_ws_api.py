@@ -11,6 +11,7 @@ from starlette.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import Connect, VoiceResponse
 from websockets import ConnectionClosed
 
+from ai_models.models import AIModelSpec
 from bots.models import BotIntegration
 from bots.models.convo_msg import ConvoBlockedStatus
 from daras_ai_v2 import settings
@@ -27,7 +28,6 @@ from routers.twilio_api import (
     resp_say_or_tts_play,
     DEFAULT_INITIAL_TEXT,
 )
-from daras_ai_v2.language_model import LargeLanguageModels
 
 app = CustomAPIRouter()
 
@@ -48,12 +48,12 @@ class TwilioVoiceWs(TwilioVoice):
         self._audio_url = str(audio_url)
         # force gpt-4o-audio for non-audio models
         if self.saved_run and self.saved_run.state:
-            llm_model = LargeLanguageModels[self.saved_run.state.get("selected_model")]
-            if not llm_model.is_audio_model:
+            llm_model = AIModelSpec.objects.get(
+                name=self.saved_run.state.get("selected_model")
+            )
+            if not llm_model.llm_is_audio_model:
                 self.request_overrides = self.request_overrides or {}
-                self.request_overrides["selected_model"] = (
-                    LargeLanguageModels.gpt_4_o_audio.name
-                )
+                self.request_overrides["selected_model"] = "gpt_4_o_audio"
 
     def _send_msg(self, *args, **kwargs):
         pass
