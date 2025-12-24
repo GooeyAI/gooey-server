@@ -22,6 +22,7 @@ from openai.types.chat import (
     ChatCompletionMessageToolCallParam,
 )
 
+from ai_models.models import AIModelSpec, ModelProvider
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
@@ -47,1104 +48,6 @@ EMBEDDING_MODEL_MAX_TOKENS = 8191
 SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
-
-
-class LLMApis(Enum):
-    palm2 = 1
-    gemini = 2
-    openai = 3
-    fireworks = 4
-    groq = 5
-    anthropic = 6
-    self_hosted = 7
-    mistral = 8
-    openai_audio = 9
-    sarvam = 10
-
-
-class LLMSpec(typing.NamedTuple):
-    label: str
-    model_id: str | tuple
-    llm_api: LLMApis
-    context_window: int
-    max_output_tokens: int | None = None
-    price: int = 1
-    is_chat_model: bool = True
-    is_vision_model: bool = False
-    is_thinking_model: bool = False
-    supports_json: bool = False
-    supports_temperature: bool = True
-    supports_input_audio: bool = False
-    is_audio_model: bool = False
-    is_deprecated: bool = False
-    # redirect to a different LLM when deprecated
-    redirect_to: str = "gpt_4_o_mini"
-    version: float = -1
-
-
-class LargeLanguageModels(Enum):
-    agrillm_qwen3_30b = LLMSpec(
-        label="AgriLLM Qwen-3 30B • ai71",
-        model_id="AI71ai/agrillm-Qwen3-30B-A3B",
-        llm_api=LLMApis.openai,
-        context_window=32_768,
-        max_output_tokens=4_096,
-        supports_json=True,
-    )
-
-    # https://platform.publicai.co/api/~endpoints
-    apertus_70b_instruct = LLMSpec(
-        label="Apertus 70B Instruct • SwissAI via PublicAI",
-        model_id="swiss-ai/apertus-70b-instruct",
-        llm_api=LLMApis.openai,
-        context_window=65_536,
-        max_output_tokens=4_096,
-        supports_json=True,
-    )
-
-    # https://docs.sea-lion.ai/models/sea-lion-v4/gemma-sea-lion-v4-27b#usage
-    sea_lion_v4_gemma_3_27b_it = LLMSpec(
-        label="SEA-LION v4 • aisingapore",
-        model_id="aisingapore/Gemma-SEA-LION-v4-27B-IT",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=8_192,
-        is_vision_model=True,
-        supports_json=True,
-    )
-
-    # https://platform.openai.com/docs/models/gpt-5.2
-    gpt_5_2 = LLMSpec(
-        label="GPT-5.2 • openai",
-        model_id="gpt-5.2-2025-12-11",
-        llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-        version=5.2,
-    )
-    # https://platform.openai.com/docs/models/gpt-5.1
-    gpt_5_1 = LLMSpec(
-        label="GPT-5.1 • openai",
-        model_id="gpt-5.1-2025-11-13",
-        llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-        version=5.1,
-    )
-    # https://platform.openai.com/docs/models/gpt-5
-    gpt_5 = LLMSpec(
-        label="GPT-5 • openai",
-        model_id="gpt-5-2025-08-07",
-        llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-        version=5,
-    )
-    # https://platform.openai.com/docs/models/gpt-5-mini
-    gpt_5_mini = LLMSpec(
-        label="GPT-5 Mini • openai",
-        model_id="gpt-5-mini-2025-08-07",
-        llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-    # https://platform.openai.com/docs/models/gpt-5-nano
-    gpt_5_nano = LLMSpec(
-        label="GPT-5 Nano • openai",
-        model_id="gpt-5-nano-2025-08-07",
-        llm_api=LLMApis.openai,
-        context_window=400_000,
-        max_output_tokens=128_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-    # https://platform.openai.com/docs/models/gpt-5-chat-latest
-    gpt_5_chat = LLMSpec(
-        label="GPT-5 Chat • openai",
-        model_id="gpt-5-chat-latest",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        is_vision_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-
-    # https://platform.openai.com/docs/models/gpt-4-1
-    gpt_4_1 = LLMSpec(
-        label="GPT-4.1 • openai",
-        model_id="gpt-4.1-2025-04-14",
-        llm_api=LLMApis.openai,
-        context_window=1_047_576,
-        max_output_tokens=32_768,
-        is_vision_model=True,
-        supports_json=True,
-    )
-    gpt_4_1_mini = LLMSpec(
-        label="GPT-4.1 Mini • openai",
-        model_id="gpt-4.1-mini-2025-04-14",
-        llm_api=LLMApis.openai,
-        context_window=1_047_576,
-        max_output_tokens=32_768,
-        is_vision_model=True,
-        supports_json=True,
-    )
-    gpt_4_1_nano = LLMSpec(
-        label="GPT-4.1 Nano • openai",
-        model_id="gpt-4.1-nano-2025-04-14",
-        llm_api=LLMApis.openai,
-        context_window=1_047_576,
-        max_output_tokens=32_768,
-        is_vision_model=True,
-        supports_json=True,
-    )
-
-    # https://platform.openai.com/docs/models#gpt-4-5
-    gpt_4_5 = LLMSpec(
-        label="GPT-4.5 • openai",
-        model_id="gpt-4.5-preview-2025-02-27",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        price=1,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-
-    # https://platform.openai.com/docs/models/o4-mini
-    o4_mini = LLMSpec(
-        label="o4-mini • openai",
-        model_id="o4-mini-2025-04-16",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=100_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-
-    # https://platform.openai.com/docs/models/o3
-    o3 = LLMSpec(
-        label="o3 • openai",
-        model_id="o3-2025-04-16",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=100_000,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-
-    # https://platform.openai.com/docs/models/o3-mini
-    o3_mini = LLMSpec(
-        label="o3-mini • openai",
-        model_id=("openai-o3-mini-prod-eastus2-1", "o3-mini-2025-01-31"),
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=100_000,
-        price=13,
-        is_vision_model=False,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-    )
-
-    # https://platform.openai.com/docs/models#o1
-    o1 = LLMSpec(
-        label="o1 • openai",
-        model_id=("openai-o1-prod-eastus2-1", "o1-2024-12-17"),
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=100_000,
-        price=50,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_json=True,
-        supports_temperature=False,
-        is_deprecated=True,
-        redirect_to="o3",
-    )
-
-    # https://platform.openai.com/docs/models#o1
-    o1_preview = LLMSpec(
-        label="o1-preview • openai",
-        model_id="o1-preview-2024-09-12",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=32_768,
-        price=50,
-        is_vision_model=False,
-        supports_json=False,
-        supports_temperature=False,
-        is_deprecated=True,
-        redirect_to="o3",
-    )
-
-    # https://platform.openai.com/docs/models#o1
-    o1_mini = LLMSpec(
-        label="o1-mini • openai",
-        model_id=("openai-o1-mini-prod-eastus2-1", "o1-mini-2024-09-12"),
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=65_536,
-        price=13,
-        is_vision_model=False,
-        is_thinking_model=True,
-        supports_json=False,
-        supports_temperature=False,
-        is_deprecated=True,
-        redirect_to="o3_mini",
-    )
-
-    # https://platform.openai.com/docs/models#gpt-4o
-    gpt_4_o = LLMSpec(
-        label="GPT-4o • openai",
-        model_id=("openai-gpt-4o-prod-eastus2-1", "gpt-4o-2024-08-06"),
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        price=10,
-        is_vision_model=True,
-        supports_json=True,
-    )
-    # https://platform.openai.com/docs/models#gpt-4o-mini
-    gpt_4_o_mini = LLMSpec(
-        label="GPT-4o-mini • openai",
-        model_id=("openai-gpt-4o-mini-prod-eastus2-1", "gpt-4o-mini-2024-07-18"),
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        price=1,
-        is_vision_model=True,
-        supports_json=True,
-    )
-
-    # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
-    gpt_4_o_audio = LLMSpec(
-        label="GPT-4o Audio • openai",
-        model_id="gpt-4o-realtime-preview-2025-06-03",
-        llm_api=LLMApis.openai_audio,
-        context_window=128_000,
-        max_output_tokens=4_096,
-        price=10,
-        is_audio_model=True,
-        supports_input_audio=True,
-    )
-    # https://platform.openai.com/docs/models/gpt-4o-realtime-preview
-    gpt_realtime = LLMSpec(
-        label="GPT-Realtime • openai",
-        model_id="gpt-realtime-2025-08-28",
-        llm_api=LLMApis.openai_audio,
-        context_window=32_000,
-        max_output_tokens=4_096,
-        price=10,
-        is_audio_model=True,
-        supports_input_audio=True,
-        supports_temperature=False,
-    )
-    # https://platform.openai.com/docs/models/gpt-4o-mini-realtime-preview
-    gpt_4_o_mini_audio = LLMSpec(
-        label="GPT-4o-mini Audio • openai",
-        model_id="gpt-4o-mini-realtime-preview-2024-12-17",
-        llm_api=LLMApis.openai_audio,
-        context_window=128_000,
-        max_output_tokens=4_096,
-        price=10,
-        is_audio_model=True,
-        supports_input_audio=True,
-    )
-
-    chatgpt_4_o = LLMSpec(
-        label="ChatGPT-4o • openai 🧪",
-        model_id="chatgpt-4o-latest",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        price=10,
-        is_vision_model=True,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-    # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
-    gpt_4_turbo_vision = LLMSpec(
-        label="GPT-4 Turbo with Vision • openai",
-        model_id=(
-            "openai-gpt-4-turbo-2024-04-09-prod-eastus2-1",
-            "gpt-4-turbo-2024-04-09",
-        ),
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=4096,
-        price=6,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-    gpt_4_vision = LLMSpec(
-        label="GPT-4 Vision • openai",
-        model_id="gpt-4-vision-preview",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=4096,
-        price=6,
-        is_vision_model=True,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-
-    # https://help.openai.com/en/articles/8555510-gpt-4-turbo
-    gpt_4_turbo = LLMSpec(
-        label="GPT-4 Turbo • openai",
-        model_id=("openai-gpt-4-turbo-prod-ca-1", "gpt-4-1106-preview"),
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        max_output_tokens=4096,
-        price=5,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-
-    # https://platform.openai.com/docs/models/gpt-4
-    gpt_4 = LLMSpec(
-        label="GPT-4 • openai",
-        model_id=("openai-gpt-4-prod-ca-1", "gpt-4"),
-        llm_api=LLMApis.openai,
-        context_window=8192,
-        max_output_tokens=8192,
-        price=10,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-    gpt_4_32k = LLMSpec(
-        label="GPT-4 32K • openai 🔻",
-        model_id="openai-gpt-4-32k-prod-ca-1",
-        llm_api=LLMApis.openai,
-        context_window=32_768,
-        max_output_tokens=8192,
-        price=20,
-        is_deprecated=True,
-        redirect_to="gpt_4_o",
-    )
-
-    # https://platform.openai.com/docs/models/gpt-3-5
-    gpt_3_5_turbo = LLMSpec(
-        label="ChatGPT • openai",
-        model_id=("openai-gpt-35-turbo-prod-ca-1", "gpt-3.5-turbo-0613"),
-        llm_api=LLMApis.openai,
-        context_window=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-    )
-    gpt_3_5_turbo_16k = LLMSpec(
-        label="ChatGPT 16k • openai",
-        model_id=("openai-gpt-35-turbo-16k-prod-ca-1", "gpt-3.5-turbo-16k-0613"),
-        llm_api=LLMApis.openai,
-        context_window=16_384,
-        max_output_tokens=4096,
-        price=2,
-        is_deprecated=True,
-    )
-    gpt_3_5_turbo_instruct = LLMSpec(
-        label="GPT-3.5 Instruct • openai",
-        model_id="gpt-3.5-turbo-instruct",
-        llm_api=LLMApis.openai,
-        context_window=4096,
-        price=1,
-        is_chat_model=False,
-        is_deprecated=True,
-    )
-
-    deepseek_r1 = LLMSpec(
-        label="DeepSeek R1",
-        model_id="accounts/fireworks/models/deepseek-r1",
-        llm_api=LLMApis.fireworks,
-        context_window=128_000,
-        max_output_tokens=8192,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="deepseek_v3p2",
-    )
-
-    deepseek_v3p1 = LLMSpec(
-        label="DeepSeek V3.1 • DeepSeek",
-        model_id="accounts/fireworks/models/deepseek-v3p1",
-        llm_api=LLMApis.fireworks,
-        context_window=163_800,
-        max_output_tokens=20_500,
-        supports_json=True,
-        is_thinking_model=True,
-        is_deprecated=True,
-        redirect_to="deepseek_v3p2",
-    )
-
-    deepseek_v3p2 = LLMSpec(
-        label="DeepSeek V3.2 • DeepSeek",
-        model_id="accounts/fireworks/models/deepseek-v3p2",
-        llm_api=LLMApis.fireworks,
-        context_window=163_800,
-        max_output_tokens=20_500,
-        supports_json=True,
-        is_thinking_model=True,
-    )
-
-    # https://console.groq.com/docs/models
-    llama4_maverick_17b_128e = LLMSpec(
-        label="Llama 4 Maverick Instruct • Meta AI",
-        model_id="accounts/fireworks/models/llama4-maverick-instruct-basic",
-        llm_api=LLMApis.fireworks,
-        context_window=1_000_000,
-        max_output_tokens=16_384,
-        supports_json=True,
-        is_vision_model=True,
-    )
-    llama4_scout_17b_16e = LLMSpec(
-        label="Llama 4 Scout Instruct • Meta AI",
-        model_id="accounts/fireworks/models/llama4-scout-instruct-basic",
-        llm_api=LLMApis.fireworks,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        supports_json=True,
-        is_vision_model=True,
-    )
-    llama3_3_70b = LLMSpec(
-        label="Llama 3.3 70B • Meta AI",
-        model_id="llama-3.3-70b-versatile",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=32_768,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_2_90b_vision = LLMSpec(
-        label="Llama 3.2 90B + Vision • Meta AI",
-        model_id="llama-3.2-90b-vision-preview",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=8192,
-        price=1,
-        supports_json=True,
-        is_vision_model=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_2_11b_vision = LLMSpec(
-        label="Llama 3.2 11B + Vision • Meta AI",
-        model_id="llama-3.2-11b-vision-preview",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=8192,
-        price=1,
-        supports_json=True,
-        is_vision_model=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-
-    llama3_2_3b = LLMSpec(
-        label="Llama 3.2 3B • Meta AI",
-        model_id="llama-3.2-3b-preview",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=8192,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_2_1b = LLMSpec(
-        label="Llama 3.2 1B • Meta AI",
-        model_id="llama-3.2-1b-preview",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=8192,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-
-    llama3_1_405b = LLMSpec(
-        label="Llama 3.1 405B • Meta AI",
-        model_id="accounts/fireworks/models/llama-v3p1-405b-instruct",
-        llm_api=LLMApis.fireworks,
-        context_window=128_000,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_1_70b = LLMSpec(
-        label="Llama 3.1 70B • Meta AI",
-        model_id="llama-3.1-70b-versatile",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_1_8b = LLMSpec(
-        label="Llama 3.1 8B • Meta AI",
-        model_id="llama-3.1-8b-instant",
-        llm_api=LLMApis.groq,
-        context_window=128_000,
-        max_output_tokens=8192,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-
-    llama3_70b = LLMSpec(
-        label="Llama 3 70B • Meta AI",
-        model_id="llama3-70b-8192",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-    llama3_8b = LLMSpec(
-        label="Llama 3 8B • Meta AI",
-        model_id="llama3-8b-8192",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="llama4_maverick_17b_128e",
-    )
-
-    pixtral_large = LLMSpec(
-        label="Pixtral Large 24/11 • mistral",
-        model_id="pixtral-large-2411",
-        llm_api=LLMApis.mistral,
-        context_window=131_000,
-        max_output_tokens=4096,
-        is_vision_model=True,
-        supports_json=True,
-    )
-    mistral_large = LLMSpec(
-        label="Mistral Large 24/11 • mistral",
-        model_id="mistral-large-2411",
-        llm_api=LLMApis.mistral,
-        context_window=131_000,
-        max_output_tokens=4096,
-        supports_json=True,
-    )
-    mistral_small_24b_instruct = LLMSpec(
-        label="Mistral Small 25/01 • mistral",
-        model_id="mistral-small-2501",
-        llm_api=LLMApis.mistral,
-        context_window=32_768,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-    )
-    mixtral_8x7b_instruct_0_1 = LLMSpec(
-        label="Mixtral 8x7b Instruct v0.1 • mistral [Deprecated]",
-        model_id="mixtral-8x7b-32768",
-        llm_api=LLMApis.groq,
-        context_window=32_768,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="mistral_small_24b_instruct",
-    )
-    gemma_2_9b_it = LLMSpec(
-        label="Gemma 2 9B • Google",
-        model_id="gemma2-9b-it",
-        llm_api=LLMApis.groq,
-        context_window=8_192,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-    )
-    gemma_7b_it = LLMSpec(
-        label="Gemma 7B • Google",
-        model_id="gemma-7b-it",
-        llm_api=LLMApis.groq,
-        context_window=8_192,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gemma_2_9b_it",
-    )
-
-    # https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro
-    gemini_3_pro = LLMSpec(
-        label="Gemini 3 Pro • Google",
-        model_id="google/gemini-3-pro-preview",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_535,
-        price=1,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-        supports_temperature=False,
-        version=3,
-    )
-
-    # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-    gemini_2_5_pro = LLMSpec(
-        label="Gemini 2.5 Pro (Google)",
-        model_id="google/gemini-2.5-pro",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_535,
-        price=1,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-    )
-    gemini_2_5_flash = LLMSpec(
-        label="Gemini 2.5 Flash • Google",
-        model_id="google/gemini-2.5-flash",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_535,
-        price=1,
-        is_vision_model=True,
-        is_thinking_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-    )
-    gemini_2_5_flash_lite = LLMSpec(
-        label="Gemini 2.5 Flash Lite • Google",
-        model_id="google/gemini-2.5-flash-lite",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_536,
-        price=1,
-        is_vision_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-    )
-    gemini_2_5_pro_preview = LLMSpec(
-        label="Gemini 2.5 Pro • Google",
-        model_id="google/gemini-2.5-pro-preview-03-25",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_535,
-        price=20,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        is_thinking_model=True,
-        redirect_to="gemini_2_5_pro",
-    )
-    gemini_2_5_flash_preview = LLMSpec(
-        label="Gemini 2.5 Flash • Google",
-        model_id="google/gemini-2.5-flash-preview-04-17",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=65_535,
-        price=20,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        is_thinking_model=True,
-        redirect_to="gemini_2_5_flash",
-    )
-    gemini_2_flash_lite = LLMSpec(
-        label="Gemini 2 Flash Lite • Google",
-        model_id="google/gemini-2.0-flash-lite",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=8192,
-        price=20,
-        is_vision_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-    )
-    gemini_2_flash = LLMSpec(
-        label="Gemini 2 Flash • Google",
-        model_id="google/gemini-2.0-flash-001",
-        llm_api=LLMApis.openai,
-        context_window=1_048_576,
-        max_output_tokens=8192,
-        price=20,
-        is_vision_model=True,
-        supports_input_audio=True,
-        supports_json=True,
-    )
-    gemini_1_5_flash = LLMSpec(
-        label="Gemini 1.5 Flash • Google",
-        model_id="gemini-1.5-flash",
-        llm_api=LLMApis.gemini,
-        context_window=1_048_576,
-        max_output_tokens=8192,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gemini_2_flash",
-    )
-    gemini_1_5_pro = LLMSpec(
-        label="Gemini 1.5 Pro • Google",
-        model_id="gemini-1.5-pro",
-        llm_api=LLMApis.gemini,
-        context_window=2_097_152,
-        max_output_tokens=8192,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="gemini_2_5_pro",
-    )
-    gemini_1_pro_vision = LLMSpec(
-        label="Gemini 1.0 Pro Vision • Google",
-        model_id="gemini-1.0-pro-vision",
-        llm_api=LLMApis.gemini,
-        context_window=2048,
-        price=25,
-        is_vision_model=True,
-        is_chat_model=False,
-        is_deprecated=True,
-        redirect_to="gemini_2_5_pro",
-    )
-    gemini_1_pro = LLMSpec(
-        label="Gemini 1.0 Pro • Google",
-        model_id="gemini-1.0-pro",
-        llm_api=LLMApis.gemini,
-        context_window=8192,
-        price=15,
-        is_deprecated=True,
-        redirect_to="gemini_2_5_pro",
-    )
-    palm2_chat = LLMSpec(
-        label="PaLM 2 Chat • Google",
-        model_id="chat-bison",
-        llm_api=LLMApis.palm2,
-        context_window=4096,
-        max_output_tokens=1024,
-        price=10,
-        is_deprecated=True,
-        redirect_to="gemini_2_flash",
-    )
-    gemini_live = LLMSpec(
-        label="Gemini Live (Voice Only) • Google",
-        model_id="gemini-live-2.5-flash-preview-native-audio-09-2025",
-        llm_api=LLMApis.gemini,
-        context_window=32_000,
-        max_output_tokens=64_000,
-        is_audio_model=True,
-    )
-    palm2_text = LLMSpec(
-        label="PaLM 2 Text • Google",
-        model_id="text-bison",
-        llm_api=LLMApis.palm2,
-        context_window=8192,
-        max_output_tokens=1024,
-        price=15,
-        is_chat_model=False,
-        is_deprecated=True,
-        redirect_to="gemini_2_flash",
-    )
-
-    # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
-    claude_4_5_sonnet = LLMSpec(
-        label="Claude 4.5 Sonnet • Anthropic",
-        model_id="claude-sonnet-4-5",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=64_000,
-        is_vision_model=True,
-        supports_json=True,
-        is_thinking_model=True,
-    )
-    claude_4_1_opus = LLMSpec(
-        label="Claude 4.1 Opus • Anthropic",
-        model_id="claude-opus-4-1",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=32_000,
-        is_vision_model=True,
-        supports_json=True,
-        is_thinking_model=True,
-    )
-    claude_4_sonnet = LLMSpec(
-        label="Claude 4 Sonnet • Anthropic",
-        model_id="claude-4-sonnet-20250514",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=64_000,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_thinking_model=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-    claude_4_opus = LLMSpec(
-        label="Claude 4 Opus • Anthropic",
-        model_id="claude-4-opus-20250514",
-        llm_api=LLMApis.openai,
-        context_window=200_000,
-        max_output_tokens=64_000,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_thinking_model=True,
-        is_deprecated=True,
-        redirect_to="claude_4_1_opus",
-    )
-    claude_3_7_sonnet = LLMSpec(
-        label="Claude 3.7 Sonnet • Anthropic",
-        model_id="claude-3-7-sonnet-20250219",
-        llm_api=LLMApis.anthropic,
-        context_window=200_000,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_thinking_model=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-    claude_3_5_sonnet = LLMSpec(
-        label="Claude 3.5 Sonnet • Anthropic",
-        model_id="claude-3-5-sonnet-20241022",
-        llm_api=LLMApis.anthropic,
-        context_window=200_000,
-        max_output_tokens=8192,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-    claude_3_opus = LLMSpec(
-        label="Claude 3 Opus • Anthropic",
-        model_id="claude-3-opus-20240229",
-        llm_api=LLMApis.anthropic,
-        context_window=200_000,
-        max_output_tokens=4096,
-        price=75,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-    claude_3_sonnet = LLMSpec(
-        label="Claude 3 Sonnet • Anthropic",
-        model_id="claude-3-sonnet-20240229",
-        llm_api=LLMApis.anthropic,
-        context_window=200_000,
-        max_output_tokens=4096,
-        price=15,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-    claude_3_haiku = LLMSpec(
-        label="Claude 3 Haiku • Anthropic",
-        model_id="claude-3-haiku-20240307",
-        llm_api=LLMApis.anthropic,
-        context_window=200_000,
-        max_output_tokens=4096,
-        price=2,
-        is_vision_model=True,
-        supports_json=True,
-        is_deprecated=True,
-        redirect_to="claude_4_5_sonnet",
-    )
-
-    afrollama_v1 = LLMSpec(
-        label="AfroLlama3 v1 • Jacaranda",
-        model_id="Jacaranda/AfroLlama_V1",
-        llm_api=LLMApis.self_hosted,
-        context_window=2048,
-        price=1,
-        is_chat_model=False,
-        is_deprecated=True,
-    )
-    llama3_8b_cpt_sea_lion_v2_1_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2.1 Instruct • aisingapore",
-        model_id="aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
-        llm_api=LLMApis.self_hosted,
-        context_window=8192,
-        price=1,
-    )
-    sarvam_2b = LLMSpec(
-        label="Sarvam 2B • sarvamai",
-        model_id="sarvamai/sarvam-2b-v0.5",
-        llm_api=LLMApis.self_hosted,
-        context_window=2048,
-        price=1,
-        is_deprecated=True,
-    )
-    sarvam_m = LLMSpec(
-        label="Sarvam M • sarvam.ai",
-        model_id="sarvam-m",
-        llm_api=LLMApis.openai,
-        context_window=128_000,
-        price=1,
-    )
-
-    llama_3_groq_70b_tool_use = LLMSpec(
-        label="Llama 3 Groq 70b Tool Use [Deprecated]",
-        model_id="llama3-groq-70b-8192-tool-use-preview",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-    )
-    llama_3_groq_8b_tool_use = LLMSpec(
-        label="Llama 3 Groq 8b Tool Use [Deprecated]",
-        model_id="llama3-groq-8b-8192-tool-use-preview",
-        llm_api=LLMApis.groq,
-        context_window=8192,
-        max_output_tokens=4096,
-        price=1,
-        supports_json=True,
-        is_deprecated=True,
-    )
-    llama2_70b_chat = LLMSpec(
-        label="Llama 2 70B Chat • Meta AI",
-        model_id="llama2-70b-4096",
-        llm_api=LLMApis.groq,
-        context_window=4096,
-        price=1,
-        is_deprecated=True,
-    )
-
-    sea_lion_7b_instruct = LLMSpec(
-        label="SEA-LION-7B-Instruct • aisingapore",
-        model_id="aisingapore/sea-lion-7b-instruct",
-        llm_api=LLMApis.self_hosted,
-        context_window=2048,
-        price=1,
-        is_deprecated=True,
-    )
-    llama3_8b_cpt_sea_lion_v2_instruct = LLMSpec(
-        label="Llama3 8B CPT SEA-LIONv2 Instruct • aisingapore",
-        model_id="aisingapore/llama3-8b-cpt-sea-lionv2-instruct",
-        llm_api=LLMApis.self_hosted,
-        context_window=8192,
-        price=1,
-        is_deprecated=True,
-    )
-
-    # https://platform.openai.com/docs/models/gpt-3
-    text_davinci_003 = LLMSpec(
-        label="GPT-3.5 Davinci-3 • openai",
-        model_id="text-davinci-003",
-        llm_api=LLMApis.openai,
-        context_window=4097,
-        price=10,
-        is_deprecated=True,
-    )
-    text_davinci_002 = LLMSpec(
-        label="GPT-3.5 Davinci-2 • openai",
-        model_id="text-davinci-002",
-        llm_api=LLMApis.openai,
-        context_window=4097,
-        price=10,
-        is_deprecated=True,
-    )
-    code_davinci_002 = LLMSpec(
-        label="Codex • openai",
-        model_id="code-davinci-002",
-        llm_api=LLMApis.openai,
-        context_window=8001,
-        price=10,
-        is_deprecated=True,
-    )
-    text_curie_001 = LLMSpec(
-        label="Curie • openai",
-        model_id="text-curie-001",
-        llm_api=LLMApis.openai,
-        context_window=2049,
-        price=5,
-        is_deprecated=True,
-    )
-    text_babbage_001 = LLMSpec(
-        label="Babbage • openai",
-        model_id="text-babbage-001",
-        llm_api=LLMApis.openai,
-        context_window=2049,
-        price=2,
-        is_deprecated=True,
-    )
-    text_ada_001 = LLMSpec(
-        label="Ada • openai",
-        model_id="text-ada-001",
-        llm_api=LLMApis.openai,
-        context_window=2049,
-        price=1,
-        is_deprecated=True,
-    )
-
-    def __init__(self, *args):
-        spec = LLMSpec(*args)
-        self.spec = spec
-        self.model_id = spec.model_id
-        self.llm_api = spec.llm_api
-        self.context_window = spec.context_window
-        self.max_output_tokens = spec.max_output_tokens
-        self.price = spec.price
-        self.is_deprecated = spec.is_deprecated
-        self.is_chat_model = spec.is_chat_model
-        self.is_vision_model = spec.is_vision_model
-        self.is_thinking_model = spec.is_thinking_model
-        self.supports_json = spec.supports_json
-        self.supports_temperature = spec.supports_temperature
-        self.supports_input_audio = spec.supports_input_audio
-        self.is_audio_model = spec.is_audio_model
-        self.redirect_to = spec.redirect_to
-        self.version = spec.version
-
-    @property
-    def value(self):
-        label = self.spec.label
-        if self.is_deprecated:
-            if self.redirect_to:
-                label += f" [Redirects to {LargeLanguageModels[self.redirect_to].spec.label}]"
-            else:
-                label += " [Deprecated]"
-
-        return label
-
-    @classmethod
-    def _deprecated(cls):
-        return {model for model in cls if model.is_deprecated}
 
 
 class _ReasoningEffort(typing.NamedTuple):
@@ -1244,9 +147,9 @@ def run_language_model(
         "Pleave provide exactly one of { prompt, messages }"
     )
 
-    model: LargeLanguageModels = LargeLanguageModels[str(model)]
+    model: AIModelSpec = AIModelSpec.objects.get(name=model)
 
-    if model == LargeLanguageModels.gemini_live:
+    if model.name == "gemini_live":
         raise UserError(
             "Gemini Live is not supported for text generation. Please use this from a Voice Deployment instead."
         )
@@ -1256,18 +159,18 @@ def run_language_model(
             raise UserError(f"Model {model} is deprecated.")
         return run_language_model(**(locals() | {"model": model.redirect_to}))
 
-    if model.max_output_tokens:
-        max_tokens = min(max_tokens, model.max_output_tokens)
-    if model.is_chat_model:
+    if model.llm_max_output_tokens:
+        max_tokens = min(max_tokens, model.llm_max_output_tokens)
+    if model.llm_is_chat_model:
         if prompt and not messages:
             # convert text prompt to chat messages
             messages = [
                 format_chat_entry(role=CHATML_ROLE_USER, content_text=prompt),
             ]
-        if model.is_audio_model and not stream:
+        if model.llm_is_audio_model and not stream:
             # audio is only supported in streaming mode, fall back to text
-            model = LargeLanguageModels.gpt_4_o
-        if not model.is_vision_model:
+            model = AIModelSpec.objects.get(name="gpt_4_o")
+        if not model.llm_is_vision_model:
             # remove images from the messages
             messages = list(
                 filter(None, (remove_images_from_entry(entry) for entry in messages))
@@ -1288,9 +191,9 @@ def run_language_model(
                 messages[0]["content"] = "\n\n".join(
                     [get_entry_text(messages[0]), DEFAULT_JSON_PROMPT]
                 )
-        if not model.supports_temperature:
+        if not model.llm_supports_temperature:
             temperature = None
-        if not model.supports_json:
+        if not model.llm_supports_json:
             response_format_type = None
         result = _run_chat_model(
             model=model,
@@ -1331,7 +234,7 @@ def run_language_model(
                 if images:
                     break
         msgs = _run_text_model(
-            api=model.llm_api,
+            api=model.provider,
             model=model.model_id,
             prompt=prompt,
             images=images,
@@ -1366,7 +269,7 @@ def output_stream_generator(
 
 def _run_text_model(
     *,
-    api: LLMApis,
+    api: ModelProvider,
     model: str | tuple,
     prompt: str,
     images: list[str],
@@ -1379,7 +282,7 @@ def _run_text_model(
 ) -> list[str]:
     logger.info(f"{api=} {model=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
     match api:
-        case LLMApis.openai:
+        case ModelProvider.openai:
             return _run_openai_text(
                 model=model,
                 prompt=prompt,
@@ -1390,16 +293,7 @@ def _run_text_model(
                 avoid_repetition=avoid_repetition,
                 quality=quality,
             )
-        case LLMApis.palm2:
-            return _run_palm_text(
-                model_id=model,
-                prompt=prompt,
-                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
-                candidate_count=num_outputs,
-                temperature=temperature,
-                stop=stop,
-            )
-        case LLMApis.gemini:
+        case ModelProvider.google:
             return _run_gemini_pro_vision(
                 model_id=model,
                 prompt=prompt,
@@ -1408,7 +302,7 @@ def _run_text_model(
                 temperature=temperature,
                 stop=stop,
             )
-        case LLMApis.self_hosted:
+        case ModelProvider.aks:
             return [
                 _run_self_hosted_llm(
                     model=model,
@@ -1425,7 +319,7 @@ def _run_text_model(
 
 def _run_chat_model(
     *,
-    model: LargeLanguageModels,
+    model: AIModelSpec,
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
@@ -1440,10 +334,10 @@ def _run_chat_model(
     audio_session_extra: dict | None = None,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
-        f"{model.llm_api=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
+        f"{model.provider=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
-    match model.llm_api:
-        case LLMApis.mistral:
+    match model.provider:
+        case ModelProvider.mistral:
             return _run_mistral_chat(
                 model=model.model_id,
                 avoid_repetition=avoid_repetition,
@@ -1455,7 +349,7 @@ def _run_chat_model(
                 tools=tools,
                 response_format_type=response_format_type,
             )
-        case LLMApis.fireworks:
+        case ModelProvider.fireworks:
             return _run_fireworks_chat(
                 model=model.model_id,
                 avoid_repetition=avoid_repetition,
@@ -1467,7 +361,7 @@ def _run_chat_model(
                 tools=tools,
                 response_format_type=response_format_type,
             )
-        case LLMApis.openai_audio:
+        case ModelProvider.openai_audio:
             return run_openai_audio(
                 model=model,
                 audio_url=audio_url,
@@ -1476,7 +370,7 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
             )
-        case LLMApis.openai:
+        case ModelProvider.openai:
             return run_openai_chat(
                 model=model,
                 avoid_repetition=avoid_repetition,
@@ -1490,7 +384,7 @@ def _run_chat_model(
                 reasoning_effort=reasoning_effort,
                 stream=stream,
             )
-        case LLMApis.gemini:
+        case ModelProvider.google:
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
             return _run_gemini_pro(
@@ -1500,17 +394,7 @@ def _run_chat_model(
                 temperature=temperature,
                 response_format_type=response_format_type,
             )
-        case LLMApis.palm2:
-            if tools:
-                raise ValueError("Only OpenAI chat models support Tools")
-            return _run_palm_chat(
-                model_id=model.model_id,
-                messages=messages,
-                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
-                candidate_count=num_outputs,
-                temperature=temperature,
-            )
-        case LLMApis.groq:
+        case ModelProvider.groq:
             return _run_groq_chat(
                 model=model.model_id,
                 messages=messages,
@@ -1521,7 +405,7 @@ def _run_chat_model(
                 response_format_type=response_format_type,
                 stop=stop,
             )
-        case LLMApis.anthropic:
+        case ModelProvider.anthropic:
             return _run_anthropic_chat(
                 model=model.model_id,
                 messages=messages,
@@ -1530,7 +414,7 @@ def _run_chat_model(
                 stop=stop,
                 response_format_type=response_format_type,
             )
-        case LLMApis.self_hosted:
+        case ModelProvider.aks:
             return [
                 {
                     "role": CHATML_ROLE_ASSISTANT,
@@ -1545,7 +429,7 @@ def _run_chat_model(
                 },
             ]
         case _:
-            raise UserError(f"Unsupported chat api: {model.llm_api}")
+            raise UserError(f"Unsupported chat api: {model.provider}")
 
 
 def _run_self_hosted_llm(
@@ -1561,10 +445,7 @@ def _run_self_hosted_llm(
     from usage_costs.models import ModelSku
 
     # sea lion doesnt support system prompt
-    if (
-        not isinstance(text_inputs, str)
-        and model == LargeLanguageModels.sea_lion_7b_instruct.model_id
-    ):
+    if not isinstance(text_inputs, str) and model.name == "sea_lion_7b_instruct":
         for i, entry in enumerate(text_inputs):
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 text_inputs[i]["role"] = CHATML_ROLE_USER
@@ -1721,7 +602,7 @@ def _run_anthropic_chat(
 @retry_if(openai_should_retry)
 def run_openai_chat(
     *,
-    model: LargeLanguageModels,
+    model: AIModelSpec,
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
@@ -1738,7 +619,7 @@ def run_openai_chat(
 
     kwargs = {}
 
-    if model.is_thinking_model:
+    if model.llm_is_thinking_model:
         thinking_budget = ReasoningEffort.high.thinking_budget
         if model.name.startswith("o"):
             # o-series models dont support reasoning_effort
@@ -1773,24 +654,21 @@ def run_openai_chat(
         # add some extra tokens for thinking
         max_tokens = max(thinking_budget + 1000, max_tokens)
 
-    if model.max_output_tokens:
+    if model.llm_max_output_tokens:
         # cap the max tokens at the model's max limit
-        max_tokens = min(max_tokens, model.max_output_tokens)
+        max_tokens = min(max_tokens, model.llm_max_output_tokens)
 
-    if "openai" in model.value:
+    if "openai" in model.label:
         # openai renamed max_tokens to max_completion_tokens
         kwargs["max_completion_tokens"] = max_tokens
     else:
         kwargs["max_tokens"] = max_tokens
 
-    if "openai" in model.value and model.is_thinking_model:
+    if "openai" in model.label and model.llm_is_thinking_model:
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
-    if model in [
-        LargeLanguageModels.apertus_70b_instruct,
-        LargeLanguageModels.sea_lion_v4_gemma_3_27b_it,
-    ]:
+    if model.name in ["apertus_70b_instruct", "sea_lion_v4_gemma_3_27b_it"]:
         # Swiss AI Apertus model doesn't support tool calling
         tools = None
 
@@ -2414,135 +1292,6 @@ def _call_gemini_api(
     )
 
     return ret
-
-
-@retry_if(vertex_ai_should_retry)
-def _run_palm_chat(
-    *,
-    model_id: str,
-    messages: list[ConversationEntry],
-    max_output_tokens: int,
-    candidate_count: int,
-    temperature: float,
-) -> list[ConversationEntry]:
-    """
-    Args:
-        model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-        messages: List of messages to generate model response.
-        max_output_tokens: The maximum number of tokens to generate. This value must be between 1 and 1024, inclusive. 0 means no limit.
-        candidate_count: The number of response variations to return.
-        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic. 0.2 recommended by Google.
-    """
-
-    instance = dict(
-        context="\n".join(
-            msg.get("content", "")
-            for msg in messages
-            if msg.get("role") == CHATML_ROLE_SYSTEM
-        ),
-        messages=[
-            {
-                "author": msg["role"],
-                "content": msg["content"],
-            }
-            for msg in messages
-            if msg.get("role") != CHATML_ROLE_SYSTEM
-        ],
-    )
-
-    session, project = get_google_auth_session()
-    r = session.post(
-        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:predict",
-        json={
-            "instances": [instance],
-            "parameters": {
-                "maxOutputTokens": max_output_tokens,
-                "temperature": temperature,
-                "candidateCount": candidate_count,
-            },
-        },
-    )
-    raise_for_status(r)
-    out = r.json()
-    ret = [
-        {
-            "role": msg["author"],
-            "content": msg["content"],
-        }
-        for pred in out["predictions"]
-        for msg in pred["candidates"]
-    ]
-
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
-
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_prompt,
-        quantity=sum(len(get_entry_text(entry)) for entry in messages),
-    )
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_completion,
-        quantity=sum(len(msg["content"] or "") for msg in ret),
-    )
-
-    return ret
-
-
-@retry_if(vertex_ai_should_retry)
-def _run_palm_text(
-    *,
-    model_id: str,
-    prompt: str,
-    max_output_tokens: int,
-    candidate_count: int,
-    temperature: float,
-    stop: list[str] = None,
-) -> list[str]:
-    """
-    Args:
-        model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-        prompt: Text input to generate model response. Prompts can include preamble, questions, suggestions, instructions, or examples.
-        max_output_tokens: The maximum number of tokens to generate. This value must be between 1 and 1024, inclusive. 0 means no limit.
-        candidate_count: The number of response variations to return.
-        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic. 0.2 recommended by Google.
-    """
-    session, project = get_google_auth_session()
-    res = session.post(
-        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:predict",
-        json={
-            "instances": [
-                {
-                    "prompt": prompt,
-                }
-            ],
-            "parameters": {
-                "maxOutputTokens": max_output_tokens,
-                "temperature": temperature,
-                "candidateCount": candidate_count,
-                "stopSequences": stop or [],
-            },
-        },
-    )
-    raise_for_status(res)
-    out = res.json()
-
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
-
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_prompt,
-        quantity=out["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_completion,
-        quantity=out["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-    )
-
-    return [prediction["content"] for prediction in out["predictions"]]
 
 
 def msgs_to_prompt_str(messages: list[ConversationEntry] | dict) -> str:

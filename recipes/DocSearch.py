@@ -2,6 +2,7 @@ import math
 import typing
 
 import gooey_gui as gui
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -15,7 +16,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
@@ -60,7 +60,6 @@ class DocSearchPage(BasePage):
         "max_context_words": 200,
         "scroll_jump": 5,
         "avoid_repetition": True,
-        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "citation_style": CitationStyles.number.name,
         "dense_weight": 1.0,
     }
@@ -69,9 +68,7 @@ class DocSearchPage(BasePage):
         task_instructions: str | None = None
         query_instructions: str | None = None
         check_document_updates: bool | None = None
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
             None
@@ -153,7 +150,7 @@ class DocSearchPage(BasePage):
         request: "DocSearchPage.RequestModel",
         response: "DocSearchPage.ResponseModel",
     ):
-        model = LargeLanguageModels[request.selected_model]
+        model = AIModelSpec.objects.get(name=request.selected_model)
 
         query_instructions = (request.query_instructions or "").strip()
         if query_instructions:
@@ -192,7 +189,7 @@ class DocSearchPage(BasePage):
         # add the question
         response.final_prompt += f"Question: {request.search_query}\nAnswer:"
 
-        yield f"Generating answer using {model.value}..."
+        yield f"Generating answer using {model.label}..."
         response.output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
@@ -220,8 +217,10 @@ class DocSearchPage(BasePage):
 
     def additional_notes(self):
         try:
-            model = LargeLanguageModels[gui.session_state["selected_model"]].value
-        except KeyError:
+            model = AIModelSpec.objects.get(
+                model_id=gui.session_state["selected_model"]
+            ).label
+        except AIModelSpec.DoesNotExist:
             model = "LLM"
         return f"\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 

@@ -1,12 +1,10 @@
 from pydantic import BaseModel
 
 import gooey_gui as gui
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import apply_parallel
-from daras_ai_v2.language_model import (
-    LargeLanguageModels,
-)
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     SerpSearchLocation,
@@ -121,7 +119,7 @@ class RelatedQnAPage(BasePage):
             ),
             all_questions,
             max_workers=4,
-            message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
+            message=f"Generating answers using {AIModelSpec.objects.get(name=request.selected_model).label}...",
         )
         if not response.output_queries:
             raise EmptySearchResults(request.search_query)

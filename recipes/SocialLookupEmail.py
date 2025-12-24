@@ -5,6 +5,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_gui as gui
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
@@ -12,7 +13,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import (
     run_language_model,
-    LargeLanguageModels,
     SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import (
@@ -33,7 +33,6 @@ class SocialLookupEmailPage(BasePage):
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 
     sane_defaults = {
-        "selected_model": LargeLanguageModels.gpt_4.name,
         "avoid_repetition": True,
         "num_outputs": 1,
         "quality": 1.0,
@@ -53,9 +52,7 @@ class SocialLookupEmailPage(BasePage):
         # domain: str | None
         # key_words: str | None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -161,8 +158,8 @@ class SocialLookupEmailPage(BasePage):
             variables=_input_variables(state),
         )
 
-        model = LargeLanguageModels[request.selected_model]
-        yield f"Running {model.value}..."
+        model = AIModelSpec.objects.get(name=request.selected_model)
+        yield f"Running {model.label}..."
 
         chunks = run_language_model(
             model=request.selected_model,
@@ -179,7 +176,7 @@ class SocialLookupEmailPage(BasePage):
             if not entries:
                 continue
             state["output_text"] = [entry["content"] for entry in entries]
-            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.label}..."
 
     def render_output(self):
         output_text = gui.session_state.get("output_text", "")

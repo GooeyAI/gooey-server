@@ -3,6 +3,7 @@ from django.db import models
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from usage_costs.twilio_usage_cost import IVRPlatformMedium
+from ai_models.models import ModelProvider
 
 max_digits = 15
 decimal_places = 10
@@ -51,33 +52,14 @@ class ModelCategory(models.IntegerChoices):
     VIDEO_GENERATION = 5, "Video Generation"
 
 
-class ModelProvider(models.IntegerChoices):
-    openai = 1, "OpenAI"
-    google = 2, "Google"
-    together_ai = 3, "TogetherAI"
-    azure_openai = 4, "Azure OpenAI"
-    anthropic = 6, "Anthropic"
-    groq = 7, "groq"
-    fireworks = 8, "Fireworks AI"
-    mistral = 9, "Mistral AI"
-    sarvam = 10, "sarvam.ai"
-    fal_ai = 11, "fal.ai"
-    twilio = 12, "Twilio"
-    sea_lion = 13, "sea-lion.ai"
-    publicai = 14, "PublicAI"
-    modal = 15, "Modal"
-
-    aks = 5, "Azure Kubernetes Service"
-
-
 def get_model_choices():
-    from daras_ai_v2.language_model import LargeLanguageModels
+    # from daras_ai_v2.language_model import LargeLanguageModels
     from recipes.DeforumSD import AnimationModels
     from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
 
     return (
-        [(api.name, api.value) for api in LargeLanguageModels]
-        + [(model.name, model.label) for model in AnimationModels]
+        # [(api.name, api.value) for api in LargeLanguageModels]
+        [(model.name, model.label) for model in AnimationModels]
         + [(model.name, model.value) for model in Text2ImgModels]
         + [(model.name, model.value) for model in Img2ImgModels]
         + [(model.name, model.value) for model in InpaintingModels]
