@@ -4,6 +4,7 @@ import gooey_gui as gui
 from furl import furl
 from pydantic import BaseModel, Field
 
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -14,7 +15,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     run_language_model,
 )
 from daras_ai_v2.language_model_settings_widgets import (
@@ -59,7 +59,6 @@ class GoogleGPTPage(BasePage):
         serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
         enable_html=False,
-        selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
         max_tokens=1024,
         num_outputs=1,
@@ -89,9 +88,7 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None = None
         query_instructions: str | None = None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
         check_document_updates: bool | None = None
         max_search_urls: int | None = None
 
@@ -245,7 +242,7 @@ class GoogleGPTPage(BasePage):
         request: "GoogleGPTPage.RequestModel",
         response: "GoogleGPTPage.ResponseModel",
     ):
-        model = LargeLanguageModels[request.selected_model]
+        model = AIModelSpec.objects.get(name=request.selected_model)
 
         query_instructions = (request.query_instructions or "").strip()
         if query_instructions:
@@ -315,7 +312,7 @@ class GoogleGPTPage(BasePage):
         # add the question
         response.final_prompt += f"Question: {request.search_query}\nAnswer:"
 
-        yield f"Generating answer using {model.value}..."
+        yield f"Generating answer using {model.label}..."
         response.output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
