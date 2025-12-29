@@ -8,11 +8,7 @@ from pydantic import BaseModel
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.language_model import (
-    run_language_model,
-    SUPERSCRIPT,
-)
+from daras_ai_v2.language_model import run_language_model, SUPERSCRIPT
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
     LanguageModelSettings,
@@ -62,7 +58,11 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        options = dict(AIModelSpec.objects.values_list("model_id", "label"))
+        options = dict(
+            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list(
+                "name", "label"
+            )
+        )
         gui.multiselect(
             label="#### 🧠 Language Models",
             key="selected_models",
