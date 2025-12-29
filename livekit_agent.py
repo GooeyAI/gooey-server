@@ -182,7 +182,9 @@ async def main(
 ):
     from livekit.plugins import noise_cancellation
 
-    llm_model = await AIModelSpec.objects.aget(model_id=request.selected_model)
+    llm_model = await AIModelSpec.llm_objects.get_available().aget(
+        name=request.selected_model
+    )
     if llm_model.llm_is_audio_model:
         session = await create_audio_model_session(llm_model, request)
     else:

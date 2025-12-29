@@ -202,7 +202,7 @@ def documents_as_prompt(docs: list[str], sep="\n\n") -> str:
 
 
 def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: dict):
-    model = AIModelSpec.objects.get(name=request.selected_model)
+    model = AIModelSpec.llm_objects.get(name=request.selected_model)
 
     task_instructions = request.task_instructions.strip()
     merge_instructions = request.merge_instructions.strip()

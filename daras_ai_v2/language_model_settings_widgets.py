@@ -1,3 +1,4 @@
+from django.db.models import Q
 from pydantic import BaseModel, Field
 
 import gooey_gui as gui
@@ -52,12 +53,15 @@ class LanguageModelSettings(BaseModel):
 
 
 def language_model_selector(
-    label: str = "##### 🔠 Language Model Settings",
-    label_visibility: str = "visible",
-    key: str = "selected_model",
+    label: str = "##### 🔠 Language Model Settings", key: str = "selected_model"
 ):
+    if selected_model_name := gui.session_state.get("selected_model"):
+        or_filter = Q(name=selected_model_name)
+    else:
+        or_filter = None
+
     options = dict(
-        AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list(
+        AIModelSpec.llm_objects.get_available(or_filter=or_filter).values_list(
             "name", "label"
         )
     )
@@ -75,7 +79,9 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
     elif not selected_models:
         selected_models = []
 
-    llms = list(AIModelSpec.objects.filter(name__in=selected_models))
+    llms = list(
+        AIModelSpec.llm_objects.get_available(or_filter=Q(name__in=selected_models))
+    )
 
     col1, col2 = gui.columns(2)
     with col1:

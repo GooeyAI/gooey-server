@@ -115,7 +115,7 @@ class RelatedQnADocPage(BasePage):
             ),
             all_questions,
             max_workers=4,
-            message=f"Generating answers using {AIModelSpec.objects.get(name=request.selected_model).label}...",
+            message=f"Generating answers using {AIModelSpec.llm_objects.get(name=request.selected_model).label}...",
         )
         if not response.output_queries:
             raise EmptySearchResults(request.search_query)

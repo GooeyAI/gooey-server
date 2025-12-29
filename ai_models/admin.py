@@ -33,10 +33,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
     ]
     autocomplete_fields = ["pricing", "redirect_to"]
 
-    readonly_fields = [
-        "created_at",
-        "updated_at",
-    ]
+    readonly_fields = ["created_at", "updated_at"]
 
     fieldsets = [
         (

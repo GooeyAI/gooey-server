@@ -242,7 +242,7 @@ class GoogleGPTPage(BasePage):
         request: "GoogleGPTPage.RequestModel",
         response: "GoogleGPTPage.ResponseModel",
     ):
-        model = AIModelSpec.objects.get(name=request.selected_model)
+        model = AIModelSpec.llm_objects.get(name=request.selected_model)
 
         query_instructions = (request.query_instructions or "").strip()
         if query_instructions:

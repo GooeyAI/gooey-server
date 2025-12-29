@@ -48,7 +48,7 @@ class TwilioVoiceWs(TwilioVoice):
         self._audio_url = str(audio_url)
         # force gpt-4o-audio for non-audio models
         if self.saved_run and self.saved_run.state:
-            llm_model = AIModelSpec.objects.get(
+            llm_model = AIModelSpec.llm_objects.get(
                 name=self.saved_run.state.get("selected_model")
             )
             if not llm_model.llm_is_audio_model:

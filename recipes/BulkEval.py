@@ -230,9 +230,9 @@ Here's what you uploaded:
                 del_button(del_key)
 
         options = dict(
-            AIModelSpec.objects.filter(llm_supports_json=True).values_list(
-                "model_id", "label"
-            )
+            AIModelSpec.llm_objects.get_available()
+            .filter(llm_supports_json=True)
+            .values_list("name", "label")
         )
         gui.selectbox(
             "##### Language Model",
