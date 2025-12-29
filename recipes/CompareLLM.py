@@ -2,6 +2,7 @@ import math
 import random
 import typing
 
+from django.db.models import Q
 import gooey_gui as gui
 from pydantic import BaseModel
 
@@ -59,9 +60,9 @@ class CompareLLMPage(BasePage):
         )
 
         options = dict(
-            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list(
-                "name", "label"
-            )
+            AIModelSpec.llm_objects.get_available(
+                or_filter=Q(names__in=(gui.session_state.get("selected_models") or []))
+            ).values_list("name", "label")
         )
         gui.multiselect(
             label="#### 🧠 Language Models",
@@ -91,7 +92,7 @@ class CompareLLMPage(BasePage):
         prompt = render_prompt_vars(request.input_prompt, state)
         state["output_text"] = output_text = {}
 
-        for model in AIModelSpec.objects.filter(name__in=request.selected_models):
+        for model in AIModelSpec.llm_objects.filter(name__in=request.selected_models):
             yield f"Running {model.label}..."
             ret = run_language_model(
                 model=model.name,
@@ -136,7 +137,7 @@ class CompareLLMPage(BasePage):
         if not grouped_costs:
             return
         parts = [
-            f"{math.ceil(total)}Cr for {AIModelSpec.objects.get(name=model_name).label}"
+            f"{math.ceil(total)}Cr for {AIModelSpec.llm_objects.get(name=model_name).label}"
             for model_name, total in grouped_costs.items()
         ]
         return f"\n*Breakdown: {' + '.join(parts)} + {self.PROFIT_CREDITS}Cr/run*"

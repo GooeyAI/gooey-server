@@ -158,7 +158,7 @@ class SocialLookupEmailPage(BasePage):
             variables=_input_variables(state),
         )
 
-        model = AIModelSpec.objects.get(name=request.selected_model)
+        model = AIModelSpec.llm_objects.get(name=request.selected_model)
         yield f"Running {model.label}..."
 
         chunks = run_language_model(

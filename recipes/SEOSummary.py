@@ -272,7 +272,7 @@ SearchSEO > Page Parsing > GPT3
 
         yield from _gen_final_prompt(request, state)
 
-        yield f"Generating content using {AIModelSpec.objects.get(name=request.selected_model).label}..."
+        yield f"Generating content using {AIModelSpec.llm_objects.get(name=request.selected_model).label}..."
 
         output_content = _run_lm(request, state["final_prompt"])
 
@@ -363,7 +363,7 @@ def _gen_final_prompt(
     )
 
     max_allowed_tokens = (
-        AIModelSpec.objects.get(name=request.selected_model).llm_context_window
+        AIModelSpec.llm_objects.get(name=request.selected_model).llm_context_window
         - request.max_tokens
         - calc_gpt_tokens(end_input_prompt)
     )

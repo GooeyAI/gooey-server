@@ -367,10 +367,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
             )
 
         try:
-            llm_model = AIModelSpec.objects.get(name=request.selected_model)
+            llm_model = AIModelSpec.llm_objects.get(name=request.selected_model)
         except AIModelSpec.DoesNotExist:
             raise UserError(
-                f"Model {request.selected_model} not found. Should be one of: {AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list('name', flat=True)}"
+                f"Model {request.selected_model} not found. Should be one of: {AIModelSpec.llm_objects.values_list('name', flat=True)}"
             )
         user_input = (request.input_prompt or "").strip()
         if not (
@@ -422,7 +422,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         ocr_texts = []
         if request.input_images and (
             request.document_model
-            or not AIModelSpec.objects.get(
+            or not AIModelSpec.llm_objects.get(
                 model_id=request.selected_model
             ).llm_is_vision_model
         ):
@@ -883,7 +883,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
         )
 
-        if not AIModelSpec.objects.filter(
+        if not AIModelSpec.llm_objects.filter(
             name=language_model, llm_is_audio_model=True
         ).exists():
             bulk_documents_uploader(
@@ -1581,7 +1581,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
     def additional_notes(self):
         try:
-            model = AIModelSpec.objects.get(
+            model = AIModelSpec.llm_objects.get(
                 model_id=gui.session_state.get("selected_model")
             ).label
         except AIModelSpec.DoesNotExist:

@@ -20,9 +20,30 @@ class ModelProvider(models.IntegerChoices):
     aks = 5, "Azure Kubernetes Service"
 
 
-class AIModelSpecQuerySet(models.QuerySet):
+class LLMSpecManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().filter(is_deprecated=False)
+        return super().get_queryset().filter(category=AIModelSpec.Categories.llm)
+
+    def get_available(self, or_filter: models.Q | None = None):
+        """
+        All non-deprecated LLM models + any other matched by include
+        """
+
+        filter = models.Q(is_deprecated=False)
+        if or_filter:
+            filter |= or_filter
+
+        return self.get_queryset().filter(filter)
+
+
+class VideoModelSpecManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(category=AIModelSpec.Categories.video)
+
+
+class AudioModelSpecManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(category=AIModelSpec.Categories.audio)
 
 
 class AIModelSpec(models.Model):
@@ -104,7 +125,10 @@ class AIModelSpec(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = AIModelSpecQuerySet.as_manager()
+    objects = models.Manager()
+    llm_objects = LLMSpecManager()
+    video_objects = VideoModelSpecManager()
+    audio_objects = AudioModelSpecManager()
 
     class Meta:
         verbose_name = "AI Model Spec"

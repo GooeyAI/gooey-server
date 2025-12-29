@@ -5,7 +5,6 @@ import json
 import mimetypes
 import re
 import typing
-from enum import Enum
 from functools import wraps
 
 import aifail
@@ -147,7 +146,7 @@ def run_language_model(
         "Pleave provide exactly one of { prompt, messages }"
     )
 
-    model: AIModelSpec = AIModelSpec.objects.get(name=model)
+    model: AIModelSpec = AIModelSpec.llm_objects.get(name=model)
 
     if model.name == "gemini_live":
         raise UserError(
@@ -169,7 +168,7 @@ def run_language_model(
             ]
         if model.llm_is_audio_model and not stream:
             # audio is only supported in streaming mode, fall back to text
-            model = AIModelSpec.objects.get(name="gpt_4_o")
+            model = AIModelSpec.llm_objects.get(name="gpt_4_o")
         if not model.llm_is_vision_model:
             # remove images from the messages
             messages = list(

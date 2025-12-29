@@ -150,7 +150,7 @@ class DocSearchPage(BasePage):
         request: "DocSearchPage.RequestModel",
         response: "DocSearchPage.ResponseModel",
     ):
-        model = AIModelSpec.objects.get(name=request.selected_model)
+        model = AIModelSpec.llm_objects.get(name=request.selected_model)
 
         query_instructions = (request.query_instructions or "").strip()
         if query_instructions:
@@ -217,7 +217,7 @@ class DocSearchPage(BasePage):
 
     def additional_notes(self):
         try:
-            model = AIModelSpec.objects.get(
+            model = AIModelSpec.llm_objects.get(
                 model_id=gui.session_state["selected_model"]
             ).label
         except AIModelSpec.DoesNotExist:

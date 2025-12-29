@@ -59,10 +59,12 @@ class VideoGenPage(BasePage):
         q = Q()
         for model_name in request.selected_models:
             q |= Q(name__icontains=model_name)
-        models = AIModelSpec.objects.filter(q)
+        models = AIModelSpec.llm_objects.filter(q)
 
         if request.selected_audio_model:
-            audio_model = AIModelSpec.objects.get(name=request.selected_audio_model)
+            audio_model = AIModelSpec.audio_objects.get(
+                name=request.selected_audio_model
+            )
         else:
             audio_model = None
 
@@ -115,20 +117,10 @@ class VideoGenPage(BasePage):
 
     def render(self):
         self.available_models = CaseInsensitiveDict(
-            {
-                model.name: model
-                for model in AIModelSpec.objects.filter(
-                    category=AIModelSpec.Categories.video
-                )
-            }
+            {model.name: model for model in AIModelSpec.video_objects.all()}
         )
         self.available_audio_models = CaseInsensitiveDict(
-            {
-                model.name: model
-                for model in AIModelSpec.objects.filter(
-                    category=AIModelSpec.Categories.audio
-                )
-            }
+            {model.name: model for model in AIModelSpec.audio_objects.all()}
         )
         super().render()
 
