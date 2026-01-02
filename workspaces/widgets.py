@@ -206,6 +206,7 @@ def get_current_workspace(user: AppUser, session: dict) -> Workspace:
 
 def set_current_workspace(session: dict, workspace_id: int):
     session[SESSION_SELECTED_WORKSPACE] = workspace_id
+    raise gui.RerunException()  # rerun the current page to update the current workspace
 
 
 def render_create_workspace_alert():
