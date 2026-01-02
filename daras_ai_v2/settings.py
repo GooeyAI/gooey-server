@@ -483,11 +483,6 @@ WEB_WIDGET_LIB = config(
     "https://cdn.jsdelivr.net/gh/GooeyAI/gooey-web-widget@2/dist/lib.js",
 )
 
-GOOEY_BUILDER_ICON = config(
-    "GOOEY_BUILDER_ICON",
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg",
-)
-
 MAX_CONCURRENCY_ANON = config("MAX_CONCURRENCY_ANON", 1, cast=int)
 MAX_CONCURRENCY_FREE = config("MAX_CONCURRENCY_FREE", 2, cast=int)
 MAX_CONCURRENCY_PAID = config("MAX_CONCURRENCY_PAID", 4, cast=int)

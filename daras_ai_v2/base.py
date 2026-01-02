@@ -48,7 +48,10 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
-from daras_ai_v2.gooey_builder import render_gooey_builder_inline
+from daras_ai_v2.gooey_builder import (
+    render_gooey_builder_inline,
+    render_gooey_builder_launcher,
+)
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -1227,42 +1230,24 @@ class BasePage:
                 self._saved_tab()
 
     def _render_gooey_builder(self):
-        enable_bot_builder = (
-            self.request.user
-            and not self.request.user.is_anonymous
-            and (
-                self.request.user.is_admin()
-                or self.current_workspace.enable_bot_builder
-            )
-        )
-        if not enable_bot_builder:
-            return
-
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
+
+        # close the sidebar for other tabs
         if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
-            # close the sidebar for other tabs
             if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
                 sidebar_ref.set_open(False)
                 sidebar_ref.set_mobile_open(False)
                 raise gui.RerunException()
             return
 
-        if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
-            # open the sidebar for the builder
-            # hidden button to trigger the onClose event passed in the widget config
-            gui.tag(
-                "button",
-                type="submit",
-                name="onCloseGooeyBuilder",
-                value="yes",
-                hidden=True,
-                id="onClose",
+        # render the launcher if the sidebar is not open
+        if not sidebar_ref.is_open and not sidebar_ref.is_mobile_open:
+            render_gooey_builder_launcher(
+                self.request,
+                current_workspace=self.current_workspace,
+                is_fab_button=True,
             )
-
-            if gui.session_state.pop("onCloseGooeyBuilder", None):
-                sidebar_ref.set_open(False)
-                raise gui.RerunException()
-
+        else:  # open the sidebar for the builder
             with gui.div(className="w-100 h-100"):
                 update_gui_state: dict | None = gui.session_state.pop(
                     "update_gui_state", None
@@ -1301,27 +1286,8 @@ class BasePage:
                             description=self.current_pr.notes,
                         ),
                     ),
+                    sidebar_ref=sidebar_ref,
                 )
-        else:
-            # render the Floating Builder button
-            with gui.styled("& .gooey-builder-open-button:hover { scale: 1.2; }"):
-                with gui.div(
-                    className="w-100 position-absolute",
-                    style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
-                ):
-                    gooey_builder_open_button = gui.button(
-                        label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 56px; height: 56px; border-radius: 50%;' />",
-                        className="btn btn-secondary border-0 d-none d-md-block p-0 gooey-builder-open-button",
-                        style={
-                            "width": "56px",
-                            "height": "56px",
-                            "borderRadius": "50%",
-                            "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
-                        },
-                    )
-                    if gooey_builder_open_button:
-                        sidebar_ref.set_open(True)
-                        raise gui.RerunException()
 
     def _render_version_history(self):
         versions = self.current_pr.versions.all()
