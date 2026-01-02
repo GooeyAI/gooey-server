@@ -1242,9 +1242,10 @@ class BasePage:
 
         # render the launcher if the sidebar is not open
         if not sidebar_ref.is_open and not sidebar_ref.is_mobile_open:
+            current_workspace = self.current_workspace if self.request.user else None
             render_gooey_builder_launcher(
                 self.request,
-                current_workspace=self.current_workspace,
+                current_workspace=current_workspace,
                 is_fab_button=True,
             )
         else:  # open the sidebar for the builder

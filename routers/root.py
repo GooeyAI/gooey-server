@@ -807,7 +807,9 @@ def page_wrapper(
                         request=request,
                         current_workspace=get_current_workspace(
                             request.user, request.session
-                        ),
+                        )
+                        if request.user
+                        else None,
                         is_fab_button=False,
                     )
 
