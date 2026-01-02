@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
+from daras_ai_v2.gooey_builder import render_gooey_builder_launcher
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
@@ -52,7 +53,13 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
-from workspaces.widgets import global_workspace_selector, workspace_selector_link
+from workspaces.models import Workspace
+from workspaces.widgets import (
+    SESSION_SELECTED_WORKSPACE,
+    get_current_workspace,
+    global_workspace_selector,
+    workspace_selector_link,
+)
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -828,19 +835,13 @@ def page_wrapper(
                 with gui.div(
                     className="d-flex justify-content-end flex-grow-1 align-items-center"
                 ):
-                    if request.user and request.user.is_admin:
-                        gooey_builder_mobile_open_button = gui.button(
-                            label=f"<img src='{settings.GOOEY_BUILDER_ICON}' style='width: 36px; height: 36px; border-radius: 50%;' />",
-                            className="border-0 m-0 btn btn-secondary rounded-pill d-md-none gooey-builder-open-button p-0",
-                            style={
-                                "width": "36px",
-                                "height": "36px",
-                                "borderRadius": "50%",
-                            },
-                        )
-                        if gooey_builder_mobile_open_button:
-                            sidebar_ref.set_mobile_open(True)
-                            raise gui.RerunException()
+                    render_gooey_builder_launcher(
+                        request=request,
+                        current_workspace=get_current_workspace(
+                            request.user, request.session
+                        ),
+                        is_fab_button=False,
+                    )
 
                     if show_search_bar:
                         _render_mobile_search_button(request, search_filters)
