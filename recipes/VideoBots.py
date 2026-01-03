@@ -401,7 +401,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             model=llm_model,
             tools_by_name=tools_by_name,
             # use LLM audio input capability if not using a dedicated ASR model
-            include_input_audio=(not asr_msg),
+            include_input_audio=(
+                not asr_msg and not is_realtime_audio_url(request.input_audio)
+            ),
         )
 
         yield from self.llm_loop(
@@ -455,8 +457,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return ocr_texts
 
     def asr_step(self, model, request, response, user_input):
-        if not request.input_audio or (
-            model.supports_input_audio and not request.asr_model
+        if (
+            not request.input_audio
+            or is_realtime_audio_url(request.input_audio)
+            or (model.supports_input_audio and not request.asr_model)
         ):
             # unless an ASR model is explicitly specified,
             # have the audio-enabled LLM accept the audio directly
